@@ -1,0 +1,65 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go-test:
+    name: Go tests (${{ matrix.backend }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [sqlite, postgres]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: sshcm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Only the postgres matrix leg talks to the service container; the
+      # sqlite leg skips the cross-dialect test via the empty env var.
+      SSHCM_TEST_PG_DSN: ${{ matrix.backend == 'postgres' && 'postgres://postgres:test@localhost:5432/sshcm?sslmode=disable' || '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -buildvcs=false ./internal/database/... ./internal/models/... ./cmd/...
+
+  frontend-check:
+    name: Frontend type-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit

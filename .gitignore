@@ -1,0 +1,53 @@
+# Go binaries
+/sshcm
+*.exe
+*.test
+*.out
+
+# Go build/test artifacts
+/bin/
+/dist/
+vendor/
+
+# Internal docs (sensitive)
+docs/
+frontend/docs/
+
+# Backups & local data
+*.sshcmbak
+*.csv
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/tsconfig.tsbuildinfo
+frontend/next-env.d.ts
+frontend/.env*
+!frontend/.env.example
+
+# Logs
+*.log
+logs/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Claude
+.claude/
