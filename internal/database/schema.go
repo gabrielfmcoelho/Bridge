@@ -90,10 +90,16 @@ var BlobColumns = map[string]map[string]bool{
 		"priv_key_nonce":      true,
 	},
 	"ssh_keys": {
+		"pub_key_ciphertext":  true,
+		"pub_key_nonce":       true,
+		"priv_key_ciphertext": true,
+		"priv_key_nonce":      true,
+		"password_ciphertext": true,
+		"password_nonce":      true,
+	},
+	"service_credentials": {
 		"credentials_ciphertext": true,
 		"credentials_nonce":      true,
-		"password_ciphertext":    true,
-		"password_nonce":         true,
 	},
 	"user_gitlab_tokens": {
 		"access_token_cipher":  true,
