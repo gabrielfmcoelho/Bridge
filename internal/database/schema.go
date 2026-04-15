@@ -74,6 +74,35 @@ var BoolColumns = map[string]map[string]bool{
 	"project_gitlab_links": {"sync_issues": true},
 }
 
+// BlobColumns lists per-table the columns stored as BLOB in SQLite and
+// BYTEA in Postgres. The portable backup/restore code uses this to
+// unconditionally base64-encode their values on dump and decode them on
+// load, instead of relying on a content heuristic. A content heuristic
+// misclassifies empty or short-printable payloads as text, which then
+// fails to restore into Postgres with SQLSTATE 22P02.
+var BlobColumns = map[string]map[string]bool{
+	"hosts": {
+		"password_ciphertext": true,
+		"password_nonce":      true,
+		"pub_key_ciphertext":  true,
+		"pub_key_nonce":       true,
+		"priv_key_ciphertext": true,
+		"priv_key_nonce":      true,
+	},
+	"ssh_keys": {
+		"credentials_ciphertext": true,
+		"credentials_nonce":      true,
+		"password_ciphertext":    true,
+		"password_nonce":         true,
+	},
+	"user_gitlab_tokens": {
+		"access_token_cipher":  true,
+		"access_token_nonce":   true,
+		"refresh_token_cipher": true,
+		"refresh_token_nonce":  true,
+	},
+}
+
 // IntColumns lists per-table the columns that hold bigint-ish values Go
 // reads into numeric fields. The portable restore uses this to coerce
 // SQLite's weakly-typed values (e.g. a stray string in an int column)

@@ -111,6 +111,7 @@ func (d *DB) dumpTable(table string) ([]map[string]any, error) {
 	defer rows.Close()
 
 	bools := BoolColumns[table]
+	blobs := BlobColumns[table]
 	var out []map[string]any
 	for rows.Next() {
 		vals := make([]any, len(cols))
@@ -123,7 +124,7 @@ func (d *DB) dumpTable(table string) ([]map[string]any, error) {
 		}
 		row := make(map[string]any, len(cols))
 		for i, c := range outNames {
-			row[c] = normalizeForJSON(vals[i], bools[c])
+			row[c] = normalizeForJSON(vals[i], bools[c], blobs[c])
 		}
 		out = append(out, row)
 	}
@@ -169,24 +170,23 @@ func (d *DB) columnNames(table string) ([]string, error) {
 // normalizeForJSON prepares a scanned value for JSON serialization. The
 // tricky cases:
 //
-//   - []byte: may be either BLOB/BYTEA binary data or a sqlite TEXT that
-//     the driver returned as bytes. We use the sentinel prefix for the
-//     binary case and plain-string for the text case.
+//   - []byte in a declared blob column: always base64-prefixed, regardless
+//     of content. A content heuristic misclassifies empty / short-printable
+//     payloads as text and fails to restore into Postgres BYTEA.
+//   - []byte in a non-blob column: may be a sqlite TEXT that the driver
+//     returned as bytes; emit as a plain string.
 //   - bool vs int64 for boolean-ish columns: unified to Go bool.
 //   - time.Time: JSON encoder already handles this as RFC3339.
-func normalizeForJSON(v any, isBool bool) any {
+func normalizeForJSON(v any, isBool, isBlob bool) any {
 	if v == nil {
 		return nil
 	}
 	switch x := v.(type) {
 	case []byte:
-		// Heuristic: if it's valid UTF-8 and contains only printable
-		// chars plus common whitespace, treat as TEXT. Otherwise it's
-		// a real blob and we base64-encode it.
-		if looksLikeText(x) {
-			return string(x)
+		if isBlob {
+			return blobPrefix + base64.StdEncoding.EncodeToString(x)
 		}
-		return blobPrefix + base64.StdEncoding.EncodeToString(x)
+		return string(x)
 	case int64:
 		if isBool {
 			return x != 0
@@ -197,22 +197,6 @@ func normalizeForJSON(v any, isBool bool) any {
 	default:
 		return v
 	}
-}
-
-func looksLikeText(b []byte) bool {
-	if len(b) == 0 {
-		return true
-	}
-	// If any byte is < 0x20 and not whitespace, it's binary.
-	for _, c := range b {
-		if c < 0x20 && c != '\t' && c != '\n' && c != '\r' {
-			return false
-		}
-		if c == 0x7f {
-			return false
-		}
-	}
-	return true
 }
 
 // ReadPortableBackup decodes a portable backup from r. It does not touch
@@ -332,6 +316,7 @@ func insertRows(tx *sql.Tx, dialect DialectKind, table string, rows []map[string
 	}
 
 	bools := BoolColumns[table]
+	blobs := BlobColumns[table]
 
 	placeholders := make([]string, len(cols))
 	quoted := make([]string, len(cols))
@@ -360,7 +345,7 @@ func insertRows(tx *sql.Tx, dialect DialectKind, table string, rows []map[string
 				args[i] = nil
 				continue
 			}
-			args[i] = coerceForDialect(v, dialect, colTypes[c], bools[c])
+			args[i] = coerceForDialect(v, dialect, colTypes[c], bools[c], blobs[c])
 		}
 		if _, err := stmt.Exec(args...); err != nil {
 			return fmt.Errorf("row %d: %w", ri+1, err)
@@ -377,13 +362,24 @@ func insertRows(tx *sql.Tx, dialect DialectKind, table string, rows []map[string
 //   - non-numeric string + int target → 0 (with no error)
 //   - blobPrefix string → decoded []byte
 //   - bool ↔ int depending on target's bool/int expectation
-func coerceForDialect(v any, dialect DialectKind, colType string, isBool bool) any {
+//   - isBlob target + bare string (legacy backup where the dumper's text
+//     heuristic mislabelled a blob) → raw bytes of that string, with ""
+//     mapped to an empty []byte so Postgres BYTEA accepts it.
+func coerceForDialect(v any, dialect DialectKind, colType string, isBool, isBlob bool) any {
 	if v == nil {
 		return nil
 	}
 	if s, ok := v.(string); ok && strings.HasPrefix(s, blobPrefix) {
 		if decoded, err := base64.StdEncoding.DecodeString(s[len(blobPrefix):]); err == nil {
 			return decoded
+		}
+	}
+	if isBlob {
+		switch s := v.(type) {
+		case string:
+			return []byte(s)
+		case []byte:
+			return s
 		}
 	}
 
