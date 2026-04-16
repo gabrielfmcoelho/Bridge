@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { servicesAPI, hostsAPI, dnsAPI, projectsAPI, enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
 import Button from "@/components/ui/Button";
 import Checkbox from "@/components/ui/Checkbox";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import TagInput from "@/components/ui/TagInput";
 import CheckboxList from "@/components/ui/CheckboxList";
-import StepIndicator from "@/components/ui/StepIndicator";
 import FormError from "@/components/ui/FormError";
 import type { Service } from "@/lib/types";
 
@@ -76,11 +76,17 @@ export default function ServiceForm({ initial, onSuccess, onSubHeaderChange }: S
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
   const enumOpts = (arr: { value: string }[]) => arr.map((e) => ({ value: e.value, label: e.value }));
 
-  const stepLabels = ["Identity", "Technical", "Deploy & Config", "Links & Tags"];
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    onSubHeaderChange?.(<StepIndicator steps={stepLabels} current={step} />);
-  }, [step]);
+  useMultiStepFormEffects({
+    step,
+    setStep,
+    totalSteps: 4,
+    stepLabels: ["Identity", "Technical", "Deploy & Config", "Links & Tags"],
+    onSubmit: () => mutation.mutate(),
+    canProceed: step === 1 ? !!form.nickname.trim() : true,
+    isPending: mutation.isPending,
+    t,
+    onSubHeaderChange,
+  });
 
   return (
     <div className="space-y-4">

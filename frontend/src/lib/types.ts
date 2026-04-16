@@ -293,8 +293,19 @@ export interface ExternalTool {
   icon: string;
   embed_enabled: boolean;
   sort_order: number;
+  service_id: number | null;
+  dns_id: number | null;
+  source: "manual" | "service";
+  has_credentials: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface ServiceWithCredentials {
+  service_id: number;
+  service_nickname: string;
+  service_type: string;
+  credentials: ServiceCredential[];
 }
 
 export interface Contact {
@@ -366,7 +377,3 @@ export interface DashboardStats {
   open_issues: number;
 }
 
-export interface AuthStatus {
-  setup_required: boolean;
-  authenticated: boolean;
-}

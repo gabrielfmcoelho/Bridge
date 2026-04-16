@@ -4,12 +4,11 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { hostsAPI, enumsAPI, sshKeysAPI, contactsAPI, usersAPI, dnsAPI, servicesAPI, projectsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
-import Button from "@/components/ui/Button";
+import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import TagInput from "@/components/ui/TagInput";
 import FormError from "@/components/ui/FormError";
-import StepIndicator from "@/components/ui/StepIndicator";
 import DrawerSection from "@/components/ui/DrawerSection";
 import MarkdownEditor from "@/components/ui/MarkdownEditor";
 import CheckboxList from "@/components/ui/CheckboxList";
@@ -167,14 +166,9 @@ export default function HostForm({
     onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
   });
 
-  /* ── Auto-select SSH key for edit ────────────────────────────────── */
-
-  useEffect(() => {
-    if (isEdit && host?.key_path && sshKeys.length > 0 && !selectedKeyId) {
-      const match = sshKeys.find((k) => host.key_path.includes(k.name.replace(/\s/g, "_")));
-      if (match) setSelectedKeyId(match.id.toString());
-    }
-  }, [isEdit, host?.key_path, sshKeys, selectedKeyId]);
+  /* ── SSH key selection is driven entirely by the picker; the backend
+     stores the encrypted key bytes on the host row itself, so there is no
+     stable filesystem path to auto-match against on edit. ─────────────── */
 
   /* ── Step validation ─────────────────────────────────────────────── */
 
@@ -182,52 +176,25 @@ export default function HostForm({
 
   /* ── Footer / SubHeader ──────────────────────────────────────────── */
 
-  const stepLabels = [t("host.basicInfo"), t("host.sshConnection"), t("host.responsibility"), t("host.links")];
+  useMultiStepFormEffects({
+    step,
+    setStep,
+    totalSteps: STEP_COUNT,
+    stepLabels: [t("host.basicInfo"), t("host.sshConnection"), t("host.responsibility"), t("host.links")],
+    onSubmit: () => mutation.mutate(),
+    canProceed: step === 1 ? canProceedStep1 : true,
+    isPending: mutation.isPending,
+    isEditMode: isEdit,
+    onClose,
+    t,
+    onFooterChange,
+    onSubHeaderChange,
+  });
 
+  // Reset open section when step changes in create mode
   useEffect(() => {
-    if (isEdit) {
-      onSubHeaderChange?.(null);
-    } else {
-      onSubHeaderChange?.(<StepIndicator steps={stepLabels} current={step} />);
-      setOpenStepSection(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!isEdit) setOpenStepSection(null);
   }, [step, isEdit]);
-
-  useEffect(() => {
-    if (isEdit) {
-      // Edit mode: Cancel + Save
-      onFooterChange?.(
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" className="flex-1" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button size="sm" className="flex-1" onClick={() => mutation.mutate()} loading={mutation.isPending}>
-            {t("common.save")}
-          </Button>
-        </div>
-      );
-    } else {
-      // Create mode: stepped navigation
-      onFooterChange?.(
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" className="flex-1" onClick={step === 1 ? onClose : () => setStep((s) => s - 1)}>
-            {step === 1 ? t("common.cancel") : t("common.back")}
-          </Button>
-          {step < STEP_COUNT ? (
-            <Button size="sm" className="flex-1" disabled={step === 1 && !canProceedStep1} onClick={() => setStep((s) => s + 1)}>
-              {t("host.nextStep")}
-            </Button>
-          ) : (
-            <Button size="sm" className="flex-1" onClick={() => mutation.mutate()} loading={mutation.isPending}>
-              {t("common.create")}
-            </Button>
-          )}
-        </div>
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mutation.isPending, step, isEdit, canProceedStep1]);
 
   /* ── Shared field groups ─────────────────────────────────────────── */
 
@@ -272,11 +239,11 @@ export default function HostForm({
             label: `${k.name}${k.fingerprint ? ` (${k.fingerprint})` : ""}`,
           }))}
         />
-      ) : isEdit && host?.has_key && host?.key_path ? (
+      ) : isEdit && host?.has_key ? (
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">{t("host.sshKey")}</label>
-          <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2" style={{ fontFamily: "var(--font-mono)" }}>
-            {host.key_path}
+          <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2">
+            {t("host.sshKeyStored")}
           </p>
         </div>
       ) : null}

@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LocaleProvider } from "@/contexts/LocaleContext";
 import { AppearanceProvider } from "@/contexts/AppearanceContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -21,11 +22,13 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppearanceProvider>
-        <LocaleProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </LocaleProvider>
-      </AppearanceProvider>
+      <ThemeProvider>
+        <AppearanceProvider>
+          <LocaleProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </LocaleProvider>
+        </AppearanceProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

@@ -3,12 +3,67 @@ package sshtest
 import (
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 )
+
+// Auth represents an SSH authentication method — either password or in-memory
+// private key. Use PasswordAuth or KeyAuth to construct one.
+type Auth struct {
+	method string // "password" or "key"
+	password string
+	keyPEM   []byte
+}
+
+// Method returns "password" or "key".
+func (a Auth) Method() string { return a.method }
+
+// Password returns the stored password (available for both auth types when the
+// host has a saved password — needed for sudo operations even on key-auth hosts).
+func (a Auth) Password() string { return a.password }
+
+// PasswordAuth creates an Auth that connects with password.
+func PasswordAuth(password string) Auth {
+	return Auth{method: "password", password: password}
+}
+
+// KeyAuth creates an Auth that connects with a private key. The password is
+// still carried for sudo operations on the remote host.
+func KeyAuth(keyPEM []byte, sudoPassword string) Auth {
+	return Auth{method: "key", keyPEM: keyPEM, password: sudoPassword}
+}
+
+// Dial opens an SSH connection using the provided auth method.
+func Dial(hostname, port, user string, auth Auth) (*ssh.Client, error) {
+	if port == "" {
+		port = "22"
+	}
+
+	var methods []ssh.AuthMethod
+	switch auth.method {
+	case "key":
+		if len(auth.keyPEM) == 0 {
+			return nil, fmt.Errorf("no private key bytes provided")
+		}
+		signer, err := ssh.ParsePrivateKey(auth.keyPEM)
+		if err != nil {
+			return nil, fmt.Errorf("parse private key: %w", err)
+		}
+		methods = []ssh.AuthMethod{ssh.PublicKeys(signer)}
+	default:
+		methods = []ssh.AuthMethod{ssh.Password(auth.password)}
+	}
+
+	config := &ssh.ClientConfig{
+		User:            user,
+		Auth:            methods,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         10 * time.Second,
+	}
+	return ssh.Dial("tcp", net.JoinHostPort(hostname, port), config)
+}
 
 const fixDevNullCmd = `sudo -n sh -c 'if [ ! -e /dev/null ] || [ ! -c /dev/null ] || [ "$(stat -c "%a" /dev/null 2>/dev/null)" != "666" ] || [ "$(stat -c "%u:%g" /dev/null 2>/dev/null)" != "0:0" ]; then rm -f /dev/null && mknod -m 666 /dev/null c 1 3 && chown root:root /dev/null; fi'`
 
@@ -37,9 +92,13 @@ type VMInfo struct {
 	LoadAvg        string   `json:"load_avg"`
 	SwapTotal      string   `json:"swap_total"`
 	SwapUsed       string   `json:"swap_used"`
-	Warnings       []string          `json:"warnings,omitempty"`
-	ProcessDetails []ProcessDetail   `json:"process_details,omitempty"`
-	SSHKeys        []SSHKeyInfo      `json:"ssh_keys,omitempty"`
+	Warnings          []string           `json:"warnings,omitempty"`
+	ProcessDetails    []ProcessDetail    `json:"process_details,omitempty"`
+	SSHKeys           []SSHKeyInfo       `json:"ssh_keys,omitempty"`
+	SystemdServices   []SystemdService   `json:"systemd_services,omitempty"`
+	InstalledPackages []InstalledPackage  `json:"installed_packages,omitempty"`
+	CronJobs          []string           `json:"cron_jobs,omitempty"`
+	FirewallStatus    string             `json:"firewall_status,omitempty"`
 }
 
 // SSHKeyInfo holds info about an SSH key found on the remote host during scan.
@@ -50,6 +109,20 @@ type SSHKeyInfo struct {
 	Source      string `json:"source"` // "authorized_keys" or "private_key"
 	Managed     bool   `json:"managed,omitempty"`
 	ManagedName string `json:"managed_name,omitempty"`
+}
+
+// SystemdService holds info about a running systemd unit.
+type SystemdService struct {
+	Unit        string `json:"unit"`
+	Description string `json:"description,omitempty"`
+	IsNative    bool   `json:"is_native"`
+}
+
+// InstalledPackage holds info about a key package found on the host.
+type InstalledPackage struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Source  string `json:"source"` // "apt", "rpm"
 }
 
 // ProcessDetail holds detailed info about an unidentified/interesting process.
@@ -65,78 +138,26 @@ type ProcessDetail struct {
 	Ports   string `json:"ports,omitempty"`
 }
 
-// TestWithPassword tests SSH connectivity using password authentication.
-func TestWithPassword(hostname, port, user, password string) error {
-	if port == "" {
-		port = "22"
-	}
-
-	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
-	}
-
-	addr := net.JoinHostPort(hostname, port)
-	client, err := ssh.Dial("tcp", addr, config)
-	if err != nil {
-		return fmt.Errorf("SSH connect to %s: %w", addr, err)
-	}
-	defer client.Close()
-
+// Test runs a simple "echo OK" over SSH to verify connectivity.
+func Test(client *ssh.Client) error {
 	session, err := client.NewSession()
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
 	defer session.Close()
-
 	if _, err := session.CombinedOutput("echo OK"); err != nil {
 		return fmt.Errorf("run test command: %w", err)
 	}
-
 	return nil
 }
 
-// TestWithPasswordCapture tests SSH + captures VM info.
-func TestWithPasswordCapture(hostname, port, user, password string) (*VMInfo, error) {
-	client, err := dialWithPassword(hostname, port, user, password)
-	if err != nil {
-		return nil, fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
+// TestCapture tests SSH connectivity and captures VM info.
+func TestCapture(client *ssh.Client) (*VMInfo, error) {
 	return captureVMInfo(client)
 }
 
-// TestWithKeyCapture tests SSH + captures VM info.
-func TestWithKeyCapture(hostname, port, user, keyPath string) (*VMInfo, error) {
-	client, err := dialWithKey(hostname, port, user, keyPath)
-	if err != nil {
-		return nil, fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
-	return captureVMInfo(client)
-}
-
-// FixDevNullWithPassword attempts to repair /dev/null permissions on remote host.
-func FixDevNullWithPassword(hostname, port, user, password string) (string, error) {
-	client, err := dialWithPassword(hostname, port, user, password)
-	if err != nil {
-		return "", fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
-	return fixDevNull(client)
-}
-
-// FixDevNullWithKey attempts to repair /dev/null permissions on remote host.
-func FixDevNullWithKey(hostname, port, user, keyPath string) (string, error) {
-	client, err := dialWithKey(hostname, port, user, keyPath)
-	if err != nil {
-		return "", fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
+// FixDevNull attempts to repair /dev/null permissions on the remote host.
+func FixDevNull(client *ssh.Client) (string, error) {
 	return fixDevNull(client)
 }
 
@@ -183,43 +204,41 @@ func runCmdRaw(client *ssh.Client, cmd string) (string, error) {
 	return cleaned, nil
 }
 
-func dialWithPassword(hostname, port, user, password string) (*ssh.Client, error) {
-	if port == "" {
-		port = "22"
+// runSudoCmd executes a command under sudo on the remote host, feeding the
+// password via the session's stdin pipe. This avoids interpolating the password
+// into the command string (which would expose it in /proc/*/cmdline and break
+// on passwords containing shell metacharacters like single quotes).
+func runSudoCmd(client *ssh.Client, password, cmd string) (string, error) {
+	session, err := client.NewSession()
+	if err != nil {
+		return "", err
 	}
-	config := &ssh.ClientConfig{
-		User:            user,
-		Auth:            []ssh.AuthMethod{ssh.Password(password)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
+	defer session.Close()
+
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		return "", fmt.Errorf("stdin pipe: %w", err)
 	}
-	return ssh.Dial("tcp", net.JoinHostPort(hostname, port), config)
+
+	// Feed the password followed by a newline to sudo -S, then close stdin
+	// so the wrapped command's own stdin is EOF (safe for non-interactive use).
+	go func() {
+		fmt.Fprintln(stdin, password)
+		stdin.Close()
+	}()
+
+	fullCmd := fmt.Sprintf("sudo -S sh -c %q 2>&1", cmd)
+	out, execErr := session.CombinedOutput(fullCmd)
+	cleaned := strings.TrimSpace(cleanCommandOutput(string(out), nil))
+	if execErr != nil {
+		if cleaned == "" {
+			return "", execErr
+		}
+		return cleaned, fmt.Errorf("%s: %w", cleaned, execErr)
+	}
+	return cleaned, nil
 }
 
-func dialWithKey(hostname, port, user, keyPath string) (*ssh.Client, error) {
-	if port == "" {
-		port = "22"
-	}
-	if strings.HasPrefix(keyPath, "~") {
-		home, _ := os.UserHomeDir()
-		keyPath = home + keyPath[1:]
-	}
-	keyData, err := os.ReadFile(keyPath)
-	if err != nil {
-		return nil, fmt.Errorf("read key file: %w", err)
-	}
-	signer, err := ssh.ParsePrivateKey(keyData)
-	if err != nil {
-		return nil, fmt.Errorf("parse private key: %w", err)
-	}
-	config := &ssh.ClientConfig{
-		User:            user,
-		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
-	}
-	return ssh.Dial("tcp", net.JoinHostPort(hostname, port), config)
-}
 
 func fixDevNull(client *ssh.Client) (string, error) {
 	before := runCmd(client, "ls -l /dev/null 2>&1")
@@ -246,69 +265,50 @@ func fixDevNull(client *ssh.Client) (string, error) {
 	return strings.TrimSpace(before + "\n" + after), nil
 }
 
-// SetupSudoNopasswdWithPassword connects via password and configures NOPASSWD.
-func SetupSudoNopasswdWithPassword(hostname, port, user, password string) (string, error) {
-	client, err := dialWithPassword(hostname, port, user, password)
-	if err != nil {
-		return "", fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
-	return setupSudoNopasswd(client, user, password)
-}
-
-// SetupSudoNopasswdWithKey connects via key and uses the stored password for sudo -S.
-func SetupSudoNopasswdWithKey(hostname, port, user, keyPath, password string) (string, error) {
-	client, err := dialWithKey(hostname, port, user, keyPath)
-	if err != nil {
-		return "", fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
+// SetupSudoNopasswd configures passwordless sudo for the given user.
+func SetupSudoNopasswd(client *ssh.Client, user, password string) (string, error) {
 	return setupSudoNopasswd(client, user, password)
 }
 
 func setupSudoNopasswd(client *ssh.Client, user, password string) (string, error) {
-	// Use -S to pipe password via stdin (no tty required)
 	file := fmt.Sprintf("/etc/sudoers.d/%s-nopasswd", user)
 	rule := fmt.Sprintf("%s ALL=(ALL) NOPASSWD:ALL", user)
 
 	// Check if already configured
-	check := fmt.Sprintf(`sudo -n true 2>/dev/null && echo ALREADY_OK || echo NEEDS_SETUP`)
-	checkOut := runCmd(client, check)
+	checkOut, _ := runCmdRaw(client, `sudo -n true 2>/dev/null && echo ALREADY_OK || echo NEEDS_SETUP`)
 	if strings.TrimSpace(checkOut) == "ALREADY_OK" {
 		return "NOPASSWD already configured for " + user, nil
 	}
 
-	// Write sudoers drop-in using echo password | sudo -S
-	cmd := fmt.Sprintf(
-		`echo '%s' | sudo -S sh -c 'echo "%s" > %s && chmod 440 %s && visudo -cf %s'`,
-		password, rule, file, file, file,
+	// Write sudoers drop-in via stdin-piped sudo (password never in command string)
+	script := fmt.Sprintf(
+		`echo "%s" > %s && chmod 440 %s && visudo -cf %s`,
+		rule, file, file, file,
 	)
-	output, err := runCmdRaw(client, cmd)
+	output, err := runSudoCmd(client, password, script)
 	if err != nil {
 		return output, fmt.Errorf("failed to configure sudoers: %w", err)
 	}
 
 	// Verify it works
-	verify := runCmd(client, `sudo -n true 2>/dev/null && echo OK || echo FAIL`)
-	if strings.TrimSpace(verify) == "OK" {
+	verifyOut, _ := runCmdRaw(client, `sudo -n true 2>/dev/null && echo OK || echo FAIL`)
+	if strings.TrimSpace(verifyOut) == "OK" {
 		return fmt.Sprintf("Created %s — NOPASSWD enabled for %s", file, user), nil
 	}
 
-	// Drop-in didn't take effect. Append the rule directly as the last line
-	// of /etc/sudoers — last matching rule always wins regardless of includes.
-	directCmd := fmt.Sprintf(
-		`echo '%s' | sudo -S sh -c '`+
-			`grep -qxF "%s" /etc/sudoers 2>/dev/null || `+
-			`(cp /etc/sudoers /etc/sudoers.bak && echo "%s" >> /etc/sudoers && visudo -cf /etc/sudoers)'`,
-		password, rule, rule,
+	// Drop-in didn't take effect — try appending directly to /etc/sudoers.
+	directScript := fmt.Sprintf(
+		`grep -qxF "%s" /etc/sudoers 2>/dev/null || `+
+			`(echo "%s" >> /etc/sudoers && visudo -cf /etc/sudoers)`,
+		rule, rule,
 	)
-	directOut, directErr := runCmdRaw(client, directCmd)
+	directOut, directErr := runSudoCmd(client, password, directScript)
 	if directErr != nil {
 		return output + "\n" + directOut, fmt.Errorf("failed to append rule to /etc/sudoers: %w", directErr)
 	}
 
-	verify2 := runCmd(client, `sudo -n true 2>/dev/null && echo OK || echo FAIL`)
-	if strings.TrimSpace(verify2) != "OK" {
+	verifyOut2, _ := runCmdRaw(client, `sudo -n true 2>/dev/null && echo OK || echo FAIL`)
+	if strings.TrimSpace(verifyOut2) != "OK" {
 		return output + "\n" + directOut + "\nNOPASSWD still not effective",
 			fmt.Errorf("rule written to both %s and /etc/sudoers but sudo -n still fails — check PAM config", file)
 	}
@@ -318,40 +318,36 @@ func setupSudoNopasswd(client *ssh.Client, user, password string) (string, error
 
 // CreateRemoteUserWithPassword connects via password and creates a user on the remote host
 // with an authorized public key and passwordless sudo.
-func CreateRemoteUserWithPassword(hostname, port, loginUser, password, newUser, pubKey string) (string, error) {
-	client, err := dialWithPassword(hostname, port, loginUser, password)
-	if err != nil {
-		return "", fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
-	return createRemoteUser(client, password, newUser, pubKey)
+// CreateRemoteUser creates a new user on the remote host with an authorized
+// public key and passwordless sudo.
+func CreateRemoteUser(client *ssh.Client, password, newUser, pubKey string, force bool) (string, error) {
+	return createRemoteUser(client, password, newUser, pubKey, force)
 }
 
-// CreateRemoteUserWithKey connects via key and creates a user on the remote host
-// with an authorized public key and passwordless sudo.
-func CreateRemoteUserWithKey(hostname, port, loginUser, keyPath, password, newUser, pubKey string) (string, error) {
-	client, err := dialWithKey(hostname, port, loginUser, keyPath)
-	if err != nil {
-		return "", fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
-	return createRemoteUser(client, password, newUser, pubKey)
-}
+// ErrUserExists is returned when the target user already exists on the remote
+// host and force was not set. The caller can inspect this to prompt the user.
+var ErrUserExists = fmt.Errorf("user already exists")
 
-func createRemoteUser(client *ssh.Client, sudoPassword, newUser, pubKey string) (string, error) {
+func createRemoteUser(client *ssh.Client, sudoPassword, newUser, pubKey string, force bool) (string, error) {
 	var out strings.Builder
 
-	// 1. Check if user already exists
+	// 1. Check if user already exists (use runCmdRaw so transient errors surface)
 	check := fmt.Sprintf(`id %s 2>/dev/null && echo EXISTS || echo MISSING`, newUser)
-	if strings.TrimSpace(runCmd(client, check)) == "EXISTS" {
+	checkRes, checkErr := runCmdRaw(client, check)
+	if checkErr != nil {
+		return checkRes, fmt.Errorf("failed to check if user %s exists: %w", newUser, checkErr)
+	}
+
+	userExists := strings.TrimSpace(checkRes) == "EXISTS"
+	if userExists && !force {
+		return fmt.Sprintf("User %s already exists on the remote host. Use the force option to proceed anyway (this will add SSH key access and NOPASSWD sudo to the existing account).", newUser), ErrUserExists
+	}
+	if userExists {
 		out.WriteString(fmt.Sprintf("User %s already exists — skipping creation.\n", newUser))
 	} else {
 		// Create user with home dir, no password login
-		cmd := fmt.Sprintf(
-			`echo '%s' | sudo -S useradd -m -s /bin/bash %s 2>&1`,
-			sudoPassword, newUser,
-		)
-		res, err := runCmdRaw(client, cmd)
+		res, err := runSudoCmd(client, sudoPassword,
+			fmt.Sprintf("useradd -m -s /bin/bash %s", newUser))
 		if err != nil {
 			return res, fmt.Errorf("failed to create user %s: %w", newUser, err)
 		}
@@ -361,19 +357,17 @@ func createRemoteUser(client *ssh.Client, sudoPassword, newUser, pubKey string) 
 	// 2. Set up authorized_keys
 	sshDir := fmt.Sprintf("/home/%s/.ssh", newUser)
 	authKeys := fmt.Sprintf("%s/authorized_keys", sshDir)
-	setupCmd := fmt.Sprintf(
-		`echo '%s' | sudo -S sh -c '`+
-			`mkdir -p %s && `+
+	setupScript := fmt.Sprintf(
+		`mkdir -p %s && `+
 			`grep -qF %q %s 2>/dev/null || echo %q >> %s && `+
 			`chown -R %s:%s %s && `+
-			`chmod 700 %s && chmod 600 %s'`,
-		sudoPassword,
+			`chmod 700 %s && chmod 600 %s`,
 		sshDir,
 		pubKey, authKeys, pubKey, authKeys,
 		newUser, newUser, sshDir,
 		sshDir, authKeys,
 	)
-	res, err := runCmdRaw(client, setupCmd)
+	res, err := runSudoCmd(client, sudoPassword, setupScript)
 	if err != nil {
 		return out.String() + res, fmt.Errorf("failed to setup authorized_keys: %w", err)
 	}
@@ -382,11 +376,11 @@ func createRemoteUser(client *ssh.Client, sudoPassword, newUser, pubKey string) 
 	// 3. Configure passwordless sudo
 	sudoFile := fmt.Sprintf("/etc/sudoers.d/%s-nopasswd", newUser)
 	sudoRule := fmt.Sprintf("%s ALL=(ALL) NOPASSWD:ALL", newUser)
-	sudoCmd := fmt.Sprintf(
-		`echo '%s' | sudo -S sh -c 'echo "%s" > %s && chmod 440 %s && visudo -cf %s' 2>&1`,
-		sudoPassword, sudoRule, sudoFile, sudoFile, sudoFile,
+	sudoScript := fmt.Sprintf(
+		`echo "%s" > %s && chmod 440 %s && visudo -cf %s`,
+		sudoRule, sudoFile, sudoFile, sudoFile,
 	)
-	res, err = runCmdRaw(client, sudoCmd)
+	res, err = runSudoCmd(client, sudoPassword, sudoScript)
 	if err != nil {
 		return out.String() + res, fmt.Errorf("failed to configure sudoers: %w", err)
 	}
@@ -406,23 +400,8 @@ type DockerStatus struct {
 	Message          string `json:"message"`
 }
 
-// CheckAndFixDockerGroupWithPassword connects via password.
-func CheckAndFixDockerGroupWithPassword(hostname, port, user, password string, fix bool) (*DockerStatus, error) {
-	client, err := dialWithPassword(hostname, port, user, password)
-	if err != nil {
-		return nil, fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
-	return checkAndFixDockerGroup(client, user, password, fix)
-}
-
-// CheckAndFixDockerGroupWithKey connects via key.
-func CheckAndFixDockerGroupWithKey(hostname, port, user, keyPath, password string, fix bool) (*DockerStatus, error) {
-	client, err := dialWithKey(hostname, port, user, keyPath)
-	if err != nil {
-		return nil, fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
+// CheckAndFixDockerGroup checks Docker installation and optionally adds user to docker group.
+func CheckAndFixDockerGroup(client *ssh.Client, user, password string, fix bool) (*DockerStatus, error) {
 	return checkAndFixDockerGroup(client, user, password, fix)
 }
 
@@ -483,13 +462,13 @@ func checkAndFixDockerGroup(client *ssh.Client, user, password string, fix bool)
 
 	// Fix: add user to docker group
 	if !status.UserInGroup {
-		var addCmd string
+		cmd := fmt.Sprintf("usermod -aG docker %s", user)
+		var err error
 		if password != "" {
-			addCmd = fmt.Sprintf(`echo '%s' | sudo -S usermod -aG docker %s`, password, user)
+			_, err = runSudoCmd(client, password, cmd)
 		} else {
-			addCmd = fmt.Sprintf(`sudo -n usermod -aG docker %s`, user)
+			_, err = runCmdRaw(client, fmt.Sprintf("sudo -n %s", cmd))
 		}
-		_, err := runCmdRaw(client, addCmd)
 		if err != nil {
 			status.Message = fmt.Sprintf("Failed to add %s to docker group: %s", user, err)
 			return status, nil
@@ -499,6 +478,176 @@ func checkAndFixDockerGroup(client *ssh.Client, user, password string, fix bool)
 	}
 
 	status.Message = fmt.Sprintf("User %s added to docker group. A new SSH session is required for the change to take effect.", user)
+	return status, nil
+}
+
+// NginxCleanupStatus holds the result of a nginx cleanup operation.
+type NginxCleanupStatus struct {
+	Found          bool               `json:"found"`
+	IsNative       bool               `json:"is_native"`
+	IsContainer    bool               `json:"is_container"`
+	BackupPath     string             `json:"backup_path,omitempty"`
+	Steps          []NginxCleanupStep `json:"steps"`
+	PackageManager string             `json:"package_manager,omitempty"`
+	Message        string             `json:"message"`
+}
+
+// NginxCleanupStep represents one step in the cleanup process.
+type NginxCleanupStep struct {
+	Name   string `json:"name"`
+	Status string `json:"status"` // "success", "failed", "skipped"
+	Output string `json:"output,omitempty"`
+}
+
+// CleanupNginx detects and removes non-containerized nginx from a remote host.
+func CleanupNginx(client *ssh.Client, password string, purge bool) (result *NginxCleanupStatus, retErr error) {
+	defer func() {
+		if rv := recover(); rv != nil {
+			result = &NginxCleanupStatus{
+				Message: fmt.Sprintf("internal error during cleanup: %v", rv),
+			}
+			retErr = fmt.Errorf("panic: %v", rv)
+		}
+	}()
+
+	status := &NginxCleanupStatus{}
+
+	// Step 1: Detect nginx — systemctl, which, and docker check
+	const sep = "---SEP---"
+	detectCmd := `systemctl is-active nginx 2>/dev/null || echo inactive` +
+		`; echo '` + sep + `'` +
+		`; which nginx 2>/dev/null || echo not_found` +
+		`; echo '` + sep + `'` +
+		`; docker ps --filter name=nginx --format '{{.Names}}' 2>/dev/null || sudo -n docker ps --filter name=nginx --format '{{.Names}}' 2>/dev/null` +
+		`; echo '` + sep + `'` +
+		`; which apt 2>/dev/null && echo apt || (which dnf 2>/dev/null && echo dnf) || (which yum 2>/dev/null && echo yum) || echo unknown`
+
+	detectRaw := runCmd(client, detectCmd)
+	parts := strings.Split(detectRaw, sep)
+	detectField := func(i int) string {
+		if i < len(parts) {
+			return strings.TrimSpace(parts[i])
+		}
+		return ""
+	}
+
+	systemctlActive := detectField(0)
+	whichNginx := detectField(1)
+	dockerNginx := detectField(2)
+	pkgMgr := detectField(3)
+	// Extract just the package manager name from last line
+	pkgLines := splitLines(pkgMgr)
+	if len(pkgLines) > 0 {
+		pkgMgr = pkgLines[len(pkgLines)-1]
+	}
+	status.PackageManager = pkgMgr
+
+	hasNativeNginx := systemctlActive == "active" || (whichNginx != "" && whichNginx != "not_found")
+	hasContainerNginx := dockerNginx != ""
+
+	if !hasNativeNginx && !hasContainerNginx {
+		status.Found = false
+		status.Message = "Nginx not found on this host (neither native nor containerized)."
+		return status, nil
+	}
+
+	status.Found = true
+	status.IsContainer = hasContainerNginx
+	status.IsNative = hasNativeNginx
+
+	if !hasNativeNginx && hasContainerNginx {
+		status.Message = fmt.Sprintf("Nginx is running only inside Docker container(s): %s. Use Docker to manage it instead.", dockerNginx)
+		return status, nil
+	}
+
+	if hasContainerNginx {
+		status.Message = "Warning: nginx is running both natively and in containers. Proceeding to clean up the native installation only."
+	}
+
+	// Step 2: Backup /etc/nginx/
+	backupFile := fmt.Sprintf("/tmp/nginx-backup-%s.tar.gz", strings.ReplaceAll(
+		strings.ReplaceAll(runCmd(client, "date +%Y%m%d%H%M%S"), "\n", ""), " ", ""))
+	if backupFile == "/tmp/nginx-backup-.tar.gz" {
+		backupFile = "/tmp/nginx-backup-manual.tar.gz"
+	}
+
+	backupOut, backupErr := runSudoCmd(client, password,
+		fmt.Sprintf("tar -czf %s /etc/nginx/ 2>&1", backupFile))
+	if backupErr != nil {
+		status.Steps = append(status.Steps, NginxCleanupStep{
+			Name: "Backup /etc/nginx/", Status: "failed", Output: backupOut,
+		})
+		status.Message = "Backup failed — aborting cleanup to preserve configuration."
+		return status, nil
+	}
+	status.BackupPath = backupFile
+	status.Steps = append(status.Steps, NginxCleanupStep{
+		Name: "Backup /etc/nginx/", Status: "success", Output: backupFile,
+	})
+
+	// Step 3: Stop nginx service
+	stopOut, stopErr := runSudoCmd(client, password, "systemctl stop nginx 2>&1")
+	if stopErr != nil {
+		status.Steps = append(status.Steps, NginxCleanupStep{
+			Name: "Stop nginx service", Status: "failed", Output: stopOut,
+		})
+		status.Message = "Failed to stop nginx — aborting further steps."
+		return status, nil
+	}
+	status.Steps = append(status.Steps, NginxCleanupStep{
+		Name: "Stop nginx service", Status: "success", Output: stopOut,
+	})
+
+	// Step 4: Disable nginx service
+	disableOut, disableErr := runSudoCmd(client, password, "systemctl disable nginx 2>&1")
+	if disableErr != nil {
+		status.Steps = append(status.Steps, NginxCleanupStep{
+			Name: "Disable nginx service", Status: "failed", Output: disableOut,
+		})
+	} else {
+		status.Steps = append(status.Steps, NginxCleanupStep{
+			Name: "Disable nginx service", Status: "success", Output: disableOut,
+		})
+	}
+
+	// Step 5: Purge (optional)
+	if !purge {
+		status.Steps = append(status.Steps, NginxCleanupStep{
+			Name: "Purge nginx packages", Status: "skipped", Output: "Purge not requested",
+		})
+		status.Message = fmt.Sprintf("Nginx stopped and disabled. Config backed up to %s.", backupFile)
+		return status, nil
+	}
+
+	var purgeCmd string
+	switch pkgMgr {
+	case "apt":
+		purgeCmd = "apt purge nginx nginx-common nginx-full nginx-core nginx-light -y 2>&1 && apt autoremove -y 2>&1"
+	case "dnf":
+		purgeCmd = "dnf remove nginx -y 2>&1"
+	case "yum":
+		purgeCmd = "yum remove nginx -y 2>&1"
+	default:
+		status.Steps = append(status.Steps, NginxCleanupStep{
+			Name: "Purge nginx packages", Status: "failed", Output: "Unknown package manager: " + pkgMgr,
+		})
+		status.Message = fmt.Sprintf("Nginx stopped and disabled but could not purge (unknown package manager). Config backed up to %s.", backupFile)
+		return status, nil
+	}
+
+	purgeOut, purgeErr := runSudoCmd(client, password, purgeCmd)
+	if purgeErr != nil {
+		status.Steps = append(status.Steps, NginxCleanupStep{
+			Name: "Purge nginx packages", Status: "failed", Output: purgeOut,
+		})
+		status.Message = fmt.Sprintf("Nginx stopped and disabled but purge failed. Config backed up to %s.", backupFile)
+	} else {
+		status.Steps = append(status.Steps, NginxCleanupStep{
+			Name: "Purge nginx packages", Status: "success", Output: purgeOut,
+		})
+		status.Message = fmt.Sprintf("Nginx fully removed. Config backed up to %s.", backupFile)
+	}
+
 	return status, nil
 }
 
@@ -605,22 +754,8 @@ type RemoteKeyInfo struct {
 }
 
 // ListRemoteKeysWithPassword connects via password and lists SSH keys on the remote host.
-func ListRemoteKeysWithPassword(hostname, port, user, password string) ([]RemoteKeyInfo, error) {
-	client, err := dialWithPassword(hostname, port, user, password)
-	if err != nil {
-		return nil, fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
-	return listRemoteKeys(client)
-}
-
-// ListRemoteKeysWithKey connects via key and lists SSH keys on the remote host.
-func ListRemoteKeysWithKey(hostname, port, user, keyPath string) ([]RemoteKeyInfo, error) {
-	client, err := dialWithKey(hostname, port, user, keyPath)
-	if err != nil {
-		return nil, fmt.Errorf("SSH connect: %w", err)
-	}
-	defer client.Close()
+// ListRemoteKeys lists SSH keys found on the remote host.
+func ListRemoteKeys(client *ssh.Client) ([]RemoteKeyInfo, error) {
 	return listRemoteKeys(client)
 }
 
@@ -927,6 +1062,84 @@ func captureVMInfo(client *ssh.Client) (*VMInfo, error) {
 		})
 	}
 
+	// ── Session 6: enhanced service discovery ──
+	const delimEnhanced = "---ENHANCED---"
+	enhancedCmd := `systemctl list-units --type=service --state=running --no-pager --plain 2>/dev/null | awk 'NR>0 && $1 ~ /\.service$/ {unit=$1; desc=""; for(i=5;i<=NF;i++) desc=desc" "$i; print unit "\t" desc}'` +
+		`; echo '` + delimEnhanced + `'` +
+		`; dpkg-query -W -f='${Package}\t${Version}\n' nginx apache2 postgresql mysql-server redis-server nodejs python3 php docker-ce 2>/dev/null || rpm -qa --queryformat '%{NAME}\t%{VERSION}\n' 2>/dev/null | grep -iE '(nginx|httpd|postgresql|mysql|redis|nodejs|python3|php|docker-ce)'` +
+		`; echo '` + delimEnhanced + `'` +
+		`; crontab -l 2>/dev/null` +
+		`; echo '` + delimEnhanced + `'` +
+		`; ufw status 2>/dev/null || iptables -L -n 2>/dev/null | head -20 || echo 'no firewall detected'`
+
+	enhancedRaw := runCmd(client, enhancedCmd)
+	enhancedSections := strings.Split(enhancedRaw, delimEnhanced)
+	enhancedSection := func(i int) string {
+		if i < len(enhancedSections) {
+			return strings.TrimSpace(enhancedSections[i])
+		}
+		return ""
+	}
+
+	// Parse systemd services
+	for _, line := range splitLines(enhancedSection(0)) {
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) == 0 || parts[0] == "" {
+			continue
+		}
+		desc := ""
+		if len(parts) > 1 {
+			desc = strings.TrimSpace(parts[1])
+		}
+		info.SystemdServices = append(info.SystemdServices, SystemdService{
+			Unit:        parts[0],
+			Description: desc,
+			IsNative:    true, // default; will cross-reference with containers below
+		})
+	}
+
+	// Cross-reference systemd services with docker containers to flag native vs container
+	containerNames := map[string]bool{}
+	for _, c := range info.Containers {
+		parts := strings.SplitN(c, " ", 2)
+		if len(parts) > 0 {
+			containerNames[strings.ToLower(parts[0])] = true
+		}
+	}
+	for i, svc := range info.SystemdServices {
+		unitBase := strings.TrimSuffix(strings.ToLower(svc.Unit), ".service")
+		for cname := range containerNames {
+			if strings.Contains(unitBase, cname) || strings.Contains(cname, unitBase) {
+				info.SystemdServices[i].IsNative = false
+				break
+			}
+		}
+	}
+
+	// Parse installed packages
+	pkgSource := "apt"
+	for _, line := range splitLines(enhancedSection(1)) {
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) != 2 || parts[0] == "" {
+			continue
+		}
+		// Detect if this looks like rpm output (no tab-separated version from dpkg)
+		if strings.Contains(parts[1], ".el") || strings.Contains(parts[1], ".fc") {
+			pkgSource = "rpm"
+		}
+		info.InstalledPackages = append(info.InstalledPackages, InstalledPackage{
+			Name:    parts[0],
+			Version: parts[1],
+			Source:  pkgSource,
+		})
+	}
+
+	// Parse cron jobs
+	info.CronJobs = splitLines(enhancedSection(2))
+
+	// Firewall status
+	info.FirewallStatus = enhancedSection(3)
+
 	if info.CPU == " vCPU" {
 		info.CPU = ""
 	}
@@ -945,28 +1158,3 @@ func captureVMInfo(client *ssh.Client) (*VMInfo, error) {
 	return info, nil
 }
 
-// TestWithKey tests SSH connectivity using public key authentication.
-func TestWithKey(hostname, port, user, keyPath string) error {
-	if port == "" {
-		port = "22"
-	}
-
-	addr := net.JoinHostPort(hostname, port)
-	client, err := dialWithKey(hostname, port, user, keyPath)
-	if err != nil {
-		return fmt.Errorf("SSH connect to %s: %w", addr, err)
-	}
-	defer client.Close()
-
-	session, err := client.NewSession()
-	if err != nil {
-		return fmt.Errorf("create session: %w", err)
-	}
-	defer session.Close()
-
-	if _, err := session.CombinedOutput("echo OK"); err != nil {
-		return fmt.Errorf("run test command: %w", err)
-	}
-
-	return nil
-}

@@ -3,6 +3,12 @@
     "title": "Bridge",
     "subtitle": "Gerenciador de Ativos de TI"
   },
+  "header": {
+    "toggleTheme": "Alternar tema",
+    "themeLabel": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Escuro"
+  },
   "nav": {
     "dashboard": "Painel",
     "issues": "Issues",
@@ -188,6 +194,7 @@
     "chamadoUser": "Usu\u00e1rio",
     "addChamado": "Adicionar Chamado",
     "sshKey": "Chave SSH",
+    "sshKeyStored": "Armazenada no banco de dados",
     "defaultAuth": "Auth Padr\u00e3o",
     "phone": "Telefone",
     "role": "Fun\u00e7\u00e3o",
@@ -260,7 +267,13 @@
     "title": "Config SSH",
     "preview": "Pr\u00e9-visualizar",
     "generate": "Gerar Config",
-    "generateDescription": "Escrever ~/.ssh/config a partir dos hosts ativos.",
+    "generateDescription": "Baixe ou copie o config SSH gerado a partir dos hosts ativos.",
+    "download": "Baixar",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "writeToServer": "Gravar no sistema de arquivos do servidor",
+    "writeWarning": "Isso vai sobrescrever o arquivo de config SSH no servidor.",
+    "writing": "Gravando...",
     "testConnection": "Testar Conex\u00e3o",
     "setupKey": "Configurar Chave"
   },
@@ -354,7 +367,26 @@
     "enableEmbed": "Habilitar visualiza\u00e7\u00e3o incorporada",
     "embed": "Abrir Incorporado",
     "openExternal": "Abrir Externo",
-    "noTools": "Nenhuma ferramenta externa configurada"
+    "noTools": "Nenhuma ferramenta externa configurada",
+    "syncFromService": "Sincronizar de Servi\u00e7o",
+    "unsync": "Dessincronizar",
+    "synced": "Sincronizado",
+    "selectService": "Selecione um servi\u00e7o",
+    "selectDns": "Selecione o dom\u00ednio DNS",
+    "viewCredentials": "Credenciais",
+    "credentialsTitle": "Credenciais da Aplica\u00e7\u00e3o",
+    "noCredentials": "Nenhuma credencial configurada",
+    "refreshUrl": "Atualizar URL",
+    "syncedFrom": "Sincronizado de"
+  },
+  "serviceCredentials": {
+    "title": "Credenciais de Aplica\u00e7\u00f5es",
+    "subtitle": "Credenciais criptografadas para servi\u00e7os e aplica\u00e7\u00f5es",
+    "noServices": "Nenhum servi\u00e7o com credenciais",
+    "noServicesDesc": "Adicione credenciais a um servi\u00e7o para v\u00ea-las aqui.",
+    "reveal": "Revelar",
+    "hide": "Ocultar",
+    "credentials": "credenciais"
   },
   "settings": {
     "title": "Configura\u00e7\u00f5es",
@@ -384,8 +416,9 @@
     "downloadBackup": "Baixar Backup",
     "restoreTitle": "Restaurar Banco de Dados",
     "restoreDescription": "Envie um arquivo .sshcmbak para substituir o banco de dados atual. Backups feitos em SQLite podem ser restaurados em Postgres e vice-versa.",
-    "restoreWarning": "Isso substituir\u00e1 todos os dados atuais. Sess\u00f5es existentes precisar\u00e3o fazer login novamente ap\u00f3s a restaura\u00e7\u00e3o.",
-    "restoreConfirm": "Isso vai substituir TODOS os dados atuais pelo backup. N\u00e3o pode ser desfeito. Continuar?",
+    "restoreWarning": "PERIGO: isso apaga e substitui completamente o banco de dados atual — todos os usu\u00e1rios, hosts, registros DNS, servi\u00e7os, projetos, chaves SSH e sess\u00f5es — pelo conte\u00fado do backup. Voc\u00ea (e todos os outros) ser\u00e3o desconectados e precisar\u00e3o entrar novamente com credenciais do backup.",
+    "restoreConfirm": "Voc\u00ea est\u00e1 prestes a SUBSTITUIR TODOS OS DADOS desta inst\u00e2ncia pelo backup enviado.\n\nIsso apaga usu\u00e1rios, hosts, registros DNS, servi\u00e7os, projetos, chaves SSH, sess\u00f5es e todas as outras tabelas. N\u00e3o pode ser desfeito.\n\nSeu login atual deixar\u00e1 de funcionar — voc\u00ea ser\u00e1 desconectado e dever\u00e1 entrar novamente com um usu\u00e1rio que exista no backup.\n\nContinuar?",
+    "restoreSuccessLogout": "Desconectando em instantes — entre novamente com um usu\u00e1rio do backup restaurado.",
     "uploadRestore": "Enviar e Restaurar"
   },
   "operation": {
@@ -462,7 +495,13 @@
     "createRemoteUserDesc": "Cria um novo usu\u00e1rio no host remoto com acesso via chave SSH e sudo sem senha.",
     "createRemoteUserFormDesc": "Informe o nome do usu\u00e1rio e selecione uma chave SSH. O usu\u00e1rio ser\u00e1 criado com a chave em authorized_keys e sudo NOPASSWD.",
     "createRemoteUserPlaceholder": "Nome do usu\u00e1rio (ex: coolify, deploy)",
-    "createRemoteUserRun": "Criar Usu\u00e1rio"
+    "createRemoteUserRun": "Criar Usu\u00e1rio",
+    "createRemoteUserForce": "For\u00e7ar (usu\u00e1rio existente)",
+    "createRemoteUserInvalidName": "O nome deve come\u00e7ar com letra ou underscore, seguido de letras min\u00fasculas, d\u00edgitos, h\u00edfens ou underscores (m\u00e1x 32 caracteres).",
+    "nginxCleanup": "Limpeza do Nginx",
+    "nginxCleanupDesc": "Detectar e remover nginx n\u00e3o containerizado. Faz backup da configura\u00e7\u00e3o antes.",
+    "confirmNginxCleanup": "Isso vai parar e desabilitar o servi\u00e7o nginx nativo no host remoto. Um backup de /etc/nginx/ ser\u00e1 criado antes. Continuar?",
+    "confirmNginxPurge": "Tamb\u00e9m desinstalar os pacotes do nginx? Clique em Cancelar para apenas parar e desabilitar sem remover pacotes."
   },
   "alert": {
     "title": "Alertas",
@@ -506,7 +545,16 @@
     "sshKeys": "Chaves SSH",
     "authorizedKeys": "Chaves Autorizadas",
     "managed": "gerenciada",
-    "unmanaged": "n\u00e3o gerenciada"
+    "unmanaged": "n\u00e3o gerenciada",
+    "systemdServices": "Servi\u00e7os Systemd",
+    "installedPackages": "Pacotes Instalados",
+    "cronJobs": "Tarefas Cron",
+    "firewallStatus": "Status do Firewall",
+    "native": "nativo",
+    "containerManaged": "container",
+    "noCronJobs": "Nenhuma tarefa cron configurada",
+    "packageName": "Pacote",
+    "packageVersion": "Vers\u00e3o"
   },
   "sshKey": {
     "coolifyAlreadyExists": "Chave j\u00e1 existe no Coolify.",

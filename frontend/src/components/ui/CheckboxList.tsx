@@ -50,7 +50,7 @@ export default function CheckboxList({ label, items, selected, onChange }: Check
       )}
       <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
         {filtered.map((item) => (
-          <label key={item.id} className={`flex items-center gap-1.5 text-xs bg-[var(--bg-elevated)] border rounded-[var(--radius-md)] px-2.5 py-1.5 cursor-pointer hover:border-[var(--border-default)] transition-colors ${
+          <label key={item.id} className={`flex items-center gap-2 text-sm md:text-xs bg-[var(--bg-elevated)] border rounded-[var(--radius-md)] px-3 py-2 md:px-2.5 md:py-1.5 cursor-pointer hover:border-[var(--border-default)] transition-colors ${
             selected.includes(item.id)
               ? "border-[var(--accent)]/30 text-[var(--accent)]"
               : "border-[var(--border-subtle)] text-[var(--text-secondary)]"
@@ -59,7 +59,7 @@ export default function CheckboxList({ label, items, selected, onChange }: Check
               type="checkbox"
               checked={selected.includes(item.id)}
               onChange={(e) => toggle(item.id, e.target.checked)}
-              className="w-3.5 h-3.5 rounded accent-[var(--accent)]"
+              className="w-4 h-4 md:w-3.5 md:h-3.5 rounded accent-[var(--accent)]"
             />
             {item.name}
           </label>

@@ -5,19 +5,22 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { servicesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useExportCSV } from "@/hooks/useExportCSV";
+import { useInventoryFilters } from "@/hooks/useInventoryFilters";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
-import EmptyState from "@/components/ui/EmptyState";
-import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
 import ListToolbar from "@/components/ui/ListToolbar";
-import { SkeletonCard } from "@/components/ui/Skeleton";
+import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
+import SearchBadge from "@/components/ui/SearchBadge";
+import ListingLabel from "@/components/ui/ListingLabel";
+import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
+import InventoryContent from "@/components/inventory/InventoryContent";
 import ServiceCard from "./_components/ServiceCard";
 import ServicesTableView from "./_components/ServicesTableView";
 import KpiSection from "./_components/KpiSection";
-import ServicesFAB from "./_components/ServicesFAB";
+import InventoryFAB from "@/components/inventory/InventoryFAB";
 import ServiceForm from "./ServiceForm";
 import ServiceFilterDrawer, { emptyFilters, type ServiceFilters } from "./FilterDrawer";
 import type { Service } from "@/lib/types";
@@ -27,16 +30,14 @@ export default function ServicesPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  const { search, setSearch, filters, setFilters, viewMode, setViewMode, sort, setSort, activeFilterCount } =
+    useInventoryFilters<ServiceFilters>({ storageKey: "services", emptyFilters, defaultSort: { field: "nickname", direction: "asc" } });
+
   const [showForm, setShowForm] = useState(false);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [showFilters, setShowFilters] = useState(false);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<ServiceFilters>(emptyFilters);
-  const [sortField, setSortField] = useLocalStorage<string>("services_sort", "nickname");
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
-  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   const { data: allServices = [], isLoading } = useQuery({
     queryKey: ["services"],
@@ -69,12 +70,13 @@ export default function ServicesPage() {
     }
     const arr = [...filtered];
     arr.sort((a, b) => {
-      const av = (sortField === "technology_stack" ? (a.technology_stack || "") : a.nickname).toLowerCase();
-      const bv = (sortField === "technology_stack" ? (b.technology_stack || "") : b.nickname).toLowerCase();
-      return av.localeCompare(bv);
+      const av = (sort.field === "technology_stack" ? (a.technology_stack || "") : a.nickname).toLowerCase();
+      const bv = (sort.field === "technology_stack" ? (b.technology_stack || "") : b.nickname).toLowerCase();
+      const cmp = av.localeCompare(bv);
+      return sort.direction === "desc" ? -cmp : cmp;
     });
     return arr;
-  }, [allServices, search, filters, sortField]);
+  }, [allServices, search, filters, sort]);
 
   const exportCSV = useExportCSV(
     allServices,
@@ -95,42 +97,19 @@ export default function ServicesPage() {
 
   return (
     <PageShell>
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 mb-6">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{t("service.title")}</h1>
-        <div className="flex items-center gap-1.5">
-          <div className="hidden sm:flex">
-            <ViewToggle
-              value={viewMode}
-              onChange={(v) => setViewMode(v as "cards" | "table")}
-              options={[
-                { key: "cards", label: t("common.cardView") || "Card view", icon: VIEW_ICONS.cards },
-                { key: "table", label: t("common.tableView") || "Table view", icon: VIEW_ICONS.table },
-              ]}
-            />
-          </div>
-          {canEdit && (
-            <div className="hidden sm:block">
-              <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("service.addService")}</Button>
-            </div>
-          )}
-        </div>
-      </div>
+      <InventoryPageHeader
+        title={t("service.title")}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        addLabel={canEdit ? t("service.addService") : undefined}
+        onAdd={canEdit ? openCreate : undefined}
+      />
 
       {/* KPI indicators */}
       {!isLoading && allServices.length > 0 && <KpiSection services={allServices} t={t} />}
 
-      {search && (
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs text-[var(--text-muted)]">{t("common.search")}:</span>
-          <span className="text-xs text-[var(--text-primary)] font-medium">&ldquo;{search}&rdquo;</span>
-          <button onClick={() => setSearch("")} className="text-xs text-[var(--text-faint)] hover:text-[var(--text-secondary)]">&times;</button>
-        </div>
-      )}
-
-      {!isLoading && allServices.length > 0 && (
-        <h2 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("service.listing") || "Services"}</h2>
-      )}
+      <SearchBadge search={search} onClear={() => setSearch("")} />
+      <ListingLabel label={t("service.listing") || "Services"} show={!isLoading && allServices.length > 0} />
 
       {/* Toolbar */}
       <ListToolbar
@@ -141,45 +120,24 @@ export default function ServicesPage() {
         searchPlaceholder={t("common.search")}
         actions={
           allServices.length > 0 ? (
-            <button
-              onClick={exportCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-[var(--radius-md)] border bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)] transition-all"
-              title={t("common.export") || "Export"}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span className="hidden sm:inline">{t("common.export") || "Exportar"}</span>
-            </button>
+            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export") || "Export"} onClick={exportCSV} />
           ) : undefined
         }
       />
 
-      {/* Content */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : services.length === 0 ? (
-        <EmptyState
-          icon="box"
-          title={t("common.noResults")}
-          description={search || activeFilterCount > 0 ? "Try adjusting your filters" : "Add your first service"}
-          action={canEdit && !search && activeFilterCount === 0 ? (
-            <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("service.addService")}</Button>
-          ) : undefined}
-        />
-      ) : viewMode === "cards" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {services.map((svc, i) => (
-            <div key={svc.id} className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" }}>
-              <ServiceCard svc={svc} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <ServicesTableView services={services} t={t} />
-      )}
+      <InventoryContent
+        isLoading={isLoading}
+        items={services}
+        viewMode={viewMode}
+        emptyIcon="box"
+        emptyTitle={t("common.noResults")}
+        emptyDescription={search || activeFilterCount > 0 ? t("host.emptyStateFilter") || "Try adjusting your filters" : t("service.emptyStateAdd") || "Add your first service"}
+        emptyAction={canEdit && !search && activeFilterCount === 0 ? (
+          <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("service.addService")}</Button>
+        ) : undefined}
+        renderCard={(svc) => <ServiceCard svc={svc} />}
+        renderTable={(items) => <ServicesTableView services={items} t={t} />}
+      />
 
       {/* Create modal */}
       <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={t("service.addService")} subHeader={formSubHeader}>
@@ -198,20 +156,22 @@ export default function ServicesPage() {
         onClose={() => setShowFilters(false)}
         filters={filters}
         onFiltersChange={setFilters}
-        sort={sortField}
-        onSortChange={setSortField}
+        sort={sort}
+        onSortChange={setSort}
         search={search}
         onSearchChange={setSearch}
       />
 
       {/* Mobile FAB */}
-      <ServicesFAB
+      <InventoryFAB
         canEdit={canEdit}
-        hasServices={allServices.length > 0}
+        hasItems={allServices.length > 0}
         activeFilterCount={activeFilterCount}
         onAdd={openCreate}
         onFilter={() => setShowFilters(true)}
         onExport={exportCSV}
+        addLabel={t("service.addService")}
+        addColor="#a855f7"
       />
     </PageShell>
   );

@@ -81,6 +81,11 @@ func Open(configDir string) (*DB, error) {
 	// Recompute SSH key fingerprints that used the old hex format.
 	d.fixSSHKeyFingerprints()
 
+	// Backfill encrypted key blobs on legacy host rows that still point at a
+	// filesystem path. After this runs, a DB backup carries the full key data
+	// and can be restored on any machine without broken key_path references.
+	d.backfillHostKeyBlobs()
+
 	return d, nil
 }
 
@@ -161,6 +166,79 @@ func (d *DB) fixSSHKeyFingerprints() {
 				d.SQL.Exec(`UPDATE ssh_keys SET fingerprint = ?, pub_key_ciphertext = ?, pub_key_nonce = ? WHERE id = ?`, newFP, ct, nonce, id)
 			}
 		}
+	}
+}
+
+// backfillHostKeyBlobs one-shot normalizes legacy host rows where the key
+// lives only as a filesystem path. For each such row it reads the private (and
+// optional public) key file from disk, encrypts it via the DB encryptor, stores
+// the blobs on the host row, and clears key_path. Rows whose file is missing
+// are left alone and logged — the user can re-link an SSH key via the editor.
+// Idempotent: rows already carrying a blob are skipped.
+func (d *DB) backfillHostKeyBlobs() {
+	rows, err := d.SQL.Query(`SELECT id, key_path, priv_key_ciphertext FROM hosts WHERE has_key = ? AND (priv_key_ciphertext IS NULL OR length(priv_key_ciphertext) = 0) AND key_path IS NOT NULL AND key_path <> ''`, true)
+	if err != nil {
+		return
+	}
+	type legacyRow struct {
+		id   int64
+		path string
+	}
+	var legacy []legacyRow
+	for rows.Next() {
+		var id int64
+		var kp string
+		var existing []byte
+		if err := rows.Scan(&id, &kp, &existing); err != nil {
+			continue
+		}
+		if len(existing) > 0 {
+			continue
+		}
+		legacy = append(legacy, legacyRow{id: id, path: kp})
+	}
+	rows.Close()
+
+	if len(legacy) == 0 {
+		return
+	}
+
+	home, _ := os.UserHomeDir()
+	expand := func(p string) string {
+		if strings.HasPrefix(p, "~") && home != "" {
+			return home + p[1:]
+		}
+		return p
+	}
+
+	for _, row := range legacy {
+		privPath := expand(row.path)
+		privBytes, rerr := os.ReadFile(privPath)
+		if rerr != nil {
+			fmt.Fprintf(os.Stderr, "[db] backfill: host id=%d key_path=%q missing on disk: %v — leaving row untouched; re-link an SSH key to restore access\n", row.id, privPath, rerr)
+			continue
+		}
+		privCT, privNonce, eerr := d.Encryptor.Encrypt(string(privBytes))
+		if eerr != nil {
+			fmt.Fprintf(os.Stderr, "[db] backfill: host id=%d encrypt private key failed: %v\n", row.id, eerr)
+			continue
+		}
+
+		var pubCT, pubNonce []byte
+		if pubBytes, perr := os.ReadFile(privPath + ".pub"); perr == nil {
+			if ct, nonce, eerr := d.Encryptor.Encrypt(string(pubBytes)); eerr == nil {
+				pubCT, pubNonce = ct, nonce
+			}
+		}
+
+		if _, uerr := d.SQL.Exec(
+			`UPDATE hosts SET priv_key_ciphertext = ?, priv_key_nonce = ?, pub_key_ciphertext = ?, pub_key_nonce = ?, key_path = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+			privCT, privNonce, pubCT, pubNonce, row.id,
+		); uerr != nil {
+			fmt.Fprintf(os.Stderr, "[db] backfill: host id=%d update failed: %v\n", row.id, uerr)
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "[db] backfill: host id=%d key migrated from %q into encrypted DB blob\n", row.id, privPath)
 	}
 }
 

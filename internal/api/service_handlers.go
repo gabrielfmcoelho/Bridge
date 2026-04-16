@@ -304,3 +304,49 @@ func (h *serviceHandlers) handleDeleteCredential(w http.ResponseWriter, r *http.
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// handleListAllCredentials returns all services that have credentials, with role summaries.
+func (h *serviceHandlers) handleListAllCredentials(w http.ResponseWriter, r *http.Request) {
+	services, err := models.ListServices(h.db.SQL)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "failed to list services")
+		return
+	}
+
+	type credSummary struct {
+		ID       int64  `json:"id"`
+		RoleName string `json:"role_name"`
+	}
+	type serviceWithCreds struct {
+		ServiceID       int64         `json:"service_id"`
+		ServiceNickname string        `json:"service_nickname"`
+		ServiceType     string        `json:"service_type"`
+		Credentials     []credSummary `json:"credentials"`
+	}
+
+	var result []serviceWithCreds
+	for _, svc := range services {
+		creds, err := models.ListServiceCredentials(h.db.SQL, svc.ID)
+		if err != nil {
+			jsonError(w, http.StatusInternalServerError, "failed to list credentials")
+			return
+		}
+		if len(creds) == 0 {
+			continue
+		}
+		summaries := make([]credSummary, len(creds))
+		for i, c := range creds {
+			summaries[i] = credSummary{ID: c.ID, RoleName: c.RoleName}
+		}
+		result = append(result, serviceWithCreds{
+			ServiceID:       svc.ID,
+			ServiceNickname: svc.Nickname,
+			ServiceType:     svc.ServiceType,
+			Credentials:     summaries,
+		})
+	}
+	if result == nil {
+		result = []serviceWithCreds{}
+	}
+	jsonOK(w, result)
+}

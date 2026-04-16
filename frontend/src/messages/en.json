@@ -3,6 +3,12 @@
     "title": "Bridge",
     "subtitle": "IT Asset Manager"
   },
+  "header": {
+    "toggleTheme": "Toggle theme",
+    "themeLabel": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "issues": "Issues",
@@ -188,6 +194,7 @@
     "chamadoUser": "User",
     "addChamado": "Add Ticket",
     "sshKey": "SSH Key",
+    "sshKeyStored": "Stored in database",
     "defaultAuth": "Default Auth",
     "phone": "Phone",
     "role": "Role",
@@ -260,7 +267,13 @@
     "title": "SSH Config",
     "preview": "Preview",
     "generate": "Generate Config",
-    "generateDescription": "Write ~/.ssh/config from active hosts.",
+    "generateDescription": "Download or copy the SSH config generated from active hosts.",
+    "download": "Download",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "writeToServer": "Write to server filesystem",
+    "writeWarning": "This will overwrite the SSH config file on the server.",
+    "writing": "Writing...",
     "testConnection": "Test Connection",
     "setupKey": "Setup Key"
   },
@@ -354,7 +367,26 @@
     "enableEmbed": "Enable embedded view",
     "embed": "Open Embedded",
     "openExternal": "Open External",
-    "noTools": "No external tools configured yet"
+    "noTools": "No external tools configured yet",
+    "syncFromService": "Sync from Service",
+    "unsync": "Unsync",
+    "synced": "Synced",
+    "selectService": "Select a service",
+    "selectDns": "Select DNS domain",
+    "viewCredentials": "Credentials",
+    "credentialsTitle": "Application Credentials",
+    "noCredentials": "No credentials configured",
+    "refreshUrl": "Refresh URL",
+    "syncedFrom": "Synced from"
+  },
+  "serviceCredentials": {
+    "title": "Application Credentials",
+    "subtitle": "Encrypted credentials for services and applications",
+    "noServices": "No services with credentials yet",
+    "noServicesDesc": "Add credentials to a service to see them here.",
+    "reveal": "Reveal",
+    "hide": "Hide",
+    "credentials": "credentials"
   },
   "settings": {
     "title": "Settings",
@@ -384,8 +416,9 @@
     "downloadBackup": "Download Backup",
     "restoreTitle": "Restore Database",
     "restoreDescription": "Upload a .sshcmbak file to replace the current database. Backups taken on SQLite can be restored into Postgres and vice versa.",
-    "restoreWarning": "This will overwrite all current data. Existing sessions will need to log in again after restore.",
-    "restoreConfirm": "This will replace ALL current data with the backup. This cannot be undone. Continue?",
+    "restoreWarning": "DANGER: this completely wipes and replaces the current database — every user, host, DNS record, service, project, SSH key and session — with the contents of the backup. You (and everyone else) will be signed out and must log in again with credentials from the backup.",
+    "restoreConfirm": "You are about to REPLACE ALL DATA in this instance with the uploaded backup.\n\nThis wipes users, hosts, DNS records, services, projects, SSH keys, sessions and every other table. It cannot be undone.\n\nYour current login will stop working — you will be signed out and must log in again with a user from the backup.\n\nContinue?",
+    "restoreSuccessLogout": "Signing you out in a moment — please log in again with a user from the restored backup.",
     "uploadRestore": "Upload & Restore"
   },
   "operation": {
@@ -462,7 +495,13 @@
     "createRemoteUserDesc": "Create a new user on the remote host with SSH key access and passwordless sudo.",
     "createRemoteUserFormDesc": "Enter a username and select an SSH key. The user will be created with the key in authorized_keys and NOPASSWD sudo.",
     "createRemoteUserPlaceholder": "Username (e.g. coolify, deploy)",
-    "createRemoteUserRun": "Create User"
+    "createRemoteUserRun": "Create User",
+    "createRemoteUserForce": "Force (existing user)",
+    "createRemoteUserInvalidName": "Username must start with a letter or underscore, followed by lowercase letters, digits, hyphens, or underscores (max 32 chars).",
+    "nginxCleanup": "Nginx Cleanup",
+    "nginxCleanupDesc": "Detect and remove non-containerized nginx. Backs up config before changes.",
+    "confirmNginxCleanup": "This will stop and disable the native nginx service on the remote host. A backup of /etc/nginx/ will be created first. Continue?",
+    "confirmNginxPurge": "Also purge (uninstall) the nginx packages? Click Cancel to just stop & disable without removing packages."
   },
   "alert": {
     "title": "Alerts",
@@ -506,7 +545,16 @@
     "sshKeys": "SSH Keys",
     "authorizedKeys": "Authorized Keys",
     "managed": "managed",
-    "unmanaged": "unmanaged"
+    "unmanaged": "unmanaged",
+    "systemdServices": "Systemd Services",
+    "installedPackages": "Installed Packages",
+    "cronJobs": "Cron Jobs",
+    "firewallStatus": "Firewall Status",
+    "native": "native",
+    "containerManaged": "container",
+    "noCronJobs": "No cron jobs configured",
+    "packageName": "Package",
+    "packageVersion": "Version"
   },
   "sshKey": {
     "coolifyAlreadyExists": "Key already exists in Coolify.",

@@ -75,7 +75,7 @@ export default function OverviewTab({ host, tags, responsaveis, chamados, canEdi
             <Field label={t("host.user")} value={host.user} />
             <Field label={t("host.port")} value={host.port || "22"} />
             <Field label={t("host.proxyJump")} value={host.proxy_jump} />
-            <Field label={t("host.sshKey")} value={host.key_path ? host.key_path.split("/").pop() || host.key_path : ""} />
+            <Field label={t("host.sshKey")} value={host.has_key ? t("host.sshKeyStored") : ""} />
             {host.has_password && isAdmin && <PasswordField slug={slug} />}
           </div>
         </Card>

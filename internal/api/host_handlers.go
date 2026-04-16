@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,8 +12,6 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 )
-
-var nonAlphanumeric = regexp.MustCompile(`[^a-zA-Z0-9_.\-]`)
 
 type hostHandlers struct {
 	db *database.DB
@@ -373,6 +368,16 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Key material only comes from the ssh_keys table via linkSSHKey. Callers
+	// cannot set a filesystem path on the host row — the DB blob is the only
+	// source of truth so backups restore cleanly onto any machine.
+	req.Host.KeyPath = ""
+	req.Host.HasKey = false
+	req.Host.PubKeyCiphertext = nil
+	req.Host.PubKeyNonce = nil
+	req.Host.PrivKeyCiphertext = nil
+	req.Host.PrivKeyNonce = nil
+
 	// Handle password encryption.
 	if req.Password != "" {
 		ct, nonce, err := h.db.Encryptor.Encrypt(req.Password)
@@ -644,48 +649,32 @@ func (h *hostHandlers) handleGetPassword(w http.ResponseWriter, r *http.Request)
 	jsonOK(w, map[string]string{"password": password})
 }
 
-// linkSSHKey decrypts a key from the ssh_keys table, writes it to ~/.ssh/, and updates the host.
+// resolveHostKeyPEM returns the decrypted private-key PEM for a host, read
+// directly from the encrypted blob stored on the host row. The filesystem is
+// never touched — this is what keeps key-auth working after a DB backup is
+// restored onto a machine where host.key_path no longer exists.
+func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
+	if host == nil || len(host.PrivKeyCiphertext) == 0 {
+		return nil, fmt.Errorf("host has no stored private key — link an SSH key via the host editor")
+	}
+	plain, err := db.Encryptor.Decrypt(host.PrivKeyCiphertext, host.PrivKeyNonce)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt host key: %w", err)
+	}
+	return []byte(plain), nil
+}
+
+// linkSSHKey copies the encrypted key blob from the ssh_keys table onto the
+// host row. It does NOT materialize the key to the filesystem — key-auth SSH
+// decrypts the blob in-memory at connection time via resolveHostKeyPEM.
 func (h *hostHandlers) linkSSHKey(hostID, sshKeyID int64, slug string) {
 	k, err := models.GetSSHKey(h.db.SQL, sshKeyID)
 	if err != nil || k == nil {
 		return
 	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
+	if len(k.PrivKeyCiphertext) == 0 {
 		return
 	}
-	sshDir := filepath.Join(home, ".ssh")
-	os.MkdirAll(sshDir, 0700)
-
-	keyName := nonAlphanumeric.ReplaceAllString(k.Name, "_")
-	base := keyName
-	if !strings.HasPrefix(keyName, "id_") {
-		base = "id_ed25519_" + keyName
-	}
-	privPath := filepath.Join(sshDir, base)
-	pubPath := privPath + ".pub"
-
-	// Write private key if available (ensure trailing newline for OpenSSH compatibility)
-	if len(k.PrivKeyCiphertext) > 0 {
-		if plain, err := h.db.Encryptor.Decrypt(k.PrivKeyCiphertext, k.PrivKeyNonce); err == nil {
-			if !strings.HasSuffix(plain, "\n") {
-				plain += "\n"
-			}
-			os.WriteFile(privPath, []byte(plain), 0600)
-		}
-	}
-
-	// Write public key if available
-	if len(k.PubKeyCiphertext) > 0 {
-		if plain, err := h.db.Encryptor.Decrypt(k.PubKeyCiphertext, k.PubKeyNonce); err == nil {
-			if !strings.HasSuffix(plain, "\n") {
-				plain += "\n"
-			}
-			os.WriteFile(pubPath, []byte(plain), 0644)
-		}
-	}
-
-	models.UpdateHostKey(h.db.SQL, hostID, true, privPath, "yes",
+	models.UpdateHostKey(h.db.SQL, hostID, true, "", "yes",
 		k.PubKeyCiphertext, k.PubKeyNonce, k.PrivKeyCiphertext, k.PrivKeyNonce)
 }

@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { projectsAPI, enumsAPI, contactsAPI } from "@/lib/api";
 import { contactsToOptions } from "@/lib/utils";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
 import Button from "@/components/ui/Button";
 import Checkbox from "@/components/ui/Checkbox";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import TagInput from "@/components/ui/TagInput";
-import StepIndicator from "@/components/ui/StepIndicator";
 import FormError from "@/components/ui/FormError";
 import type { Project } from "@/lib/types";
 
@@ -73,11 +73,18 @@ export default function ProjectForm({ initial, onSuccess, onSubHeaderChange }: P
 
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
 
-  const stepLabels = [t("common.basicInfo"), t("project.responsaveis") + " & " + t("common.tags")];
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    onSubHeaderChange?.(<StepIndicator steps={stepLabels} current={step} />);
-  }, [step]);
+  useMultiStepFormEffects({
+    step,
+    setStep,
+    totalSteps: 2,
+    stepLabels: [t("common.basicInfo"), t("project.responsaveis") + " & " + t("common.tags")],
+    onSubmit: () => mutation.mutate(),
+    canProceed: step === 1 ? !!form.name.trim() : true,
+    isPending: mutation.isPending,
+    submitLabel: initial ? t("common.save") : t("common.create"),
+    t,
+    onSubHeaderChange,
+  });
 
   return (
     <div className="space-y-4">

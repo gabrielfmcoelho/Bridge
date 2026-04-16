@@ -2,16 +2,17 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toolsAPI } from "@/lib/api";
+import { toolsAPI, servicesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import type { ExternalTool } from "@/lib/types";
+import type { ExternalTool, ServiceCredential } from "@/lib/types";
 import PageShell from "@/components/layout/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Checkbox from "@/components/ui/Checkbox";
 import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import PageHeader from "@/components/ui/PageHeader";
 import FormError from "@/components/ui/FormError";
@@ -27,7 +28,7 @@ const TOOL_ICONS: Record<string, string> = {
 };
 
 function getIconPath(icon: string): string {
-  return TOOL_ICONS[icon.toLowerCase()] || TOOL_ICONS.default;
+  return TOOL_ICONS[icon?.toLowerCase()] || TOOL_ICONS.default;
 }
 
 export default function ToolsPage() {
@@ -36,8 +37,10 @@ export default function ToolsPage() {
   const queryClient = useQueryClient();
   const isAdmin = user?.role === "admin";
   const [showForm, setShowForm] = useState(false);
+  const [showSync, setShowSync] = useState(false);
   const [editTool, setEditTool] = useState<ExternalTool | null>(null);
   const [embedTool, setEmbedTool] = useState<ExternalTool | null>(null);
+  const [credsTool, setCredsTool] = useState<ExternalTool | null>(null);
 
   const { data: tools = [], isLoading } = useQuery({
     queryKey: ["tools"],
@@ -51,7 +54,12 @@ export default function ToolsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tools"] }),
   });
 
-  // If embedding a tool, show full-screen iframe
+  const unsyncMutation = useMutation({
+    mutationFn: (id: number) => toolsAPI.unsyncService(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tools"] }),
+  });
+
+  // Embed view with optional credentials button
   if (embedTool) {
     return (
       <PageShell>
@@ -67,15 +75,31 @@ export default function ToolsPage() {
               {t("common.back")}
             </button>
             <h1 className="text-lg font-bold" style={{ fontFamily: "var(--font-display)" }}>{embedTool.name}</h1>
+            {embedTool.source === "service" && (
+              <Badge color="cyan">{t("tool.synced")}</Badge>
+            )}
           </div>
-          <a
-            href={embedTool.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
-          >
-            {t("tool.openExternal")}
-          </a>
+          <div className="flex items-center gap-3">
+            {embedTool.has_credentials && (
+              <button
+                onClick={() => setCredsTool(embedTool)}
+                className="inline-flex items-center gap-1.5 text-xs text-[var(--accent)] hover:underline"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+                {t("tool.viewCredentials")}
+              </button>
+            )}
+            <a
+              href={embedTool.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+            >
+              {t("tool.openExternal")}
+            </a>
+          </div>
         </div>
         <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] overflow-hidden bg-white" style={{ height: "calc(100vh - 160px)" }}>
           <iframe
@@ -85,13 +109,27 @@ export default function ToolsPage() {
             sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
           />
         </div>
+
+        {/* Credentials modal from embed view */}
+        <CredentialsModal tool={credsTool} onClose={() => setCredsTool(null)} />
       </PageShell>
     );
   }
 
   return (
     <PageShell>
-      <PageHeader title={t("tool.title")} addLabel={isAdmin ? t("tool.addTool") : undefined} onAdd={isAdmin ? () => setShowForm(true) : undefined} />
+      <div className="flex items-center justify-between mb-6">
+        <PageHeader
+          title={t("tool.title")}
+          addLabel={isAdmin ? t("tool.addTool") : undefined}
+          onAdd={isAdmin ? () => setShowForm(true) : undefined}
+        />
+        {isAdmin && (
+          <Button variant="secondary" size="sm" onClick={() => setShowSync(true)}>
+            {t("tool.syncFromService")}
+          </Button>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -115,7 +153,12 @@ export default function ToolsPage() {
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-[var(--text-primary)] text-sm">{tool.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-[var(--text-primary)] text-sm">{tool.name}</h3>
+                      {tool.source === "service" && (
+                        <Badge color="cyan" className="text-[10px]">{t("tool.synced")}</Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{tool.description || "-"}</p>
                   </div>
                 </div>
@@ -131,6 +174,14 @@ export default function ToolsPage() {
                       {t("tool.openExternal")}
                     </a>
                   )}
+                  {tool.has_credentials && (
+                    <button
+                      onClick={() => setCredsTool(tool)}
+                      className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+                    >
+                      {t("tool.viewCredentials")}
+                    </button>
+                  )}
                   {tool.embed_enabled && tool.url && (
                     <button
                       onClick={() => setEmbedTool(tool)}
@@ -140,12 +191,22 @@ export default function ToolsPage() {
                     </button>
                   )}
                   {isAdmin && (
-                    <button
-                      onClick={() => setEditTool(tool)}
-                      className="text-xs text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors ml-auto"
-                    >
-                      {t("common.edit")}
-                    </button>
+                    <div className="flex items-center gap-2 ml-auto">
+                      {tool.source === "service" && (
+                        <button
+                          onClick={() => { if (confirm("Unsync this tool?")) unsyncMutation.mutate(tool.id); }}
+                          className="text-xs text-[var(--text-faint)] hover:text-red-400 transition-colors"
+                        >
+                          {t("tool.unsync")}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setEditTool(tool)}
+                        className="text-xs text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
+                      >
+                        {t("common.edit")}
+                      </button>
+                    </div>
                   )}
                 </div>
               </Card>
@@ -154,7 +215,7 @@ export default function ToolsPage() {
         </div>
       )}
 
-      {/* Create modal */}
+      {/* Create manual tool modal */}
       <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={t("tool.addTool")}>
         <ToolForm
           onSuccess={() => {
@@ -164,7 +225,7 @@ export default function ToolsPage() {
         />
       </ResponsiveModal>
 
-      {/* Edit modal */}
+      {/* Edit tool modal */}
       <ResponsiveModal open={!!editTool} onClose={() => setEditTool(null)} title={t("common.edit")}>
         {editTool && (
           <ToolForm
@@ -180,9 +241,24 @@ export default function ToolsPage() {
           />
         )}
       </ResponsiveModal>
+
+      {/* Sync from service modal */}
+      <ResponsiveModal open={showSync} onClose={() => setShowSync(false)} title={t("tool.syncFromService")}>
+        <SyncForm
+          onSuccess={() => {
+            setShowSync(false);
+            queryClient.invalidateQueries({ queryKey: ["tools"] });
+          }}
+        />
+      </ResponsiveModal>
+
+      {/* Credentials modal */}
+      <CredentialsModal tool={credsTool} onClose={() => setCredsTool(null)} />
     </PageShell>
   );
 }
+
+// --- Manual tool form ---
 
 function ToolForm({ tool, onSuccess, onDelete }: {
   tool?: ExternalTool;
@@ -190,6 +266,7 @@ function ToolForm({ tool, onSuccess, onDelete }: {
   onDelete?: () => void;
 }) {
   const { t } = useLocale();
+  const isSynced = tool?.source === "service";
   const [form, setForm] = useState({
     name: tool?.name || "",
     description: tool?.description || "",
@@ -214,9 +291,14 @@ function ToolForm({ tool, onSuccess, onDelete }: {
   return (
     <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
       <FormError message={error} />
-      <Input label={t("tool.name")} value={form.name} onChange={(e) => set("name", e.target.value)} required autoFocus />
-      <Input label={t("common.description")} value={form.description} onChange={(e) => set("description", e.target.value)} />
-      <Input label="URL" value={form.url} onChange={(e) => set("url", e.target.value)} placeholder="https://..." />
+      {isSynced && (
+        <div className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-3 border border-[var(--border-subtle)]">
+          {t("tool.syncedFrom")}: <span className="font-medium text-[var(--text-secondary)]">{tool.name}</span>
+        </div>
+      )}
+      <Input label={t("tool.name")} value={form.name} onChange={(e) => set("name", e.target.value)} required autoFocus disabled={isSynced} />
+      <Input label={t("common.description")} value={form.description} onChange={(e) => set("description", e.target.value)} disabled={isSynced} />
+      <Input label="URL" value={form.url} onChange={(e) => set("url", e.target.value)} placeholder="https://..." disabled={isSynced} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input label={t("tool.icon")} value={form.icon} onChange={(e) => set("icon", e.target.value)} placeholder="outline, gitlab, signoz, metabase" />
         <Input label={t("tool.sortOrder")} type="number" value={form.sort_order.toString()} onChange={(e) => set("sort_order", parseInt(e.target.value) || 0)} />
@@ -238,5 +320,173 @@ function ToolForm({ tool, onSuccess, onDelete }: {
         </Button>
       </div>
     </form>
+  );
+}
+
+// --- Sync from service form ---
+
+function SyncForm({ onSuccess }: { onSuccess: () => void }) {
+  const { t } = useLocale();
+  const [serviceId, setServiceId] = useState("");
+  const [dnsId, setDnsId] = useState("");
+  const [embedEnabled, setEmbedEnabled] = useState(false);
+  const [icon, setIcon] = useState("");
+  const [sortOrder, setSortOrder] = useState(0);
+  const [error, setError] = useState("");
+
+  const { data: services = [] } = useQuery({
+    queryKey: ["services"],
+    queryFn: servicesAPI.list,
+  });
+
+  // Fetch DNS IDs for the selected service
+  const { data: serviceDetail } = useQuery({
+    queryKey: ["service-detail", serviceId],
+    queryFn: () => servicesAPI.get(Number(serviceId)),
+    enabled: !!serviceId,
+  });
+
+  const { data: dnsRecords = [] } = useQuery({
+    queryKey: ["dns"],
+    queryFn: () => import("@/lib/api").then((m) => m.dnsAPI.list()),
+  });
+
+  const linkedDnsIds = serviceDetail?.dns_ids || [];
+  const dnsOptions = dnsRecords
+    .filter((d) => linkedDnsIds.includes(d.id))
+    .map((d) => ({
+      value: String(d.id),
+      label: `${d.has_https ? "https" : "http"}://${d.domain}`,
+    }));
+
+  // Only show services that have DNS links
+  const servicesWithDns = services.filter((s) => {
+    // We don't know dns_ids from the list endpoint, so show all services
+    return true;
+  });
+
+  const serviceOptions = servicesWithDns.map((s) => ({
+    value: String(s.id),
+    label: s.nickname,
+  }));
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      toolsAPI.syncFromService({
+        service_id: Number(serviceId),
+        dns_id: Number(dnsId),
+        embed_enabled: embedEnabled,
+        icon,
+        sort_order: sortOrder,
+      }),
+    onSuccess: () => onSuccess(),
+    onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
+  });
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
+      <FormError message={error} />
+      <Select
+        label={t("tool.selectService")}
+        options={serviceOptions}
+        value={serviceId}
+        onChange={(e) => { setServiceId(e.target.value); setDnsId(""); }}
+      />
+      {serviceId && (
+        <Select
+          label={t("tool.selectDns")}
+          options={dnsOptions}
+          value={dnsId}
+          onChange={(e) => setDnsId(e.target.value)}
+        />
+      )}
+      {serviceId && dnsOptions.length === 0 && serviceDetail && (
+        <p className="text-xs text-[var(--text-faint)]">
+          This service has no linked DNS records. Link a DNS record to the service first.
+        </p>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input label={t("tool.icon")} value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="outline, gitlab, signoz, metabase" />
+        <Input label={t("tool.sortOrder")} type="number" value={sortOrder.toString()} onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)} />
+      </div>
+      <Checkbox label={t("tool.enableEmbed")} checked={embedEnabled} onChange={setEmbedEnabled} />
+
+      <div className="flex justify-end pt-2">
+        <Button type="submit" loading={mutation.isPending} disabled={!serviceId || !dnsId}>
+          {t("tool.syncFromService")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// --- Credentials modal ---
+
+function CredentialsModal({ tool, onClose }: { tool: ExternalTool | null; onClose: () => void }) {
+  const { t } = useLocale();
+
+  const { data: credentials = [] } = useQuery({
+    queryKey: ["tool-credentials", tool?.id],
+    queryFn: () => toolsAPI.listToolCredentials(tool!.id),
+    enabled: !!tool,
+  });
+
+  return (
+    <ResponsiveModal open={!!tool} onClose={onClose} title={t("tool.credentialsTitle")} subHeader={tool?.name}>
+      {credentials.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)] py-4">{t("tool.noCredentials")}</p>
+      ) : (
+        <div className="space-y-2">
+          {credentials.map((cred) => (
+            <CredentialRow key={cred.id} toolId={tool!.id} credential={cred} />
+          ))}
+        </div>
+      )}
+    </ResponsiveModal>
+  );
+}
+
+function CredentialRow({ toolId, credential }: { toolId: number; credential: ServiceCredential }) {
+  const { t } = useLocale();
+  const [revealed, setRevealed] = useState(false);
+  const [value, setValue] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const reveal = async () => {
+    if (revealed) {
+      setRevealed(false);
+      setValue(null);
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await toolsAPI.getToolCredential(toolId, credential.id);
+      setValue(data.credentials || "");
+      setRevealed(true);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-[var(--text-primary)]">{credential.role_name}</span>
+        <button
+          onClick={reveal}
+          disabled={loading}
+          className="text-xs text-[var(--accent)] hover:underline disabled:opacity-50"
+        >
+          {loading ? t("common.loading") : revealed ? t("serviceCredentials.hide") : t("serviceCredentials.reveal")}
+        </button>
+      </div>
+      {revealed && value !== null && (
+        <pre className="mt-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface)] rounded-[var(--radius-sm)] p-2 overflow-x-auto whitespace-pre-wrap break-all border border-[var(--border-subtle)]">
+          {value}
+        </pre>
+      )}
+    </div>
   );
 }

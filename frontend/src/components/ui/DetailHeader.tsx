@@ -42,7 +42,7 @@ export default function DetailHeader({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1
-            className="text-2xl font-bold truncate"
+            className="text-xl sm:text-2xl font-bold truncate"
             style={{ fontFamily: fontVar, color: titleColor || "var(--text-primary)" }}
           >
             {title}

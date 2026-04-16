@@ -45,8 +45,7 @@ export default function ServiceTopologyTab({
         {filteredGraph.nodes.length > 0 ? (
           <Card
             hover={false}
-            className="overflow-hidden flex flex-col"
-            style={{ height: "calc(100vh - 18rem)" }}
+            className="overflow-hidden flex flex-col h-[50vh] lg:h-[calc(100vh-18rem)]"
           >
             <h2
               className="text-sm font-semibold text-[var(--text-secondary)] mb-3 shrink-0"

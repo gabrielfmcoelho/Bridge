@@ -26,7 +26,7 @@ export default function DnsTopologyTab({ filteredGraph, linkedHosts, linkedServi
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
         {/* Graph */}
         {filteredGraph.nodes.length > 0 ? (
-          <Card hover={false} className="overflow-hidden flex flex-col" style={{ height: "calc(100vh - 18rem)" }}>
+          <Card hover={false} className="overflow-hidden flex flex-col h-[50vh] lg:h-[calc(100vh-18rem)]">
             <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3 shrink-0" style={{ fontFamily: "var(--font-display)" }}>
               Topology
             </h2>

@@ -181,7 +181,7 @@ export default function DashboardPage() {
       ) : stats ? (
         <>
           {/* Stat cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-6">
             {statConfig.map((cfg, i) => (
               <StatCard
                 key={cfg.key}

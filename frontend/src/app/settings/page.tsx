@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { enumsAPI, usersAPI, appearanceAPI, importAPI, backupAPI } from "@/lib/api";
 import type { ImportResult } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -1102,6 +1103,8 @@ function ImportSection() {
 
 function BackupSection() {
   const { t } = useLocale();
+  const { logout } = useAuth();
+  const router = useRouter();
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -1138,7 +1141,21 @@ function BackupSection() {
       if (res.cross_dialect && res.source_dialect && res.target_dialect) {
         parts.push(`Cross-dialect: ${res.source_dialect} → ${res.target_dialect}.`);
       }
+      parts.push(t("settings.restoreSuccessLogout"));
       setResult({ ok: true, message: parts.join(" ") });
+      if (restoreInputRef.current) restoreInputRef.current.value = "";
+      // The restore wiped the users and sessions tables, so the current
+      // session cookie now points to nothing. Give the user a moment to
+      // read the success banner, then force a clean re-login.
+      setTimeout(async () => {
+        try {
+          await logout();
+        } catch {
+          // Server-side session is already gone — ignore and continue.
+        }
+        router.push("/login");
+      }, 2500);
+      return;
     } catch (err) {
       setResult({ ok: false, message: err instanceof Error ? err.message : "Restore failed" });
     } finally {

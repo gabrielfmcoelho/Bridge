@@ -29,6 +29,34 @@ export type DockerStatusType = {
   message: string;
 };
 
+export type SystemdServiceType = {
+  unit: string;
+  description?: string;
+  is_native: boolean;
+};
+
+export type InstalledPackageType = {
+  name: string;
+  version: string;
+  source: string;
+};
+
+export type NginxCleanupStepType = {
+  name: string;
+  status: string;
+  output?: string;
+};
+
+export type NginxCleanupStatusType = {
+  found: boolean;
+  is_native: boolean;
+  is_container: boolean;
+  backup_path?: string;
+  steps: NginxCleanupStepType[];
+  package_manager?: string;
+  message: string;
+};
+
 export type VMInfoType = {
   cpu: string; cpu_usage: string;
   ram: string; ram_used: string; ram_percent: string;
@@ -41,6 +69,10 @@ export type VMInfoType = {
   warnings?: string[];
   process_details?: ProcessDetail[];
   ssh_keys?: SSHKeyInfoScan[];
+  systemd_services?: SystemdServiceType[];
+  installed_packages?: InstalledPackageType[];
+  cron_jobs?: string[];
+  firewall_status?: string;
 };
 
 export type SSHKeyInfoScan = {
@@ -323,8 +355,8 @@ export const sshAPI = {
     api.post<{ success: boolean; method?: string; message?: string; output?: string; error?: string }>(`/api/ssh/fix-dev-null/${slug}`, { method }),
   setupSudoNopasswd: (slug: string) =>
     api.post<{ success: boolean; message?: string; output?: string; error?: string }>(`/api/ssh/setup-sudo-nopasswd/${slug}`),
-  createRemoteUser: (slug: string, username: string, pubKey: string) =>
-    api.post<{ success: boolean; message?: string; output?: string; error?: string }>(`/api/ssh/create-remote-user/${slug}`, { username, pub_key: pubKey }),
+  createRemoteUser: (slug: string, username: string, pubKey: string, force = false) =>
+    api.post<{ success: boolean; message?: string; output?: string; error?: string; user_exists?: boolean }>(`/api/ssh/create-remote-user/${slug}`, { username, pub_key: pubKey, force }),
   setupKey: (slug: string, data: {
     user?: string; password?: string; use_saved_password?: boolean;
     mode: "generate" | "existing"; existing_key_path?: string;
@@ -347,6 +379,8 @@ export const sshAPI = {
     api.get<{ config: string }>(`/api/ssh/host-config/${slug}?include_key=${includeKey}`),
   dockerSetup: (slug: string, fix: boolean) =>
     api.post<{ success: boolean; error?: string; status?: DockerStatusType }>(`/api/ssh/docker-setup/${slug}`, { fix }),
+  nginxCleanup: (slug: string, purge: boolean) =>
+    api.post<{ success: boolean; error?: string; status?: NginxCleanupStatusType }>(`/api/ssh/nginx-cleanup/${slug}`, { purge }),
 };
 
 // SSH Keys
@@ -475,7 +509,7 @@ export const releasesAPI = {
 export const toolsAPI = {
   list: async () => {
     const data = await api.get<unknown>("/api/tools");
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data) ? (data as import("./types").ExternalTool[]) : [];
   },
   get: (id: number) => api.get<import("./types").ExternalTool>(`/api/tools/${id}`),
   create: (data: Partial<import("./types").ExternalTool>) =>
@@ -483,6 +517,18 @@ export const toolsAPI = {
   update: (id: number, data: Partial<import("./types").ExternalTool>) =>
     api.put<import("./types").ExternalTool>(`/api/tools/${id}`, data),
   delete: (id: number) => api.delete(`/api/tools/${id}`),
+  syncFromService: (data: { service_id: number; dns_id: number; embed_enabled?: boolean; icon?: string; sort_order?: number }) =>
+    api.post<import("./types").ExternalTool>("/api/tools/sync-service", data),
+  unsyncService: (id: number) => api.delete(`/api/tools/sync-service/${id}`),
+  listToolCredentials: (toolId: number) =>
+    api.get<import("./types").ServiceCredential[]>(`/api/tools/${toolId}/credentials`),
+  getToolCredential: (toolId: number, credId: number) =>
+    api.get<import("./types").ServiceCredential>(`/api/tools/${toolId}/credentials/${credId}`),
+};
+
+// Service credentials (all services)
+export const serviceCredentialsAPI = {
+  listAll: () => api.get<import("./types").ServiceWithCredentials[]>("/api/services/credentials/all"),
 };
 
 // Appearance settings

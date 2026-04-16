@@ -803,4 +803,9 @@ var migrationsSQLite = []string{
 	// ALTER TABLE RENAME COLUMN; the embedded modernc/sqlite build ships
 	// with a much newer release so this is safe.
 	`ALTER TABLE hosts RENAME COLUMN user TO ssh_user;`,
+
+	// Version 49: link external_tools to services and DNS for sync.
+	`ALTER TABLE external_tools ADD COLUMN service_id INTEGER REFERENCES services(id) ON DELETE SET NULL;
+	ALTER TABLE external_tools ADD COLUMN dns_id INTEGER REFERENCES dns_records(id) ON DELETE SET NULL;
+	ALTER TABLE external_tools ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';`,
 }

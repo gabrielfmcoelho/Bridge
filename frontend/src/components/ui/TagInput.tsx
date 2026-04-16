@@ -11,9 +11,10 @@ interface TagInputProps {
   onChange: (tags: string[]) => void;
   suggestions?: string[];
   entityType?: string;
+  placeholder?: string;
 }
 
-export default function TagInput({ label, tags, onChange, suggestions: externalSuggestions, entityType }: TagInputProps) {
+export default function TagInput({ label, tags, onChange, suggestions: externalSuggestions, entityType, placeholder }: TagInputProps) {
   const [input, setInput] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,15 +67,15 @@ export default function TagInput({ label, tags, onChange, suggestions: externalS
                   if (e.key === "Enter") { e.preventDefault(); addTag(); }
                   if (e.key === "Escape") setShowSuggestions(false);
                 }}
-                placeholder="Add tag..."
-                className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none"
+                placeholder={placeholder || "Add tag..."}
+                className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2.5 md:py-2 text-base md:text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none"
               />
             </Popover.Anchor>
           </div>
           <button
             type="button"
             onClick={() => addTag()}
-            className="px-3 py-2 text-sm font-medium bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20 rounded-[var(--radius-md)] hover:bg-[var(--accent)]/20 transition-colors"
+            className="px-4 py-2.5 md:py-2 text-sm font-medium bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20 rounded-[var(--radius-md)] hover:bg-[var(--accent)]/20 transition-colors"
           >
             +
           </button>
@@ -110,7 +111,7 @@ export default function TagInput({ label, tags, onChange, suggestions: externalS
           {tags.map((tag) => (
             <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-[var(--bg-overlay)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
               {tag}
-              <button type="button" onClick={() => removeTag(tag)} className="w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-red-500/20 hover:text-red-400 transition-colors text-[10px] leading-none">
+              <button type="button" onClick={() => removeTag(tag)} className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-red-500/20 hover:text-red-400 transition-colors text-xs leading-none">
                 &times;
               </button>
             </span>

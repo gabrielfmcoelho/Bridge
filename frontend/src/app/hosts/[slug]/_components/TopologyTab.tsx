@@ -174,15 +174,15 @@ export default function TopologyTab({ data, filteredGraph, t }: {
 
   return (
     <div className="animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-5" style={{ height: "calc(100vh - 16rem)" }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 lg:gap-5 h-[60vh] lg:h-[calc(100vh-16rem)]">
         {filteredGraph.nodes.length > 0 ? (
-          <div className="rounded-[var(--radius-lg)] overflow-hidden border border-[var(--border-subtle)] h-full">
+          <div className="rounded-[var(--radius-lg)] overflow-hidden border border-[var(--border-subtle)] h-full min-h-[300px]">
             <TopologyGraph data={filteredGraph} className="w-full h-full" />
           </div>
         ) : (
           <EmptyState icon="topology" title={t("host.noTopology") || "No connections yet"} compact />
         )}
-        <div className="overflow-y-auto pr-1" style={{ maxHeight: "calc(100vh - 16rem)" }}>
+        <div className="overflow-y-auto pr-1 max-h-[40vh] lg:max-h-none">
           {connectionList}
         </div>
       </div>

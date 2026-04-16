@@ -162,6 +162,73 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
       {info.container_stats?.length > 0 && (
         <ContainersList stats={info.container_stats} title={t("scan.dockerContainers")} />
       )}
+
+      {/* Systemd Services */}
+      {info.systemd_services && info.systemd_services.length > 0 && (
+        <>
+          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.systemdServices")}</h3>
+          <Card hover={false}>
+            <div className="flex flex-wrap gap-1.5">
+              {info.systemd_services.map((svc, i) => (
+                <span
+                  key={i}
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] border ${
+                    svc.is_native
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : "bg-sky-500/10 text-sky-400 border-sky-500/20"
+                  }`}
+                  title={svc.description || svc.unit}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${svc.is_native ? "bg-emerald-400" : "bg-sky-400"}`} />
+                  {svc.unit.replace(".service", "")}
+                  <span className="opacity-60">({svc.is_native ? t("scan.native") : t("scan.containerManaged")})</span>
+                </span>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* Installed Packages */}
+      {info.installed_packages && info.installed_packages.length > 0 && (
+        <>
+          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.installedPackages")}</h3>
+          <Card hover={false}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+              {info.installed_packages.map((pkg, i) => (
+                <div key={i} className="flex items-center justify-between py-1 border-b border-[var(--border-subtle)]/50 last:border-0">
+                  <span className="text-xs text-[var(--text-primary)]">{pkg.name}</span>
+                  <span className="text-xs text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{pkg.version}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* Cron Jobs */}
+      {info.cron_jobs && info.cron_jobs.length > 0 && (
+        <>
+          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.cronJobs")}</h3>
+          <Card hover={false}>
+            <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
+              {info.cron_jobs.join("\n")}
+            </pre>
+          </Card>
+        </>
+      )}
+
+      {/* Firewall Status */}
+      {info.firewall_status && (
+        <>
+          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.firewallStatus")}</h3>
+          <Card hover={false}>
+            <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
+              {info.firewall_status}
+            </pre>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

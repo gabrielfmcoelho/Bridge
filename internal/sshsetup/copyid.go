@@ -2,43 +2,17 @@ package sshsetup
 
 import (
 	"fmt"
-	"net"
-	"os"
 	"strings"
-	"time"
 
 	"golang.org/x/crypto/ssh"
 )
 
-// CopyPublicKey connects to a remote host via password auth and appends the
-// public key to ~/.ssh/authorized_keys (like ssh-copy-id).
+// CopyPublicKey appends the public key to ~/.ssh/authorized_keys on the remote
+// host using an already-established SSH connection.
+// pubKey is the authorized_keys-formatted public key string.
 // It is idempotent: skips if the key is already present.
-func CopyPublicKey(hostname, port, user, password, pubKeyPath string) error {
-	pubKeyData, err := os.ReadFile(pubKeyPath)
-	if err != nil {
-		return fmt.Errorf("read public key: %w", err)
-	}
-	pubKeyStr := strings.TrimSpace(string(pubKeyData))
-
-	if port == "" {
-		port = "22"
-	}
-
-	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
-	}
-
-	addr := net.JoinHostPort(hostname, port)
-	client, err := ssh.Dial("tcp", addr, config)
-	if err != nil {
-		return fmt.Errorf("SSH connect to %s: %w", addr, err)
-	}
-	defer client.Close()
+func CopyPublicKey(client *ssh.Client, pubKey string) error {
+	pubKeyStr := strings.TrimSpace(pubKey)
 
 	// Check if key already exists, then append if not
 	cmd := fmt.Sprintf(

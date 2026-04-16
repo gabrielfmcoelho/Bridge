@@ -2,12 +2,16 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
+
+	"golang.org/x/crypto/ssh"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -17,6 +21,15 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshsetup"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
 )
+
+// validLinuxUsername matches POSIX portable usernames: starts with lowercase
+// letter or underscore, followed by up to 31 lowercase alphanums, hyphens, or
+// underscores. This prevents shell metacharacter injection when the name is
+// interpolated into remote commands.
+var validLinuxUsername = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
+
+// validSSHPubKeyPrefix matches the type prefix of an OpenSSH public key line.
+var validSSHPubKeyPrefix = regexp.MustCompile(`^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)\s+[A-Za-z0-9+/=]+`)
 
 type sshHandlers struct {
 	db         *database.DB
@@ -39,6 +52,99 @@ func (h *sshHandlers) logOperation(r *http.Request, hostID int64, opType string,
 	if err := models.CreateOperationLog(h.db.SQL, ol); err != nil {
 		log.Printf("[ssh] failed to log operation: %v", err)
 	}
+}
+
+// requireHost loads a host by slug from the request path. Returns nil and
+// writes an HTTP error if not found.
+func (h *sshHandlers) requireHost(w http.ResponseWriter, r *http.Request) *models.Host {
+	slug := r.PathValue("slug")
+	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	if err != nil || host == nil {
+		jsonError(w, http.StatusNotFound, "host not found")
+		return nil
+	}
+	return host
+}
+
+// requireUser returns the host's configured SSH user, or writes an HTTP error.
+func (h *sshHandlers) requireUser(w http.ResponseWriter, host *models.Host) string {
+	if host.User == "" {
+		jsonError(w, http.StatusBadRequest, "host has no user configured")
+		return ""
+	}
+	return host.User
+}
+
+
+// resolveAuth builds an Auth for the given method. If method is empty, it picks
+// the best available method. Returns the resolved method name and Auth, or
+// writes an HTTP error and returns false.
+func (h *sshHandlers) resolveAuth(w http.ResponseWriter, host *models.Host, method string) (string, sshtest.Auth, bool) {
+	// Auto-select method if not specified
+	if method == "" {
+		switch {
+		case host.HasPassword && host.HasKey:
+			if host.PreferredAuth == "password" || host.PreferredAuth == "key" {
+				method = host.PreferredAuth
+			} else {
+				jsonError(w, http.StatusBadRequest, "host has both auth methods; set preferred auth or choose one")
+				return "", sshtest.Auth{}, false
+			}
+		case host.HasKey:
+			method = "key"
+		case host.HasPassword:
+			method = "password"
+		default:
+			jsonError(w, http.StatusBadRequest, "host has no password or key configured")
+			return "", sshtest.Auth{}, false
+		}
+	}
+
+	switch method {
+	case "password":
+		if !host.HasPassword {
+			jsonError(w, http.StatusBadRequest, "no password stored for this host")
+			return "", sshtest.Auth{}, false
+		}
+		pw, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
+		if err != nil {
+			jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
+			return "", sshtest.Auth{}, false
+		}
+		return "password", sshtest.PasswordAuth(pw), true
+
+	case "key":
+		if !host.HasKey {
+			jsonError(w, http.StatusBadRequest, "no key configured for this host")
+			return "", sshtest.Auth{}, false
+		}
+		keyPEM, err := resolveHostKeyPEM(h.db, host)
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return "", sshtest.Auth{}, false
+		}
+		// Carry the password for sudo operations even with key auth
+		var pw string
+		if host.HasPassword {
+			pw, _ = h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
+		}
+		return "key", sshtest.KeyAuth(keyPEM, pw), true
+
+	default:
+		jsonError(w, http.StatusBadRequest, "method must be 'password' or 'key'")
+		return "", sshtest.Auth{}, false
+	}
+}
+
+// dial opens an SSH connection using the resolved auth. Returns the client or
+// writes an HTTP error and returns nil.
+func (h *sshHandlers) dial(w http.ResponseWriter, host *models.Host, user string, auth sshtest.Auth) *ssh.Client {
+	client, err := sshtest.Dial(host.Hostname, host.Port, user, auth)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "SSH connect: "+err.Error())
+		return nil
+	}
+	return client
 }
 
 // handlePreviewConfig renders the SSH config that would be generated.
@@ -78,10 +184,12 @@ func (h *sshHandlers) handleGenerateConfig(w http.ResponseWriter, r *http.Reques
 
 // handleTestConnection tests SSH connectivity to a host.
 func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
-	if err != nil || host == nil {
-		jsonError(w, http.StatusNotFound, "host not found")
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	user := h.requireUser(w, host)
+	if user == "" {
 		return
 	}
 
@@ -94,70 +202,44 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	user := host.User
-	if user == "" {
-		jsonError(w, http.StatusBadRequest, "host has no user configured")
+	method, auth, ok := h.resolveAuth(w, host, req.Method)
+	if !ok {
 		return
+	}
+	client := h.dial(w, host, user, auth)
+	if client == nil {
+		return
+	}
+	defer client.Close()
+
+	// Helper to update test status on the host record
+	setTestStatus := func(status string) {
+		if method == "password" {
+			host.PasswordTestStatus = &status
+		} else {
+			host.KeyTestStatus = &status
+		}
 	}
 
 	result := map[string]any{}
 
 	if req.Capture {
-		// Use capture variants that return VM info
-		var vmInfo *sshtest.VMInfo
-		var testErr error
-		switch req.Method {
-		case "password":
-			if !host.HasPassword {
-				jsonError(w, http.StatusBadRequest, "no password stored for this host")
-				return
-			}
-			password, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
-			if err != nil {
-				jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
-				return
-			}
-			vmInfo, testErr = sshtest.TestWithPasswordCapture(host.Hostname, host.Port, user, password)
-		case "key":
-			if host.KeyPath == "" {
-				jsonError(w, http.StatusBadRequest, "no key configured for this host")
-				return
-			}
-			vmInfo, testErr = sshtest.TestWithKeyCapture(host.Hostname, host.Port, user, host.KeyPath)
-		default:
-			jsonError(w, http.StatusBadRequest, "method must be 'password' or 'key'")
-			return
-		}
+		vmInfo, testErr := sshtest.TestCapture(client)
 		if testErr != nil {
-			// Mark connection failure
 			host.ConnectionsFailed++
-			// Update test status for the failed method
-			if req.Method == "password" {
-				status := "failed"
-				host.PasswordTestStatus = &status
-			} else if req.Method == "key" {
-				status := "failed"
-				host.KeyTestStatus = &status
-			}
+			setTestStatus("failed")
 			models.UpdateHost(h.db.SQL, host)
-			h.logOperation(r, host.ID, "test", &req.Method, "failed", testErr.Error())
+			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
 			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
 			return
 		}
 		result["success"] = true
 		result["vm_info"] = vmInfo
-		// Reset failure counter on successful connection
 		if host.ConnectionsFailed > 0 {
 			host.ConnectionsFailed = 0
 		}
-		// Update test status for the successful method
-		if req.Method == "password" {
-			status := "success"
-			host.PasswordTestStatus = &status
-		} else if req.Method == "key" {
-			status := "success"
-			host.KeyTestStatus = &status
-		}
+		setTestStatus("success")
+
 		// Auto-update host resource fields if empty
 		updated := false
 		if host.RecursoCPU == "" && vmInfo.CPU != "" {
@@ -177,26 +259,21 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		ramPct := parsePercent(vmInfo.RAMPercent)
 		diskPct := parsePercent(vmInfo.DiskPercent)
 
-		// Alert: any resource > 80%
 		if cpuPct > 80 || ramPct > 80 || diskPct > 80 {
 			host.PrecisaManutencao = true
 			updated = true
 			result["resource_alert"] = true
-			// Auto-tag alerta-recursos, remove sub-utilizado
 			models.AddTag(h.db.SQL, "host", host.ID, "alerta-recursos")
 			models.RemoveTag(h.db.SQL, "host", host.ID, "sub-utilizado")
 		} else if cpuPct > 0 && cpuPct < 5 && ramPct > 0 && ramPct < 5 && diskPct > 0 && diskPct < 5 {
-			// Sub-utilized: all resources < 5%
 			result["sub_utilized"] = true
 			models.AddTag(h.db.SQL, "host", host.ID, "sub-utilizado")
 			models.RemoveTag(h.db.SQL, "host", host.ID, "alerta-recursos")
-			// Clear maintenance flag if it was set by resource alert
 			if host.PrecisaManutencao {
 				host.PrecisaManutencao = false
 				updated = true
 			}
 		} else {
-			// Normal range — remove both auto-tags
 			models.RemoveTag(h.db.SQL, "host", host.ID, "alerta-recursos")
 			models.RemoveTag(h.db.SQL, "host", host.ID, "sub-utilizado")
 			if host.PrecisaManutencao {
@@ -208,7 +285,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		if updated {
 			models.UpdateHost(h.db.SQL, host)
 		}
-		h.logOperation(r, host.ID, "test", &req.Method, "success", "")
+		h.logOperation(r, host.ID, "test", &method, "success", "")
 		// Annotate scanned SSH keys with managed status from DB
 		if len(vmInfo.SSHKeys) > 0 {
 			dbKeys, _ := models.ListSSHKeys(h.db.SQL)
@@ -225,67 +302,28 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		// Store scan snapshot in DB
 		if scanJSON, err := json.Marshal(vmInfo); err == nil {
 			if dbErr := models.CreateHostScan(h.db.SQL, host.ID, string(scanJSON)); dbErr != nil {
-				// Include error in response for debugging
 				result["scan_save_error"] = dbErr.Error()
 			} else {
 				result["scan_saved"] = true
 			}
 		}
 	} else {
-		var testErr error
-		switch req.Method {
-		case "password":
-			if !host.HasPassword {
-				jsonError(w, http.StatusBadRequest, "no password stored for this host")
-				return
-			}
-			password, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
-			if err != nil {
-				jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
-				return
-			}
-			testErr = sshtest.TestWithPassword(host.Hostname, host.Port, user, password)
-		case "key":
-			if host.KeyPath == "" {
-				jsonError(w, http.StatusBadRequest, "no key configured for this host")
-				return
-			}
-			testErr = sshtest.TestWithKey(host.Hostname, host.Port, user, host.KeyPath)
-		default:
-			jsonError(w, http.StatusBadRequest, "method must be 'password' or 'key'")
-			return
-		}
+		testErr := sshtest.Test(client)
 		if testErr != nil {
-			// Mark connection failure
 			host.ConnectionsFailed++
-			// Update test status for the failed method
-			if req.Method == "password" {
-				status := "failed"
-				host.PasswordTestStatus = &status
-			} else if req.Method == "key" {
-				status := "failed"
-				host.KeyTestStatus = &status
-			}
+			setTestStatus("failed")
 			models.UpdateHost(h.db.SQL, host)
-			h.logOperation(r, host.ID, "test", &req.Method, "failed", testErr.Error())
+			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
 			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
 			return
 		}
 		result["success"] = true
-		// Reset failure counter on successful connection and update test status
 		if host.ConnectionsFailed > 0 {
 			host.ConnectionsFailed = 0
 		}
-		// Update test status for the successful method
-		if req.Method == "password" {
-			status := "success"
-			host.PasswordTestStatus = &status
-		} else if req.Method == "key" {
-			status := "success"
-			host.KeyTestStatus = &status
-		}
+		setTestStatus("success")
 		models.UpdateHost(h.db.SQL, host)
-		h.logOperation(r, host.ID, "test", &req.Method, "success", "")
+		h.logOperation(r, host.ID, "test", &method, "success", "")
 	}
 
 	jsonOK(w, result)
@@ -293,90 +331,42 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 
 // handleFixDevNull attempts to repair /dev/null permissions on remote host.
 func (h *sshHandlers) handleFixDevNull(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
-	if err != nil || host == nil {
-		jsonError(w, http.StatusNotFound, "host not found")
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	user := h.requireUser(w, host)
+	if user == "" {
 		return
 	}
 
 	var req struct {
-		Method string `json:"method"` // "password" or "key"
+		Method string `json:"method"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	user := host.User
-	if user == "" {
-		jsonError(w, http.StatusBadRequest, "host has no user configured")
+	method, auth, ok := h.resolveAuth(w, host, strings.TrimSpace(req.Method))
+	if !ok {
 		return
 	}
-
-	method := strings.TrimSpace(req.Method)
-	if method == "" {
-		switch {
-		case host.HasPassword && host.KeyPath != "":
-			if host.PreferredAuth == "password" || host.PreferredAuth == "key" {
-				method = host.PreferredAuth
-			} else {
-				jsonError(w, http.StatusBadRequest, "host has both auth methods; set preferred auth or choose one")
-				return
-			}
-		case host.HasPassword:
-			method = "password"
-		case host.KeyPath != "":
-			method = "key"
-		default:
-			jsonError(w, http.StatusBadRequest, "host has no password or key configured")
-			return
-		}
-	}
-
-	var output string
-	var fixErr error
-
-	switch method {
-	case "password":
-		if !host.HasPassword {
-			jsonError(w, http.StatusBadRequest, "no password stored for this host")
-			return
-		}
-		password, decErr := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
-		if decErr != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
-			return
-		}
-		output, fixErr = sshtest.FixDevNullWithPassword(host.Hostname, host.Port, user, password)
-	case "key":
-		if host.KeyPath == "" {
-			jsonError(w, http.StatusBadRequest, "no key configured for this host")
-			return
-		}
-		output, fixErr = sshtest.FixDevNullWithKey(host.Hostname, host.Port, user, host.KeyPath)
-	default:
-		jsonError(w, http.StatusBadRequest, "method must be 'password' or 'key'")
+	client := h.dial(w, host, user, auth)
+	if client == nil {
 		return
 	}
+	defer client.Close()
 
+	output, fixErr := sshtest.FixDevNull(client)
 	if fixErr != nil {
 		h.logOperation(r, host.ID, "fix-dev-null", &method, "failed", fixErr.Error()+"\n"+output)
-		jsonOK(w, map[string]any{
-			"success": false,
-			"error":   fixErr.Error(),
-			"output":  output,
-		})
+		jsonOK(w, map[string]any{"success": false, "error": fixErr.Error(), "output": output})
 		return
 	}
 
 	h.logOperation(r, host.ID, "fix-dev-null", &method, "success", output)
-	jsonOK(w, map[string]any{
-		"success": true,
-		"method":  method,
-		"output":  output,
-		"message": "Remote /dev/null was validated and is now in expected state.",
-	})
+	jsonOK(w, map[string]any{"success": true, "method": method, "output": output, "message": "Remote /dev/null was validated and is now in expected state."})
 }
 
 // handleSetupKey sets up an SSH key for a host.
@@ -426,43 +416,42 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 		existingKeyPath = host.KeyPath
 	}
 
+	// Dial with password auth for the initial key copy
+	auth := sshtest.PasswordAuth(password)
+	client := h.dial(w, host, user, auth)
+	if client == nil {
+		return
+	}
+	defer client.Close()
+
 	setupReq := sshsetup.Request{
 		Host:            host.OficialSlug,
-		HostName:        host.Hostname,
-		Port:            host.Port,
-		User:            user,
-		Password:        password,
 		Mode:            req.Mode,
 		ExistingKeyPath: existingKeyPath,
 	}
 
-	result, err := sshsetup.Execute(setupReq)
+	result, err := sshsetup.Execute(client, setupReq)
 	if err != nil {
-		pwMethod := "password"
-		h.logOperation(r, host.ID, "setup-key", &pwMethod, "failed", err.Error())
+		method := auth.Method()
+		h.logOperation(r, host.ID, "setup-key", &method, "failed", err.Error())
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	pwMethodOK := "password"
-	h.logOperation(r, host.ID, "setup-key", &pwMethodOK, "success", fmt.Sprintf("mode=%s key=%s", req.Mode, result.PublicKeyPath))
-	// Read key file contents and store encrypted in DB as backup.
-	var pubKeyCT, pubKeyNonce, privKeyCT, privKeyNonce []byte
-	if privBytes, err := os.ReadFile(result.PrivateKeyPath); err == nil {
-		privKeyCT, privKeyNonce, _ = h.db.Encryptor.Encrypt(string(privBytes))
-	}
-	if pubBytes, err := os.ReadFile(result.PublicKeyPath); err == nil {
-		pubKeyCT, pubKeyNonce, _ = h.db.Encryptor.Encrypt(string(pubBytes))
-	}
+	method := auth.Method()
+	h.logOperation(r, host.ID, "setup-key", &method, "success", fmt.Sprintf("mode=%s generated=%v", req.Mode, result.Generated))
 
-	// Update host key fields.
-	models.UpdateHostKey(h.db.SQL, host.ID, true, result.PrivateKeyPath, "yes",
+	// Encrypt key material and store in DB — nothing touches the filesystem.
+	privKeyCT, privKeyNonce, _ := h.db.Encryptor.Encrypt(string(result.PrivKeyPEM))
+	pubKeyCT, pubKeyNonce, _ := h.db.Encryptor.Encrypt(result.PubKeyLine)
+
+	// key_path is empty — keys live only in the encrypted DB blob.
+	models.UpdateHostKey(h.db.SQL, host.ID, true, "", "yes",
 		pubKeyCT, pubKeyNonce, privKeyCT, privKeyNonce)
 
 	jsonOK(w, map[string]any{
-		"success":    true,
-		"generated":  result.Generated,
-		"public_key": result.PublicKeyPath,
+		"success":   true,
+		"generated": result.Generated,
 	})
 }
 
@@ -522,141 +511,114 @@ func (h *sshHandlers) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleSetupSudoNopasswd configures passwordless sudo for the remote user.
-// Connects via password or key (based on available credentials), but always
-// needs the stored password for `sudo -S`.
+// handleSetupSudoNopasswd configures passwordless sudo for the remote host's user.
 func (h *sshHandlers) handleSetupSudoNopasswd(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
-	if err != nil || host == nil {
-		jsonError(w, http.StatusNotFound, "host not found")
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	user := h.requireUser(w, host)
+	if user == "" {
 		return
 	}
 
-	user := host.User
-	if user == "" {
-		jsonError(w, http.StatusBadRequest, "host has no user configured")
+	method, auth, ok := h.resolveAuth(w, host, "")
+	if !ok {
 		return
 	}
-	if !host.HasPassword {
+	password := auth.Password()
+	if password == "" {
 		jsonError(w, http.StatusBadRequest, "stored password required for sudo -S")
 		return
 	}
 
-	password, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
-	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
+	client := h.dial(w, host, user, auth)
+	if client == nil {
 		return
 	}
+	defer client.Close()
 
-	// Pick auth method: prefer key if available, fall back to password
-	var method string
-	var output string
-	var setupErr error
-
-	if host.HasKey && host.KeyPath != "" {
-		method = "key"
-		output, setupErr = sshtest.SetupSudoNopasswdWithKey(host.Hostname, host.Port, user, host.KeyPath, password)
-	} else {
-		method = "password"
-		output, setupErr = sshtest.SetupSudoNopasswdWithPassword(host.Hostname, host.Port, user, password)
-	}
-
+	output, setupErr := sshtest.SetupSudoNopasswd(client, user, password)
 	if setupErr != nil {
 		h.logOperation(r, host.ID, "setup-sudo-nopasswd", &method, "failed", setupErr.Error()+"\n"+output)
-		jsonOK(w, map[string]any{
-			"success": false,
-			"error":   setupErr.Error(),
-			"output":  output,
-		})
+		jsonOK(w, map[string]any{"success": false, "error": setupErr.Error(), "output": output})
 		return
 	}
 
 	h.logOperation(r, host.ID, "setup-sudo-nopasswd", &method, "success", output)
-	jsonOK(w, map[string]any{
-		"success": true,
-		"output":  output,
-		"message": "NOPASSWD sudo configured for " + user,
-	})
+	jsonOK(w, map[string]any{"success": true, "output": output, "message": "NOPASSWD sudo configured for " + user})
 }
 
 // handleCreateRemoteUser creates a new user on the remote host with an authorized
-// SSH key and passwordless sudo. The username and public key are provided in the request body.
+// SSH key and passwordless sudo.
 func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
-	if err != nil || host == nil {
-		jsonError(w, http.StatusNotFound, "host not found")
+	host := h.requireHost(w, r)
+	if host == nil {
 		return
 	}
 
 	var req struct {
 		Username string `json:"username"`
 		PubKey   string `json:"pub_key"`
+		Force    bool   `json:"force"`
 	}
 	if err := decodeJSON(r, &req); err != nil || req.Username == "" || req.PubKey == "" {
 		jsonError(w, http.StatusBadRequest, "username and pub_key are required")
 		return
 	}
-
-	loginUser := host.User
-	if loginUser == "" {
-		jsonError(w, http.StatusBadRequest, "host has no user configured")
+	if !validLinuxUsername.MatchString(req.Username) {
+		jsonError(w, http.StatusBadRequest, "invalid username: must be 1-32 lowercase alphanumeric characters, hyphens, or underscores, starting with a letter or underscore")
 		return
 	}
-	if !host.HasPassword {
+	if !validSSHPubKeyPrefix.MatchString(req.PubKey) {
+		jsonError(w, http.StatusBadRequest, "invalid public key format: must be a valid OpenSSH public key")
+		return
+	}
+
+	loginUser := h.requireUser(w, host)
+	if loginUser == "" {
+		return
+	}
+
+	method, auth, ok := h.resolveAuth(w, host, "")
+	if !ok {
+		return
+	}
+	password := auth.Password()
+	if password == "" {
 		jsonError(w, http.StatusBadRequest, "stored password required for sudo")
 		return
 	}
 
-	password, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
-	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
+	client := h.dial(w, host, loginUser, auth)
+	if client == nil {
 		return
 	}
+	defer client.Close()
 
-	var method string
-	var output string
-	var setupErr error
-
-	if host.HasKey && host.KeyPath != "" {
-		method = "key"
-		output, setupErr = sshtest.CreateRemoteUserWithKey(host.Hostname, host.Port, loginUser, host.KeyPath, password, req.Username, req.PubKey)
-	} else {
-		method = "password"
-		output, setupErr = sshtest.CreateRemoteUserWithPassword(host.Hostname, host.Port, loginUser, password, req.Username, req.PubKey)
-	}
-
+	output, setupErr := sshtest.CreateRemoteUser(client, password, req.Username, req.PubKey, req.Force)
 	if setupErr != nil {
+		resp := map[string]any{"success": false, "error": setupErr.Error(), "output": output}
+		if errors.Is(setupErr, sshtest.ErrUserExists) {
+			resp["user_exists"] = true
+		}
 		h.logOperation(r, host.ID, "create-remote-user", &method, "failed", setupErr.Error()+"\n"+output)
-		jsonOK(w, map[string]any{
-			"success": false,
-			"error":   setupErr.Error(),
-			"output":  output,
-		})
+		jsonOK(w, resp)
 		return
 	}
 
 	h.logOperation(r, host.ID, "create-remote-user", &method, "success", output)
-	jsonOK(w, map[string]any{
-		"success": true,
-		"output":  output,
-		"message": "User " + req.Username + " created with sudo NOPASSWD",
-	})
+	jsonOK(w, map[string]any{"success": true, "output": output, "message": "User " + req.Username + " created with sudo NOPASSWD"})
 }
 
 // handleDockerSetup checks docker status and optionally adds user to docker group.
 func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
-	if err != nil || host == nil {
-		jsonError(w, http.StatusNotFound, "host not found")
+	host := h.requireHost(w, r)
+	if host == nil {
 		return
 	}
-
-	user := host.User
+	user := h.requireUser(w, host)
 	if user == "" {
-		jsonError(w, http.StatusBadRequest, "host has no user configured")
 		return
 	}
 
@@ -665,26 +627,17 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 	}
 	decodeJSON(r, &req)
 
-	var password string
-	if host.HasPassword {
-		password, _ = h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
-	}
-
-	var status *sshtest.DockerStatus
-	var method string
-	var opErr error
-
-	if host.HasKey && host.KeyPath != "" {
-		method = "key"
-		status, opErr = sshtest.CheckAndFixDockerGroupWithKey(host.Hostname, host.Port, user, host.KeyPath, password, req.Fix)
-	} else if host.HasPassword {
-		method = "password"
-		status, opErr = sshtest.CheckAndFixDockerGroupWithPassword(host.Hostname, host.Port, user, password, req.Fix)
-	} else {
-		jsonError(w, http.StatusBadRequest, "no credentials configured")
+	method, auth, ok := h.resolveAuth(w, host, "")
+	if !ok {
 		return
 	}
+	client := h.dial(w, host, user, auth)
+	if client == nil {
+		return
+	}
+	defer client.Close()
 
+	status, opErr := sshtest.CheckAndFixDockerGroup(client, user, auth.Password(), req.Fix)
 	if opErr != nil {
 		s := "failed"
 		host.DockerGroupStatus = &s
@@ -694,7 +647,6 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Persist docker group status
 	var dockerStatus string
 	if !status.Installed {
 		dockerStatus = "not_installed"
@@ -718,41 +670,86 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, map[string]any{"success": true, "status": status})
 }
 
+// handleNginxCleanup detects and removes non-containerized nginx from a remote host.
+func (h *sshHandlers) handleNginxCleanup(w http.ResponseWriter, r *http.Request) {
+	// Recover from any panic to return a proper JSON error.
+	defer func() {
+		if rv := recover(); rv != nil {
+			log.Printf("[ssh] nginx-cleanup panic: %v", rv)
+			jsonError(w, http.StatusInternalServerError, fmt.Sprintf("internal error: %v", rv))
+		}
+	}()
+
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	user := h.requireUser(w, host)
+	if user == "" {
+		return
+	}
+
+	var req struct {
+		Purge bool `json:"purge"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		// Body might be empty; purge defaults to false — that's fine.
+		req.Purge = false
+	}
+
+	method, auth, ok := h.resolveAuth(w, host, "")
+	if !ok {
+		return
+	}
+	password := auth.Password()
+	if password == "" {
+		jsonError(w, http.StatusBadRequest, "stored password required for sudo operations")
+		return
+	}
+
+	client := h.dial(w, host, user, auth)
+	if client == nil {
+		return
+	}
+	defer client.Close()
+
+	status, opErr := sshtest.CleanupNginx(client, password, req.Purge)
+	if opErr != nil {
+		h.logOperation(r, host.ID, "nginx-cleanup", &method, "failed", opErr.Error())
+		jsonOK(w, map[string]any{"success": false, "error": opErr.Error()})
+		return
+	}
+
+	logStatus := "success"
+	if !status.Found || status.IsContainer {
+		logStatus = "info"
+	}
+	h.logOperation(r, host.ID, "nginx-cleanup", &method, logStatus, status.Message)
+	jsonOK(w, map[string]any{"success": true, "status": status})
+}
+
 // handleListRemoteKeys lists SSH keys found on the remote host.
 func (h *sshHandlers) handleListRemoteKeys(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
-	if err != nil || host == nil {
-		jsonError(w, http.StatusNotFound, "host not found")
+	host := h.requireHost(w, r)
+	if host == nil {
 		return
 	}
-
-	user := host.User
+	user := h.requireUser(w, host)
 	if user == "" {
-		jsonError(w, http.StatusBadRequest, "host has no user configured")
 		return
 	}
 
-	var keys []sshtest.RemoteKeyInfo
-	var method string
-	var listErr error
-
-	if host.HasKey && host.KeyPath != "" {
-		method = "key"
-		keys, listErr = sshtest.ListRemoteKeysWithKey(host.Hostname, host.Port, user, host.KeyPath)
-	} else if host.HasPassword {
-		method = "password"
-		password, decErr := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
-		if decErr != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
-			return
-		}
-		keys, listErr = sshtest.ListRemoteKeysWithPassword(host.Hostname, host.Port, user, password)
-	} else {
-		jsonError(w, http.StatusBadRequest, "no credentials configured")
+	method, auth, ok := h.resolveAuth(w, host, "")
+	if !ok {
 		return
 	}
+	client := h.dial(w, host, user, auth)
+	if client == nil {
+		return
+	}
+	defer client.Close()
 
+	keys, listErr := sshtest.ListRemoteKeys(client)
 	if listErr != nil {
 		h.logOperation(r, host.ID, "list-remote-keys", &method, "failed", listErr.Error())
 		jsonOK(w, map[string]any{"success": false, "error": listErr.Error()})

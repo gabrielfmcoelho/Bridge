@@ -44,7 +44,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "nav.credentials",
     items: [
       { href: "/ssh-keys", label: "nav.hostCredentials", icon: "Key" },
-      { href: "#", label: "nav.serviceCredentials", icon: "Lock" },
+      { href: "/service-credentials", label: "nav.serviceCredentials", icon: "Lock" },
     ],
   },
   {

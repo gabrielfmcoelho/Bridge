@@ -110,6 +110,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("DELETE /api/services/{id}", authedRole(db, "admin", http.HandlerFunc(sh.handleDelete)))
 
 	// Service credentials
+	mux.Handle("GET /api/services/credentials/all", authenticated(db, http.HandlerFunc(sh.handleListAllCredentials)))
 	mux.Handle("GET /api/services/{id}/credentials", authenticated(db, http.HandlerFunc(sh.handleListCredentials)))
 	mux.Handle("POST /api/services/{id}/credentials", authedRole(db, "editor", http.HandlerFunc(sh.handleCreateCredential)))
 	mux.Handle("GET /api/services/{id}/credentials/{credId}", authenticated(db, http.HandlerFunc(sh.handleGetCredential)))
@@ -135,6 +136,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/ssh/operation-logs/{slug}", authenticated(db, http.HandlerFunc(ssh.handleOperationLogs)))
 	mux.Handle("POST /api/ssh/list-remote-keys/{slug}", authedRole(db, "editor", http.HandlerFunc(ssh.handleListRemoteKeys)))
 	mux.Handle("POST /api/ssh/docker-setup/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleDockerSetup)))
+	mux.Handle("POST /api/ssh/nginx-cleanup/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleNginxCleanup)))
 	mux.Handle("GET /api/ssh/host-config/{slug}", authenticated(db, http.HandlerFunc(ssh.handleHostSSHConfig)))
 
 	// Graph & Dashboard
@@ -175,8 +177,12 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 
 	// External tools
 	mux.Handle("GET /api/tools", authenticated(db, http.HandlerFunc(th.handleList)))
-	mux.Handle("GET /api/tools/{id}", authenticated(db, http.HandlerFunc(th.handleGet)))
 	mux.Handle("POST /api/tools", authedRole(db, "admin", http.HandlerFunc(th.handleCreate)))
+	mux.Handle("POST /api/tools/sync-service", authedRole(db, "admin", http.HandlerFunc(th.handleSyncFromService)))
+	mux.Handle("DELETE /api/tools/sync-service/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleUnsyncService)))
+	mux.Handle("GET /api/tools/{id}", authenticated(db, http.HandlerFunc(th.handleGet)))
+	mux.Handle("GET /api/tools/{id}/credentials", authenticated(db, http.HandlerFunc(th.handleListToolCredentials)))
+	mux.Handle("GET /api/tools/{id}/credentials/{credId}", authenticated(db, http.HandlerFunc(th.handleGetToolCredential)))
 	mux.Handle("PUT /api/tools/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleUpdate)))
 	mux.Handle("DELETE /api/tools/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleDelete)))
 

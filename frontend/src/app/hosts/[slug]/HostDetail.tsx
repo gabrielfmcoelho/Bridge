@@ -218,7 +218,7 @@ export default function HostDetail({ slug }: { slug: string }) {
               <SSHOperations
                 slug={data.host.oficial_slug}
                 hasPassword={data.host.has_password}
-                hasKey={!!data.host.key_path}
+                hasKey={data.host.has_key}
                 preferredAuth={data.host.preferred_auth}
                 passwordTestStatus={data.host.password_test_status}
                 keyTestStatus={data.host.key_test_status}

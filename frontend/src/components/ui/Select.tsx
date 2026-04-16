@@ -8,6 +8,7 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "onC
   error?: string;
   options: { value: string; label: string }[];
   onChange?: (e: { target: { value: string } }) => void;
+  searchPlaceholder?: string;
 }
 
 export default function Select({
@@ -18,6 +19,7 @@ export default function Select({
   value,
   onChange,
   disabled,
+  searchPlaceholder,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -80,8 +82,8 @@ export default function Select({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--accent)]"
+                  placeholder={searchPlaceholder || "Search..."}
+                  className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
             )}

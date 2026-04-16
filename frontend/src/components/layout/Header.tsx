@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useRouter } from "next/navigation";
 import Drawer from "@/components/ui/Drawer";
 import AiChatDrawer from "@/components/ai/AiChatDrawer";
@@ -23,6 +24,7 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
   const { user, logout } = useAuth();
   const { locale, setLocale, t } = useLocale();
   const { appName, appColor, appLogo } = useAppearance();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const [userDrawer, setUserDrawer] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
@@ -99,10 +101,10 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
           </button>
         )}
         {/* Locale toggle */}
-        <div className="flex rounded-[var(--radius-md)] border border-[var(--border-default)] overflow-hidden">
+        <div className="flex h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] overflow-hidden">
           <button
             onClick={() => setLocale("en")}
-            className={`px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
+            className={`px-3 text-[11px] font-medium transition-all duration-150 ${
               locale === "en"
                 ? "bg-[var(--accent-muted)] text-[var(--accent)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
@@ -112,7 +114,7 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
           </button>
           <button
             onClick={() => setLocale("pt-BR")}
-            className={`px-2.5 py-1 text-[11px] font-medium border-l border-[var(--border-default)] transition-all duration-150 ${
+            className={`px-3 text-[11px] font-medium border-l border-[var(--border-default)] transition-all duration-150 ${
               locale === "pt-BR"
                 ? "bg-[var(--accent-muted)] text-[var(--accent)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
@@ -121,6 +123,25 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
             PT
           </button>
         </div>
+
+        {/* Theme toggle — sized to match the locale pair and the user avatar */}
+        <button
+          onClick={toggleTheme}
+          aria-label={t("header.toggleTheme")}
+          title={theme === "dark" ? t("header.themeLight") : t("header.themeDark")}
+          className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-elevated)] transition-colors"
+        >
+          {theme === "dark" ? (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2m0 14v2M5.05 5.05l1.41 1.41M17.54 17.54l1.41 1.41M3 12h2m14 0h2M5.05 18.95l1.41-1.41M17.54 6.46l1.41-1.41" />
+              <circle cx="12" cy="12" r="4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
+            </svg>
+          )}
+        </button>
 
         {/* Desktop user avatar + dropdown */}
         {user && (
@@ -222,6 +243,40 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
                     }`}
                   >
                     Português
+                  </button>
+                </div>
+              </div>
+
+              {/* Theme */}
+              <div>
+                <p className="text-xs text-[var(--text-faint)] mb-2 font-medium uppercase tracking-wider">{t("header.themeLabel")}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => theme === "light" && toggleTheme()}
+                    className={`flex-1 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      theme === "dark"
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20"
+                        : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
+                    }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
+                    </svg>
+                    {t("header.themeDark")}
+                  </button>
+                  <button
+                    onClick={() => theme === "dark" && toggleTheme()}
+                    className={`flex-1 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                      theme === "light"
+                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20"
+                        : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
+                    }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2m0 14v2M5.05 5.05l1.41 1.41M17.54 17.54l1.41 1.41M3 12h2m14 0h2M5.05 18.95l1.41-1.41M17.54 6.46l1.41-1.41" />
+                      <circle cx="12" cy="12" r="4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {t("header.themeLight")}
                   </button>
                 </div>
               </div>

@@ -5,19 +5,22 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useExportCSV } from "@/hooks/useExportCSV";
+import { useInventoryFilters } from "@/hooks/useInventoryFilters";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
-import EmptyState from "@/components/ui/EmptyState";
-import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
 import ListToolbar from "@/components/ui/ListToolbar";
-import { SkeletonCard, SkeletonTable } from "@/components/ui/Skeleton";
+import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
+import SearchBadge from "@/components/ui/SearchBadge";
+import ListingLabel from "@/components/ui/ListingLabel";
+import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
+import InventoryContent from "@/components/inventory/InventoryContent";
 import ProjectCard from "./_components/ProjectCard";
 import ProjectsTableView from "./_components/ProjectsTableView";
 import KpiSection from "./_components/KpiSection";
-import ProjectsFAB from "./_components/ProjectsFAB";
+import InventoryFAB from "@/components/inventory/InventoryFAB";
 import ProjectForm from "./ProjectForm";
 import ProjectFilterDrawer, { emptyFilters, type ProjectFilters } from "./FilterDrawer";
 import type { Project } from "@/lib/types";
@@ -27,18 +30,15 @@ export default function ProjectsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  const { search, setSearch, filters, setFilters, viewMode, setViewMode, sort, setSort, activeFilterCount } =
+    useInventoryFilters<ProjectFilters>({ storageKey: "projects", emptyFilters, defaultSort: { field: "name", direction: "asc" } });
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<ProjectFilters>(emptyFilters);
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  const [sort, setSort] = useLocalStorage("projects_sort", "name");
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
-  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   const { data: allProjects = [], isLoading } = useQuery({
     queryKey: ["projects"],
@@ -62,11 +62,13 @@ export default function ProjectsPage() {
       result = result.filter(p => p.situacao === filters.situacao);
     }
     result.sort((a, b) => {
-      switch (sort) {
-        case "situacao": return a.situacao.localeCompare(b.situacao);
-        case "setor": return (a.setor_responsavel || "").localeCompare(b.setor_responsavel || "");
-        default: return a.name.localeCompare(b.name);
+      let cmp = 0;
+      switch (sort.field) {
+        case "situacao": cmp = a.situacao.localeCompare(b.situacao); break;
+        case "setor": cmp = (a.setor_responsavel || "").localeCompare(b.setor_responsavel || ""); break;
+        default: cmp = a.name.localeCompare(b.name);
       }
+      return sort.direction === "desc" ? -cmp : cmp;
     });
     return result;
   }, [allProjects, search, filters, sort]);
@@ -90,41 +92,18 @@ export default function ProjectsPage() {
 
   return (
     <PageShell>
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 mb-6">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{t("project.title")}</h1>
-        <div className="flex items-center gap-1.5">
-          <div className="hidden sm:flex">
-            <ViewToggle
-              value={viewMode}
-              onChange={(v) => setViewMode(v as "cards" | "table")}
-              options={[
-                { key: "cards", label: t("common.cardView") || "Cards", icon: VIEW_ICONS.cards },
-                { key: "table", label: t("common.tableView") || "Table", icon: VIEW_ICONS.table },
-              ]}
-            />
-          </div>
-          {canEdit && (
-            <div className="hidden sm:block">
-              <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("project.addProject")}</Button>
-            </div>
-          )}
-        </div>
-      </div>
+      <InventoryPageHeader
+        title={t("project.title")}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        addLabel={canEdit ? t("project.addProject") : undefined}
+        onAdd={canEdit ? openCreate : undefined}
+      />
 
       {!isLoading && allProjects.length > 0 && <KpiSection projects={allProjects} t={t} />}
 
-      {search && (
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs text-[var(--text-muted)]">{t("common.search")}:</span>
-          <span className="text-xs text-[var(--text-primary)] font-medium">&ldquo;{search}&rdquo;</span>
-          <button onClick={() => setSearch("")} className="text-xs text-[var(--text-faint)] hover:text-[var(--text-secondary)]">&times;</button>
-        </div>
-      )}
-
-      {!isLoading && allProjects.length > 0 && (
-        <h2 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("project.listing") || "Projects"}</h2>
-      )}
+      <SearchBadge search={search} onClear={() => setSearch("")} />
+      <ListingLabel label={t("project.listing") || "Projects"} show={!isLoading && allProjects.length > 0} />
 
       <ListToolbar
         search={search}
@@ -134,49 +113,24 @@ export default function ProjectsPage() {
         searchPlaceholder={t("common.search")}
         actions={
           allProjects.length > 0 ? (
-            <button
-              onClick={exportCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-[var(--radius-md)] border bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)] transition-all"
-              title={t("common.export") || "Export"}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span className="hidden sm:inline">{t("common.export") || "Export"}</span>
-            </button>
+            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export") || "Export"} onClick={exportCSV} />
           ) : undefined
         }
       />
 
-      {/* Content */}
-      {isLoading ? (
-        viewMode === "cards" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
-          </div>
-        ) : (
-          <SkeletonTable rows={5} />
-        )
-      ) : filteredAndSorted.length === 0 ? (
-        <EmptyState
-          icon="folder"
-          title={t("common.noResults")}
-          description={search || activeFilterCount ? "Try adjusting your filters" : "Create your first project"}
-          action={canEdit && !search && !activeFilterCount ? (
-            <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("project.addProject")}</Button>
-          ) : undefined}
-        />
-      ) : viewMode === "cards" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredAndSorted.map((project, i) => (
-            <div key={project.id} className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" }}>
-              <ProjectCard project={project} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <ProjectsTableView projects={filteredAndSorted} t={t} />
-      )}
+      <InventoryContent
+        isLoading={isLoading}
+        items={filteredAndSorted}
+        viewMode={viewMode}
+        emptyIcon="folder"
+        emptyTitle={t("common.noResults")}
+        emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") || "Try adjusting your filters" : t("project.emptyStateAdd") || "Create your first project"}
+        emptyAction={canEdit && !search && !activeFilterCount ? (
+          <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("project.addProject")}</Button>
+        ) : undefined}
+        renderCard={(project) => <ProjectCard project={project} />}
+        renderTable={(items) => <ProjectsTableView projects={items} t={t} />}
+      />
 
       <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={editing ? t("common.edit") : t("project.addProject")} subHeader={formSubHeader}>
         <ProjectForm
@@ -201,13 +155,15 @@ export default function ProjectsPage() {
         onSearchChange={setSearch}
       />
 
-      <ProjectsFAB
+      <InventoryFAB
         canEdit={canEdit}
-        hasProjects={allProjects.length > 0}
+        hasItems={allProjects.length > 0}
         activeFilterCount={activeFilterCount}
         onAdd={openCreate}
         onFilter={() => setShowFilters(true)}
         onExport={exportCSV}
+        addLabel={t("project.addProject")}
+        addColor="#f59e0b"
       />
     </PageShell>
   );

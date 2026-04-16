@@ -5,6 +5,7 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
+| #1245 | 8:50 PM | 🔴 | CPU Usage Measurement Improved with Pre-Scan Delta Method | ~457 |
 | #1241 | 8:47 PM | 🟣 | Authorized Keys Discovery Added to VM Scan | ~432 |
 | #1239 | " | 🟣 | Added Source Field to SSH Key Scan Results | ~315 |
 | #1235 | 8:46 PM | 🔵 | SSH Key Management Tracking in Scan Data | ~390 |

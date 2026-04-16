@@ -37,7 +37,7 @@ export default function Card({
     <div
       className={`
         relative
-        bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-5
+        bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-3.5 md:p-5
         transition-all duration-200 ease-out
         ${hover ? "hover:border-[var(--border-default)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]" : ""}
         ${onClick ? "cursor-pointer" : ""}

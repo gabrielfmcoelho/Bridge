@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { dnsAPI, hostsAPI, enumsAPI, contactsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
 import Button from "@/components/ui/Button";
 import Checkbox from "@/components/ui/Checkbox";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import TagInput from "@/components/ui/TagInput";
 import CheckboxList from "@/components/ui/CheckboxList";
-import StepIndicator from "@/components/ui/StepIndicator";
 import FormError from "@/components/ui/FormError";
 import ResponsavelList from "@/components/inventory/ResponsavelList";
 import type { DNSRecord, EntityResponsavel } from "@/lib/types";
@@ -67,44 +67,21 @@ export default function DnsForm({
     onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
   });
 
+  useMultiStepFormEffects({
+    step,
+    setStep,
+    totalSteps: 3,
+    stepLabels: ["DNS Info", t("host.responsaveis") || "Responsaveis", "Links & Tags"],
+    onSubmit: () => mutation.mutate(),
+    canProceed: step === 1 ? !!form.domain.trim() : true,
+    isPending: mutation.isPending,
+    submitLabel: initial ? t("common.save") : t("common.create"),
+    t,
+    onFooterChange,
+    onSubHeaderChange,
+  });
+
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
-
-  const stepLabels = ["DNS Info", t("host.responsaveis") || "Responsaveis", "Links & Tags"];
-
-  useEffect(() => {
-    onSubHeaderChange?.(<StepIndicator steps={stepLabels} current={step} />);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
-
-  // If onFooterChange is provided (detail page edit mode), manage footer externally
-  useEffect(() => {
-    if (!onFooterChange) return;
-    onFooterChange(
-      <div className="flex gap-2">
-        {step > 1 && (
-          <Button type="button" variant="secondary" size="sm" className="flex-1" onClick={() => setStep(step - 1)}>
-            {t("common.back")}
-          </Button>
-        )}
-        {step < 3 ? (
-          <Button
-            type="button"
-            size="sm"
-            className="flex-1"
-            disabled={step === 1 && !form.domain.trim()}
-            onClick={() => setStep(step + 1)}
-          >
-            {t("host.nextStep")}
-          </Button>
-        ) : (
-          <Button size="sm" className="flex-1" onClick={() => mutation.mutate()} loading={mutation.isPending}>
-            {initial ? t("common.save") : t("common.create")}
-          </Button>
-        )}
-      </div>
-    );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, form.domain, mutation.isPending]);
 
   const hasExternalFooter = !!onFooterChange;
 

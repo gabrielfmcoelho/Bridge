@@ -1,18 +1,20 @@
 "use client";
 
 import { useState, useCallback, type ReactNode } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { sshAPI, hostsAPI, sshKeysAPI } from "@/lib/api";
 import { resolveAuthMethod } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useSSHMutation } from "@/hooks/useSSHMutation";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import IconButton from "@/components/ui/IconButton";
 import Drawer from "@/components/ui/Drawer";
 import StatusAlert from "@/components/ui/StatusAlert";
+import OperationOutput from "@/components/ui/OperationOutput";
 import VMInfoDisplay from "./VMInfoDisplay";
 import IntegrationsSection from "./IntegrationsSection";
-import type { VMInfoType, OperationLog, RemoteKeyInfo, DockerStatusType } from "@/lib/api";
+import type { VMInfoType, OperationLog, RemoteKeyInfo, DockerStatusType, NginxCleanupStatusType } from "@/lib/api";
 
 type ConsoleEntry = {
   label: string;
@@ -74,16 +76,19 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     queryClient.invalidateQueries({ queryKey: ["operation-logs", slug] });
   };
 
-  const testMutation = useMutation({
+  const testMutation = useSSHMutation({
+    slug,
     mutationFn: ({ method, capture }: { method: "password" | "key"; capture: boolean }) =>
       sshAPI.testConnection(slug, method, capture),
-    onSuccess: (data) => {
-      setTestResult(data);
-      invalidateAll();
-      if (data.success) {
-        if (data.vm_info) {
-          const warnings = data.vm_info.warnings || [];
-          pushConsole(t("operation.testCapture"), warnings.length > 0 ? "warning" : "success",
+    label: t("operation.testConnection"),
+    pushConsole,
+    onAfterSuccess: (data) => setTestResult(data),
+    onResult: (data) => {
+      if (data.success && data.vm_info) {
+        const warnings = data.vm_info.warnings || [];
+        return {
+          status: warnings.length > 0 ? "warning" : "success",
+          content: (
             <div className="space-y-3">
               {warnings.length > 0 && (
                 <div className="rounded-[var(--radius-md)] p-2.5 bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
@@ -96,19 +101,11 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               <VMInfoDisplay info={data.vm_info} locale={locale} compact />
               <p className="text-[var(--text-faint)] text-[10px]">{t("operation.scanSaved")}</p>
             </div>
-          );
-        } else {
-          pushConsole(t("operation.testConnection"), "success", t("operation.connectionSuccessful"));
-        }
-      } else {
-        pushConsole(t("operation.testConnection"), "error", data.error || "Failed");
+          ),
+        };
       }
-    },
-    onError: (err) => {
-      const msg = err instanceof Error ? err.message : "Failed";
-      setTestResult({ success: false, error: msg });
-      invalidateAll();
-      pushConsole(t("operation.testConnection"), "error", msg);
+      if (data.success) return { status: "success", content: t("operation.connectionSuccessful") };
+      return { status: "error", content: data.error || "Failed" };
     },
   });
 
@@ -146,93 +143,80 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     }
   };
 
-  const fixDevNullMutation = useMutation({
+  const fixDevNullMutation = useSSHMutation({
+    slug,
     mutationFn: (method: "password" | "key") => sshAPI.fixDevNull(slug, method),
-    onSuccess: (data) => {
-      invalidateAll();
-      if (data.success) {
-        pushConsole(t("operation.repairDevNull"), "success", <pre className="whitespace-pre-wrap text-[10px]" style={{ fontFamily: "var(--font-mono)" }}>{data.message}{data.output ? "\n" + data.output : ""}</pre>);
-      } else {
-        pushConsole(t("operation.repairDevNull"), "warning", <pre className="whitespace-pre-wrap text-[10px]" style={{ fontFamily: "var(--font-mono)" }}>{data.error}{data.output ? "\n" + data.output : ""}</pre>);
-      }
-    },
-    onError: (err) => {
-      invalidateAll();
-      pushConsole(t("operation.repairDevNull"), "error", err instanceof Error ? err.message : "Failed");
-    },
+    label: t("operation.repairDevNull"),
+    pushConsole,
+    onResult: (data) => ({
+      status: data.success ? "success" : "warning",
+      content: <OperationOutput data={data} />,
+    }),
   });
 
-  const sudoNopasswdMutation = useMutation({
+  const sudoNopasswdMutation = useSSHMutation({
+    slug,
     mutationFn: () => sshAPI.setupSudoNopasswd(slug),
-    onSuccess: (data) => {
-      invalidateAll();
-      if (data.success) {
-        pushConsole(t("operation.setupSudoNopasswd"), "success", <pre className="whitespace-pre-wrap text-[10px]" style={{ fontFamily: "var(--font-mono)" }}>{data.message}{data.output ? "\n" + data.output : ""}</pre>);
-      } else {
-        pushConsole(t("operation.setupSudoNopasswd"), "error", <pre className="whitespace-pre-wrap text-[10px]" style={{ fontFamily: "var(--font-mono)" }}>{data.error}{data.output ? "\n" + data.output : ""}</pre>);
-      }
-    },
-    onError: (err) => {
-      invalidateAll();
-      pushConsole(t("operation.setupSudoNopasswd"), "error", err instanceof Error ? err.message : "Failed");
-    },
+    label: t("operation.setupSudoNopasswd"),
+    pushConsole,
+    onResult: (data) => ({
+      status: data.success ? "success" : "error",
+      content: <OperationOutput data={data} />,
+    }),
   });
 
-  const createRemoteUserMutation = useMutation({
-    mutationFn: ({ username, pubKey }: { username: string; pubKey: string }) => sshAPI.createRemoteUser(slug, username, pubKey),
-    onSuccess: (data) => {
-      invalidateAll();
+  const createRemoteUserMutation = useSSHMutation({
+    slug,
+    mutationFn: ({ username, pubKey, force }: { username: string; pubKey: string; force?: boolean }) => sshAPI.createRemoteUser(slug, username, pubKey, force),
+    label: t("operation.createRemoteUser"),
+    pushConsole,
+    onResult: (data) => {
+      if (data.user_exists) {
+        setRunningOp(null);
+        return { status: "error", content: <OperationOutput data={{ error: data.output || data.error }} /> };
+      }
       setShowCreateUser(false);
-      if (data.success) {
-        pushConsole(t("operation.createRemoteUser"), "success", <pre className="whitespace-pre-wrap text-[10px]" style={{ fontFamily: "var(--font-mono)" }}>{data.message}{data.output ? "\n" + data.output : ""}</pre>);
-      } else {
-        pushConsole(t("operation.createRemoteUser"), "error", <pre className="whitespace-pre-wrap text-[10px]" style={{ fontFamily: "var(--font-mono)" }}>{data.error}{data.output ? "\n" + data.output : ""}</pre>);
-      }
-    },
-    onError: (err) => {
-      invalidateAll();
-      pushConsole(t("operation.createRemoteUser"), "error", err instanceof Error ? err.message : "Failed");
+      return { status: data.success ? "success" : "error", content: <OperationOutput data={data} /> };
     },
   });
 
-  const listRemoteKeysMutation = useMutation({
+  const listRemoteKeysMutation = useSSHMutation({
+    slug,
     mutationFn: () => sshAPI.listRemoteKeys(slug),
-    onSuccess: (data) => {
-      invalidateAll();
-      if (data.success) {
-        const keys = data.keys || [];
-        pushConsole(t("operation.listRemoteKeys"), "success",
-          keys.length === 0 ? <p className="text-xs">{t("operation.noRemoteKeys")}</p> : (
-            <div className="space-y-1.5">
-              {keys.map((k: RemoteKeyInfo, i: number) => (
-                <div key={`${k.fingerprint}-${i}`} className="flex items-center gap-2 text-xs">
-                  <Badge>{k.source === "authorized_keys" ? "authorized" : "private"}</Badge>
-                  <span className="text-[var(--text-muted)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{k.fingerprint}</span>
-                  <span className="text-[var(--text-faint)]">{k.type}</span>
-                  {k.name && <span className="text-[var(--text-secondary)] truncate">{k.name}</span>}
-                </div>
-              ))}
-            </div>
-          )
-        );
-      } else {
-        pushConsole(t("operation.listRemoteKeys"), "error", data.error || "Failed");
-      }
-    },
-    onError: (err) => {
-      invalidateAll();
-      pushConsole(t("operation.listRemoteKeys"), "error", err instanceof Error ? err.message : "Failed");
+    label: t("operation.listRemoteKeys"),
+    pushConsole,
+    onResult: (data) => {
+      if (!data.success) return { status: "error", content: data.error || "Failed" };
+      const keys = data.keys || [];
+      return {
+        status: "success",
+        content: keys.length === 0 ? <p className="text-xs">{t("operation.noRemoteKeys")}</p> : (
+          <div className="space-y-1.5">
+            {keys.map((k: RemoteKeyInfo, i: number) => (
+              <div key={`${k.fingerprint}-${i}`} className="flex items-center gap-2 text-xs">
+                <Badge>{k.source === "authorized_keys" ? "authorized" : "private"}</Badge>
+                <span className="text-[var(--text-muted)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{k.fingerprint}</span>
+                <span className="text-[var(--text-faint)]">{k.type}</span>
+                {k.name && <span className="text-[var(--text-secondary)] truncate">{k.name}</span>}
+              </div>
+            ))}
+          </div>
+        ),
+      };
     },
   });
 
-  const dockerSetupMutation = useMutation({
+  const dockerSetupMutation = useSSHMutation({
+    slug,
     mutationFn: (fix: boolean) => sshAPI.dockerSetup(slug, fix),
-    onSuccess: (data) => {
-      invalidateAll();
-      if (data.success && data.status) {
-        const s = data.status as DockerStatusType;
-        const variant = !s.installed ? "warning" : s.needs_sudo ? "warning" : "success";
-        pushConsole(t("operation.dockerSetup"), variant,
+    label: t("operation.dockerSetup"),
+    pushConsole,
+    onResult: (data) => {
+      if (!data.success || !data.status) return { status: "error", content: data.error || "Failed" };
+      const s = data.status as DockerStatusType;
+      return {
+        status: !s.installed || s.needs_sudo ? "warning" : "success",
+        content: (
           <div className="space-y-2 text-xs">
             <p>{s.message}</p>
             {s.installed && (
@@ -243,14 +227,39 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               </div>
             )}
           </div>
-        );
-      } else {
-        pushConsole(t("operation.dockerSetup"), "error", data.error || "Failed");
-      }
+        ),
+      };
     },
-    onError: (err) => {
-      invalidateAll();
-      pushConsole(t("operation.dockerSetup"), "error", err instanceof Error ? err.message : "Failed");
+  });
+
+  const nginxCleanupMutation = useSSHMutation({
+    slug,
+    mutationFn: (purge: boolean) => sshAPI.nginxCleanup(slug, purge),
+    label: t("operation.nginxCleanup"),
+    pushConsole,
+    onResult: (data) => {
+      if (!data.success || !data.status) return { status: "error" as const, content: data.error || "Failed" };
+      const s = data.status as NginxCleanupStatusType;
+      if (!s.found) return { status: "warning" as const, content: s.message };
+      if (s.is_container && !s.is_native) return { status: "warning" as const, content: s.message };
+      return {
+        status: s.steps.every((st) => st.status === "success" || st.status === "skipped") ? "success" as const : "warning" as const,
+        content: (
+          <div className="space-y-2 text-xs">
+            <p>{s.message}</p>
+            {s.backup_path && <p>Backup: <span style={{ fontFamily: "var(--font-mono)" }}>{s.backup_path}</span></p>}
+            <div className="space-y-1">
+              {s.steps.map((step, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${step.status === "success" ? "bg-emerald-400" : step.status === "failed" ? "bg-red-400" : "bg-gray-400"}`} />
+                  <span className="text-[var(--text-primary)]">{step.name}</span>
+                  {step.output && <span className="text-[var(--text-faint)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{step.output}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ),
+      };
     },
   });
 
@@ -349,6 +358,20 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       status: dockerGroupStatus === "ok" || dockerGroupStatus === "fixed" ? "success" : dockerGroupStatus === "failed" || dockerGroupStatus === "needs_sudo" ? "failed" : null,
       showStatus: true,
       onClick: () => { setRunningOp("docker-setup"); dockerSetupMutation.mutate(true); },
+    } satisfies OpDef] : []),
+    ...(isAdmin ? [{
+      id: "nginx-cleanup",
+      label: t("operation.nginxCleanup"),
+      description: t("operation.nginxCleanupDesc"),
+      command: `systemctl is-active nginx && tar -czf /tmp/nginx-backup.tar.gz /etc/nginx/ && systemctl stop nginx && systemctl disable nginx`,
+      disabled: !hasPassword && !hasKey,
+      loading: runningOp === "nginx-cleanup",
+      onClick: () => {
+        if (!window.confirm(t("operation.confirmNginxCleanup"))) return;
+        const purge = window.confirm(t("operation.confirmNginxPurge"));
+        setRunningOp("nginx-cleanup");
+        nginxCleanupMutation.mutate(purge);
+      },
     } satisfies OpDef] : []),
     ...(hasPassword && isAdmin ? [{
       id: "setup-sudo-nopasswd",
@@ -523,9 +546,14 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
           <input
             placeholder={t("operation.createRemoteUserPlaceholder")}
             value={createUserName}
-            onChange={(e) => setCreateUserName(e.target.value)}
+            onChange={(e) => setCreateUserName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
+            pattern="^[a-z_][a-z0-9_\-]{0,31}$"
+            maxLength={32}
             className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
           />
+          {createUserName && !/^[a-z_][a-z0-9_-]{0,31}$/.test(createUserName) && (
+            <p className="text-xs text-amber-400">{t("operation.createRemoteUserInvalidName")}</p>
+          )}
           {sshKeysList.length > 0 && (
             <select
               value={createUserKeyId}
@@ -541,7 +569,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
           <div className="flex gap-2 pt-1">
             <Button
               size="sm"
-              disabled={!createUserName.trim() || !createUserKeyId}
+              disabled={!createUserName.trim() || !/^[a-z_][a-z0-9_-]{0,31}$/.test(createUserName) || !createUserKeyId}
               loading={createRemoteUserMutation.isPending}
               onClick={() => {
                 const key = sshKeysList.find(k => k.id.toString() === createUserKeyId);
@@ -554,6 +582,24 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               }}
             >
               {t("operation.createRemoteUserRun")}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="text-amber-400 border-amber-500/30"
+              disabled={!createUserName.trim() || !/^[a-z_][a-z0-9_-]{0,31}$/.test(createUserName) || !createUserKeyId}
+              loading={createRemoteUserMutation.isPending}
+              onClick={() => {
+                const key = sshKeysList.find(k => k.id.toString() === createUserKeyId);
+                if (!key) return;
+                setRunningOp("create-remote-user");
+                sshKeysAPI.get(key.id).then(detail => {
+                  if (!detail.public_key) { pushConsole(t("operation.createRemoteUser"), "error", "Selected key has no public key"); setRunningOp(null); return; }
+                  createRemoteUserMutation.mutate({ username: createUserName.trim(), pubKey: detail.public_key, force: true });
+                });
+              }}
+            >
+              {t("operation.createRemoteUserForce")}
             </Button>
             <Button size="sm" variant="secondary" onClick={() => setShowCreateUser(false)}>{t("common.cancel")}</Button>
           </div>
@@ -648,6 +694,7 @@ function opTypeLabel(type_: string, t: (k: string) => string): string {
     case "setup-sudo-nopasswd": return t("operation.setupSudoNopasswd");
     case "list-remote-keys": return t("operation.listRemoteKeys");
     case "docker-setup": return t("operation.dockerSetup");
+    case "nginx-cleanup": return t("operation.nginxCleanup");
     case "create-remote-user": return t("operation.createRemoteUser");
     default: return type_;
   }

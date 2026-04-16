@@ -5,20 +5,22 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { dnsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useExportCSV } from "@/hooks/useExportCSV";
+import { useInventoryFilters } from "@/hooks/useInventoryFilters";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
-import EmptyState from "@/components/ui/EmptyState";
-import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
 import ListToolbar from "@/components/ui/ListToolbar";
-import { SkeletonCard, SkeletonTable } from "@/components/ui/Skeleton";
+import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
+import SearchBadge from "@/components/ui/SearchBadge";
+import ListingLabel from "@/components/ui/ListingLabel";
+import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
+import InventoryContent from "@/components/inventory/InventoryContent";
 import DnsCard from "./_components/DnsCard";
 import DnsTableView from "./_components/DnsTableView";
 import KpiSection from "./_components/KpiSection";
-import DnsFAB from "./_components/DnsFAB";
+import InventoryFAB from "@/components/inventory/InventoryFAB";
 import DnsForm from "./DnsForm";
 import DnsFilterDrawer, { emptyFilters, type DNSFilters } from "./FilterDrawer";
 import type { DNSRecord } from "@/lib/types";
@@ -28,19 +30,15 @@ export default function DNSPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const isMobile = useMediaQuery("(max-width: 639px)");
+  const { search, setSearch, filters, setFilters, viewMode, setViewMode, sort, setSort, activeFilterCount } =
+    useInventoryFilters<DNSFilters>({ storageKey: "dns", emptyFilters, defaultSort: { field: "domain", direction: "asc" } });
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<DNSRecord | null>(null);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<DNSFilters>(emptyFilters);
-  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  const [sort, setSort] = useLocalStorage("dns_sort", "domain");
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
-  const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
   const { data: allRecords = [], isLoading } = useQuery({
     queryKey: ["dns"],
@@ -60,11 +58,13 @@ export default function DNSPage() {
     else if (filters.has_https === "no") result = result.filter(d => !d.has_https);
 
     result.sort((a, b) => {
-      switch (sort) {
-        case "situacao": return a.situacao.localeCompare(b.situacao);
-        case "responsavel": return (a.responsavel || "").localeCompare(b.responsavel || "");
-        default: return a.domain.localeCompare(b.domain);
+      let cmp = 0;
+      switch (sort.field) {
+        case "situacao": cmp = a.situacao.localeCompare(b.situacao); break;
+        case "responsavel": cmp = (a.responsavel || "").localeCompare(b.responsavel || ""); break;
+        default: cmp = a.domain.localeCompare(b.domain);
       }
+      return sort.direction === "desc" ? -cmp : cmp;
     });
     return result;
   }, [allRecords, search, filters, sort]);
@@ -91,41 +91,18 @@ export default function DNSPage() {
 
   return (
     <PageShell>
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 mb-6">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{t("dns.title")}</h1>
-        <div className="flex items-center gap-1.5">
-          <div className="hidden sm:flex">
-            <ViewToggle
-              value={viewMode}
-              onChange={(v) => setViewMode(v as "cards" | "table")}
-              options={[
-                { key: "cards", label: t("common.cardView"), icon: VIEW_ICONS.cards },
-                { key: "table", label: t("common.tableView"), icon: VIEW_ICONS.table },
-              ]}
-            />
-          </div>
-          {canEdit && (
-            <div className="hidden sm:block">
-              <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("dns.addDns")}</Button>
-            </div>
-          )}
-        </div>
-      </div>
+      <InventoryPageHeader
+        title={t("dns.title")}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        addLabel={canEdit ? t("dns.addDns") : undefined}
+        onAdd={canEdit ? openCreate : undefined}
+      />
 
       {!isLoading && allRecords.length > 0 && <KpiSection records={allRecords} t={t} />}
 
-      {search && (
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-xs text-[var(--text-muted)]">{t("common.search")}:</span>
-          <span className="text-xs text-[var(--text-primary)] font-medium">&ldquo;{search}&rdquo;</span>
-          <button onClick={() => setSearch("")} className="text-xs text-[var(--text-faint)] hover:text-[var(--text-secondary)]">&times;</button>
-        </div>
-      )}
-
-      {!isLoading && allRecords.length > 0 && (
-        <h2 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("dns.listing") || "DNS Records"}</h2>
-      )}
+      <SearchBadge search={search} onClear={() => setSearch("")} />
+      <ListingLabel label={t("dns.listing") || "DNS Records"} show={!isLoading && allRecords.length > 0} />
 
       <ListToolbar
         search={search}
@@ -135,50 +112,22 @@ export default function DNSPage() {
         searchPlaceholder={t("common.search")}
         actions={
           allRecords.length > 0 ? (
-            <button
-              onClick={exportCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-[var(--radius-md)] border bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)] transition-all"
-              title={t("common.export") || "Export"}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span className="hidden sm:inline">{t("common.export") || "Export"}</span>
-            </button>
+            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export") || "Export"} onClick={exportCSV} />
           ) : undefined
         }
       />
 
-      {/* Content */}
-      {isLoading ? (
-        viewMode === "cards" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
-          </div>
-        ) : (
-          <SkeletonTable rows={5} />
-        )
-      ) : filteredAndSorted.length === 0 ? (
-        <EmptyState
-          icon="globe"
-          title={t("common.noResults")}
-          description={search || activeFilterCount ? t("host.emptyStateFilter") || "Try adjusting your filters" : t("dns.emptyStateAdd") || "Add your first DNS record"}
-          action={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={openCreate}>+ {t("dns.addDns")}</Button> : undefined}
-        />
-      ) : viewMode === "cards" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredAndSorted.map((dns, i) => (
-            <div key={dns.id} className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" }}>
-              <DnsCard dns={dns} />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <DnsTableView
-          records={filteredAndSorted}
-          t={t}
-        />
-      )}
+      <InventoryContent
+        isLoading={isLoading}
+        items={filteredAndSorted}
+        viewMode={viewMode}
+        emptyIcon="globe"
+        emptyTitle={t("common.noResults")}
+        emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") || "Try adjusting your filters" : t("dns.emptyStateAdd") || "Add your first DNS record"}
+        emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={openCreate}>+ {t("dns.addDns")}</Button> : undefined}
+        renderCard={(dns) => <DnsCard dns={dns} />}
+        renderTable={(items) => <DnsTableView records={items} t={t} />}
+      />
 
       <Drawer open={showForm} onClose={() => setShowForm(false)} title={editing ? t("common.edit") : t("dns.addDns")} subHeader={formSubHeader}>
         <DnsForm
@@ -199,13 +148,15 @@ export default function DNSPage() {
         onSearchChange={setSearch}
       />
 
-      <DnsFAB
+      <InventoryFAB
         canEdit={canEdit}
-        hasRecords={allRecords.length > 0}
+        hasItems={allRecords.length > 0}
         activeFilterCount={activeFilterCount}
         onAdd={openCreate}
         onFilter={() => setShowFilters(true)}
         onExport={exportCSV}
+        addLabel={t("dns.addDns")}
+        addColor="#06b6d4"
       />
     </PageShell>
   );

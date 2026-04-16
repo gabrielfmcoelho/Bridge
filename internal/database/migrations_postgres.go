@@ -763,4 +763,9 @@ var migrationsPostgres = []string{
 	// Version 48: rename hosts."user" to hosts.ssh_user so model SQL can
 	// stop quoting the reserved word. Aligns with SQLite v48.
 	`ALTER TABLE hosts RENAME COLUMN "user" TO ssh_user;`,
+
+	// Version 49: link external_tools to services and DNS for sync.
+	`ALTER TABLE external_tools ADD COLUMN IF NOT EXISTS service_id BIGINT REFERENCES services(id) ON DELETE SET NULL;
+	ALTER TABLE external_tools ADD COLUMN IF NOT EXISTS dns_id BIGINT REFERENCES dns_records(id) ON DELETE SET NULL;
+	ALTER TABLE external_tools ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual';`,
 }

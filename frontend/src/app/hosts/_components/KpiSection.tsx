@@ -1,4 +1,4 @@
-import StatCard from "@/components/ui/StatCard";
+import KpiGrid from "@/components/inventory/KpiGrid";
 import type { Host } from "@/lib/types";
 
 export default function KpiSection({ hosts, t }: { hosts: Host[]; t: (key: string) => string }) {
@@ -10,14 +10,5 @@ export default function KpiSection({ hosts, t }: { hosts: Host[]; t: (key: strin
     { label: t("host.alerts"), value: hosts.filter(h => h.alerts && h.alerts.length > 0).length, color: "amber", icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" },
   ];
 
-  return (
-    <div className="mb-5">
-      <h2 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("common.indicators") || "Indicators"}</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {kpis.map((kpi) => (
-          <StatCard key={kpi.label} label={kpi.label} value={kpi.value} color={kpi.color} icon={kpi.icon} />
-        ))}
-      </div>
-    </div>
-  );
+  return <KpiGrid kpis={kpis} heading={t("common.indicators") || "Indicators"} columns={5} />;
 }
