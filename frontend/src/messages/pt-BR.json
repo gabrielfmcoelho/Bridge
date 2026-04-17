@@ -96,6 +96,7 @@
     "cardView": "Cart\u00f5es",
     "tableView": "Tabela",
     "indicators": "Indicadores",
+    "refresh": "Atualizar",
     "copy": "Copiar",
     "copied": "Copiado!"
   },
@@ -251,7 +252,23 @@
     "externalUrl": "URL Externo",
     "externalContact": "Contato Externo",
     "dependencies": "Depend\u00eancias",
-    "dependents": "Usado Por"
+    "dependents": "Usado Por",
+    "source": "Origem",
+    "sourceManual": "Manual",
+    "sourceAuto": "Auto-descoberto",
+    "sourceFixed": "Fixado",
+    "containerOnline": "Online",
+    "containerOffline": "Offline",
+    "containerInfo": "Container",
+    "containerName": "Nome do Container",
+    "containerImage": "Imagem",
+    "containerId": "ID do Container",
+    "containerPorts": "Portas",
+    "containerStatus": "Status",
+    "lastSeen": "\u00daltima Visualiza\u00e7\u00e3o",
+    "fixate": "Fixar",
+    "fixateDesc": "Fixe este servi\u00e7o para que ele persista mesmo se o container cair",
+    "updateContainer": "Atualizar Container"
   },
   "topology": {
     "title": "Topologia da Arquitetura",
@@ -377,7 +394,12 @@
     "credentialsTitle": "Credenciais da Aplica\u00e7\u00e3o",
     "noCredentials": "Nenhuma credencial configurada",
     "refreshUrl": "Atualizar URL",
-    "syncedFrom": "Sincronizado de"
+    "syncedFrom": "Sincronizado de",
+    "embedLoading": "Carregando visualiza\u00e7\u00e3o incorporada...",
+    "embedBlockedTitle": "N\u00e3o foi poss\u00edvel incorporar esta aplica\u00e7\u00e3o",
+    "embedBlockedDescription": "A aplica\u00e7\u00e3o bloqueou o carregamento em iframe ou n\u00e3o concluiu a sess\u00e3o dentro do tempo esperado.",
+    "embedLikelyBlockedMinio": "MinIO geralmente bloqueia iframe via cabe\u00e7alhos de seguran\u00e7a (X-Frame-Options/CSP). Abra externamente ou ajuste o proxy para permitir frame-ancestors.",
+    "embedLikelyUnstableAirflow": "Airflow carregou, mas a sess\u00e3o pode falhar em iframe sem ajustes de base_url, proxy headers e cookies."
   },
   "serviceCredentials": {
     "title": "Credenciais de Aplica\u00e7\u00f5es",

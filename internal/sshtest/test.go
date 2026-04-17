@@ -92,6 +92,7 @@ type VMInfo struct {
 	LoadAvg        string   `json:"load_avg"`
 	SwapTotal      string   `json:"swap_total"`
 	SwapUsed       string   `json:"swap_used"`
+	ParsedContainers  []ContainerInfo    `json:"parsed_containers,omitempty"`
 	Warnings          []string           `json:"warnings,omitempty"`
 	ProcessDetails    []ProcessDetail    `json:"process_details,omitempty"`
 	SSHKeys           []SSHKeyInfo       `json:"ssh_keys,omitempty"`
@@ -99,6 +100,15 @@ type VMInfo struct {
 	InstalledPackages []InstalledPackage  `json:"installed_packages,omitempty"`
 	CronJobs          []string           `json:"cron_jobs,omitempty"`
 	FirewallStatus    string             `json:"firewall_status,omitempty"`
+}
+
+// ContainerInfo holds structured data about a running Docker container.
+type ContainerInfo struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Image  string `json:"image"`
+	Status string `json:"status"`
+	Ports  string `json:"ports"`
 }
 
 // SSHKeyInfo holds info about an SSH key found on the remote host during scan.
@@ -885,6 +895,13 @@ func cleanCommandOutput(raw string, warnings map[string]bool) string {
 	return strings.Join(filtered, "\n")
 }
 
+func safeIndex(parts []string, i int) string {
+	if i < len(parts) {
+		return parts[i]
+	}
+	return ""
+}
+
 func splitLines(s string) []string {
 	if s == "" {
 		return nil
@@ -1002,11 +1019,29 @@ func captureVMInfo(client *ssh.Client) (*VMInfo, error) {
 	info.Ports = splitLines(section(3))
 
 	// ── Sessions 4-5: Docker (needs special handling for sudo fallback) ──
-	info.Containers = splitLines(captureDocker(client,
-		`docker ps --format '{{.Names}} ({{.Image}}) {{.Status}}'`,
-		`sudo -n docker ps --format '{{.Names}} ({{.Image}}) {{.Status}}' 2>/dev/null`,
+	// Enhanced format captures container ID and port mappings.
+	dockerRaw := captureDocker(client,
+		`docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'`,
+		`sudo -n docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null`,
 		warnFlags,
-	))
+	)
+	// Populate old string field for backward compatibility and parse structured data.
+	for _, line := range splitLines(dockerRaw) {
+		parts := strings.SplitN(line, "\t", 5)
+		if len(parts) >= 3 {
+			// Old format: "name (image) status"
+			info.Containers = append(info.Containers, parts[1]+" ("+parts[2]+") "+safeIndex(parts, 3))
+			info.ParsedContainers = append(info.ParsedContainers, ContainerInfo{
+				ID:     parts[0],
+				Name:   parts[1],
+				Image:  parts[2],
+				Status: safeIndex(parts, 3),
+				Ports:  safeIndex(parts, 4),
+			})
+		} else {
+			info.Containers = append(info.Containers, line)
+		}
+	}
 	info.ContainerStats = splitLines(captureDocker(client,
 		`docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}'`,
 		`sudo -n docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}' 2>/dev/null`,

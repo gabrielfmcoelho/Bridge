@@ -307,6 +307,15 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 				result["scan_saved"] = true
 			}
 		}
+
+		// Reconcile container-based services.
+		if len(vmInfo.ParsedContainers) > 0 {
+			if reconcileErr := models.ReconcileContainerServices(h.db.SQL, host.ID, vmInfo.ParsedContainers); reconcileErr != nil {
+				result["reconcile_error"] = reconcileErr.Error()
+			} else {
+				result["services_reconciled"] = true
+			}
+		}
 	} else {
 		testErr := sshtest.Test(client)
 		if testErr != nil {

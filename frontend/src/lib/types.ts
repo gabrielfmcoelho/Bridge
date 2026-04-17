@@ -194,6 +194,14 @@ export interface Service {
   repository_url: string;
   gitlab_url: string;
   documentation_url: string;
+  source: "manual" | "auto" | "fixed";
+  container_status: "online" | "offline" | "";
+  container_id: string;
+  container_name: string;
+  container_image: string;
+  container_ports: string;
+  discovered_at: string | null;
+  last_seen_at: string | null;
   created_at: string;
   updated_at: string;
   tags?: string[];

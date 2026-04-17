@@ -768,4 +768,29 @@ var migrationsPostgres = []string{
 	`ALTER TABLE external_tools ADD COLUMN IF NOT EXISTS service_id BIGINT REFERENCES services(id) ON DELETE SET NULL;
 	ALTER TABLE external_tools ADD COLUMN IF NOT EXISTS dns_id BIGINT REFERENCES dns_records(id) ON DELETE SET NULL;
 	ALTER TABLE external_tools ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual';`,
+
+	// Version 50: service evolution — container discovery, service modes (manual/auto/fixed).
+	`ALTER TABLE services ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS container_status TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS container_id TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS container_name TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS container_image TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS container_ports TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS discovered_at TIMESTAMPTZ;
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+
+	UPDATE services SET service_type = 'app-fullstack' WHERE service_type = 'fullstack';
+	UPDATE services SET service_type = 'app-frontend' WHERE service_type = 'frontend';
+	UPDATE services SET service_type = 'app-api' WHERE service_type = 'api';
+	UPDATE enum_options SET value = 'app-fullstack' WHERE category = 'service_type' AND value = 'fullstack';
+	UPDATE enum_options SET value = 'app-frontend' WHERE category = 'service_type' AND value = 'frontend';
+	UPDATE enum_options SET value = 'app-api' WHERE category = 'service_type' AND value = 'api';
+
+	INSERT INTO enum_options (category, value, sort_order) VALUES
+		('service_type', 'nginx', 8),
+		('service_type', 'agents', 9),
+		('service_type', 'others', 10)
+	ON CONFLICT DO NOTHING;
+
+	CREATE INDEX IF NOT EXISTS idx_services_container ON services(container_name, source);`,
 }

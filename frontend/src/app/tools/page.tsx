@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toolsAPI, servicesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -18,6 +18,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import FormError from "@/components/ui/FormError";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
+import Drawer from "@/components/ui/Drawer";
 
 const TOOL_ICONS: Record<string, string> = {
   outline: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
@@ -31,6 +32,20 @@ function getIconPath(icon: string): string {
   return TOOL_ICONS[icon?.toLowerCase()] || TOOL_ICONS.default;
 }
 
+function getEmbedHintKey(url: string): string | null {
+  const lower = url.toLowerCase();
+
+  if (lower.includes("minio")) {
+    return "tool.embedLikelyBlockedMinio";
+  }
+
+  if (lower.includes("airflow")) {
+    return "tool.embedLikelyUnstableAirflow";
+  }
+
+  return null;
+}
+
 export default function ToolsPage() {
   const { t } = useLocale();
   const { user } = useAuth();
@@ -41,6 +56,58 @@ export default function ToolsPage() {
   const [editTool, setEditTool] = useState<ExternalTool | null>(null);
   const [embedTool, setEmbedTool] = useState<ExternalTool | null>(null);
   const [credsTool, setCredsTool] = useState<ExternalTool | null>(null);
+  const [embedBlocked, setEmbedBlocked] = useState(false);
+  const [embedLoading, setEmbedLoading] = useState(false);
+  const [embedReloadKey, setEmbedReloadKey] = useState(0);
+  const [embedErrorKey, setEmbedErrorKey] = useState<string | null>(null);
+  const embedLoadedRef = useRef(false);
+
+  const primeEmbedState = (tool: ExternalTool) => {
+    embedLoadedRef.current = false;
+    setEmbedLoading(true);
+    setEmbedBlocked(false);
+    setEmbedErrorKey(getEmbedHintKey(tool.url));
+  };
+
+  const openEmbedTool = (tool: ExternalTool) => {
+    setEmbedReloadKey(0);
+    primeEmbedState(tool);
+    setEmbedTool(tool);
+  };
+
+  const reloadEmbeddedTool = () => {
+    if (!embedTool) {
+      return;
+    }
+    primeEmbedState(embedTool);
+    setEmbedReloadKey((v) => v + 1);
+  };
+
+  useEffect(() => {
+    if (!embedTool?.url) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (!embedLoadedRef.current) {
+        setEmbedLoading(false);
+        setEmbedBlocked(true);
+      }
+    }, 12000);
+
+    return () => clearTimeout(timeout);
+  }, [embedTool?.id, embedTool?.url, embedReloadKey]);
+
+  const handleEmbedLoaded = () => {
+    embedLoadedRef.current = true;
+    setEmbedLoading(false);
+    setEmbedBlocked(false);
+  };
+
+  const handleEmbedFailed = () => {
+    setEmbedLoading(false);
+    setEmbedBlocked(true);
+  };
 
   const { data: tools = [], isLoading } = useQuery({
     queryKey: ["tools"],
@@ -66,7 +133,11 @@ export default function ToolsPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setEmbedTool(null)}
+              onClick={() => {
+                setEmbedTool(null);
+                setEmbedReloadKey(0);
+                setEmbedErrorKey(null);
+              }}
               className="inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -81,15 +152,12 @@ export default function ToolsPage() {
           </div>
           <div className="flex items-center gap-3">
             {embedTool.has_credentials && (
-              <button
-                onClick={() => setCredsTool(embedTool)}
-                className="inline-flex items-center gap-1.5 text-xs text-[var(--accent)] hover:underline"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <Button size="sm" variant="secondary" onClick={() => setCredsTool(embedTool)}>
+                <svg className="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
                 {t("tool.viewCredentials")}
-              </button>
+              </Button>
             )}
             <a
               href={embedTool.url}
@@ -102,16 +170,51 @@ export default function ToolsPage() {
           </div>
         </div>
         <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] overflow-hidden bg-white" style={{ height: "calc(100vh - 160px)" }}>
-          <iframe
-            src={embedTool.url}
-            className="w-full h-full border-0"
-            title={embedTool.name}
-            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-          />
+          <div className="relative w-full h-full">
+            {(embedLoading || embedBlocked) && (
+              <div className="absolute inset-0 z-10 bg-[var(--bg-surface)]/95 backdrop-blur-sm p-4 flex items-center justify-center">
+                <div className="max-w-xl w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 space-y-3">
+                  {embedLoading ? (
+                    <p className="text-sm text-[var(--text-secondary)]">{t("tool.embedLoading")}</p>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{t("tool.embedBlockedTitle")}</p>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        {embedErrorKey ? t(embedErrorKey) : t("tool.embedBlockedDescription")}
+                      </p>
+                      <div className="flex items-center gap-3 pt-1">
+                        <Button size="sm" variant="secondary" onClick={reloadEmbeddedTool}>
+                          {t("common.refresh")}
+                        </Button>
+                        <a
+                          href={embedTool.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[var(--accent)] hover:underline"
+                        >
+                          {t("tool.openExternal")}
+                        </a>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <iframe
+              key={`embed-${embedTool.id}-${embedReloadKey}`}
+              src={embedTool.url}
+              className="w-full h-full border-0"
+              title={embedTool.name}
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+              onLoad={handleEmbedLoaded}
+              onError={handleEmbedFailed}
+            />
+          </div>
         </div>
 
-        {/* Credentials modal from embed view */}
-        <CredentialsModal tool={credsTool} onClose={() => setCredsTool(null)} />
+        {/* Credentials drawer from embed view */}
+        <CredentialsDrawer tool={credsTool} onClose={() => setCredsTool(null)} />
       </PageShell>
     );
   }
@@ -184,7 +287,7 @@ export default function ToolsPage() {
                   )}
                   {tool.embed_enabled && tool.url && (
                     <button
-                      onClick={() => setEmbedTool(tool)}
+                      onClick={() => openEmbedTool(tool)}
                       className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors ml-auto"
                     >
                       {t("tool.embed")}
@@ -360,10 +463,7 @@ function SyncForm({ onSuccess }: { onSuccess: () => void }) {
     }));
 
   // Only show services that have DNS links
-  const servicesWithDns = services.filter((s) => {
-    // We don't know dns_ids from the list endpoint, so show all services
-    return true;
-  });
+  const servicesWithDns = services;
 
   const serviceOptions = servicesWithDns.map((s) => ({
     value: String(s.id),
@@ -443,6 +543,32 @@ function CredentialsModal({ tool, onClose }: { tool: ExternalTool | null; onClos
         </div>
       )}
     </ResponsiveModal>
+  );
+}
+
+// --- Credentials drawer for embed mode ---
+
+function CredentialsDrawer({ tool, onClose }: { tool: ExternalTool | null; onClose: () => void }) {
+  const { t } = useLocale();
+
+  const { data: credentials = [] } = useQuery({
+    queryKey: ["tool-credentials", tool?.id],
+    queryFn: () => toolsAPI.listToolCredentials(tool!.id),
+    enabled: !!tool,
+  });
+
+  return (
+    <Drawer open={!!tool} onClose={onClose} title={t("tool.credentialsTitle")} subHeader={tool?.name}>
+      {credentials.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)] py-4">{t("tool.noCredentials")}</p>
+      ) : (
+        <div className="space-y-2">
+          {credentials.map((cred) => (
+            <CredentialRow key={cred.id} toolId={tool!.id} credential={cred} />
+          ))}
+        </div>
+      )}
+    </Drawer>
   );
 }
 

@@ -23,13 +23,23 @@ export default function ServiceCard({ svc }: { svc: Service }) {
           subtitle={svc.service_type ? `${svc.service_type}${svc.service_subtype ? ` / ${svc.service_subtype}` : ""}` : undefined}
           description={svc.description || t("common.noDescription") || "-"}
           badge={
-            svc.is_external_dependency ? (
-              <Badge color="red" compact>{t("service.isExternalDependency") || "External Dep"}</Badge>
-            ) : (
-              <Badge color={svc.developed_by === "internal" ? "cyan" : "amber"} compact>
-                {svc.developed_by === "internal" ? t("service.internal") || "Internal" : t("service.external") || "External"}
-              </Badge>
-            )
+            <div className="flex items-center gap-1.5">
+              {svc.source !== "manual" && (
+                <Badge color={svc.source === "auto" ? "blue" : "emerald"} compact>
+                  {svc.source === "auto" ? t("service.sourceAuto") : t("service.sourceFixed")}
+                </Badge>
+              )}
+              {svc.container_status && (
+                <span className={`inline-block w-2 h-2 rounded-full ${svc.container_status === "online" ? "bg-emerald-400" : "bg-gray-400"}`} title={svc.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")} />
+              )}
+              {svc.is_external_dependency ? (
+                <Badge color="red" compact>{t("service.isExternalDependency") || "External Dep"}</Badge>
+              ) : (
+                <Badge color={svc.developed_by === "internal" ? "cyan" : "amber"} compact>
+                  {svc.developed_by === "internal" ? t("service.internal") || "Internal" : t("service.external") || "External"}
+                </Badge>
+              )}
+            </div>
           }
         />
 

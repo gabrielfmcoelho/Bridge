@@ -16,6 +16,7 @@ export default function ServicesTableView({ services, t }: ServicesTableViewProp
           <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
             <th className="text-left px-4 py-3 font-semibold">{t("service.nickname")}</th>
             <th className="text-left px-4 py-3 font-semibold">{t("common.description")}</th>
+            <th className="text-left px-4 py-3 font-semibold">{t("service.source")}</th>
             <th className="text-left px-4 py-3 font-semibold">{t("service.technologyStack")}</th>
             <th className="text-left px-4 py-3 font-semibold">{t("service.developedBy")}</th>
             <th className="text-left px-4 py-3 font-semibold">{t("common.tags")}</th>
@@ -28,8 +29,20 @@ export default function ServicesTableView({ services, t }: ServicesTableViewProp
               className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
               onClick={() => window.location.href = `/services/${svc.id}`}
             >
-              <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">{svc.nickname}</td>
+              <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
+                <div className="flex items-center gap-1.5">
+                  {svc.container_status && (
+                    <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${svc.container_status === "online" ? "bg-emerald-400" : "bg-gray-400"}`} />
+                  )}
+                  {svc.nickname}
+                </div>
+              </td>
               <td className="px-4 py-2.5 text-[var(--text-secondary)] max-w-[200px] truncate">{svc.description || "-"}</td>
+              <td className="px-4 py-2.5">
+                <Badge color={svc.source === "auto" ? "blue" : svc.source === "fixed" ? "emerald" : "default"}>
+                  {svc.source === "auto" ? t("service.sourceAuto") : svc.source === "fixed" ? t("service.sourceFixed") : t("service.sourceManual")}
+                </Badge>
+              </td>
               <td className="px-4 py-2.5">{svc.technology_stack ? <Badge>{svc.technology_stack}</Badge> : <span className="text-[var(--text-faint)]">-</span>}</td>
               <td className="px-4 py-2.5">
                 {svc.is_external_dependency ? (

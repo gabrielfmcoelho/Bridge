@@ -96,6 +96,7 @@
     "cardView": "Card view",
     "tableView": "Table view",
     "indicators": "Indicators",
+    "refresh": "Refresh",
     "copy": "Copy",
     "copied": "Copied!"
   },
@@ -251,7 +252,23 @@
     "externalUrl": "External URL",
     "externalContact": "External Contact",
     "dependencies": "Dependencies",
-    "dependents": "Used By"
+    "dependents": "Used By",
+    "source": "Source",
+    "sourceManual": "Manual",
+    "sourceAuto": "Auto-discovered",
+    "sourceFixed": "Fixed",
+    "containerOnline": "Online",
+    "containerOffline": "Offline",
+    "containerInfo": "Container",
+    "containerName": "Container Name",
+    "containerImage": "Image",
+    "containerId": "Container ID",
+    "containerPorts": "Ports",
+    "containerStatus": "Status",
+    "lastSeen": "Last Seen",
+    "fixate": "Fixate",
+    "fixateDesc": "Pin this service so it persists even if the container goes down",
+    "updateContainer": "Update Container"
   },
   "topology": {
     "title": "Architecture Topology",
@@ -377,7 +394,12 @@
     "credentialsTitle": "Application Credentials",
     "noCredentials": "No credentials configured",
     "refreshUrl": "Refresh URL",
-    "syncedFrom": "Synced from"
+    "syncedFrom": "Synced from",
+    "embedLoading": "Loading embedded view...",
+    "embedBlockedTitle": "This application could not be embedded",
+    "embedBlockedDescription": "The application blocked iframe loading or did not complete session bootstrap within the expected time.",
+    "embedLikelyBlockedMinio": "MinIO commonly blocks iframe embedding via security headers (X-Frame-Options/CSP). Open externally or adjust the proxy to allow frame-ancestors.",
+    "embedLikelyUnstableAirflow": "Airflow loaded, but iframe sessions may fail without base_url, proxy headers, and cookie settings aligned."
   },
   "serviceCredentials": {
     "title": "Application Credentials",

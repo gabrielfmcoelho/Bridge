@@ -8,46 +8,62 @@ import (
 )
 
 type Service struct {
-	ID                     int64     `json:"id"`
-	Nickname               string    `json:"nickname"`
-	ProjectID              *int64    `json:"project_id"`
-	Description            string    `json:"description"`
-	ServiceType            string    `json:"service_type"`
-	ServiceSubtype         string    `json:"service_subtype"`
-	TechnologyStack        string    `json:"technology_stack"`
-	DeployApproach         string    `json:"deploy_approach"`
-	OrchestratorTool       string    `json:"orchestrator_tool"`
-	Environment            string    `json:"environment"`
-	Port                   string    `json:"port"`
-	Version                string    `json:"version"`
-	OrchestratorManaged    bool      `json:"orchestrator_managed"`
-	IsDirectlyManaged      bool      `json:"is_directly_managed"`
-	IsResponsible          bool      `json:"is_responsible"`
-	DevelopedBy            string    `json:"developed_by"`
-	IsExternalDependency   bool      `json:"is_external_dependency"`
-	ExternalProvider       string    `json:"external_provider"`
-	ExternalURL            string    `json:"external_url"`
-	ExternalContact        string    `json:"external_contact"`
-	RepositoryURL          string    `json:"repository_url"`
-	GitlabURL              string    `json:"gitlab_url"`
-	DocumentationURL       string    `json:"documentation_url"`
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	ID                     int64      `json:"id"`
+	Nickname               string     `json:"nickname"`
+	ProjectID              *int64     `json:"project_id"`
+	Description            string     `json:"description"`
+	ServiceType            string     `json:"service_type"`
+	ServiceSubtype         string     `json:"service_subtype"`
+	TechnologyStack        string     `json:"technology_stack"`
+	DeployApproach         string     `json:"deploy_approach"`
+	OrchestratorTool       string     `json:"orchestrator_tool"`
+	Environment            string     `json:"environment"`
+	Port                   string     `json:"port"`
+	Version                string     `json:"version"`
+	OrchestratorManaged    bool       `json:"orchestrator_managed"`
+	IsDirectlyManaged      bool       `json:"is_directly_managed"`
+	IsResponsible          bool       `json:"is_responsible"`
+	DevelopedBy            string     `json:"developed_by"`
+	IsExternalDependency   bool       `json:"is_external_dependency"`
+	ExternalProvider       string     `json:"external_provider"`
+	ExternalURL            string     `json:"external_url"`
+	ExternalContact        string     `json:"external_contact"`
+	RepositoryURL          string     `json:"repository_url"`
+	GitlabURL              string     `json:"gitlab_url"`
+	DocumentationURL       string     `json:"documentation_url"`
+	Source                 string     `json:"source"`
+	ContainerStatus        string     `json:"container_status"`
+	ContainerID            string     `json:"container_id"`
+	ContainerName          string     `json:"container_name"`
+	ContainerImage         string     `json:"container_image"`
+	ContainerPorts         string     `json:"container_ports"`
+	DiscoveredAt           *time.Time `json:"discovered_at"`
+	LastSeenAt             *time.Time `json:"last_seen_at"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
 func CreateService(db *sql.DB, s *Service) error {
+	if s.Source == "" {
+		s.Source = "manual"
+	}
 	id, err := database.InsertReturningID(db,
 		`INSERT INTO services (nickname, project_id, description, service_type, service_subtype,
 			technology_stack, deploy_approach, orchestrator_tool, environment, port, version,
 			orchestrator_managed, is_directly_managed, is_responsible, developed_by,
 			is_external_dependency, external_provider, external_url, external_contact,
-			repository_url, gitlab_url, documentation_url)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			repository_url, gitlab_url, documentation_url,
+			source, container_status, container_id, container_name, container_image, container_ports,
+			discovered_at, last_seen_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+			?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype,
 		s.TechnologyStack, s.DeployApproach, s.OrchestratorTool, s.Environment, s.Port, s.Version,
 		s.OrchestratorManaged, s.IsDirectlyManaged, s.IsResponsible, s.DevelopedBy,
 		s.IsExternalDependency, s.ExternalProvider, s.ExternalURL, s.ExternalContact,
 		s.RepositoryURL, s.GitlabURL, s.DocumentationURL,
+		s.Source, s.ContainerStatus, s.ContainerID, s.ContainerName, s.ContainerImage, s.ContainerPorts,
+		s.DiscoveredAt, s.LastSeenAt,
 	)
 	if err != nil {
 		return err
@@ -60,14 +76,18 @@ const serviceCols = `id, nickname, project_id, description, service_type, servic
 	technology_stack, deploy_approach, orchestrator_tool, environment, port, version,
 	orchestrator_managed, is_directly_managed, is_responsible, developed_by,
 	is_external_dependency, external_provider, external_url, external_contact,
-	repository_url, gitlab_url, documentation_url, created_at, updated_at`
+	repository_url, gitlab_url, documentation_url,
+	source, container_status, container_id, container_name, container_image, container_ports,
+	discovered_at, last_seen_at, created_at, updated_at`
 
 func scanService(scanner interface{ Scan(...any) error }, s *Service) error {
 	return scanner.Scan(&s.ID, &s.Nickname, &s.ProjectID, &s.Description, &s.ServiceType, &s.ServiceSubtype,
 		&s.TechnologyStack, &s.DeployApproach, &s.OrchestratorTool, &s.Environment, &s.Port, &s.Version,
 		&s.OrchestratorManaged, &s.IsDirectlyManaged, &s.IsResponsible, &s.DevelopedBy,
 		&s.IsExternalDependency, &s.ExternalProvider, &s.ExternalURL, &s.ExternalContact,
-		&s.RepositoryURL, &s.GitlabURL, &s.DocumentationURL, &s.CreatedAt, &s.UpdatedAt,
+		&s.RepositoryURL, &s.GitlabURL, &s.DocumentationURL,
+		&s.Source, &s.ContainerStatus, &s.ContainerID, &s.ContainerName, &s.ContainerImage, &s.ContainerPorts,
+		&s.DiscoveredAt, &s.LastSeenAt, &s.CreatedAt, &s.UpdatedAt,
 	)
 }
 
@@ -117,13 +137,14 @@ func ListServicesByProject(db *sql.DB, projectID int64) ([]Service, error) {
 }
 
 func ListServicesByHost(db *sql.DB, hostID int64) ([]Service, error) {
-	// Build prefixed column list from serviceCols
 	rows, err := db.Query(
 		`SELECT s.id, s.nickname, s.project_id, s.description, s.service_type, s.service_subtype,
 			s.technology_stack, s.deploy_approach, s.orchestrator_tool, s.environment, s.port, s.version,
 			s.orchestrator_managed, s.is_directly_managed, s.is_responsible, s.developed_by,
 			s.is_external_dependency, s.external_provider, s.external_url, s.external_contact,
-			s.repository_url, s.gitlab_url, s.documentation_url, s.created_at, s.updated_at
+			s.repository_url, s.gitlab_url, s.documentation_url,
+			s.source, s.container_status, s.container_id, s.container_name, s.container_image, s.container_ports,
+			s.discovered_at, s.last_seen_at, s.created_at, s.updated_at
 		FROM services s
 		JOIN service_host_links l ON s.id = l.service_id
 		WHERE l.host_id = ? ORDER BY s.nickname`, hostID,
@@ -150,15 +171,66 @@ func UpdateService(db *sql.DB, s *Service) error {
 			technology_stack = ?, deploy_approach = ?, orchestrator_tool = ?, environment = ?, port = ?, version = ?,
 			orchestrator_managed = ?, is_directly_managed = ?, is_responsible = ?, developed_by = ?,
 			is_external_dependency = ?, external_provider = ?, external_url = ?, external_contact = ?,
-			repository_url = ?, gitlab_url = ?, documentation_url = ?, updated_at = CURRENT_TIMESTAMP
+			repository_url = ?, gitlab_url = ?, documentation_url = ?,
+			source = ?, container_status = ?, container_id = ?, container_name = ?, container_image = ?, container_ports = ?,
+			discovered_at = ?, last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype,
 		s.TechnologyStack, s.DeployApproach, s.OrchestratorTool, s.Environment, s.Port, s.Version,
 		s.OrchestratorManaged, s.IsDirectlyManaged, s.IsResponsible, s.DevelopedBy,
 		s.IsExternalDependency, s.ExternalProvider, s.ExternalURL, s.ExternalContact,
-		s.RepositoryURL, s.GitlabURL, s.DocumentationURL, s.ID,
+		s.RepositoryURL, s.GitlabURL, s.DocumentationURL,
+		s.Source, s.ContainerStatus, s.ContainerID, s.ContainerName, s.ContainerImage, s.ContainerPorts,
+		s.DiscoveredAt, s.LastSeenAt, s.ID,
 	)
 	return err
+}
+
+// FixateService converts an auto-discovered service to a fixed service.
+func FixateService(db *sql.DB, id int64) error {
+	_, err := db.Exec(`UPDATE services SET source = 'fixed', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND source = 'auto'`, id)
+	return err
+}
+
+// UpdateContainerBinding rebinds a fixed/manual service to a different container.
+func UpdateContainerBinding(db *sql.DB, id int64, containerName, containerID string) error {
+	_, err := db.Exec(
+		`UPDATE services SET container_name = ?, container_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		containerName, containerID, id,
+	)
+	return err
+}
+
+// ListContainerServicesByHost returns all auto/fixed services linked to a host
+// that have a container_name set.
+func ListContainerServicesByHost(db *sql.DB, hostID int64) ([]Service, error) {
+	rows, err := db.Query(
+		`SELECT s.id, s.nickname, s.project_id, s.description, s.service_type, s.service_subtype,
+			s.technology_stack, s.deploy_approach, s.orchestrator_tool, s.environment, s.port, s.version,
+			s.orchestrator_managed, s.is_directly_managed, s.is_responsible, s.developed_by,
+			s.is_external_dependency, s.external_provider, s.external_url, s.external_contact,
+			s.repository_url, s.gitlab_url, s.documentation_url,
+			s.source, s.container_status, s.container_id, s.container_name, s.container_image, s.container_ports,
+			s.discovered_at, s.last_seen_at, s.created_at, s.updated_at
+		FROM services s
+		JOIN service_host_links l ON s.id = l.service_id
+		WHERE l.host_id = ? AND s.source IN ('auto', 'fixed') AND s.container_name != ''
+		ORDER BY s.nickname`, hostID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var services []Service
+	for rows.Next() {
+		var s Service
+		if err := scanService(rows, &s); err != nil {
+			return nil, err
+		}
+		services = append(services, s)
+	}
+	return services, rows.Err()
 }
 
 func DeleteService(db *sql.DB, id int64) error {

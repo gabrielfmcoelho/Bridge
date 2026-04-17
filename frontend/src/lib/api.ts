@@ -333,6 +333,10 @@ export const servicesAPI = {
     api.get<import("./types").ServiceCredential>(`/api/services/${serviceId}/credentials/${credId}`),
   deleteCredential: (serviceId: number, credId: number) =>
     api.delete(`/api/services/${serviceId}/credentials/${credId}`),
+  fixate: (id: number) =>
+    api.post<import("./types").Service>(`/api/services/${id}/fixate`),
+  updateContainer: (id: number, data: { container_name: string; container_id: string }) =>
+    api.put<import("./types").Service>(`/api/services/${id}/container`, data),
 };
 
 // Orchestrators

@@ -108,6 +108,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/services/{id}", authenticated(db, http.HandlerFunc(sh.handleGet)))
 	mux.Handle("PUT /api/services/{id}", authedRole(db, "editor", http.HandlerFunc(sh.handleUpdate)))
 	mux.Handle("DELETE /api/services/{id}", authedRole(db, "admin", http.HandlerFunc(sh.handleDelete)))
+	mux.Handle("POST /api/services/{id}/fixate", authedRole(db, "editor", http.HandlerFunc(sh.handleFixate)))
+	mux.Handle("PUT /api/services/{id}/container", authedRole(db, "editor", http.HandlerFunc(sh.handleUpdateContainer)))
 
 	// Service credentials
 	mux.Handle("GET /api/services/credentials/all", authenticated(db, http.HandlerFunc(sh.handleListAllCredentials)))

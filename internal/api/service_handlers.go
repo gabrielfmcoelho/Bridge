@@ -305,6 +305,70 @@ func (h *serviceHandlers) handleDeleteCredential(w http.ResponseWriter, r *http.
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
+// handleFixate converts an auto-discovered service to a fixed service.
+func (h *serviceHandlers) handleFixate(w http.ResponseWriter, r *http.Request) {
+	id, err := pathInt64(r, "id")
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	svc, err := models.GetService(h.db.SQL, id)
+	if err != nil || svc == nil {
+		jsonError(w, http.StatusNotFound, "service not found")
+		return
+	}
+	if svc.Source != "auto" {
+		jsonError(w, http.StatusBadRequest, "only auto-discovered services can be fixated")
+		return
+	}
+
+	if err := models.FixateService(h.db.SQL, id); err != nil {
+		jsonError(w, http.StatusInternalServerError, "failed to fixate service")
+		return
+	}
+
+	svc.Source = "fixed"
+	jsonOK(w, svc)
+}
+
+// handleUpdateContainer rebinds a fixed/manual service to a different container.
+func (h *serviceHandlers) handleUpdateContainer(w http.ResponseWriter, r *http.Request) {
+	id, err := pathInt64(r, "id")
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	svc, err := models.GetService(h.db.SQL, id)
+	if err != nil || svc == nil {
+		jsonError(w, http.StatusNotFound, "service not found")
+		return
+	}
+	if svc.Source == "auto" {
+		jsonError(w, http.StatusBadRequest, "cannot rebind auto services; fixate first")
+		return
+	}
+
+	var req struct {
+		ContainerName string `json:"container_name"`
+		ContainerID   string `json:"container_id"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := models.UpdateContainerBinding(h.db.SQL, id, req.ContainerName, req.ContainerID); err != nil {
+		jsonError(w, http.StatusInternalServerError, "failed to update container binding")
+		return
+	}
+
+	svc.ContainerName = req.ContainerName
+	svc.ContainerID = req.ContainerID
+	jsonOK(w, svc)
+}
+
 // handleListAllCredentials returns all services that have credentials, with role summaries.
 func (h *serviceHandlers) handleListAllCredentials(w http.ResponseWriter, r *http.Request) {
 	services, err := models.ListServices(h.db.SQL)

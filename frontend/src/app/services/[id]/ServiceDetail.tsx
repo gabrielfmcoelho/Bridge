@@ -94,6 +94,14 @@ export default function ServiceDetail({ id }: { id: number }) {
     },
   });
 
+  const fixateMutation = useMutation({
+    mutationFn: () => servicesAPI.fixate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["service", id] });
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+    },
+  });
+
   return (
     <PageShell>
       {isLoading ? (
@@ -121,6 +129,16 @@ export default function ServiceDetail({ id }: { id: number }) {
             description={data.service.description}
             badges={
               <>
+                {data.service.source !== "manual" && (
+                  <Badge color={data.service.source === "auto" ? "blue" : "emerald"} compact>
+                    {data.service.source === "auto" ? t("service.sourceAuto") : t("service.sourceFixed")}
+                  </Badge>
+                )}
+                {data.service.container_status && (
+                  <Badge color={data.service.container_status === "online" ? "emerald" : "default"} compact>
+                    {data.service.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")}
+                  </Badge>
+                )}
                 {data.service.is_external_dependency ? (
                   <Badge color="red" compact>{t("service.isExternalDependency") || "External Dep"}</Badge>
                 ) : (
@@ -133,13 +151,20 @@ export default function ServiceDetail({ id }: { id: number }) {
               </>
             }
           >
-            <DetailActions
-              canEdit={canEdit}
-              isAdmin={isAdmin}
-              onEdit={() => setShowEditDrawer(true)}
-              onDelete={() => deleteMutation.mutate()}
-              deleteConfirmMessage={`Delete service "${data.service.nickname}"? This cannot be undone.`}
-            />
+            <div className="flex items-center gap-2">
+              {canEdit && data.service.source === "auto" && (
+                <Button size="sm" variant="secondary" onClick={() => fixateMutation.mutate()} loading={fixateMutation.isPending}>
+                  {t("service.fixate")}
+                </Button>
+              )}
+              <DetailActions
+                canEdit={canEdit}
+                isAdmin={isAdmin}
+                onEdit={() => setShowEditDrawer(true)}
+                onDelete={() => deleteMutation.mutate()}
+                deleteConfirmMessage={`Delete service "${data.service.nickname}"? This cannot be undone.`}
+              />
+            </div>
           </DetailHeader>
 
           {/* ── Tab bar ── */}
