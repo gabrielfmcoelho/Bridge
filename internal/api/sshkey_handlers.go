@@ -15,7 +15,7 @@ type sshKeyHandlers struct {
 func (h *sshKeyHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	keys, err := models.ListSSHKeys(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list credentials")
+		jsonServerError(w, r, "failed to list credentials", err)
 		return
 	}
 	type keyInfo struct {
@@ -47,7 +47,7 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Password       string `json:"password"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Name == "" {
@@ -71,7 +71,7 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if req.PublicKey != "" {
 		ct, nonce, err := h.db.Encryptor.Encrypt(req.PublicKey)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to encrypt public key")
+			jsonServerError(w, r, "failed to encrypt public key", err)
 			return
 		}
 		k.PubKeyCiphertext = ct
@@ -84,7 +84,7 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if req.PrivateKey != "" {
 		ct, nonce, err := h.db.Encryptor.Encrypt(req.PrivateKey)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to encrypt private key")
+			jsonServerError(w, r, "failed to encrypt private key", err)
 			return
 		}
 		k.PrivKeyCiphertext = ct
@@ -107,7 +107,7 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if req.Password != "" {
 		ct, nonce, err := h.db.Encryptor.Encrypt(req.Password)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to encrypt password")
+			jsonServerError(w, r, "failed to encrypt password", err)
 			return
 		}
 		k.PasswordCiphertext = ct
@@ -115,7 +115,7 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.CreateSSHKey(h.db.SQL, k); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create credential")
+		jsonServerError(w, r, "failed to create credential", err)
 		return
 	}
 	jsonCreated(w, k)
@@ -124,7 +124,7 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *sshKeyHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 	k, err := models.GetSSHKey(h.db.SQL, id)
@@ -161,7 +161,7 @@ func (h *sshKeyHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 	existing, err := models.GetSSHKey(h.db.SQL, id)
@@ -180,7 +180,7 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		Password       string `json:"password"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -197,7 +197,7 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.PublicKey != "" {
 		ct, nonce, err := h.db.Encryptor.Encrypt(req.PublicKey)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to encrypt public key")
+			jsonServerError(w, r, "failed to encrypt public key", err)
 			return
 		}
 		k.PubKeyCiphertext = ct
@@ -210,7 +210,7 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.PrivateKey != "" {
 		ct, nonce, err := h.db.Encryptor.Encrypt(req.PrivateKey)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to encrypt private key")
+			jsonServerError(w, r, "failed to encrypt private key", err)
 			return
 		}
 		k.PrivKeyCiphertext = ct
@@ -233,7 +233,7 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.Password != "" {
 		ct, nonce, err := h.db.Encryptor.Encrypt(req.Password)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to encrypt password")
+			jsonServerError(w, r, "failed to encrypt password", err)
 			return
 		}
 		k.PasswordCiphertext = ct
@@ -241,7 +241,7 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.UpdateSSHKey(h.db.SQL, k); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update credential")
+		jsonServerError(w, r, "failed to update credential", err)
 		return
 	}
 	jsonOK(w, k)
@@ -250,11 +250,11 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *sshKeyHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 	if err := models.DeleteSSHKey(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete key")
+		jsonServerError(w, r, "failed to delete key", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})

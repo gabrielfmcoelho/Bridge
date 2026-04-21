@@ -14,7 +14,7 @@ type serviceHandlers struct {
 func (h *serviceHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	services, err := models.ListServices(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list services")
+		jsonServerError(w, r, "failed to list services", err)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *serviceHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 func (h *serviceHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -100,7 +100,7 @@ func (h *serviceHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Responsaveis []models.ServiceResponsavelInput  `json:"responsaveis"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Nickname == "" {
@@ -109,7 +109,7 @@ func (h *serviceHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.CreateService(h.db.SQL, &req.Service); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create service")
+		jsonServerError(w, r, "failed to create service", err)
 		return
 	}
 
@@ -135,7 +135,7 @@ func (h *serviceHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -154,13 +154,13 @@ func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		Responsaveis *[]models.ServiceResponsavelInput   `json:"responsaveis"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
 	req.Service.ID = id
 	if err := models.UpdateService(h.db.SQL, &req.Service); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update service")
+		jsonServerError(w, r, "failed to update service", err)
 		return
 	}
 
@@ -186,13 +186,13 @@ func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *serviceHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
 	models.DeleteTags(h.db.SQL, "service", id)
 	if err := models.DeleteService(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete service")
+		jsonServerError(w, r, "failed to delete service", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
@@ -203,13 +203,13 @@ func (h *serviceHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 func (h *serviceHandlers) handleListCredentials(w http.ResponseWriter, r *http.Request) {
 	serviceID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid service id")
+		jsonBadRequest(w, r, "invalid service id", err)
 		return
 	}
 
 	creds, err := models.ListServiceCredentials(h.db.SQL, serviceID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list credentials")
+		jsonServerError(w, r, "failed to list credentials", err)
 		return
 	}
 
@@ -228,7 +228,7 @@ func (h *serviceHandlers) handleListCredentials(w http.ResponseWriter, r *http.R
 func (h *serviceHandlers) handleCreateCredential(w http.ResponseWriter, r *http.Request) {
 	serviceID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid service id")
+		jsonBadRequest(w, r, "invalid service id", err)
 		return
 	}
 
@@ -237,7 +237,7 @@ func (h *serviceHandlers) handleCreateCredential(w http.ResponseWriter, r *http.
 		Credentials string `json:"credentials"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.RoleName == "" || req.Credentials == "" {
@@ -247,7 +247,7 @@ func (h *serviceHandlers) handleCreateCredential(w http.ResponseWriter, r *http.
 
 	ct, nonce, err := h.db.Encryptor.Encrypt(req.Credentials)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to encrypt credentials")
+		jsonServerError(w, r, "failed to encrypt credentials", err)
 		return
 	}
 
@@ -268,7 +268,7 @@ func (h *serviceHandlers) handleCreateCredential(w http.ResponseWriter, r *http.
 func (h *serviceHandlers) handleGetCredential(w http.ResponseWriter, r *http.Request) {
 	credID, err := pathInt64(r, "credId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid credential id")
+		jsonBadRequest(w, r, "invalid credential id", err)
 		return
 	}
 
@@ -280,7 +280,7 @@ func (h *serviceHandlers) handleGetCredential(w http.ResponseWriter, r *http.Req
 
 	plaintext, err := h.db.Encryptor.Decrypt(cred.CredentialsCiphertext, cred.CredentialsNonce)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to decrypt credentials")
+		jsonServerError(w, r, "failed to decrypt credentials", err)
 		return
 	}
 
@@ -294,12 +294,12 @@ func (h *serviceHandlers) handleGetCredential(w http.ResponseWriter, r *http.Req
 func (h *serviceHandlers) handleDeleteCredential(w http.ResponseWriter, r *http.Request) {
 	credID, err := pathInt64(r, "credId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid credential id")
+		jsonBadRequest(w, r, "invalid credential id", err)
 		return
 	}
 
 	if err := models.DeleteServiceCredential(h.db.SQL, credID); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete credential")
+		jsonServerError(w, r, "failed to delete credential", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
@@ -309,7 +309,7 @@ func (h *serviceHandlers) handleDeleteCredential(w http.ResponseWriter, r *http.
 func (h *serviceHandlers) handleFixate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -324,7 +324,7 @@ func (h *serviceHandlers) handleFixate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.FixateService(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to fixate service")
+		jsonServerError(w, r, "failed to fixate service", err)
 		return
 	}
 
@@ -336,7 +336,7 @@ func (h *serviceHandlers) handleFixate(w http.ResponseWriter, r *http.Request) {
 func (h *serviceHandlers) handleUpdateContainer(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -355,12 +355,12 @@ func (h *serviceHandlers) handleUpdateContainer(w http.ResponseWriter, r *http.R
 		ContainerID   string `json:"container_id"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
 	if err := models.UpdateContainerBinding(h.db.SQL, id, req.ContainerName, req.ContainerID); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update container binding")
+		jsonServerError(w, r, "failed to update container binding", err)
 		return
 	}
 
@@ -373,7 +373,7 @@ func (h *serviceHandlers) handleUpdateContainer(w http.ResponseWriter, r *http.R
 func (h *serviceHandlers) handleListAllCredentials(w http.ResponseWriter, r *http.Request) {
 	services, err := models.ListServices(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list services")
+		jsonServerError(w, r, "failed to list services", err)
 		return
 	}
 
@@ -392,7 +392,7 @@ func (h *serviceHandlers) handleListAllCredentials(w http.ResponseWriter, r *htt
 	for _, svc := range services {
 		creds, err := models.ListServiceCredentials(h.db.SQL, svc.ID)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to list credentials")
+			jsonServerError(w, r, "failed to list credentials", err)
 			return
 		}
 		if len(creds) == 0 {

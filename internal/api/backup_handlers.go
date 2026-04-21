@@ -35,19 +35,19 @@ func (h *backupHandlers) handleBackup(w http.ResponseWriter, r *http.Request) {
 func (h *backupHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 500*1024*1024)
 	if err := r.ParseMultipartForm(64 * 1024 * 1024); err != nil {
-		jsonError(w, http.StatusBadRequest, "file too large (max 500MB)")
+		jsonBadRequest(w, r, "file too large (max 500MB)", err)
 		return
 	}
 	file, _, err := r.FormFile("backup")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "missing backup file")
+		jsonBadRequest(w, r, "missing backup file", err)
 		return
 	}
 	defer file.Close()
 
 	backup, err := database.ReadPortableBackup(file)
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, fmt.Sprintf("invalid backup: %v", err))
+		jsonBadRequest(w, r, fmt.Sprintf("invalid backup: %v", err), err)
 		return
 	}
 
@@ -57,7 +57,7 @@ func (h *backupHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.db.RestorePortable(backup); err != nil {
-		jsonError(w, http.StatusInternalServerError, fmt.Sprintf("restore failed: %v", err))
+		jsonServerError(w, r, fmt.Sprintf("restore failed: %v", err), err)
 		return
 	}
 

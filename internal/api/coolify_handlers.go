@@ -147,7 +147,134 @@ func (h *coolifyHandlers) handleCheckHost(w http.ResponseWriter, r *http.Request
 	jsonOK(w, map[string]any{"found": false})
 }
 
-// handleRegisterHost uploads the host's SSH key and creates a server in Coolify.
+// resolvePrivateKeyUUID finds or uploads a private key in Coolify and returns
+// its UUID. Matching order: exact name, then fingerprint (both against the
+// current key list), then create-and-handle-422 (re-list and fingerprint-match
+// when Coolify reports the key already exists).
+func (h *coolifyHandlers) resolvePrivateKeyUUID(client *coolify.Client, privKey, keyName, description string) (string, error) {
+	existingKeys, listErr := client.ListPrivateKeys()
+	if listErr != nil {
+		log.Printf("[coolify] failed to list keys: %v", listErr)
+	}
+	log.Printf("[coolify] found %d existing keys in Coolify", len(existingKeys))
+
+	for _, k := range existingKeys {
+		log.Printf("[coolify] key: uuid=%s name=%q fingerprint=%q", k.UUID, k.Name, k.Fingerprint)
+		if k.Name == keyName {
+			log.Printf("[coolify] matched by name: %s", k.UUID)
+			return k.UUID, nil
+		}
+	}
+
+	ourFingerprint := ""
+	if signer, err := gossh.ParsePrivateKey([]byte(privKey)); err == nil {
+		ourFingerprint = strings.TrimPrefix(gossh.FingerprintSHA256(signer.PublicKey()), "SHA256:")
+		log.Printf("[coolify] our key fingerprint: %s", ourFingerprint)
+	} else {
+		log.Printf("[coolify] failed to parse private key for fingerprint: %v", err)
+	}
+
+	if ourFingerprint != "" {
+		for _, k := range existingKeys {
+			if k.Fingerprint != "" && k.Fingerprint == ourFingerprint {
+				log.Printf("[coolify] matched by fingerprint: %s (name=%q)", k.UUID, k.Name)
+				return k.UUID, nil
+			}
+		}
+	}
+
+	uuid, createErr := client.CreatePrivateKey(coolify.CreateKeyRequest{
+		Name:        keyName,
+		Description: description,
+		PrivateKey:  privKey,
+	})
+	if createErr == nil {
+		log.Printf("[coolify] key created: %s", uuid)
+		return uuid, nil
+	}
+
+	log.Printf("[coolify] key create failed: %v", createErr)
+	if !strings.Contains(createErr.Error(), "422") && !strings.Contains(createErr.Error(), "already exists") {
+		return "", createErr
+	}
+	log.Printf("[coolify] 422 duplicate — re-listing for fingerprint match, our fp=%q", ourFingerprint)
+	freshKeys, _ := client.ListPrivateKeys()
+	for _, k := range freshKeys {
+		log.Printf("[coolify] re-list key: uuid=%s name=%q fingerprint=%q", k.UUID, k.Name, k.Fingerprint)
+		if ourFingerprint != "" && k.Fingerprint == ourFingerprint {
+			log.Printf("[coolify] matched on re-list by fingerprint: %s", k.UUID)
+			return k.UUID, nil
+		}
+	}
+	return "", createErr
+}
+
+// selectRegistrationKey resolves which sshcm SSH key should be uploaded to
+// Coolify for a given host. Priority: explicit sshKeyID from the caller,
+// then host_remote_users link for `targetUser`, then the host's own
+// connection key (backward compatibility). Returns the decrypted private-key
+// text, the Coolify key name to use, and a description.
+func (h *coolifyHandlers) selectRegistrationKey(host *models.Host, sshKeyID int64, targetUser string) (privKey, keyName, description string, err error) {
+	load := func(id int64) (*models.SSHKey, string, error) {
+		k, gerr := models.GetSSHKey(h.db.SQL, id)
+		if gerr != nil {
+			return nil, "", gerr
+		}
+		if k == nil {
+			return nil, "", fmt.Errorf("ssh key %d not found", id)
+		}
+		if len(k.PrivKeyCiphertext) == 0 {
+			return nil, "", fmt.Errorf("ssh key %d has no private key stored", id)
+		}
+		plain, derr := h.db.Encryptor.Decrypt(k.PrivKeyCiphertext, k.PrivKeyNonce)
+		if derr != nil {
+			return nil, "", fmt.Errorf("decrypt ssh key %d: %w", id, derr)
+		}
+		return k, plain, nil
+	}
+
+	if sshKeyID > 0 {
+		k, plain, lerr := load(sshKeyID)
+		if lerr != nil {
+			return "", "", "", lerr
+		}
+		return plain, coolifyManagedKeyName(k), fmt.Sprintf("Managed by SSHCM key %q", k.Name), nil
+	}
+
+	if targetUser != "" {
+		if link, lerr := models.GetHostRemoteUserByUsername(h.db.SQL, host.ID, targetUser); lerr == nil && link != nil && link.SSHKeyID != nil {
+			k, plain, lderr := load(*link.SSHKeyID)
+			if lderr == nil {
+				return plain, coolifyManagedKeyName(k), fmt.Sprintf("Managed by SSHCM key %q (remote user %s)", k.Name, targetUser), nil
+			}
+			log.Printf("[coolify] host_remote_users link present for host=%d user=%s key_id=%d but load failed: %v", host.ID, targetUser, *link.SSHKeyID, lderr)
+		}
+	}
+
+	if len(host.PrivKeyCiphertext) == 0 {
+		return "", "", "", fmt.Errorf("host has no private key stored and no linked ssh key available")
+	}
+	plain, derr := h.db.Encryptor.Decrypt(host.PrivKeyCiphertext, host.PrivKeyNonce)
+	if derr != nil {
+		return "", "", "", fmt.Errorf("decrypt host key: %w", derr)
+	}
+	return plain, fmt.Sprintf("sshcm-%s", host.OficialSlug), fmt.Sprintf("Managed by SSHCM for host %s", host.Nickname), nil
+}
+
+// coolifyManagedKeyName produces a Coolify-side name for an sshcm key that is
+// shared across hosts. Kept distinct from the per-host `sshcm-<slug>` name so
+// multiple hosts can reference the same uploaded key without colliding.
+func coolifyManagedKeyName(k *models.SSHKey) string {
+	safe := strings.Map(func(r rune) rune {
+		if r == ' ' || r == '/' || r == '\\' {
+			return '_'
+		}
+		return r
+	}, k.Name)
+	return "sshcm-key-" + safe
+}
+
+// handleRegisterHost uploads the chosen SSH key and creates a server in Coolify.
 func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := models.GetHostBySlug(h.db.SQL, slug)
@@ -156,104 +283,41 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Optional body; legacy callers POST with no payload.
+	var req struct {
+		SSHKeyID int64 `json:"ssh_key_id"`
+	}
+	_ = decodeJSON(r, &req)
+
 	client, err := h.getClient()
 	if err != nil {
 		jsonError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
 
-	// Decrypt the host's private key
-	if len(host.PrivKeyCiphertext) == 0 {
-		jsonError(w, http.StatusBadRequest, "host has no private key stored")
-		return
+	// Coolify rejects usernames with dots. Use configured default user or "root".
+	coolifyUser := models.GetAppSettingValue(h.db.SQL, "coolify_default_user")
+	if coolifyUser == "" {
+		coolifyUser = "root"
 	}
-	privKey, err := h.db.Encryptor.Decrypt(host.PrivKeyCiphertext, host.PrivKeyNonce)
+
+	privKey, keyName, description, err := h.selectRegistrationKey(host, req.SSHKeyID, coolifyUser)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to decrypt host key")
+		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// Resolve private key UUID in Coolify: try name match, then create, then fingerprint match on 422.
-	keyName := fmt.Sprintf("sshcm-%s", host.OficialSlug)
-	var privateKeyUUID string
-
-	existingKeys, listErr := client.ListPrivateKeys()
-	if listErr != nil {
-		log.Printf("[coolify] failed to list keys: %v", listErr)
-	}
-	log.Printf("[coolify] found %d existing keys in Coolify", len(existingKeys))
-	for _, k := range existingKeys {
-		log.Printf("[coolify] key: uuid=%s name=%q fingerprint=%q", k.UUID, k.Name, k.Fingerprint)
-		if k.Name == keyName {
-			privateKeyUUID = k.UUID
-			log.Printf("[coolify] matched by name: %s", privateKeyUUID)
-			break
-		}
-	}
-
-	// Compute our key's fingerprint for matching (strip SHA256: prefix to match Coolify format)
-	ourFingerprint := ""
-	if signer, err := gossh.ParsePrivateKey([]byte(privKey)); err == nil {
-		ourFingerprint = strings.TrimPrefix(gossh.FingerprintSHA256(signer.PublicKey()), "SHA256:")
-		log.Printf("[coolify] our key fingerprint: %s", ourFingerprint)
-	} else {
-		log.Printf("[coolify] failed to parse our private key for fingerprint: %v", err)
-	}
-
-	// If no name match, try fingerprint match before attempting create
-	if privateKeyUUID == "" && ourFingerprint != "" {
-		for _, k := range existingKeys {
-			if k.Fingerprint != "" && k.Fingerprint == ourFingerprint {
-				privateKeyUUID = k.UUID
-				log.Printf("[coolify] matched by fingerprint: %s (name=%q)", privateKeyUUID, k.Name)
-				break
-			}
-		}
-	}
-
-	if privateKeyUUID == "" {
-		uuid, createErr := client.CreatePrivateKey(coolify.CreateKeyRequest{
-			Name:        keyName,
-			Description: fmt.Sprintf("Managed by SSHCM for host %s", host.Nickname),
-			PrivateKey:  privKey,
-		})
-		if createErr != nil {
-			log.Printf("[coolify] key create failed: %v", createErr)
-			// 422 = duplicate content. Try fingerprint match as last resort.
-			if strings.Contains(createErr.Error(), "422") || strings.Contains(createErr.Error(), "already exists") {
-				log.Printf("[coolify] 422 duplicate — fingerprint match had %d candidates, our fp=%q", len(existingKeys), ourFingerprint)
-				// Re-list in case the first list was stale or empty
-				freshKeys, _ := client.ListPrivateKeys()
-				for _, k := range freshKeys {
-					log.Printf("[coolify] re-list key: uuid=%s name=%q fingerprint=%q", k.UUID, k.Name, k.Fingerprint)
-					if ourFingerprint != "" && k.Fingerprint == ourFingerprint {
-						privateKeyUUID = k.UUID
-						log.Printf("[coolify] matched on re-list by fingerprint: %s", privateKeyUUID)
-						break
-					}
-				}
-			}
-			if privateKeyUUID == "" {
-				h.logOp(r, host.ID, "coolify-register", "failed", "key upload: "+createErr.Error())
-				jsonError(w, http.StatusBadGateway, "failed to upload key to coolify: "+createErr.Error())
-				return
-			}
-		} else {
-			privateKeyUUID = uuid
-			log.Printf("[coolify] key created: %s", uuid)
-		}
+	privateKeyUUID, err := h.resolvePrivateKeyUUID(client, privKey, keyName, description)
+	if err != nil {
+		h.logOp(r, host.ID, "coolify-register", "failed", "key upload: "+err.Error())
+		jsonError(w, http.StatusBadGateway, "failed to upload key to coolify: "+err.Error())
+		return
 	}
 
 	// Parse port
 	port := 22
 	if p, err := strconv.Atoi(host.Port); err == nil && p > 0 {
 		port = p
-	}
-
-	// Coolify rejects usernames with dots. Use configured default user or "root".
-	coolifyUser := models.GetAppSettingValue(h.db.SQL, "coolify_default_user")
-	if coolifyUser == "" {
-		coolifyUser = "root"
 	}
 
 	// Create server
@@ -306,6 +370,62 @@ func (h *coolifyHandlers) handleValidateHost(w http.ResponseWriter, r *http.Requ
 
 	h.logOp(r, host.ID, "coolify-validate", "success", "validation triggered for "+*host.CoolifyServerUUID)
 	jsonOK(w, map[string]any{"message": "validation started"})
+}
+
+// handleUpdateServerKey swaps the private key a Coolify server uses to SSH into
+// the host. Uploads the selected sshcm key to Coolify (reusing any existing
+// match), then PATCHes the server with the new key's UUID.
+func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	if err != nil || host == nil {
+		jsonError(w, http.StatusNotFound, "host not found")
+		return
+	}
+	if host.CoolifyServerUUID == nil || *host.CoolifyServerUUID == "" {
+		jsonError(w, http.StatusBadRequest, "host is not linked to a coolify server")
+		return
+	}
+
+	var req struct {
+		SSHKeyID int64 `json:"ssh_key_id"`
+	}
+	if err := decodeJSON(r, &req); err != nil || req.SSHKeyID <= 0 {
+		jsonError(w, http.StatusBadRequest, "ssh_key_id is required")
+		return
+	}
+
+	client, err := h.getClient()
+	if err != nil {
+		jsonError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	// Pass empty targetUser so selectRegistrationKey uses only the explicit key
+	// (no auto-resolution fallback — the caller asked for a specific key).
+	privKey, keyName, description, err := h.selectRegistrationKey(host, req.SSHKeyID, "")
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	privateKeyUUID, err := h.resolvePrivateKeyUUID(client, privKey, keyName, description)
+	if err != nil {
+		h.logOp(r, host.ID, "coolify-update-key", "failed", "key upload: "+err.Error())
+		jsonError(w, http.StatusBadGateway, "failed to upload key to coolify: "+err.Error())
+		return
+	}
+
+	if err := client.UpdateServer(*host.CoolifyServerUUID, coolify.UpdateServerRequest{
+		PrivateKeyUUID: privateKeyUUID,
+	}); err != nil {
+		h.logOp(r, host.ID, "coolify-update-key", "failed", err.Error())
+		jsonError(w, http.StatusBadGateway, "update failed: "+err.Error())
+		return
+	}
+
+	h.logOp(r, host.ID, "coolify-update-key", "success", fmt.Sprintf("server %s key=%s", *host.CoolifyServerUUID, privateKeyUUID))
+	jsonOK(w, map[string]any{"success": true, "private_key_uuid": privateKeyUUID})
 }
 
 // handleSyncHost updates the Coolify server with current host info.
@@ -389,7 +509,7 @@ func (h *coolifyHandlers) handleCheckKey(w http.ResponseWriter, r *http.Request)
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -429,7 +549,7 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 	idStr := r.PathValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -445,7 +565,7 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 
 	privKeyText, err := h.db.Encryptor.Decrypt(key.PrivKeyCiphertext, key.PrivKeyNonce)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to decrypt key")
+		jsonServerError(w, r, "failed to decrypt key", err)
 		return
 	}
 

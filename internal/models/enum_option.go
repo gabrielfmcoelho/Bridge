@@ -1,6 +1,9 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+	"fmt"
+)
 
 type EnumOption struct {
 	Category  string `json:"category"`
@@ -52,14 +55,21 @@ func CreateEnumOption(db *sql.DB, o *EnumOption) error {
 	// Auto-assign sort_order as max+1 if not specified.
 	if o.SortOrder == 0 {
 		var maxOrder int
-		db.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) FROM enum_options WHERE category = ?`, o.Category).Scan(&maxOrder)
+		if err := db.QueryRow(`SELECT COALESCE(MAX(sort_order), -1) FROM enum_options WHERE category = ?`, o.Category).Scan(&maxOrder); err != nil {
+			return fmt.Errorf("enum_options: read max sort_order for %q: %w", o.Category, err)
+		}
 		o.SortOrder = maxOrder + 1
 	}
-	_, err := db.Exec(
-		`INSERT OR IGNORE INTO enum_options (category, value, sort_order, color) VALUES (?, ?, ?, ?)`,
+	// `ON CONFLICT DO NOTHING` without a target is supported by both SQLite
+	// (3.24+) and Postgres. The older `INSERT OR IGNORE` syntax is SQLite-only
+	// and caused silent 500s in production when adding enum options on Postgres.
+	if _, err := db.Exec(
+		`INSERT INTO enum_options (category, value, sort_order, color) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING`,
 		o.Category, o.Value, o.SortOrder, o.Color,
-	)
-	return err
+	); err != nil {
+		return fmt.Errorf("enum_options: insert %s=%q: %w", o.Category, o.Value, err)
+	}
+	return nil
 }
 
 func UpdateEnumOption(db *sql.DB, category, oldValue, newValue, color string) error {

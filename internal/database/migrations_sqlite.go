@@ -832,4 +832,19 @@ var migrationsSQLite = []string{
 		('service_type', 'others', 10);
 
 	CREATE INDEX IF NOT EXISTS idx_services_container ON services(container_name, source);`,
+
+	// Version 51: host_remote_users — links a remote-user account (e.g. "coolify")
+	// created on a host to the sshcm-managed ssh_keys row whose pubkey was
+	// installed in that user's authorized_keys. Used by the Coolify integration
+	// to auto-pick the right private key when registering the server.
+	`CREATE TABLE IF NOT EXISTS host_remote_users (
+		id          INTEGER PRIMARY KEY AUTOINCREMENT,
+		host_id     INTEGER NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+		username    TEXT NOT NULL,
+		ssh_key_id  INTEGER REFERENCES ssh_keys(id) ON DELETE SET NULL,
+		created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(host_id, username)
+	);
+	CREATE INDEX IF NOT EXISTS idx_host_remote_users_host ON host_remote_users(host_id);`,
 }

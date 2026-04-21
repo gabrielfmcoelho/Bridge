@@ -15,7 +15,7 @@ type releaseHandlers struct {
 func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	releases, err := models.ListReleases(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list releases")
+		jsonServerError(w, r, "failed to list releases", err)
 		return
 	}
 
@@ -34,7 +34,7 @@ func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 func (h *releaseHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -57,7 +57,7 @@ func (h *releaseHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		IssueIDs []int64 `json:"issue_ids"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Title == "" {
@@ -69,7 +69,7 @@ func (h *releaseHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.CreateRelease(h.db.SQL, &req.Release); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create release")
+		jsonServerError(w, r, "failed to create release", err)
 		return
 	}
 
@@ -83,7 +83,7 @@ func (h *releaseHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -98,7 +98,7 @@ func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		IssueIDs []int64 `json:"issue_ids"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -110,7 +110,7 @@ func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.UpdateRelease(h.db.SQL, &req.Release); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update release")
+		jsonServerError(w, r, "failed to update release", err)
 		return
 	}
 
@@ -124,12 +124,12 @@ func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *releaseHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
 	if err := models.DeleteRelease(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete release")
+		jsonServerError(w, r, "failed to delete release", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})

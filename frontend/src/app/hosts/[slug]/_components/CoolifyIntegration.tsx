@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { coolifyAPI } from "@/lib/api";
+import { coolifyAPI, sshKeysAPI } from "@/lib/api";
 import type { CoolifyServer } from "@/lib/api";
 import Button from "@/components/ui/Button";
 
@@ -18,6 +18,16 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
   const queryClient = useQueryClient();
   const [server, setServer] = useState<CoolifyServer | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // Empty string == "auto": backend picks from host_remote_users or host key.
+  const [selectedKeyId, setSelectedKeyId] = useState<string>("");
+
+  const keysQuery = useQuery({
+    queryKey: ["ssh-keys"],
+    queryFn: () => sshKeysAPI.list(),
+    enabled: available,
+    staleTime: 60_000,
+  });
+  const eligibleKeys = (keysQuery.data ?? []).filter(k => k.credential_type === "key" && k.has_private_key);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["host", slug] });
 
@@ -38,11 +48,24 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
   });
 
   const registerMutation = useMutation({
-    mutationFn: () => coolifyAPI.registerHost(slug),
+    mutationFn: () => coolifyAPI.registerHost(slug, selectedKeyId ? parseInt(selectedKeyId, 10) : undefined),
     onSuccess: () => {
       setMessage({ type: "success", text: t("operation.coolifyRegistered") });
       setServer(null);
       invalidate();
+    },
+    onError: (err: Error) => setMessage({ type: "error", text: err.message }),
+  });
+
+  const updateKeyMutation = useMutation({
+    mutationFn: () => {
+      const id = parseInt(selectedKeyId, 10);
+      if (!id) throw new Error("no key selected");
+      return coolifyAPI.updateServerKey(slug, id);
+    },
+    onSuccess: () => {
+      setMessage({ type: "success", text: t("operation.coolifyKeyUpdated") });
+      queryClient.invalidateQueries({ queryKey: ["coolify-server-status", slug] });
     },
     onError: (err: Error) => setMessage({ type: "error", text: err.message }),
   });
@@ -77,8 +100,27 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
   });
 
   const linked = !!coolifyUUID;
-  const loading = checkMutation.isPending || registerMutation.isPending || validateMutation.isPending || syncMutation.isPending || deleteMutation.isPending;
+  const loading = checkMutation.isPending || registerMutation.isPending || validateMutation.isPending || syncMutation.isPending || deleteMutation.isPending || updateKeyMutation.isPending;
   const sv = statusQuery.data?.server ?? server;
+
+  const keyPicker = (
+    <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+      <span className="shrink-0">{t("operation.coolifyKeyPickerLabel")}</span>
+      <select
+        value={selectedKeyId}
+        onChange={(e) => setSelectedKeyId(e.target.value)}
+        disabled={loading || eligibleKeys.length === 0}
+        className="flex-1 min-w-0 bg-[var(--bg-input)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-2 py-1 text-xs text-[var(--text-primary)]"
+      >
+        <option value="">{t("operation.coolifyKeyPickerAuto")}</option>
+        {eligibleKeys.map(k => (
+          <option key={k.id} value={k.id.toString()}>
+            {k.name}{k.fingerprint ? ` · ${k.fingerprint.slice(0, 24)}…` : ""}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   return (
     <div className="border border-[var(--border-subtle)] rounded-[var(--radius-md)] overflow-hidden">
@@ -117,6 +159,9 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
                 </span>
               </div>
             )}
+            {isAdmin && (eligibleKeys.length > 0 ? keyPicker : (
+              <p className="text-[11px] text-[var(--text-faint)]">{t("operation.coolifyKeyPickerEmpty")}</p>
+            ))}
             <div className="flex items-center gap-2 flex-wrap">
               <Button size="sm" variant="secondary" onClick={() => queryClient.invalidateQueries({ queryKey: ["coolify-server-status", slug] })} loading={statusQuery.isFetching} disabled={loading}>
                 {t("operation.coolifyStatus")}
@@ -128,6 +173,11 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
                 {t("operation.coolifySync")}
               </Button>
               {isAdmin && (
+                <Button size="sm" variant="secondary" onClick={() => updateKeyMutation.mutate()} loading={updateKeyMutation.isPending} disabled={loading || !selectedKeyId}>
+                  {t("operation.coolifyUpdateKey")}
+                </Button>
+              )}
+              {isAdmin && (
                 <Button size="sm" variant="secondary" onClick={() => { if (confirm(t("operation.coolifyDeleteConfirm"))) deleteMutation.mutate(); }} loading={deleteMutation.isPending} disabled={loading}>
                   {t("operation.coolifyDelete")}
                 </Button>
@@ -135,12 +185,17 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
             </div>
           </div>
         ) : (
-          /* Initial state — offer check */
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-[var(--text-muted)] flex-1">{t("operation.coolifyCheckDesc")}</p>
-            <Button size="sm" variant="secondary" onClick={() => checkMutation.mutate()} loading={checkMutation.isPending} disabled={loading}>
-              {t("operation.coolifyCheck")}
-            </Button>
+          /* Initial state — offer check (+ optional key override) */
+          <div className="space-y-2">
+            <p className="text-xs text-[var(--text-muted)]">{t("operation.coolifyCheckDesc")}</p>
+            {eligibleKeys.length > 0 ? keyPicker : (
+              <p className="text-[11px] text-[var(--text-faint)]">{t("operation.coolifyKeyPickerEmpty")}</p>
+            )}
+            <div className="flex justify-end">
+              <Button size="sm" variant="secondary" onClick={() => checkMutation.mutate()} loading={checkMutation.isPending} disabled={loading}>
+                {t("operation.coolifyCheck")}
+              </Button>
+            </div>
           </div>
         )}
 

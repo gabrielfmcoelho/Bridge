@@ -14,7 +14,7 @@ type dnsHandlers struct {
 func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	records, err := models.ListDNSRecords(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list DNS records")
+		jsonServerError(w, r, "failed to list DNS records", err)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 func (h *dnsHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Responsaveis []models.DNSResponsavelInput  `json:"responsaveis"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Domain == "" {
@@ -102,7 +102,7 @@ func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -119,13 +119,13 @@ func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		Responsaveis *[]models.DNSResponsavelInput  `json:"responsaveis"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
 	req.DNSRecord.ID = id
 	if err := models.UpdateDNSRecord(h.db.SQL, &req.DNSRecord); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update DNS record")
+		jsonServerError(w, r, "failed to update DNS record", err)
 		return
 	}
 
@@ -145,13 +145,13 @@ func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *dnsHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
 	models.DeleteTags(h.db.SQL, "dns", id)
 	if err := models.DeleteDNSRecord(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete DNS record")
+		jsonServerError(w, r, "failed to delete DNS record", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})

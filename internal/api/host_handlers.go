@@ -145,7 +145,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 
 	hosts, err := models.ListHosts(h.db.SQL, f)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list hosts")
+		jsonServerError(w, r, "failed to list hosts", err)
 		return
 	}
 
@@ -311,7 +311,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := models.GetHostBySlug(h.db.SQL, slug)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "database error")
+		jsonServerError(w, r, "database error", err)
 		return
 	}
 	if host == nil {
@@ -354,7 +354,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		ProjectIDs   []int64                     `json:"project_ids"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Nickname == "" || req.OficialSlug == "" {
@@ -382,7 +382,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if req.Password != "" {
 		ct, nonce, err := h.db.Encryptor.Encrypt(req.Password)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to encrypt password")
+			jsonServerError(w, r, "failed to encrypt password", err)
 			return
 		}
 		req.Host.HasPassword = true
@@ -398,7 +398,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	req.Host.PreferredAuth = preferredAuth
 
 	if err := models.CreateHost(h.db.SQL, &req.Host); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create host")
+		jsonServerError(w, r, "failed to create host", err)
 		return
 	}
 
@@ -418,9 +418,15 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Link SSH key from DB if provided.
+	// Link SSH key from DB if provided. A failure here doesn't abort host
+	// creation (the host row already exists at this point) but it MUST be
+	// surfaced to the client so the user isn't misled into thinking the key
+	// was attached. See linkSSHKey for the silent-failure modes this guards.
 	if req.SSHKeyID > 0 {
-		h.linkSSHKey(req.Host.ID, req.SSHKeyID, req.OficialSlug)
+		if linkErr := h.linkSSHKey(req.Host.ID, req.SSHKeyID, req.OficialSlug); linkErr != nil {
+			jsonServerError(w, r, "host created but ssh key link failed: "+linkErr.Error(), linkErr)
+			return
+		}
 	}
 
 	// Link DNS records and services if provided.
@@ -465,13 +471,16 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Host = *existing
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
 	// If only ssh_key_id is provided (no host data), just link the key and return.
 	if req.SSHKeyID > 0 && req.Nickname == "" {
-		h.linkSSHKey(existing.ID, req.SSHKeyID, existing.OficialSlug)
+		if linkErr := h.linkSSHKey(existing.ID, req.SSHKeyID, existing.OficialSlug); linkErr != nil {
+			jsonServerError(w, r, "failed to link ssh key: "+linkErr.Error(), linkErr)
+			return
+		}
 		updatedHost, getErr := models.GetHostByID(h.db.SQL, existing.ID)
 		if getErr == nil && updatedHost != nil {
 			preferredAuth, normErr := normalizePreferredAuth(updatedHost.HasPassword, updatedHost.HasKey, updatedHost.PreferredAuth)
@@ -496,7 +505,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.Host.OficialSlug != existing.OficialSlug {
 		exists, slugErr := models.HostSlugExists(h.db.SQL, req.Host.OficialSlug, existing.ID)
 		if slugErr != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to validate slug")
+			jsonServerError(w, r, "failed to validate slug", slugErr)
 			return
 		}
 		if exists {
@@ -509,7 +518,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.Password != "" {
 		ct, nonce, err := h.db.Encryptor.Encrypt(req.Password)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to encrypt password")
+			jsonServerError(w, r, "failed to encrypt password", err)
 			return
 		}
 		req.Host.HasPassword = true
@@ -553,7 +562,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	req.Host.PreferredAuth = preferredAuth
 
 	if err := models.UpdateHost(h.db.SQL, &req.Host); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update host")
+		jsonServerError(w, r, "failed to update host", err)
 		return
 	}
 
@@ -573,9 +582,14 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Link SSH key from DB if provided.
+	// Link SSH key from DB if provided. Host was already updated above with
+	// the preserved key data, so this will overwrite with the selected key.
+	// Failure must be surfaced so the client knows the link didn't stick.
 	if req.SSHKeyID > 0 {
-		h.linkSSHKey(existing.ID, req.SSHKeyID, existing.OficialSlug)
+		if linkErr := h.linkSSHKey(existing.ID, req.SSHKeyID, existing.OficialSlug); linkErr != nil {
+			jsonServerError(w, r, "host updated but ssh key link failed: "+linkErr.Error(), linkErr)
+			return
+		}
 	}
 
 	// Sync DNS and service links if provided.
@@ -624,7 +638,7 @@ func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 	models.DeleteTags(h.db.SQL, "host", host.ID)
 	if err := models.DeleteHost(h.db.SQL, host.ID); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete host")
+		jsonServerError(w, r, "failed to delete host", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
@@ -643,7 +657,7 @@ func (h *hostHandlers) handleGetPassword(w http.ResponseWriter, r *http.Request)
 	}
 	password, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
+		jsonServerError(w, r, "failed to decrypt password", err)
 		return
 	}
 	jsonOK(w, map[string]string{"password": password})
@@ -667,14 +681,30 @@ func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
 // linkSSHKey copies the encrypted key blob from the ssh_keys table onto the
 // host row. It does NOT materialize the key to the filesystem — key-auth SSH
 // decrypts the blob in-memory at connection time via resolveHostKeyPEM.
-func (h *hostHandlers) linkSSHKey(hostID, sshKeyID int64, slug string) {
+//
+// Returns an error so callers can surface linking failures instead of the
+// previous silent-return behavior that made "I selected a key but it didn't
+// save" bugs impossible to diagnose in production.
+func (h *hostHandlers) linkSSHKey(hostID, sshKeyID int64, slug string) error {
 	k, err := models.GetSSHKey(h.db.SQL, sshKeyID)
-	if err != nil || k == nil {
-		return
+	if err != nil {
+		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: GetSSHKey error: %v", slug, sshKeyID, err)
+		return fmt.Errorf("load ssh key %d: %w", sshKeyID, err)
+	}
+	if k == nil {
+		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: ssh key not found", slug, sshKeyID)
+		return fmt.Errorf("ssh key %d not found", sshKeyID)
 	}
 	if len(k.PrivKeyCiphertext) == 0 {
-		return
+		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: ssh key has no private key stored (name=%q, credential_type=%q)",
+			slug, sshKeyID, k.Name, k.CredentialType)
+		return fmt.Errorf("ssh key %q has no stored private key — add a private key to the entry or pick a different key", k.Name)
 	}
-	models.UpdateHostKey(h.db.SQL, hostID, true, "", "yes",
-		k.PubKeyCiphertext, k.PubKeyNonce, k.PrivKeyCiphertext, k.PrivKeyNonce)
+	if err := models.UpdateHostKey(h.db.SQL, hostID, true, "", "yes",
+		k.PubKeyCiphertext, k.PubKeyNonce, k.PrivKeyCiphertext, k.PrivKeyNonce); err != nil {
+		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: UpdateHostKey error: %v", slug, sshKeyID, err)
+		return fmt.Errorf("update host key: %w", err)
+	}
+	log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: linked key %q (fingerprint=%s)", slug, sshKeyID, k.Name, k.Fingerprint)
+	return nil
 }

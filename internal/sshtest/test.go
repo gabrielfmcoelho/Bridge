@@ -1,8 +1,11 @@
 package sshtest
 
 import (
+	"encoding/base64"
 	"fmt"
+	"log"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -100,6 +103,31 @@ type VMInfo struct {
 	InstalledPackages []InstalledPackage  `json:"installed_packages,omitempty"`
 	CronJobs          []string           `json:"cron_jobs,omitempty"`
 	FirewallStatus    string             `json:"firewall_status,omitempty"`
+	RemoteUsers       []RemoteUserInfo   `json:"remote_users,omitempty"`
+	PortOwners        []PortOwner        `json:"port_owners,omitempty"`
+}
+
+// PortOwner attaches ownership info to a listening port so the UI can tell
+// operators which application actually answers on each port (docker
+// container, nginx server_name, systemd service, or bare process).
+type PortOwner struct {
+	Port      int    `json:"port"`
+	Process   string `json:"process,omitempty"`    // raw name from ss (docker-proxy, nginx, sshd, …)
+	OwnerType string `json:"owner_type,omitempty"` // "container" | "nginx" | "process" | "docker"
+	OwnerName string `json:"owner_name,omitempty"` // container name, "nginx", or process name
+	Target    string `json:"target,omitempty"`     // container image or nginx server_name(s)
+}
+
+// RemoteUserInfo describes a real (non-system) user account discovered on the
+// remote host. The scan persists these so the "delete remote user" wizard can
+// offer a dropdown instead of asking the operator to type the name manually.
+type RemoteUserInfo struct {
+	Name      string `json:"name"`
+	UID       int    `json:"uid"`
+	Shell     string `json:"shell,omitempty"`
+	Home      string `json:"home,omitempty"`
+	HasLogin  bool   `json:"has_login"`
+	IsCurrent bool   `json:"is_current,omitempty"`
 }
 
 // ContainerInfo holds structured data about a running Docker container.
@@ -113,6 +141,7 @@ type ContainerInfo struct {
 
 // SSHKeyInfo holds info about an SSH key found on the remote host during scan.
 type SSHKeyInfo struct {
+	User        string `json:"user,omitempty"` // owning account (empty on legacy scans that only read login user)
 	Name        string `json:"name"`
 	Type        string `json:"type"`
 	Fingerprint string `json:"fingerprint"`
@@ -161,9 +190,12 @@ func Test(client *ssh.Client) error {
 	return nil
 }
 
-// TestCapture tests SSH connectivity and captures VM info.
-func TestCapture(client *ssh.Client) (*VMInfo, error) {
-	return captureVMInfo(client)
+// TestCapture tests SSH connectivity and captures VM info. sudoPassword is
+// optional: when non-empty the SSH-key scan can read foreign users' homes
+// via `sudo -S`, which matters after create-remote-user because the login
+// user typically doesn't have NOPASSWD sudo.
+func TestCapture(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
+	return captureVMInfo(client, sudoPassword)
 }
 
 // FixDevNull attempts to repair /dev/null permissions on the remote host.
@@ -237,7 +269,18 @@ func runSudoCmd(client *ssh.Client, password, cmd string) (string, error) {
 		stdin.Close()
 	}()
 
-	fullCmd := fmt.Sprintf("sudo -S sh -c %q 2>&1", cmd)
+	// Base64-encode the script so no shell metacharacter (esp. `$var` or `$(…)`
+	// inside awk/sh single-quoted regions) is interpreted by the outer login
+	// shell before sudo dispatches it. Without this, a `%q` double-quoted
+	// wrapper leaks outer-shell expansion into the script body and silently
+	// empties every unset variable — e.g. `$1/$3/$6` inside an awk program.
+	//
+	// `-p ''` silences sudo's own password prompt. Otherwise `sudo -S` still
+	// writes `[sudo] password for <user>: ` to stderr (no trailing newline);
+	// with `2>&1` merging stderr into stdout, that prompt gets glued onto the
+	// first real output line and corrupts it for line-oriented parsers.
+	encoded := base64.StdEncoding.EncodeToString([]byte(cmd))
+	fullCmd := fmt.Sprintf("sudo -S -p '' sh -c 'echo %s | base64 -d | sh' 2>&1", encoded)
 	out, execErr := session.CombinedOutput(fullCmd)
 	cleaned := strings.TrimSpace(cleanCommandOutput(string(out), nil))
 	if execErr != nil {
@@ -339,16 +382,28 @@ func CreateRemoteUser(client *ssh.Client, password, newUser, pubKey string, forc
 var ErrUserExists = fmt.Errorf("user already exists")
 
 func createRemoteUser(client *ssh.Client, sudoPassword, newUser, pubKey string, force bool) (string, error) {
+	// %q escapes control chars to Go-literal form (e.g. \n becomes literal
+	// backslash-n in the shell), so a trailing newline from the stored key
+	// would poison authorized_keys. Trim once up front.
+	pubKey = strings.TrimSpace(pubKey)
+
+	// Fingerprint for correlation with later scans. Best-effort: on parse
+	// failure we still log the key prefix so the operator can eyeball it.
+	pubFP := pubKeyFingerprint(pubKey)
+	log.Printf("[sshcm] create-remote-user begin user=%s force=%t pub_fp=%s", newUser, force, pubFP)
+
 	var out strings.Builder
 
 	// 1. Check if user already exists (use runCmdRaw so transient errors surface)
 	check := fmt.Sprintf(`id %s 2>/dev/null && echo EXISTS || echo MISSING`, newUser)
 	checkRes, checkErr := runCmdRaw(client, check)
 	if checkErr != nil {
+		log.Printf("[sshcm] create-remote-user user=%s step=exists-check error=%v", newUser, checkErr)
 		return checkRes, fmt.Errorf("failed to check if user %s exists: %w", newUser, checkErr)
 	}
 
 	userExists := strings.TrimSpace(checkRes) == "EXISTS"
+	log.Printf("[sshcm] create-remote-user user=%s step=exists-check exists=%t", newUser, userExists)
 	if userExists && !force {
 		return fmt.Sprintf("User %s already exists on the remote host. Use the force option to proceed anyway (this will add SSH key access and NOPASSWD sudo to the existing account).", newUser), ErrUserExists
 	}
@@ -359,8 +414,10 @@ func createRemoteUser(client *ssh.Client, sudoPassword, newUser, pubKey string, 
 		res, err := runSudoCmd(client, sudoPassword,
 			fmt.Sprintf("useradd -m -s /bin/bash %s", newUser))
 		if err != nil {
+			log.Printf("[sshcm] create-remote-user user=%s step=useradd error=%v", newUser, err)
 			return res, fmt.Errorf("failed to create user %s: %w", newUser, err)
 		}
+		log.Printf("[sshcm] create-remote-user user=%s step=useradd ok", newUser)
 		out.WriteString(fmt.Sprintf("Created user %s.\n", newUser))
 	}
 
@@ -379,8 +436,10 @@ func createRemoteUser(client *ssh.Client, sudoPassword, newUser, pubKey string, 
 	)
 	res, err := runSudoCmd(client, sudoPassword, setupScript)
 	if err != nil {
+		log.Printf("[sshcm] create-remote-user user=%s step=authorized_keys path=%s error=%v", newUser, authKeys, err)
 		return out.String() + res, fmt.Errorf("failed to setup authorized_keys: %w", err)
 	}
+	log.Printf("[sshcm] create-remote-user user=%s step=authorized_keys path=%s pub_fp=%s ok", newUser, authKeys, pubFP)
 	out.WriteString(fmt.Sprintf("Authorized key added to %s.\n", authKeys))
 
 	// 3. Configure passwordless sudo
@@ -392,9 +451,134 @@ func createRemoteUser(client *ssh.Client, sudoPassword, newUser, pubKey string, 
 	)
 	res, err = runSudoCmd(client, sudoPassword, sudoScript)
 	if err != nil {
+		log.Printf("[sshcm] create-remote-user user=%s step=sudoers path=%s error=%v", newUser, sudoFile, err)
 		return out.String() + res, fmt.Errorf("failed to configure sudoers: %w", err)
 	}
+	log.Printf("[sshcm] create-remote-user user=%s step=sudoers path=%s ok", newUser, sudoFile)
 	out.WriteString(fmt.Sprintf("NOPASSWD rule created at %s.\n", sudoFile))
+
+	log.Printf("[sshcm] create-remote-user user=%s done pub_fp=%s", newUser, pubFP)
+	return out.String(), nil
+}
+
+// pubKeyFingerprint returns the SHA256 fingerprint of an OpenSSH authorized_keys
+// line, or a short placeholder if the line can't be parsed — cheap, for logs.
+func pubKeyFingerprint(pubKey string) string {
+	pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubKey))
+	if err != nil {
+		prefix := pubKey
+		if len(prefix) > 30 {
+			prefix = prefix[:30]
+		}
+		return fmt.Sprintf("unparseable(%q)", prefix)
+	}
+	return ssh.FingerprintSHA256(pub)
+}
+
+// ErrUserMissing is returned when the target user does not exist on the
+// remote host. The caller can treat this as a no-op or surface it to the UI.
+var ErrUserMissing = fmt.Errorf("user does not exist")
+
+// ErrUserProtected is returned when the target user is a system account
+// (UID < 1000) or one of the hard-blocked names (root, etc.), i.e. deleting
+// it would break the box.
+var ErrUserProtected = fmt.Errorf("user is protected and cannot be deleted")
+
+// protectedUsernames lists accounts that must never be deleted by this tool
+// even if somehow the UID check is bypassed. These are the common base-system
+// users on every Linux distro.
+var protectedUsernames = map[string]struct{}{
+	"root":    {},
+	"nobody":  {},
+	"daemon":  {},
+	"sync":    {},
+	"bin":     {},
+	"sys":     {},
+	"systemd": {},
+}
+
+// DeleteRemoteUser removes a non-system user from the remote host. It will:
+//
+//  1. Refuse to delete "root", other hard-blocked names, UID<1000, or the
+//     current SSH login user (so we never lock ourselves out).
+//  2. Terminate any processes owned by the user (TERM, then KILL).
+//  3. Run userdel (with -r when removeHome is true).
+//  4. Remove the /etc/sudoers.d/<user>-nopasswd drop-in if present.
+//
+// The returned string is the human-readable operation log; the error is
+// non-nil on failure or for the well-known sentinel cases above.
+func DeleteRemoteUser(client *ssh.Client, sudoPassword, loginUser, targetUser string, removeHome bool) (string, error) {
+	return deleteRemoteUser(client, sudoPassword, loginUser, targetUser, removeHome)
+}
+
+func deleteRemoteUser(client *ssh.Client, sudoPassword, loginUser, targetUser string, removeHome bool) (string, error) {
+	var out strings.Builder
+
+	if _, blocked := protectedUsernames[targetUser]; blocked {
+		return "", fmt.Errorf("%w: %q is a protected system account", ErrUserProtected, targetUser)
+	}
+	if loginUser != "" && targetUser == loginUser {
+		return "", fmt.Errorf("%w: refusing to delete the SSH login user %q (would lock this tool out)", ErrUserProtected, targetUser)
+	}
+
+	// 1. Verify the user exists and is not a system account.
+	probe := fmt.Sprintf(
+		`if id %s >/dev/null 2>&1; then uid=$(id -u %s); echo "UID=$uid"; else echo MISSING; fi`,
+		targetUser, targetUser,
+	)
+	probeOut, probeErr := runCmdRaw(client, probe)
+	if probeErr != nil {
+		return probeOut, fmt.Errorf("probe user %s: %w", targetUser, probeErr)
+	}
+	probeOut = strings.TrimSpace(probeOut)
+	if probeOut == "MISSING" {
+		return fmt.Sprintf("User %s does not exist on the remote host — nothing to delete.", targetUser), ErrUserMissing
+	}
+	var uid int
+	if _, err := fmt.Sscanf(probeOut, "UID=%d", &uid); err != nil {
+		return probeOut, fmt.Errorf("parse uid for %s from %q: %w", targetUser, probeOut, err)
+	}
+	if uid < 1000 {
+		return "", fmt.Errorf("%w: %q has UID %d (<1000, reserved for system accounts)", ErrUserProtected, targetUser, uid)
+	}
+	out.WriteString(fmt.Sprintf("Target user %s found (uid=%d).\n", targetUser, uid))
+
+	// 2. Terminate processes owned by the user. Best-effort: either command
+	// may legitimately return non-zero if the user has no live processes.
+	killScript := fmt.Sprintf(
+		`pkill -TERM -u %s >/dev/null 2>&1; sleep 1; pkill -KILL -u %s >/dev/null 2>&1; true`,
+		targetUser, targetUser,
+	)
+	if _, err := runSudoCmd(client, sudoPassword, killScript); err != nil {
+		return out.String(), fmt.Errorf("terminate processes for %s: %w", targetUser, err)
+	}
+	out.WriteString(fmt.Sprintf("Sent TERM then KILL to any processes owned by %s.\n", targetUser))
+
+	// 3. Delete the user (and optionally its home directory).
+	userdelFlag := ""
+	if removeHome {
+		userdelFlag = "-r "
+	}
+	delScript := fmt.Sprintf(`userdel %s%s`, userdelFlag, targetUser)
+	delOut, delErr := runSudoCmd(client, sudoPassword, delScript)
+	if delErr != nil {
+		return out.String() + delOut, fmt.Errorf("userdel %s: %w", targetUser, delErr)
+	}
+	if removeHome {
+		out.WriteString(fmt.Sprintf("Deleted user %s and its home directory.\n", targetUser))
+	} else {
+		out.WriteString(fmt.Sprintf("Deleted user %s (home directory preserved).\n", targetUser))
+	}
+
+	// 4. Remove the NOPASSWD drop-in we add in createRemoteUser, if present.
+	// We also remove any lingering lock entries (shadow backups) that userdel
+	// occasionally leaves when processes are still settling.
+	sudoFile := fmt.Sprintf("/etc/sudoers.d/%s-nopasswd", targetUser)
+	cleanupScript := fmt.Sprintf(`rm -f %s /etc/subuid.lock /etc/subgid.lock`, sudoFile)
+	if _, err := runSudoCmd(client, sudoPassword, cleanupScript); err != nil {
+		return out.String(), fmt.Errorf("cleanup sudoers drop-in %s: %w", sudoFile, err)
+	}
+	out.WriteString(fmt.Sprintf("Removed sudoers drop-in %s (if it existed).\n", sudoFile))
 
 	return out.String(), nil
 }
@@ -879,6 +1063,16 @@ func cleanCommandOutput(raw string, warnings map[string]bool) string {
 	lines := strings.Split(raw, "\n")
 	filtered := make([]string, 0, len(lines))
 	for _, line := range lines {
+		// `sudo -S` writes `[sudo] password for <user>: ` to stderr with no
+		// trailing newline. When the caller merges stderr into stdout
+		// (`2>&1`), that prompt gets glued onto the front of the first real
+		// output line. Strip any such prefix (and a standalone prompt line)
+		// so line-oriented parsers downstream see only the real output.
+		if idx := strings.Index(line, "[sudo] password for "); idx >= 0 {
+			if colon := strings.Index(line[idx:], ": "); colon >= 0 {
+				line = line[:idx] + line[idx+colon+2:]
+			}
+		}
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
@@ -916,7 +1110,7 @@ func splitLines(s string) []string {
 	return lines
 }
 
-func captureVMInfo(client *ssh.Client) (*VMInfo, error) {
+func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	warnFlags := map[string]bool{}
 
 	// ── Session 0: measure CPU usage BEFORE the heavy scan commands ──
@@ -1050,52 +1244,128 @@ func captureVMInfo(client *ssh.Client) (*VMInfo, error) {
 	// Detailed process discovery (python, node, java — long-running interpreters)
 	info.ProcessDetails = captureProcessDetails(client)
 
-	// SSH keys on the remote host (private keys in ~/.ssh/)
-	keysRaw := runCmd(client, `ls ~/.ssh/id_* 2>/dev/null | grep -v '\.pub$' | while read -r f; do
-		[ -f "$f.pub" ] || continue
-		fp=$(ssh-keygen -lf "$f.pub" 2>/dev/null)
-		[ -n "$fp" ] && echo "$(basename "$f")|$fp"
-	done; true`)
-	for _, line := range splitLines(keysRaw) {
-		parts := strings.SplitN(line, "|", 2)
-		if len(parts) != 2 {
-			continue
+	// SSH keys per user — authorized_keys and ~/.ssh/id_* for every real
+	// account on the box. Falls back to `sudo -n` to read homes we don't own;
+	// if sudo isn't configured NOPASSWD, we silently skip those users (no
+	// secrets exfiltrated, partial data is better than a failed scan).
+	//
+	// When the host has a stored sudo password, we run the whole scan under
+	// `sudo -S` instead — root can read every home directly, so newly-created
+	// users (who don't grant the login user NOPASSWD sudo) still show up.
+	//
+	// Output lines are pipe-delimited with a fixed 5-field prefix so the
+	// fingerprint line (which never contains '|') stays intact as the tail:
+	//   KEY|<user>|<source>|<filename or empty>|<ssh-keygen -lf output>
+	keyScanCmd := `current=$(whoami 2>/dev/null); ` +
+		`getent passwd 2>/dev/null | awk -F: -v cur="$current" '($3 >= 1000 && $3 < 65534) || $3 == 0 || $1 == cur {print $1 ":" $6}' | sort -u | while IFS=: read -r usr home; do ` +
+		`  [ -z "$usr" ] && continue; ` +
+		`  sshdir="$home/.ssh"; ` +
+		`  ak=$(cat "$sshdir/authorized_keys" 2>/dev/null); ` +
+		`  [ -z "$ak" ] && ak=$(sudo -n cat "$sshdir/authorized_keys" 2>/dev/null); ` +
+		`  if [ -n "$ak" ]; then ` +
+		`    printf '%s\n' "$ak" | while IFS= read -r line; do ` +
+		`      [ -z "$line" ] && continue; ` +
+		`      case "$line" in \#*) continue;; esac; ` +
+		`      fp=$(printf '%s' "$line" | ssh-keygen -lf - 2>/dev/null); ` +
+		`      if [ -n "$fp" ]; then ` +
+		`        printf 'KEY|%s|authorized_keys||%s\n' "$usr" "$fp"; ` +
+		`      else ` +
+		`        enc=$(printf '%s' "$line" | base64 | tr -d '\n'); ` +
+		`        printf 'DROPPED|%s|authorized_keys||%s\n' "$usr" "$enc"; ` +
+		`      fi; ` +
+		`    done; ` +
+		`  fi; ` +
+		`  files=$(ls -1 "$sshdir" 2>/dev/null); ` +
+		`  [ -z "$files" ] && files=$(sudo -n ls -1 "$sshdir" 2>/dev/null); ` +
+		`  printf '%s\n' "$files" | while IFS= read -r fname; do ` +
+		`    case "$fname" in ""|*.pub) continue;; esac; ` +
+		`    case "$fname" in id_*) ;; *) continue;; esac; ` +
+		`    pubpath="$sshdir/${fname}.pub"; ` +
+		`    pub=$(cat "$pubpath" 2>/dev/null); ` +
+		`    [ -z "$pub" ] && pub=$(sudo -n cat "$pubpath" 2>/dev/null); ` +
+		`    [ -z "$pub" ] && continue; ` +
+		`    fp=$(printf '%s' "$pub" | ssh-keygen -lf - 2>/dev/null); ` +
+		`    if [ -n "$fp" ]; then ` +
+		`      printf 'KEY|%s|private_key|%s|%s\n' "$usr" "$fname" "$fp"; ` +
+		`    else ` +
+		`      enc=$(printf '%s' "$pub" | base64 | tr -d '\n'); ` +
+		`      printf 'DROPPED|%s|private_key|%s|%s\n' "$usr" "$fname" "$enc"; ` +
+		`    fi; ` +
+		`  done; ` +
+		`done; true`
+	var keysRaw string
+	elevated := false
+	if sudoPassword != "" {
+		// Elevate: root can read every user's .ssh/ without the per-user
+		// NOPASSWD dance. Errors degrade to unprivileged mode below.
+		out, err := runSudoCmd(client, sudoPassword, keyScanCmd)
+		if err != nil {
+			log.Printf("[sshscan] key-enum sudo -S failed, falling back to unprivileged: %v", err)
+		} else {
+			keysRaw = out
+			elevated = true
 		}
-		fpParts := strings.Fields(parts[1])
-		if len(fpParts) < 3 {
-			continue
-		}
-		info.SSHKeys = append(info.SSHKeys, SSHKeyInfo{
-			Name:        parts[0],
-			Type:        strings.Trim(fpParts[len(fpParts)-1], "()"),
-			Fingerprint: fpParts[1],
-			Source:      "private_key",
-		})
 	}
-
-	// Authorized keys — who can log in to this host
-	authKeysRaw := runCmd(client, `while IFS= read -r line; do
-		echo "$line" | ssh-keygen -lf - 2>/dev/null
-	done < ~/.ssh/authorized_keys 2>/dev/null`)
-	for _, line := range splitLines(authKeysRaw) {
-		parts := strings.Fields(line)
-		if len(parts) < 3 {
+	if keysRaw == "" {
+		keysRaw = runCmd(client, keyScanCmd)
+	}
+	rawLines := splitLines(keysRaw)
+	dropped := 0
+	for _, line := range rawLines {
+		parts := strings.SplitN(line, "|", 5)
+		if len(parts) != 5 {
+			dropped++
+			log.Printf("[sshscan] key-enum dropped line reason=malformed_output raw=%q", line)
 			continue
 		}
-		// ssh-keygen output: "<bits> <fingerprint> <comment> (<type>)"
+		if parts[0] == "DROPPED" {
+			// Sentinel emitted by the remote shell when `ssh-keygen -lf -` returned
+			// nothing for a candidate key. The payload is the base64-encoded raw
+			// input line (authorized_keys entry or .pub contents) so operators can
+			// see exactly what was unparseable (CRLF endings, merged lines,
+			// unsupported key types, etc.).
+			dropped++
+			dUser, dSource, dFname, encoded := parts[1], parts[2], parts[3], parts[4]
+			if decoded, decErr := base64.StdEncoding.DecodeString(encoded); decErr == nil {
+				log.Printf("[sshscan] key-enum dropped line user=%s source=%s fname=%s reason=ssh_keygen_failed raw=%q", dUser, dSource, dFname, string(decoded))
+			} else {
+				log.Printf("[sshscan] key-enum dropped line user=%s source=%s fname=%s reason=ssh_keygen_failed base64_decode_err=%v raw_b64=%q", dUser, dSource, dFname, decErr, encoded)
+			}
+			continue
+		}
+		if parts[0] != "KEY" {
+			dropped++
+			log.Printf("[sshscan] key-enum dropped line reason=unknown_prefix prefix=%q raw=%q", parts[0], line)
+			continue
+		}
+		user, source, fname, fpLine := parts[1], parts[2], parts[3], parts[4]
+		fields := strings.Fields(fpLine)
+		if len(fields) < 3 {
+			dropped++
+			log.Printf("[sshscan] key-enum dropped line user=%s source=%s reason=malformed_ssh_keygen_output raw=%q", user, source, fpLine)
+			continue
+		}
+		// ssh-keygen output: "<bits> <fingerprint> <comment> (<type>)".
 		// Comment may be multi-word or "no comment" when absent.
-		keyType := strings.Trim(parts[len(parts)-1], "()")
-		name := strings.Join(parts[2:len(parts)-1], " ")
-		if name == "no comment" {
-			name = ""
+		keyType := strings.Trim(fields[len(fields)-1], "()")
+		var name string
+		if source == "private_key" {
+			name = fname
+		} else {
+			name = strings.Join(fields[2:len(fields)-1], " ")
+			if name == "no comment" {
+				name = ""
+			}
 		}
 		info.SSHKeys = append(info.SSHKeys, SSHKeyInfo{
+			User:        user,
 			Name:        name,
 			Type:        keyType,
-			Fingerprint: parts[1],
-			Source:      "authorized_keys",
+			Fingerprint: fields[1],
+			Source:      source,
 		})
 	}
+	log.Printf("[sshscan] key-enum elevated=%t raw_lines=%d parsed=%d dropped=%d", elevated, len(rawLines), len(info.SSHKeys), dropped)
 
 	// ── Session 6: enhanced service discovery ──
 	const delimEnhanced = "---ENHANCED---"
@@ -1175,6 +1445,89 @@ func captureVMInfo(client *ssh.Client) (*VMInfo, error) {
 	// Firewall status
 	info.FirewallStatus = enhancedSection(3)
 
+	// ── Session 7: non-system user accounts ──
+	// Pulls real users (UID >= 1000, excluding `nobody` at 65534) from getent
+	// so the remote-user wizards can show a picker instead of asking the
+	// operator to type the name. Shell is captured so the UI can badge
+	// accounts whose login shell is /sbin/nologin or /usr/sbin/nologin.
+	usersRaw := runCmd(client,
+		`current=$(whoami 2>/dev/null); `+
+			`getent passwd 2>/dev/null | `+
+			`awk -F: -v cur="$current" '$3 >= 1000 && $3 < 65534 {is=($1==cur)?"1":"0"; print $1"|"$3"|"$6"|"$7"|"is}'`)
+	for _, line := range splitLines(usersRaw) {
+		parts := strings.Split(line, "|")
+		if len(parts) < 5 || parts[0] == "" {
+			continue
+		}
+		uid, convErr := strconv.Atoi(parts[1])
+		if convErr != nil {
+			continue
+		}
+		shell := parts[3]
+		hasLogin := shell != "" && !strings.HasSuffix(shell, "/nologin") && !strings.HasSuffix(shell, "/false")
+		info.RemoteUsers = append(info.RemoteUsers, RemoteUserInfo{
+			Name:      parts[0],
+			UID:       uid,
+			Home:      parts[2],
+			Shell:     shell,
+			HasLogin:  hasLogin,
+			IsCurrent: parts[4] == "1",
+		})
+	}
+
+	// ── Session 8: nginx server blocks ──
+	// `nginx -T` dumps every loaded config file (main + includes). Used to
+	// resolve "which server_name answers port N" for the port-owners panel.
+	nginxConfig := runCmd(client, `nginx -T 2>/dev/null || sudo -n nginx -T 2>/dev/null || true`)
+	nginxPortMap := parseNginxListens(nginxConfig)
+
+	// Build a map of docker host port → container for fast lookup.
+	dockerHostPorts := map[int]*ContainerInfo{}
+	for i := range info.ParsedContainers {
+		c := &info.ParsedContainers[i]
+		for _, pair := range parseDockerPortBindings(c.Ports) {
+			for p := pair.hostStart; p <= pair.hostEnd; p++ {
+				dockerHostPorts[p] = c
+			}
+		}
+	}
+
+	// Annotate each listening port with its owner — the richer data the UI
+	// renders when available. The existing info.Ports []string stays as-is
+	// for backward compatibility with older scans and the legacy renderer.
+	for _, rawLine := range info.Ports {
+		fields := strings.Fields(rawLine)
+		if len(fields) == 0 {
+			continue
+		}
+		port, convErr := strconv.Atoi(fields[0])
+		if convErr != nil || port <= 0 {
+			continue
+		}
+		proc := ""
+		if len(fields) > 1 {
+			proc = fields[1]
+		}
+		po := PortOwner{Port: port, Process: proc}
+		if c, ok := dockerHostPorts[port]; ok {
+			po.OwnerType = "container"
+			po.OwnerName = c.Name
+			po.Target = c.Image
+		} else if names, ok := nginxPortMap[port]; ok {
+			po.OwnerType = "nginx"
+			po.OwnerName = "nginx"
+			po.Target = strings.Join(names, ", ")
+		} else if proc == "docker-proxy" || proc == "dockerd" {
+			po.OwnerType = "docker"
+			po.OwnerName = proc
+			po.Target = "no container binding matched"
+		} else if proc != "" {
+			po.OwnerType = "process"
+			po.OwnerName = proc
+		}
+		info.PortOwners = append(info.PortOwners, po)
+	}
+
 	if info.CPU == " vCPU" {
 		info.CPU = ""
 	}
@@ -1191,5 +1544,183 @@ func captureVMInfo(client *ssh.Client) (*VMInfo, error) {
 		info.Warnings = append(info.Warnings, "Docker requires sudo to run. Container data was collected via sudo -n. Consider adding the user to the docker group.")
 	}
 	return info, nil
+}
+
+// dockerPortRange is a single host→container mapping parsed from the
+// `Ports` column of `docker ps`. Ports can be ranges (8080-8085->80-85).
+type dockerPortRange struct {
+	hostStart, hostEnd int
+	contStart, contEnd int
+	proto              string
+}
+
+// parseDockerPortBindings extracts every host port (or range) that a
+// container has published, given the raw `Ports` column from `docker ps`.
+// Examples it handles:
+//
+//	0.0.0.0:8080->80/tcp
+//	0.0.0.0:8080->80/tcp, :::8080->80/tcp
+//	0.0.0.0:8080-8085->80-85/tcp
+//
+// Entries without a host binding (e.g. pure internal exposes) are ignored.
+func parseDockerPortBindings(raw string) []dockerPortRange {
+	var out []dockerPortRange
+	if raw == "" {
+		return out
+	}
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		arrowIdx := strings.Index(part, "->")
+		if arrowIdx < 0 {
+			continue
+		}
+		left := part[:arrowIdx]
+		right := part[arrowIdx+2:]
+		// Left side: "<ip>:<port>" or "<ip>:<start>-<end>"
+		colon := strings.LastIndex(left, ":")
+		if colon < 0 {
+			continue
+		}
+		hostSpec := left[colon+1:]
+		hs, he := parsePortRange(hostSpec)
+		if hs == 0 {
+			continue
+		}
+		// Right side: "<port>/<proto>" or "<start>-<end>/<proto>"
+		slash := strings.LastIndex(right, "/")
+		proto := ""
+		contSpec := right
+		if slash >= 0 {
+			contSpec = right[:slash]
+			proto = right[slash+1:]
+		}
+		cs, ce := parsePortRange(contSpec)
+		out = append(out, dockerPortRange{
+			hostStart: hs, hostEnd: he,
+			contStart: cs, contEnd: ce,
+			proto: proto,
+		})
+	}
+	return out
+}
+
+func parsePortRange(s string) (int, int) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, 0
+	}
+	if dash := strings.Index(s, "-"); dash > 0 {
+		a, err1 := strconv.Atoi(s[:dash])
+		b, err2 := strconv.Atoi(s[dash+1:])
+		if err1 == nil && err2 == nil && a <= b {
+			return a, b
+		}
+		return 0, 0
+	}
+	p, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, 0
+	}
+	return p, p
+}
+
+// parseNginxListens walks the output of `nginx -T` and returns a map of
+// port → list of server_names answering on that port. Only top-level
+// `server { … }` blocks are considered (nginx forbids nesting); the parser
+// tracks brace depth so directives inside `location { … }` are ignored.
+//
+// If a server block has no `server_name` directive, it's recorded as "_"
+// (nginx's default-server marker) so the UI still shows something.
+func parseNginxListens(cfg string) map[int][]string {
+	out := map[int][]string{}
+	if strings.TrimSpace(cfg) == "" {
+		return out
+	}
+
+	var inServer bool
+	var serverBraceDepth int
+	var depth int
+	var listens []int
+	var names []string
+
+	flush := func() {
+		for _, p := range listens {
+			if len(names) == 0 {
+				out[p] = append(out[p], "_")
+			} else {
+				out[p] = append(out[p], names...)
+			}
+		}
+		listens = listens[:0]
+		names = names[:0]
+		inServer = false
+	}
+
+	for _, raw := range strings.Split(cfg, "\n") {
+		line := strings.TrimSpace(raw)
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+
+		// Detect the start of a server block before we update depth, so
+		// we capture it correctly regardless of surrounding http / stream
+		// blocks that also carry their own braces.
+		if !inServer && strings.HasPrefix(line, "server") {
+			bodyStart := strings.IndexByte(line, '{')
+			if bodyStart >= 0 {
+				// `server` or `server {` — ignore lines like `server 1.2.3.4;`
+				// inside an upstream block by checking what's before the {.
+				prefix := strings.TrimSpace(line[:bodyStart])
+				if prefix == "server" {
+					inServer = true
+					serverBraceDepth = depth
+					// fall through to count braces in this line
+				}
+			}
+		}
+
+		// Update depth from braces in the line.
+		for _, c := range line {
+			switch c {
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if inServer && depth == serverBraceDepth {
+					flush()
+				}
+			}
+		}
+
+		if !inServer || depth != serverBraceDepth+1 {
+			continue
+		}
+
+		// We're at the immediate top-level of a server { … } block.
+		switch {
+		case strings.HasPrefix(line, "listen ") || strings.HasPrefix(line, "listen\t"):
+			rest := strings.TrimSuffix(strings.TrimSpace(strings.TrimPrefix(line, "listen")), ";")
+			f := strings.Fields(rest)
+			if len(f) == 0 {
+				continue
+			}
+			spec := f[0]
+			if idx := strings.LastIndex(spec, ":"); idx >= 0 {
+				spec = spec[idx+1:]
+			}
+			if p, err := strconv.Atoi(spec); err == nil && p > 0 {
+				listens = append(listens, p)
+			}
+		case strings.HasPrefix(line, "server_name ") || strings.HasPrefix(line, "server_name\t"):
+			rest := strings.TrimSuffix(strings.TrimSpace(strings.TrimPrefix(line, "server_name")), ";")
+			for _, n := range strings.Fields(rest) {
+				if n != "" && n != "_" {
+					names = append(names, n)
+				}
+			}
+		}
+	}
+
+	return out
 }
 

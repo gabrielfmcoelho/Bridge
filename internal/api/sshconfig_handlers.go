@@ -151,7 +151,7 @@ func (h *sshHandlers) dial(w http.ResponseWriter, host *models.Host, user string
 func (h *sshHandlers) handlePreviewConfig(w http.ResponseWriter, r *http.Request) {
 	hosts, err := models.ListHostsForSSHConfig(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to load hosts")
+		jsonServerError(w, r, "failed to load hosts", err)
 		return
 	}
 
@@ -165,13 +165,13 @@ func (h *sshHandlers) handlePreviewConfig(w http.ResponseWriter, r *http.Request
 func (h *sshHandlers) handleGenerateConfig(w http.ResponseWriter, r *http.Request) {
 	hosts, err := models.ListHostsForSSHConfig(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to load hosts")
+		jsonServerError(w, r, "failed to load hosts", err)
 		return
 	}
 
 	entries := hostsToEntries(hosts)
 	if err := sshconfig.WriteFile(h.configPath, entries); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to write config: "+err.Error())
+		jsonServerError(w, r, "failed to write config: "+err.Error(), err)
 		return
 	}
 
@@ -198,7 +198,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		Capture bool   `json:"capture"` // capture VM specs
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -224,7 +224,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 	result := map[string]any{}
 
 	if req.Capture {
-		vmInfo, testErr := sshtest.TestCapture(client)
+		vmInfo, testErr := sshtest.TestCapture(client, auth.Password())
 		if testErr != nil {
 			host.ConnectionsFailed++
 			setTestStatus("failed")
@@ -289,15 +289,23 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		// Annotate scanned SSH keys with managed status from DB
 		if len(vmInfo.SSHKeys) > 0 {
 			dbKeys, _ := models.ListSSHKeys(h.db.SQL)
+			matched := 0
 			for i, sk := range vmInfo.SSHKeys {
 				for _, dk := range dbKeys {
 					if dk.Fingerprint != "" && dk.Fingerprint == sk.Fingerprint {
 						vmInfo.SSHKeys[i].Managed = true
 						vmInfo.SSHKeys[i].ManagedName = dk.Name
+						matched++
 						break
 					}
 				}
+				if !vmInfo.SSHKeys[i].Managed {
+					log.Printf("[ssh] scan-annotate host=%s unmatched user=%s source=%s fp=%s (no DB key with this fingerprint)",
+						host.OficialSlug, sk.User, sk.Source, sk.Fingerprint)
+				}
 			}
+			log.Printf("[ssh] scan-annotate host=%s scanned=%d matched=%d db_keys=%d",
+				host.OficialSlug, len(vmInfo.SSHKeys), matched, len(dbKeys))
 		}
 		// Store scan snapshot in DB
 		if scanJSON, err := json.Marshal(vmInfo); err == nil {
@@ -353,7 +361,7 @@ func (h *sshHandlers) handleFixDevNull(w http.ResponseWriter, r *http.Request) {
 		Method string `json:"method"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -395,7 +403,7 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 		ExistingKeyPath  string `json:"existing_key_path"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -403,7 +411,7 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	if req.UseSavedPassword && host.HasPassword {
 		pw, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
+			jsonServerError(w, r, "failed to decrypt password", err)
 			return
 		}
 		password = pw
@@ -443,7 +451,7 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		method := auth.Method()
 		h.logOperation(r, host.ID, "setup-key", &method, "failed", err.Error())
-		jsonError(w, http.StatusInternalServerError, err.Error())
+		jsonServerError(w, r, err.Error(), err)
 		return
 	}
 
@@ -468,7 +476,7 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 func (h *sshHandlers) handleListKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := sshkeys.ListKeys()
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list keys")
+		jsonServerError(w, r, "failed to list keys", err)
 		return
 	}
 	jsonOK(w, keys)
@@ -478,7 +486,7 @@ func (h *sshHandlers) handleListKeys(w http.ResponseWriter, r *http.Request) {
 func (h *sshHandlers) handleDownloadConfig(w http.ResponseWriter, r *http.Request) {
 	hosts, err := models.ListHostsForSSHConfig(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to load hosts")
+		jsonServerError(w, r, "failed to load hosts", err)
 		return
 	}
 
@@ -569,6 +577,7 @@ func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Requ
 	var req struct {
 		Username string `json:"username"`
 		PubKey   string `json:"pub_key"`
+		SSHKeyID int64  `json:"ssh_key_id"`
 		Force    bool   `json:"force"`
 	}
 	if err := decodeJSON(r, &req); err != nil || req.Username == "" || req.PubKey == "" {
@@ -616,8 +625,90 @@ func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Record the linkage so the Coolify integration can auto-pick this key
+	// when registering/syncing the server. Non-fatal on failure: the remote
+	// account was created successfully; only the convenience lookup is lost.
+	var keyIDArg *int64
+	if req.SSHKeyID > 0 {
+		id := req.SSHKeyID
+		keyIDArg = &id
+	}
+	if linkErr := models.CreateOrUpdateHostRemoteUser(h.db.SQL, host.ID, req.Username, keyIDArg); linkErr != nil {
+		log.Printf("[sshcm] create-remote-user host=%d user=%s link-persist error=%v", host.ID, req.Username, linkErr)
+	}
+
 	h.logOperation(r, host.ID, "create-remote-user", &method, "success", output)
 	jsonOK(w, map[string]any{"success": true, "output": output, "message": "User " + req.Username + " created with sudo NOPASSWD"})
+}
+
+// handleDeleteRemoteUser removes a non-system user from the remote host and
+// cleans up its NOPASSWD sudoers drop-in. Safety rails live in sshtest.
+// DeleteRemoteUser (root, UID<1000, and SSH login user are refused).
+func (h *sshHandlers) handleDeleteRemoteUser(w http.ResponseWriter, r *http.Request) {
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+
+	var req struct {
+		Username   string `json:"username"`
+		RemoveHome bool   `json:"remove_home"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+	req.Username = strings.TrimSpace(req.Username)
+	if req.Username == "" {
+		jsonError(w, http.StatusBadRequest, "username is required")
+		return
+	}
+	if !validLinuxUsername.MatchString(req.Username) {
+		jsonError(w, http.StatusBadRequest, "invalid username: must be 1-32 lowercase alphanumeric characters, hyphens, or underscores, starting with a letter or underscore")
+		return
+	}
+
+	loginUser := h.requireUser(w, host)
+	if loginUser == "" {
+		return
+	}
+
+	method, auth, ok := h.resolveAuth(w, host, "")
+	if !ok {
+		return
+	}
+	password := auth.Password()
+	if password == "" {
+		jsonError(w, http.StatusBadRequest, "stored password required for sudo")
+		return
+	}
+
+	client := h.dial(w, host, loginUser, auth)
+	if client == nil {
+		return
+	}
+	defer client.Close()
+
+	output, delErr := sshtest.DeleteRemoteUser(client, password, loginUser, req.Username, req.RemoveHome)
+	if delErr != nil {
+		resp := map[string]any{"success": false, "error": delErr.Error(), "output": output}
+		switch {
+		case errors.Is(delErr, sshtest.ErrUserMissing):
+			resp["user_missing"] = true
+		case errors.Is(delErr, sshtest.ErrUserProtected):
+			resp["user_protected"] = true
+		}
+		h.logOperation(r, host.ID, "delete-remote-user", &method, "failed", delErr.Error()+"\n"+output)
+		jsonOK(w, resp)
+		return
+	}
+
+	if linkErr := models.DeleteHostRemoteUser(h.db.SQL, host.ID, req.Username); linkErr != nil {
+		log.Printf("[sshcm] delete-remote-user host=%d user=%s link-cleanup error=%v", host.ID, req.Username, linkErr)
+	}
+
+	h.logOperation(r, host.ID, "delete-remote-user", &method, "success", output)
+	jsonOK(w, map[string]any{"success": true, "output": output, "message": "User " + req.Username + " deleted"})
 }
 
 // handleDockerSetup checks docker status and optionally adds user to docker group.
@@ -685,7 +776,7 @@ func (h *sshHandlers) handleNginxCleanup(w http.ResponseWriter, r *http.Request)
 	defer func() {
 		if rv := recover(); rv != nil {
 			log.Printf("[ssh] nginx-cleanup panic: %v", rv)
-			jsonError(w, http.StatusInternalServerError, fmt.Sprintf("internal error: %v", rv))
+			jsonServerError(w, r, fmt.Sprintf("internal error: %v", rv), fmt.Errorf("panic: %v", rv))
 		}
 	}()
 
@@ -772,6 +863,42 @@ func (h *sshHandlers) handleListRemoteKeys(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, map[string]any{"success": true, "keys": keys})
 }
 
+// identityFileNameSanitizer strips characters that would be awkward in a
+// filename while preserving readability for ssh_keys names the user typed.
+var identityFileNameSanitizer = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+
+// resolveIdentityFile builds the ~/.ssh/<name> path the user is expected to
+// save the private key at. It matches the host's stored pub key against the
+// centralized ssh_keys table by fingerprint; if no match is found (e.g. a key
+// generated directly on the host), it falls back to a slug-based name.
+func (h *sshHandlers) resolveIdentityFile(host *models.Host) string {
+	fallback := "~/.ssh/id_ed25519_" + identityFileNameSanitizer.ReplaceAllString(host.OficialSlug, "_")
+
+	if len(host.PubKeyCiphertext) == 0 {
+		return fallback
+	}
+	pubPEM, err := h.db.Encryptor.Decrypt(host.PubKeyCiphertext, host.PubKeyNonce)
+	if err != nil {
+		return fallback
+	}
+	pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubPEM))
+	if err != nil {
+		return fallback
+	}
+	fp := ssh.FingerprintSHA256(pub)
+
+	keys, err := models.ListSSHKeys(h.db.SQL)
+	if err != nil {
+		return fallback
+	}
+	for _, k := range keys {
+		if k.Fingerprint != "" && k.Fingerprint == fp && k.Name != "" {
+			return "~/.ssh/" + identityFileNameSanitizer.ReplaceAllString(k.Name, "_")
+		}
+	}
+	return fallback
+}
+
 // handleHostSSHConfig returns the SSH config snippet for a single host.
 func (h *sshHandlers) handleHostSSHConfig(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
@@ -789,9 +916,9 @@ func (h *sshHandlers) handleHostSSHConfig(w http.ResponseWriter, r *http.Request
 		User:     host.User,
 		Port:     host.Port,
 	}
-	if includeKey && host.KeyPath != "" {
-		entry.IdentityFile = host.KeyPath
-		entry.IdentitiesOnly = host.IdentitiesOnly
+	if includeKey && host.HasKey {
+		entry.IdentityFile = h.resolveIdentityFile(host)
+		entry.IdentitiesOnly = "yes"
 	}
 	if host.ProxyJump != "" {
 		entry.ProxyJump = host.ProxyJump
@@ -822,7 +949,7 @@ func (h *sshHandlers) handleOperationLogs(w http.ResponseWriter, r *http.Request
 
 	logs, err := models.ListOperationLogs(h.db.SQL, host.ID, limit)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to load operation logs")
+		jsonServerError(w, r, "failed to load operation logs", err)
 		return
 	}
 	if logs == nil {

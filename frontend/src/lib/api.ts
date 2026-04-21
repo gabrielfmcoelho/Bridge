@@ -73,9 +73,38 @@ export type VMInfoType = {
   installed_packages?: InstalledPackageType[];
   cron_jobs?: string[];
   firewall_status?: string;
+  remote_users?: RemoteUserInfo[];
+  port_owners?: PortOwner[];
+  parsed_containers?: ParsedContainer[];
+};
+
+export type ParsedContainer = {
+  id: string;
+  name: string;
+  image: string;
+  status: string;
+  ports: string;
+};
+
+export type PortOwner = {
+  port: number;
+  process?: string;
+  owner_type?: "container" | "nginx" | "process" | "docker" | string;
+  owner_name?: string;
+  target?: string;
+};
+
+export type RemoteUserInfo = {
+  name: string;
+  uid: number;
+  shell?: string;
+  home?: string;
+  has_login: boolean;
+  is_current?: boolean;
 };
 
 export type SSHKeyInfoScan = {
+  user?: string; // owning account; absent on legacy scans
   name: string;
   type: string;
   fingerprint: string;
@@ -359,8 +388,10 @@ export const sshAPI = {
     api.post<{ success: boolean; method?: string; message?: string; output?: string; error?: string }>(`/api/ssh/fix-dev-null/${slug}`, { method }),
   setupSudoNopasswd: (slug: string) =>
     api.post<{ success: boolean; message?: string; output?: string; error?: string }>(`/api/ssh/setup-sudo-nopasswd/${slug}`),
-  createRemoteUser: (slug: string, username: string, pubKey: string, force = false) =>
-    api.post<{ success: boolean; message?: string; output?: string; error?: string; user_exists?: boolean }>(`/api/ssh/create-remote-user/${slug}`, { username, pub_key: pubKey, force }),
+  createRemoteUser: (slug: string, username: string, pubKey: string, force = false, sshKeyId?: number) =>
+    api.post<{ success: boolean; message?: string; output?: string; error?: string; user_exists?: boolean }>(`/api/ssh/create-remote-user/${slug}`, { username, pub_key: pubKey, force, ssh_key_id: sshKeyId }),
+  deleteRemoteUser: (slug: string, username: string, removeHome = false) =>
+    api.post<{ success: boolean; message?: string; output?: string; error?: string; user_missing?: boolean; user_protected?: boolean }>(`/api/ssh/delete-remote-user/${slug}`, { username, remove_home: removeHome }),
   setupKey: (slug: string, data: {
     user?: string; password?: string; use_saved_password?: boolean;
     mode: "generate" | "existing"; existing_key_path?: string;
@@ -625,8 +656,10 @@ export const coolifyAPI = {
     api.get<{ server: CoolifyServer }>(`/api/coolify/server-status/${slug}`),
   checkHost: (slug: string) =>
     api.post<{ found: boolean; server?: CoolifyServer }>(`/api/coolify/check/${slug}`),
-  registerHost: (slug: string) =>
-    api.post<{ uuid: string }>(`/api/coolify/register/${slug}`),
+  registerHost: (slug: string, sshKeyId?: number) =>
+    api.post<{ uuid: string }>(`/api/coolify/register/${slug}`, sshKeyId ? { ssh_key_id: sshKeyId } : {}),
+  updateServerKey: (slug: string, sshKeyId: number) =>
+    api.post<{ success: boolean; private_key_uuid: string }>(`/api/coolify/server/${slug}/key`, { ssh_key_id: sshKeyId }),
   validateHost: (slug: string) =>
     api.post<{ message: string }>(`/api/coolify/validate/${slug}`),
   syncHost: (slug: string) =>

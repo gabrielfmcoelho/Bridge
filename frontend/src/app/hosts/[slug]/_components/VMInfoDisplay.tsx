@@ -8,7 +8,7 @@ import SortableTable, { sortRows } from "@/components/ui/SortableTable";
 import { UsageBar } from "./UsageBar";
 import { ContainersList } from "./SortableResourceList";
 import { formatUptime, parseLoginEntry, formatLoginDate, portIcon, parseServiceRow } from "@/lib/utils";
-import type { VMInfoType, ProcessDetail } from "@/lib/api";
+import type { VMInfoType, ProcessDetail, PortOwner } from "@/lib/api";
 
 export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoType; locale: string; compact?: boolean }) {
   const { t } = useLocale();
@@ -45,15 +45,68 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                 </div>
               ))}
             </div>
-            {info.ports?.length > 0 && (
-              <div className="py-1.5">
-                <span className="text-xs text-[var(--text-muted)] block mb-2">{t("scan.listeningPorts")}</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {info.ports.map((p, i) => { const parts = p.split(/\s+/); const port = parts[0] || ""; const proc = parts.slice(1).join(" "); return <span key={i} className="px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] text-xs" title={proc}>{portIcon(p)} :{port}</span>; })}
+            {info.ports?.length > 0 && (() => {
+              const ownerByPort = new Map<number, PortOwner>();
+              for (const po of info.port_owners ?? []) ownerByPort.set(po.port, po);
+
+              // Badge color by owner type so the panel scans at a glance.
+              // Each variant pairs a pale tint for both themes with a text
+              // shade dark enough to read on light backgrounds (via light:)
+              // and bright enough to read on the dark navy surface by
+              // default. Border opacity bumps to 40% so the chip keeps a
+              // visible edge over low-contrast light backgrounds.
+              const ownerClasses = (ownerType?: string): string => {
+                switch (ownerType) {
+                  case "container": return "bg-cyan-500/15 text-cyan-200 light:text-cyan-800 border-cyan-500/40";
+                  case "nginx": return "bg-fuchsia-500/15 text-fuchsia-200 light:text-fuchsia-800 border-fuchsia-500/40";
+                  case "docker": return "bg-blue-500/15 text-blue-200 light:text-blue-800 border-blue-500/40";
+                  case "process": return "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-default)]";
+                  default: return "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-default)]";
+                }
+              };
+
+              return (
+                <div className="py-1.5">
+                  <span className="text-xs text-[var(--text-muted)] block mb-2">{t("scan.listeningPorts")}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {info.ports.map((p, i) => {
+                      const parts = p.split(/\s+/);
+                      const portStr = parts[0] || "";
+                      const portNum = parseInt(portStr, 10);
+                      const rawProc = parts.slice(1).join(" ");
+                      const owner = Number.isNaN(portNum) ? undefined : ownerByPort.get(portNum);
+
+                      const displayName = owner?.owner_name || rawProc;
+                      const tooltipParts: string[] = [];
+                      if (owner?.owner_type) tooltipParts.push(owner.owner_type);
+                      if (owner?.target) tooltipParts.push(owner.target);
+                      if (rawProc && rawProc !== owner?.owner_name) tooltipParts.push(`proc=${rawProc}`);
+                      const tooltip = tooltipParts.length > 0 ? tooltipParts.join(" · ") : rawProc;
+
+                      return (
+                        <span
+                          key={i}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs ${ownerClasses(owner?.owner_type)}`}
+                          title={tooltip}
+                        >
+                          {portIcon(p)}
+                          <span style={{ fontFamily: "var(--font-mono)" }}>:{portStr}</span>
+                          {displayName && (
+                            <span className="text-[10px] opacity-80 truncate max-w-[10rem]" style={{ fontFamily: "var(--font-mono)" }}>
+                              {owner?.owner_type === "nginx" && owner.target ? `nginx → ${owner.target}` : displayName}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-            {info.ssh_keys && info.ssh_keys.length > 0 && (() => {
+              );
+            })()}
+            {/* Legacy flat rendering — only used when the scan predates the
+                per-user discovery added below. Once remote_users is present,
+                the richer "Remote Users" card takes over. */}
+            {info.ssh_keys && info.ssh_keys.length > 0 && !(info.remote_users && info.remote_users.length > 0) && (() => {
               const authKeys = info.ssh_keys.filter(k => k.source === "authorized_keys");
               const privKeys = info.ssh_keys.filter(k => k.source !== "authorized_keys");
               const renderKey = (k: typeof info.ssh_keys[0], i: number) => (
@@ -95,6 +148,150 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
           </Card>
           </>
         ) : null;
+      })()}
+
+      {/* Remote Users + their keys (post-per-user-scan). Each user gets its
+          own card with authorized_keys and private keys nested beneath it. */}
+      {info.remote_users && info.remote_users.length > 0 && (() => {
+        const allKeys = info.ssh_keys ?? [];
+        type Key = (typeof allKeys)[number];
+        const keysByUser = new Map<string, Key[]>();
+        for (const k of allKeys) {
+          if (!k.user) continue;
+          const list = keysByUser.get(k.user) ?? [];
+          list.push(k);
+          keysByUser.set(k.user, list);
+        }
+        // Orphan keys — entries the scan discovered without a user tag (legacy
+        // or unparseable rows). Shown under a synthetic group so nothing is
+        // silently dropped.
+        const orphanKeys = allKeys.filter((k) => !k.user);
+
+        // Key icon color encodes managed status (green = known to the DB,
+        // faint gray = unmanaged). The old "managed"/"unmanaged" text badge
+        // was redundant with the color; we only show a chip now when there's
+        // unique info to add — the managed_name of a matched DB key.
+        const renderKey = (k: Key, i: number) => (
+          <div key={i} className="flex gap-2 text-xs">
+            <svg
+              className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${k.managed ? "text-emerald-400" : "text-[var(--text-faint)]"}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              aria-label={k.managed ? t("scan.managed") : t("scan.unmanaged")}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            </svg>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                  {k.name || "\u2014"}
+                </span>
+                <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider">{k.type}</span>
+              </div>
+              <div
+                className="text-[10px] text-[var(--text-muted)] break-all leading-snug"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                {k.fingerprint}
+              </div>
+              {/* Reserve the badge slot even for unmanaged keys so rows
+                  with/without a managed_name align vertically. An invisible
+                  chip keeps the height but doesn't render text/border. */}
+              <div className="mt-1 h-[18px]">
+                {k.managed && k.managed_name ? (
+                  <span className="inline-block px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-[10px] text-emerald-400 border border-emerald-500/20">
+                    {k.managed_name}
+                  </span>
+                ) : (
+                  <span className="inline-block h-[18px]" aria-hidden="true" />
+                )}
+              </div>
+            </div>
+          </div>
+        );
+
+        return (
+          <>
+            <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.remoteUsers")}</h3>
+            {/* auto-rows-fr forces every row to share the tallest row's
+                height, so cards without keys don't collapse and the grid
+                stays visually aligned across rows. */}
+            <div className={`grid ${gridCols} gap-2 auto-rows-fr`}>
+              {info.remote_users.map((u) => {
+                const userKeys = keysByUser.get(u.name) ?? [];
+                const authKeys = userKeys.filter((k) => k.source === "authorized_keys");
+                const privKeys = userKeys.filter((k) => k.source !== "authorized_keys");
+                return (
+                  <Card key={u.name} hover={false} className="!p-3 flex flex-col h-full">
+                    <div className="flex items-center gap-2 mb-1">
+                      <svg
+                        className={`w-3.5 h-3.5 shrink-0 ${u.is_current ? "text-cyan-400" : "text-[var(--text-faint)]"}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+                        aria-label={u.is_current ? t("scan.userCurrent") : undefined}
+                      >
+                        <title>{u.is_current ? t("scan.userCurrent") : u.name}</title>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span className="text-sm font-medium text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{u.name}</span>
+                      {!u.has_login && (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]">
+                          {t("scan.userNoLogin")}
+                        </span>
+                      )}
+                      <span
+                        className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]"
+                        style={{ fontFamily: "var(--font-mono)" }}
+                      >
+                        uid {u.uid}
+                      </span>
+                    </div>
+                    {u.home && (
+                      <p className="text-[10px] text-[var(--text-muted)] break-all leading-relaxed line-clamp-2" style={{ fontFamily: "var(--font-mono)" }}>
+                        {u.home}
+                      </p>
+                    )}
+                    {/* Divider sits directly under the home path (no gap)
+                        and extends edge-to-edge through the card padding, so
+                        every card has the same visual rhythm regardless of
+                        how much key content follows. */}
+                    <div className="-mx-3 mt-2 border-t border-[var(--border-subtle)]/50" />
+                    {userKeys.length === 0 ? (
+                      <p className="text-[10px] text-[var(--text-faint)] italic mt-auto pt-2">
+                        {t("scan.userNoKeys")}
+                      </p>
+                    ) : (
+                      <div className="pt-2 space-y-2">
+                        {authKeys.length > 0 && (
+                          <div>
+                            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                              {t("scan.authorizedKeys")} <span className="text-[var(--text-faint)]">({authKeys.length})</span>
+                            </span>
+                            <div className="space-y-1">{authKeys.map(renderKey)}</div>
+                          </div>
+                        )}
+                        {privKeys.length > 0 && (
+                          <div>
+                            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                              {t("scan.sshKeys")} <span className="text-[var(--text-faint)]">({privKeys.length})</span>
+                            </span>
+                            <div className="space-y-1">{privKeys.map(renderKey)}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+              {orphanKeys.length > 0 && (
+                <Card hover={false} className="!p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-semibold text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{t("scan.userOrphanKeys")}</span>
+                  </div>
+                  <div className="space-y-1">{orphanKeys.map(renderKey)}</div>
+                </Card>
+              )}
+            </div>
+          </>
+        );
       })()}
 
       {/* Last SSH Logins */}
@@ -160,7 +357,11 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
 
       {/* Docker Containers */}
       {info.container_stats?.length > 0 && (
-        <ContainersList stats={info.container_stats} title={t("scan.dockerContainers")} />
+        <ContainersList
+          stats={info.container_stats}
+          parsedContainers={info.parsed_containers ?? []}
+          title={t("scan.dockerContainers")}
+        />
       )}
 
       {/* Systemd Services */}

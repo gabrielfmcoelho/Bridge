@@ -33,11 +33,12 @@ type CreateServerRequest struct {
 
 // UpdateServerRequest is the body for PATCH /servers/{uuid}.
 type UpdateServerRequest struct {
-	Name        string `json:"name,omitempty"`
-	Description string `json:"description,omitempty"`
-	IP          string `json:"ip,omitempty"`
-	Port        int    `json:"port,omitempty"`
-	User        string `json:"user,omitempty"`
+	Name           string `json:"name,omitempty"`
+	Description    string `json:"description,omitempty"`
+	IP             string `json:"ip,omitempty"`
+	Port           int    `json:"port,omitempty"`
+	User           string `json:"user,omitempty"`
+	PrivateKeyUUID string `json:"private_key_uuid,omitempty"`
 }
 
 // CreateKeyRequest is the body for POST /security/keys.

@@ -111,7 +111,7 @@ func (h *integrationSettingsHandlers) handleUpdateIntegrationGroup(w http.Respon
 
 	var req map[string]string
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid JSON")
+		jsonBadRequest(w, r, "invalid JSON", err)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (h *integrationSettingsHandlers) handleUpdateIntegrationGroup(w http.Respon
 			// Encrypt the secret value.
 			cipher, nonce, err := h.db.Encryptor.Encrypt(value)
 			if err != nil {
-				jsonError(w, http.StatusInternalServerError, "failed to encrypt "+key)
+				jsonServerError(w, r, "failed to encrypt "+key, err)
 				return
 			}
 			models.SetAppSettingValue(h.db.SQL, key+"_cipher", hex.EncodeToString(cipher))
@@ -189,13 +189,13 @@ func (h *integrationSettingsHandlers) handleTestLDAP(w http.ResponseWriter, r *h
 func (h *integrationSettingsHandlers) handleGetPermissions(w http.ResponseWriter, r *http.Request) {
 	perms, err := models.ListPermissions(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list permissions")
+		jsonServerError(w, r, "failed to list permissions", err)
 		return
 	}
 
 	rolePerms, err := models.ListAllRolePermissions(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list role permissions")
+		jsonServerError(w, r, "failed to list role permissions", err)
 		return
 	}
 
@@ -218,7 +218,7 @@ func (h *integrationSettingsHandlers) handleUpdatePermissions(w http.ResponseWri
 		Permissions []string `json:"permissions"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid JSON")
+		jsonBadRequest(w, r, "invalid JSON", err)
 		return
 	}
 	if req.Role == "" {
@@ -232,7 +232,7 @@ func (h *integrationSettingsHandlers) handleUpdatePermissions(w http.ResponseWri
 	}
 
 	if err := models.SetRolePermissions(h.db.SQL, req.Role, req.Permissions); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update permissions")
+		jsonServerError(w, r, "failed to update permissions", err)
 		return
 	}
 
@@ -245,7 +245,7 @@ func (h *integrationSettingsHandlers) handleUpdatePermissions(w http.ResponseWri
 func (h *integrationSettingsHandlers) handleGetRoleMappings(w http.ResponseWriter, r *http.Request) {
 	mappings, err := models.ListAuthRoleMappings(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list role mappings")
+		jsonServerError(w, r, "failed to list role mappings", err)
 		return
 	}
 	if mappings == nil {
@@ -258,7 +258,7 @@ func (h *integrationSettingsHandlers) handleGetRoleMappings(w http.ResponseWrite
 func (h *integrationSettingsHandlers) handleCreateRoleMapping(w http.ResponseWriter, r *http.Request) {
 	var req models.AuthRoleMapping
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid JSON")
+		jsonBadRequest(w, r, "invalid JSON", err)
 		return
 	}
 	if req.ProviderName == "" || req.ExternalGroup == "" || req.LocalRole == "" {
@@ -278,12 +278,12 @@ func (h *integrationSettingsHandlers) handleCreateRoleMapping(w http.ResponseWri
 func (h *integrationSettingsHandlers) handleDeleteRoleMapping(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid mapping id")
+		jsonBadRequest(w, r, "invalid mapping id", err)
 		return
 	}
 
 	if err := models.DeleteAuthRoleMapping(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete mapping")
+		jsonServerError(w, r, "failed to delete mapping", err)
 		return
 	}
 

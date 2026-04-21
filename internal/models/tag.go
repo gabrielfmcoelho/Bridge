@@ -21,7 +21,7 @@ func SetTags(db *sql.DB, entityType string, entityID int64, tags []string) error
 			continue
 		}
 		if _, err := tx.Exec(
-			`INSERT OR IGNORE INTO tags (entity_type, entity_id, tag) VALUES (?, ?, ?)`,
+			`INSERT INTO tags (entity_type, entity_id, tag) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`,
 			entityType, entityID, tag,
 		); err != nil {
 			return err
@@ -130,7 +130,7 @@ func DeleteTags(db *sql.DB, entityType string, entityID int64) error {
 
 func AddTag(db *sql.DB, entityType string, entityID int64, tag string) error {
 	_, err := db.Exec(
-		`INSERT OR IGNORE INTO tags (entity_type, entity_id, tag) VALUES (?, ?, ?)`,
+		`INSERT INTO tags (entity_type, entity_id, tag) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`,
 		entityType, entityID, tag,
 	)
 	return err

@@ -10,6 +10,10 @@ interface DrawerProps {
   title?: string;
   subHeader?: ReactNode;
   headerAction?: ReactNode;
+  /** Optional back-arrow button rendered to the left of the title. Wire it
+   *  to onClose (or a more nuanced navigation callback) when the drawer
+   *  functions as a subview that the user should "back out of". */
+  onBack?: () => void;
   children: ReactNode;
   footer?: ReactNode;
   /** Force a specific side. When omitted, auto-switches: right on desktop, bottom on mobile. */
@@ -18,7 +22,20 @@ interface DrawerProps {
   wide?: boolean;
 }
 
-export default function Drawer({ open, onClose, title, subHeader, headerAction, children, footer, side, wide }: DrawerProps) {
+export default function Drawer({ open, onClose, title, subHeader, headerAction, onBack, children, footer, side, wide }: DrawerProps) {
+  const BackButton = onBack ? (
+    <button
+      type="button"
+      onClick={onBack}
+      className="w-7 h-7 -ml-1 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors shrink-0"
+      aria-label="Back"
+      title="Back"
+    >
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+    </button>
+  ) : null;
   const isMobile = useMediaQuery("(max-width: 767px)");
   const resolvedSide = side ?? (isMobile ? "bottom" : "right");
 
@@ -38,8 +55,9 @@ export default function Drawer({ open, onClose, title, subHeader, headerAction, 
           >
             {title ? (
               <div className="border-b border-[var(--border-subtle)]">
-                <div className="flex items-center justify-between p-4">
-                  <VaulDrawer.Title className="text-lg font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+                <div className="flex items-center gap-2 p-4">
+                  {BackButton}
+                  <VaulDrawer.Title className="text-lg font-semibold flex-1 min-w-0 truncate" style={{ fontFamily: "var(--font-display)" }}>
                     {title}
                   </VaulDrawer.Title>
                   {headerAction}
@@ -80,8 +98,9 @@ export default function Drawer({ open, onClose, title, subHeader, headerAction, 
           </div>
           {title ? (
             <div className="border-b border-[var(--border-subtle)]">
-              <div className="flex items-center justify-between px-4 pb-3">
-                <VaulDrawer.Title className="text-lg font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+              <div className="flex items-center gap-2 px-4 pb-3">
+                {BackButton}
+                <VaulDrawer.Title className="text-lg font-semibold flex-1 min-w-0 truncate" style={{ fontFamily: "var(--font-display)" }}>
                   {title}
                 </VaulDrawer.Title>
                 {headerAction}

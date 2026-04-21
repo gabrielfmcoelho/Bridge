@@ -39,7 +39,7 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 		Password string   `json:"password"`
 	}
 	if err := decodeJSON(r, &items); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid JSON: expected array of host objects")
+		jsonBadRequest(w, r, "invalid JSON: expected array of host objects", err)
 		return
 	}
 	if len(items) == 0 {
@@ -120,7 +120,7 @@ func (h *importHandlers) handleImportDNS(w http.ResponseWriter, r *http.Request)
 		HostIDs []int64  `json:"host_ids"`
 	}
 	if err := decodeJSON(r, &items); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid JSON: expected array of DNS objects")
+		jsonBadRequest(w, r, "invalid JSON: expected array of DNS objects", err)
 		return
 	}
 	if len(items) == 0 {
@@ -167,7 +167,7 @@ func (h *importHandlers) handleImport(w http.ResponseWriter, r *http.Request) {
 	// Generic import endpoint that auto-detects type from the JSON structure
 	var raw json.RawMessage
 	if err := decodeJSON(r, &raw); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid JSON body")
+		jsonBadRequest(w, r, "invalid JSON body", err)
 		return
 	}
 

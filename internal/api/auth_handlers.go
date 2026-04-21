@@ -17,7 +17,7 @@ type authHandlers struct {
 func (h *authHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	setupRequired, err := auth.SetupRequired(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to check setup status")
+		jsonServerError(w, r, "failed to check setup status", err)
 		return
 	}
 
@@ -69,7 +69,7 @@ func (h *authHandlers) handleSetup(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `json:"display_name"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Username == "" || req.Password == "" {
@@ -85,7 +85,7 @@ func (h *authHandlers) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 	token, expiresAt, err := auth.CreateSession(h.db.SQL, user.ID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create session")
+		jsonServerError(w, r, "failed to create session", err)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *authHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Provider string `json:"provider"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Provider == "" {
@@ -148,7 +148,7 @@ func (h *authHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
 		} else {
 			u, err := h.resolveOrProvisionUser(identity)
 			if err != nil {
-				jsonError(w, http.StatusInternalServerError, "failed to resolve user")
+				jsonServerError(w, r, "failed to resolve user", err)
 				return
 			}
 			user = u
@@ -157,7 +157,7 @@ func (h *authHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	token, expiresAt, err := auth.CreateSession(h.db.SQL, user.ID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create session")
+		jsonServerError(w, r, "failed to create session", err)
 		return
 	}
 
@@ -338,7 +338,7 @@ func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 func (h *authHandlers) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := models.ListUsers(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list users")
+		jsonServerError(w, r, "failed to list users", err)
 		return
 	}
 	jsonOK(w, users)
@@ -352,7 +352,7 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		Role        string `json:"role"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Username == "" || req.Password == "" {
@@ -365,7 +365,7 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to hash password")
+		jsonServerError(w, r, "failed to hash password", err)
 		return
 	}
 
@@ -386,7 +386,7 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid user id")
+		jsonBadRequest(w, r, "invalid user id", err)
 		return
 	}
 
@@ -397,7 +397,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 		Password    string `json:"password"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -417,18 +417,18 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 		user.Role = req.Role
 	}
 	if err := models.UpdateUser(h.db.SQL, user); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update user")
+		jsonServerError(w, r, "failed to update user", err)
 		return
 	}
 
 	if req.Password != "" {
 		hash, err := auth.HashPassword(req.Password)
 		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to hash password")
+			jsonServerError(w, r, "failed to hash password", err)
 			return
 		}
 		if err := models.UpdateUserPassword(h.db.SQL, id, hash); err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to update password")
+			jsonServerError(w, r, "failed to update password", err)
 			return
 		}
 	}
@@ -439,7 +439,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 func (h *authHandlers) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid user id")
+		jsonBadRequest(w, r, "invalid user id", err)
 		return
 	}
 
@@ -451,7 +451,7 @@ func (h *authHandlers) handleDeleteUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := models.DeleteUser(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete user")
+		jsonServerError(w, r, "failed to delete user", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})

@@ -105,6 +105,12 @@
   --font-mono: var(--font-mono);
 }
 
+/* Light-theme variant: the app swaps themes by toggling
+   [data-theme="light"] on <html>, so `light:` classes scope to that
+   selector. Use this for tweaks that don't fit in CSS custom properties
+   — e.g. Tailwind color shades that need to invert between themes. */
+@custom-variant light (&:where([data-theme="light"] *));
+
 /* ─── Base ─── */
 html {
   scroll-behavior: smooth;

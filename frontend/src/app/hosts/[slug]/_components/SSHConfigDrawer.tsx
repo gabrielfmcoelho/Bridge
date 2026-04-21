@@ -75,7 +75,7 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
           <button
             type="button"
             onClick={handleCopy}
-            className="absolute top-2 right-2 p-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition-all opacity-0 group-hover:opacity-100"
+            className="absolute top-2 right-2 p-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition-all"
             title={t("common.copy")}
           >
             {copied ? (
@@ -90,8 +90,8 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
           </button>
         </div>
 
-        {/* Copy button (always visible on mobile) */}
-        <Button size="sm" variant="secondary" className="w-full md:hidden" onClick={handleCopy}>
+        {/* Full-width copy button */}
+        <Button size="sm" variant="secondary" className="w-full" onClick={handleCopy}>
           {copied ? t("common.copied") : t("common.copy")}
         </Button>
 

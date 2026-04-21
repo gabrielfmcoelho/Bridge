@@ -74,7 +74,7 @@ func DeleteDNSRecord(db *sql.DB, id int64) error {
 
 // LinkDNSToHost creates a link between a DNS record and a host.
 func LinkDNSToHost(db *sql.DB, dnsID, hostID int64) error {
-	_, err := db.Exec(`INSERT OR IGNORE INTO dns_host_links (dns_id, host_id) VALUES (?, ?)`, dnsID, hostID)
+	_, err := db.Exec(`INSERT INTO dns_host_links (dns_id, host_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, dnsID, hostID)
 	return err
 }
 

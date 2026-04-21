@@ -14,7 +14,7 @@ type orchestratorHandlers struct {
 func (h *orchestratorHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	orchs, err := models.ListOrchestrators(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list orchestrators")
+		jsonServerError(w, r, "failed to list orchestrators", err)
 		return
 	}
 	jsonOK(w, orchs)
@@ -23,7 +23,7 @@ func (h *orchestratorHandlers) handleList(w http.ResponseWriter, r *http.Request
 func (h *orchestratorHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req models.Orchestrator
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.HostID == 0 {
@@ -41,7 +41,7 @@ func (h *orchestratorHandlers) handleCreate(w http.ResponseWriter, r *http.Reque
 func (h *orchestratorHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -53,13 +53,13 @@ func (h *orchestratorHandlers) handleUpdate(w http.ResponseWriter, r *http.Reque
 
 	var req models.Orchestrator
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
 	req.ID = id
 	if err := models.UpdateOrchestrator(h.db.SQL, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update orchestrator")
+		jsonServerError(w, r, "failed to update orchestrator", err)
 		return
 	}
 	jsonOK(w, req)
@@ -68,12 +68,12 @@ func (h *orchestratorHandlers) handleUpdate(w http.ResponseWriter, r *http.Reque
 func (h *orchestratorHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
 	if err := models.DeleteOrchestrator(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete orchestrator")
+		jsonServerError(w, r, "failed to delete orchestrator", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})

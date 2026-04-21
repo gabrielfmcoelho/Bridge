@@ -29,7 +29,7 @@ func (h *hostChamadoHandlers) handleList(w http.ResponseWriter, r *http.Request)
 
 	chamados, err := models.ListHostChamados(h.db.SQL, host.ID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list chamados")
+		jsonServerError(w, r, "failed to list chamados", err)
 		return
 	}
 
@@ -44,13 +44,13 @@ func (h *hostChamadoHandlers) handleCreate(w http.ResponseWriter, r *http.Reques
 
 	var req models.HostChamadoInput
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
 	id, err := models.CreateHostChamado(h.db.SQL, host.ID, &req)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create chamado")
+		jsonServerError(w, r, "failed to create chamado", err)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *hostChamadoHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 
 	chamadoID, err := pathInt64(r, "chamadoId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid chamado id")
+		jsonBadRequest(w, r, "invalid chamado id", err)
 		return
 	}
 
@@ -83,12 +83,12 @@ func (h *hostChamadoHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 
 	var req models.HostChamadoInput
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
 	if err := models.UpdateHostChamado(h.db.SQL, chamadoID, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update chamado")
+		jsonServerError(w, r, "failed to update chamado", err)
 		return
 	}
 
@@ -104,7 +104,7 @@ func (h *hostChamadoHandlers) handleDelete(w http.ResponseWriter, r *http.Reques
 
 	chamadoID, err := pathInt64(r, "chamadoId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid chamado id")
+		jsonBadRequest(w, r, "invalid chamado id", err)
 		return
 	}
 
@@ -115,7 +115,7 @@ func (h *hostChamadoHandlers) handleDelete(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := models.DeleteHostChamado(h.db.SQL, chamadoID); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete chamado")
+		jsonServerError(w, r, "failed to delete chamado", err)
 		return
 	}
 

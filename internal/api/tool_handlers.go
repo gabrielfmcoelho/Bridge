@@ -16,7 +16,7 @@ type toolHandlers struct {
 func (h *toolHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	tools, err := models.ListExternalTools(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list tools")
+		jsonServerError(w, r, "failed to list tools", err)
 		return
 	}
 	if tools == nil {
@@ -28,7 +28,7 @@ func (h *toolHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 func (h *toolHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (h *toolHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 func (h *toolHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req models.ExternalTool
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Name == "" {
@@ -52,7 +52,7 @@ func (h *toolHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.CreateExternalTool(h.db.SQL, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create tool")
+		jsonServerError(w, r, "failed to create tool", err)
 		return
 	}
 	jsonCreated(w, req)
@@ -61,7 +61,7 @@ func (h *toolHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	var req models.ExternalTool
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -89,7 +89,7 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.UpdateExternalTool(h.db.SQL, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update tool")
+		jsonServerError(w, r, "failed to update tool", err)
 		return
 	}
 	jsonOK(w, req)
@@ -98,12 +98,12 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *toolHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
 	if err := models.DeleteExternalTool(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete tool")
+		jsonServerError(w, r, "failed to delete tool", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
@@ -119,7 +119,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 		SortOrder    int    `json:"sort_order"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.ServiceID == 0 || req.DNSID == 0 {
@@ -144,7 +144,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 	// Verify DNS is linked to the service.
 	dnsIDs, err := models.GetServiceDNSIDs(h.db.SQL, req.ServiceID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to check service-dns links")
+		jsonServerError(w, r, "failed to check service-dns links", err)
 		return
 	}
 	if !slices.Contains(dnsIDs, req.DNSID) {
@@ -162,7 +162,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 	// Check for existing synced tool.
 	existing, err := models.GetToolByServiceAndDNS(h.db.SQL, req.ServiceID, req.DNSID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to check existing tool")
+		jsonServerError(w, r, "failed to check existing tool", err)
 		return
 	}
 
@@ -177,7 +177,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 		}
 		existing.SortOrder = req.SortOrder
 		if err := models.UpdateExternalTool(h.db.SQL, existing); err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to update synced tool")
+			jsonServerError(w, r, "failed to update synced tool", err)
 			return
 		}
 		jsonOK(w, existing)
@@ -197,7 +197,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 		Source:       "service",
 	}
 	if err := models.CreateExternalTool(h.db.SQL, tool); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create synced tool")
+		jsonServerError(w, r, "failed to create synced tool", err)
 		return
 	}
 	jsonCreated(w, tool)
@@ -207,7 +207,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 func (h *toolHandlers) handleUnsyncService(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -222,7 +222,7 @@ func (h *toolHandlers) handleUnsyncService(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := models.DeleteExternalTool(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete synced tool")
+		jsonServerError(w, r, "failed to delete synced tool", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
@@ -232,7 +232,7 @@ func (h *toolHandlers) handleUnsyncService(w http.ResponseWriter, r *http.Reques
 func (h *toolHandlers) handleListToolCredentials(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -248,7 +248,7 @@ func (h *toolHandlers) handleListToolCredentials(w http.ResponseWriter, r *http.
 
 	creds, err := models.ListServiceCredentials(h.db.SQL, *tool.ServiceID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list credentials")
+		jsonServerError(w, r, "failed to list credentials", err)
 		return
 	}
 
@@ -267,7 +267,7 @@ func (h *toolHandlers) handleListToolCredentials(w http.ResponseWriter, r *http.
 func (h *toolHandlers) handleGetToolCredential(w http.ResponseWriter, r *http.Request) {
 	toolID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid tool id")
+		jsonBadRequest(w, r, "invalid tool id", err)
 		return
 	}
 
@@ -283,7 +283,7 @@ func (h *toolHandlers) handleGetToolCredential(w http.ResponseWriter, r *http.Re
 
 	credID, err := pathInt64(r, "credId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid credential id")
+		jsonBadRequest(w, r, "invalid credential id", err)
 		return
 	}
 
@@ -301,7 +301,7 @@ func (h *toolHandlers) handleGetToolCredential(w http.ResponseWriter, r *http.Re
 
 	plaintext, err := h.db.Encryptor.Decrypt(cred.CredentialsCiphertext, cred.CredentialsNonce)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to decrypt credentials")
+		jsonServerError(w, r, "failed to decrypt credentials", err)
 		return
 	}
 

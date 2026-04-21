@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { sshAPI, hostsAPI, sshKeysAPI } from "@/lib/api";
 import { resolveAuthMethod } from "@/lib/utils";
@@ -14,7 +14,7 @@ import StatusAlert from "@/components/ui/StatusAlert";
 import OperationOutput from "@/components/ui/OperationOutput";
 import VMInfoDisplay from "./VMInfoDisplay";
 import IntegrationsSection from "./IntegrationsSection";
-import type { VMInfoType, OperationLog, RemoteKeyInfo, DockerStatusType, NginxCleanupStatusType } from "@/lib/api";
+import type { VMInfoType, OperationLog, RemoteKeyInfo, DockerStatusType, NginxCleanupStatusType, RemoteUserInfo } from "@/lib/api";
 
 type ConsoleEntry = {
   label: string;
@@ -23,7 +23,7 @@ type ConsoleEntry = {
   timestamp: number;
 };
 
-export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth, passwordTestStatus, keyTestStatus, dockerGroupStatus, coolifyServerUUID, serverInfo, t, locale, isAdmin }: {
+export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth, passwordTestStatus, keyTestStatus, dockerGroupStatus, coolifyServerUUID, serverInfo, lastScan, t, locale, isAdmin }: {
   slug: string; hasPassword: boolean; hasKey: boolean;
   preferredAuth?: "password" | "key" | "";
   passwordTestStatus?: "success" | "failed" | null;
@@ -31,10 +31,23 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   dockerGroupStatus?: "ok" | "fixed" | "needs_sudo" | "needs_relogin" | "not_installed" | "failed" | null;
   coolifyServerUUID?: string | null;
   serverInfo?: { hostname: string; is_local: boolean; message: string } | null;
+  lastScan?: { data: string; scanned_at: string };
   t: (key: string) => string;
   locale: string;
   isAdmin: boolean;
 }) {
+  // Derive the list of non-system users discovered by the most recent scan
+  // (see sshtest.captureVMInfo → RemoteUsers). Used by the delete-user wizard
+  // to show a picker instead of a free-form text input.
+  const scannedRemoteUsers = useMemo<RemoteUserInfo[]>(() => {
+    if (!lastScan?.data) return [];
+    try {
+      const parsed = JSON.parse(lastScan.data) as VMInfoType;
+      return Array.isArray(parsed.remote_users) ? parsed.remote_users : [];
+    } catch {
+      return [];
+    }
+  }, [lastScan?.data]);
   const queryClient = useQueryClient();
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string; vm_info?: VMInfoType } | null>(null);
   const [setupStatus, setSetupStatus] = useState<"idle" | "choosing" | "testing" | "installing" | "done" | "error">("idle");
@@ -49,6 +62,11 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [createUserName, setCreateUserName] = useState("");
   const [createUserKeyId, setCreateUserKeyId] = useState("");
+
+  // Delete remote user form
+  const [showDeleteUser, setShowDeleteUser] = useState(false);
+  const [deleteUserName, setDeleteUserName] = useState("");
+  const [deleteRemoveHome, setDeleteRemoveHome] = useState(false);
 
   // Track which operation is running
   const [runningOp, setRunningOp] = useState<string | null>(null);
@@ -76,18 +94,22 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     queryClient.invalidateQueries({ queryKey: ["operation-logs", slug] });
   };
 
-  const testMutation = useSSHMutation({
+  // Shared configuration for test-connection mutations. Each button gets its
+  // own mutation instance so rapid clicks across buttons can't drop a
+  // previous invocation's callbacks (which used to leave runningOp stuck,
+  // making the Run button appear permanently disabled).
+  const testMutationOptions = useMemo(() => ({
     slug,
     mutationFn: ({ method, capture }: { method: "password" | "key"; capture: boolean }) =>
       sshAPI.testConnection(slug, method, capture),
     label: t("operation.testConnection"),
     pushConsole,
-    onAfterSuccess: (data) => setTestResult(data),
-    onResult: (data) => {
+    onAfterSuccess: (data: { success: boolean; error?: string; vm_info?: VMInfoType }) => setTestResult(data),
+    onResult: (data: { success: boolean; error?: string; vm_info?: VMInfoType }) => {
       if (data.success && data.vm_info) {
         const warnings = data.vm_info.warnings || [];
         return {
-          status: warnings.length > 0 ? "warning" : "success",
+          status: warnings.length > 0 ? "warning" as const : "success" as const,
           content: (
             <div className="space-y-3">
               {warnings.length > 0 && (
@@ -98,16 +120,20 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   ))}
                 </div>
               )}
-              <VMInfoDisplay info={data.vm_info} locale={locale} compact />
+              <VMInfoDisplay info={data.vm_info!} locale={locale} compact />
               <p className="text-[var(--text-faint)] text-[10px]">{t("operation.scanSaved")}</p>
             </div>
           ),
         };
       }
-      if (data.success) return { status: "success", content: t("operation.connectionSuccessful") };
-      return { status: "error", content: data.error || "Failed" };
+      if (data.success) return { status: "success" as const, content: t("operation.connectionSuccessful") };
+      return { status: "error" as const, content: data.error || "Failed" };
     },
-  });
+  }), [slug, t, locale, pushConsole]);
+
+  const testPasswordMutation = useSSHMutation(testMutationOptions);
+  const testKeyMutation = useSSHMutation(testMutationOptions);
+  const testCaptureMutation = useSSHMutation(testMutationOptions);
 
   const testAndSetupKey = async () => {
     setRunningOp("setup-key");
@@ -167,7 +193,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
   const createRemoteUserMutation = useSSHMutation({
     slug,
-    mutationFn: ({ username, pubKey, force }: { username: string; pubKey: string; force?: boolean }) => sshAPI.createRemoteUser(slug, username, pubKey, force),
+    mutationFn: ({ username, pubKey, force, sshKeyId }: { username: string; pubKey: string; force?: boolean; sshKeyId?: number }) => sshAPI.createRemoteUser(slug, username, pubKey, force, sshKeyId),
     label: t("operation.createRemoteUser"),
     pushConsole,
     onResult: (data) => {
@@ -176,6 +202,24 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         return { status: "error", content: <OperationOutput data={{ error: data.output || data.error }} /> };
       }
       setShowCreateUser(false);
+      return { status: data.success ? "success" : "error", content: <OperationOutput data={data} /> };
+    },
+  });
+
+  const deleteRemoteUserMutation = useSSHMutation({
+    slug,
+    mutationFn: ({ username, removeHome }: { username: string; removeHome: boolean }) => sshAPI.deleteRemoteUser(slug, username, removeHome),
+    label: t("operation.deleteRemoteUser"),
+    pushConsole,
+    onResult: (data) => {
+      // Always close the wizard drawer when the mutation settles — the
+      // console drawer will show the outcome, and leaving the wizard open
+      // would stack two drawers on top of each other.
+      setShowDeleteUser(false);
+      if (data.success) {
+        setDeleteUserName("");
+        setDeleteRemoveHome(false);
+      }
       return { status: data.success ? "success" : "error", content: <OperationOutput data={data} /> };
     },
   });
@@ -283,7 +327,40 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
   const toggleOp = (id: string) => setExpandedOp((prev) => (prev === id ? null : id));
 
-  type OpDef = { id: string; label: string; description: string; command: string; disabled?: boolean; loading?: boolean; status?: "success" | "failed" | null; showStatus?: boolean; onClick: () => void };
+  // Safety net: clear a stale runningOp if no mutation is actually pending.
+  // Prevents a Run button from being stuck in its loading/disabled state if a
+  // mutation's success/error callback somehow fails to fire (e.g. a Query
+  // Client cancellation during a rapid re-click or component unmount race).
+  const anyMutationPending =
+    testPasswordMutation.isPending ||
+    testKeyMutation.isPending ||
+    testCaptureMutation.isPending ||
+    fixDevNullMutation.isPending ||
+    sudoNopasswdMutation.isPending ||
+    createRemoteUserMutation.isPending ||
+    deleteRemoteUserMutation.isPending ||
+    listRemoteKeysMutation.isPending ||
+    dockerSetupMutation.isPending ||
+    nginxCleanupMutation.isPending;
+
+  useEffect(() => {
+    if (!anyMutationPending && runningOp && setupStatus !== "testing" && setupStatus !== "installing") {
+      setRunningOp(null);
+    }
+  }, [anyMutationPending, runningOp, setupStatus]);
+
+  type OpDef = {
+    id: string;
+    label: string;
+    description: string;
+    command: string;
+    disabled?: boolean;
+    disabledReason?: string;
+    loading?: boolean;
+    status?: "success" | "failed" | null;
+    showStatus?: boolean;
+    onClick: () => void;
+  };
 
   const operations: OpDef[] = [
     {
@@ -292,10 +369,11 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       description: t("operation.testPasswordDesc"),
       command: `ssh -o StrictHostKeyChecking=no -o BatchMode=yes <user>@<host> -p <port> echo ok`,
       disabled: !hasPassword,
-      loading: runningOp === "test-password",
+      disabledReason: !hasPassword ? t("host.testPasswordDisabledNoPassword") : undefined,
+      loading: testPasswordMutation.isPending,
       status: passwordTestStatus,
       showStatus: true,
-      onClick: () => { setRunningOp("test-password"); testMutation.mutate({ method: "password", capture: false }); },
+      onClick: () => { setRunningOp("test-password"); testPasswordMutation.mutate({ method: "password", capture: false }); },
     },
     {
       id: "test-key",
@@ -303,10 +381,11 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       description: t("operation.testKeyDesc"),
       command: `ssh -o StrictHostKeyChecking=no -i <key_path> <user>@<host> -p <port> echo ok`,
       disabled: !hasKey,
-      loading: runningOp === "test-key",
+      disabledReason: !hasKey ? t("host.testKeyDisabledNoKey") : undefined,
+      loading: testKeyMutation.isPending,
       status: keyTestStatus,
       showStatus: true,
-      onClick: () => { setRunningOp("test-key"); testMutation.mutate({ method: "key", capture: false }); },
+      onClick: () => { setRunningOp("test-key"); testKeyMutation.mutate({ method: "key", capture: false }); },
     },
     {
       id: "test-capture",
@@ -314,8 +393,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       description: t("operation.testCaptureDesc"),
       command: `ssh <user>@<host> "uname -a && free -h && df -h && docker ps --format '{{.Names}}' ..."`,
       disabled: !hasPassword && !hasKey,
-      loading: runningOp === "test-capture",
-      onClick: () => { setRunningOp("test-capture"); testMutation.mutate({
+      disabledReason: !hasPassword && !hasKey ? t("operation.noCreds") : undefined,
+      loading: testCaptureMutation.isPending,
+      onClick: () => { setRunningOp("test-capture"); testCaptureMutation.mutate({
         method: hasPassword && hasKey
           ? (preferredAuth === "password" ? "password" : "key")
           : (hasPassword ? "password" : "key"),
@@ -389,6 +469,14 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       loading: runningOp === "create-remote-user",
       onClick: () => setShowCreateUser(true),
     } satisfies OpDef] : []),
+    ...(hasPassword && isAdmin ? [{
+      id: "delete-remote-user",
+      label: t("operation.deleteRemoteUser"),
+      description: t("operation.deleteRemoteUserDesc"),
+      command: `sudo pkill -KILL -u <username>; sudo userdel [-r] <username> && sudo rm -f /etc/sudoers.d/<username>-nopasswd`,
+      loading: runningOp === "delete-remote-user",
+      onClick: () => setShowDeleteUser(true),
+    } satisfies OpDef] : []),
   ];
 
   return (
@@ -443,7 +531,14 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <Button size="sm" variant="secondary" disabled={op.disabled} loading={op.loading} onClick={op.onClick}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={op.disabled}
+                  loading={op.loading}
+                  onClick={op.onClick}
+                  title={op.disabled ? op.disabledReason : undefined}
+                >
                   {t("common.run")}
                 </Button>
               </div>
@@ -506,17 +601,34 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       </div>
       )}
 
-      {/* Key setup wizard */}
-      {setupStatus === "choosing" && (
-        <div className="rounded-[var(--radius-md)] p-4 bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 animate-slide-up space-y-3">
-          <p className="text-sm font-medium">{t("operation.chooseKeySource")}</p>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setSetupKeySource("generate")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition-all ${setupKeySource === "generate" ? "border-cyan-400 bg-cyan-500/15" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
-              <strong className="block mb-0.5">{t("operation.generateNewKey")}</strong>{t("operation.generateNewKeyDesc")}
-            </button>
-            <button type="button" onClick={() => setSetupKeySource("existing")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition-all ${setupKeySource === "existing" ? "border-cyan-400 bg-cyan-500/15" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
-              <strong className="block mb-0.5">{t("operation.useExistingKey")}</strong>{t("operation.useExistingKeyDesc")}
-            </button>
+      {/* Key setup wizard (in drawer) */}
+      <Drawer
+        open={setupStatus === "choosing"}
+        onClose={() => setSetupStatus("idle")}
+        title={hasKey ? t("operation.reSetupKey") : t("operation.setupKey")}
+        footer={
+          <div className="flex gap-2 justify-end">
+            <Button size="sm" variant="secondary" onClick={() => setSetupStatus("idle")}>{t("common.cancel")}</Button>
+            <Button size="sm" onClick={testAndSetupKey} disabled={setupKeySource === "existing" && !setupExistingKeyId}>{t("operation.testInstall")}</Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-[var(--text-primary)]">
+          <p className="text-xs text-[var(--text-muted)]">{t("operation.setupKeyDesc")}</p>
+          <div>
+            <label className="block text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-1.5">
+              {t("operation.chooseKeySource")}
+            </label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setSetupKeySource("generate")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition-all ${setupKeySource === "generate" ? "border-cyan-400 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
+                <strong className="block mb-0.5">{t("operation.generateNewKey")}</strong>
+                <span className="text-[var(--text-faint)]">{t("operation.generateNewKeyDesc")}</span>
+              </button>
+              <button type="button" onClick={() => setSetupKeySource("existing")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition-all ${setupKeySource === "existing" ? "border-cyan-400 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
+                <strong className="block mb-0.5">{t("operation.useExistingKey")}</strong>
+                <span className="text-[var(--text-faint)]">{t("operation.useExistingKeyDesc")}</span>
+              </button>
+            </div>
           </div>
           {setupKeySource === "existing" && sshKeysList.length > 0 && (
             <select value={setupExistingKeyId} onChange={(e) => setSetupExistingKeyId(e.target.value)} className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm">
@@ -525,86 +637,283 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             </select>
           )}
           {setupKeySource === "existing" && sshKeysList.length === 0 && <p className="text-xs text-[var(--text-faint)]">{t("operation.noKeysInDb")}</p>}
-          <div className="flex gap-2 pt-1">
-            <Button size="sm" onClick={testAndSetupKey} disabled={setupKeySource === "existing" && !setupExistingKeyId}>{t("operation.testInstall")}</Button>
-            <Button size="sm" variant="secondary" onClick={() => setSetupStatus("idle")}>{t("common.cancel")}</Button>
-          </div>
         </div>
-      )}
+      </Drawer>
 
-      {/* Inline status for setup wizard */}
+      {/* Inline status for setup wizard (shown after drawer closes) */}
       {setupStatus === "testing" && <StatusAlert variant="loading">{t("operation.testingConnection")}</StatusAlert>}
       {setupStatus === "installing" && <StatusAlert variant="loading">{t("operation.installingKey")}</StatusAlert>}
       {setupStatus === "done" && <StatusAlert variant="success">{t("operation.keyInstalled")}</StatusAlert>}
       {setupStatus === "error" && <StatusAlert variant="error">{setupError}</StatusAlert>}
 
-      {/* Create remote user wizard */}
-      {showCreateUser && (
-        <div className="rounded-[var(--radius-md)] p-4 bg-violet-500/10 border border-violet-500/25 text-violet-300 animate-slide-up space-y-3">
-          <p className="text-sm font-medium">{t("operation.createRemoteUser")}</p>
-          <p className="text-xs text-[var(--text-muted)]">{t("operation.createRemoteUserFormDesc")}</p>
-          <input
-            placeholder={t("operation.createRemoteUserPlaceholder")}
-            value={createUserName}
-            onChange={(e) => setCreateUserName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
-            pattern="^[a-z_][a-z0-9_\-]{0,31}$"
-            maxLength={32}
-            className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
-          />
-          {createUserName && !/^[a-z_][a-z0-9_-]{0,31}$/.test(createUserName) && (
-            <p className="text-xs text-amber-400">{t("operation.createRemoteUserInvalidName")}</p>
-          )}
-          {sshKeysList.length > 0 && (
-            <select
-              value={createUserKeyId}
-              onChange={(e) => setCreateUserKeyId(e.target.value)}
-              className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
-            >
-              <option value="">{t("operation.selectKey")}</option>
-              {sshKeysList.filter(k => k.credential_type === "key" && k.has_public_key).map((k) => (
-                <option key={k.id} value={k.id.toString()}>{k.name}{k.fingerprint ? ` (${k.fingerprint})` : ""}</option>
-              ))}
-            </select>
-          )}
-          <div className="flex gap-2 pt-1">
-            <Button
-              size="sm"
-              disabled={!createUserName.trim() || !/^[a-z_][a-z0-9_-]{0,31}$/.test(createUserName) || !createUserKeyId}
-              loading={createRemoteUserMutation.isPending}
-              onClick={() => {
-                const key = sshKeysList.find(k => k.id.toString() === createUserKeyId);
-                if (!key) return;
-                setRunningOp("create-remote-user");
-                sshKeysAPI.get(key.id).then(detail => {
-                  if (!detail.public_key) { pushConsole(t("operation.createRemoteUser"), "error", "Selected key has no public key"); setRunningOp(null); return; }
-                  createRemoteUserMutation.mutate({ username: createUserName.trim(), pubKey: detail.public_key });
-                });
-              }}
-            >
-              {t("operation.createRemoteUserRun")}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              className="text-amber-400 border-amber-500/30"
-              disabled={!createUserName.trim() || !/^[a-z_][a-z0-9_-]{0,31}$/.test(createUserName) || !createUserKeyId}
-              loading={createRemoteUserMutation.isPending}
-              onClick={() => {
-                const key = sshKeysList.find(k => k.id.toString() === createUserKeyId);
-                if (!key) return;
-                setRunningOp("create-remote-user");
-                sshKeysAPI.get(key.id).then(detail => {
-                  if (!detail.public_key) { pushConsole(t("operation.createRemoteUser"), "error", "Selected key has no public key"); setRunningOp(null); return; }
-                  createRemoteUserMutation.mutate({ username: createUserName.trim(), pubKey: detail.public_key, force: true });
-                });
-              }}
-            >
-              {t("operation.createRemoteUserForce")}
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => setShowCreateUser(false)}>{t("common.cancel")}</Button>
-          </div>
-        </div>
-      )}
+      {/* Create remote user wizard (in drawer) */}
+      {(() => {
+        const eligibleKeys = sshKeysList.filter(k => k.credential_type === "key" && k.has_public_key);
+        const selectedKey = eligibleKeys.find(k => k.id.toString() === createUserKeyId);
+        const nameValid = !!createUserName.trim() && /^[a-z_][a-z0-9_-]{0,31}$/.test(createUserName);
+        const canSubmit = nameValid && !!createUserKeyId && eligibleKeys.length > 0;
+
+        const runCreate = (force: boolean) => {
+          if (!selectedKey) return;
+          setRunningOp("create-remote-user");
+          sshKeysAPI.get(selectedKey.id).then(detail => {
+            if (!detail.public_key) {
+              pushConsole(t("operation.createRemoteUser"), "error", t("operation.createRemoteUserNoPubKey"));
+              setRunningOp(null);
+              return;
+            }
+            createRemoteUserMutation.mutate({ username: createUserName.trim(), pubKey: detail.public_key, force, sshKeyId: selectedKey.id });
+          }).catch((err) => {
+            pushConsole(t("operation.createRemoteUser"), "error", err instanceof Error ? err.message : "Failed to load key");
+            setRunningOp(null);
+          });
+        };
+
+        return (
+          <Drawer
+            open={showCreateUser}
+            onClose={() => setShowCreateUser(false)}
+            title={t("operation.createRemoteUser")}
+            footer={
+              <div className="flex gap-2 justify-end flex-wrap">
+                <Button size="sm" variant="secondary" onClick={() => setShowCreateUser(false)}>{t("common.cancel")}</Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="text-amber-400 border-amber-500/30"
+                  disabled={!canSubmit}
+                  loading={createRemoteUserMutation.isPending}
+                  onClick={() => runCreate(true)}
+                >
+                  {t("operation.createRemoteUserForce")}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!canSubmit}
+                  loading={createRemoteUserMutation.isPending}
+                  onClick={() => runCreate(false)}
+                >
+                  {t("operation.createRemoteUserRun")}
+                </Button>
+              </div>
+            }
+          >
+            <div className="space-y-6">
+              <p className="text-xs text-[var(--text-muted)]">{t("operation.createRemoteUserFormDesc")}</p>
+
+              {/* ── Identity section ── */}
+              <section>
+                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                  {t("operation.createRemoteUserIdentitySection")}
+                </h3>
+                <input
+                  placeholder={t("operation.createRemoteUserPlaceholder")}
+                  value={createUserName}
+                  onChange={(e) => setCreateUserName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
+                  pattern="^[a-z_][a-z0-9_\-]{0,31}$"
+                  maxLength={32}
+                  className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
+                />
+                {createUserName && !nameValid && (
+                  <p className="mt-1 text-xs text-amber-400">{t("operation.createRemoteUserInvalidName")}</p>
+                )}
+              </section>
+
+              {/* ── Access section ── */}
+              <section>
+                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                  {t("operation.createRemoteUserAccessSection")}
+                </h3>
+                {eligibleKeys.length > 0 ? (
+                  <div className="space-y-2">
+                    <select
+                      value={createUserKeyId}
+                      onChange={(e) => setCreateUserKeyId(e.target.value)}
+                      className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
+                    >
+                      <option value="">{t("operation.selectKey")}</option>
+                      {eligibleKeys.map((k) => (
+                        <option key={k.id} value={k.id.toString()}>{k.name}{k.fingerprint ? ` (${k.fingerprint})` : ""}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+                      {t("operation.createRemoteUserKeyHint")}
+                    </p>
+                    {selectedKey && (
+                      <div className="px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[10px]">
+                        <span className="text-[var(--text-faint)]">{t("operation.createRemoteUserKeyPreview")} </span>
+                        <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{selectedKey.name}</span>
+                        {selectedKey.fingerprint && (
+                          <>
+                            <span className="text-[var(--text-faint)]"> · </span>
+                            <span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{selectedKey.fingerprint}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/25 rounded-[var(--radius-sm)] px-2.5 py-2">
+                    {t("operation.createRemoteUserNoEligibleKeys")}
+                  </p>
+                )}
+              </section>
+            </div>
+          </Drawer>
+        );
+      })()}
+
+      {/* Delete remote user wizard (in drawer) */}
+      {(() => {
+        const nameValid = !!deleteUserName.trim() && /^[a-z_][a-z0-9_-]{0,31}$/.test(deleteUserName);
+        // Client-side hint list only — the backend is the authority on what's
+        // deletable (UID<1000, SSH login user, etc.) via sshtest.ErrUserProtected.
+        const isProtected = ["root", "nobody", "daemon", "sync", "bin", "sys", "systemd"].includes(deleteUserName.trim());
+
+        // Only offer deletable candidates: exclude the SSH login user (the
+        // scan marks it with is_current) since deleting it would lock us out.
+        // Non-login users (shell=/sbin/nologin) are allowed — they may still
+        // be real accounts (e.g. service users) the admin wants to clean up.
+        const pickerUsers = scannedRemoteUsers.filter((u) => !u.is_current);
+        const usePicker = pickerUsers.length > 0;
+        const selectedScannedUser = pickerUsers.find((u) => u.name === deleteUserName.trim());
+        const canSubmit = nameValid && !isProtected;
+
+        const closeAndReset = () => {
+          setShowDeleteUser(false);
+          setDeleteUserName("");
+          setDeleteRemoveHome(false);
+        };
+
+        const runDelete = () => {
+          if (!canSubmit) return;
+          const confirmMsg = t("operation.deleteRemoteUserConfirm").replace("{username}", deleteUserName.trim());
+          if (!window.confirm(confirmMsg)) return;
+          setRunningOp("delete-remote-user");
+          deleteRemoteUserMutation.mutate({ username: deleteUserName.trim(), removeHome: deleteRemoveHome });
+        };
+
+        return (
+          <Drawer
+            open={showDeleteUser}
+            onClose={closeAndReset}
+            title={t("operation.deleteRemoteUser")}
+            footer={
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="secondary" onClick={closeAndReset}>{t("common.cancel")}</Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={!canSubmit}
+                  loading={deleteRemoteUserMutation.isPending}
+                  onClick={runDelete}
+                >
+                  {t("operation.deleteRemoteUserRun")}
+                </Button>
+              </div>
+            }
+          >
+            <div className="space-y-6">
+              <p className="text-xs text-[var(--text-muted)]">{t("operation.deleteRemoteUserFormDesc")}</p>
+
+              {/* ── Target user section ── */}
+              <section>
+                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                  {t("operation.deleteRemoteUserTargetSection")}
+                </h3>
+                {usePicker ? (
+                  <div className="space-y-2">
+                    <select
+                      value={deleteUserName}
+                      onChange={(e) => setDeleteUserName(e.target.value)}
+                      className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
+                    >
+                      <option value="">{t("operation.deleteRemoteUserPickPlaceholder")}</option>
+                      {pickerUsers.map((u) => (
+                        <option key={u.name} value={u.name}>
+                          {u.name} (uid {u.uid}){u.has_login ? "" : ` · ${t("operation.deleteRemoteUserNoLogin")}`}
+                        </option>
+                      ))}
+                    </select>
+                    {lastScan?.scanned_at && (
+                      <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+                        {t("operation.deleteRemoteUserSourceScan").replace("{date}", new Date(lastScan.scanned_at).toLocaleString(locale === "pt-BR" ? "pt-BR" : "en-US"))}
+                      </p>
+                    )}
+                    {selectedScannedUser && (
+                      <div className="px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[10px] space-y-0.5">
+                        {selectedScannedUser.home && (
+                          <div>
+                            <span className="text-[var(--text-faint)]">{t("operation.deleteRemoteUserHomeLabel")} </span>
+                            <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{selectedScannedUser.home}</span>
+                          </div>
+                        )}
+                        {selectedScannedUser.shell && (
+                          <div>
+                            <span className="text-[var(--text-faint)]">{t("operation.deleteRemoteUserShellLabel")} </span>
+                            <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{selectedScannedUser.shell}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      placeholder={t("operation.deleteRemoteUserPlaceholder")}
+                      value={deleteUserName}
+                      onChange={(e) => setDeleteUserName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
+                      pattern="^[a-z_][a-z0-9_\-]{0,31}$"
+                      maxLength={32}
+                      className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
+                    />
+                    <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+                      {t("operation.deleteRemoteUserNoScanHint")}
+                    </p>
+                  </div>
+                )}
+                {deleteUserName && !nameValid && (
+                  <p className="mt-2 text-xs text-amber-400">{t("operation.createRemoteUserInvalidName")}</p>
+                )}
+                {isProtected && (
+                  <p className="mt-2 text-xs text-amber-400">{t("operation.deleteRemoteUserProtected")}</p>
+                )}
+              </section>
+
+              {/* ── Options section ── */}
+              <section>
+                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                  {t("operation.deleteRemoteUserOptionsSection")}
+                </h3>
+                <label className="flex items-start gap-2 text-xs cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={deleteRemoveHome}
+                    onChange={(e) => setDeleteRemoveHome(e.target.checked)}
+                    className="mt-0.5 accent-red-400"
+                  />
+                  <div>
+                    <span className="text-[var(--text-primary)] font-medium">{t("operation.deleteRemoteUserRemoveHome")}</span>
+                    <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+                      {t("operation.deleteRemoteUserRemoveHomeHint")}
+                    </p>
+                  </div>
+                </label>
+              </section>
+
+              {/* ── Warning section ── */}
+              <section>
+                <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-2">
+                  {t("operation.deleteRemoteUserWarningSection")}
+                </h3>
+                <div className="rounded-[var(--radius-sm)] bg-red-500/10 border border-red-500/25 px-2.5 py-2 text-[11px] leading-relaxed text-red-300">
+                  {t("operation.deleteRemoteUserWarning")}
+                </div>
+              </section>
+            </div>
+          </Drawer>
+        );
+      })()}
 
       {/* Integrations */}
       <IntegrationsSection
@@ -653,32 +962,70 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         </div>
       )}
 
-      {/* Console Drawer */}
-      <Drawer open={consoleOpen} onClose={() => setConsoleOpen(false)} title={t("operation.console")} wide>
-        {consoleEntry ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${
-                consoleEntry.status === "success" ? "bg-emerald-400"
-                : consoleEntry.status === "error" ? "bg-red-400"
-                : consoleEntry.status === "warning" ? "bg-amber-400"
-                : "bg-blue-400 animate-pulse"
-              }`} />
-              <span className="text-sm font-medium text-[var(--text-primary)]">{consoleEntry.label}</span>
-              <span className="text-[10px] text-[var(--text-faint)] ml-auto tabular-nums">
-                {new Date(consoleEntry.timestamp).toLocaleTimeString()}
-              </span>
+      {/* Console Drawer — three sections (Wizard / Status / Output) instead
+          of the single tinted card. Removing the colored outer wrapper fixes
+          the "card inside card" visual noise when the output itself is made
+          of VMInfoDisplay cards. */}
+      <Drawer
+        open={consoleOpen}
+        onClose={() => setConsoleOpen(false)}
+        onBack={() => setConsoleOpen(false)}
+        title={t("operation.console")}
+        wide
+      >
+        {consoleEntry ? (() => {
+          const statusLabel =
+            consoleEntry.status === "success" ? t("operation.statusSuccess")
+            : consoleEntry.status === "error" ? t("operation.statusError")
+            : consoleEntry.status === "warning" ? t("operation.statusWarning")
+            : t("operation.statusRunning");
+          const statusDotClass =
+            consoleEntry.status === "success" ? "bg-emerald-400"
+            : consoleEntry.status === "error" ? "bg-red-400"
+            : consoleEntry.status === "warning" ? "bg-amber-400"
+            : "bg-blue-400 animate-pulse";
+          const statusTextClass =
+            consoleEntry.status === "success" ? "text-emerald-400"
+            : consoleEntry.status === "error" ? "text-red-400"
+            : consoleEntry.status === "warning" ? "text-amber-400"
+            : "text-blue-400";
+
+          return (
+            <div className="space-y-6">
+              {/* ── Wizard section ── */}
+              <section>
+                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                  {t("operation.consoleWizard")}
+                </h3>
+                <p className="text-sm font-medium text-[var(--text-primary)]">{consoleEntry.label}</p>
+              </section>
+
+              {/* ── Status section ── */}
+              <section>
+                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                  {t("operation.consoleStatus")}
+                </h3>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass}`} />
+                  <span className={`font-medium ${statusTextClass}`}>{statusLabel}</span>
+                  <span className="text-[10px] text-[var(--text-faint)] ml-auto tabular-nums">
+                    {new Date(consoleEntry.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+              </section>
+
+              {/* ── Output section ── */}
+              <section>
+                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                  {t("operation.consoleOutput")}
+                </h3>
+                <div className="text-sm text-[var(--text-primary)]">
+                  {typeof consoleEntry.content === "string" ? <p>{consoleEntry.content}</p> : consoleEntry.content}
+                </div>
+              </section>
             </div>
-            <div className={`rounded-[var(--radius-md)] p-3 text-xs border ${
-              consoleEntry.status === "success" ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
-              : consoleEntry.status === "error" ? "bg-red-500/10 border-red-500/25 text-red-400"
-              : consoleEntry.status === "warning" ? "bg-amber-500/10 border-amber-500/25 text-amber-300"
-              : "bg-blue-500/10 border-blue-500/25 text-blue-400"
-            }`}>
-              {typeof consoleEntry.content === "string" ? <p>{consoleEntry.content}</p> : consoleEntry.content}
-            </div>
-          </div>
-        ) : (
+          );
+        })() : (
           <p className="text-xs text-[var(--text-muted)]">{t("operation.noConsoleOutput")}</p>
         )}
       </Drawer>
@@ -696,6 +1043,7 @@ function opTypeLabel(type_: string, t: (k: string) => string): string {
     case "docker-setup": return t("operation.dockerSetup");
     case "nginx-cleanup": return t("operation.nginxCleanup");
     case "create-remote-user": return t("operation.createRemoteUser");
+    case "delete-remote-user": return t("operation.deleteRemoteUser");
     default: return type_;
   }
 }

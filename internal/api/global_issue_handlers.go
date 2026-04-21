@@ -36,7 +36,7 @@ func (h *globalIssueHandlers) handleList(w http.ResponseWriter, r *http.Request)
 
 	issues, err := models.ListIssues(h.db.SQL, f)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list issues")
+		jsonServerError(w, r, "failed to list issues", err)
 		return
 	}
 
@@ -66,7 +66,7 @@ func (h *globalIssueHandlers) handleCreate(w http.ResponseWriter, r *http.Reques
 		AlertIDs    []int64 `json:"alert_ids"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Title == "" {
@@ -99,7 +99,7 @@ func (h *globalIssueHandlers) handleCreate(w http.ResponseWriter, r *http.Reques
 
 	if err := models.CreateIssue(h.db.SQL, &req.Issue); err != nil {
 		log.Printf("[issues] CreateIssue error: %v", err)
-		jsonError(w, http.StatusInternalServerError, "failed to create issue")
+		jsonServerError(w, r, "failed to create issue", err)
 		return
 	}
 
@@ -122,7 +122,7 @@ func (h *globalIssueHandlers) handleCreate(w http.ResponseWriter, r *http.Reques
 func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid issue id")
+		jsonBadRequest(w, r, "invalid issue id", err)
 		return
 	}
 
@@ -138,7 +138,7 @@ func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 		AlertIDs    *[]int64 `json:"alert_ids"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := models.UpdateIssue(h.db.SQL, &req.Issue); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update issue")
+		jsonServerError(w, r, "failed to update issue", err)
 		return
 	}
 
@@ -195,7 +195,7 @@ func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid issue id")
+		jsonBadRequest(w, r, "invalid issue id", err)
 		return
 	}
 
@@ -204,7 +204,7 @@ func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request)
 		Position float64 `json:"position"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Status == "" {
@@ -213,7 +213,7 @@ func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := models.MoveIssue(h.db.SQL, issueID, req.Status, req.Position); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to move issue")
+		jsonServerError(w, r, "failed to move issue", err)
 		return
 	}
 
@@ -230,7 +230,7 @@ func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request)
 func (h *globalIssueHandlers) handleArchive(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid issue id")
+		jsonBadRequest(w, r, "invalid issue id", err)
 		return
 	}
 
@@ -242,7 +242,7 @@ func (h *globalIssueHandlers) handleArchive(w http.ResponseWriter, r *http.Reque
 
 	existing.Archived = !existing.Archived
 	if err := models.UpdateIssue(h.db.SQL, existing); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to archive issue")
+		jsonServerError(w, r, "failed to archive issue", err)
 		return
 	}
 
@@ -252,12 +252,12 @@ func (h *globalIssueHandlers) handleArchive(w http.ResponseWriter, r *http.Reque
 func (h *globalIssueHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid issue id")
+		jsonBadRequest(w, r, "invalid issue id", err)
 		return
 	}
 
 	if err := models.DeleteIssue(h.db.SQL, issueID); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete issue")
+		jsonServerError(w, r, "failed to delete issue", err)
 		return
 	}
 

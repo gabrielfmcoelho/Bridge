@@ -30,7 +30,7 @@ func (h *hostAlertHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 
 	alerts, err := models.ListHostAlerts(h.db.SQL, host.ID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list alerts")
+		jsonServerError(w, r, "failed to list alerts", err)
 		return
 	}
 
@@ -62,7 +62,7 @@ func (h *hostAlertHandlers) handleCreate(w http.ResponseWriter, r *http.Request)
 
 	var req models.HostAlert
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Type == "" || req.Message == "" {
@@ -80,7 +80,7 @@ func (h *hostAlertHandlers) handleCreate(w http.ResponseWriter, r *http.Request)
 
 	if err := models.CreateHostAlert(h.db.SQL, &req); err != nil {
 		log.Printf("[alerts] CreateHostAlert error: %v", err)
-		jsonError(w, http.StatusInternalServerError, "failed to create alert")
+		jsonServerError(w, r, "failed to create alert", err)
 		return
 	}
 
@@ -96,7 +96,7 @@ func (h *hostAlertHandlers) handleUpdate(w http.ResponseWriter, r *http.Request)
 
 	alertID, err := pathInt64(r, "alertId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid alert id")
+		jsonBadRequest(w, r, "invalid alert id", err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *hostAlertHandlers) handleUpdate(w http.ResponseWriter, r *http.Request)
 
 	var req models.HostAlert
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -122,7 +122,7 @@ func (h *hostAlertHandlers) handleUpdate(w http.ResponseWriter, r *http.Request)
 	existing.Description = req.Description
 
 	if err := models.UpdateHostAlert(h.db.SQL, existing); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update alert")
+		jsonServerError(w, r, "failed to update alert", err)
 		return
 	}
 
@@ -137,7 +137,7 @@ func (h *hostAlertHandlers) handleConclude(w http.ResponseWriter, r *http.Reques
 
 	alertID, err := pathInt64(r, "alertId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid alert id")
+		jsonBadRequest(w, r, "invalid alert id", err)
 		return
 	}
 
@@ -156,7 +156,7 @@ func (h *hostAlertHandlers) handleConclude(w http.ResponseWriter, r *http.Reques
 
 	if err := models.ResolveHostAlert(h.db.SQL, alertID); err != nil {
 		log.Printf("[alerts] ResolveHostAlert error: %v", err)
-		jsonError(w, http.StatusInternalServerError, "failed to conclude alert")
+		jsonServerError(w, r, "failed to conclude alert", err)
 		return
 	}
 
@@ -171,7 +171,7 @@ func (h *hostAlertHandlers) handleDelete(w http.ResponseWriter, r *http.Request)
 
 	alertID, err := pathInt64(r, "alertId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid alert id")
+		jsonBadRequest(w, r, "invalid alert id", err)
 		return
 	}
 
@@ -186,7 +186,7 @@ func (h *hostAlertHandlers) handleDelete(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := models.DeleteHostAlert(h.db.SQL, alertID); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete alert")
+		jsonServerError(w, r, "failed to delete alert", err)
 		return
 	}
 

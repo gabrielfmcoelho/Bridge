@@ -18,7 +18,7 @@ type settingsHandlers struct {
 func (h *settingsHandlers) handleGetAppearance(w http.ResponseWriter, r *http.Request) {
 	s, err := models.GetAppSettings(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to load settings")
+		jsonServerError(w, r, "failed to load settings", err)
 		return
 	}
 	jsonOK(w, s)
@@ -27,7 +27,7 @@ func (h *settingsHandlers) handleGetAppearance(w http.ResponseWriter, r *http.Re
 func (h *settingsHandlers) handleUpdateAppearance(w http.ResponseWriter, r *http.Request) {
 	var req models.AppSettings
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid JSON")
+		jsonBadRequest(w, r, "invalid JSON", err)
 		return
 	}
 	if req.AppName == "" {
@@ -38,7 +38,7 @@ func (h *settingsHandlers) handleUpdateAppearance(w http.ResponseWriter, r *http
 		req.AppColor = "#06b6d4"
 	}
 	if err := models.UpdateAppSettings(h.db.SQL, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to save settings")
+		jsonServerError(w, r, "failed to save settings", err)
 		return
 	}
 	jsonOK(w, req)
@@ -49,13 +49,13 @@ const maxLogoSize = 512 * 1024 // 512KB
 func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxLogoSize+1024)
 	if err := r.ParseMultipartForm(maxLogoSize + 1024); err != nil {
-		jsonError(w, http.StatusBadRequest, "file too large (max 512KB)")
+		jsonBadRequest(w, r, "file too large (max 512KB)", err)
 		return
 	}
 
 	file, header, err := r.FormFile("logo")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "missing logo file")
+		jsonBadRequest(w, r, "missing logo file", err)
 		return
 	}
 	defer file.Close()
@@ -68,7 +68,7 @@ func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Reque
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to read file")
+		jsonServerError(w, r, "failed to read file", err)
 		return
 	}
 
@@ -76,12 +76,12 @@ func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Reque
 
 	s, err := models.GetAppSettings(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to load settings")
+		jsonServerError(w, r, "failed to load settings", err)
 		return
 	}
 	s.AppLogo = dataURI
 	if err := models.UpdateAppSettings(h.db.SQL, s); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to save logo")
+		jsonServerError(w, r, "failed to save logo", err)
 		return
 	}
 
@@ -91,7 +91,7 @@ func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Reque
 func (h *settingsHandlers) handleGetAlertThresholds(w http.ResponseWriter, r *http.Request) {
 	t, err := models.GetAlertThresholds(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to load alert thresholds")
+		jsonServerError(w, r, "failed to load alert thresholds", err)
 		return
 	}
 	jsonOK(w, t)
@@ -100,7 +100,7 @@ func (h *settingsHandlers) handleGetAlertThresholds(w http.ResponseWriter, r *ht
 func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r *http.Request) {
 	var req models.AlertThresholds
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid JSON")
+		jsonBadRequest(w, r, "invalid JSON", err)
 		return
 	}
 	if req.ResourceCritical < 0 || req.ResourceCritical > 100 ||
@@ -110,7 +110,7 @@ func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r 
 		return
 	}
 	if err := models.UpdateAlertThresholds(h.db.SQL, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to save alert thresholds")
+		jsonServerError(w, r, "failed to save alert thresholds", err)
 		return
 	}
 	jsonOK(w, req)
@@ -119,12 +119,12 @@ func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r 
 func (h *settingsHandlers) handleDeleteLogo(w http.ResponseWriter, r *http.Request) {
 	s, err := models.GetAppSettings(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to load settings")
+		jsonServerError(w, r, "failed to load settings", err)
 		return
 	}
 	s.AppLogo = ""
 	if err := models.UpdateAppSettings(h.db.SQL, s); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to remove logo")
+		jsonServerError(w, r, "failed to remove logo", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "ok"})

@@ -225,6 +225,7 @@ export default function HostDetail({ slug }: { slug: string }) {
                 dockerGroupStatus={data.host.docker_group_status}
                 coolifyServerUUID={data.host.coolify_server_uuid}
                 serverInfo={serverInfo}
+                lastScan={data.last_scan ?? undefined}
                 t={t}
                 locale={locale}
                 isAdmin={isAdmin}

@@ -58,7 +58,13 @@ export default function HostForm({
   const [formTags, setFormTags] = useState<string[]>(tags ?? []);
   const [formResponsaveis, setFormResponsaveis] = useState<HostResponsavel[]>(responsaveis ?? []);
   const [formChamados, setFormChamados] = useState<HostChamado[]>(chamados ?? []);
-  const [selectedKeyId, setSelectedKeyId] = useState("");
+  // selectedKeyId is three-valued:
+  //   - null           → untouched; don't send ssh_key_id OR clear_key
+  //   - "__clear__"    → user explicitly chose to unlink the current key
+  //   - any digit id   → link that ssh_keys row
+  // The plain empty-string state was ambiguous and caused edit-without-key-
+  // touch saves to silently wipe the stored key in production.
+  const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
   const [linkedDnsIds, setLinkedDnsIds] = useState<number[]>(dnsRecords?.map((d) => d.id) ?? []);
   const [linkedServiceIds, setLinkedServiceIds] = useState<number[]>(linkedServices?.map((s) => s.id) ?? []);
   const [linkedProjectIds, setLinkedProjectIds] = useState<number[]>(linkedProjects?.map((p) => p.id) ?? []);
@@ -135,7 +141,10 @@ export default function HostForm({
   const mutation = useMutation({
     mutationFn: async () => {
       const effectiveHasPassword = Boolean(form.password) || (isEdit && Boolean(host?.has_password));
-      const effectiveHasKey = Boolean(selectedKeyId);
+      const willLinkNewKey = selectedKeyId !== null && selectedKeyId !== "" && selectedKeyId !== "__clear__";
+      const willClearKey = selectedKeyId === "__clear__";
+      const keptExistingKey = isEdit && Boolean(host?.has_key) && !willClearKey && !willLinkNewKey;
+      const effectiveHasKey = willLinkNewKey || keptExistingKey;
       const preferredAuth = resolvePreferredAuth(effectiveHasPassword, effectiveHasKey, String(form.preferred_auth || ""));
       if (!preferredAuth.valid) {
         setError(preferredAuth.error);
@@ -152,11 +161,13 @@ export default function HostForm({
         service_ids: linkedServiceIds,
         project_ids: linkedProjectIds,
       };
-      if (selectedKeyId) {
-        payload.ssh_key_id = parseInt(selectedKeyId);
-      } else if (isEdit && host?.has_key) {
+      if (willLinkNewKey) {
+        payload.ssh_key_id = parseInt(selectedKeyId as string);
+      } else if (willClearKey) {
         payload.clear_key = true;
       }
+      // When selectedKeyId is null (untouched), we send neither field, so
+      // the backend preserves whatever key the host currently has.
       if (isEdit) {
         return hostsAPI.update(host.oficial_slug, payload);
       }
@@ -230,15 +241,34 @@ export default function HostForm({
         />
       </div>
       {sshKeys.length > 0 ? (
-        <Select
-          label={t("host.sshKey")}
-          value={selectedKeyId}
-          onChange={(e) => setSelectedKeyId(e.target.value)}
-          options={sshKeys.map((k) => ({
-            value: k.id.toString(),
-            label: `${k.name}${k.fingerprint ? ` (${k.fingerprint})` : ""}`,
-          }))}
-        />
+        <div className="space-y-1">
+          <Select
+            label={t("host.sshKey")}
+            value={selectedKeyId ?? ""}
+            onChange={(e) => setSelectedKeyId(e.target.value === "" ? null : e.target.value)}
+            options={[
+              {
+                value: "",
+                label: isEdit && host?.has_key
+                  ? t("host.sshKeyKeepCurrent")
+                  : t("host.sshKeyNone"),
+              },
+              ...(isEdit && host?.has_key
+                ? [{ value: "__clear__", label: t("host.sshKeyClear") }]
+                : []),
+              ...sshKeys.map((k) => ({
+                value: k.id.toString(),
+                label: `${k.name}${k.fingerprint ? ` (${k.fingerprint})` : ""}`,
+              })),
+            ]}
+          />
+          {isEdit && host?.has_key && selectedKeyId === null && (
+            <p className="text-[10px] text-[var(--text-faint)]">{t("host.sshKeyKeepCurrentHint")}</p>
+          )}
+          {selectedKeyId === "__clear__" && (
+            <p className="text-[10px] text-amber-400">{t("host.sshKeyClearHint")}</p>
+          )}
+        </div>
       ) : isEdit && host?.has_key ? (
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">{t("host.sshKey")}</label>

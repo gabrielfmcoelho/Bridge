@@ -14,7 +14,7 @@ type projectHandlers struct {
 func (h *projectHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	projects, err := models.ListProjects(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list projects")
+		jsonServerError(w, r, "failed to list projects", err)
 		return
 	}
 
@@ -40,7 +40,7 @@ func (h *projectHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 func (h *projectHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Responsaveis []models.ProjectResponsavelInput `json:"responsaveis"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Name == "" {
@@ -101,7 +101,7 @@ func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.CreateProject(h.db.SQL, &req.Project); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create project")
+		jsonServerError(w, r, "failed to create project", err)
 		return
 	}
 
@@ -118,7 +118,7 @@ func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
@@ -134,13 +134,13 @@ func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		Responsaveis *[]models.ProjectResponsavelInput `json:"responsaveis"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
 	req.Project.ID = id
 	if err := models.UpdateProject(h.db.SQL, &req.Project); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update project")
+		jsonServerError(w, r, "failed to update project", err)
 		return
 	}
 
@@ -157,13 +157,13 @@ func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *projectHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 
 	models.DeleteTags(h.db.SQL, "project", id)
 	if err := models.DeleteProject(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete project")
+		jsonServerError(w, r, "failed to delete project", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})

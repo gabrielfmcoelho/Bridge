@@ -14,7 +14,7 @@ type contactHandlers struct {
 func (h *contactHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	contacts, err := models.ListContacts(h.db.SQL)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list contacts")
+		jsonServerError(w, r, "failed to list contacts", err)
 		return
 	}
 	jsonOK(w, contacts)
@@ -23,7 +23,7 @@ func (h *contactHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req models.Contact
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Name == "" {
@@ -31,7 +31,7 @@ func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := models.CreateContact(h.db.SQL, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create contact")
+		jsonServerError(w, r, "failed to create contact", err)
 		return
 	}
 	jsonCreated(w, req)
@@ -40,12 +40,12 @@ func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 	var req models.Contact
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Name == "" {
@@ -54,7 +54,7 @@ func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	req.ID = id
 	if err := models.UpdateContact(h.db.SQL, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update contact")
+		jsonServerError(w, r, "failed to update contact", err)
 		return
 	}
 	jsonOK(w, req)
@@ -63,11 +63,11 @@ func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *contactHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid id")
+		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
 	if err := models.DeleteContact(h.db.SQL, id); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete contact")
+		jsonServerError(w, r, "failed to delete contact", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})

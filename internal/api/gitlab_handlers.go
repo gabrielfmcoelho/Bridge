@@ -72,7 +72,7 @@ func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request)
 		BaseURL string `json:"base_url"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid JSON")
+		jsonBadRequest(w, r, "invalid JSON", err)
 		return
 	}
 	if req.Token == "" {
@@ -97,7 +97,7 @@ func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request)
 	// Encrypt and store.
 	cipher, nonce, err := h.db.Encryptor.Encrypt(req.Token)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "encryption failed")
+		jsonServerError(w, r, "encryption failed", err)
 		return
 	}
 
@@ -110,7 +110,7 @@ func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request)
 		GitLabUsername:     glUser.Username,
 	}
 	if err := models.UpsertUserGitLabToken(h.db.SQL, t); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to save token")
+		jsonServerError(w, r, "failed to save token", err)
 		return
 	}
 
@@ -138,7 +138,7 @@ func (h *gitlabHandlers) handleDeleteToken(w http.ResponseWriter, r *http.Reques
 func (h *gitlabHandlers) handleListCommits(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid project id")
+		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
 
@@ -167,7 +167,7 @@ func (h *gitlabHandlers) handleListCommits(w http.ResponseWriter, r *http.Reques
 func (h *gitlabHandlers) handleListIssues(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid project id")
+		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
 
@@ -201,7 +201,7 @@ func (h *gitlabHandlers) handleListIssues(w http.ResponseWriter, r *http.Request
 func (h *gitlabHandlers) handleLinkProject(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid project id")
+		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
 

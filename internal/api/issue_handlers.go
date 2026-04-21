@@ -16,7 +16,7 @@ type issueHandlers struct {
 func (h *issueHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid project id")
+		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
 
@@ -29,7 +29,7 @@ func (h *issueHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 
 	issues, err := models.ListIssuesByProject(h.db.SQL, projectID, serviceID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list issues")
+		jsonServerError(w, r, "failed to list issues", err)
 		return
 	}
 
@@ -39,7 +39,7 @@ func (h *issueHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 func (h *issueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid project id")
+		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *issueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 	var req models.Issue
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Title == "" {
@@ -65,7 +65,7 @@ func (h *issueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.CreateIssue(h.db.SQL, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to create issue")
+		jsonServerError(w, r, "failed to create issue", err)
 		return
 	}
 
@@ -75,7 +75,7 @@ func (h *issueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (h *issueHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "issueId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid issue id")
+		jsonBadRequest(w, r, "invalid issue id", err)
 		return
 	}
 
@@ -87,7 +87,7 @@ func (h *issueHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	var req models.Issue
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 
@@ -102,7 +102,7 @@ func (h *issueHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.UpdateIssue(h.db.SQL, &req); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to update issue")
+		jsonServerError(w, r, "failed to update issue", err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *issueHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 func (h *issueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "issueId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid issue id")
+		jsonBadRequest(w, r, "invalid issue id", err)
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *issueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 		Position float64 `json:"position"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid request body")
+		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
 	if req.Status == "" {
@@ -130,7 +130,7 @@ func (h *issueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.MoveIssue(h.db.SQL, issueID, req.Status, req.Position); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to move issue")
+		jsonServerError(w, r, "failed to move issue", err)
 		return
 	}
 
@@ -140,12 +140,12 @@ func (h *issueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 func (h *issueHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "issueId")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid issue id")
+		jsonBadRequest(w, r, "invalid issue id", err)
 		return
 	}
 
 	if err := models.DeleteIssue(h.db.SQL, issueID); err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to delete issue")
+		jsonServerError(w, r, "failed to delete issue", err)
 		return
 	}
 
@@ -155,13 +155,13 @@ func (h *issueHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 func (h *issueHandlers) handleListByService(w http.ResponseWriter, r *http.Request) {
 	serviceID, err := pathInt64(r, "id")
 	if err != nil {
-		jsonError(w, http.StatusBadRequest, "invalid service id")
+		jsonBadRequest(w, r, "invalid service id", err)
 		return
 	}
 
 	issues, err := models.ListIssuesByService(h.db.SQL, serviceID)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "failed to list issues")
+		jsonServerError(w, r, "failed to list issues", err)
 		return
 	}
 
