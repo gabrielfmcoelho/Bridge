@@ -7,8 +7,17 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
+
+// encodeNamespacedPath URL-encodes a GitLab namespaced path for use as a single
+// path parameter. GitLab's API requires slashes to be encoded as %2F (url.PathEscape
+// leaves them intact because it treats them as path separators), so we do it
+// explicitly here. Used for /projects/:path and /groups/:path lookups.
+func encodeNamespacedPath(p string) string {
+	return strings.ReplaceAll(url.PathEscape(p), "/", "%2F")
+}
 
 // Client interacts with the GitLab REST API v4.
 type Client struct {
@@ -78,8 +87,7 @@ func (c *Client) GetProject(projectID int) (*Project, error) {
 
 // SearchProjectByPath finds a project by its path (e.g., "org/repo").
 func (c *Client) SearchProjectByPath(path string) (*Project, error) {
-	encoded := url.PathEscape(path)
-	body, err := c.get(fmt.Sprintf("/projects/%s", encoded), nil)
+	body, err := c.get(fmt.Sprintf("/projects/%s", encodeNamespacedPath(path)), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -87,11 +95,65 @@ func (c *Client) SearchProjectByPath(path string) (*Project, error) {
 	return &project, json.Unmarshal(body, &project)
 }
 
+// SearchGroupByPath finds a group by its full path (e.g., "org/subgroup").
+func (c *Client) SearchGroupByPath(path string) (*Group, error) {
+	body, err := c.get(fmt.Sprintf("/groups/%s", encodeNamespacedPath(path)), nil)
+	if err != nil {
+		return nil, err
+	}
+	var group Group
+	return &group, json.Unmarshal(body, &group)
+}
+
+// GetGroup returns a group by numeric ID — used for health verification of stored group links.
+func (c *Client) GetGroup(groupID int) (*Group, error) {
+	body, err := c.get(fmt.Sprintf("/groups/%d", groupID), nil)
+	if err != nil {
+		return nil, err
+	}
+	var group Group
+	return &group, json.Unmarshal(body, &group)
+}
+
+// ListGroupProjects returns projects under a group, optionally recursing into subgroups.
+// Fetches up to 100 projects per page and stops at maxPages to keep latency bounded.
+func (c *Client) ListGroupProjects(groupID int, includeSubgroups bool) ([]Project, error) {
+	const maxPages = 5
+	var all []Project
+	for page := 1; page <= maxPages; page++ {
+		q := url.Values{}
+		q.Set("per_page", "100")
+		q.Set("page", strconv.Itoa(page))
+		q.Set("simple", "true")
+		q.Set("archived", "false")
+		if includeSubgroups {
+			q.Set("include_subgroups", "true")
+		}
+
+		body, err := c.get(fmt.Sprintf("/groups/%d/projects", groupID), q)
+		if err != nil {
+			return nil, err
+		}
+		var batch []Project
+		if err := json.Unmarshal(body, &batch); err != nil {
+			return nil, err
+		}
+		all = append(all, batch...)
+		if len(batch) < 100 {
+			break
+		}
+	}
+	return all, nil
+}
+
 // ListCommits returns recent commits for a project.
+// Pass params.All=true to include commits from every branch (default is the repo's default branch only).
 func (c *Client) ListCommits(projectID int, params CommitListParams) ([]Commit, error) {
 	q := url.Values{}
 	if params.RefName != "" {
 		q.Set("ref_name", params.RefName)
+	} else if params.All {
+		q.Set("all", "true")
 	}
 	if params.PerPage > 0 {
 		q.Set("per_page", strconv.Itoa(params.PerPage))
@@ -108,6 +170,22 @@ func (c *Client) ListCommits(projectID int, params CommitListParams) ([]Commit, 
 	}
 	var commits []Commit
 	return commits, json.Unmarshal(body, &commits)
+}
+
+// ListCommitRefs returns the branches (and/or tags) that contain a given commit.
+// Pass refType = "branch" to limit the response to branches only.
+func (c *Client) ListCommitRefs(projectID int, sha, refType string) ([]CommitRef, error) {
+	q := url.Values{}
+	if refType != "" {
+		q.Set("type", refType)
+	}
+	q.Set("per_page", "20")
+	body, err := c.get(fmt.Sprintf("/projects/%d/repository/commits/%s/refs", projectID, sha), q)
+	if err != nil {
+		return nil, err
+	}
+	var refs []CommitRef
+	return refs, json.Unmarshal(body, &refs)
 }
 
 // ListIssues returns issues for a project.

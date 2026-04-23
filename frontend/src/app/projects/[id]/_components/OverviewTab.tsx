@@ -7,6 +7,7 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import ResponsaveisSection from "@/components/inventory/ResponsaveisSection";
+import ProjectAiAnalysis from "./ProjectAiAnalysis";
 import type { Project, ProjectResponsavel, Service } from "@/lib/types";
 
 interface OverviewTabProps {
@@ -66,6 +67,9 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
           )}
         </div>
       </Card>
+
+      {/* AI analysis of recent work (based on commits from linked GitLab repos) */}
+      <ProjectAiAnalysis projectId={project.id} />
 
       {/* Responsaveis — shared cards/table view */}
       <ResponsaveisSection responsaveis={responsaveis} t={t} />

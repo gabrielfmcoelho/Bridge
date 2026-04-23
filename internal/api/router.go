@@ -3,10 +3,12 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth/providers"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	glpiclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/glpi"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 )
 
@@ -45,8 +47,14 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	ish := &integrationSettingsHandlers{db: db, registry: registry}
 	oah := &oauthHandlers{db: db, registry: registry, ah: ah}
 	glh := &gitlabHandlers{db: db}
+	pglh := &projectGitLabHandlers{db: db}
 	aih := &aiHandlers{db: db}
 	clh := &coolifyHandlers{db: db}
+	grh := &grafanaHandlers{db: db}
+	gwh := &grafanaWebhookHandlers{db: db}
+	olh := &outlineHandlers{db: db}
+	glpiSessionCache := glpiclient.NewSessionCache(30 * time.Minute)
+	glpih := &glpiHandlers{db: db, cache: glpiSessionCache}
 
 	// Auth routes (no auth required)
 	mux.HandleFunc("GET /api/auth/status", ah.handleStatus)
@@ -140,6 +148,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("POST /api/ssh/list-remote-keys/{slug}", authedRole(db, "editor", http.HandlerFunc(ssh.handleListRemoteKeys)))
 	mux.Handle("POST /api/ssh/docker-setup/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleDockerSetup)))
 	mux.Handle("POST /api/ssh/nginx-cleanup/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleNginxCleanup)))
+	mux.Handle("POST /api/ssh/grafana-agent-setup/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleGrafanaAgentSetup)))
 	mux.Handle("GET /api/ssh/host-config/{slug}", authenticated(db, http.HandlerFunc(ssh.handleHostSSHConfig)))
 
 	// Graph & Dashboard
@@ -202,6 +211,11 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/settings/integrations", authedRole(db, "admin", http.HandlerFunc(ish.handleGetIntegrations)))
 	mux.Handle("PUT /api/settings/integrations/{group}", authedRole(db, "admin", http.HandlerFunc(ish.handleUpdateIntegrationGroup)))
 	mux.Handle("POST /api/settings/integrations/test/ldap", authedRole(db, "admin", http.HandlerFunc(ish.handleTestLDAP)))
+	mux.Handle("POST /api/settings/integrations/test/gitlab-code", authedRole(db, "admin", http.HandlerFunc(ish.handleTestGitLabCode)))
+	mux.Handle("POST /api/settings/integrations/test/llm", authedRole(db, "admin", http.HandlerFunc(ish.handleTestLLM)))
+	mux.Handle("POST /api/settings/integrations/test/grafana", authedRole(db, "admin", http.HandlerFunc(ish.handleTestGrafana)))
+	mux.Handle("POST /api/settings/integrations/test/outline", authedRole(db, "admin", http.HandlerFunc(ish.handleTestOutline)))
+	mux.Handle("DELETE /api/settings/integrations/{group}/secret/{key}", authedRole(db, "admin", http.HandlerFunc(ish.handleClearIntegrationSecret)))
 
 	// Permissions management (admin only)
 	mux.Handle("GET /api/settings/permissions", authedRole(db, "admin", http.HandlerFunc(ish.handleGetPermissions)))
@@ -212,7 +226,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("POST /api/settings/role-mappings", authedRole(db, "admin", http.HandlerFunc(ish.handleCreateRoleMapping)))
 	mux.Handle("DELETE /api/settings/role-mappings/{id}", authedRole(db, "admin", http.HandlerFunc(ish.handleDeleteRoleMapping)))
 
-	// GitLab integration
+	// GitLab — per-user token (profile-level, optional)
 	mux.Handle("GET /api/gitlab/status", authenticated(db, http.HandlerFunc(glh.handleStatus)))
 	mux.Handle("POST /api/gitlab/token", authenticated(db, http.HandlerFunc(glh.handleSaveToken)))
 	mux.Handle("DELETE /api/gitlab/token", authenticated(db, http.HandlerFunc(glh.handleDeleteToken)))
@@ -220,11 +234,65 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/gitlab/projects/{id}/issues", authenticated(db, http.HandlerFunc(glh.handleListIssues)))
 	mux.Handle("POST /api/gitlab/projects/{id}/link", authedRole(db, "editor", http.HandlerFunc(glh.handleLinkProject)))
 
+	// GitLab Code Management — per-project link management + aggregated commits (uses shared service PAT)
+	mux.Handle("GET /api/projects/{id}/gitlab/links", authenticated(db, http.HandlerFunc(pglh.handleListLinks)))
+	mux.Handle("POST /api/projects/{id}/gitlab/links", authedRole(db, "editor", http.HandlerFunc(pglh.handleCreateLink)))
+	mux.Handle("DELETE /api/projects/{id}/gitlab/links/{linkId}", authedRole(db, "editor", http.HandlerFunc(pglh.handleDeleteLink)))
+	mux.Handle("GET /api/projects/{id}/gitlab/commits", authenticated(db, http.HandlerFunc(pglh.handleListCommits)))
+
 	// AI / LLM integration
 	mux.Handle("GET /api/ai/status", authenticated(db, http.HandlerFunc(aih.handleStatus)))
 	mux.Handle("POST /api/ai/assist/issue", authedPermission(db, "ai.use", http.HandlerFunc(aih.handleAssistIssue)))
 	mux.Handle("POST /api/ai/assist/host-doc", authedPermission(db, "ai.use", http.HandlerFunc(aih.handleAssistHostDoc)))
 	mux.Handle("POST /api/ai/chat", authedPermission(db, "ai.use", http.HandlerFunc(aih.handleChat)))
+	mux.Handle("GET /api/projects/{id}/ai/analyze", authenticated(db, http.HandlerFunc(aih.handleGetProjectAnalysis)))
+	mux.Handle("POST /api/projects/{id}/ai/analyze", authedPermission(db, "ai.use", http.HandlerFunc(aih.handleAnalyzeProject)))
+
+	// Grafana integration
+	mux.Handle("GET /api/grafana/embed-url", authenticated(db, http.HandlerFunc(grh.handleEmbedURL)))
+	mux.Handle("GET /api/hosts/{slug}/metrics/live", authenticated(db, http.HandlerFunc(grh.handleHostLiveMetrics)))
+	mux.Handle("POST /api/hosts/{slug}/grafana/provision", authedRole(db, "admin", http.HandlerFunc(grh.handleProvisionHostDashboard)))
+	mux.Handle("POST /api/services/{id}/grafana/provision", authedRole(db, "admin", http.HandlerFunc(grh.handleProvisionServiceDashboard)))
+
+	// Public webhook — no auth middleware; HMAC-signed by Grafana and verified in the handler.
+	mux.HandleFunc("POST /api/webhooks/grafana/alerts", gwh.handleAlertWebhook)
+
+	// GLPI integration
+	mux.Handle("GET /api/settings/integrations/glpi/tokens", authedRole(db, "admin", http.HandlerFunc(glpih.handleListTokenProfiles)))
+	mux.Handle("POST /api/settings/integrations/glpi/tokens", authedRole(db, "admin", http.HandlerFunc(glpih.handleCreateTokenProfile)))
+	mux.Handle("PUT /api/settings/integrations/glpi/tokens/{id}", authedRole(db, "admin", http.HandlerFunc(glpih.handleUpdateTokenProfile)))
+	mux.Handle("DELETE /api/settings/integrations/glpi/tokens/{id}", authedRole(db, "admin", http.HandlerFunc(glpih.handleDeleteTokenProfile)))
+	mux.Handle("POST /api/settings/integrations/glpi/tokens/{id}/test", authedRole(db, "admin", http.HandlerFunc(glpih.handleTestTokenProfile)))
+	mux.Handle("GET /api/settings/integrations/glpi/dropdowns", authedRole(db, "admin", http.HandlerFunc(glpih.handleListDropdownCatalogues)))
+	mux.Handle("GET /api/settings/integrations/glpi/dropdowns/{itemtype}", authedRole(db, "admin", http.HandlerFunc(glpih.handleGetDropdownCatalogue)))
+	mux.Handle("PUT /api/settings/integrations/glpi/dropdowns/{itemtype}", authedRole(db, "admin", http.HandlerFunc(glpih.handleUpsertDropdownCatalogue)))
+	mux.Handle("DELETE /api/settings/integrations/glpi/dropdowns/{itemtype}", authedRole(db, "admin", http.HandlerFunc(glpih.handleDeleteDropdownCatalogue)))
+	mux.Handle("POST /api/glpi/tickets", authedRole(db, "editor", http.HandlerFunc(glpih.handleCreateTicket)))
+	mux.Handle("GET /api/glpi/tickets/{id}", authenticated(db, http.HandlerFunc(glpih.handleGetTicket)))
+	mux.Handle("GET /api/glpi/tickets/{id}/details", authenticated(db, http.HandlerFunc(glpih.handleGetTicketDetails)))
+	mux.Handle("GET /api/glpi/documents/{id}", authenticated(db, http.HandlerFunc(glpih.handleGetGlpiDocument)))
+	mux.Handle("GET /api/glpi/forms", authenticated(db, http.HandlerFunc(glpih.handleListForms)))
+	mux.Handle("GET /api/glpi/forms/{id}", authenticated(db, http.HandlerFunc(glpih.handleGetFormBundle)))
+	mux.Handle("POST /api/glpi/forms/{id}/submit", authedRole(db, "editor", http.HandlerFunc(glpih.handleSubmitForm)))
+	mux.Handle("POST /api/glpi/forms/uploads", authedRole(db, "editor", http.HandlerFunc(glpih.handleUploadFormDocument)))
+	mux.Handle("GET /api/glpi/dropdowns/{itemtype}/search", authenticated(db, http.HandlerFunc(glpih.handleSearchDropdown)))
+	mux.Handle("GET /api/glpi/users/search", authenticated(db, http.HandlerFunc(glpih.handleSearchUsers)))
+	mux.Handle("GET /api/glpi/formcreator/tags/search", authenticated(db, http.HandlerFunc(glpih.handleSearchFormcreatorTags)))
+	mux.Handle("GET /api/projects/{id}/glpi/tickets", authenticated(db, http.HandlerFunc(glpih.handleListProjectTickets)))
+	mux.Handle("GET /api/glpi/profiles/{id}/tickets", authenticated(db, http.HandlerFunc(glpih.handleListProfileTickets)))
+	mux.Handle("GET /api/hosts/{slug}/glpi/tickets", authenticated(db, http.HandlerFunc(glpih.handleListHostTickets)))
+	mux.Handle("POST /api/hosts/{slug}/chamados/{chamadoId}/glpi/refresh", authedRole(db, "editor", http.HandlerFunc(glpih.handleRefreshChamadoCache)))
+
+	// Outline (wiki) integration
+	mux.Handle("GET /api/projects/{id}/wiki", authenticated(db, http.HandlerFunc(olh.handleListProjectWiki)))
+	mux.Handle("POST /api/projects/{id}/wiki/documents", authedRole(db, "editor", http.HandlerFunc(olh.handleCreateProjectDocument)))
+	mux.Handle("GET /api/projects/{id}/wiki/search", authenticated(db, http.HandlerFunc(olh.handleSearchProjectWiki)))
+	mux.Handle("GET /api/wiki/documents", authenticated(db, http.HandlerFunc(olh.handleListCommonWiki)))
+	mux.Handle("POST /api/wiki/documents", authedRole(db, "editor", http.HandlerFunc(olh.handleCreateCommonDocument)))
+	mux.Handle("GET /api/wiki/search", authenticated(db, http.HandlerFunc(olh.handleSearchCommonWiki)))
+	mux.Handle("GET /api/wiki/collections", authedRole(db, "admin", http.HandlerFunc(olh.handleListWorkspaceCollections)))
+	mux.Handle("GET /api/wiki/tree", authenticated(db, http.HandlerFunc(olh.handleCommonWikiTree)))
+	mux.Handle("GET /api/wiki/documents/{id}", authenticated(db, http.HandlerFunc(olh.handleGetWikiDocument)))
 
 	// Coolify integration
 	mux.Handle("GET /api/coolify/status", authenticated(db, http.HandlerFunc(clh.handleStatus)))

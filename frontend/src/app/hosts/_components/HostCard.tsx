@@ -29,8 +29,12 @@ export default function HostCard({ host }: { host: Host }) {
 
   const mainResp = host.responsaveis?.find((r) => r.is_main);
 
-  const authDot = (status?: "success" | "failed" | null) =>
-    status === "success" ? "bg-emerald-400" : status === "failed" ? "bg-red-400" : "border border-[var(--border-default)]";
+  const authIconColor = (has: boolean, status?: "success" | "failed" | null) => {
+    if (!has) return "text-[var(--text-faint)]/30";
+    if (status === "success") return "text-emerald-400";
+    if (status === "failed") return "text-red-400";
+    return "text-[var(--text-faint)]";
+  };
 
   return (
     <Link href={`/hosts/${host.oficial_slug}`}>
@@ -82,34 +86,32 @@ export default function HostCard({ host }: { host: Host }) {
         </div>
 
         {/* Bottom indicators */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4">
-          {/* Auth dots — unique to hosts */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5" title={`Password: ${host.has_password ? (host.password_test_status || "untested") : "none"}`}>
-              <span className={`text-xs uppercase tracking-wider ${host.has_password ? "text-[var(--text-faint)]" : "text-[var(--text-faint)]/30"}`}>pwd</span>
-              <span className={`w-2 h-2 rounded-full ${host.has_password ? authDot(host.password_test_status) : "bg-[var(--bg-elevated)]"}`} />
-            </div>
-            <div className="flex items-center gap-1.5" title={`Key: ${host.has_key ? (host.key_test_status || "untested") : "none"}`}>
-              <span className={`text-xs uppercase tracking-wider ${host.has_key ? "text-[var(--text-faint)]" : "text-[var(--text-faint)]/30"}`}>key</span>
-              <span className={`w-2 h-2 rounded-full ${host.has_key ? authDot(host.key_test_status) : "bg-[var(--bg-elevated)]"}`} />
-            </div>
-          </div>
-
-          <span className="hidden sm:block w-px h-3.5 bg-[var(--border-subtle)]" />
-
-          {/* Entity counts & status */}
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4">
+          {/* Row 1: scan, dns, containers, processes, services, projects */}
+          <div className="grid grid-cols-[repeat(6,2.25rem)] justify-start gap-x-2">
+            <ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} />
+            <CardIndicator icon={ICON_PATHS.globe} count={host.dns_count || 0} color="cyan" title={`${host.dns_count || 0} DNS`} />
             <CardIndicator icon={ICON_PATHS.container} count={host.containers_count || 0} color="sky" title={`${host.containers_count || 0} ${t("host.containers").toLowerCase()}`} />
             <CardIndicator icon={ICON_PATHS.terminal} count={host.processes_count || 0} color="violet" title={`${host.processes_count || 0} ${t("host.processes").toLowerCase()}`} />
             <CardIndicator icon={ICON_PATHS.gear} count={host.services_count || 0} color="amber" title={`${host.services_count || 0} ${t("host.services").toLowerCase()}`} />
-            <CardIndicator icon={ICON_PATHS.globe} count={host.dns_count || 0} color="cyan" title={`${host.dns_count || 0} DNS`} />
             <CardIndicator icon={ICON_PATHS.folder} count={host.projects_count || 0} color="violet" title={`${host.projects_count || 0} projetos`} />
-            <CardIndicatorSeparator />
-            <CardIndicator icon={ICON_PATHS.code} count={host.can_compile ? 1 : 0} color="emerald" title={host.can_compile ? t("host.compilable") : t("host.missingHostnameOrUser")} hideCount />
-            <ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} />
+          </div>
+
+          {/* Row 2: auth (pwd, key), chamados, alerts, issues */}
+          <div className="grid grid-cols-[repeat(6,2.25rem)] justify-start gap-x-2">
+            <div className="flex items-center" title={`Password: ${host.has_password ? (host.password_test_status || "untested") : "none"}`}>
+              <svg className={`w-3.5 h-3.5 ${authIconColor(host.has_password, host.password_test_status)}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d={ICON_PATHS.lock} />
+              </svg>
+            </div>
+            <div className="flex items-center" title={`Key: ${host.has_key ? (host.key_test_status || "untested") : "none"}`}>
+              <svg className={`w-3.5 h-3.5 ${authIconColor(host.has_key, host.key_test_status)}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d={ICON_PATHS.key} />
+              </svg>
+            </div>
+            <CardIndicator icon={ICON_PATHS.document} count={host.chamados_count || 0} color="orange" title={`${host.chamados_count || 0} chamados`} />
             <CardIndicator icon={ICON_PATHS.alert} count={host.alerts?.length || 0} color="amber" title={`${host.alerts?.length || 0} alerts`} />
             <CardIndicator icon={ICON_PATHS.clipboard} count={host.issues_count || 0} color="purple" title={`${host.issues_count || 0} issues`} />
-            <CardIndicator icon={ICON_PATHS.document} count={host.chamados_count || 0} color="orange" title={`${host.chamados_count || 0} chamados`} />
           </div>
         </div>
       </Card>

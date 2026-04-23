@@ -847,4 +847,117 @@ var migrationsSQLite = []string{
 		UNIQUE(host_id, username)
 	);
 	CREATE INDEX IF NOT EXISTS idx_host_remote_users_host ON host_remote_users(host_id);`,
+
+	// Version 52: GitLab Code Management — extend project_gitlab_links to support
+	// both individual projects and whole subgroups (which fan out to all repos in the group),
+	// plus an optional per-link branch override and a human-readable label. Also add the
+	// shared service PAT and default-branch settings used by the commits tab.
+	`ALTER TABLE project_gitlab_links ADD COLUMN kind TEXT NOT NULL DEFAULT 'project';
+	ALTER TABLE project_gitlab_links ADD COLUMN ref_name TEXT NOT NULL DEFAULT '';
+	ALTER TABLE project_gitlab_links ADD COLUMN display_name TEXT NOT NULL DEFAULT '';
+
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('gitlab_code_service_token_cipher', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('gitlab_code_service_token_nonce', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('gitlab_code_default_ref', '');`,
+
+	// Version 53: cache per-project AI analyses so the overview tab shows the
+	// last generated summary without re-calling the LLM on every visit.
+	// One row per project; regeneration overwrites in place.
+	`CREATE TABLE IF NOT EXISTS project_ai_analyses (
+		project_id    INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+		content       TEXT NOT NULL DEFAULT '',
+		locale        TEXT NOT NULL DEFAULT '',
+		commits_used  INTEGER NOT NULL DEFAULT 0,
+		repos_used    INTEGER NOT NULL DEFAULT 0,
+		generated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);`,
+
+	// Version 54: Grafana integration scaffolding.
+	//   - hosts/services gain an optional grafana_dashboard_uid for the Metrics tab.
+	//   - host_alerts gain external_id + external_source so Grafana-fired alerts
+	//     can be ingested idempotently via their webhook fingerprint.
+	//   - app_settings seeds every grafana_* key so admin reads return them.
+	`ALTER TABLE hosts ADD COLUMN grafana_dashboard_uid TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN grafana_dashboard_uid TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_alerts ADD COLUMN external_id TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_alerts ADD COLUMN external_source TEXT NOT NULL DEFAULT '';
+	CREATE INDEX IF NOT EXISTS idx_host_alerts_external ON host_alerts(external_source, external_id);
+
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_enabled', 'false');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_base_url', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_api_token_cipher', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_api_token_nonce', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_webhook_secret_cipher', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_webhook_secret_nonce', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_host_default_dashboard_uid', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_service_default_dashboard_uid', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_prom_remote_write_url', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_prom_remote_write_username', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_prom_remote_write_password_cipher', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_prom_remote_write_password_nonce', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('grafana_datasource_uid', '');`,
+
+	// Version 55: Outline (wiki) integration — adds per-project collection pointer
+	// plus the app-wide settings for the common wiki. Base URL + API token are the
+	// only required wiring; common_collection_id is optional (feeds /wiki if set).
+	`ALTER TABLE projects ADD COLUMN outline_collection_id TEXT NOT NULL DEFAULT '';
+
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('outline_enabled', 'false');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('outline_base_url', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('outline_api_token_cipher', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('outline_api_token_nonce', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('outline_common_collection_id', '');`,
+
+	// Version 56: GLPI integration.
+	//   - glpi_tokens holds N named user-token profiles (1 instance App-Token + N user tokens).
+	//   - host_chamados gains external_* + cached_* so ticket refs can be live-synced against GLPI.
+	//   - projects.glpi_token_id picks which profile that project uses.
+	//   - alert_chamado_links is the ticket-side mirror of issue_alert_links — lets us cascade
+	//     an alert to resolved when its GLPI ticket closes.
+	`CREATE TABLE IF NOT EXISTS glpi_tokens (
+		id                INTEGER PRIMARY KEY AUTOINCREMENT,
+		name              TEXT NOT NULL UNIQUE,
+		description       TEXT NOT NULL DEFAULT '',
+		user_token_cipher BLOB,
+		user_token_nonce  BLOB,
+		default_entity_id INTEGER NOT NULL DEFAULT 0,
+		created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	ALTER TABLE host_chamados ADD COLUMN external_source TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_chamados ADD COLUMN external_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_chamados ADD COLUMN cached_title TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_chamados ADD COLUMN cached_status TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_chamados ADD COLUMN cached_at DATETIME;
+
+	ALTER TABLE projects ADD COLUMN glpi_token_id INTEGER DEFAULT NULL REFERENCES glpi_tokens(id) ON DELETE SET NULL;
+	ALTER TABLE projects ADD COLUMN glpi_entity_id INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE projects ADD COLUMN glpi_category_id INTEGER NOT NULL DEFAULT 0;
+
+	CREATE TABLE IF NOT EXISTS alert_chamado_links (
+		alert_id   INTEGER NOT NULL REFERENCES host_alerts(id) ON DELETE CASCADE,
+		chamado_id INTEGER NOT NULL REFERENCES host_chamados(id) ON DELETE CASCADE,
+		PRIMARY KEY(alert_id, chamado_id)
+	);
+
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('glpi_enabled', 'false');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('glpi_base_url', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('glpi_app_token_cipher', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('glpi_app_token_nonce', '');
+	INSERT OR IGNORE INTO app_settings (key, value) VALUES ('glpi_default_entity_id', '0');`,
+
+	// Version 57: GLPI dropdown catalogue — admin-curated option lists per GLPI
+	// itemtype, used when the profile's REST rights don't let the picker read
+	// /ITILCategory, /Entity, etc. directly. The options column is a JSON array
+	// of {id, name, completename?, parent_id?} — stored as TEXT because SQLite
+	// has no native JSON type and the data is read whole.
+	`CREATE TABLE IF NOT EXISTS glpi_dropdown_catalogues (
+		id           INTEGER PRIMARY KEY AUTOINCREMENT,
+		itemtype     TEXT NOT NULL UNIQUE,
+		options      TEXT NOT NULL DEFAULT '[]',
+		option_count INTEGER NOT NULL DEFAULT 0,
+		updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_by   INTEGER
+	);`,
 }

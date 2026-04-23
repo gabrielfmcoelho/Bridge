@@ -103,7 +103,16 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
                 </div>
                 <div>
                   <span className="text-[var(--text-faint)] block mb-0.5">{t("alert.source")}</span>
-                  <span className="text-[var(--text-muted)]">{alert.source === "manual" ? t("alert.manual") : t("alert.auto")}</span>
+                  {alert.source === "grafana" ? (
+                    <span className="inline-flex items-center gap-1 text-purple-400">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Grafana
+                    </span>
+                  ) : (
+                    <span className="text-[var(--text-muted)]">{alert.source === "manual" ? t("alert.manual") : t("alert.auto")}</span>
+                  )}
                 </div>
               </div>
             </Card>

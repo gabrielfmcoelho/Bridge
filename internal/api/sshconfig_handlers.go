@@ -15,6 +15,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshconfig"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshkeys"
@@ -826,6 +827,84 @@ func (h *sshHandlers) handleNginxCleanup(w http.ResponseWriter, r *http.Request)
 	}
 	h.logOperation(r, host.ID, "nginx-cleanup", &method, logStatus, status.Message)
 	jsonOK(w, map[string]any{"success": true, "status": status})
+}
+
+// handleGrafanaAgentSetup installs and starts grafana-agent on the target host,
+// configured to scrape node_exporter locally and remote_write to the Prometheus
+// endpoint from Grafana integration settings. Mirrors handleDockerSetup's shape.
+func (h *sshHandlers) handleGrafanaAgentSetup(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if rv := recover(); rv != nil {
+			log.Printf("[ssh] grafana-agent-setup panic: %v", rv)
+			jsonServerError(w, r, fmt.Sprintf("internal error: %v", rv), fmt.Errorf("panic: %v", rv))
+		}
+	}()
+
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	user := h.requireUser(w, host)
+	if user == "" {
+		return
+	}
+
+	// Load Grafana settings and validate the pieces the Agent actually needs.
+	settings, err := grafanaclient.LoadSettings(h.db.SQL, h.db.Encryptor)
+	if err != nil {
+		jsonServerError(w, r, "failed to load grafana settings", err)
+		return
+	}
+	if !settings.Enabled {
+		jsonError(w, http.StatusBadRequest, "Grafana integration is disabled in settings")
+		return
+	}
+	if settings.PromRemoteWriteURL == "" {
+		jsonError(w, http.StatusBadRequest,
+			"Prometheus remote_write URL is not configured — set it in Settings → Integrations → Grafana")
+		return
+	}
+
+	method, auth, ok := h.resolveAuth(w, host, "")
+	if !ok {
+		return
+	}
+	password := auth.Password()
+	if password == "" {
+		jsonError(w, http.StatusBadRequest, "stored password required for agent install (uses sudo)")
+		return
+	}
+
+	client := h.dial(w, host, user, auth)
+	if client == nil {
+		return
+	}
+	defer client.Close()
+
+	script := grafanaclient.RenderInstallScript(grafanaclient.AgentInstallParams{
+		HostLabel:           host.OficialSlug,
+		RemoteWriteURL:      settings.PromRemoteWriteURL,
+		RemoteWriteUsername: settings.PromRemoteWriteUsername,
+		RemoteWritePassword: settings.PromRemoteWritePassword,
+	})
+
+	output, runErr := sshtest.RunPrivilegedScript(client, password, script)
+	if runErr != nil {
+		errMsg := runErr.Error()
+		if output != "" {
+			errMsg = output
+		}
+		h.logOperation(r, host.ID, "grafana-agent-setup", &method, "failed", errMsg)
+		jsonOK(w, map[string]any{"success": false, "error": errMsg, "output": output})
+		return
+	}
+
+	h.logOperation(r, host.ID, "grafana-agent-setup", &method, "success", output)
+	jsonOK(w, map[string]any{
+		"success": true,
+		"output":  output,
+		"message": "grafana-agent installed and running. Metrics labelled host=" + host.OficialSlug + " will appear within ~1 minute.",
+	})
 }
 
 // handleListRemoteKeys lists SSH keys found on the remote host.

@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { hostsAPI, dnsAPI, servicesAPI, projectsAPI } from "@/lib/api";
+import { hostsAPI, dnsAPI, servicesAPI, projectsAPI, integrationsAPI } from "@/lib/api";
 import Button from "@/components/ui/Button";
+import CreateTicketModal from "@/components/glpi/CreateTicketModal";
 import Drawer from "@/components/ui/Drawer";
 import DrawerSection from "@/components/ui/DrawerSection";
 import Input from "@/components/ui/Input";
@@ -102,10 +103,11 @@ export function AlertDrawer({ open, onClose, onSave, loading, t, knownTypes }: {
    Alert Detail Drawer — Read / Edit / Delete
    ═══════════════════════════════════════════════════════════════════ */
 
-export function AlertDetailDrawer({ open, onClose, alert, canEdit, onCreateIssue, onConclude, onUpdate, onDelete, createLoading, concludeLoading, updateLoading, t }: {
+export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreateIssue, onConclude, onUpdate, onDelete, createLoading, concludeLoading, updateLoading, t }: {
   open: boolean;
   onClose: () => void;
   alert: HostAlert | null;
+  slug?: string;
   canEdit: boolean;
   onCreateIssue: (alert: HostAlert) => void;
   onConclude?: (alert: HostAlert) => void;
@@ -117,6 +119,16 @@ export function AlertDetailDrawer({ open, onClose, alert, canEdit, onCreateIssue
   t: (k: string) => string;
 }) {
   const [editing, setEditing] = useState(false);
+  const [escalateOpen, setEscalateOpen] = useState(false);
+
+  // Integration status controls visibility of the Escalate-to-GLPI affordance.
+  const { data: integrations } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: integrationsAPI.get,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const glpiEnabled = integrations?.glpi?.glpi_enabled === "true";
   const [editType, setEditType] = useState("");
   const [editLevel, setEditLevel] = useState("");
   const [editMessage, setEditMessage] = useState("");
@@ -140,7 +152,7 @@ export function AlertDetailDrawer({ open, onClose, alert, canEdit, onCreateIssue
   const canConclude = canEdit && isManual && !hasLinkedIssue && !isResolved;
 
   const readFooter = (
-    <div className="flex gap-2">
+    <div className="flex gap-2 flex-wrap">
       <Button variant="secondary" size="sm" className="flex-1" onClick={onClose}>{t("common.close")}</Button>
       {canEdit && isManual && !isResolved && (
         <Button size="sm" className="flex-1" onClick={() => setEditing(true)}>{t("common.edit")}</Button>
@@ -153,6 +165,11 @@ export function AlertDetailDrawer({ open, onClose, alert, canEdit, onCreateIssue
       {canEdit && !hasLinkedIssue && !isResolved && (
         <Button size="sm" className="flex-1" onClick={() => { onCreateIssue(alert); onClose(); }} loading={createLoading}>
           + {t("common.createIssue")}
+        </Button>
+      )}
+      {canEdit && glpiEnabled && slug && !isResolved && (
+        <Button variant="secondary" size="sm" className="flex-1" onClick={() => setEscalateOpen(true)}>
+          + GLPI
         </Button>
       )}
     </div>
@@ -187,6 +204,7 @@ export function AlertDetailDrawer({ open, onClose, alert, canEdit, onCreateIssue
   }
 
   return (
+    <>
     <Drawer open={open} onClose={onClose} title={t("alert.detail")} footer={readFooter}>
       <div className="space-y-4">
         <p className="text-base font-semibold text-[var(--text-primary)]">{alert.message}</p>
@@ -199,7 +217,7 @@ export function AlertDetailDrawer({ open, onClose, alert, canEdit, onCreateIssue
               <span className={`text-sm capitalize ${ALERT_TEXT_COLOR[alert.level] || "text-[var(--text-secondary)]"}`}>{alert.level}</span>
             </div>
           </div>
-          <Field label={t("alert.source")} value={isManual ? t("alert.manual") : t("alert.auto")} />
+          <Field label={t("alert.source")} value={alert.source === "grafana" ? "Grafana (external)" : isManual ? t("alert.manual") : t("alert.auto")} />
         </div>
 
         <Field label={t("alert.type")} value={alert.type} mono />
@@ -235,6 +253,23 @@ export function AlertDetailDrawer({ open, onClose, alert, canEdit, onCreateIssue
         )}
       </div>
     </Drawer>
+    {slug && (
+      <CreateTicketModal
+        open={escalateOpen}
+        onClose={() => setEscalateOpen(false)}
+        defaultTitle={`[alerta] ${alert.message}`}
+        defaultDescription={
+          `**Alerta:** ${alert.message}\n\n` +
+          `- **Tipo:** ${alert.type}\n` +
+          `- **Nível:** ${alert.level}\n` +
+          (alert.description ? `\n${alert.description}\n` : "")
+        }
+        hostSlug={slug}
+        alertID={alert.id}
+        onCreated={onClose}
+      />
+    )}
+    </>
   );
 }
 

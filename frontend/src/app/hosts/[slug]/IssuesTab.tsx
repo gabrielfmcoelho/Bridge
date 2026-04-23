@@ -250,6 +250,7 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
         open={showAlertDetailDrawer}
         onClose={() => setShowAlertDetailDrawer(false)}
         alert={selectedAlert}
+        slug={slug}
         canEdit={canEdit}
         onCreateIssue={createIssueFromAlert}
         onConclude={(alert) => {

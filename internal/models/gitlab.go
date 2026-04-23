@@ -65,23 +65,39 @@ func DeleteUserGitLabToken(db *sql.DB, userID int64, baseURL string) error {
 	return err
 }
 
-// ProjectGitLabLink links an SSHCM project to a GitLab project.
+// Link kinds stored in project_gitlab_links.kind.
+const (
+	GitLabLinkKindProject = "project"
+	GitLabLinkKindGroup   = "group"
+)
+
+// ProjectGitLabLink links an SSHCM project to either a single GitLab project
+// or a whole GitLab group (expanded to all repos at read time).
+// When Kind == "group", GitLabProjectID holds the group ID.
 type ProjectGitLabLink struct {
 	ID              int64      `json:"id"`
 	ProjectID       int64      `json:"project_id"`
 	GitLabProjectID int        `json:"gitlab_project_id"`
 	GitLabBaseURL   string     `json:"gitlab_base_url"`
 	GitLabPath      string     `json:"gitlab_path"`
+	Kind            string     `json:"kind"`
+	RefName         string     `json:"ref_name"`
+	DisplayName     string     `json:"display_name"`
 	SyncIssues      bool       `json:"sync_issues"`
 	LastSyncedAt    *time.Time `json:"last_synced_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 }
 
 func CreateProjectGitLabLink(db *sql.DB, l *ProjectGitLabLink) error {
+	if l.Kind == "" {
+		l.Kind = GitLabLinkKindProject
+	}
 	id, err := database.InsertReturningID(db, `
-		INSERT INTO project_gitlab_links (project_id, gitlab_project_id, gitlab_base_url, gitlab_path, sync_issues)
-		VALUES (?, ?, ?, ?, ?)`,
-		l.ProjectID, l.GitLabProjectID, l.GitLabBaseURL, l.GitLabPath, l.SyncIssues,
+		INSERT INTO project_gitlab_links
+			(project_id, gitlab_project_id, gitlab_base_url, gitlab_path, kind, ref_name, display_name, sync_issues)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		l.ProjectID, l.GitLabProjectID, l.GitLabBaseURL, l.GitLabPath,
+		l.Kind, l.RefName, l.DisplayName, l.SyncIssues,
 	)
 	if err != nil {
 		return err
@@ -90,19 +106,59 @@ func CreateProjectGitLabLink(db *sql.DB, l *ProjectGitLabLink) error {
 	return nil
 }
 
+// GetProjectGitLabLink returns the first link for a project (legacy single-link callers).
 func GetProjectGitLabLink(db *sql.DB, projectID int64) (*ProjectGitLabLink, error) {
 	l := &ProjectGitLabLink{}
 	err := db.QueryRow(`
-		SELECT id, project_id, gitlab_project_id, gitlab_base_url, gitlab_path, sync_issues, last_synced_at, created_at
-		FROM project_gitlab_links WHERE project_id = ?`, projectID,
-	).Scan(&l.ID, &l.ProjectID, &l.GitLabProjectID, &l.GitLabBaseURL, &l.GitLabPath, &l.SyncIssues, &l.LastSyncedAt, &l.CreatedAt)
+		SELECT id, project_id, gitlab_project_id, gitlab_base_url, gitlab_path,
+			kind, ref_name, display_name, sync_issues, last_synced_at, created_at
+		FROM project_gitlab_links WHERE project_id = ?
+		ORDER BY id ASC LIMIT 1`, projectID,
+	).Scan(&l.ID, &l.ProjectID, &l.GitLabProjectID, &l.GitLabBaseURL, &l.GitLabPath,
+		&l.Kind, &l.RefName, &l.DisplayName, &l.SyncIssues, &l.LastSyncedAt, &l.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return l, err
 }
 
+// ListProjectGitLabLinks returns every GitLab link attached to a project.
+func ListProjectGitLabLinks(db *sql.DB, projectID int64) ([]ProjectGitLabLink, error) {
+	rows, err := db.Query(`
+		SELECT id, project_id, gitlab_project_id, gitlab_base_url, gitlab_path,
+			kind, ref_name, display_name, sync_issues, last_synced_at, created_at
+		FROM project_gitlab_links WHERE project_id = ?
+		ORDER BY id ASC`, projectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var links []ProjectGitLabLink
+	for rows.Next() {
+		var l ProjectGitLabLink
+		if err := rows.Scan(&l.ID, &l.ProjectID, &l.GitLabProjectID, &l.GitLabBaseURL, &l.GitLabPath,
+			&l.Kind, &l.RefName, &l.DisplayName, &l.SyncIssues, &l.LastSyncedAt, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		links = append(links, l)
+	}
+	return links, rows.Err()
+}
+
 func DeleteProjectGitLabLink(db *sql.DB, id int64) error {
 	_, err := db.Exec(`DELETE FROM project_gitlab_links WHERE id = ?`, id)
 	return err
+}
+
+// DeleteProjectGitLabLinkByID removes a link only if it belongs to the given project —
+// prevents URL tampering where linkId from another project is passed.
+func DeleteProjectGitLabLinkByID(db *sql.DB, linkID, projectID int64) (bool, error) {
+	res, err := db.Exec(`DELETE FROM project_gitlab_links WHERE id = ? AND project_id = ?`, linkID, projectID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }

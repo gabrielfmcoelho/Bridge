@@ -40,11 +40,22 @@ export function pctBarColor(pct: number): string {
   return pct >= 80 ? "bg-red-500" : pct >= 50 ? "bg-amber-500" : "bg-emerald-500";
 }
 
-/** Format a relative time ago string from an ISO date. */
-export function getTimeAgo(dateStr: string): string {
+/** Format a relative time ago string from an ISO date. Pass locale="pt-BR" for Portuguese. */
+export function getTimeAgo(dateStr: string, locale: string = "en"): string {
   const date = new Date(dateStr);
   const diffMs = Date.now() - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);
+
+  if (locale === "pt-BR") {
+    if (diffMin < 1) return "agora";
+    if (diffMin < 60) return `há ${diffMin} ${diffMin === 1 ? "minuto" : "minutos"}`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `há ${diffH} ${diffH === 1 ? "hora" : "horas"}`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 30) return `há ${diffD} ${diffD === 1 ? "dia" : "dias"}`;
+    return date.toLocaleDateString("pt-BR");
+  }
+
   if (diffMin < 1) return "just now";
   if (diffMin < 60) return `${diffMin}m ago`;
   const diffH = Math.floor(diffMin / 60);

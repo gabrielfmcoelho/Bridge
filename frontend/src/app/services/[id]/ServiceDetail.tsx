@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { servicesAPI, issuesAPI, hostsAPI, dnsAPI, graphAPI } from "@/lib/api";
+import { servicesAPI, issuesAPI, hostsAPI, dnsAPI, graphAPI, integrationsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilteredGraph } from "@/hooks/useFilteredGraph";
@@ -21,8 +21,9 @@ import ConnectionsTab from "./_components/ConnectionsTab";
 import TopologyTab from "./_components/TopologyTab";
 import CredentialsTab from "./_components/CredentialsTab";
 import IssuesTab from "./_components/IssuesTab";
+import MetricsTab from "./_components/MetricsTab";
 
-type TabKey = "overview" | "connections" | "topology" | "credentials" | "issues";
+type TabKey = "overview" | "connections" | "topology" | "credentials" | "issues" | "metrics";
 
 const VIEW_TABS: { key: TabKey; label: string; icon?: string }[] = [
   { key: "overview", label: "Overview", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
@@ -75,6 +76,14 @@ export default function ServiceDetail({ id }: { id: number }) {
     queryFn: graphAPI.get,
     enabled: activeTab === "topology",
   });
+
+  const { data: integrations } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: integrationsAPI.get,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const grafanaEnabled = integrations?.grafana?.grafana_enabled === "true";
 
   // ── Derived data ──
   const dependsOnServices = allServices.filter((s) => data?.depends_on_ids?.includes(s.id));
@@ -169,7 +178,12 @@ export default function ServiceDetail({ id }: { id: number }) {
 
           {/* ── Tab bar ── */}
           <TabBar
-            tabs={VIEW_TABS.map((tab) => ({
+            tabs={[
+              ...VIEW_TABS,
+              ...(grafanaEnabled
+                ? [{ key: "metrics" as TabKey, label: "Metrics", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" }]
+                : []),
+            ].map((tab) => ({
               key: tab.key,
               label: tab.label,
               icon: tab.icon,
@@ -216,6 +230,10 @@ export default function ServiceDetail({ id }: { id: number }) {
 
           {activeTab === "issues" && (
             <IssuesTab issues={issues} t={t} />
+          )}
+
+          {activeTab === "metrics" && grafanaEnabled && (
+            <MetricsTab serviceId={id} nickname={data.service.nickname} />
           )}
 
           {/* ── Edit Drawer ── */}

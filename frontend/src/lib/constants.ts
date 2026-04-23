@@ -37,6 +37,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/projects", label: "nav.projects", icon: "FolderKanban" },
       { href: "/releases", label: "nav.releases", icon: "Rocket" },
       { href: "/contacts", label: "nav.contacts", icon: "Users" },
+      { href: "/wiki", label: "nav.wiki", icon: "Book" },
+      { href: "/chamados", label: "nav.chamados", icon: "Ticket" },
     ],
   },
   {

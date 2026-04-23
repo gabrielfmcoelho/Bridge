@@ -808,4 +808,97 @@ var migrationsPostgres = []string{
 		UNIQUE(host_id, username)
 	);
 	CREATE INDEX IF NOT EXISTS idx_host_remote_users_host ON host_remote_users(host_id);`,
+
+	// Version 52: GitLab Code Management — see migrations_sqlite.go for rationale.
+	`ALTER TABLE project_gitlab_links ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'project';
+	ALTER TABLE project_gitlab_links ADD COLUMN IF NOT EXISTS ref_name TEXT NOT NULL DEFAULT '';
+	ALTER TABLE project_gitlab_links ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT '';
+
+	INSERT INTO app_settings (key, value) VALUES ('gitlab_code_service_token_cipher', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('gitlab_code_service_token_nonce', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('gitlab_code_default_ref', '') ON CONFLICT DO NOTHING;`,
+
+	// Version 53: cache per-project AI analyses — see migrations_sqlite.go for rationale.
+	`CREATE TABLE IF NOT EXISTS project_ai_analyses (
+		project_id    BIGINT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+		content       TEXT NOT NULL DEFAULT '',
+		locale        TEXT NOT NULL DEFAULT '',
+		commits_used  INTEGER NOT NULL DEFAULT 0,
+		repos_used    INTEGER NOT NULL DEFAULT 0,
+		generated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);`,
+
+	// Version 54: Grafana integration scaffolding — see migrations_sqlite.go for details.
+	`ALTER TABLE hosts ADD COLUMN IF NOT EXISTS grafana_dashboard_uid TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS grafana_dashboard_uid TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_alerts ADD COLUMN IF NOT EXISTS external_id TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_alerts ADD COLUMN IF NOT EXISTS external_source TEXT NOT NULL DEFAULT '';
+	CREATE INDEX IF NOT EXISTS idx_host_alerts_external ON host_alerts(external_source, external_id);
+
+	INSERT INTO app_settings (key, value) VALUES ('grafana_enabled', 'false') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_base_url', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_api_token_cipher', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_api_token_nonce', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_webhook_secret_cipher', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_webhook_secret_nonce', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_host_default_dashboard_uid', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_service_default_dashboard_uid', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_prom_remote_write_url', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_prom_remote_write_username', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_prom_remote_write_password_cipher', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_prom_remote_write_password_nonce', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('grafana_datasource_uid', '') ON CONFLICT DO NOTHING;`,
+
+	// Version 55: Outline integration — see migrations_sqlite.go for rationale.
+	`ALTER TABLE projects ADD COLUMN IF NOT EXISTS outline_collection_id TEXT NOT NULL DEFAULT '';
+
+	INSERT INTO app_settings (key, value) VALUES ('outline_enabled', 'false') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('outline_base_url', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('outline_api_token_cipher', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('outline_api_token_nonce', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('outline_common_collection_id', '') ON CONFLICT DO NOTHING;`,
+
+	// Version 56: GLPI integration — see migrations_sqlite.go for rationale.
+	`CREATE TABLE IF NOT EXISTS glpi_tokens (
+		id                BIGSERIAL PRIMARY KEY,
+		name              TEXT NOT NULL UNIQUE,
+		description       TEXT NOT NULL DEFAULT '',
+		user_token_cipher BYTEA,
+		user_token_nonce  BYTEA,
+		default_entity_id INTEGER NOT NULL DEFAULT 0,
+		created_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at        TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+
+	ALTER TABLE host_chamados ADD COLUMN IF NOT EXISTS external_source TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_chamados ADD COLUMN IF NOT EXISTS external_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_chamados ADD COLUMN IF NOT EXISTS cached_title TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_chamados ADD COLUMN IF NOT EXISTS cached_status TEXT NOT NULL DEFAULT '';
+	ALTER TABLE host_chamados ADD COLUMN IF NOT EXISTS cached_at TIMESTAMPTZ;
+
+	ALTER TABLE projects ADD COLUMN IF NOT EXISTS glpi_token_id BIGINT DEFAULT NULL REFERENCES glpi_tokens(id) ON DELETE SET NULL;
+	ALTER TABLE projects ADD COLUMN IF NOT EXISTS glpi_entity_id INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE projects ADD COLUMN IF NOT EXISTS glpi_category_id INTEGER NOT NULL DEFAULT 0;
+
+	CREATE TABLE IF NOT EXISTS alert_chamado_links (
+		alert_id   BIGINT NOT NULL REFERENCES host_alerts(id) ON DELETE CASCADE,
+		chamado_id BIGINT NOT NULL REFERENCES host_chamados(id) ON DELETE CASCADE,
+		PRIMARY KEY(alert_id, chamado_id)
+	);
+
+	INSERT INTO app_settings (key, value) VALUES ('glpi_enabled', 'false') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('glpi_base_url', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('glpi_app_token_cipher', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('glpi_app_token_nonce', '') ON CONFLICT DO NOTHING;
+	INSERT INTO app_settings (key, value) VALUES ('glpi_default_entity_id', '0') ON CONFLICT DO NOTHING;`,
+
+	// Version 57: GLPI dropdown catalogue — see migrations_sqlite.go for rationale.
+	`CREATE TABLE IF NOT EXISTS glpi_dropdown_catalogues (
+		id           BIGSERIAL PRIMARY KEY,
+		itemtype     TEXT NOT NULL UNIQUE,
+		options      TEXT NOT NULL DEFAULT '[]',
+		option_count INTEGER NOT NULL DEFAULT 0,
+		updated_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_by   BIGINT
+	);`,
 }

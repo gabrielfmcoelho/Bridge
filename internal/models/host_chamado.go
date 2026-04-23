@@ -2,20 +2,29 @@ package models
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 )
 
 // HostChamado represents a chamado (ticket/request) associated with a host.
+// When linked to GLPI (ExternalSource="glpi"), the cached_* fields hold the
+// last-known ticket title and status so lists render without re-querying GLPI
+// on every page view.
 type HostChamado struct {
-	ID              int64  `json:"id"`
-	HostID          int64  `json:"host_id"`
-	ChamadoID       string `json:"chamado_id"`
-	Title           string `json:"title"`
-	Status          string `json:"status"`
-	UserID          int64  `json:"user_id"`
-	UserDisplayName string `json:"user_display_name"`
-	Date            string `json:"date"`
+	ID              int64      `json:"id"`
+	HostID          int64      `json:"host_id"`
+	ChamadoID       string     `json:"chamado_id"`
+	Title           string     `json:"title"`
+	Status          string     `json:"status"`
+	UserID          int64      `json:"user_id"`
+	UserDisplayName string     `json:"user_display_name"`
+	Date            string     `json:"date"`
+	ExternalSource  string     `json:"external_source,omitempty"`
+	ExternalURL     string     `json:"external_url,omitempty"`
+	CachedTitle     string     `json:"cached_title,omitempty"`
+	CachedStatus    string     `json:"cached_status,omitempty"`
+	CachedAt        *time.Time `json:"cached_at,omitempty"`
 }
 
 // HostChamadoInput is the input for creating/syncing host chamados.
@@ -27,10 +36,13 @@ type HostChamadoInput struct {
 	Date      string `json:"date"`
 }
 
-const chamadoCols = `hc.id, hc.host_id, hc.chamado_id, hc.title, hc.status, hc.user_id, COALESCE(u.display_name, '') AS user_display_name, hc.date`
+const chamadoCols = `hc.id, hc.host_id, hc.chamado_id, hc.title, hc.status, hc.user_id, COALESCE(u.display_name, '') AS user_display_name, hc.date,
+	hc.external_source, hc.external_url, hc.cached_title, hc.cached_status, hc.cached_at`
 
 func scanChamado(scanner interface{ Scan(...any) error }, c *HostChamado) error {
-	return scanner.Scan(&c.ID, &c.HostID, &c.ChamadoID, &c.Title, &c.Status, &c.UserID, &c.UserDisplayName, &c.Date)
+	return scanner.Scan(&c.ID, &c.HostID, &c.ChamadoID, &c.Title, &c.Status, &c.UserID, &c.UserDisplayName, &c.Date,
+		&c.ExternalSource, &c.ExternalURL, &c.CachedTitle, &c.CachedStatus, &c.CachedAt,
+	)
 }
 
 // ListHostChamados returns all chamados for a host, joined with user display_name.
@@ -95,6 +107,35 @@ func UpdateHostChamado(db *sql.DB, id int64, inp *HostChamadoInput) error {
 func DeleteHostChamado(db *sql.DB, id int64) error {
 	_, err := db.Exec(`DELETE FROM host_chamados WHERE id = ?`, id)
 	return err
+}
+
+// UpdateChamadoCache refreshes the cached_* columns for an existing chamado after
+// a live lookup against the external source. Used by the GLPI integration.
+func UpdateChamadoCache(db *sql.DB, id int64, externalSource, externalURL, title, status string) error {
+	_, err := db.Exec(
+		`UPDATE host_chamados SET external_source = ?, external_url = ?, cached_title = ?, cached_status = ?, cached_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		externalSource, externalURL, title, status, id,
+	)
+	return err
+}
+
+// CreateExternalHostChamado inserts a chamado row that's linked to an external system
+// (e.g. a GLPI ticket just created from sshcm). Returns the id.
+func CreateExternalHostChamado(
+	db *sql.DB,
+	hostID int64,
+	userID int64,
+	chamadoID, title, status, date, externalSource, externalURL string,
+) (int64, error) {
+	if status == "" {
+		status = "in_execution"
+	}
+	return database.InsertReturningID(db,
+		`INSERT INTO host_chamados
+			(host_id, chamado_id, title, status, user_id, date, external_source, external_url, cached_title, cached_status, cached_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		hostID, chamadoID, title, status, userID, date, externalSource, externalURL, title, status,
+	)
 }
 
 // SyncHostChamados replaces all chamados for a host with the given inputs.

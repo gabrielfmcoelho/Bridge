@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { hostsAPI, enumsAPI, sshKeysAPI, contactsAPI, usersAPI, dnsAPI, servicesAPI, projectsAPI } from "@/lib/api";
+import { hostsAPI, enumsAPI, sshKeysAPI, contactsAPI, usersAPI, dnsAPI, servicesAPI, projectsAPI, grafanaAPI, integrationsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
 import Input from "@/components/ui/Input";
@@ -54,6 +54,7 @@ export default function HostForm({
     proxy_jump: host?.proxy_jump ?? "",
     forward_agent: host?.forward_agent ?? "",
     observacoes: host?.observacoes ?? "",
+    grafana_dashboard_uid: host?.grafana_dashboard_uid ?? "",
   });
   const [formTags, setFormTags] = useState<string[]>(tags ?? []);
   const [formResponsaveis, setFormResponsaveis] = useState<HostResponsavel[]>(responsaveis ?? []);
@@ -324,6 +325,23 @@ export default function HostForm({
           placeholder="Markdown..."
         />
       </DrawerSection>
+      <DrawerSection title="Grafana" open={openStepSection === "grafana"} onToggle={() => toggleStepSection("grafana")} active={!!form.grafana_dashboard_uid}>
+        <Input
+          label="Grafana dashboard UID"
+          value={form.grafana_dashboard_uid as string}
+          onChange={(e) => set("grafana_dashboard_uid", e.target.value)}
+          placeholder="leave blank to use the default from Settings"
+        />
+        <p className="text-[11px] text-[var(--text-muted)] mt-1">
+          Shown in the Metrics tab. The host&apos;s <code className="text-[var(--text-secondary)]">oficial_slug</code> is passed as dashboard variable <code className="text-[var(--text-secondary)]">var-host</code>.
+        </p>
+        {isEdit && host?.oficial_slug && (
+          <HostDashboardProvisionButton
+            slug={host.oficial_slug}
+            onProvisioned={(uid) => set("grafana_dashboard_uid", uid)}
+          />
+        )}
+      </DrawerSection>
     </div>
   );
 
@@ -431,4 +449,53 @@ function resolvePreferredAuth(hasPassword: boolean, hasKey: boolean, preferredAu
   if (hasPassword) return { valid: true as const, value: "password", error: "" };
   if (hasKey) return { valid: true as const, value: "key", error: "" };
   return { valid: true as const, value: "", error: "" };
+}
+
+// HostDashboardProvisionButton calls POST /api/hosts/{slug}/grafana/provision
+// and populates the UID field with the returned deterministic UID on success.
+// Only rendered for existing hosts (slug must be persisted).
+function HostDashboardProvisionButton({ slug, onProvisioned }: { slug: string; onProvisioned: (uid: string) => void }) {
+  const { data: integrations } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: integrationsAPI.get,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const grafanaEnabled = integrations?.grafana?.grafana_enabled === "true";
+  const datasourceSet = !!integrations?.grafana?.grafana_datasource_uid;
+
+  const mutation = useMutation({
+    mutationFn: () => grafanaAPI.provisionHostDashboard(slug),
+    onSuccess: (res) => {
+      onProvisioned(res.uid);
+    },
+  });
+
+  if (!grafanaEnabled) return null;
+
+  return (
+    <div className="mt-3 space-y-1">
+      <button
+        type="button"
+        onClick={() => mutation.mutate()}
+        disabled={mutation.isPending || !datasourceSet}
+        className="text-[11px] text-[var(--accent)] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+      >
+        {mutation.isPending ? "Provisioning…" : "Provision default dashboard in Grafana"}
+      </button>
+      {!datasourceSet && (
+        <p className="text-[10px] text-amber-400">
+          Set the Prometheus datasource UID in Settings → Integrations → Grafana first.
+        </p>
+      )}
+      {mutation.isSuccess && !mutation.isPending && (
+        <p className="text-[10px] text-emerald-400">{mutation.data?.message}</p>
+      )}
+      {mutation.isError && (
+        <p className="text-[10px] text-red-400">
+          {mutation.error instanceof Error ? mutation.error.message : "Provision failed"}
+        </p>
+      )}
+    </div>
+  );
 }

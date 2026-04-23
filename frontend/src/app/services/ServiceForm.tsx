@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { servicesAPI, hostsAPI, dnsAPI, projectsAPI, enumsAPI } from "@/lib/api";
+import { servicesAPI, hostsAPI, dnsAPI, projectsAPI, enumsAPI, grafanaAPI, integrationsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
 import Button from "@/components/ui/Button";
@@ -46,6 +46,7 @@ export default function ServiceForm({ initial, onSuccess, onSubHeaderChange }: S
     repository_url: initial?.repository_url || "",
     gitlab_url: initial?.gitlab_url || "",
     documentation_url: initial?.documentation_url || "",
+    grafana_dashboard_uid: initial?.grafana_dashboard_uid || "",
     host_ids: initial?.host_ids || [] as number[],
     dns_ids: initial?.dns_ids || [] as number[],
     depends_on_ids: initial?.depends_on_ids || [] as number[],
@@ -131,6 +132,18 @@ export default function ServiceForm({ initial, onSuccess, onSubHeaderChange }: S
           )}
           <Input label="Repository URL" value={form.repository_url} onChange={(e) => set("repository_url", e.target.value)} type="url" placeholder="https://gitlab.com/..." />
           <Input label={t("project.documentationUrl")} value={form.documentation_url} onChange={(e) => set("documentation_url", e.target.value)} type="url" placeholder="https://docs..." />
+          <Input
+            label="Grafana dashboard UID"
+            value={form.grafana_dashboard_uid}
+            onChange={(e) => set("grafana_dashboard_uid", e.target.value)}
+            placeholder="leave blank to use the default from Settings"
+          />
+          {initial?.id && (
+            <ServiceDashboardProvisionButton
+              serviceId={initial.id}
+              onProvisioned={(uid) => set("grafana_dashboard_uid", uid)}
+            />
+          )}
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>{t("common.back")}</Button>
             <Button type="button" className="flex-1" onClick={() => setStep(3)}>{t("host.nextStep")}</Button>
@@ -169,6 +182,54 @@ export default function ServiceForm({ initial, onSuccess, onSubHeaderChange }: S
             <Button type="submit" className="flex-1" loading={mutation.isPending}>{t("common.create")}</Button>
           </div>
         </form>
+      )}
+    </div>
+  );
+}
+
+// ServiceDashboardProvisionButton is the service-side counterpart to the
+// host provision button — keyed by numeric id since services can be renamed.
+function ServiceDashboardProvisionButton({ serviceId, onProvisioned }: { serviceId: number; onProvisioned: (uid: string) => void }) {
+  const { data: integrations } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: integrationsAPI.get,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const grafanaEnabled = integrations?.grafana?.grafana_enabled === "true";
+  const datasourceSet = !!integrations?.grafana?.grafana_datasource_uid;
+
+  const mutation = useMutation({
+    mutationFn: () => grafanaAPI.provisionServiceDashboard(serviceId),
+    onSuccess: (res) => {
+      onProvisioned(res.uid);
+    },
+  });
+
+  if (!grafanaEnabled) return null;
+
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => mutation.mutate()}
+        disabled={mutation.isPending || !datasourceSet}
+        className="text-[11px] text-[var(--accent)] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+      >
+        {mutation.isPending ? "Provisioning…" : "Provision default dashboard in Grafana"}
+      </button>
+      {!datasourceSet && (
+        <p className="text-[10px] text-amber-400">
+          Set the Prometheus datasource UID in Settings → Integrations → Grafana first.
+        </p>
+      )}
+      {mutation.isSuccess && !mutation.isPending && (
+        <p className="text-[10px] text-emerald-400">{mutation.data?.message}</p>
+      )}
+      {mutation.isError && (
+        <p className="text-[10px] text-red-400">
+          {mutation.error instanceof Error ? mutation.error.message : "Provision failed"}
+        </p>
       )}
     </div>
   );

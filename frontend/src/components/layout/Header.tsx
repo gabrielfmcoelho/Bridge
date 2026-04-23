@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Drawer from "@/components/ui/Drawer";
 import AiChatDrawer from "@/components/ai/AiChatDrawer";
 
@@ -26,6 +26,11 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
   const { appName, appColor, appLogo } = useAppearance();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
+  const pathname = usePathname();
+  // Route → title mapping for the global header. Extend as other pages want
+  // to surface their name next to the collapse button.
+  const headerTitle =
+    pathname === "/wiki" || pathname?.startsWith("/wiki/") ? "Wiki" : "";
   const [userDrawer, setUserDrawer] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
   const [aiChat, setAiChat] = useState(false);
@@ -81,6 +86,14 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
           </svg>
         </button>
+        {headerTitle && (
+          <h1
+            className="hidden md:block ml-2 text-sm font-semibold text-[var(--text-primary)] truncate"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {headerTitle}
+          </h1>
+        )}
       </div>
 
       {/* AI Chat Drawer */}

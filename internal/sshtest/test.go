@@ -246,6 +246,14 @@ func runCmdRaw(client *ssh.Client, cmd string) (string, error) {
 	return cleaned, nil
 }
 
+// RunPrivilegedScript executes an arbitrary shell script under sudo on the
+// remote host. It is the exported cousin of runSudoCmd, intended for operations
+// like Grafana Agent install that need root + full shell features. The script
+// is base64-encoded before transport so no outer-shell metacharacters leak.
+func RunPrivilegedScript(client *ssh.Client, password, script string) (string, error) {
+	return runSudoCmd(client, password, script)
+}
+
 // runSudoCmd executes a command under sudo on the remote host, feeding the
 // password via the session's stdin pipe. This avoids interpolating the password
 // into the command string (which would expose it in /proc/*/cmdline and break

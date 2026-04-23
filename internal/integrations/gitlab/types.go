@@ -21,6 +21,14 @@ type Project struct {
 	DefaultBranch     string `json:"default_branch"`
 }
 
+// Group represents a GitLab group.
+type Group struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	FullPath string `json:"full_path"`
+	WebURL   string `json:"web_url"`
+}
+
 // Commit represents a GitLab commit.
 type Commit struct {
 	ID             string    `json:"id"`
@@ -53,8 +61,16 @@ type Issue struct {
 // CommitListParams are query parameters for listing commits.
 type CommitListParams struct {
 	RefName string
+	All     bool // when true, return commits from every branch/ref (de-duped by SHA)
 	PerPage int
 	Page    int
+}
+
+// CommitRef is an entry from /projects/:id/repository/commits/:sha/refs — a branch or tag
+// that contains the commit.
+type CommitRef struct {
+	Type string `json:"type"` // "branch" or "tag"
+	Name string `json:"name"`
 }
 
 // IssueListParams are query parameters for listing issues.

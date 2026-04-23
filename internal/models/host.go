@@ -50,6 +50,7 @@ type Host struct {
 	DockerGroupStatus         *string   `json:"docker_group_status"`
 	CoolifyServerUUID         *string   `json:"coolify_server_uuid"`
 	Observacoes               string    `json:"observacoes"`
+	GrafanaDashboardUID       string    `json:"grafana_dashboard_uid"`
 	CreatedAt                 time.Time `json:"created_at"`
 	UpdatedAt                 time.Time `json:"updated_at"`
 }
@@ -80,8 +81,9 @@ func CreateHost(db *sql.DB, h *Host) error {
 			description, setor_responsavel, responsavel_interno, contato_responsavel_interno,
 			acesso_empresa_externa, empresa_responsavel, responsavel_externo, contato_responsavel_externo,
 			recurso_cpu, recurso_ram, recurso_armazenamento,
-			situacao, precisa_manutencao, preferred_auth, connections_failed, password_test_status, key_test_status, docker_group_status, observacoes
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			situacao, precisa_manutencao, preferred_auth, connections_failed, password_test_status, key_test_status, docker_group_status, observacoes,
+			grafana_dashboard_uid
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		h.Nickname, h.OficialSlug, h.Hostname, h.Hospedagem, h.TipoMaquina,
 		h.User, h.HasPassword, h.PasswordCiphertext, h.PasswordNonce,
 		h.HasKey, h.KeyPath, h.PubKeyCiphertext, h.PubKeyNonce, h.PrivKeyCiphertext, h.PrivKeyNonce,
@@ -90,6 +92,7 @@ func CreateHost(db *sql.DB, h *Host) error {
 		h.AcessoEmpresaExterna, h.EmpresaResponsavel, h.ResponsavelExterno, h.ContatoResponsavelExterno,
 		h.RecursoCPU, h.RecursoRAM, h.RecursoArmazenamento,
 		h.Situacao, h.PrecisaManutencao, h.PreferredAuth, h.ConnectionsFailed, h.PasswordTestStatus, h.KeyTestStatus, h.DockerGroupStatus, h.Observacoes,
+		h.GrafanaDashboardUID,
 	)
 	if err != nil {
 		return err
@@ -258,6 +261,7 @@ func UpdateHost(db *sql.DB, h *Host) error {
 			acesso_empresa_externa = ?, empresa_responsavel = ?, responsavel_externo = ?, contato_responsavel_externo = ?,
 			recurso_cpu = ?, recurso_ram = ?, recurso_armazenamento = ?,
 			situacao = ?, precisa_manutencao = ?, preferred_auth = ?, connections_failed = ?, password_test_status = ?, key_test_status = ?, docker_group_status = ?, observacoes = ?,
+			grafana_dashboard_uid = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		h.Nickname, h.OficialSlug, h.Hostname, h.Hospedagem, h.TipoMaquina,
@@ -269,6 +273,7 @@ func UpdateHost(db *sql.DB, h *Host) error {
 		h.AcessoEmpresaExterna, h.EmpresaResponsavel, h.ResponsavelExterno, h.ContatoResponsavelExterno,
 		h.RecursoCPU, h.RecursoRAM, h.RecursoArmazenamento,
 		h.Situacao, h.PrecisaManutencao, h.PreferredAuth, h.ConnectionsFailed, h.PasswordTestStatus, h.KeyTestStatus, h.DockerGroupStatus, h.Observacoes,
+		h.GrafanaDashboardUID,
 		h.ID,
 	)
 	return err
@@ -343,6 +348,7 @@ func hostColumns() string {
 		acesso_empresa_externa, empresa_responsavel, responsavel_externo, contato_responsavel_externo,
 		recurso_cpu, recurso_ram, recurso_armazenamento,
 		situacao, precisa_manutencao, preferred_auth, connections_failed, password_test_status, key_test_status, docker_group_status, coolify_server_uuid, observacoes,
+		grafana_dashboard_uid,
 		created_at, updated_at,
 		pub_key_ciphertext, pub_key_nonce, priv_key_ciphertext, priv_key_nonce`
 }
@@ -356,6 +362,7 @@ func hostScanDest(h *Host) []any {
 		&h.AcessoEmpresaExterna, &h.EmpresaResponsavel, &h.ResponsavelExterno, &h.ContatoResponsavelExterno,
 		&h.RecursoCPU, &h.RecursoRAM, &h.RecursoArmazenamento,
 		&h.Situacao, &h.PrecisaManutencao, &h.PreferredAuth, &h.ConnectionsFailed, &h.PasswordTestStatus, &h.KeyTestStatus, &h.DockerGroupStatus, &h.CoolifyServerUUID, &h.Observacoes,
+		&h.GrafanaDashboardUID,
 		&h.CreatedAt, &h.UpdatedAt,
 		&h.PubKeyCiphertext, &h.PubKeyNonce, &h.PrivKeyCiphertext, &h.PrivKeyNonce,
 	}

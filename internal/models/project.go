@@ -20,6 +20,10 @@ type Project struct {
 	IsResponsible               bool      `json:"is_responsible"`
 	GitlabURL                   string    `json:"gitlab_url"`
 	DocumentationURL            string    `json:"documentation_url"`
+	OutlineCollectionID         string    `json:"outline_collection_id"`
+	GlpiTokenID                 *int64    `json:"glpi_token_id"`
+	GlpiEntityID                int       `json:"glpi_entity_id"`
+	GlpiCategoryID              int       `json:"glpi_category_id"`
 	CreatedAt                   time.Time `json:"created_at"`
 	UpdatedAt                   time.Time `json:"updated_at"`
 }
@@ -35,11 +39,13 @@ func CreateProject(db *sql.DB, p *Project) error {
 	id, err := database.InsertReturningID(db,
 		`INSERT INTO projects (name, description, situacao, setor_responsavel, responsavel,
 			tem_empresa_externa_responsavel, contato_empresa_responsavel,
-			is_directly_managed, is_responsible, gitlab_url, documentation_url)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			is_directly_managed, is_responsible, gitlab_url, documentation_url, outline_collection_id,
+			glpi_token_id, glpi_entity_id, glpi_category_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		p.Name, p.Description, p.Situacao, p.SetorResponsavel, p.Responsavel,
 		p.TemEmpresaExternaResponsavel, p.ContatoEmpresaResponsavel,
-		p.IsDirectlyManaged, p.IsResponsible, p.GitlabURL, p.DocumentationURL,
+		p.IsDirectlyManaged, p.IsResponsible, p.GitlabURL, p.DocumentationURL, p.OutlineCollectionID,
+		p.GlpiTokenID, p.GlpiEntityID, p.GlpiCategoryID,
 	)
 	if err != nil {
 		return err
@@ -53,12 +59,14 @@ func GetProject(db *sql.DB, id int64) (*Project, error) {
 	err := db.QueryRow(
 		`SELECT id, name, description, situacao, setor_responsavel, responsavel,
 			tem_empresa_externa_responsavel, contato_empresa_responsavel,
-			is_directly_managed, is_responsible, gitlab_url, documentation_url,
+			is_directly_managed, is_responsible, gitlab_url, documentation_url, outline_collection_id,
+			glpi_token_id, glpi_entity_id, glpi_category_id,
 			created_at, updated_at
 		FROM projects WHERE id = ?`, id,
 	).Scan(&p.ID, &p.Name, &p.Description, &p.Situacao, &p.SetorResponsavel, &p.Responsavel,
 		&p.TemEmpresaExternaResponsavel, &p.ContatoEmpresaResponsavel,
-		&p.IsDirectlyManaged, &p.IsResponsible, &p.GitlabURL, &p.DocumentationURL,
+		&p.IsDirectlyManaged, &p.IsResponsible, &p.GitlabURL, &p.DocumentationURL, &p.OutlineCollectionID,
+		&p.GlpiTokenID, &p.GlpiEntityID, &p.GlpiCategoryID,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -71,7 +79,8 @@ func ListProjects(db *sql.DB) ([]Project, error) {
 	rows, err := db.Query(
 		`SELECT id, name, description, situacao, setor_responsavel, responsavel,
 			tem_empresa_externa_responsavel, contato_empresa_responsavel,
-			is_directly_managed, is_responsible, gitlab_url, documentation_url,
+			is_directly_managed, is_responsible, gitlab_url, documentation_url, outline_collection_id,
+			glpi_token_id, glpi_entity_id, glpi_category_id,
 			created_at, updated_at
 		FROM projects ORDER BY name`,
 	)
@@ -85,7 +94,8 @@ func ListProjects(db *sql.DB) ([]Project, error) {
 		var p Project
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Situacao, &p.SetorResponsavel, &p.Responsavel,
 			&p.TemEmpresaExternaResponsavel, &p.ContatoEmpresaResponsavel,
-			&p.IsDirectlyManaged, &p.IsResponsible, &p.GitlabURL, &p.DocumentationURL,
+			&p.IsDirectlyManaged, &p.IsResponsible, &p.GitlabURL, &p.DocumentationURL, &p.OutlineCollectionID,
+			&p.GlpiTokenID, &p.GlpiEntityID, &p.GlpiCategoryID,
 			&p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -99,12 +109,14 @@ func UpdateProject(db *sql.DB, p *Project) error {
 	_, err := db.Exec(
 		`UPDATE projects SET name = ?, description = ?, situacao = ?, setor_responsavel = ?, responsavel = ?,
 			tem_empresa_externa_responsavel = ?, contato_empresa_responsavel = ?,
-			is_directly_managed = ?, is_responsible = ?, gitlab_url = ?, documentation_url = ?,
+			is_directly_managed = ?, is_responsible = ?, gitlab_url = ?, documentation_url = ?, outline_collection_id = ?,
+			glpi_token_id = ?, glpi_entity_id = ?, glpi_category_id = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		p.Name, p.Description, p.Situacao, p.SetorResponsavel, p.Responsavel,
 		p.TemEmpresaExternaResponsavel, p.ContatoEmpresaResponsavel,
-		p.IsDirectlyManaged, p.IsResponsible, p.GitlabURL, p.DocumentationURL,
+		p.IsDirectlyManaged, p.IsResponsible, p.GitlabURL, p.DocumentationURL, p.OutlineCollectionID,
+		p.GlpiTokenID, p.GlpiEntityID, p.GlpiCategoryID,
 		p.ID,
 	)
 	return err
@@ -163,7 +175,8 @@ func ListProjectsByHost(db *sql.DB, hostID int64) ([]Project, error) {
 		var p Project
 		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Situacao, &p.SetorResponsavel, &p.Responsavel,
 			&p.TemEmpresaExternaResponsavel, &p.ContatoEmpresaResponsavel,
-			&p.IsDirectlyManaged, &p.IsResponsible, &p.GitlabURL, &p.DocumentationURL,
+			&p.IsDirectlyManaged, &p.IsResponsible, &p.GitlabURL, &p.DocumentationURL, &p.OutlineCollectionID,
+			&p.GlpiTokenID, &p.GlpiEntityID, &p.GlpiCategoryID,
 			&p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, err

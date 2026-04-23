@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Field from "@/components/ui/Field";
 import Badge from "@/components/ui/Badge";
+import { glpiAPI, integrationsAPI } from "@/lib/api";
 import type { HostChamado } from "@/lib/types";
 
 function applyDateMask(raw: string): string {
@@ -43,9 +46,10 @@ interface ChamadoDrawerProps {
   onDelete: (id: number) => void;
   loading: boolean;
   t: (k: string) => string;
+  slug?: string; // needed for the GLPI refresh button
 }
 
-export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate, onUpdate, onDelete, loading, t }: ChamadoDrawerProps) {
+export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate, onUpdate, onDelete, loading, t, slug }: ChamadoDrawerProps) {
   const isEdit = !!chamado;
   const [mode, setMode] = useState<"read" | "edit" | "create">("create");
   const [chamadoId, setChamadoId] = useState("");
@@ -117,6 +121,8 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
           </div>
 
           <Field label={t("host.chamadoDate") || "Date"} value={chamado.date || "--"} />
+
+          {slug && <GlpiRefreshBlock slug={slug} chamado={chamado} />}
         </div>
       </Drawer>
     );
@@ -195,5 +201,112 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
         />
       </div>
     </Drawer>
+  );
+}
+
+// GlpiRefreshBlock renders a small card inside the chamado read view when the
+// chamado_id looks numeric and the GLPI integration is enabled. It shows the
+// cached title/status from the last refresh plus a button to re-query GLPI.
+// A profile picker appears inline when more than one profile is configured.
+function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamado }) {
+  const queryClient = useQueryClient();
+  const [profileID, setProfileID] = useState<number | null>(null);
+  const [liveStatus, setLiveStatus] = useState<{ label: string; slug: string } | null>(null);
+
+  const { data: integrations } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: integrationsAPI.get,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const glpiEnabled = integrations?.glpi?.glpi_enabled === "true";
+
+  const { data: profiles } = useQuery({
+    queryKey: ["glpi-profiles"],
+    queryFn: glpiAPI.listProfiles,
+    enabled: glpiEnabled,
+    retry: false,
+  });
+
+  // Auto-pick the first profile if only one is configured.
+  useEffect(() => {
+    if (profiles && profiles.length > 0 && profileID == null) {
+      setProfileID(profiles[0].id);
+    }
+  }, [profiles, profileID]);
+
+  const ticketID = parseInt(chamado.chamado_id.trim(), 10);
+  const isNumericTicket = !Number.isNaN(ticketID) && ticketID > 0;
+
+  const mutation = useMutation({
+    mutationFn: () => glpiAPI.refreshChamadoCache(slug, chamado.id!, profileID!),
+    onSuccess: (res) => {
+      setLiveStatus({ label: res.status_label, slug: res.status_slug });
+      queryClient.invalidateQueries({ queryKey: ["chamados", slug] });
+    },
+  });
+
+  if (!glpiEnabled || !isNumericTicket || !chamado.id) return null;
+
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3 space-y-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-[var(--text-primary)]">GLPI</p>
+          {chamado.cached_title ? (
+            <p className="text-[11px] text-[var(--text-muted)] truncate">{chamado.cached_title}</p>
+          ) : (
+            <p className="text-[11px] text-[var(--text-faint)] italic">No live data yet — click Refresh.</p>
+          )}
+          {(chamado.cached_status || liveStatus) && (
+            <div className="flex items-center gap-2 mt-1">
+              <Badge className="text-[10px] uppercase tracking-wide">
+                {liveStatus?.label ?? chamado.cached_status}
+              </Badge>
+              {chamado.external_url && (
+                <Link
+                  href={chamado.external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-[var(--accent)] hover:underline"
+                >
+                  Open in GLPI ↗
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => mutation.mutate()}
+          loading={mutation.isPending}
+          disabled={!profileID}
+        >
+          Refresh
+        </Button>
+      </div>
+
+      {(profiles?.length ?? 0) > 1 && (
+        <div>
+          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Using profile</label>
+          <select
+            value={profileID ?? ""}
+            onChange={(e) => setProfileID(e.target.value ? parseInt(e.target.value, 10) : null)}
+            className="w-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-2 py-1 text-xs"
+          >
+            {(profiles ?? []).map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {mutation.isError && (
+        <p className="text-[11px] text-red-400">
+          {mutation.error instanceof Error ? mutation.error.message : "Refresh failed"}
+        </p>
+      )}
+    </div>
   );
 }

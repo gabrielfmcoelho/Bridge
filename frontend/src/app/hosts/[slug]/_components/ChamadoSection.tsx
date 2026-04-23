@@ -12,6 +12,7 @@ import SortableTable, { sortRows } from "@/components/ui/SortableTable";
 import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
 import EmptyState from "@/components/ui/EmptyState";
 import ChamadoDrawer from "./ChamadoDrawer";
+import GlpiHostTicketsBlock from "./GlpiHostTicketsBlock";
 import type { HostChamado } from "@/lib/types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -210,7 +211,10 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
         onDelete={(id) => { if (confirm("Delete this chamado?")) deleteMutation.mutate(id); }}
         loading={createMutation.isPending || updateMutation.isPending}
         t={t}
+        slug={slug}
       />
+
+      <GlpiHostTicketsBlock slug={slug} />
     </>
   );
 }

@@ -60,6 +60,7 @@ export interface Host {
   docker_group_status?: "ok" | "fixed" | "needs_sudo" | "needs_relogin" | "not_installed" | "failed" | null;
   coolify_server_uuid?: string | null;
   observacoes: string;
+  grafana_dashboard_uid?: string;
   created_at: string;
   updated_at: string;
   tags?: string[];
@@ -95,10 +96,12 @@ export interface HostAlert {
   level: AlertLevel;
   message: string;
   description?: string;
-  source: "auto" | "manual";
+  source: "auto" | "manual" | "grafana";
   status?: "active" | "resolved";
   host_id?: number;
   linked_issue_id?: number | null;
+  external_id?: string;
+  external_source?: string;
 }
 
 export interface AlertThresholds {
@@ -153,6 +156,10 @@ export interface Project {
   is_responsible: boolean;
   gitlab_url: string;
   documentation_url: string;
+  outline_collection_id?: string;
+  glpi_token_id?: number | null;
+  glpi_entity_id?: number;
+  glpi_category_id?: number;
   created_at: string;
   updated_at: string;
   tags?: string[];
@@ -194,6 +201,7 @@ export interface Service {
   repository_url: string;
   gitlab_url: string;
   documentation_url: string;
+  grafana_dashboard_uid?: string;
   source: "manual" | "auto" | "fixed";
   container_status: "online" | "offline" | "";
   container_id: string;
@@ -348,6 +356,11 @@ export interface HostChamado {
   user_id: number;
   user_display_name?: string;
   date: string;
+  external_source?: string;
+  external_url?: string;
+  cached_title?: string;
+  cached_status?: string;
+  cached_at?: string;
 }
 
 export interface SSHKeyRecord {

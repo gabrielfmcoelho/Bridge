@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -446,7 +447,33 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fire-and-forget: if Grafana integration is fully configured, auto-provision
+	// a default dashboard for this new host in the background. Failures just log —
+	// we never block host creation on Grafana being reachable.
+	h.maybeProvisionGrafanaDashboard(req.Host)
+
 	jsonCreated(w, req.Host)
+}
+
+// maybeProvisionGrafanaDashboard runs ProvisionHostDashboard in a goroutine if
+// the integration is enabled. Keep the call site cheap — a couple of DB reads
+// worst case when it's disabled.
+func (h *hostHandlers) maybeProvisionGrafanaDashboard(host models.Host) {
+	if models.GetAppSettingValue(h.db.SQL, "grafana_enabled") != "true" {
+		return
+	}
+	go func(host models.Host) {
+		defer func() {
+			if rv := recover(); rv != nil {
+				log.Printf("[grafana-provision] host %d panic: %v", host.ID, rv)
+			}
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if _, err := ProvisionHostDashboard(ctx, h.db, &host); err != nil {
+			log.Printf("[grafana-provision] host %d (%s): %v", host.ID, host.OficialSlug, err)
+		}
+	}(host)
 }
 
 func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {

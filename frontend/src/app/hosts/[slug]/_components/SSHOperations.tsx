@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { sshAPI, hostsAPI, sshKeysAPI } from "@/lib/api";
+import { sshAPI, hostsAPI, sshKeysAPI, integrationsAPI } from "@/lib/api";
 import { resolveAuthMethod } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSSHMutation } from "@/hooks/useSSHMutation";
@@ -82,6 +82,14 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   }, []);
 
   const { data: sshKeysList = [] } = useQuery({ queryKey: ["ssh-keys"], queryFn: sshKeysAPI.list });
+  const { data: integrationsData } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: integrationsAPI.get,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const grafanaEnabled = integrationsData?.grafana?.grafana_enabled === "true";
+  const grafanaRemoteWriteConfigured = !!integrationsData?.grafana?.grafana_prom_remote_write_url;
   const { data: operationLogs = [] } = useQuery({
     queryKey: ["operation-logs", slug],
     queryFn: () => sshAPI.operationLogs(slug),
@@ -276,6 +284,52 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     },
   });
 
+  const grafanaAgentMutation = useSSHMutation({
+    slug,
+    mutationFn: () => sshAPI.grafanaAgentSetup(slug),
+    label: "Install Grafana Agent",
+    pushConsole,
+    onResult: (data) => {
+      if (!data.success) {
+        return {
+          status: "error" as const,
+          content: (
+            <div className="space-y-2 text-xs">
+              <p>{data.error || "Install failed"}</p>
+              {data.output && (
+                <pre
+                  className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-[10px] overflow-x-auto whitespace-pre-wrap break-all"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  {data.output}
+                </pre>
+              )}
+            </div>
+          ),
+        };
+      }
+      return {
+        status: "success" as const,
+        content: (
+          <div className="space-y-2 text-xs">
+            <p>{data.message || "grafana-agent installed"}</p>
+            {data.output && (
+              <details>
+                <summary className="cursor-pointer text-[var(--text-muted)]">Output</summary>
+                <pre
+                  className="mt-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-[10px] overflow-x-auto whitespace-pre-wrap break-all"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                >
+                  {data.output}
+                </pre>
+              </details>
+            )}
+          </div>
+        ),
+      };
+    },
+  });
+
   const nginxCleanupMutation = useSSHMutation({
     slug,
     mutationFn: (purge: boolean) => sshAPI.nginxCleanup(slug, purge),
@@ -341,7 +395,8 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     deleteRemoteUserMutation.isPending ||
     listRemoteKeysMutation.isPending ||
     dockerSetupMutation.isPending ||
-    nginxCleanupMutation.isPending;
+    nginxCleanupMutation.isPending ||
+    grafanaAgentMutation.isPending;
 
   useEffect(() => {
     if (!anyMutationPending && runningOp && setupStatus !== "testing" && setupStatus !== "installing") {
@@ -451,6 +506,21 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         const purge = window.confirm(t("operation.confirmNginxPurge"));
         setRunningOp("nginx-cleanup");
         nginxCleanupMutation.mutate(purge);
+      },
+    } satisfies OpDef] : []),
+    ...(isAdmin && grafanaEnabled ? [{
+      id: "grafana-agent-setup",
+      label: "Install Grafana Agent",
+      description: grafanaRemoteWriteConfigured
+        ? "Installs grafana-agent on this host (with node_exporter built in) configured to remote_write to the endpoint in Settings → Integrations → Grafana. Requires sudo."
+        : "Disabled — configure the Prometheus remote_write URL in Settings → Integrations → Grafana first.",
+      command: `curl -fsSL https://github.com/grafana/agent/releases/... -o grafana-agent && install /usr/local/bin/grafana-agent && systemctl enable --now grafana-agent`,
+      disabled: !hasPassword || !grafanaRemoteWriteConfigured,
+      loading: runningOp === "grafana-agent-setup",
+      onClick: () => {
+        if (!window.confirm("Install and start grafana-agent on this host? This requires sudo and will overwrite any existing /etc/grafana-agent/config.yaml.")) return;
+        setRunningOp("grafana-agent-setup");
+        grafanaAgentMutation.mutate();
       },
     } satisfies OpDef] : []),
     ...(hasPassword && isAdmin ? [{

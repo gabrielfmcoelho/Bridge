@@ -30,6 +30,11 @@ func (p *GitLabProvider) Name() string             { return "gitlab" }
 func (p *GitLabProvider) SupportsDirectLogin() bool { return false }
 
 func (p *GitLabProvider) Enabled() bool {
+	// SSO is only live when the admin has explicitly flipped the SSO switch on
+	// AND GitLab is the chosen auth provider. Either switch being off blocks login.
+	if models.GetAppSettingValue(p.db, "auth_gitlab_enabled") != "true" {
+		return false
+	}
 	return models.GetAppSettingValue(p.db, "auth_active_provider") == "gitlab"
 }
 

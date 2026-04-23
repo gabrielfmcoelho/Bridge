@@ -5,7 +5,7 @@ import { useFilteredGraph } from "@/hooks/useFilteredGraph";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { hostsAPI, sshAPI, graphAPI, globalIssuesAPI } from "@/lib/api";
+import { hostsAPI, sshAPI, graphAPI, globalIssuesAPI, integrationsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
@@ -20,10 +20,11 @@ import SSHOperations from "./_components/SSHOperations";
 import TopologyTab from "./_components/TopologyTab";
 import OverviewTab from "./_components/OverviewTab";
 import ScansTab from "./_components/ScansTab";
+import MetricsTab from "./_components/MetricsTab";
 import IssuesTab from "./IssuesTab";
 import SSHConfigDrawer from "./_components/SSHConfigDrawer";
 
-type TabKey = "overview" | "scans" | "operations" | "alerts" | "topology";
+type TabKey = "overview" | "scans" | "operations" | "alerts" | "topology" | "metrics";
 
 export default function HostDetail({ slug }: { slug: string }) {
   const { t, formatDateTime, locale } = useLocale();
@@ -98,12 +99,21 @@ export default function HostDetail({ slug }: { slug: string }) {
     topology: "M13 10V3L4 14h7v7l9-11h-7z",
   };
 
+  const { data: integrations } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: integrationsAPI.get,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const grafanaEnabled = integrations?.grafana?.grafana_enabled === "true";
+
   const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
     { key: "overview", label: t("host.tabOverview"), icon: tabIcons.overview },
     { key: "scans", label: t("host.tabScans"), icon: tabIcons.scans },
     ...(canEdit ? [{ key: "operations" as TabKey, label: t("host.tabOperations"), icon: tabIcons.operations }] : []),
     { key: "alerts" as TabKey, label: t("host.tabTracking"), icon: tabIcons.alerts, badge: issuesTabBadge || undefined },
     { key: "topology", label: t("host.tabTopology"), icon: tabIcons.topology },
+    ...(grafanaEnabled ? [{ key: "metrics" as TabKey, label: "Metrics", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" }] : []),
   ];
 
   /* ─── Render ─── */
@@ -254,6 +264,9 @@ export default function HostDetail({ slug }: { slug: string }) {
           {activeTab === "topology" && (
             <TopologyTab data={data} filteredGraph={filteredGraph} t={t} />
           )}
+
+          {/* ═══ METRICS TAB ═══ */}
+          {activeTab === "metrics" && grafanaEnabled && <MetricsTab slug={slug} />}
         </div>
       ) : null}
 

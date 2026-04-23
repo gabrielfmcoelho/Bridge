@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { projectsAPI, enumsAPI, contactsAPI } from "@/lib/api";
+import { projectsAPI, enumsAPI, contactsAPI, integrationsAPI, glpiAPI } from "@/lib/api";
 import { contactsToOptions } from "@/lib/utils";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
@@ -12,6 +12,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import TagInput from "@/components/ui/TagInput";
 import FormError from "@/components/ui/FormError";
+import GitLabLinksEditor from "./[id]/_components/GitLabLinksEditor";
 import type { Project } from "@/lib/types";
 
 interface ProjectFormProps {
@@ -35,6 +36,10 @@ export default function ProjectForm({ initial, onSuccess, onSubHeaderChange }: P
     is_responsible: initial?.is_responsible ?? true,
     gitlab_url: initial?.gitlab_url || "",
     documentation_url: initial?.documentation_url || "",
+    outline_collection_id: initial?.outline_collection_id || "",
+    glpi_token_id: initial?.glpi_token_id ?? null,
+    glpi_entity_id: initial?.glpi_entity_id ?? 0,
+    glpi_category_id: initial?.glpi_category_id ?? 0,
   });
   const [tags, setTags] = useState<string[]>(initial?.tags || []);
   const [responsaveis, setResponsaveis] = useState<{ nome: string; contato: string }[]>([]);
@@ -46,6 +51,24 @@ export default function ProjectForm({ initial, onSuccess, onSubHeaderChange }: P
   });
   const { data: rawContacts } = useQuery({ queryKey: ["contacts"], queryFn: contactsAPI.list });
   const contacts = Array.isArray(rawContacts) ? rawContacts : [];
+
+  // Best-effort read of the configured GitLab base URL for pretty link labels.
+  // Non-admins can't read /api/settings/integrations; that's fine — we fall back to gitlab.com.
+  const { data: integrations } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: integrationsAPI.get,
+    enabled: !!initial?.id,
+    retry: false,
+  });
+  const gitlabBaseURL = integrations?.gitlab?.auth_gitlab_base_url || "https://gitlab.com";
+  const outlineEnabled = integrations?.outline?.outline_enabled === "true";
+  const glpiEnabled = integrations?.glpi?.glpi_enabled === "true";
+  const { data: glpiProfiles } = useQuery({
+    queryKey: ["glpi-profiles"],
+    queryFn: glpiAPI.listProfiles,
+    enabled: glpiEnabled,
+    retry: false,
+  });
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -111,7 +134,6 @@ export default function ProjectForm({ initial, onSuccess, onSubHeaderChange }: P
               <Input label={t("project.temEmpresaExterna") + " - Contato"} value={form.contato_empresa_responsavel} onChange={(e) => set("contato_empresa_responsavel", e.target.value)} placeholder="Contact info" />
             </div>
           )}
-          <Input label={t("project.gitlabUrl")} value={form.gitlab_url} onChange={(e) => set("gitlab_url", e.target.value)} type="url" placeholder="https://gitlab.com/..." />
           <Input label={t("project.documentationUrl")} value={form.documentation_url} onChange={(e) => set("documentation_url", e.target.value)} type="url" placeholder="https://docs..." />
           <Button type="button" className="w-full" disabled={!form.name.trim()} onClick={() => setStep(2)}>
             {t("host.nextStep")}
@@ -139,6 +161,67 @@ export default function ProjectForm({ initial, onSuccess, onSubHeaderChange }: P
             <Button type="button" variant="ghost" size="sm" onClick={() => setResponsaveis([...responsaveis, { nome: "", contato: "" }])}>+ {t("common.add")}</Button>
           </div>
           <TagInput label={t("common.tags")} tags={tags} onChange={setTags} entityType="project" />
+
+          <section className="pt-2">
+            <h3 className="text-xs font-semibold text-[var(--text-secondary)] tracking-wide uppercase mb-2">
+              Vínculos
+            </h3>
+            {initial?.id ? (
+              <GitLabLinksEditor projectId={initial.id} canEdit={true} gitlabBaseURL={gitlabBaseURL} />
+            ) : (
+              <p className="text-[11px] text-[var(--text-muted)] italic">
+                GitLab sources can be linked after the project is created.
+              </p>
+            )}
+            {outlineEnabled && (
+              <div className="mt-3 space-y-1">
+                <Input
+                  label="Outline collection ID"
+                  value={form.outline_collection_id}
+                  onChange={(e) => set("outline_collection_id", e.target.value)}
+                  placeholder="e.g. d3b71c7e-8f7e-4f9d-b5a2-xxxxxxxxxxxx"
+                />
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Paste the UUID of the Outline collection that holds this project&apos;s documentation. The Wiki tab will list recent docs from it.
+                </p>
+              </div>
+            )}
+            {glpiEnabled && (
+              <div className="mt-3 space-y-2">
+                <div>
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">GLPI token profile</label>
+                  <select
+                    value={form.glpi_token_id == null ? "" : String(form.glpi_token_id)}
+                    onChange={(e) => set("glpi_token_id", e.target.value ? parseInt(e.target.value, 10) : null)}
+                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
+                  >
+                    <option value="">(none)</option>
+                    {(glpiProfiles ?? []).map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}{p.description ? ` — ${p.description}` : ""}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Entity ID (0 = profile default)"
+                    type="number"
+                    value={String(form.glpi_entity_id ?? 0)}
+                    onChange={(e) => set("glpi_entity_id", parseInt(e.target.value || "0", 10))}
+                  />
+                  <Input
+                    label="Category ID (optional filter)"
+                    type="number"
+                    value={String(form.glpi_category_id ?? 0)}
+                    onChange={(e) => set("glpi_category_id", parseInt(e.target.value || "0", 10))}
+                  />
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Picks which GLPI account sshcm uses for this project&apos;s Chamados tab. Entity/category scope the listing.
+                </p>
+              </div>
+            )}
+          </section>
+
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>{t("common.back")}</Button>
             <Button type="submit" className="flex-1" loading={mutation.isPending}>{initial ? t("common.save") : t("common.create")}</Button>

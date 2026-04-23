@@ -45,7 +45,15 @@ function LoadingSkeleton() {
   );
 }
 
-export default function PageShell({ children }: { children: React.ReactNode }) {
+export default function PageShell({
+  children,
+  fullBleed = false,
+}: {
+  children: React.ReactNode;
+  // When true, <main> loses its padding and outer scroll so the page can own
+  // a full-height layout (e.g. /wiki with its own internal scroll regions).
+  fullBleed?: boolean;
+}) {
   const { isAuthenticated, setupRequired, loading } = useAuth();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -78,8 +86,14 @@ export default function PageShell({ children }: { children: React.ReactNode }) {
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed(!collapsed)}
         />
-        <main className="flex-1 overflow-y-auto p-3 md:p-6 pb-20 md:pb-6">
-          <div className="animate-fade-in">
+        <main
+          className={
+            fullBleed
+              ? "flex-1 overflow-hidden min-h-0"
+              : "flex-1 overflow-y-auto p-3 md:p-6 pb-20 md:pb-6"
+          }
+        >
+          <div className={fullBleed ? "h-full animate-fade-in" : "animate-fade-in"}>
             {children}
           </div>
         </main>

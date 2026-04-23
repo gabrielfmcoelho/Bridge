@@ -324,6 +324,40 @@ input[type="checkbox"]:hover {
 .markdown-preview th { background: var(--bg-overlay); font-weight: 600; }
 .markdown-preview input[type="checkbox"] { margin-right: 0.5em; }
 
+/* ─── Wiki doc viewer: long-form typography (Outline-ish) ───
+   Scoped overrides for the /wiki in-app document viewer. Leaves the compact
+   .markdown-preview rules (used by alert descriptions etc.) untouched. */
+.wiki-doc .markdown-preview { color: var(--text-primary); font-size: 15px; line-height: 1.7; }
+.wiki-doc .markdown-preview > *:first-child { margin-top: 0 !important; }
+.wiki-doc .markdown-preview h1 { font-size: 1.75rem; margin-top: 1.6em; padding-bottom: 0.25em; border-bottom: 1px solid var(--border-subtle); }
+.wiki-doc .markdown-preview h2 { font-size: 1.35rem; margin-top: 1.4em; padding-bottom: 0.2em; border-bottom: 1px solid var(--border-subtle); }
+.wiki-doc .markdown-preview h3 { font-size: 1.1rem; margin-top: 1.2em; }
+.wiki-doc .markdown-preview h4 { font-size: 1rem; font-weight: 600; margin-top: 1em; color: var(--text-primary); }
+.wiki-doc .markdown-preview p { margin: 0.75em 0; }
+.wiki-doc .markdown-preview ul, .wiki-doc .markdown-preview ol { margin: 0.75em 0; }
+.wiki-doc .markdown-preview li { margin: 0.35em 0; }
+.wiki-doc .markdown-preview pre { background: var(--bg-elevated); border: 1px solid var(--border-subtle); padding: 1em; margin: 1em 0; }
+.wiki-doc .markdown-preview blockquote { border-left: 3px solid var(--accent); margin: 1em 0; padding: 0.25em 1em; color: var(--text-secondary); }
+.wiki-doc .markdown-preview a:hover { text-decoration: underline; }
+.wiki-doc .markdown-preview img { max-width: 100%; border-radius: var(--radius-md); margin: 1em 0; }
+.wiki-doc .markdown-preview table { margin: 1em 0; }
+.wiki-doc .markdown-preview tr:nth-child(even) td { background: var(--bg-elevated); }
+
+/* ─── GLPI ticket HTML content (followups / descriptions) ───
+   GLPI stores rich-text as arbitrary HTML. These rules prevent it from
+   overflowing the drawer and give it consistent typography. */
+.glpi-content { line-height: 1.55; word-break: break-word; }
+.glpi-content p { margin: 0.35em 0; }
+.glpi-content ul, .glpi-content ol { padding-left: 1.25em; margin: 0.35em 0; }
+.glpi-content li { margin: 0.15em 0; }
+.glpi-content a { color: var(--accent); text-decoration: underline; }
+.glpi-content code { font-family: var(--font-mono); font-size: 0.9em; background: var(--bg-overlay); padding: 0.1em 0.35em; border-radius: 4px; }
+.glpi-content pre { background: var(--bg-overlay); padding: 0.6em; border-radius: var(--radius-sm); overflow-x: auto; margin: 0.4em 0; }
+.glpi-content img { max-width: 100%; height: auto; border-radius: var(--radius-sm); }
+.glpi-content table { border-collapse: collapse; width: 100%; }
+.glpi-content th, .glpi-content td { border: 1px solid var(--border-subtle); padding: 0.3em 0.5em; }
+.glpi-content blockquote { border-left: 3px solid var(--border-strong); padding-left: 0.6em; margin: 0.4em 0; color: var(--text-muted); }
+
 /* ─── Glass effect ─── */
 .glass {
   background: var(--glass-bg);

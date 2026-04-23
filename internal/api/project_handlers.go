@@ -45,7 +45,11 @@ func (h *projectHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	project, err := models.GetProject(h.db.SQL, id)
-	if err != nil || project == nil {
+	if err != nil {
+		jsonServerError(w, r, "project lookup failed", err)
+		return
+	}
+	if project == nil {
 		jsonError(w, http.StatusNotFound, "project not found")
 		return
 	}

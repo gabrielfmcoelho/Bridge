@@ -416,6 +416,8 @@ export const sshAPI = {
     api.post<{ success: boolean; error?: string; status?: DockerStatusType }>(`/api/ssh/docker-setup/${slug}`, { fix }),
   nginxCleanup: (slug: string, purge: boolean) =>
     api.post<{ success: boolean; error?: string; status?: NginxCleanupStatusType }>(`/api/ssh/nginx-cleanup/${slug}`, { purge }),
+  grafanaAgentSetup: (slug: string) =>
+    api.post<{ success: boolean; error?: string; output?: string; message?: string }>(`/api/ssh/grafana-agent-setup/${slug}`),
 };
 
 // SSH Keys
@@ -594,6 +596,102 @@ export const integrationsAPI = {
   update: (group: string, data: Record<string, string>) =>
     api.put<{ status: string }>(`/api/settings/integrations/${group}`, data),
   testLDAP: () => api.post<{ success: boolean; error?: string }>("/api/settings/integrations/test/ldap"),
+  testGitLabCode: (data?: { base_url?: string; token?: string }) =>
+    api.post<{ success: boolean; error?: string; username?: string; name?: string }>(
+      "/api/settings/integrations/test/gitlab-code",
+      data ?? {}
+    ),
+  testLLM: (data?: { base_url?: string; api_key?: string; model?: string }) =>
+    api.post<{
+      success: boolean;
+      error?: string;
+      stage?: "models" | "chat";
+      warning?: string;
+      models_count?: number;
+      model?: string;
+      model_available?: boolean;
+      chat_ok?: boolean;
+      chat_reply?: string;
+    }>("/api/settings/integrations/test/llm", data ?? {}),
+  testGrafana: (data?: { base_url?: string; token?: string }) =>
+    api.post<{
+      success: boolean;
+      error?: string;
+      stage?: "health" | "auth";
+      version?: string;
+      database?: string;
+      user?: string;
+      name?: string;
+      org_id?: number;
+    }>("/api/settings/integrations/test/grafana", data ?? {}),
+  testOutline: (data?: { base_url?: string; token?: string }) =>
+    api.post<{
+      success: boolean;
+      error?: string;
+      user?: string;
+      user_email?: string;
+      workspace?: string;
+      workspace_url?: string;
+    }>("/api/settings/integrations/test/outline", data ?? {}),
+  clearSecret: (group: string, key: string) =>
+    api.delete<{ status: string }>(`/api/settings/integrations/${group}/secret/${key}`),
+};
+
+// GitLab Code Management — per-project links + aggregated commits (uses shared service PAT)
+export type ProjectGitLabLink = {
+  id: number;
+  project_id: number;
+  gitlab_project_id: number;
+  gitlab_base_url: string;
+  gitlab_path: string;
+  kind: "project" | "group";
+  ref_name: string;
+  display_name: string;
+  sync_issues: boolean;
+  last_synced_at: string | null;
+  created_at: string;
+  reachable?: boolean;        // set by the list endpoint after verifying against GitLab
+  health_error?: string;
+};
+
+export type ProjectGitLabLinksResponse = {
+  enabled: boolean;
+  configured: boolean;
+  links: ProjectGitLabLink[];
+};
+
+export type ProjectGitLabCommit = {
+  id: string;
+  short_id: string;
+  title: string;
+  message: string;
+  author_name: string;
+  author_email: string;
+  committed_date: string;
+  web_url: string;
+  source_project_id: number;
+  source_project_name: string;
+  source_project_path: string;
+  branches?: string[];
+};
+
+export type ProjectGitLabCommitsResponse = {
+  enabled: boolean;
+  configured: boolean;
+  commits: ProjectGitLabCommit[];
+  warnings?: string[];
+  error?: string;
+};
+
+export const projectGitlabAPI = {
+  listLinks: (projectId: number) =>
+    api.get<ProjectGitLabLinksResponse>(`/api/projects/${projectId}/gitlab/links`),
+  addLink: (projectId: number, data: { kind: "project" | "group"; path: string; ref_name?: string }) =>
+    api.post<ProjectGitLabLink>(`/api/projects/${projectId}/gitlab/links`, data),
+  deleteLink: (projectId: number, linkId: number) =>
+    api.delete(`/api/projects/${projectId}/gitlab/links/${linkId}`),
+  listCommits: (projectId: number) =>
+    api.get<ProjectGitLabCommitsResponse>(`/api/projects/${projectId}/gitlab/commits`),
 };
 
 // Permissions management (admin)
@@ -630,6 +728,19 @@ export const aiAPI = {
     api.post<{ documentation: string }>("/api/ai/assist/host-doc", { host_slug: hostSlug }),
   chat: (message: string) =>
     api.post<{ response: string }>("/api/ai/chat", { message }),
+  analyzeProject: (projectId: number, locale: string) =>
+    api.post<ProjectAIAnalysisRecord>(`/api/projects/${projectId}/ai/analyze`, { locale }),
+  getProjectAnalysis: (projectId: number) =>
+    api.get<ProjectAIAnalysisRecord | null>(`/api/projects/${projectId}/ai/analyze`),
+};
+
+export type ProjectAIAnalysisRecord = {
+  project_id: number;
+  content: string;
+  locale: string;
+  commits_used: number;
+  repos_used: number;
+  generated_at: string;
 };
 
 // GitLab integration
@@ -646,6 +757,432 @@ export const gitlabAPI = {
     ),
   linkProject: (projectId: number, gitlabPath: string) =>
     api.post(`/api/gitlab/projects/${projectId}/link`, { gitlab_path: gitlabPath }),
+};
+
+// GLPI integration
+export type GlpiTokenProfile = {
+  id: number;
+  name: string;
+  description: string;
+  has_token: boolean;
+  default_entity_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GlpiTicketSummary = {
+  id: number;
+  name: string;
+  status: number;
+  status_label: string;
+  status_slug: "new" | "assigned" | "planned" | "waiting" | "solved" | "closed" | "unknown";
+  priority: number;
+  entities_id: number;
+  date?: string;
+  url: string;
+};
+
+export type GlpiTicketEvent = {
+  type: "followup" | "task" | "solution";
+  id: number;
+  content: string;
+  date: string;
+  user_id: number;
+  user_name?: string;
+  is_private?: boolean;
+  state?: number;   // tasks: 0=info 1=todo 2=done
+  status?: number;  // solutions: 1=proposed 2=accepted 3=refused
+};
+
+export type GlpiTicketDetails = {
+  ticket: GlpiTicketSummary & { content?: string; date_mod?: string };
+  glpi_base_url: string;
+  requester: { id: number; name: string };
+  events: GlpiTicketEvent[];
+  event_counts: { followup: number; task: number; solution: number };
+  warnings?: string[];
+};
+
+// ─── Formcreator types ──────────────────────────────────────────────────────
+export type FormcreatorForm = {
+  id: number;
+  name: string;
+  description?: string;
+  content?: string;
+  is_active?: number;
+  language?: string;
+  entities_id?: number;
+  plugin_formcreator_categories_id?: number;
+  access_rights?: number;
+  icon?: string;
+  icon_color?: string;
+  background_color?: string;
+};
+
+export type FormcreatorSection = {
+  id: number;
+  name: string;
+  order: number;
+  plugin_formcreator_forms_id: number;
+};
+
+export type FormcreatorQuestion = {
+  id: number;
+  name: string;
+  fieldtype: string;
+  required: number;
+  description?: string;
+  default_values?: string;
+  values?: string;
+  order: number;
+  row?: number;
+  col?: number;
+  width?: number;
+  plugin_formcreator_sections_id: number;
+  regex?: string;
+};
+
+export type FormcreatorCondition = {
+  id: number;
+  itemtype: "PluginFormcreatorQuestion" | "PluginFormcreatorSection";
+  items_id: number;
+  plugin_formcreator_questions_id: number;
+  show_logic: "AND" | "OR" | string;
+  show_condition: "eq" | "neq" | "lt" | "le" | "gt" | "ge" | "regex" | string;
+  show_value: string;
+  order: number;
+};
+
+export type FormcreatorBundle = {
+  form: FormcreatorForm;
+  sections: FormcreatorSection[];
+  questions: FormcreatorQuestion[];
+  conditions: FormcreatorCondition[];
+  glpi_base_url: string;
+  warnings?: string[];
+};
+
+export type FormcreatorSubmitResult = {
+  form_answer_id: number;
+  status: number;
+  url?: string;
+  created_tickets?: { id: number; url: string }[];
+  created_counts?: Record<string, number>;
+};
+
+// ── Dropdown catalogue (admin-curated option lists) ──
+export type GlpiCatalogueOption = {
+  id: number;
+  name: string;
+  completename?: string;
+  parent_id?: number;
+};
+
+export type GlpiDropdownCatalogueSummary = {
+  itemtype: string;
+  option_count: number;
+  updated_at: string;
+  updated_by?: number | null;
+};
+
+export type GlpiDropdownCatalogue = {
+  id?: number;
+  itemtype: string;
+  options: GlpiCatalogueOption[];
+  option_count: number;
+  updated_at?: string;
+  updated_by?: number | null;
+};
+
+export const glpiAPI = {
+  // Admin profile CRUD
+  listProfiles: () => api.get<GlpiTokenProfile[]>("/api/settings/integrations/glpi/tokens"),
+  createProfile: (data: { name: string; description?: string; user_token: string; default_entity_id?: number }) =>
+    api.post<GlpiTokenProfile>("/api/settings/integrations/glpi/tokens", data),
+  updateProfile: (id: number, data: { name: string; description?: string; user_token?: string; default_entity_id?: number }) =>
+    api.put<{ status: string }>(`/api/settings/integrations/glpi/tokens/${id}`, data),
+  deleteProfile: (id: number) =>
+    api.delete<{ status: string }>(`/api/settings/integrations/glpi/tokens/${id}`),
+  testProfile: (id: number) =>
+    api.post<{ success: boolean; error?: string; profiles?: string[] }>(`/api/settings/integrations/glpi/tokens/${id}/test`),
+
+  // Ticket ops
+  createTicket: (data: {
+    profile_id: number;
+    title: string;
+    description?: string;
+    entity_id?: number;
+    category_id?: number;
+    host_slug?: string;
+    alert_id?: number;
+    link_computer?: boolean;
+  }) =>
+    api.post<{
+      ticket_id: number;
+      ticket_url: string;
+      chamado_id?: number;
+      computer_linked?: boolean;
+      warning?: string;
+    }>("/api/glpi/tickets", data),
+  getTicket: (ticketID: number, profileID: number) =>
+    api.get<GlpiTicketSummary>(`/api/glpi/tickets/${ticketID}?profile_id=${profileID}`),
+  ticketDetails: (ticketID: number, profileID: number) =>
+    api.get<GlpiTicketDetails>(
+      `/api/glpi/tickets/${ticketID}/details?profile_id=${profileID}`
+    ),
+  listForms: (profileID: number, q?: string) => {
+    const params = new URLSearchParams({ profile_id: String(profileID) });
+    if (q) params.set("q", q);
+    return api.get<{ forms: FormcreatorForm[]; count: number }>(
+      `/api/glpi/forms?${params.toString()}`
+    );
+  },
+  getFormBundle: (formID: number, profileID: number) =>
+    api.get<FormcreatorBundle>(`/api/glpi/forms/${formID}?profile_id=${profileID}`),
+  submitForm: (formID: number, profileID: number, answers: Record<string, unknown>) =>
+    api.post<FormcreatorSubmitResult>(
+      `/api/glpi/forms/${formID}/submit?profile_id=${profileID}`,
+      { answers }
+    ),
+  searchDropdown: (itemtype: string, profileID: number, q: string) => {
+    const params = new URLSearchParams({ profile_id: String(profileID) });
+    if (q) params.set("q", q);
+    return api.get<{
+      items: { id: number; name: string; completename?: string }[];
+      count: number;
+      source?: "catalogue" | "rest";
+    }>(`/api/glpi/dropdowns/${encodeURIComponent(itemtype)}/search?${params.toString()}`);
+  },
+  // ── Admin: dropdown catalogues (manually-mapped option lists) ──
+  listDropdownCatalogues: () =>
+    api.get<{
+      catalogues: GlpiDropdownCatalogueSummary[];
+      allowed_itemtypes: string[];
+    }>("/api/settings/integrations/glpi/dropdowns"),
+  getDropdownCatalogue: (itemtype: string) =>
+    api.get<GlpiDropdownCatalogue>(
+      `/api/settings/integrations/glpi/dropdowns/${encodeURIComponent(itemtype)}`
+    ),
+  upsertDropdownCatalogue: (itemtype: string, options: GlpiCatalogueOption[]) =>
+    api.put<{ itemtype: string; option_count: number }>(
+      `/api/settings/integrations/glpi/dropdowns/${encodeURIComponent(itemtype)}`,
+      { options }
+    ),
+  deleteDropdownCatalogue: (itemtype: string) =>
+    api.delete<{ status: string }>(
+      `/api/settings/integrations/glpi/dropdowns/${encodeURIComponent(itemtype)}`
+    ),
+  searchFormcreatorTags: (profileID: number, q: string) => {
+    const params = new URLSearchParams({ profile_id: String(profileID) });
+    if (q) params.set("q", q);
+    return api.get<{
+      tags: { id: number; name: string; color?: string }[];
+      count: number;
+    }>(`/api/glpi/formcreator/tags/search?${params.toString()}`);
+  },
+  searchUsers: (profileID: number, q: string) => {
+    const params = new URLSearchParams({ profile_id: String(profileID) });
+    if (q) params.set("q", q);
+    return api.get<{
+      users: { id: number; login: string; display: string; email?: string }[];
+      count: number;
+    }>(`/api/glpi/users/search?${params.toString()}`);
+  },
+  uploadFormFile: async (profileID: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(
+      `${API_BASE}/api/glpi/forms/uploads?profile_id=${profileID}`,
+      { method: "POST", credentials: "include", body: form }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Upload failed: ${res.status}`);
+    }
+    return res.json() as Promise<{ id: number; filename: string; mime?: string; size: number }>;
+  },
+  projectTickets: (projectID: number) =>
+    api.get<{ tickets: GlpiTicketSummary[]; warning?: string }>(`/api/projects/${projectID}/glpi/tickets`),
+  profileTickets: (profileID: number, opts?: { includeClosed?: boolean; range?: string }) => {
+    const params = new URLSearchParams();
+    if (opts?.includeClosed) params.set("status", "all");
+    if (opts?.range) params.set("range", opts.range);
+    const qs = params.toString();
+    return api.get<{ tickets: GlpiTicketSummary[]; count: number; range: string }>(
+      `/api/glpi/profiles/${profileID}/tickets${qs ? `?${qs}` : ""}`
+    );
+  },
+  hostTickets: (slug: string, profileID: number) =>
+    api.get<{ tickets: GlpiTicketSummary[]; computer?: { id: number; name: string } | null; warning?: string }>(
+      `/api/hosts/${encodeURIComponent(slug)}/glpi/tickets?profile_id=${profileID}`
+    ),
+  refreshChamadoCache: (slug: string, chamadoID: number, profileID: number) =>
+    api.post<GlpiTicketSummary>(`/api/hosts/${encodeURIComponent(slug)}/chamados/${chamadoID}/glpi/refresh?profile_id=${profileID}`),
+};
+
+// Outline (wiki) integration
+export type OutlineDocumentSummary = {
+  id: string;
+  url_id: string;
+  title: string;
+  emoji?: string;
+  excerpt: string;
+  updated_at: string;
+  updated_by?: string;
+  browse_url: string;
+};
+
+export type OutlineCollectionSummary = {
+  id: string;
+  urlId: string;
+  name: string;
+  description: string;
+  color: string;
+  icon?: string;
+};
+
+export type OutlineWikiEnvelope = {
+  enabled: boolean;
+  configured: boolean;
+  collection: OutlineCollectionSummary | null;
+  collection_browse_url?: string;
+  documents: OutlineDocumentSummary[];
+  warning?: string;
+};
+
+// One configured common collection + its recent documents. Failures are soft —
+// `collection` is null and `warning` carries the reason.
+export type OutlineCommonWikiSection = {
+  collection_id: string;
+  collection: OutlineCollectionSummary | null;
+  collection_browse_url?: string;
+  documents: OutlineDocumentSummary[];
+  warning?: string;
+};
+
+export type OutlineCommonWikiEnvelope = {
+  enabled: boolean;
+  configured: boolean;
+  sections: OutlineCommonWikiSection[];
+  warning?: string;
+};
+
+export type OutlineSearchHit = {
+  context: string;
+  id: string;
+  url_id: string;
+  title: string;
+  collection_id: string;
+  updated_at: string;
+  browse_url: string;
+};
+
+// Workspace collection picker row (Settings multi-select).
+export type OutlineWorkspaceCollection = {
+  id: string;
+  url_id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+};
+
+// Recursive tree node for the /wiki left nav.
+export type OutlineDocumentNode = {
+  id: string;
+  title: string;
+  url?: string;
+  emoji?: string;
+  icon?: string;
+  color?: string;
+  children?: OutlineDocumentNode[];
+};
+
+export type OutlineCommonWikiTreeSection = {
+  collection_id: string;
+  collection: OutlineCollectionSummary | null;
+  collection_browse_url?: string;
+  nodes: OutlineDocumentNode[];
+  warning?: string;
+};
+
+export type OutlineCommonWikiTreeEnvelope = {
+  enabled: boolean;
+  configured: boolean;
+  base_url?: string;
+  sections: OutlineCommonWikiTreeSection[];
+  warning?: string;
+};
+
+// Single-doc fetch used by the in-app viewer.
+export type OutlineFullDocument = {
+  id: string;
+  url_id: string;
+  title: string;
+  emoji?: string;
+  text: string;
+  collection_id: string;
+  updated_at: string;
+  updated_by?: string;
+  browse_url: string;
+};
+
+export const outlineAPI = {
+  projectWiki: (projectId: number) =>
+    api.get<OutlineWikiEnvelope>(`/api/projects/${projectId}/wiki`),
+  createProjectDocument: (projectId: number, title: string) =>
+    api.post<{ id: string; url_id: string; title: string; browse_url: string }>(
+      `/api/projects/${projectId}/wiki/documents`,
+      { title }
+    ),
+  searchProjectWiki: (projectId: number, query: string) =>
+    api.get<{ results: OutlineSearchHit[] }>(
+      `/api/projects/${projectId}/wiki/search?q=${encodeURIComponent(query)}`
+    ),
+  commonWiki: () => api.get<OutlineCommonWikiEnvelope>("/api/wiki/documents"),
+  createCommonDocument: (title: string, collectionID?: string) =>
+    api.post<{ id: string; url_id: string; title: string; browse_url: string; collection_id: string }>(
+      "/api/wiki/documents",
+      collectionID ? { title, collection_id: collectionID } : { title }
+    ),
+  searchCommonWiki: (query: string) =>
+    api.get<{ results: OutlineSearchHit[] }>(`/api/wiki/search?q=${encodeURIComponent(query)}`),
+  listWorkspaceCollections: () =>
+    api.get<{ collections: OutlineWorkspaceCollection[] }>("/api/wiki/collections"),
+  commonWikiTree: () => api.get<OutlineCommonWikiTreeEnvelope>("/api/wiki/tree"),
+  getDocument: (id: string) =>
+    api.get<OutlineFullDocument>(`/api/wiki/documents/${encodeURIComponent(id)}`),
+};
+
+// Grafana integration
+export type HostLiveMetrics = {
+  enabled: boolean;
+  configured: boolean;
+  host_up: boolean | null;
+  cpu_pct: number | null;
+  ram_pct: number | null;
+  disk_pct: number | null;
+  load_1m: number | null;
+  uptime_seconds: number | null;
+  fetched_at: string;
+  warnings?: string[];
+};
+
+export const grafanaAPI = {
+  embedURL: (entity: "host" | "service", id: string | number) =>
+    api.get<{
+      configured: boolean;
+      url?: string;
+      dashboard_uid?: string;
+      variable?: string;
+      value?: string;
+    }>(`/api/grafana/embed-url?entity=${entity}&id=${encodeURIComponent(String(id))}`),
+  hostLiveMetrics: (slug: string) =>
+    api.get<HostLiveMetrics>(`/api/hosts/${encodeURIComponent(slug)}/metrics/live`),
+  provisionHostDashboard: (slug: string) =>
+    api.post<{ uid: string; message: string }>(`/api/hosts/${encodeURIComponent(slug)}/grafana/provision`),
+  provisionServiceDashboard: (serviceId: number) =>
+    api.post<{ uid: string; message: string }>(`/api/services/${serviceId}/grafana/provision`),
 };
 
 // Coolify integration

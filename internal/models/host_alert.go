@@ -8,22 +8,24 @@ import (
 )
 
 type HostAlert struct {
-	ID          int64     `json:"id"`
-	HostID      int64     `json:"host_id"`
-	Type        string    `json:"type"`
-	Level       string    `json:"level"`
-	Message     string    `json:"message"`
-	Description string    `json:"description"`
-	Source      string    `json:"source"`
-	Status      string    `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             int64     `json:"id"`
+	HostID         int64     `json:"host_id"`
+	Type           string    `json:"type"`
+	Level          string    `json:"level"`
+	Message        string    `json:"message"`
+	Description    string    `json:"description"`
+	Source         string    `json:"source"`
+	Status         string    `json:"status"`
+	ExternalID     string    `json:"external_id,omitempty"`
+	ExternalSource string    `json:"external_source,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
-const hostAlertCols = `id, host_id, type, level, message, description, source, status, created_at, updated_at`
+const hostAlertCols = `id, host_id, type, level, message, description, source, status, external_id, external_source, created_at, updated_at`
 
 func scanHostAlert(scanner interface{ Scan(...any) error }, a *HostAlert) error {
-	return scanner.Scan(&a.ID, &a.HostID, &a.Type, &a.Level, &a.Message, &a.Description, &a.Source, &a.Status, &a.CreatedAt, &a.UpdatedAt)
+	return scanner.Scan(&a.ID, &a.HostID, &a.Type, &a.Level, &a.Message, &a.Description, &a.Source, &a.Status, &a.ExternalID, &a.ExternalSource, &a.CreatedAt, &a.UpdatedAt)
 }
 
 func CreateHostAlert(db *sql.DB, a *HostAlert) error {
@@ -97,6 +99,59 @@ func UpdateHostAlert(db *sql.DB, a *HostAlert) error {
 func DeleteHostAlert(db *sql.DB, id int64) error {
 	_, err := db.Exec(`DELETE FROM host_alerts WHERE id = ?`, id)
 	return err
+}
+
+// GetExternalHostAlert returns the alert identified by (external_source, external_id).
+// Returns nil if no such alert exists.
+func GetExternalHostAlert(db *sql.DB, source, externalID string) (*HostAlert, error) {
+	a := &HostAlert{}
+	err := scanHostAlert(db.QueryRow(
+		`SELECT `+hostAlertCols+` FROM host_alerts WHERE external_source = ? AND external_id = ? LIMIT 1`,
+		source, externalID,
+	), a)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return a, err
+}
+
+// UpsertExternalHostAlert creates or updates an externally-sourced alert keyed by
+// (external_source, external_id). Used by webhook ingestion to keep Grafana's
+// alert state mirrored in sshcm's alert board without creating duplicates when
+// Grafana re-fires the same alert. Returns the resulting alert (with ID set).
+func UpsertExternalHostAlert(db *sql.DB, a *HostAlert) (*HostAlert, error) {
+	if a.ExternalSource == "" || a.ExternalID == "" {
+		return nil, sql.ErrNoRows // caller must set these
+	}
+	existing, err := GetExternalHostAlert(db, a.ExternalSource, a.ExternalID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		// Update in place. Preserve creation timestamp, refresh everything else.
+		_, err := db.Exec(
+			`UPDATE host_alerts SET host_id = ?, type = ?, level = ?, message = ?, description = ?,
+				source = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?`,
+			a.HostID, a.Type, a.Level, a.Message, a.Description, a.Source, a.Status, existing.ID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		a.ID = existing.ID
+		return a, nil
+	}
+	// Insert new.
+	id, err := database.InsertReturningID(db,
+		`INSERT INTO host_alerts (host_id, type, level, message, description, source, status, external_id, external_source)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.HostID, a.Type, a.Level, a.Message, a.Description, a.Source, a.Status, a.ExternalID, a.ExternalSource,
+	)
+	if err != nil {
+		return nil, err
+	}
+	a.ID = id
+	return a, nil
 }
 
 func ResolveHostAlert(db *sql.DB, id int64) error {

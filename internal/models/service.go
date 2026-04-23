@@ -39,6 +39,7 @@ type Service struct {
 	ContainerPorts         string     `json:"container_ports"`
 	DiscoveredAt           *time.Time `json:"discovered_at"`
 	LastSeenAt             *time.Time `json:"last_seen_at"`
+	GrafanaDashboardUID    string     `json:"grafana_dashboard_uid"`
 	CreatedAt              time.Time  `json:"created_at"`
 	UpdatedAt              time.Time  `json:"updated_at"`
 }
@@ -54,16 +55,16 @@ func CreateService(db *sql.DB, s *Service) error {
 			is_external_dependency, external_provider, external_url, external_contact,
 			repository_url, gitlab_url, documentation_url,
 			source, container_status, container_id, container_name, container_image, container_ports,
-			discovered_at, last_seen_at)
+			discovered_at, last_seen_at, grafana_dashboard_uid)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-			?, ?, ?, ?, ?, ?, ?, ?)`,
+			?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype,
 		s.TechnologyStack, s.DeployApproach, s.OrchestratorTool, s.Environment, s.Port, s.Version,
 		s.OrchestratorManaged, s.IsDirectlyManaged, s.IsResponsible, s.DevelopedBy,
 		s.IsExternalDependency, s.ExternalProvider, s.ExternalURL, s.ExternalContact,
 		s.RepositoryURL, s.GitlabURL, s.DocumentationURL,
 		s.Source, s.ContainerStatus, s.ContainerID, s.ContainerName, s.ContainerImage, s.ContainerPorts,
-		s.DiscoveredAt, s.LastSeenAt,
+		s.DiscoveredAt, s.LastSeenAt, s.GrafanaDashboardUID,
 	)
 	if err != nil {
 		return err
@@ -78,7 +79,7 @@ const serviceCols = `id, nickname, project_id, description, service_type, servic
 	is_external_dependency, external_provider, external_url, external_contact,
 	repository_url, gitlab_url, documentation_url,
 	source, container_status, container_id, container_name, container_image, container_ports,
-	discovered_at, last_seen_at, created_at, updated_at`
+	discovered_at, last_seen_at, grafana_dashboard_uid, created_at, updated_at`
 
 func scanService(scanner interface{ Scan(...any) error }, s *Service) error {
 	return scanner.Scan(&s.ID, &s.Nickname, &s.ProjectID, &s.Description, &s.ServiceType, &s.ServiceSubtype,
@@ -87,7 +88,7 @@ func scanService(scanner interface{ Scan(...any) error }, s *Service) error {
 		&s.IsExternalDependency, &s.ExternalProvider, &s.ExternalURL, &s.ExternalContact,
 		&s.RepositoryURL, &s.GitlabURL, &s.DocumentationURL,
 		&s.Source, &s.ContainerStatus, &s.ContainerID, &s.ContainerName, &s.ContainerImage, &s.ContainerPorts,
-		&s.DiscoveredAt, &s.LastSeenAt, &s.CreatedAt, &s.UpdatedAt,
+		&s.DiscoveredAt, &s.LastSeenAt, &s.GrafanaDashboardUID, &s.CreatedAt, &s.UpdatedAt,
 	)
 }
 
@@ -144,7 +145,7 @@ func ListServicesByHost(db *sql.DB, hostID int64) ([]Service, error) {
 			s.is_external_dependency, s.external_provider, s.external_url, s.external_contact,
 			s.repository_url, s.gitlab_url, s.documentation_url,
 			s.source, s.container_status, s.container_id, s.container_name, s.container_image, s.container_ports,
-			s.discovered_at, s.last_seen_at, s.created_at, s.updated_at
+			s.discovered_at, s.last_seen_at, s.grafana_dashboard_uid, s.created_at, s.updated_at
 		FROM services s
 		JOIN service_host_links l ON s.id = l.service_id
 		WHERE l.host_id = ? ORDER BY s.nickname`, hostID,
@@ -173,7 +174,7 @@ func UpdateService(db *sql.DB, s *Service) error {
 			is_external_dependency = ?, external_provider = ?, external_url = ?, external_contact = ?,
 			repository_url = ?, gitlab_url = ?, documentation_url = ?,
 			source = ?, container_status = ?, container_id = ?, container_name = ?, container_image = ?, container_ports = ?,
-			discovered_at = ?, last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
+			discovered_at = ?, last_seen_at = ?, grafana_dashboard_uid = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype,
 		s.TechnologyStack, s.DeployApproach, s.OrchestratorTool, s.Environment, s.Port, s.Version,
@@ -181,7 +182,7 @@ func UpdateService(db *sql.DB, s *Service) error {
 		s.IsExternalDependency, s.ExternalProvider, s.ExternalURL, s.ExternalContact,
 		s.RepositoryURL, s.GitlabURL, s.DocumentationURL,
 		s.Source, s.ContainerStatus, s.ContainerID, s.ContainerName, s.ContainerImage, s.ContainerPorts,
-		s.DiscoveredAt, s.LastSeenAt, s.ID,
+		s.DiscoveredAt, s.LastSeenAt, s.GrafanaDashboardUID, s.ID,
 	)
 	return err
 }
@@ -211,7 +212,7 @@ func ListContainerServicesByHost(db *sql.DB, hostID int64) ([]Service, error) {
 			s.is_external_dependency, s.external_provider, s.external_url, s.external_contact,
 			s.repository_url, s.gitlab_url, s.documentation_url,
 			s.source, s.container_status, s.container_id, s.container_name, s.container_image, s.container_ports,
-			s.discovered_at, s.last_seen_at, s.created_at, s.updated_at
+			s.discovered_at, s.last_seen_at, s.grafana_dashboard_uid, s.created_at, s.updated_at
 		FROM services s
 		JOIN service_host_links l ON s.id = l.service_id
 		WHERE l.host_id = ? AND s.source IN ('auto', 'fixed') AND s.container_name != ''

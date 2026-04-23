@@ -1,7 +1,10 @@
 package api
 
 import (
+	"context"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -129,7 +132,30 @@ func (h *serviceHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		models.SyncServiceResponsaveis(h.db.SQL, req.Service.ID, req.Responsaveis)
 	}
 
+	// Fire-and-forget auto-provision of the default Grafana dashboard.
+	h.maybeProvisionGrafanaDashboard(req.Service)
+
 	jsonCreated(w, req.Service)
+}
+
+// maybeProvisionGrafanaDashboard runs ProvisionServiceDashboard in a goroutine
+// if the integration is enabled. Failures only log — creation never blocks.
+func (h *serviceHandlers) maybeProvisionGrafanaDashboard(svc models.Service) {
+	if models.GetAppSettingValue(h.db.SQL, "grafana_enabled") != "true" {
+		return
+	}
+	go func(svc models.Service) {
+		defer func() {
+			if rv := recover(); rv != nil {
+				log.Printf("[grafana-provision] service %d panic: %v", svc.ID, rv)
+			}
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if _, err := ProvisionServiceDashboard(ctx, h.db, &svc); err != nil {
+			log.Printf("[grafana-provision] service %d (%s): %v", svc.ID, svc.Nickname, err)
+		}
+	}(svc)
 }
 
 func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {

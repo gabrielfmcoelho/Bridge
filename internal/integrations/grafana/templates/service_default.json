@@ -1,0 +1,52 @@
+{
+  "uid": "{{.UID}}",
+  "title": "{{.Title}}",
+  "description": "Auto-provisioned by sshcm for service {{.Slug}}. Customize freely — sshcm will not overwrite unless you click 'Provision default dashboard' again.",
+  "tags": ["sshcm", "service", "auto"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "editable": true,
+  "refresh": "30s",
+  "time": {"from": "now-6h", "to": "now"},
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "constant",
+        "query": "{{.Slug}}",
+        "hide": 2,
+        "current": {"text": "{{.Slug}}", "value": "{{.Slug}}"}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Instances up",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "{{.DatasourceUID}}"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "{{.DatasourceUID}}"},
+          "expr": "sum(up{service=\"$service\"})",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "auto"}
+    },
+    {
+      "id": 2,
+      "type": "text",
+      "title": "About this dashboard",
+      "gridPos": {"h": 6, "w": 18, "x": 6, "y": 0},
+      "options": {
+        "mode": "markdown",
+        "content": "This is a placeholder service dashboard. Edit it to add panels that match the metrics your **{{.Slug}}** service actually emits. The `$service` template variable is pre-filled to `{{.Slug}}` for convenient PromQL selectors like `my_metric{service=\"$service\"}`."
+      }
+    }
+  ]
+}
