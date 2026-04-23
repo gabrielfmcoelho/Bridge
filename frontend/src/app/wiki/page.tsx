@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -60,7 +60,7 @@ function CollectionIconPip({ icon, color, size = 14 }: { icon?: string; color?: 
   );
 }
 
-export default function WikiPage() {
+function WikiPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -530,5 +530,13 @@ export default function WikiPage() {
         submitting={createMutation.isPending}
       />
     </PageShell>
+  );
+}
+
+export default function WikiPage() {
+  return (
+    <Suspense fallback={<PageShell fullBleed><div className="h-full" /></PageShell>}>
+      <WikiPageInner />
+    </Suspense>
   );
 }
