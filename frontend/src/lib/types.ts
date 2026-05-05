@@ -84,8 +84,22 @@ export interface Host {
   alerts?: HostAlert[];
   responsaveis?: HostResponsavel[];
   chamados?: HostChamado[];
+  entidades?: HostEntidade[];
   main_responsavel_name?: string;
+  main_entidade?: string;
   chamados_count?: number;
+}
+
+export interface HostEntidade {
+  id?: number;
+  host_id?: number;
+  entidade: string;
+  is_main: boolean;
+}
+
+export interface HostEntidadeInput {
+  entidade: string;
+  is_main: boolean;
 }
 
 export type AlertLevel = "critical" | "warning" | "info";
@@ -124,6 +138,7 @@ export interface HostFilters {
   responsavel_interno: string;
   key_test_status: string;
   password_test_status: string;
+  scan_result: string;
   has_scan: string;
   alert_level: string;
 }
@@ -330,18 +345,33 @@ export interface Contact {
   phone: string;
   role: string;
   entity: string;
+  notes: string;
+  is_external: boolean;
 }
 
-// Generic entity responsavel — shared across hosts, DNS, services, projects
+// Generic entity responsavel — shared across hosts, DNS, services, projects.
+// Hosts/DNS/services/projects can only LINK to an existing contact (contact_id
+// is required). Display fields (name/phone/role/entity/notes/is_external) are
+// joined from the contact for read responses; the backend ignores them on write.
 export interface EntityResponsavel {
   id?: number;
-  contact_id?: number;
+  contact_id: number;
   is_main: boolean;
-  is_externo: boolean;
+  // Joined from the contact:
   name: string;
   phone: string;
   role: string;
   entity: string;
+  notes: string;
+  is_external: boolean;
+}
+
+// Write-side payload for syncing responsaveis. Only contact_id + is_main are
+// persisted; everything else on EntityResponsavel is read-side metadata joined
+// from contacts.
+export interface EntityResponsavelInput {
+  contact_id: number;
+  is_main: boolean;
 }
 
 // Alias for backward compatibility

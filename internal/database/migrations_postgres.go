@@ -901,4 +901,47 @@ var migrationsPostgres = []string{
 		updated_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_by   BIGINT
 	);`,
+
+	// Version 58: contacts gain notes + is_external. is_external becomes
+	// intrinsic to the contact (a person from an outside org is external
+	// regardless of which host references them), replacing the per-junction
+	// is_externo flag. Junction is_externo columns are kept for back-compat
+	// but Sync* functions stop relying on them.
+	`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';
+	ALTER TABLE contacts ADD COLUMN IF NOT EXISTS is_external BOOLEAN NOT NULL DEFAULT FALSE;
+	UPDATE contacts SET is_external = TRUE WHERE id IN (
+		SELECT contact_id FROM host_responsaveis WHERE is_externo
+		UNION SELECT contact_id FROM dns_responsaveis WHERE is_externo
+		UNION SELECT contact_id FROM service_responsaveis WHERE is_externo
+		UNION SELECT contact_id FROM project_responsaveis WHERE is_externo AND contact_id > 0
+	);`,
+
+	// Version 59: drop deprecated junction is_externo columns (now intrinsic
+	// to contacts) and the legacy nome/contato pair on project_responsaveis
+	// (replaced by contact_id). Dropping nome implicitly drops the
+	// UNIQUE(project_id, nome) constraint in Postgres.
+	`ALTER TABLE host_responsaveis DROP COLUMN IF EXISTS is_externo;
+	ALTER TABLE dns_responsaveis DROP COLUMN IF EXISTS is_externo;
+	ALTER TABLE service_responsaveis DROP COLUMN IF EXISTS is_externo;
+	DELETE FROM project_responsaveis WHERE contact_id <= 0;
+	ALTER TABLE project_responsaveis DROP COLUMN IF EXISTS is_externo;
+	ALTER TABLE project_responsaveis DROP COLUMN IF EXISTS nome;
+	ALTER TABLE project_responsaveis DROP COLUMN IF EXISTS contato;`,
+
+	// Version 60: hosts ↔ entidades is now a 1-n relation. host_entidades
+	// is the junction; the previous single-string hosts.setor_responsavel
+	// is backfilled as the host's main entidade. The legacy column is kept
+	// (no longer read by app code) so this migration is non-destructive.
+	`CREATE TABLE IF NOT EXISTS host_entidades (
+		id         BIGSERIAL PRIMARY KEY,
+		host_id    BIGINT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+		entidade   TEXT NOT NULL,
+		is_main    BOOLEAN NOT NULL DEFAULT FALSE,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(host_id, entidade)
+	);
+	CREATE INDEX IF NOT EXISTS idx_host_entidades_host ON host_entidades(host_id);
+	INSERT INTO host_entidades (host_id, entidade, is_main)
+		SELECT id, setor_responsavel, TRUE FROM hosts WHERE setor_responsavel != ''
+	ON CONFLICT DO NOTHING;`,
 }

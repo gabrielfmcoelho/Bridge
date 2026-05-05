@@ -105,6 +105,44 @@ type VMInfo struct {
 	FirewallStatus    string             `json:"firewall_status,omitempty"`
 	RemoteUsers       []RemoteUserInfo   `json:"remote_users,omitempty"`
 	PortOwners        []PortOwner        `json:"port_owners,omitempty"`
+	SSHAuthPolicy     *SSHAuthPolicy     `json:"ssh_auth_policy,omitempty"`
+}
+
+// SSHAuthPolicy summarizes the SSH server's authentication policy as observed
+// by `sshd -T` (with fallback to /etc/ssh/sshd_config). Operators use this to
+// answer "does this host accept password logins, and for which users?".
+//
+// Fields mirror the canonical sshd_config directives (lowercased, since
+// `sshd -T` always emits keys in lowercase). Empty strings mean the directive
+// could not be determined (typically because we lacked permission to run
+// `sshd -T` and the config file wasn't parseable either).
+type SSHAuthPolicy struct {
+	PasswordAuth          string   `json:"password_auth,omitempty"`           // "yes" | "no"
+	KbdInteractiveAuth    string   `json:"kbd_interactive_auth,omitempty"`    // "yes" | "no"
+	UsePAM                string   `json:"use_pam,omitempty"`                 // "yes" | "no"
+	PermitRootLogin       string   `json:"permit_root_login,omitempty"`       // "yes" | "no" | "prohibit-password" | "forced-commands-only"
+	PubkeyAuth            string   `json:"pubkey_auth,omitempty"`             // "yes" | "no"
+	AuthenticationMethods string   `json:"authentication_methods,omitempty"`  // e.g. "publickey,password" or "any"
+	AllowUsers            []string `json:"allow_users,omitempty"`
+	AllowGroups           []string `json:"allow_groups,omitempty"`
+	DenyUsers             []string `json:"deny_users,omitempty"`
+	DenyGroups            []string `json:"deny_groups,omitempty"`
+	Source                string   `json:"source,omitempty"` // "sshd -T" | "sshd -T (sudo)" | "sshd_config" | ""
+	// DirectiveSources maps a lowercased directive name to a list of
+	// "<file>:<line>" hits found in /etc/ssh/sshd_config and its drop-in
+	// fragments. Useful to answer "which file is setting PasswordAuth=no?"
+	// when the daemon's effective config came from somewhere unexpected
+	// (cloud-init drop-in, vendor hardening preset, etc.).
+	DirectiveSources map[string][]DirectiveSource `json:"directive_sources,omitempty"`
+}
+
+// DirectiveSource records a single occurrence of an sshd_config directive,
+// including the surrounding line text so the UI can show what value is
+// being set without re-fetching the file.
+type DirectiveSource struct {
+	File  string `json:"file"`
+	Line  int    `json:"line"`
+	Value string `json:"value,omitempty"` // raw line content with the directive value (no key prefix)
 }
 
 // PortOwner attaches ownership info to a listening port so the UI can tell
@@ -128,6 +166,14 @@ type RemoteUserInfo struct {
 	Home      string `json:"home,omitempty"`
 	HasLogin  bool   `json:"has_login"`
 	IsCurrent bool   `json:"is_current,omitempty"`
+	// PasswordStatus is parsed from `passwd -S <user>` field 2:
+	//   "P"   = a usable password is set
+	//   "L"   = the account is locked (`!` prefix in /etc/shadow)
+	//   "NP"  = no password is set (empty shadow field)
+	//   ""    = unknown (passwd -S unavailable / not run with privileges)
+	// Cross-reference with SSHAuthPolicy.PasswordAuth to know whether this
+	// user can actually log in via password.
+	PasswordStatus string `json:"password_status,omitempty"`
 }
 
 // ContainerInfo holds structured data about a running Docker container.
@@ -203,40 +249,71 @@ func FixDevNull(client *ssh.Client) (string, error) {
 	return fixDevNull(client)
 }
 
-func runCmd(client *ssh.Client, cmd string) string {
+// sshCmdTimeout caps how long a single remote command can run before we
+// give up and force-close the session. Most healthy commands return in
+// under a second; anything above this is almost certainly a hang
+// (df on a stuck NFS mount, curl waiting on dead DNS, etc).
+const sshCmdTimeout = 30 * time.Second
+
+// runCmdWithDeadline executes cmd in a fresh session with a hard deadline.
+// On timeout it closes the session (which makes the underlying
+// CombinedOutput return on its goroutine) and logs the offending command
+// snippet so operators can identify chronic offenders. Returns the
+// captured output (possibly partial on timeout) and an error if the
+// session failed or the deadline fired.
+func runCmdWithDeadline(client *ssh.Client, cmd string, timeout time.Duration) (string, error) {
 	session, err := client.NewSession()
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("new session: %w", err)
 	}
-	defer session.Close()
-	out, err := session.CombinedOutput(cmd)
+
+	type result struct {
+		out []byte
+		err error
+	}
+	ch := make(chan result, 1)
+	go func() {
+		out, runErr := session.CombinedOutput(cmd)
+		ch <- result{out, runErr}
+	}()
+
+	select {
+	case r := <-ch:
+		session.Close()
+		return string(r.out), r.err
+	case <-time.After(timeout):
+		// Force-close the session — the goroutine's CombinedOutput will
+		// return with an error and write to the buffered channel; we
+		// don't need to read it (Go GC will collect the goroutine).
+		session.Close()
+		snippet := cmd
+		if len(snippet) > 120 {
+			snippet = snippet[:120] + "..."
+		}
+		log.Printf("[sshcmd] timeout after %s: %q", timeout, snippet)
+		return "", fmt.Errorf("ssh cmd timeout after %s", timeout)
+	}
+}
+
+func runCmd(client *ssh.Client, cmd string) string {
+	out, err := runCmdWithDeadline(client, cmd, sshCmdTimeout)
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(cleanCommandOutput(string(out), nil))
+	return strings.TrimSpace(cleanCommandOutput(out, nil))
 }
 
 func runCmdWithWarnings(client *ssh.Client, cmd string, warnings map[string]bool) string {
-	session, err := client.NewSession()
+	out, err := runCmdWithDeadline(client, cmd, sshCmdTimeout)
 	if err != nil {
 		return ""
 	}
-	defer session.Close()
-	out, err := session.CombinedOutput(cmd)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(cleanCommandOutput(string(out), warnings))
+	return strings.TrimSpace(cleanCommandOutput(out, warnings))
 }
 
 func runCmdRaw(client *ssh.Client, cmd string) (string, error) {
-	session, err := client.NewSession()
-	if err != nil {
-		return "", err
-	}
-	defer session.Close()
-	out, execErr := session.CombinedOutput(cmd)
-	cleaned := strings.TrimSpace(cleanCommandOutput(string(out), nil))
+	out, execErr := runCmdWithDeadline(client, cmd, sshCmdTimeout)
+	cleaned := strings.TrimSpace(cleanCommandOutput(out, nil))
 	if execErr != nil {
 		if cleaned == "" {
 			return "", execErr
@@ -1483,6 +1560,52 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		})
 	}
 
+	// ── Session 7b: per-user password status ──
+	// `passwd -S <user>` prints "<name> <status> ...", where status is:
+	//   P  = usable password set
+	//   L  = locked (`!` prefix in /etc/shadow)
+	//   NP = no password set
+	// Reading /etc/shadow requires root, so we prefer `sudo -S passwd -Sa`
+	// when a sudo password is available. Falls back to per-user `passwd -S`
+	// (which works for the current user even without sudo).
+	passwdStatuses := map[string]string{}
+	if sudoPassword != "" {
+		if out, err := runSudoCmd(client, sudoPassword, "passwd -Sa 2>/dev/null"); err == nil {
+			for _, line := range splitLines(out) {
+				fields := strings.Fields(line)
+				if len(fields) >= 2 {
+					passwdStatuses[fields[0]] = fields[1]
+				}
+			}
+		}
+	}
+	if len(passwdStatuses) == 0 {
+		// Best-effort: query each known user individually. Without sudo,
+		// only the current user's status will come back populated.
+		for _, u := range info.RemoteUsers {
+			out := runCmd(client, fmt.Sprintf("passwd -S %s 2>/dev/null", shellEscape(u.Name)))
+			fields := strings.Fields(out)
+			if len(fields) >= 2 {
+				passwdStatuses[fields[0]] = fields[1]
+			}
+		}
+	}
+	for i, u := range info.RemoteUsers {
+		if status, ok := passwdStatuses[u.Name]; ok {
+			info.RemoteUsers[i].PasswordStatus = status
+		}
+	}
+
+	// ── Session 7c: SSH server auth policy ──
+	// `sshd -T` dumps the *effective* config (resolves Includes, defaults,
+	// per-Match overrides for the connecting user). It usually requires
+	// root; we try the unprivileged path first (works on some distros where
+	// the binary is suid or readable) and fall back to sudo.
+	policy := scanSSHAuthPolicy(client, sudoPassword)
+	if policy != nil {
+		info.SSHAuthPolicy = policy
+	}
+
 	// ── Session 8: nginx server blocks ──
 	// `nginx -T` dumps every loaded config file (main + includes). Used to
 	// resolve "which server_name answers port N" for the port-owners panel.
@@ -1730,5 +1853,266 @@ func parseNginxListens(cfg string) map[int][]string {
 	}
 
 	return out
+}
+
+// shellEscape wraps an identifier in single quotes for safe inclusion in a
+// shell command. Used for usernames passed to `passwd -S` — they should never
+// contain quotes, but we don't want a malformed entry in /etc/passwd to be
+// able to inject a command.
+func shellEscape(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+// scanSSHAuthPolicy queries the remote host's effective sshd config and
+// returns the auth-related directives. It tries (in order):
+//  1. `sshd -T` unprivileged — works on some hosts where the binary is
+//     readable or running as the current user matches sshd's run user.
+//  2. `sudo -S sshd -T` — root resolves the config the way the daemon does,
+//     including Match overrides.
+//  3. `cat /etc/ssh/sshd_config` (+ Includes) — last-resort, picks up only
+//     the explicit values; defaults are not filled in.
+//
+// Returns nil only if all three fall through with empty output.
+func scanSSHAuthPolicy(client *ssh.Client, sudoPassword string) *SSHAuthPolicy {
+	var raw, source string
+
+	// `sshd -T` is the canonical way; try the unprivileged path first since
+	// on many systemd-managed boxes the operator's user can run it.
+	if out := runCmd(client, "sshd -T 2>/dev/null"); strings.TrimSpace(out) != "" {
+		raw = out
+		source = "sshd -T"
+	}
+	if raw == "" && sudoPassword != "" {
+		if out, err := runSudoCmd(client, sudoPassword, "sshd -T 2>/dev/null"); err == nil && strings.TrimSpace(out) != "" {
+			raw = out
+			source = "sshd -T (sudo)"
+		}
+	}
+	if raw == "" {
+		// sudo -n in case NOPASSWD sudo is configured for sshd.
+		if out := runCmd(client, "sudo -n sshd -T 2>/dev/null"); strings.TrimSpace(out) != "" {
+			raw = out
+			source = "sshd -T (sudo)"
+		}
+	}
+	if raw == "" {
+		// Fallback: cat the main config and any drop-in fragments. We
+		// concatenate them so the parser sees one stream — last setting
+		// wins, matching sshd's "first occurrence wins" rule in reverse,
+		// so we read the main file *after* the Includes for parity.
+		out := runCmd(client,
+			`for f in /etc/ssh/sshd_config.d/*.conf /etc/ssh/sshd_config; do `+
+				`[ -r "$f" ] && cat "$f"; `+
+				`done 2>/dev/null`)
+		if strings.TrimSpace(out) != "" {
+			raw = out
+			source = "sshd_config"
+		}
+	}
+	if raw == "" {
+		return nil
+	}
+
+	policy := &SSHAuthPolicy{Source: source}
+	// Track whether we've already consumed a directive — sshd_config follows
+	// "first occurrence wins", so the *first* line is authoritative when
+	// reading the raw config. `sshd -T` already collapses to the effective
+	// value, so for that source the first/last distinction doesn't matter.
+	seen := map[string]bool{}
+	setOnce := func(key, value string) {
+		if seen[key] || strings.TrimSpace(value) == "" {
+			return
+		}
+		seen[key] = true
+		switch key {
+		case "passwordauthentication":
+			policy.PasswordAuth = strings.ToLower(value)
+		case "kbdinteractiveauthentication", "challengeresponseauthentication":
+			// Aliases — keep whichever we see first.
+			if policy.KbdInteractiveAuth == "" {
+				policy.KbdInteractiveAuth = strings.ToLower(value)
+			}
+		case "usepam":
+			policy.UsePAM = strings.ToLower(value)
+		case "permitrootlogin":
+			policy.PermitRootLogin = strings.ToLower(value)
+		case "pubkeyauthentication":
+			policy.PubkeyAuth = strings.ToLower(value)
+		case "authenticationmethods":
+			policy.AuthenticationMethods = value
+		case "allowusers":
+			policy.AllowUsers = strings.Fields(value)
+		case "allowgroups":
+			policy.AllowGroups = strings.Fields(value)
+		case "denyusers":
+			policy.DenyUsers = strings.Fields(value)
+		case "denygroups":
+			policy.DenyGroups = strings.Fields(value)
+		}
+	}
+
+	// Skip directives inside `Match` blocks — they're conditional on the
+	// connecting user/host/address and would mislead the global summary.
+	// `sshd -T` without `-C` already excludes them, but raw sshd_config
+	// includes them verbatim.
+	inMatch := false
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Strip trailing comments. sshd_config doesn't allow inline `#`
+		// inside quoted strings; for the few directives we care about
+		// none use quotes, so a naive split is safe.
+		if i := strings.Index(line, "#"); i >= 0 {
+			line = strings.TrimSpace(line[:i])
+			if line == "" {
+				continue
+			}
+		}
+		lower := strings.ToLower(line)
+		if strings.HasPrefix(lower, "match ") {
+			inMatch = true
+			continue
+		}
+		if inMatch {
+			// A line starting with a non-indented directive that isn't
+			// `match` ends the previous Match block in `sshd -T` output;
+			// in raw config, Match blocks extend to EOF or another Match.
+			// We can't reliably detect the end without more state, so we
+			// remain conservative and ignore directives until another
+			// `Match` or EOF is hit. This is fine: the global summary is
+			// still useful, and per-user policy can be derived from the
+			// AllowUsers/AllowGroups lists we already captured.
+			if strings.HasPrefix(lower, "match ") {
+				continue
+			}
+			if source == "sshd -T" || source == "sshd -T (sudo)" {
+				// `sshd -T` without `-C` doesn't emit Match-conditional
+				// values, so anything we see here is global. Reset.
+				inMatch = false
+			} else {
+				continue
+			}
+		}
+		// Split on first whitespace run.
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		key := strings.ToLower(fields[0])
+		value := strings.TrimSpace(strings.TrimPrefix(line, fields[0]))
+		setOnce(key, value)
+	}
+
+	// Apply sshd's defaults for directives that weren't explicitly set in a
+	// raw sshd_config (where omission means "use compiled-in default").
+	// `sshd -T` always emits the effective value, so we only fill defaults
+	// when reading the raw file.
+	if source == "sshd_config" {
+		if policy.PasswordAuth == "" {
+			policy.PasswordAuth = "yes"
+		}
+		if policy.KbdInteractiveAuth == "" {
+			policy.KbdInteractiveAuth = "yes"
+		}
+		if policy.UsePAM == "" {
+			policy.UsePAM = "no"
+		}
+		if policy.PermitRootLogin == "" {
+			policy.PermitRootLogin = "prohibit-password"
+		}
+		if policy.PubkeyAuth == "" {
+			policy.PubkeyAuth = "yes"
+		}
+	}
+
+	// Independently of the policy parser, grep over /etc/ssh/sshd_config and
+	// its drop-in fragments to record exactly which file is setting each
+	// directive. This is the only way to answer "where did this value come
+	// from?" when sshd -T reports a value that doesn't match the main config
+	// (typical when cloud-init drops a fragment in /etc/ssh/sshd_config.d/).
+	policy.DirectiveSources = scanSSHDirectiveSources(client, sudoPassword)
+
+	return policy
+}
+
+// scanSSHDirectiveSources greps the sshd config tree for the directives we
+// surface in the UI, returning a map of directive → list of (file, line, value)
+// hits. The grep matches case-insensitively and ignores commented lines.
+func scanSSHDirectiveSources(client *ssh.Client, sudoPassword string) map[string][]DirectiveSource {
+	directives := []string{
+		"PasswordAuthentication",
+		"KbdInteractiveAuthentication",
+		"ChallengeResponseAuthentication",
+		"PubkeyAuthentication",
+		"UsePAM",
+		"PermitRootLogin",
+		"AuthenticationMethods",
+		"AllowUsers",
+		"AllowGroups",
+		"DenyUsers",
+		"DenyGroups",
+	}
+	pattern := "^[[:space:]]*(" + strings.Join(directives, "|") + ")[[:space:]]"
+	cmd := fmt.Sprintf(
+		`grep -EHnir --include='*.conf' --include='sshd_config' '%s' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/ 2>/dev/null`,
+		pattern,
+	)
+
+	out := runCmd(client, cmd)
+	if strings.TrimSpace(out) == "" && sudoPassword != "" {
+		// Most files are world-readable, but some hardened distros chmod
+		// the drop-in directory to 0700. Retry under sudo.
+		if sudoOut, err := runSudoCmd(client, sudoPassword, cmd); err == nil {
+			out = sudoOut
+		}
+	}
+	if strings.TrimSpace(out) == "" {
+		return nil
+	}
+
+	result := map[string][]DirectiveSource{}
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// grep -Hn output: <file>:<line>:<content>
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		file := parts[0]
+		lineNum, convErr := strconv.Atoi(parts[1])
+		if convErr != nil {
+			continue
+		}
+		content := strings.TrimSpace(parts[2])
+		if strings.HasPrefix(content, "#") {
+			continue
+		}
+		fields := strings.Fields(content)
+		if len(fields) < 2 {
+			continue
+		}
+		key := strings.ToLower(fields[0])
+		// Aliases: ChallengeResponseAuthentication is the legacy name for
+		// KbdInteractiveAuthentication — fold them together.
+		if key == "challengeresponseauthentication" {
+			key = "kbdinteractiveauthentication"
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(content, fields[0]))
+		result[key] = append(result[key], DirectiveSource{
+			File:  file,
+			Line:  lineNum,
+			Value: value,
+		})
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 

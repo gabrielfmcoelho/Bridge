@@ -57,6 +57,30 @@ export type NginxCleanupStatusType = {
   message: string;
 };
 
+export type NetworkPortCheck = {
+  port: number;
+  ok: boolean;
+  latency_ms: number;
+  error?: string;
+};
+
+export type NetworkPingCheck = {
+  ok: boolean;
+  skipped: boolean;
+  latency_ms?: number;
+  output?: string;
+  error?: string;
+};
+
+export type NetworkTestResult = {
+  success: boolean;
+  hostname: string;
+  ping: NetworkPingCheck;
+  ssh_port: NetworkPortCheck;
+  custom_port?: NetworkPortCheck;
+  error?: string;
+};
+
 export type VMInfoType = {
   cpu: string; cpu_usage: string;
   ram: string; ram_used: string; ram_percent: string;
@@ -76,6 +100,28 @@ export type VMInfoType = {
   remote_users?: RemoteUserInfo[];
   port_owners?: PortOwner[];
   parsed_containers?: ParsedContainer[];
+  ssh_auth_policy?: SSHAuthPolicy;
+};
+
+export type SSHAuthPolicy = {
+  password_auth?: string;           // "yes" | "no"
+  kbd_interactive_auth?: string;
+  use_pam?: string;
+  permit_root_login?: string;       // "yes" | "no" | "prohibit-password" | "forced-commands-only"
+  pubkey_auth?: string;
+  authentication_methods?: string;
+  allow_users?: string[];
+  allow_groups?: string[];
+  deny_users?: string[];
+  deny_groups?: string[];
+  source?: string;                  // "sshd -T" | "sshd -T (sudo)" | "sshd_config"
+  directive_sources?: Record<string, DirectiveSource[]>;
+};
+
+export type DirectiveSource = {
+  file: string;
+  line: number;
+  value?: string;
 };
 
 export type ParsedContainer = {
@@ -101,6 +147,7 @@ export type RemoteUserInfo = {
   home?: string;
   has_login: boolean;
   is_current?: boolean;
+  password_status?: string; // "P" | "L" | "NP" | "" (unknown)
 };
 
 export type SSHKeyInfoScan = {
@@ -136,25 +183,47 @@ export type ProcessDetail = {
   ports?: string;
 };
 
+// Default per-request timeout. Generous enough for long SSH scans
+// (captureVMInfo runs many sequential commands), but bounded so that a
+// stalled fetch — dropped TCP, dev-proxy ECONNRESET, hung backend —
+// surfaces as a deterministic Error instead of waiting forever. Callers
+// can override via the third arg (e.g. cheap reads can pass 30000).
+const DEFAULT_REQUEST_TIMEOUT_MS = 120000;
+
 async function request<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Request failed: ${res.status}`);
+  const controller = new AbortController();
+  // Compose with a caller-provided signal if any: abort propagates either way.
+  if (options.signal) {
+    options.signal.addEventListener("abort", () => controller.abort(), { once: true });
   }
-
-  return res.json();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      credentials: "include",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Request failed: ${res.status}`);
+    }
+    return res.json();
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const api = {
@@ -209,10 +278,11 @@ export const hostsAPI = {
       last_scan: { id: number; data: string; scanned_at: string } | null;
       responsaveis: import("./types").HostResponsavel[];
       chamados: import("./types").HostChamado[];
+      entidades: import("./types").HostEntidade[];
     }>(`/api/hosts/${slug}`),
-  create: (data: Partial<import("./types").Host> & { password?: string; tags?: string[]; dns_ids?: number[]; service_ids?: number[]; project_ids?: number[] }) =>
+  create: (data: Partial<import("./types").Host> & { password?: string; tags?: string[]; dns_ids?: number[]; service_ids?: number[]; project_ids?: number[]; entidades?: import("./types").HostEntidadeInput[] }) =>
     api.post<import("./types").Host>("/api/hosts", data),
-  update: (slug: string, data: Partial<import("./types").Host> & { password?: string; tags?: string[]; dns_ids?: number[]; service_ids?: number[]; project_ids?: number[] }) =>
+  update: (slug: string, data: Partial<import("./types").Host> & { password?: string; tags?: string[]; dns_ids?: number[]; service_ids?: number[]; project_ids?: number[]; entidades?: import("./types").HostEntidadeInput[] }) =>
     api.put<import("./types").Host>(`/api/hosts/${slug}`, data),
   delete: (slug: string) => api.delete(`/api/hosts/${slug}`),
   getPassword: (slug: string) => api.get<{ password: string }>(`/api/hosts/${slug}/password`),
@@ -248,9 +318,9 @@ export const hostChamadosAPI = {
 export const dnsAPI = {
   list: () => api.get<import("./types").DNSRecord[]>("/api/dns"),
   get: (id: number) => api.get<{ dns_record: import("./types").DNSRecord; tags: string[]; host_ids: number[]; responsaveis: import("./types").EntityResponsavel[] }>(`/api/dns/${id}`),
-  create: (data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavel[] }) =>
+  create: (data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.post<import("./types").DNSRecord>("/api/dns", data),
-  update: (id: number, data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavel[] }) =>
+  update: (id: number, data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.put<import("./types").DNSRecord>(`/api/dns/${id}`, data),
   delete: (id: number) => api.delete(`/api/dns/${id}`),
 };
@@ -330,9 +400,9 @@ export const projectsAPI = {
       host_ids: number[];
       dns_ids: number[];
     }>(`/api/projects/${id}`),
-  create: (data: Partial<import("./types").Project> & { tags?: string[]; responsaveis?: import("./types").EntityResponsavel[] }) =>
+  create: (data: Partial<import("./types").Project> & { tags?: string[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.post<import("./types").Project>("/api/projects", data),
-  update: (id: number, data: Partial<import("./types").Project> & { tags?: string[]; responsaveis?: import("./types").EntityResponsavel[] }) =>
+  update: (id: number, data: Partial<import("./types").Project> & { tags?: string[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.put<import("./types").Project>(`/api/projects/${id}`, data),
   delete: (id: number) => api.delete(`/api/projects/${id}`),
 };
@@ -351,9 +421,9 @@ export const servicesAPI = {
       credentials: import("./types").ServiceCredential[];
       responsaveis: import("./types").EntityResponsavel[];
     }>(`/api/services/${id}`),
-  create: (data: Partial<import("./types").Service> & { tags?: string[]; host_ids?: number[]; dns_ids?: number[]; depends_on_ids?: number[]; responsaveis?: import("./types").EntityResponsavel[] }) =>
+  create: (data: Partial<import("./types").Service> & { tags?: string[]; host_ids?: number[]; dns_ids?: number[]; depends_on_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.post<import("./types").Service>("/api/services", data),
-  update: (id: number, data: Partial<import("./types").Service> & { tags?: string[]; host_ids?: number[]; dns_ids?: number[]; depends_on_ids?: number[]; responsaveis?: import("./types").EntityResponsavel[] }) =>
+  update: (id: number, data: Partial<import("./types").Service> & { tags?: string[]; host_ids?: number[]; dns_ids?: number[]; depends_on_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.put<import("./types").Service>(`/api/services/${id}`, data),
   delete: (id: number) => api.delete(`/api/services/${id}`),
   createCredential: (serviceId: number, data: { role_name: string; credentials: string }) =>
@@ -384,6 +454,8 @@ export const sshAPI = {
   generateConfig: () => api.post<{ status: string; host_count: number; path: string }>("/api/ssh/generate-config"),
   testConnection: (slug: string, method: "password" | "key", capture = false) =>
     api.post<{ success: boolean; error?: string; vm_info?: VMInfoType }>(`/api/ssh/test/${slug}`, { method, capture }),
+  networkTest: (slug: string, port?: number) =>
+    api.post<NetworkTestResult>(`/api/ssh/network-test/${slug}`, port ? { port } : {}),
   fixDevNull: (slug: string, method: "password" | "key") =>
     api.post<{ success: boolean; method?: string; message?: string; output?: string; error?: string }>(`/api/ssh/fix-dev-null/${slug}`, { method }),
   setupSudoNopasswd: (slug: string) =>
@@ -480,14 +552,22 @@ export const tagsAPI = {
 };
 
 // Contacts
+type ContactPayload = {
+  name: string;
+  phone?: string;
+  role?: string;
+  entity?: string;
+  notes?: string;
+  is_external?: boolean;
+};
 export const contactsAPI = {
   list: async () => {
     const data = await api.get<unknown>("/api/contacts");
     return Array.isArray(data) ? (data as import("./types").Contact[]) : [];
   },
-  create: (data: { name: string; phone?: string; role?: string; entity?: string }) =>
+  create: (data: ContactPayload) =>
     api.post<import("./types").Contact>("/api/contacts", data),
-  update: (id: number, data: { name: string; phone?: string; role?: string; entity?: string }) =>
+  update: (id: number, data: ContactPayload) =>
     api.put<import("./types").Contact>(`/api/contacts/${id}`, data),
   delete: (id: number) => api.delete(`/api/contacts/${id}`),
 };

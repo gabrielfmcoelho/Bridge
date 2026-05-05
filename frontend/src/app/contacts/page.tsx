@@ -2,17 +2,19 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { contactsAPI } from "@/lib/api";
+import { contactsAPI, enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
-import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
+import Checkbox from "@/components/ui/Checkbox";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import PageHeader from "@/components/ui/PageHeader";
 import FormError from "@/components/ui/FormError";
 import EmptyState from "@/components/ui/EmptyState";
+import Badge from "@/components/ui/Badge";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import type { Contact } from "@/lib/types";
 
@@ -49,11 +51,15 @@ export default function ContactsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["contacts"] }),
   });
 
-  const filtered = contacts.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search)
-  );
+  const filtered = contacts.filter((c) => {
+    const q = search.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.phone.includes(search) ||
+      c.role.toLowerCase().includes(q) ||
+      c.entity.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <PageShell>
@@ -83,8 +89,11 @@ export default function ContactsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs">
-                <th className="text-left px-4 py-2.5 font-medium">Name</th>
-                <th className="text-left px-4 py-2.5 font-medium">Phone</th>
+                <th className="text-left px-4 py-2.5 font-medium">{t("responsavel.name")}</th>
+                <th className="text-left px-4 py-2.5 font-medium">{t("responsavel.phone")}</th>
+                <th className="text-left px-4 py-2.5 font-medium">{t("responsavel.role")}</th>
+                <th className="text-left px-4 py-2.5 font-medium">{t("responsavel.entity")}</th>
+                <th className="text-left px-4 py-2.5 font-medium w-24">{t("responsavel.external")}</th>
                 {canEdit && <th className="text-right px-4 py-2.5 font-medium w-24">Actions</th>}
               </tr>
             </thead>
@@ -93,6 +102,9 @@ export default function ContactsPage() {
                 <tr key={c.id} className={`border-t border-[var(--border-subtle)] ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}>
                   <td className="px-4 py-2.5 text-[var(--text-primary)] font-medium">{c.name}</td>
                   <td className="px-4 py-2.5 text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>{c.phone ? formatPhone(c.phone) : "-"}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.role || "-"}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.entity || "-"}</td>
+                  <td className="px-4 py-2.5">{c.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}</td>
                   {canEdit && (
                     <td className="px-4 py-2.5 text-right">
                       <div className="flex justify-end gap-1">
@@ -132,9 +144,18 @@ export default function ContactsPage() {
 function ContactForm({ initial, onSuccess }: { initial: Contact | null; onSuccess: () => void }) {
   const { t } = useLocale();
   const [name, setName] = useState(initial?.name ?? "");
-  const [phone, setPhone] = useState(initial?.phone ?? ""); // raw digits
+  const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [role, setRole] = useState(initial?.role ?? "");
+  const [entity, setEntity] = useState(initial?.entity ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [isExternal, setIsExternal] = useState(initial?.is_external ?? false);
   const [error, setError] = useState("");
   const [phoneError, setPhoneError] = useState("");
+
+  const { data: entidades = [] } = useQuery({
+    queryKey: ["enums", "entidade_responsavel"],
+    queryFn: () => enumsAPI.list("entidade_responsavel"),
+  });
 
   const validatePhone = (raw: string) => {
     if (!raw) { setPhoneError(""); return true; }
@@ -152,16 +173,17 @@ function ContactForm({ initial, onSuccess }: { initial: Contact | null; onSucces
 
   const mutation = useMutation({
     mutationFn: () => {
-      if (initial) {
-        return contactsAPI.delete(initial.id).then(() =>
-          contactsAPI.create({ name, phone })
-        );
-      }
-      return contactsAPI.create({ name, phone });
+      const payload = { name, phone, role, entity, notes, is_external: isExternal };
+      return initial ? contactsAPI.update(initial.id, payload) : contactsAPI.create(payload);
     },
     onSuccess: () => onSuccess(),
     onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
   });
+
+  const entidadeOptions = [
+    { value: "", label: "—" },
+    ...entidades.map((e) => ({ value: e.value, label: e.value })),
+  ];
 
   return (
     <form onSubmit={(e) => {
@@ -170,14 +192,39 @@ function ContactForm({ initial, onSuccess }: { initial: Contact | null; onSucces
       mutation.mutate();
     }} className="space-y-4">
       <FormError message={error} />
-      <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+      <Input label={t("responsavel.name")} value={name} onChange={(e) => setName(e.target.value)} required />
       <Input
-        label="Phone"
+        label={t("responsavel.phone")}
         type="tel"
         value={formatPhone(phone)}
         onChange={(e) => handlePhoneChange(e.target.value)}
         error={phoneError}
         placeholder="(XX) XX 9 XXXX-XXXX"
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Input label={t("responsavel.role")} value={role} onChange={(e) => setRole(e.target.value)} />
+        <Select
+          label={t("responsavel.entity")}
+          value={entity}
+          options={entidadeOptions}
+          onChange={(e) => setEntity(e.target.value)}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
+          {t("responsavel.notes")}
+        </label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
+        />
+      </div>
+      <Checkbox
+        label={t("responsavel.external")}
+        checked={isExternal}
+        onChange={setIsExternal}
       />
       <div className="flex justify-end gap-2">
         <Button type="submit" loading={mutation.isPending}>

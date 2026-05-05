@@ -28,13 +28,6 @@ type Project struct {
 	UpdatedAt                   time.Time `json:"updated_at"`
 }
 
-type ProjectResponsavel struct {
-	ID        int64  `json:"id"`
-	ProjectID int64  `json:"project_id"`
-	Nome      string `json:"nome"`
-	Contato   string `json:"contato"`
-}
-
 func CreateProject(db *sql.DB, p *Project) error {
 	id, err := database.InsertReturningID(db,
 		`INSERT INTO projects (name, description, situacao, setor_responsavel, responsavel,
@@ -204,46 +197,3 @@ func GetProjectHostIDs(db *sql.DB, projectID int64) ([]int64, error) {
 	return ids, rows.Err()
 }
 
-// Project responsaveis
-
-func SetProjectResponsaveis(db *sql.DB, projectID int64, responsaveis []ProjectResponsavel) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.Exec(`DELETE FROM project_responsaveis WHERE project_id = ?`, projectID); err != nil {
-		return err
-	}
-	for _, r := range responsaveis {
-		if _, err := tx.Exec(
-			`INSERT INTO project_responsaveis (project_id, nome, contato) VALUES (?, ?, ?)`,
-			projectID, r.Nome, r.Contato,
-		); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
-}
-
-func GetProjectResponsaveis(db *sql.DB, projectID int64) ([]ProjectResponsavel, error) {
-	rows, err := db.Query(
-		`SELECT id, project_id, nome, contato FROM project_responsaveis WHERE project_id = ? ORDER BY nome`,
-		projectID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var result []ProjectResponsavel
-	for rows.Next() {
-		var r ProjectResponsavel
-		if err := rows.Scan(&r.ID, &r.ProjectID, &r.Nome, &r.Contato); err != nil {
-			return nil, err
-		}
-		result = append(result, r)
-	}
-	return result, rows.Err()
-}

@@ -14,7 +14,7 @@ import type { HostFilters, HostSortConfig, SortField } from "@/lib/types";
 const emptyFilters: HostFilters = {
   situacao: "", tag: "", entidade_responsavel: "",
   responsavel_interno: "", key_test_status: "", password_test_status: "",
-  has_scan: "", alert_level: "",
+  scan_result: "", has_scan: "", alert_level: "",
 };
 
 interface FilterDrawerProps {
@@ -114,14 +114,19 @@ export default function FilterDrawer({
         </div>
       </DrawerSection>
 
-      <DrawerSection title={t("filters.tests")} open={openSection === "tests"} onToggle={() => toggle("tests")} active={!!filters.key_test_status || !!filters.password_test_status}>
-        <div className="grid grid-cols-2 gap-3">
-          <FieldLabel label={t("filters.keyTest")}>
-            <Select value={filters.key_test_status} onChange={(e) => set("key_test_status", e.target.value)} options={testStatusOptions} />
+      <DrawerSection title={t("filters.tests")} open={openSection === "tests"} onToggle={() => toggle("tests")} active={!!filters.scan_result || !!filters.key_test_status || !!filters.password_test_status}>
+        <div className="space-y-3">
+          <FieldLabel label={t("filters.scanResult")}>
+            <Select value={filters.scan_result} onChange={(e) => set("scan_result", e.target.value)} options={testStatusOptions} />
           </FieldLabel>
-          <FieldLabel label={t("filters.pwdTest")}>
-            <Select value={filters.password_test_status} onChange={(e) => set("password_test_status", e.target.value)} options={testStatusOptions} />
-          </FieldLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldLabel label={t("filters.keyTest")}>
+              <Select value={filters.key_test_status} onChange={(e) => set("key_test_status", e.target.value)} options={testStatusOptions} />
+            </FieldLabel>
+            <FieldLabel label={t("filters.pwdTest")}>
+              <Select value={filters.password_test_status} onChange={(e) => set("password_test_status", e.target.value)} options={testStatusOptions} />
+            </FieldLabel>
+          </div>
         </div>
       </DrawerSection>
 

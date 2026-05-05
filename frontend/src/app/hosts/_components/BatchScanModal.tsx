@@ -8,27 +8,104 @@ export default function BatchScanModal({
   scannedCount,
   successCount,
   failedCount,
+  concurrency,
+  onConcurrencyChange,
+  scope,
+  onScopeChange,
+  allHostsCount,
+  failedHostsCount,
+  successHostsCount,
+  untestedHostsCount,
   onStart,
   onStop,
   onClose,
+  onViewFailed,
   t,
 }: {
   scanning: boolean;
-  scanProgress: Record<string, { status: "pending" | "scanning" | "success" | "failed" | "skipped"; error?: string }>;
+  scanProgress: Record<string, { status: "pending" | "scanning" | "success" | "failed" | "skipped"; error?: string; attempt?: number }>;
   scannableHosts: Host[];
   scannedCount: number;
   successCount: number;
   failedCount: number;
+  concurrency: number;
+  onConcurrencyChange: (value: number) => void;
+  scope: "all" | "failed" | "success" | "untested";
+  onScopeChange: (scope: "all" | "failed" | "success" | "untested") => void;
+  allHostsCount: number;
+  failedHostsCount: number;
+  successHostsCount: number;
+  untestedHostsCount: number;
   onStart: () => void;
   onStop: () => void;
   onClose: () => void;
+  onViewFailed: () => void;
   t: (key: string) => string;
 }) {
+  const scanFinished = !scanning && scannedCount > 0;
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--text-secondary)]">
         {t("host.scanAllDescription")} ({scannableHosts.length} {t("host.title").toLowerCase()})
       </p>
+
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">{t("host.scanScope")}:</span>
+        <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--border-subtle)] overflow-hidden">
+          <button
+            type="button"
+            disabled={scanning}
+            onClick={() => onScopeChange("all")}
+            className={`px-3 py-1.5 text-xs transition-colors ${scope === "all" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {t("host.scopeAll")} ({allHostsCount})
+          </button>
+          <button
+            type="button"
+            disabled={scanning || failedHostsCount === 0}
+            onClick={() => onScopeChange("failed")}
+            className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${scope === "failed" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
+          >
+            {t("host.scopeFailed")} ({failedHostsCount})
+          </button>
+          <button
+            type="button"
+            disabled={scanning || successHostsCount === 0}
+            onClick={() => onScopeChange("success")}
+            className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${scope === "success" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
+          >
+            {t("host.scopeSuccess")} ({successHostsCount})
+          </button>
+          <button
+            type="button"
+            disabled={scanning || untestedHostsCount === 0}
+            onClick={() => onScopeChange("untested")}
+            className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${scope === "untested" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
+          >
+            {t("host.scopeUntested")} ({untestedHostsCount})
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label htmlFor="scan-concurrency" className="text-xs text-[var(--text-muted)] whitespace-nowrap">
+          {t("host.scanConcurrency")}
+        </label>
+        <input
+          id="scan-concurrency"
+          type="range"
+          min={1}
+          max={20}
+          step={1}
+          value={concurrency}
+          disabled={scanning}
+          onChange={(e) => onConcurrencyChange(Number(e.target.value))}
+          className="flex-1 accent-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        />
+        <span className="text-xs font-medium text-[var(--text-primary)] w-6 text-right" style={{ fontFamily: "var(--font-mono)" }}>
+          {concurrency}
+        </span>
+      </div>
 
       {scanning && (
         <div>
@@ -63,7 +140,7 @@ export default function BatchScanModal({
                 {s.status === "success" && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
                 {s.status === "failed" && <span className="w-2 h-2 rounded-full bg-red-400" />}
                 <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{host.nickname}</span>
-                {s.status === "scanning" && <span className="text-[var(--accent)] ml-auto">{t("host.scanning")}</span>}
+                {s.status === "scanning" && <span className="text-[var(--accent)] ml-auto">{t("host.scanning")}{s.attempt && s.attempt > 1 ? ` (${s.attempt}/3)` : ""}</span>}
                 {s.status === "success" && <span className="text-emerald-400 ml-auto">OK</span>}
                 {s.error && <span className="text-red-400 ml-auto truncate max-w-[200px]" title={s.error}>{s.error}</span>}
               </div>
@@ -77,6 +154,11 @@ export default function BatchScanModal({
           <Button variant="danger" size="sm" onClick={onStop}>{t("host.stopScan")}</Button>
         ) : (
           <>
+            {scanFinished && failedCount > 0 && (
+              <Button variant="secondary" size="sm" onClick={onViewFailed}>
+                {t("host.viewFailed")} ({failedCount})
+              </Button>
+            )}
             <Button variant="secondary" size="sm" onClick={onClose}>{t("common.cancel")}</Button>
             <Button size="sm" onClick={onStart}>
               <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

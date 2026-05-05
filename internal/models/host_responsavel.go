@@ -2,41 +2,38 @@ package models
 
 import (
 	"database/sql"
-
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"fmt"
 )
 
 // HostResponsavel represents a junction between a host and a contact (responsavel).
+// is_external/notes/role/entity are joined from the contacts table — they are
+// intrinsic to the contact, not to the host link.
 type HostResponsavel struct {
-	ID        int64  `json:"id"`
-	HostID    int64  `json:"host_id"`
-	ContactID int64  `json:"contact_id"`
-	IsMain    bool   `json:"is_main"`
-	IsExterno bool   `json:"is_externo"`
-	// Joined from contacts:
-	Name   string `json:"name"`
-	Phone  string `json:"phone"`
-	Role   string `json:"role"`
-	Entity string `json:"entity"`
+	ID         int64  `json:"id"`
+	HostID     int64  `json:"host_id"`
+	ContactID  int64  `json:"contact_id"`
+	IsMain     bool   `json:"is_main"`
+	Name       string `json:"name"`
+	Phone      string `json:"phone"`
+	Role       string `json:"role"`
+	Entity     string `json:"entity"`
+	Notes      string `json:"notes"`
+	IsExternal bool   `json:"is_external"`
 }
 
-// HostResponsavelInput is the input for creating/syncing host responsaveis.
+// HostResponsavelInput is the input for syncing host responsaveis.
+// Hosts can only link to existing contacts — contact creation is a separate
+// operation against /api/contacts. ContactID is required.
 type HostResponsavelInput struct {
-	ContactID int64  `json:"contact_id"`
-	IsMain    bool   `json:"is_main"`
-	IsExterno bool   `json:"is_externo"`
-	// For creating new contacts inline:
-	Name   string `json:"name"`
-	Phone  string `json:"phone"`
-	Role   string `json:"role"`
-	Entity string `json:"entity"`
+	ContactID int64 `json:"contact_id"`
+	IsMain    bool  `json:"is_main"`
 }
 
 // ListHostResponsaveis returns all responsaveis for a host, joined with contact details.
 func ListHostResponsaveis(db *sql.DB, hostID int64) ([]HostResponsavel, error) {
 	rows, err := db.Query(`
-		SELECT hr.id, hr.host_id, hr.contact_id, hr.is_main, hr.is_externo,
-		       c.name, c.phone, c.role, c.entity
+		SELECT hr.id, hr.host_id, hr.contact_id, hr.is_main,
+		       c.name, c.phone, c.role, c.entity, c.notes, c.is_external
 		FROM host_responsaveis hr
 		JOIN contacts c ON c.id = hr.contact_id
 		WHERE hr.host_id = ?
@@ -49,8 +46,8 @@ func ListHostResponsaveis(db *sql.DB, hostID int64) ([]HostResponsavel, error) {
 	var result []HostResponsavel
 	for rows.Next() {
 		var r HostResponsavel
-		if err := rows.Scan(&r.ID, &r.HostID, &r.ContactID, &r.IsMain, &r.IsExterno,
-			&r.Name, &r.Phone, &r.Role, &r.Entity); err != nil {
+		if err := rows.Scan(&r.ID, &r.HostID, &r.ContactID, &r.IsMain,
+			&r.Name, &r.Phone, &r.Role, &r.Entity, &r.Notes, &r.IsExternal); err != nil {
 			return nil, err
 		}
 		result = append(result, r)
@@ -58,13 +55,13 @@ func ListHostResponsaveis(db *sql.DB, hostID int64) ([]HostResponsavel, error) {
 	return result, rows.Err()
 }
 
-// GetMainResponsavelName returns the name of the main (is_main=1) internal responsavel for a host.
+// GetMainResponsavelName returns the name of the main internal responsavel for a host.
 func GetMainResponsavelName(db *sql.DB, hostID int64) string {
 	var name string
 	_ = db.QueryRow(`
 		SELECT c.name FROM host_responsaveis hr
 		JOIN contacts c ON c.id = hr.contact_id
-		WHERE hr.host_id = ? AND hr.is_main AND NOT hr.is_externo
+		WHERE hr.host_id = ? AND hr.is_main AND NOT c.is_external
 		LIMIT 1`, hostID).Scan(&name)
 	return name
 }
@@ -81,7 +78,7 @@ func GetMainResponsavelNamesBulk(db *sql.DB) (map[int64]string, error) {
 	rows, err := db.Query(`
 		SELECT hr.host_id, c.name FROM host_responsaveis hr
 		JOIN contacts c ON c.id = hr.contact_id
-		WHERE hr.is_main AND NOT hr.is_externo`)
+		WHERE hr.is_main AND NOT c.is_external`)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +117,8 @@ func GetChamadosCountsBulk(db *sql.DB) (map[int64]int, error) {
 }
 
 // SyncHostResponsaveis replaces all responsaveis for a host with the given inputs.
-// If an input has ContactID=0 and a Name, a new contact is created.
+// Each input must reference an existing contact (ContactID > 0). Inline contact
+// creation is not supported — manage contacts via /api/contacts.
 func SyncHostResponsaveis(db *sql.DB, hostID int64, inputs []HostResponsavelInput) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -128,52 +126,17 @@ func SyncHostResponsaveis(db *sql.DB, hostID int64, inputs []HostResponsavelInpu
 	}
 	defer tx.Rollback()
 
-	// Delete existing
 	if _, err := tx.Exec(`DELETE FROM host_responsaveis WHERE host_id = ?`, hostID); err != nil {
 		return err
 	}
 
 	for _, inp := range inputs {
-		contactID := inp.ContactID
-
-		if contactID == 0 && inp.Name != "" {
-			// Try to find existing contact by name+phone
-			err := tx.QueryRow(
-				`SELECT id FROM contacts WHERE name = ? AND phone = ?`,
-				inp.Name, inp.Phone,
-			).Scan(&contactID)
-
-			if err == sql.ErrNoRows {
-				newID, insertErr := database.InsertReturningID(tx,
-					`INSERT INTO contacts (name, phone, role, entity) VALUES (?, ?, ?, ?)`,
-					inp.Name, inp.Phone, inp.Role, inp.Entity,
-				)
-				if insertErr != nil {
-					return insertErr
-				}
-				contactID = newID
-			} else if err != nil {
-				return err
-			} else {
-				// Update existing contact's role/entity if provided
-				if inp.Role != "" || inp.Entity != "" {
-					if _, err := tx.Exec(
-						`UPDATE contacts SET role = ?, entity = ? WHERE id = ?`,
-						inp.Role, inp.Entity, contactID,
-					); err != nil {
-						return err
-					}
-				}
-			}
+		if inp.ContactID <= 0 {
+			return fmt.Errorf("contact_id is required for each responsavel")
 		}
-
-		if contactID == 0 {
-			continue
-		}
-
 		if _, err := tx.Exec(
-			`INSERT INTO host_responsaveis (host_id, contact_id, is_main, is_externo) VALUES (?, ?, ?, ?)`,
-			hostID, contactID, inp.IsMain, inp.IsExterno,
+			`INSERT INTO host_responsaveis (host_id, contact_id, is_main) VALUES (?, ?, ?)`,
+			hostID, inp.ContactID, inp.IsMain,
 		); err != nil {
 			return err
 		}

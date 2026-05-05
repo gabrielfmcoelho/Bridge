@@ -14,7 +14,7 @@ import StatusAlert from "@/components/ui/StatusAlert";
 import OperationOutput from "@/components/ui/OperationOutput";
 import VMInfoDisplay from "./VMInfoDisplay";
 import IntegrationsSection from "./IntegrationsSection";
-import type { VMInfoType, OperationLog, RemoteKeyInfo, DockerStatusType, NginxCleanupStatusType, RemoteUserInfo } from "@/lib/api";
+import type { VMInfoType, OperationLog, RemoteKeyInfo, DockerStatusType, NginxCleanupStatusType, RemoteUserInfo, NetworkTestResult } from "@/lib/api";
 
 type ConsoleEntry = {
   label: string;
@@ -67,6 +67,10 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   const [showDeleteUser, setShowDeleteUser] = useState(false);
   const [deleteUserName, setDeleteUserName] = useState("");
   const [deleteRemoveHome, setDeleteRemoveHome] = useState(false);
+
+  // Network test form (ping + TCP probe; runs from the SSHCM server, not via SSH)
+  const [showNetworkTest, setShowNetworkTest] = useState(false);
+  const [networkTestPort, setNetworkTestPort] = useState("");
 
   // Track which operation is running
   const [runningOp, setRunningOp] = useState<string | null>(null);
@@ -361,6 +365,56 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     },
   });
 
+  const networkTestMutation = useSSHMutation({
+    slug,
+    mutationFn: (port?: number) => sshAPI.networkTest(slug, port),
+    label: t("operation.networkTest"),
+    pushConsole,
+    onAfterSuccess: () => {
+      setShowNetworkTest(false);
+      setNetworkTestPort("");
+    },
+    onResult: (data: NetworkTestResult) => {
+      const renderPort = (label: string, p: { port: number; ok: boolean; latency_ms: number; error?: string }) => (
+        <div className="flex items-center gap-2 text-xs">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${p.ok ? "bg-emerald-400" : "bg-red-400"}`} />
+          <span className="text-[var(--text-primary)]">{label}</span>
+          <span className="text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>tcp/{p.port}</span>
+          {p.ok
+            ? <span className="text-[var(--text-muted)] tabular-nums">{p.latency_ms}ms</span>
+            : <span className="text-red-400 truncate">{p.error || t("operation.networkTestFailed")}</span>}
+        </div>
+      );
+      const ping = data.ping;
+      const pingDot = ping.skipped ? "border border-[var(--border-default)]" : ping.ok ? "bg-emerald-400" : "bg-red-400";
+      return {
+        status: data.success ? "success" : "error",
+        content: (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${pingDot}`} />
+              <span className="text-[var(--text-primary)]">{t("operation.networkTestPing")}</span>
+              <span className="text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>{data.hostname}</span>
+              {ping.skipped
+                ? <span className="text-[var(--text-faint)] truncate">{ping.error || t("operation.networkTestPingSkipped")}</span>
+                : ping.ok
+                  ? <span className="text-[var(--text-muted)] tabular-nums">{ping.latency_ms ?? 0}ms</span>
+                  : <span className="text-red-400 truncate">{t("operation.networkTestFailed")}</span>}
+            </div>
+            {renderPort(t("operation.networkTestSshPort"), data.ssh_port)}
+            {data.custom_port && renderPort(t("operation.networkTestCustomPort"), data.custom_port)}
+            {ping.output && (
+              <details className="text-[10px]">
+                <summary className="cursor-pointer text-[var(--text-muted)]">{t("operation.networkTestPingDetails")}</summary>
+                <pre className="mt-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded p-2 overflow-x-auto whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>{ping.output}</pre>
+              </details>
+            )}
+          </div>
+        ),
+      };
+    },
+  });
+
   const handleFixDevNull = () => {
     const method = resolveAuthMethod(hasPassword, hasKey, preferredAuth);
     if (!method) {
@@ -396,6 +450,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     listRemoteKeysMutation.isPending ||
     dockerSetupMutation.isPending ||
     nginxCleanupMutation.isPending ||
+    networkTestMutation.isPending ||
     grafanaAgentMutation.isPending;
 
   useEffect(() => {
@@ -418,6 +473,14 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   };
 
   const operations: OpDef[] = [
+    {
+      id: "network-test",
+      label: t("operation.networkTest"),
+      description: t("operation.networkTestDesc"),
+      command: `ping -c 3 <host> && nc -zv <host> <port>`,
+      loading: runningOp === "network-test",
+      onClick: () => { setNetworkTestPort(""); setShowNetworkTest(true); },
+    },
     {
       id: "test-password",
       label: t("operation.testPassword"),
@@ -985,6 +1048,71 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         );
       })()}
 
+      {/* Network test wizard (in drawer) */}
+      {(() => {
+        const trimmed = networkTestPort.trim();
+        const portNum = trimmed ? parseInt(trimmed, 10) : 0;
+        const portValid = trimmed === "" || (Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535);
+
+        const closeAndReset = () => {
+          setShowNetworkTest(false);
+          setNetworkTestPort("");
+        };
+
+        const runNetworkTest = () => {
+          if (!portValid) return;
+          setRunningOp("network-test");
+          networkTestMutation.mutate(portNum > 0 ? portNum : undefined);
+        };
+
+        return (
+          <Drawer
+            open={showNetworkTest}
+            onClose={closeAndReset}
+            title={t("operation.networkTest")}
+            footer={
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="secondary" onClick={closeAndReset}>{t("common.cancel")}</Button>
+                <Button
+                  size="sm"
+                  disabled={!portValid}
+                  loading={networkTestMutation.isPending}
+                  onClick={runNetworkTest}
+                >
+                  {t("common.run")}
+                </Button>
+              </div>
+            }
+          >
+            <div className="space-y-6">
+              <p className="text-xs text-[var(--text-muted)]">{t("operation.networkTestFormDesc")}</p>
+
+              <section>
+                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                  {t("operation.networkTestPortSection")}
+                </h3>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={65535}
+                  placeholder={t("operation.networkTestPortPlaceholder")}
+                  value={networkTestPort}
+                  onChange={(e) => setNetworkTestPort(e.target.value.replace(/[^0-9]/g, ""))}
+                  className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
+                />
+                <p className="mt-2 text-[10px] text-[var(--text-faint)] leading-relaxed">
+                  {t("operation.networkTestPortHint")}
+                </p>
+                {!portValid && (
+                  <p className="mt-2 text-xs text-amber-400">{t("operation.networkTestPortInvalid")}</p>
+                )}
+              </section>
+            </div>
+          </Drawer>
+        );
+      })()}
+
       {/* Integrations */}
       <IntegrationsSection
         slug={slug}
@@ -1106,6 +1234,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 function opTypeLabel(type_: string, t: (k: string) => string): string {
   switch (type_) {
     case "test": return t("operation.testConnection") || "Test Connection";
+    case "network-test": return t("operation.networkTest");
     case "setup-key": return t("operation.setupKey");
     case "fix-dev-null": return t("operation.repairDevNull");
     case "setup-sudo-nopasswd": return t("operation.setupSudoNopasswd");

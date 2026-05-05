@@ -88,7 +88,7 @@ export default function ResponsaveisSection({
                   <span className="text-xs text-[var(--text-muted)] truncate block">{r.role || "--"}</span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {r.is_externo && <Badge color="amber">{t("responsavel.external")}</Badge>}
+                  {r.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}
                   {r.phone && <WhatsAppButton phone={r.phone} name={r.name} />}
                 </div>
               </div>
@@ -146,7 +146,7 @@ export default function ResponsaveisSection({
                 <td className="px-4 py-2.5 text-[var(--text-muted)]">{r.entity || "--"}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-1">
-                    {r.is_externo && <Badge color="amber">{t("responsavel.external")}</Badge>}
+                    {r.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}
                   </div>
                 </td>
                 <td className="px-4 py-2.5">

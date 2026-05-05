@@ -2,39 +2,35 @@ package models
 
 import (
 	"database/sql"
-
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"fmt"
 )
 
 // ServiceResponsavel represents a junction between a service and a contact.
+// is_external/notes/role/entity are joined from the contacts table.
 type ServiceResponsavel struct {
-	ID        int64  `json:"id"`
-	ServiceID int64  `json:"service_id"`
-	ContactID int64  `json:"contact_id"`
-	IsMain    bool   `json:"is_main"`
-	IsExterno bool   `json:"is_externo"`
-	Name      string `json:"name"`
-	Phone     string `json:"phone"`
-	Role      string `json:"role"`
-	Entity    string `json:"entity"`
+	ID         int64  `json:"id"`
+	ServiceID  int64  `json:"service_id"`
+	ContactID  int64  `json:"contact_id"`
+	IsMain     bool   `json:"is_main"`
+	Name       string `json:"name"`
+	Phone      string `json:"phone"`
+	Role       string `json:"role"`
+	Entity     string `json:"entity"`
+	Notes      string `json:"notes"`
+	IsExternal bool   `json:"is_external"`
 }
 
-// ServiceResponsavelInput is the input for creating/syncing service responsaveis.
+// ServiceResponsavelInput requires an existing contact id; inline creation is not supported.
 type ServiceResponsavelInput struct {
-	ContactID int64  `json:"contact_id"`
-	IsMain    bool   `json:"is_main"`
-	IsExterno bool   `json:"is_externo"`
-	Name      string `json:"name"`
-	Phone     string `json:"phone"`
-	Role      string `json:"role"`
-	Entity    string `json:"entity"`
+	ContactID int64 `json:"contact_id"`
+	IsMain    bool  `json:"is_main"`
 }
 
 // ListServiceResponsaveis returns all responsaveis for a service, joined with contact details.
 func ListServiceResponsaveis(db *sql.DB, serviceID int64) ([]ServiceResponsavel, error) {
 	rows, err := db.Query(`
-		SELECT sr.id, sr.service_id, sr.contact_id, sr.is_main, sr.is_externo,
-		       c.name, c.phone, c.role, c.entity
+		SELECT sr.id, sr.service_id, sr.contact_id, sr.is_main,
+		       c.name, c.phone, c.role, c.entity, c.notes, c.is_external
 		FROM service_responsaveis sr
 		JOIN contacts c ON c.id = sr.contact_id
 		WHERE sr.service_id = ?
@@ -47,8 +43,8 @@ func ListServiceResponsaveis(db *sql.DB, serviceID int64) ([]ServiceResponsavel,
 	var result []ServiceResponsavel
 	for rows.Next() {
 		var r ServiceResponsavel
-		if err := rows.Scan(&r.ID, &r.ServiceID, &r.ContactID, &r.IsMain, &r.IsExterno,
-			&r.Name, &r.Phone, &r.Role, &r.Entity); err != nil {
+		if err := rows.Scan(&r.ID, &r.ServiceID, &r.ContactID, &r.IsMain,
+			&r.Name, &r.Phone, &r.Role, &r.Entity, &r.Notes, &r.IsExternal); err != nil {
 			return nil, err
 		}
 		result = append(result, r)
@@ -56,12 +52,12 @@ func ListServiceResponsaveis(db *sql.DB, serviceID int64) ([]ServiceResponsavel,
 	return result, rows.Err()
 }
 
-// GetServiceMainResponsavelNamesBulk returns main responsavel names for all services in a single query.
+// GetServiceMainResponsavelNamesBulk returns main responsavel names for all services.
 func GetServiceMainResponsavelNamesBulk(db *sql.DB) (map[int64]string, error) {
 	rows, err := db.Query(`
 		SELECT sr.service_id, c.name FROM service_responsaveis sr
 		JOIN contacts c ON c.id = sr.contact_id
-		WHERE sr.is_main AND NOT sr.is_externo`)
+		WHERE sr.is_main AND NOT c.is_external`)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +75,8 @@ func GetServiceMainResponsavelNamesBulk(db *sql.DB) (map[int64]string, error) {
 	return m, rows.Err()
 }
 
-// SyncServiceResponsaveis replaces all responsaveis for a service with the given inputs.
+// SyncServiceResponsaveis replaces all responsaveis for a service. Each input
+// must reference an existing contact.
 func SyncServiceResponsaveis(db *sql.DB, serviceID int64, inputs []ServiceResponsavelInput) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -92,44 +89,12 @@ func SyncServiceResponsaveis(db *sql.DB, serviceID int64, inputs []ServiceRespon
 	}
 
 	for _, inp := range inputs {
-		contactID := inp.ContactID
-
-		if contactID == 0 && inp.Name != "" {
-			err := tx.QueryRow(
-				`SELECT id FROM contacts WHERE name = ? AND phone = ?`,
-				inp.Name, inp.Phone,
-			).Scan(&contactID)
-
-			if err == sql.ErrNoRows {
-				newID, insertErr := database.InsertReturningID(tx,
-					`INSERT INTO contacts (name, phone, role, entity) VALUES (?, ?, ?, ?)`,
-					inp.Name, inp.Phone, inp.Role, inp.Entity,
-				)
-				if insertErr != nil {
-					return insertErr
-				}
-				contactID = newID
-			} else if err != nil {
-				return err
-			} else {
-				if inp.Role != "" || inp.Entity != "" {
-					if _, err := tx.Exec(
-						`UPDATE contacts SET role = ?, entity = ? WHERE id = ?`,
-						inp.Role, inp.Entity, contactID,
-					); err != nil {
-						return err
-					}
-				}
-			}
+		if inp.ContactID <= 0 {
+			return fmt.Errorf("contact_id is required for each responsavel")
 		}
-
-		if contactID == 0 {
-			continue
-		}
-
 		if _, err := tx.Exec(
-			`INSERT INTO service_responsaveis (service_id, contact_id, is_main, is_externo) VALUES (?, ?, ?, ?)`,
-			serviceID, contactID, inp.IsMain, inp.IsExterno,
+			`INSERT INTO service_responsaveis (service_id, contact_id, is_main) VALUES (?, ?, ?)`,
+			serviceID, inp.ContactID, inp.IsMain,
 		); err != nil {
 			return err
 		}

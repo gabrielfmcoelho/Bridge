@@ -55,7 +55,7 @@ export default function HostCard({ host }: { host: Host }) {
             { label: t("host.hostname"), value: host.hostname || "-", mono: true },
             { label: t("host.hospedagem"), value: host.hospedagem || "-" },
             { label: t("dns.responsavel"), value: mainResp?.name || host.main_responsavel_name || "-" },
-            { label: t("host.entity"), value: mainResp?.entity || "-" },
+            { label: t("host.entity"), value: host.main_entidade || "-" },
           ]}
         />
 

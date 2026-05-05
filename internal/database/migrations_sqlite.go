@@ -960,4 +960,54 @@ var migrationsSQLite = []string{
 		updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_by   INTEGER
 	);`,
+
+	// Version 58: contacts gain notes + is_external. is_external becomes
+	// intrinsic to the contact (a person from an outside org is external
+	// regardless of which host references them), replacing the per-junction
+	// is_externo flag. Junction is_externo columns are kept for back-compat
+	// but Sync* functions stop relying on them.
+	`ALTER TABLE contacts ADD COLUMN notes TEXT NOT NULL DEFAULT '';
+	ALTER TABLE contacts ADD COLUMN is_external INTEGER NOT NULL DEFAULT 0;
+	UPDATE contacts SET is_external = 1 WHERE id IN (
+		SELECT contact_id FROM host_responsaveis WHERE is_externo
+		UNION SELECT contact_id FROM dns_responsaveis WHERE is_externo
+		UNION SELECT contact_id FROM service_responsaveis WHERE is_externo
+		UNION SELECT contact_id FROM project_responsaveis WHERE is_externo AND contact_id > 0
+	);`,
+
+	// Version 59: drop deprecated junction is_externo columns (now intrinsic
+	// to contacts) and the legacy nome/contato pair on project_responsaveis
+	// (replaced by contact_id). project_responsaveis is rebuilt because the
+	// inline UNIQUE(project_id, nome) constraint can't be removed by
+	// DROP COLUMN alone in SQLite.
+	`ALTER TABLE host_responsaveis DROP COLUMN is_externo;
+	ALTER TABLE dns_responsaveis DROP COLUMN is_externo;
+	ALTER TABLE service_responsaveis DROP COLUMN is_externo;
+
+	CREATE TABLE project_responsaveis_new (
+		id         INTEGER PRIMARY KEY AUTOINCREMENT,
+		project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+		is_main    INTEGER NOT NULL DEFAULT 0
+	);
+	INSERT INTO project_responsaveis_new (id, project_id, contact_id, is_main)
+		SELECT id, project_id, contact_id, is_main FROM project_responsaveis WHERE contact_id > 0;
+	DROP TABLE project_responsaveis;
+	ALTER TABLE project_responsaveis_new RENAME TO project_responsaveis;`,
+
+	// Version 60: hosts ↔ entidades is now a 1-n relation. host_entidades
+	// is the junction; the previous single-string hosts.setor_responsavel
+	// is backfilled as the host's main entidade. The legacy column is kept
+	// (no longer read by app code) so this migration is non-destructive.
+	`CREATE TABLE IF NOT EXISTS host_entidades (
+		id         INTEGER PRIMARY KEY AUTOINCREMENT,
+		host_id    INTEGER NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+		entidade   TEXT NOT NULL,
+		is_main    INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(host_id, entidade)
+	);
+	CREATE INDEX IF NOT EXISTS idx_host_entidades_host ON host_entidades(host_id);
+	INSERT OR IGNORE INTO host_entidades (host_id, entidade, is_main)
+		SELECT id, setor_responsavel, 1 FROM hosts WHERE setor_responsavel != '';`,
 }

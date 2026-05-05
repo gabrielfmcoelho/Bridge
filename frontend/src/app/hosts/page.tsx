@@ -28,7 +28,23 @@ import HostsTableView from "./_components/HostsTableView";
 import type { Host, HostFilters, HostSortConfig } from "@/lib/types";
 
 type ScanStatus = "pending" | "scanning" | "success" | "failed" | "skipped";
-type ScanProgress = Record<string, { status: ScanStatus; error?: string }>;
+type ScanProgress = Record<string, { status: ScanStatus; error?: string; attempt?: number }>;
+
+// activeMethodStatus returns the test status of the SSH method that would
+// actually be used to connect to a host. Mirrors the picker in
+// startBatchScan so bucket counts and the scan target list stay coherent.
+function activeMethodStatus(h: Host): "success" | "failed" | "" {
+  const useKey = h.has_key && h.has_password
+    ? h.preferred_auth !== "password"
+    : h.has_key;
+  const status = useKey ? h.key_test_status : h.password_test_status;
+  if (status === "success") return "success";
+  if (status === "failed") return "failed";
+  return "";
+}
+
+const SCAN_MAX_ATTEMPTS = 3; // 1 initial + 2 retries
+const SCAN_RETRY_BACKOFF_MS = [500, 1500];
 
 export default function HostsPage() {
   const { t } = useLocale();
@@ -51,7 +67,17 @@ export default function HostsPage() {
   const [showScanModal, setShowScanModal] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress>({});
+  const [scanConcurrency, setScanConcurrency] = useLocalStorage("hosts.scanConcurrency", 10);
+  const [scanScope, setScanScope] = useLocalStorage<"all" | "failed" | "success" | "untested">("hosts.scanScope", "all");
   const abortRef = useRef(false);
+
+  // Pinned search — restored from localStorage on mount, kept in sync via the pin button.
+  const [pinnedSearch, setPinnedSearch] = useLocalStorage("hosts.pinnedSearch", "");
+  useEffect(() => {
+    if (pinnedSearch && !search) setSearch(pinnedSearch);
+    // Mount-only restore; further changes to pinnedSearch should not overwrite live typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [sort, setSort] = useLocalStorage<HostSortConfig>("hosts_sort", { field: "nickname", direction: "asc" });
 
@@ -96,7 +122,35 @@ export default function HostsPage() {
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
-  const scannableHosts = hosts.filter(h => h.has_key || h.has_password);
+  const scannableHosts = useMemo(() => hosts.filter(h => h.has_key || h.has_password), [hosts]);
+  // Bucketing uses the *active* SSH method (the one startBatchScan actually
+  // dials with), not "any column failed". This matches what startBatchScan
+  // picks at line 148 and ensures a host that succeeds via the active method
+  // moves out of "failed" even if a stale status from the inactive method
+  // still says 'failed'.
+  const failedScannableHosts = useMemo(
+    () => scannableHosts.filter(h => activeMethodStatus(h) === "failed"),
+    [scannableHosts],
+  );
+  const successScannableHosts = useMemo(
+    () => scannableHosts.filter(h => activeMethodStatus(h) === "success"),
+    [scannableHosts],
+  );
+  const untestedScannableHosts = useMemo(
+    () => scannableHosts.filter(h => activeMethodStatus(h) === ""),
+    [scannableHosts],
+  );
+  // If the persisted scope has no candidates, fall back to "all" so the start button stays usable.
+  const effectiveScope: "all" | "failed" | "success" | "untested" =
+    scanScope === "failed" && failedScannableHosts.length > 0 ? "failed" :
+    scanScope === "success" && successScannableHosts.length > 0 ? "success" :
+    scanScope === "untested" && untestedScannableHosts.length > 0 ? "untested" :
+    "all";
+  const targetHosts =
+    effectiveScope === "failed" ? failedScannableHosts :
+    effectiveScope === "success" ? successScannableHosts :
+    effectiveScope === "untested" ? untestedScannableHosts :
+    scannableHosts;
 
   const exportCSV = useExportCSV(
     hosts,
@@ -127,24 +181,56 @@ export default function HostsPage() {
     abortRef.current = false;
     setScanning(true);
     const initial: ScanProgress = {};
-    scannableHosts.forEach(h => { initial[h.oficial_slug] = { status: "pending" }; });
+    targetHosts.forEach(h => { initial[h.oficial_slug] = { status: "pending" }; });
     setScanProgress(initial);
-    for (const host of scannableHosts) {
-      if (abortRef.current) break;
-      setScanProgress(prev => ({ ...prev, [host.oficial_slug]: { status: "scanning" } }));
-      const method: "password" | "key" = host.has_key && host.has_password
-        ? (host.preferred_auth === "password" ? "password" : "key") : (host.has_key ? "key" : "password");
-      try {
-        const res = await sshAPI.testConnection(host.oficial_slug, method, true);
-        setScanProgress(prev => ({ ...prev, [host.oficial_slug]: res.success ? { status: "success" } : { status: "failed", error: res.error || "Connection failed" } }));
-      } catch (err: unknown) {
-        setScanProgress(prev => ({ ...prev, [host.oficial_slug]: { status: "failed", error: err instanceof Error ? err.message : "Unknown error" } }));
+
+    // Sliding-window worker pool: scanConcurrency workers share a single
+    // index cursor. Each worker grabs the next host atomically (cursor++ runs
+    // synchronously between awaits in JS), processes it, then loops. Faster
+    // hosts free up slots immediately instead of waiting for a batch peer.
+    let cursor = 0;
+    const workerCount = Math.min(Math.max(1, scanConcurrency), targetHosts.length);
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (true) {
+        if (abortRef.current) return;
+        const i = cursor++;
+        if (i >= targetHosts.length) return;
+        const host = targetHosts[i];
+        const method: "password" | "key" = host.has_key && host.has_password
+          ? (host.preferred_auth === "password" ? "password" : "key") : (host.has_key ? "key" : "password");
+
+        let lastError = "Connection failed";
+        let succeeded = false;
+        for (let attempt = 1; attempt <= SCAN_MAX_ATTEMPTS; attempt++) {
+          if (abortRef.current) return;
+          setScanProgress(prev => ({ ...prev, [host.oficial_slug]: { status: "scanning", attempt } }));
+          try {
+            const res = await sshAPI.testConnection(host.oficial_slug, method, true);
+            if (res.success) {
+              setScanProgress(prev => ({ ...prev, [host.oficial_slug]: { status: "success", attempt } }));
+              succeeded = true;
+              break;
+            }
+            lastError = res.error || "Connection failed";
+          } catch (err: unknown) {
+            lastError = err instanceof Error ? err.message : "Unknown error";
+          }
+          // Backoff before next retry (skip after final attempt).
+          if (attempt < SCAN_MAX_ATTEMPTS) {
+            await new Promise(r => setTimeout(r, SCAN_RETRY_BACKOFF_MS[attempt - 1] ?? 1000));
+          }
+        }
+        if (!succeeded) {
+          setScanProgress(prev => ({ ...prev, [host.oficial_slug]: { status: "failed", error: lastError, attempt: SCAN_MAX_ATTEMPTS } }));
+        }
       }
-    }
+    });
+    await Promise.all(workers);
+
     setScanning(false);
     queryClient.invalidateQueries({ queryKey: ["hosts"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-  }, [scanning, scannableHosts, queryClient]);
+  }, [scanning, targetHosts, scanConcurrency, queryClient]);
 
   const stopBatchScan = useCallback(() => { abortRef.current = true; }, []);
 
@@ -176,6 +262,14 @@ export default function HostsPage() {
         onFilterClick={() => setShowFilters(true)}
         activeFilterCount={activeFilterCount}
         searchPlaceholder={t("common.search")}
+        searchAdornment={
+          <PinSearchButton
+            search={search}
+            pinnedSearch={pinnedSearch}
+            onTogglePin={() => setPinnedSearch(pinnedSearch === search && search ? "" : search)}
+            t={t}
+          />
+        }
         actions={
           <div className="flex items-center gap-1.5">
             {hosts.length > 0 && (
@@ -208,9 +302,17 @@ export default function HostsPage() {
       </Drawer>
 
       <ResponsiveModal open={showScanModal} onClose={() => { if (!scanning) setShowScanModal(false); }} title={t("host.scanAll")}>
-        <BatchScanModal scanning={scanning} scanProgress={scanProgress} scannableHosts={scannableHosts}
+        <BatchScanModal scanning={scanning} scanProgress={scanProgress} scannableHosts={targetHosts}
           scannedCount={scannedCount} successCount={successCount} failedCount={failedCount}
-          onStart={startBatchScan} onStop={stopBatchScan} onClose={() => setShowScanModal(false)} t={t} />
+          concurrency={scanConcurrency} onConcurrencyChange={setScanConcurrency}
+          scope={effectiveScope} onScopeChange={setScanScope}
+          allHostsCount={scannableHosts.length}
+          failedHostsCount={failedScannableHosts.length}
+          successHostsCount={successScannableHosts.length}
+          untestedHostsCount={untestedScannableHosts.length}
+          onStart={startBatchScan} onStop={stopBatchScan} onClose={() => setShowScanModal(false)}
+          onViewFailed={() => { setFilters({ ...emptyFilters, scan_result: "failed" }); setShowScanModal(false); }}
+          t={t} />
       </ResponsiveModal>
 
       <FilterDrawer open={showFilters} onClose={() => setShowFilters(false)} filters={filters} onFiltersChange={setFilters}
@@ -232,5 +334,34 @@ export default function HostsPage() {
         }] : undefined}
       />
     </PageShell>
+  );
+}
+
+function PinSearchButton({
+  search,
+  pinnedSearch,
+  onTogglePin,
+  t,
+}: {
+  search: string;
+  pinnedSearch: string;
+  onTogglePin: () => void;
+  t: (key: string) => string;
+}) {
+  const isPinned = pinnedSearch !== "" && pinnedSearch === search;
+  const canPin = search.trim() !== "" || isPinned;
+  return (
+    <button
+      type="button"
+      onClick={onTogglePin}
+      disabled={!canPin}
+      title={isPinned ? t("host.unpinSearch") : t("host.pinSearch")}
+      aria-label={isPinned ? t("host.unpinSearch") : t("host.pinSearch")}
+      className={`p-1 rounded transition-colors ${isPinned ? "text-[var(--accent)]" : "text-[var(--text-faint)] hover:text-[var(--text-secondary)]"} disabled:opacity-30 disabled:cursor-not-allowed`}
+    >
+      <svg className="w-4 h-4" fill={isPinned ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+      </svg>
+    </button>
   );
 }

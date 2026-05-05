@@ -51,7 +51,6 @@ export default function DnsForm({
   const { data: situacoes = [] } = useQuery({ queryKey: ["enums", "situacao"], queryFn: () => enumsAPI.list("situacao") });
   const { data: rawContacts } = useQuery({ queryKey: ["contacts"], queryFn: contactsAPI.list });
   const contacts = Array.isArray(rawContacts) ? rawContacts : [];
-  const { data: entidades = [] } = useQuery({ queryKey: ["enums", "entidade_responsavel"], queryFn: () => enumsAPI.list("entidade_responsavel") });
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -109,7 +108,6 @@ export default function DnsForm({
             value={responsaveis}
             onChange={setResponsaveis}
             contacts={contacts}
-            entidades={entidades}
             t={t}
           />
           {!hasExternalFooter && (

@@ -64,6 +64,7 @@ type HostFilter struct {
 	ResponsavelInterno  string
 	KeyTestStatus       string // "success" | "failed" | "untested"
 	PasswordTestStatus  string // "success" | "failed" | "untested"
+	ScanResult          string // "failed" | "success" | "untested" — combined OR across both _test_status columns
 	HasScan             string // "with" | "without"
 	Page                int
 	PerPage             int
@@ -147,7 +148,7 @@ func ListHosts(db *sql.DB, f HostFilter) ([]Host, error) {
 		args = append(args, f.Tag)
 	}
 	if f.EntidadeResponsavel != "" {
-		where = append(where, "setor_responsavel = ?")
+		where = append(where, "id IN (SELECT host_id FROM host_entidades WHERE entidade = ?)")
 		args = append(args, f.EntidadeResponsavel)
 	}
 	if f.ResponsavelInterno != "" {
@@ -165,6 +166,23 @@ func ListHosts(db *sql.DB, f HostFilter) ([]Host, error) {
 	} else if f.PasswordTestStatus != "" {
 		where = append(where, "password_test_status = ?")
 		args = append(args, f.PasswordTestStatus)
+	}
+	// scan_result buckets by the *active* method (the one actually used to
+	// connect to the host), not "any column matches". Mirrors the
+	// frontend's activeMethodStatus helper.
+	const activeStatusExpr = `CASE
+		WHEN has_password AND has_key AND preferred_auth = 'password' THEN COALESCE(password_test_status,'')
+		WHEN has_password AND has_key THEN COALESCE(key_test_status,'')
+		WHEN has_key THEN COALESCE(key_test_status,'')
+		ELSE COALESCE(password_test_status,'')
+	END`
+	switch f.ScanResult {
+	case "failed":
+		where = append(where, "("+activeStatusExpr+") = 'failed'")
+	case "success":
+		where = append(where, "("+activeStatusExpr+") = 'success'")
+	case "untested":
+		where = append(where, "("+activeStatusExpr+") = ''")
 	}
 	if f.HasScan == "with" {
 		where = append(where, "id IN (SELECT DISTINCT host_id FROM host_scans)")

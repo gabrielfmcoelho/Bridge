@@ -284,6 +284,7 @@ export default function HostDetail({ slug }: { slug: string }) {
             tags={data.tags}
             responsaveis={data.responsaveis ?? []}
             chamados={data.chamados ?? []}
+            entidades={data.entidades ?? []}
             dnsRecords={data.dns_records ?? []}
             services={data.services ?? []}
             projects={data.projects ?? []}

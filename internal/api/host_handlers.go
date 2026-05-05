@@ -127,6 +127,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		ResponsavelInterno:  r.URL.Query().Get("responsavel_interno"),
 		KeyTestStatus:       r.URL.Query().Get("key_test_status"),
 		PasswordTestStatus:  r.URL.Query().Get("password_test_status"),
+		ScanResult:          r.URL.Query().Get("scan_result"),
 		HasScan:             r.URL.Query().Get("has_scan"),
 		SortBy:              r.URL.Query().Get("sort_by"),
 		SortDir:             r.URL.Query().Get("sort_dir"),
@@ -182,6 +183,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		CanCompile           bool           `json:"can_compile"`
 		Alerts               []hostAlert    `json:"alerts"`
 		MainResponsavelName  string         `json:"main_responsavel_name"`
+		MainEntidade         string         `json:"main_entidade"`
 		ChamadosCount        int            `json:"chamados_count"`
 		ProjectsCount        int            `json:"projects_count"`
 	}
@@ -191,6 +193,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	dnsCounts, _ := models.GetDNSCountsByHost(h.db.SQL)
 	issueCounts, _ := models.GetIssueCountsByEntity(h.db.SQL, "host")
 	mainRespNames, _ := models.GetMainResponsavelNamesBulk(h.db.SQL)
+	mainEntidades, _ := models.GetMainEntidadeBulk(h.db.SQL)
 	chamadosCounts, _ := models.GetChamadosCountsBulk(h.db.SQL)
 	manualAlertsBulk, _ := models.ListHostAlertsBulk(h.db.SQL)
 	alertLinkedIssues, _ := models.GetAlertLinkedIssueIDsBulk(h.db.SQL)
@@ -202,6 +205,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		hwt.DNSCount = dnsCounts[host.ID]
 		hwt.IssuesCount = issueCounts[host.ID]
 		hwt.MainResponsavelName = mainRespNames[host.ID]
+		hwt.MainEntidade = mainEntidades[host.ID]
 		hwt.ChamadosCount = chamadosCounts[host.ID]
 		hwt.ProjectsCount = projCounts[host.ID]
 		hwt.CanCompile = host.Hostname != "" && host.User != ""
@@ -328,6 +332,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	lastScan, _ := models.GetLatestHostScan(h.db.SQL, host.ID)
 	responsaveis, _ := models.ListHostResponsaveis(h.db.SQL, host.ID)
 	chamados, _ := models.ListHostChamados(h.db.SQL, host.ID)
+	entidades, _ := models.ListHostEntidades(h.db.SQL, host.ID)
 
 	jsonOK(w, map[string]any{
 		"host":         host,
@@ -339,20 +344,22 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		"last_scan":    lastScan,
 		"responsaveis": responsaveis,
 		"chamados":     chamados,
+		"entidades":    entidades,
 	})
 }
 
 func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		models.Host
-		Tags         []string                    `json:"tags"`
-		Password     string                      `json:"password"`
-		SSHKeyID     int64                       `json:"ssh_key_id"`
+		Tags         []string                      `json:"tags"`
+		Password     string                        `json:"password"`
+		SSHKeyID     int64                         `json:"ssh_key_id"`
 		Responsaveis []models.HostResponsavelInput `json:"responsaveis"`
 		Chamados     []models.HostChamadoInput     `json:"chamados"`
-		DNSIDs       []int64                     `json:"dns_ids"`
-		ServiceIDs   []int64                     `json:"service_ids"`
-		ProjectIDs   []int64                     `json:"project_ids"`
+		Entidades    []models.HostEntidadeInput    `json:"entidades"`
+		DNSIDs       []int64                       `json:"dns_ids"`
+		ServiceIDs   []int64                       `json:"service_ids"`
+		ProjectIDs   []int64                       `json:"project_ids"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -416,6 +423,11 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if len(req.Chamados) > 0 {
 		if err := models.SyncHostChamados(h.db.SQL, req.Host.ID, req.Chamados); err != nil {
 			log.Printf("[hosts] SyncHostChamados error on create: %v", err)
+		}
+	}
+	if len(req.Entidades) > 0 {
+		if err := models.SyncHostEntidades(h.db.SQL, req.Host.ID, req.Entidades); err != nil {
+			log.Printf("[hosts] SyncHostEntidades error on create: %v", err)
 		}
 	}
 
@@ -486,15 +498,16 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		models.Host
-		Tags         []string                      `json:"tags"`
-		Password     string                        `json:"password"`
-		SSHKeyID     int64                         `json:"ssh_key_id"`
-		ClearKey     bool                          `json:"clear_key"`
+		Tags         []string                       `json:"tags"`
+		Password     string                         `json:"password"`
+		SSHKeyID     int64                          `json:"ssh_key_id"`
+		ClearKey     bool                           `json:"clear_key"`
 		Responsaveis *[]models.HostResponsavelInput `json:"responsaveis"`
 		Chamados     *[]models.HostChamadoInput     `json:"chamados"`
-		DNSIDs       *[]int64                      `json:"dns_ids"`
-		ServiceIDs   *[]int64                      `json:"service_ids"`
-		ProjectIDs   *[]int64                      `json:"project_ids"`
+		Entidades    *[]models.HostEntidadeInput    `json:"entidades"`
+		DNSIDs       *[]int64                       `json:"dns_ids"`
+		ServiceIDs   *[]int64                       `json:"service_ids"`
+		ProjectIDs   *[]int64                       `json:"project_ids"`
 	}
 	req.Host = *existing
 	if err := decodeJSON(r, &req); err != nil {
@@ -606,6 +619,11 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.Chamados != nil {
 		if err := models.SyncHostChamados(h.db.SQL, existing.ID, *req.Chamados); err != nil {
 			log.Printf("[hosts] SyncHostChamados error on update: %v", err)
+		}
+	}
+	if req.Entidades != nil {
+		if err := models.SyncHostEntidades(h.db.SQL, existing.ID, *req.Entidades); err != nil {
+			log.Printf("[hosts] SyncHostEntidades error on update: %v", err)
 		}
 	}
 

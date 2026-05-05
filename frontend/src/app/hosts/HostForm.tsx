@@ -14,13 +14,15 @@ import MarkdownEditor from "@/components/ui/MarkdownEditor";
 import CheckboxList from "@/components/ui/CheckboxList";
 import ResponsavelList from "./_components/ResponsavelList";
 import ChamadoList from "./_components/ChamadoList";
-import type { Host, DNSRecord, Service, Project, HostResponsavel, HostChamado } from "@/lib/types";
+import EntidadeList from "./_components/EntidadeList";
+import type { Host, DNSRecord, Service, Project, HostResponsavel, HostChamado, HostEntidade } from "@/lib/types";
 
 interface HostFormProps {
   host?: Host;
   tags?: string[];
   responsaveis?: HostResponsavel[];
   chamados?: HostChamado[];
+  entidades?: HostEntidade[];
   dnsRecords?: DNSRecord[];
   services?: Service[];
   projects?: Project[];
@@ -33,7 +35,7 @@ interface HostFormProps {
 const STEP_COUNT = 4;
 
 export default function HostForm({
-  host, tags, responsaveis, chamados, dnsRecords, services: linkedServices, projects: linkedProjects,
+  host, tags, responsaveis, chamados, entidades, dnsRecords, services: linkedServices, projects: linkedProjects,
   onSuccess, onClose, onFooterChange, onSubHeaderChange,
 }: HostFormProps) {
   const { t } = useLocale();
@@ -59,6 +61,7 @@ export default function HostForm({
   const [formTags, setFormTags] = useState<string[]>(tags ?? []);
   const [formResponsaveis, setFormResponsaveis] = useState<HostResponsavel[]>(responsaveis ?? []);
   const [formChamados, setFormChamados] = useState<HostChamado[]>(chamados ?? []);
+  const [formEntidades, setFormEntidades] = useState<HostEntidade[]>(entidades ?? []);
   // selectedKeyId is three-valued:
   //   - null           → untouched; don't send ssh_key_id OR clear_key
   //   - "__clear__"    → user explicitly chose to unlink the current key
@@ -93,11 +96,11 @@ export default function HostForm({
     queryKey: ["enums", "situacao"],
     queryFn: () => enumsAPI.list("situacao"),
   });
-  const { data: rawEntidades } = useQuery({
+  const { data: rawEntidadeOptions } = useQuery({
     queryKey: ["enums", "entidade_responsavel"],
     queryFn: () => enumsAPI.list("entidade_responsavel"),
   });
-  const entidades = Array.isArray(rawEntidades) ? rawEntidades : [];
+  const entidadeOptions = Array.isArray(rawEntidadeOptions) ? rawEntidadeOptions : [];
   const { data: rawContacts } = useQuery({
     queryKey: ["contacts"],
     queryFn: contactsAPI.list,
@@ -158,6 +161,7 @@ export default function HostForm({
         password: form.password || undefined,
         responsaveis: formResponsaveis,
         chamados: formChamados,
+        entidades: formEntidades.map((e) => ({ entidade: e.entidade, is_main: e.is_main })),
         dns_ids: linkedDnsIds,
         service_ids: linkedServiceIds,
         project_ids: linkedProjectIds,
@@ -300,12 +304,19 @@ export default function HostForm({
 
   const responsaveisFields = (
     <div className="space-y-0">
+      <DrawerSection title={t("entidade.label")} open={openStepSection === "entidades"} onToggle={() => toggleStepSection("entidades")} active={formEntidades.length > 0}>
+        <EntidadeList
+          value={formEntidades}
+          onChange={setFormEntidades}
+          options={entidadeOptions}
+          t={t}
+        />
+      </DrawerSection>
       <DrawerSection title={t("project.responsaveis")} open={openStepSection === "responsaveis"} onToggle={() => toggleStepSection("responsaveis")} active={formResponsaveis.length > 0}>
         <ResponsavelList
           value={formResponsaveis}
           onChange={setFormResponsaveis}
           contacts={contacts}
-          entidades={entidades}
           t={t}
         />
       </DrawerSection>

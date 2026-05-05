@@ -1,23 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useMemo } from "react";
 import type { EntityResponsavel, Contact } from "@/lib/types";
-import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
-import Checkbox from "@/components/ui/Checkbox";
 import IconButton from "@/components/ui/IconButton";
 import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
+import EmptyState from "@/components/ui/EmptyState";
 
 interface ResponsavelListProps {
   value: EntityResponsavel[];
   onChange: (v: EntityResponsavel[]) => void;
   contacts: Contact[];
-  entidades: { value: string }[];
   t: (k: string) => string;
-}
-
-function toRawDigits(val: string): string {
-  return val.replace(/\D/g, "");
 }
 
 function formatPhone(raw: string): string {
@@ -30,115 +25,36 @@ function formatPhone(raw: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4, 5)} ${d.slice(5, 9)}-${d.slice(9, 13)}`;
 }
 
-function ContactAutocomplete({
-  value,
-  onChange,
-  onSelect,
-  contacts,
-  label,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onSelect: (c: Contact) => void;
-  contacts: Contact[];
-  label?: string;
-  placeholder?: string;
-}) {
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const filtered = value
-    ? contacts
-        .filter(
-          (c) =>
-            c.name &&
-            c.name.toLowerCase().includes(value.toLowerCase()) &&
-            c.name !== value
-        )
-        .slice(0, 6)
-    : [];
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest("[data-portal-dropdown]")) return;
-      if (ref.current && !ref.current.contains(target)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div className="space-y-1.5 relative" ref={ref}>
-      {label && (
-        <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
-          {label}
-        </label>
-      )}
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setShowSuggestions(true);
-        }}
-        onFocus={() => setShowSuggestions(true)}
-        className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
-        placeholder={placeholder}
-      />
-      {showSuggestions && filtered.length > 0 && (
-        <div className="absolute z-20 left-0 right-0 mt-1 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-[var(--radius-md)] shadow-lg max-h-40 overflow-y-auto">
-          {filtered.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                onSelect(c);
-                setShowSuggestions(false);
-              }}
-              className="w-full text-left px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors"
-            >
-              <span>{c.name}</span>
-              {c.phone && (
-                <span className="text-[var(--text-faint)] ml-2 text-xs">
-                  {formatPhone(c.phone)}
-                </span>
-              )}
-              {c.entity && (
-                <span className="text-[var(--text-faint)] ml-2 text-xs">
-                  ({c.entity})
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+function fromContact(c: Contact, isMain: boolean): EntityResponsavel {
+  return {
+    contact_id: c.id,
+    is_main: isMain,
+    name: c.name,
+    phone: c.phone,
+    role: c.role,
+    entity: c.entity,
+    notes: c.notes,
+    is_external: c.is_external,
+  };
 }
 
-export default function ResponsavelList({
-  value,
-  onChange,
-  contacts,
-  entidades,
-  t,
-}: ResponsavelListProps) {
-  const empty: EntityResponsavel = {
-    is_main: value.length === 0,
-    is_externo: false,
-    name: "",
-    phone: "",
-    role: "",
-    entity: "",
-  };
+export default function ResponsavelList({ value, onChange, contacts, t }: ResponsavelListProps) {
+  const linkedIds = useMemo(() => new Set(value.map((v) => v.contact_id)), [value]);
+  const availableContacts = useMemo(
+    () => contacts.filter((c) => !linkedIds.has(c.id)),
+    [contacts, linkedIds]
+  );
 
-  const update = (idx: number, patch: Partial<EntityResponsavel>) => {
-    const next = value.map((item, i) => (i === idx ? { ...item, ...patch } : item));
-    onChange(next);
+  const options = [
+    { value: "", label: t("responsavel.select") },
+    ...availableContacts.map((c) => ({
+      value: String(c.id),
+      label: c.entity ? `${c.name} — ${c.entity}` : c.name,
+    })),
+  ];
+
+  const setMain = (idx: number) => {
+    onChange(value.map((item, i) => ({ ...item, is_main: i === idx })));
   };
 
   const remove = (idx: number) => {
@@ -149,40 +65,74 @@ export default function ResponsavelList({
     onChange(next);
   };
 
-  const add = () => {
-    onChange([...value, { ...empty, is_main: value.length === 0 }]);
+  const addContact = (contactId: number) => {
+    const c = contacts.find((x) => x.id === contactId);
+    if (!c) return;
+    const isMain = value.length === 0;
+    onChange([...value, fromContact(c, isMain)]);
   };
 
-  const setMain = (idx: number) => {
-    const next = value.map((item, i) => ({
-      ...item,
-      is_main: i === idx,
-    }));
-    onChange(next);
-  };
-
-  const handleContactSelect = (idx: number, contact: Contact) => {
-    update(idx, {
-      contact_id: contact.id,
-      name: contact.name,
-      phone: contact.phone,
-      role: contact.role,
-      entity: contact.entity,
-    });
-  };
-
-  const handlePhoneChange = (idx: number, inputValue: string) => {
-    const raw = toRawDigits(inputValue).slice(0, 13);
-    update(idx, { phone: raw });
-  };
-
-  const entidadeOptions = entidades.map((e) => ({ value: e.value, label: e.value }));
+  if (contacts.length === 0) {
+    return (
+      <EmptyState
+        icon="folder"
+        title={t("responsavel.noContacts")}
+        compact
+      />
+    );
+  }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {value.map((item, idx) => (
-        <div key={idx} className="relative pb-3 mb-3 border-b border-[var(--border-subtle)] last:border-0 last:mb-0 last:pb-0">
-          <div className="absolute top-0 right-0">
+        <div
+          key={item.contact_id}
+          className="flex items-start gap-3 p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)]"
+        >
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-[var(--text-primary)]">{item.name}</span>
+              {item.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
+              {item.phone && (
+                <div>
+                  <span className="text-[var(--text-faint)] block">{t("responsavel.phone")}</span>
+                  <span style={{ fontFamily: "var(--font-mono)" }}>{formatPhone(item.phone)}</span>
+                </div>
+              )}
+              {item.role && (
+                <div>
+                  <span className="text-[var(--text-faint)] block">{t("responsavel.role")}</span>
+                  <span>{item.role}</span>
+                </div>
+              )}
+              {item.entity && (
+                <div>
+                  <span className="text-[var(--text-faint)] block">{t("responsavel.entity")}</span>
+                  <span>{item.entity}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMain(idx)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                item.is_main
+                  ? "bg-[var(--accent)] text-white"
+                  : "bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[var(--border-default)]"
+              }`}
+            >
+              {item.is_main && (
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {t("responsavel.main")}
+            </button>
             <IconButton
               variant="danger"
               size="sm"
@@ -195,94 +145,30 @@ export default function ResponsavelList({
               </svg>
             </IconButton>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pr-8">
-            <ContactAutocomplete
-              label={t("responsavel.name")}
-              value={item.name}
-              onChange={(v) => {
-                const match = contacts.find(
-                  (c) => c.name.toLowerCase() === v.toLowerCase()
-                );
-                if (match) {
-                  update(idx, {
-                    name: v,
-                    contact_id: match.id,
-                    phone: match.phone || item.phone,
-                    role: match.role || item.role,
-                    entity: match.entity || item.entity,
-                  });
-                } else {
-                  update(idx, { name: v, contact_id: undefined });
-                }
-              }}
-              onSelect={(c) => handleContactSelect(idx, c)}
-              contacts={contacts}
-              placeholder={t("responsavel.searchPlaceholder")}
-            />
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
-                {t("responsavel.phone")}
-              </label>
-              <input
-                type="tel"
-                value={formatPhone(item.phone)}
-                onChange={(e) => handlePhoneChange(idx, e.target.value)}
-                placeholder="(XX) XX 9 XXXX-XXXX"
-                className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
-              />
-            </div>
-
-            <Input
-              label={t("responsavel.role")}
-              value={item.role}
-              onChange={(e) => update(idx, { role: e.target.value })}
-            />
-
-            <div className="relative z-10">
-              <Select
-                label={t("responsavel.entity")}
-                value={item.entity}
-                options={entidadeOptions}
-                onChange={(e) => update(idx, { entity: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 mt-2">
-            <button
-              type="button"
-              onClick={() => setMain(idx)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                item.is_main
-                  ? "bg-[var(--accent)] text-white"
-                  : "bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[var(--border-default)]"
-              }`}
-            >
-              {item.is_main && (
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-              {t("responsavel.main")}
-            </button>
-
-            <Checkbox
-              label={t("responsavel.external")}
-              checked={item.is_externo}
-              onChange={(checked) => update(idx, { is_externo: checked })}
-            />
-          </div>
         </div>
       ))}
 
-      <Button type="button" variant="secondary" size="sm" onClick={add}>
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        {t("responsavel.add")}
-      </Button>
+      {availableContacts.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <Select
+              value=""
+              options={options}
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                if (id) addContact(id);
+              }}
+            />
+          </div>
+          <Button type="button" variant="secondary" size="sm" disabled>
+            {t("responsavel.add")}
+          </Button>
+        </div>
+      ) : (
+        value.length > 0 && (
+          <p className="text-xs text-[var(--text-faint)]">{t("responsavel.alreadyLinked")}</p>
+        )
+      )}
     </div>
   );
 }

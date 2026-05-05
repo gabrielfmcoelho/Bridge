@@ -5,6 +5,8 @@ interface ListToolbarProps {
   activeFilterCount: number;
   searchPlaceholder?: string;
   actions?: React.ReactNode;
+  /** Optional element rendered absolute-right inside the search input. */
+  searchAdornment?: React.ReactNode;
 }
 
 export default function ListToolbar({
@@ -14,6 +16,7 @@ export default function ListToolbar({
   activeFilterCount,
   searchPlaceholder = "Search...",
   actions,
+  searchAdornment,
 }: ListToolbarProps) {
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-5">
@@ -33,8 +36,13 @@ export default function ListToolbar({
             placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 pr-3 py-2 text-base md:text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
+            className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 ${searchAdornment ? "pr-9" : "pr-3"} py-2 text-base md:text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]`}
           />
+          {searchAdornment && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+              {searchAdornment}
+            </div>
+          )}
         </div>
 
         {/* Filter button */}

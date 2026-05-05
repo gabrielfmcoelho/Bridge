@@ -136,6 +136,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/ssh/preview-config", authenticated(db, http.HandlerFunc(ssh.handlePreviewConfig)))
 	mux.Handle("POST /api/ssh/generate-config", authedRole(db, "editor", http.HandlerFunc(ssh.handleGenerateConfig)))
 	mux.Handle("POST /api/ssh/test/{slug}", authedRole(db, "editor", http.HandlerFunc(ssh.handleTestConnection)))
+	mux.Handle("POST /api/ssh/network-test/{slug}", authedRole(db, "editor", http.HandlerFunc(ssh.handleNetworkTest)))
 	mux.Handle("POST /api/ssh/setup-key/{slug}", authedRole(db, "editor", http.HandlerFunc(ssh.handleSetupKey)))
 	mux.Handle("POST /api/ssh/fix-dev-null/{slug}", authedRole(db, "editor", http.HandlerFunc(ssh.handleFixDevNull)))
 	mux.Handle("POST /api/ssh/setup-sudo-nopasswd/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleSetupSudoNopasswd)))

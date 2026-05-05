@@ -1,15 +1,20 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -207,11 +212,6 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	client := h.dial(w, host, user, auth)
-	if client == nil {
-		return
-	}
-	defer client.Close()
 
 	// Helper to update test status on the host record
 	setTestStatus := func(status string) {
@@ -221,6 +221,21 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 			host.KeyTestStatus = &status
 		}
 	}
+
+	// Dial inline (don't use h.dial helper) so we can persist
+	// "failed" test status to the DB on connection failures. The helper
+	// returns 502 without touching the DB, which leaves rows stuck as
+	// "untested" forever even though the user clearly attempted a scan.
+	client, dialErr := sshtest.Dial(host.Hostname, host.Port, user, auth)
+	if dialErr != nil {
+		host.ConnectionsFailed++
+		setTestStatus("failed")
+		models.UpdateHost(h.db.SQL, host)
+		h.logOperation(r, host.ID, "test", &method, "failed", dialErr.Error())
+		jsonOK(w, map[string]any{"success": false, "error": "SSH connect: " + dialErr.Error()})
+		return
+	}
+	defer client.Close()
 
 	result := map[string]any{}
 
@@ -1035,6 +1050,158 @@ func (h *sshHandlers) handleOperationLogs(w http.ResponseWriter, r *http.Request
 		logs = []models.OperationLog{}
 	}
 	jsonOK(w, logs)
+}
+
+// portCheckResult is the per-port outcome of a TCP connect probe.
+type portCheckResult struct {
+	Port      int    `json:"port"`
+	OK        bool   `json:"ok"`
+	LatencyMS int64  `json:"latency_ms"`
+	Error     string `json:"error,omitempty"`
+}
+
+// pingResult is the outcome of an ICMP ping probe. ICMP requires extra
+// privileges that aren't available everywhere (containers, etc.), so
+// Skipped flags the case where the check couldn't run rather than failed.
+type pingResult struct {
+	OK        bool   `json:"ok"`
+	Skipped   bool   `json:"skipped"`
+	LatencyMS int64  `json:"latency_ms,omitempty"`
+	Output    string `json:"output,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// runPing shells out to the system `ping` binary. We don't open raw ICMP
+// sockets ourselves because that needs CAP_NET_RAW (or root) — the binary
+// is usually setuid and works without elevating the Go process.
+func runPing(host string) pingResult {
+	bin, err := exec.LookPath("ping")
+	if err != nil {
+		return pingResult{Skipped: true, Error: "ping binary not available on this server"}
+	}
+	var args []string
+	if runtime.GOOS == "windows" {
+		args = []string{"-n", "3", "-w", "2000", host}
+	} else {
+		args = []string{"-c", "3", "-W", "2", host}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	start := time.Now()
+	out, err := exec.CommandContext(ctx, bin, args...).CombinedOutput()
+	latency := time.Since(start).Milliseconds()
+	output := strings.TrimSpace(string(out))
+	if err != nil {
+		// `ping` returns non-zero on packet loss; surface as a normal failure
+		// rather than a "skipped" so the user sees the failure clearly.
+		return pingResult{OK: false, LatencyMS: latency, Output: output, Error: err.Error()}
+	}
+	return pingResult{OK: true, LatencyMS: latency, Output: output}
+}
+
+// runTCPConnect attempts a TCP handshake to host:port within timeout. We
+// only need the connect to succeed — anything we'd write would be protocol
+// specific (and might confuse the server).
+func runTCPConnect(host string, port int, timeout time.Duration) portCheckResult {
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
+	start := time.Now()
+	conn, err := net.DialTimeout("tcp", addr, timeout)
+	latency := time.Since(start).Milliseconds()
+	if err != nil {
+		return portCheckResult{Port: port, OK: false, LatencyMS: latency, Error: err.Error()}
+	}
+	_ = conn.Close()
+	return portCheckResult{Port: port, OK: true, LatencyMS: latency}
+}
+
+// handleNetworkTest probes a host's reachability without using SSH. It
+// always pings (best-effort) and TCP-connects to the configured SSH port,
+// plus an optional custom port supplied by the caller. This is the
+// "is it even on the network" check before debugging SSH itself.
+func (h *sshHandlers) handleNetworkTest(w http.ResponseWriter, r *http.Request) {
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+
+	var req struct {
+		Port int `json:"port"`
+	}
+	if r.ContentLength > 0 {
+		if err := decodeJSON(r, &req); err != nil {
+			jsonBadRequest(w, r, "invalid request body", err)
+			return
+		}
+	}
+	if req.Port < 0 || req.Port > 65535 {
+		jsonError(w, http.StatusBadRequest, "port must be between 1 and 65535")
+		return
+	}
+
+	hostname := strings.TrimSpace(host.Hostname)
+	if hostname == "" {
+		jsonError(w, http.StatusBadRequest, "host has no hostname configured")
+		return
+	}
+
+	ping := runPing(hostname)
+
+	sshPort, err := strconv.Atoi(strings.TrimSpace(host.Port))
+	if err != nil || sshPort <= 0 {
+		sshPort = 22
+	}
+	sshTCP := runTCPConnect(hostname, sshPort, 5*time.Second)
+
+	var customTCP *portCheckResult
+	if req.Port > 0 && req.Port != sshPort {
+		res := runTCPConnect(hostname, req.Port, 5*time.Second)
+		customTCP = &res
+	}
+
+	// "Success" means at least one probe got through. Pure ICMP success
+	// (without any TCP) still counts because it answers "is the box up?".
+	success := ping.OK || sshTCP.OK || (customTCP != nil && customTCP.OK)
+
+	// Build a compact log line so operators can scan history quickly.
+	var sb strings.Builder
+	if ping.Skipped {
+		sb.WriteString("ping: skipped")
+	} else if ping.OK {
+		fmt.Fprintf(&sb, "ping: ok (%dms)", ping.LatencyMS)
+	} else {
+		fmt.Fprintf(&sb, "ping: failed (%s)", strings.TrimSpace(ping.Error))
+	}
+	fmt.Fprintf(&sb, "; tcp/%d: ", sshTCP.Port)
+	if sshTCP.OK {
+		fmt.Fprintf(&sb, "ok (%dms)", sshTCP.LatencyMS)
+	} else {
+		fmt.Fprintf(&sb, "failed (%s)", strings.TrimSpace(sshTCP.Error))
+	}
+	if customTCP != nil {
+		fmt.Fprintf(&sb, "; tcp/%d: ", customTCP.Port)
+		if customTCP.OK {
+			fmt.Fprintf(&sb, "ok (%dms)", customTCP.LatencyMS)
+		} else {
+			fmt.Fprintf(&sb, "failed (%s)", strings.TrimSpace(customTCP.Error))
+		}
+	}
+
+	logStatus := "success"
+	if !success {
+		logStatus = "failed"
+	}
+	h.logOperation(r, host.ID, "network-test", nil, logStatus, sb.String())
+
+	resp := map[string]any{
+		"success":  success,
+		"hostname": hostname,
+		"ping":     ping,
+		"ssh_port": sshTCP,
+	}
+	if customTCP != nil {
+		resp["custom_port"] = customTCP
+	}
+	jsonOK(w, resp)
 }
 
 // hostsToEntries converts DB hosts to SSH config HostEntry slice.

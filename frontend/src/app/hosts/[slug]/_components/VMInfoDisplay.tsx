@@ -237,6 +237,21 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                           {t("scan.userNoLogin")}
                         </span>
                       )}
+                      {u.password_status === "P" && (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-[10px] text-amber-400 light:text-amber-700 border border-amber-500/30" title={t("scan.userPasswordSetTooltip")}>
+                          {t("scan.userPasswordSet")}
+                        </span>
+                      )}
+                      {u.password_status === "L" && (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]" title={t("scan.userPasswordLockedTooltip")}>
+                          {t("scan.userPasswordLocked")}
+                        </span>
+                      )}
+                      {u.password_status === "NP" && (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-[10px] text-emerald-400 light:text-emerald-800 border border-emerald-500/30" title={t("scan.userPasswordNoneTooltip")}>
+                          {t("scan.userPasswordNone")}
+                        </span>
+                      )}
                       <span
                         className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]"
                         style={{ fontFamily: "var(--font-mono)" }}
@@ -430,7 +445,215 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
           </Card>
         </>
       )}
+
+      {/* SSH Auth Policy — answers "does this host accept passwords, and for whom?" */}
+      {info.ssh_auth_policy && <SSHAuthPolicyCard policy={info.ssh_auth_policy} users={info.remote_users ?? []} t={t} />}
     </div>
+  );
+}
+
+/* ─── SSH Auth Policy card ─── */
+
+function SSHAuthPolicyCard({ policy, users, t }: {
+  policy: NonNullable<VMInfoType["ssh_auth_policy"]>;
+  users: NonNullable<VMInfoType["remote_users"]>;
+  t: (k: string) => string;
+}) {
+  // Treat "yes" / "no" as boolean-ish; anything else (including "") is unknown.
+  const yn = (v?: string): "yes" | "no" | "unknown" => {
+    if (v === "yes") return "yes";
+    if (v === "no") return "no";
+    return "unknown";
+  };
+  const passwordAllowed = yn(policy.password_auth);
+  const kbdAllowed = yn(policy.kbd_interactive_auth);
+  // Effective password access = either directive may unlock password-style auth.
+  const effectivePassword: "yes" | "no" | "unknown" =
+    passwordAllowed === "yes" || kbdAllowed === "yes"
+      ? "yes"
+      : passwordAllowed === "no" && kbdAllowed === "no"
+      ? "no"
+      : "unknown";
+
+  const verdictClass =
+    effectivePassword === "yes"
+      ? "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40"
+      : effectivePassword === "no"
+      ? "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40"
+      : "bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-default)]";
+
+  // Cross-reference users against AllowUsers/DenyUsers + their PasswordStatus
+  // to compute "users who can actually log in via password".
+  const allow = new Set((policy.allow_users ?? []).map((s) => s.toLowerCase()));
+  const deny = new Set((policy.deny_users ?? []).map((s) => s.toLowerCase()));
+  const passwordCapableUsers = users.filter((u) => {
+    if (effectivePassword !== "yes") return false;
+    if (u.password_status !== "P") return false;
+    if (!u.has_login) return false;
+    const name = u.name.toLowerCase();
+    if (deny.has(name)) return false;
+    if (allow.size > 0 && !allow.has(name)) return false;
+    return true;
+  });
+
+  const sources = policy.directive_sources ?? {};
+  const rows: { label: string; value: React.ReactNode; key: string }[] = [
+    { key: "passwordauthentication", label: t("scan.policyPasswordAuth"), value: <YesNoBadge value={passwordAllowed} t={t} /> },
+    { key: "kbdinteractiveauthentication", label: t("scan.policyKbdInteractive"), value: <YesNoBadge value={kbdAllowed} t={t} /> },
+    { key: "pubkeyauthentication", label: t("scan.policyPubkeyAuth"), value: <YesNoBadge value={yn(policy.pubkey_auth)} t={t} /> },
+    { key: "usepam", label: t("scan.policyUsePAM"), value: <YesNoBadge value={yn(policy.use_pam)} t={t} /> },
+    {
+      key: "permitrootlogin",
+      label: t("scan.policyPermitRoot"),
+      value: (
+        <span className="text-xs text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>
+          {policy.permit_root_login || "—"}
+        </span>
+      ),
+    },
+  ];
+  if (policy.authentication_methods && policy.authentication_methods !== "any") {
+    rows.push({
+      key: "authenticationmethods",
+      label: t("scan.policyAuthMethods"),
+      value: (
+        <span className="text-xs text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>
+          {policy.authentication_methods}
+        </span>
+      ),
+    });
+  }
+
+  const renderList = (label: string, items: string[] | undefined) =>
+    items && items.length > 0 ? (
+      <div className="flex flex-wrap items-center gap-2 py-1.5 border-b border-[var(--border-subtle)]/50 last:border-0">
+        <span className="text-xs text-[var(--text-muted)] shrink-0">{label}</span>
+        <div className="flex flex-wrap gap-1">
+          {items.map((u) => (
+            <span
+              key={u}
+              className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[10px] text-[var(--text-secondary)] border border-[var(--border-subtle)]"
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              {u}
+            </span>
+          ))}
+        </div>
+      </div>
+    ) : null;
+
+  return (
+    <>
+      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.sshAuthPolicy")}</h3>
+      <Card hover={false}>
+        {/* Verdict line */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs ${verdictClass}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+            {effectivePassword === "yes"
+              ? t("scan.policyPasswordAllowed")
+              : effectivePassword === "no"
+              ? t("scan.policyPasswordDenied")
+              : t("scan.policyPasswordUnknown")}
+          </span>
+          {policy.source && (
+            <span className="ml-auto text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+              {policy.source}
+            </span>
+          )}
+        </div>
+
+        {/* Directives grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mb-3">
+          {rows.map(({ key, label, value }) => {
+            const hits = sources[key];
+            return (
+              <div key={key} className="py-1.5 border-b border-[var(--border-subtle)]/50 last:border-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[var(--text-muted)]">{label}</span>
+                  {value}
+                </div>
+                {hits && hits.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {hits.map((h, i) => (
+                      <div
+                        key={i}
+                        className="text-[10px] text-[var(--text-faint)] truncate"
+                        style={{ fontFamily: "var(--font-mono)" }}
+                        title={h.value ? `${h.file}:${h.line} → ${h.value}` : `${h.file}:${h.line}`}
+                      >
+                        <span className="opacity-60">↳</span> {h.file}:{h.line}
+                        {h.value && <span className="ml-1 opacity-70">{h.value}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Allow/Deny lists */}
+        {(policy.allow_users?.length ||
+          policy.allow_groups?.length ||
+          policy.deny_users?.length ||
+          policy.deny_groups?.length) ? (
+          <div className="border-t border-[var(--border-subtle)]/50 pt-2">
+            {renderList(t("scan.policyAllowUsers"), policy.allow_users)}
+            {renderList(t("scan.policyAllowGroups"), policy.allow_groups)}
+            {renderList(t("scan.policyDenyUsers"), policy.deny_users)}
+            {renderList(t("scan.policyDenyGroups"), policy.deny_groups)}
+          </div>
+        ) : null}
+
+        {/* Password-capable users — empty list when password auth is off */}
+        {effectivePassword !== "no" && (
+          <div className="border-t border-[var(--border-subtle)]/50 pt-3 mt-3">
+            <span className="text-xs text-[var(--text-muted)] block mb-2">{t("scan.policyPasswordUsers")}</span>
+            {passwordCapableUsers.length === 0 ? (
+              <p className="text-[10px] text-[var(--text-faint)] italic">
+                {effectivePassword === "yes" ? t("scan.policyPasswordUsersNone") : t("scan.policyPasswordUsersUnknown")}
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {passwordCapableUsers.map((u) => (
+                  <span
+                    key={u.name}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 light:text-amber-800 border border-amber-500/30 text-xs"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                    title={`uid ${u.uid} · ${u.shell || ""}`}
+                  >
+                    {u.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+function YesNoBadge({ value, t }: { value: "yes" | "no" | "unknown"; t: (k: string) => string }) {
+  if (value === "yes") {
+    return (
+      <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border border-emerald-500/30 text-[10px]">
+        {t("common.yes")}
+      </span>
+    );
+  }
+  if (value === "no") {
+    return (
+      <span className="px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-300 light:text-rose-800 border border-rose-500/30 text-[10px]">
+        {t("common.no")}
+      </span>
+    );
+  }
+  return (
+    <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-faint)] border border-[var(--border-subtle)] text-[10px]">
+      —
+    </span>
   );
 }
 

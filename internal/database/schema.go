@@ -67,10 +67,12 @@ var BoolColumns = map[string]map[string]bool{
 	"services":             {"orchestrator_managed": true, "is_directly_managed": true, "is_responsible": true, "is_external_dependency": true},
 	"external_tools":       {"embed_enabled": true},
 	"issues":               {"archived": true},
-	"host_responsaveis":    {"is_main": true, "is_externo": true},
-	"dns_responsaveis":     {"is_main": true, "is_externo": true},
-	"service_responsaveis": {"is_main": true, "is_externo": true},
-	"project_responsaveis": {"is_main": true, "is_externo": true},
+	"contacts":             {"is_external": true},
+	"host_responsaveis":    {"is_main": true},
+	"dns_responsaveis":     {"is_main": true},
+	"service_responsaveis": {"is_main": true},
+	"project_responsaveis": {"is_main": true},
+	"host_entidades":       {"is_main": true},
 	"project_gitlab_links": {"sync_issues": true},
 }
 

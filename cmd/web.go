@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/api"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -62,7 +63,19 @@ var webCmd = &cobra.Command{
 
 		fmt.Printf("Starting sshcm at %s\n", url)
 		fmt.Println("Press Ctrl+C to stop")
-		return http.ListenAndServe(addr, mux)
+
+		// http.Server with explicit timeouts. WriteTimeout intentionally
+		// left unset because long-running SSH operations (TestCapture
+		// runs many sequential commands) can legitimately exceed any
+		// fixed deadline. ReadHeaderTimeout caps slowloris-style stalls;
+		// IdleTimeout closes leaking keep-alive sockets.
+		srv := &http.Server{
+			Addr:              addr,
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		}
+		return srv.ListenAndServe()
 	},
 }
 
