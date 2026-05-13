@@ -50,10 +50,19 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    key: "atlas",
+    label: "nav.atlas",
+    items: [
+      { href: "/atlas/topology", label: "nav.topology", icon: "Network" },
+      { href: "/atlas/lineage", label: "nav.lineage", icon: "GitBranch" },
+      { href: "/atlas/catalog", label: "nav.catalog", icon: "Database" },
+      { href: "/atlas/pipeline", label: "nav.pipeline", icon: "Workflow" },
+    ],
+  },
+  {
     key: "tools",
     label: "nav.toolsSection",
     items: [
-      { href: "/topology", label: "nav.topology", icon: "Network" },
       { href: "/ssh-config", label: "nav.sshConfig", icon: "Terminal" },
       { href: "/tools", label: "nav.tools", icon: "Wrench" },
       { href: "/settings", label: "nav.settings", icon: "Settings" },

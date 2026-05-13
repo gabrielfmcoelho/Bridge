@@ -15,6 +15,7 @@ const emptyFilters: HostFilters = {
   situacao: "", tag: "", entidade_responsavel: "",
   responsavel_interno: "", key_test_status: "", password_test_status: "",
   scan_result: "", has_scan: "", alert_level: "",
+  idle: "",
 };
 
 interface FilterDrawerProps {
@@ -70,6 +71,11 @@ export default function FilterDrawer({
     { value: "warning", label: t("alert.warning") },
     { value: "info", label: t("alert.info") },
     { value: "none", label: t("filters.noAlerts") },
+  ];
+  const idleOptions = [
+    { value: "", label: "--" },
+    { value: "idle", label: t("filters.idleOnly") },
+    { value: "active", label: t("filters.activeOnly") },
   ];
 
   // Adapt HostSortConfig to generic SortConfig for InventoryFilterDrawer
@@ -139,6 +145,15 @@ export default function FilterDrawer({
             <Select value={filters.alert_level} onChange={(e) => set("alert_level", e.target.value)} options={alertOptions} />
           </FieldLabel>
         </div>
+      </DrawerSection>
+
+      <DrawerSection title={t("filters.idleSection")} open={openSection === "idle"} onToggle={() => toggle("idle")} active={!!filters.idle}>
+        <FieldLabel label={t("host.idle")}>
+          <Select value={filters.idle} onChange={(e) => set("idle", e.target.value)} options={idleOptions} />
+        </FieldLabel>
+        <p className="mt-2 text-[10px] text-[var(--text-muted)] leading-relaxed">
+          {t("filters.idleHint")}
+        </p>
       </DrawerSection>
     </InventoryFilterDrawer>
   );

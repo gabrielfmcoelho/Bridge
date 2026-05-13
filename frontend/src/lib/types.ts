@@ -74,6 +74,12 @@ export interface Host {
     storage?: string;
     disk_percent?: string;
   };
+  // Idle-VM heuristic (computed during scan). idle=true means every rule
+  // (R1..R4) passed; idle_reasons lists which rules passed,
+  // idle_counterfacts lists which rules failed (with brief explanations).
+  idle?: boolean;
+  idle_reasons?: string[];
+  idle_counterfacts?: string[];
   containers_count?: number;
   processes_count?: number;
   services_count?: number;
@@ -141,6 +147,10 @@ export interface HostFilters {
   scan_result: string;
   has_scan: string;
   alert_level: string;
+  // "idle"   → only hosts the scan flagged as idle (R1..R4 all passed)
+  // "active" → only hosts with at least one workload signal
+  // ""       → no filter
+  idle: string;
 }
 
 export interface DNSRecord {

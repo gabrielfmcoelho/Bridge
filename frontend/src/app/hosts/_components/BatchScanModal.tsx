@@ -12,6 +12,10 @@ export default function BatchScanModal({
   onConcurrencyChange,
   scope,
   onScopeChange,
+  authMethod,
+  onAuthMethodChange,
+  passwordCapableCount,
+  keyCapableCount,
   allHostsCount,
   failedHostsCount,
   successHostsCount,
@@ -32,6 +36,10 @@ export default function BatchScanModal({
   onConcurrencyChange: (value: number) => void;
   scope: "all" | "failed" | "success" | "untested";
   onScopeChange: (scope: "all" | "failed" | "success" | "untested") => void;
+  authMethod: "auto" | "password" | "key";
+  onAuthMethodChange: (m: "auto" | "password" | "key") => void;
+  passwordCapableCount: number;
+  keyCapableCount: number;
   allHostsCount: number;
   failedHostsCount: number;
   successHostsCount: number;
@@ -83,6 +91,42 @@ export default function BatchScanModal({
             className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${scope === "untested" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
           >
             {t("host.scopeUntested")} ({untestedHostsCount})
+          </button>
+        </div>
+      </div>
+
+      {/* Auth method picker — operator chooses password or key explicitly,
+          or "auto" to fall back to each host's preferred_auth. The counts
+          on the buttons reflect how many hosts in the current scope have
+          that credential, so picking "key" with 0 in the bucket is
+          obviously a no-op. */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">{t("host.scanAuthMethod")}:</span>
+        <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--border-subtle)] overflow-hidden">
+          <button
+            type="button"
+            disabled={scanning}
+            onClick={() => onAuthMethodChange("auto")}
+            className={`px-3 py-1.5 text-xs transition-colors ${authMethod === "auto" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-50 disabled:cursor-not-allowed`}
+            title={t("host.scanAuthMethodAutoTooltip")}
+          >
+            {t("host.scanAuthMethodAuto")}
+          </button>
+          <button
+            type="button"
+            disabled={scanning || passwordCapableCount === 0}
+            onClick={() => onAuthMethodChange("password")}
+            className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${authMethod === "password" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
+          >
+            {t("host.scanAuthMethodPassword")} ({passwordCapableCount})
+          </button>
+          <button
+            type="button"
+            disabled={scanning || keyCapableCount === 0}
+            onClick={() => onAuthMethodChange("key")}
+            className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${authMethod === "key" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
+          >
+            {t("host.scanAuthMethodKey")} ({keyCapableCount})
           </button>
         </div>
       </div>
@@ -139,9 +183,11 @@ export default function BatchScanModal({
                 {s.status === "scanning" && <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />}
                 {s.status === "success" && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
                 {s.status === "failed" && <span className="w-2 h-2 rounded-full bg-red-400" />}
+                {s.status === "skipped" && <span className="w-2 h-2 rounded-full bg-slate-400" />}
                 <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{host.nickname}</span>
                 {s.status === "scanning" && <span className="text-[var(--accent)] ml-auto">{t("host.scanning")}{s.attempt && s.attempt > 1 ? ` (${s.attempt}/3)` : ""}</span>}
                 {s.status === "success" && <span className="text-emerald-400 ml-auto">OK</span>}
+                {s.status === "skipped" && <span className="text-slate-400 ml-auto">{t("host.scanSkipped")}</span>}
                 {s.error && <span className="text-red-400 ml-auto truncate max-w-[200px]" title={s.error}>{s.error}</span>}
               </div>
             );

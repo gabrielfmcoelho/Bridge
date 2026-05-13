@@ -41,6 +41,58 @@ export type InstalledPackageType = {
   source: string;
 };
 
+export type CronJob = {
+  source: string;       // "system" | "/etc/cron.d/<f>" | "/etc/cron.<period>" | "user:<name>" | "anacron" | "timer"
+  kind: string;         // "cron" | "anacron" | "timer"
+  schedule: string;
+  user?: string;
+  command: string;
+  next_run?: string;
+  last_run?: string;
+  disabled?: boolean;
+};
+
+export type CronInfo = {
+  daemon_installed: boolean;
+  daemon_active: boolean;
+  daemon_enabled: boolean;
+  daemon_name?: string;
+  jobs?: CronJob[];
+};
+
+export type Agent = {
+  name: string;
+  label: string;
+  vendor?: string;
+  category: string;          // monitoring|logging|security|inventory|config-mgmt|backup|cloud|orchestration|remote-access
+  state?: string;            // active|inactive|failed|running|stopped
+  enabled?: boolean;
+  unit?: string;
+  pid?: number;
+  version?: string;
+  package?: string;
+  ports?: number[];
+  config_path?: string;
+  sources?: string[];        // ["systemd","process","package","port"]
+};
+
+export type DiscoveredService = {
+  name: string;
+  label: string;
+  vendor?: string;
+  kind: string;              // web|proxy|database|cache|queue|dns|mail|file-sharing|directory|runtime|analytics|logging
+  state?: string;            // active|inactive|failed|running|stopped
+  enabled?: boolean;
+  unit?: string;
+  pid?: number;
+  version?: string;
+  package?: string;
+  ports?: number[];
+  container_id?: string;
+  container_image?: string;
+  sources?: string[];        // ["systemd","process","package","port","container"]
+};
+
 export type NginxCleanupStepType = {
   name: string;
   status: string;
@@ -96,6 +148,10 @@ export type VMInfoType = {
   systemd_services?: SystemdServiceType[];
   installed_packages?: InstalledPackageType[];
   cron_jobs?: string[];
+  cron?: CronInfo;
+  agents?: Agent[];
+  service_inventory?: DiscoveredService[];
+  resource_top?: ResourceUsageSnapshot;
   firewall_status?: string;
   remote_users?: RemoteUserInfo[];
   port_owners?: PortOwner[];
@@ -124,6 +180,56 @@ export type DirectiveSource = {
   value?: string;
 };
 
+export type DockerContainerLogInfo = {
+  id: string;
+  name: string;
+  image: string;
+  log_path?: string;
+  size_bytes: number;
+  human_size?: string;
+  log_driver?: string;
+  log_options?: Record<string, string>;
+  has_rotation: boolean;
+};
+
+export type ResourceProcess = {
+  pid: number;
+  user: string;
+  cpu_percent: number;
+  mem_percent: number;
+  rss_bytes: number;
+  command: string;
+};
+
+export type ResourceDiskItem = {
+  path: string;
+  size_bytes: number;
+  human_size?: string;
+};
+
+export type ResourceUsageSnapshot = {
+  top_cpu?: ResourceProcess[];
+  top_mem?: ResourceProcess[];
+  top_disk?: ResourceDiskItem[];
+};
+
+export type DockerLogsReport = {
+  log_driver: string;
+  log_options?: Record<string, string>;
+  daemon_json_path?: string;
+  daemon_json_exists: boolean;
+  daemon_log_driver?: string;
+  daemon_log_opts?: Record<string, string>;
+  daemon_json_unclean?: boolean;
+  containers?: DockerContainerLogInfo[];
+  total_log_bytes: number;
+  largest_log_bytes: number;
+  unbounded_containers: number;
+  rotation_configured: boolean;
+  risk_level: "ok" | "warning" | "critical" | string;
+  recommendation?: string;
+};
+
 export type ParsedContainer = {
   id: string;
   name: string;
@@ -140,6 +246,11 @@ export type PortOwner = {
   target?: string;
 };
 
+export type LoginEntry = {
+  from: string;
+  when: string;
+};
+
 export type RemoteUserInfo = {
   name: string;
   uid: number;
@@ -148,6 +259,10 @@ export type RemoteUserInfo = {
   has_login: boolean;
   is_current?: boolean;
   password_status?: string; // "P" | "L" | "NP" | "" (unknown)
+  // Up to 5 most-recent SSH logins for this user, grouped server-side.
+  // Absent on legacy scans — the frontend falls back to grouping
+  // info.last_logins client-side when this field isn't present.
+  last_logins?: LoginEntry[];
 };
 
 export type SSHKeyInfoScan = {
@@ -196,11 +311,26 @@ async function request<T>(
   timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS
 ): Promise<T> {
   const controller = new AbortController();
-  // Compose with a caller-provided signal if any: abort propagates either way.
+  // Track the abort cause so callers can distinguish a real cancellation
+  // (their AbortController.abort()) from our own timeout fallback. Without
+  // this, the batch-scan stop button looks identical to a 120s timeout.
+  let timedOut = false;
+  let externallyAborted = false;
   if (options.signal) {
-    options.signal.addEventListener("abort", () => controller.abort(), { once: true });
+    if (options.signal.aborted) {
+      externallyAborted = true;
+      controller.abort();
+    } else {
+      options.signal.addEventListener("abort", () => {
+        externallyAborted = true;
+        controller.abort();
+      }, { once: true });
+    }
   }
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
@@ -218,7 +348,11 @@ async function request<T>(
     return res.json();
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error(`Request timed out after ${timeoutMs}ms`);
+      // Caller cancellation re-throws as a fresh AbortError so the
+      // upstream catch block can `err.name === "AbortError"` without
+      // worrying about DOMException quirks across realms.
+      if (externallyAborted) throw new DOMException("Request aborted by caller", "AbortError");
+      if (timedOut) throw new Error(`Request timed out after ${timeoutMs}ms`);
     }
     throw err;
   } finally {
@@ -452,12 +586,27 @@ export const orchestratorsAPI = {
 export const sshAPI = {
   previewConfig: () => api.get<{ content: string }>("/api/ssh/preview-config"),
   generateConfig: () => api.post<{ status: string; host_count: number; path: string }>("/api/ssh/generate-config"),
-  testConnection: (slug: string, method: "password" | "key", capture = false) =>
-    api.post<{ success: boolean; error?: string; vm_info?: VMInfoType }>(`/api/ssh/test/${slug}`, { method, capture }),
+  // signal lets the batch scanner cancel an in-flight scan when the
+  // operator clicks Stop — the request hits its body, the abort propagates
+  // to fetch, and the worker catches an AbortError instead of waiting for
+  // the SSH op to time out at the default 120s.
+  testConnection: (slug: string, method: "password" | "key", capture = false, signal?: AbortSignal) =>
+    request<{ success: boolean; error?: string; vm_info?: VMInfoType }>(
+      `/api/ssh/test/${slug}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ method, capture }),
+        ...(signal ? { signal } : {}),
+      },
+    ),
   networkTest: (slug: string, port?: number) =>
     api.post<NetworkTestResult>(`/api/ssh/network-test/${slug}`, port ? { port } : {}),
   fixDevNull: (slug: string, method: "password" | "key") =>
     api.post<{ success: boolean; method?: string; message?: string; output?: string; error?: string }>(`/api/ssh/fix-dev-null/${slug}`, { method }),
+  dockerLogsInspect: (slug: string) =>
+    api.post<{ success: boolean; method?: string; report?: DockerLogsReport; error?: string }>(`/api/ssh/docker-logs/${slug}`, {}),
+  dockerLogsApplyRotation: (slug: string, opts: { max_size?: string; max_file?: number; driver?: string }) =>
+    api.post<{ success: boolean; method?: string; message?: string; daemon_json?: string; error?: string }>(`/api/ssh/docker-logs-rotation/${slug}`, opts),
   setupSudoNopasswd: (slug: string) =>
     api.post<{ success: boolean; message?: string; output?: string; error?: string }>(`/api/ssh/setup-sudo-nopasswd/${slug}`),
   createRemoteUser: (slug: string, username: string, pubKey: string, force = false, sshKeyId?: number) =>

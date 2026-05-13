@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
-import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
-import SortableTable, { sortRows } from "@/components/ui/SortableTable";
 import { UsageBar } from "./UsageBar";
 import { ContainersList } from "./SortableResourceList";
 import { formatUptime, parseLoginEntry, formatLoginDate, portIcon, parseServiceRow } from "@/lib/utils";
-import type { VMInfoType, ProcessDetail, PortOwner } from "@/lib/api";
+import type { VMInfoType, ProcessDetail, PortOwner, CronInfo, CronJob, Agent, DiscoveredService, ResourceUsageSnapshot, ResourceProcess, ResourceDiskItem } from "@/lib/api";
+
+// Login users that aren't real accounts — these come from `last`'s wtmp
+// rollover and reboot bookkeeping. Filter them out before grouping logins
+// per user so the Remote Users cards only show meaningful entries.
+const NON_USER_LOGIN_TOKENS = new Set(["reboot", "shutdown", "wtmp", "runlevel", ""]);
 
 export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoType; locale: string; compact?: boolean }) {
   const { t } = useLocale();
-  const [loginsView, setLoginsView] = useState<"cards" | "table">("cards");
   const gridCols = compact
     ? "grid-cols-1 sm:grid-cols-2"
     : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
@@ -27,6 +29,19 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
           {info.ram_percent && <UsageBar label={t("vm.ram")} total={info.ram} used={info.ram_used} percent={info.ram_percent} />}
           {info.disk_percent && <UsageBar label={t("vm.disk")} total={info.storage} used={info.storage_used} percent={info.disk_percent} />}
         </div>
+        {/* Top consumers — captured during the scan so the operator can
+            answer "the host is at 87% RAM, who is using it?" without
+            opening another terminal. Sublists are rendered side-by-side
+            on wide viewports and stacked on narrow ones. */}
+        {info.resource_top && (
+          (info.resource_top.top_cpu?.length || 0) +
+          (info.resource_top.top_mem?.length || 0) +
+          (info.resource_top.top_disk?.length || 0) > 0
+        ) && (
+          <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]/50">
+            <ResourceTopPanel snapshot={info.resource_top} t={t} />
+          </div>
+        )}
       </Card>
 
       {/* System + Ports (merged) */}
@@ -60,6 +75,15 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                   case "container": return "bg-cyan-500/15 text-cyan-200 light:text-cyan-800 border-cyan-500/40";
                   case "nginx": return "bg-fuchsia-500/15 text-fuchsia-200 light:text-fuchsia-800 border-fuchsia-500/40";
                   case "docker": return "bg-blue-500/15 text-blue-200 light:text-blue-800 border-blue-500/40";
+                  // "agent" and "service" are back-filled from the
+                  // catalogs when ss couldn't read the owning process
+                  // (Zabbix on :10050, PostgreSQL on :5432, MongoDB on
+                  // :27017 — each running under a dedicated user).
+                  // Violet for agents, emerald for application services
+                  // so the operator can distinguish "what's monitoring
+                  // me" from "what am I actually running" at a glance.
+                  case "agent": return "bg-violet-500/15 text-violet-200 light:text-violet-800 border-violet-500/40";
+                  case "service": return "bg-emerald-500/15 text-emerald-200 light:text-emerald-800 border-emerald-500/40";
                   case "process": return "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-default)]";
                   default: return "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-default)]";
                 }
@@ -167,6 +191,24 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
         // silently dropped.
         const orphanKeys = allKeys.filter((k) => !k.user);
 
+        // Per-user logins. Modern scans carry the grouped slice on each
+        // RemoteUserInfo (server-side, last 5 per user, bookkeeping rows
+        // already filtered). Legacy scans only have the flat
+        // info.last_logins []string — for those we fall back to grouping
+        // client-side, which is best-effort because the legacy capture
+        // window is narrower (top-N total, not per-user).
+        const hasStructuredLogins = (info.remote_users ?? []).some((u) => u.last_logins && u.last_logins.length > 0);
+        const loginsByUser = new Map<string, { from: string; when: string }[]>();
+        if (!hasStructuredLogins) {
+          for (const raw of info.last_logins ?? []) {
+            const { user, from, when } = parseLoginEntry(raw);
+            if (NON_USER_LOGIN_TOKENS.has(user)) continue;
+            const list = loginsByUser.get(user) ?? [];
+            if (list.length < 5) list.push({ from, when });
+            loginsByUser.set(user, list);
+          }
+        }
+
         // Key icon color encodes managed status (green = known to the DB,
         // faint gray = unmanaged). The old "managed"/"unmanaged" text badge
         // was redundant with the color; we only show a chip now when there's
@@ -220,6 +262,9 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                 const userKeys = keysByUser.get(u.name) ?? [];
                 const authKeys = userKeys.filter((k) => k.source === "authorized_keys");
                 const privKeys = userKeys.filter((k) => k.source !== "authorized_keys");
+                const userLogins = (u.last_logins && u.last_logins.length > 0)
+                  ? u.last_logins
+                  : (loginsByUser.get(u.name) ?? []);
                 return (
                   <Card key={u.name} hover={false} className="!p-3 flex flex-col h-full">
                     <div className="flex items-center gap-2 mb-1">
@@ -293,6 +338,25 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                         )}
                       </div>
                     )}
+                    {userLogins.length > 0 && (
+                      <div className="pt-2">
+                        <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                          {t("scan.userLastLogins")} <span className="text-[var(--text-faint)]">({userLogins.length})</span>
+                        </span>
+                        <div className="space-y-0.5">
+                          {userLogins.map((l, i) => (
+                            <div
+                              key={i}
+                              className="flex items-baseline gap-2 text-[10px] text-[var(--text-secondary)] leading-snug"
+                              style={{ fontFamily: "var(--font-mono)" }}
+                            >
+                              <span className="truncate text-[var(--text-primary)]" title={l.from}>{l.from || "—"}</span>
+                              <span className="ml-auto shrink-0 text-[var(--text-muted)]">{formatLoginDate(l.when, locale)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </Card>
                 );
               })}
@@ -309,64 +373,6 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
         );
       })()}
 
-      {/* Last SSH Logins */}
-      {info.last_logins?.length > 0 && (
-        <>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("scan.lastLogins")}</h3>
-          <ViewToggle
-            value={loginsView}
-            onChange={(v) => setLoginsView(v as "cards" | "table")}
-            options={[
-              { key: "cards", label: t("common.cards"), icon: VIEW_ICONS.cards },
-              { key: "table", label: t("common.table"), icon: VIEW_ICONS.table },
-            ]}
-          />
-        </div>
-        {loginsView === "cards" ? (
-          <div className={`grid ${gridCols} gap-2`}>
-            {info.last_logins.map((l, i) => {
-              const { user, from, when } = parseLoginEntry(l);
-              return (
-                <Card key={i} hover={false} className="!p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className="w-3.5 h-3.5 text-[var(--text-faint)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    <span className="text-sm font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{user}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[var(--text-faint)] block mb-0.5">{t("vm.from")}</span>
-                      <span className="text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>{from}</span>
-                    </div>
-                    <div>
-                      <span className="text-[var(--text-faint)] block mb-0.5">{t("vm.when")}</span>
-                      <span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{formatLoginDate(when, locale)}</span>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        ) : (
-          <SortableTable columns={[{ key: "user" as const, label: t("vm.user") }, { key: "from" as const, label: t("vm.from") }, { key: "when" as const, label: t("vm.when") }]} defaultSort="user">
-            {(sk, sd) => {
-              const parsed = info.last_logins.map((l) => ({ ...parseLoginEntry(l), raw: l }));
-              const sorted = sortRows(parsed, sk, sd, { user: (a, b) => a.user.localeCompare(b.user), from: (a, b) => a.from.localeCompare(b.from), when: (a, b) => a.when.localeCompare(b.when) });
-              return sorted.map((row, i) => (
-                <tr key={i} className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}>
-                  <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{row.user}</td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>{row.from}</td>
-                  <td className="px-4 py-2.5 text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{formatLoginDate(row.when, locale)}</td>
-                </tr>
-              ));
-            }}
-          </SortableTable>
-        )}
-        </>
-      )}
-
       {/* Running Services — unified cards */}
       <ProcessCards info={info} t={t} gridCols={gridCols} />
 
@@ -379,8 +385,27 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
         />
       )}
 
-      {/* Systemd Services */}
-      {info.systemd_services && info.systemd_services.length > 0 && (
+      {/* Management agents — well-known monitoring/security/cloud agents
+          detected by cross-referencing systemd units, packages, processes
+          and listen ports. Renders before generic systemd services so the
+          operator sees "what's watching this host?" up front. */}
+      {info.agents && info.agents.length > 0 && (
+        <AgentsCard agents={info.agents} t={t} />
+      )}
+
+      {/* Service inventory — unified taxonomy of application services
+          (web, db, cache, queue, …) classified into typed buckets. Each
+          row collapses systemd + process + package + port + container
+          signals into a single entry, so nginx-managed-by-systemd is no
+          longer split between the Systemd and Running Services panels. */}
+      {info.service_inventory && info.service_inventory.length > 0 && (
+        <ServiceInventoryCard services={info.service_inventory} t={t} />
+      )}
+
+      {/* Systemd Services — legacy panel. Hidden when service_inventory is
+          present (the unified card supersedes it); kept for backward compat
+          with scans persisted before the inventory was introduced. */}
+      {!info.service_inventory && info.systemd_services && info.systemd_services.length > 0 && (
         <>
           <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.systemdServices")}</h3>
           <Card hover={false}>
@@ -422,16 +447,23 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
         </>
       )}
 
-      {/* Cron Jobs */}
-      {info.cron_jobs && info.cron_jobs.length > 0 && (
-        <>
-          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.cronJobs")}</h3>
-          <Card hover={false}>
-            <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
-              {info.cron_jobs.join("\n")}
-            </pre>
-          </Card>
-        </>
+      {/* Cron Jobs — structured collector (cron daemon state + system/user
+          crontabs + drop-in dirs + anacron + systemd timers). Falls back to
+          the legacy raw `cron_jobs` blob for scans persisted before the
+          structured collector was added. */}
+      {info.cron ? (
+        <CronInfoCard cron={info.cron} t={t} />
+      ) : (
+        info.cron_jobs && info.cron_jobs.length > 0 && (
+          <>
+            <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.cronJobs")}</h3>
+            <Card hover={false}>
+              <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
+                {info.cron_jobs.join("\n")}
+              </pre>
+            </Card>
+          </>
+        )
       )}
 
       {/* Firewall Status */}
@@ -862,4 +894,623 @@ function isSystemProcess(command: string, cwd?: string): boolean {
   if (SYSTEM_COMMANDS.some((c) => command.toLowerCase().includes(c.toLowerCase()))) return true;
   if (cwd === "/" || cwd === "/root") return true;
   return false;
+}
+
+/* ─── Cron / scheduled tasks card ─── */
+
+// Buckets jobs into "system" (anything package-manager / sysadmin-owned —
+// /etc/crontab, /etc/cron.d/*, drop-in dirs, anacron, systemd timers) and
+// "user" (per-user crontabs in /var/spool/cron/, edited by the owning
+// account). This is the operator-facing distinction: "what does the OS
+// schedule for me?" vs "what did somebody add by hand on this host?".
+function bucketCronJobs(jobs: CronJob[]): { system: CronJob[]; user: CronJob[] } {
+  const system: CronJob[] = [];
+  const user: CronJob[] = [];
+  for (const j of jobs) {
+    if (j.source.startsWith("user:")) user.push(j);
+    else system.push(j);
+  }
+  return { system, user };
+}
+
+function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string) => string }) {
+  const jobs = cron.jobs ?? [];
+  const { system, user } = bucketCronJobs(jobs);
+
+  const daemonState: "active" | "inactive" | "missing" =
+    !cron.daemon_installed && !cron.daemon_active ? "missing" : cron.daemon_active ? "active" : "inactive";
+  const daemonChip =
+    daemonState === "active"
+      ? "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40"
+      : daemonState === "inactive"
+      ? "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40"
+      : "bg-slate-500/15 text-slate-300 light:text-slate-700 border-slate-500/40";
+  const daemonLabel =
+    daemonState === "active"
+      ? t("scan.cron.daemonActive")
+      : daemonState === "inactive"
+      ? t("scan.cron.daemonInactive")
+      : t("scan.cron.daemonMissing");
+
+  return (
+    <>
+      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.cronJobs")}</h3>
+      <Card hover={false}>
+        {/* Daemon state row */}
+        <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] border ${daemonChip}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${daemonState === "active" ? "bg-emerald-400" : daemonState === "inactive" ? "bg-amber-400" : "bg-slate-400"}`} />
+            {(cron.daemon_name || "cron")}: {daemonLabel}
+          </span>
+          {cron.daemon_installed && (
+            <span className="text-[10px] text-[var(--text-muted)]">
+              {cron.daemon_enabled ? t("scan.cron.daemonEnabledAtBoot") : t("scan.cron.daemonNotEnabled")}
+            </span>
+          )}
+          <span className="ml-auto text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+            {jobs.length} {jobs.length === 1 ? t("scan.cron.jobSingular") : t("scan.cron.jobPlural")}
+          </span>
+        </div>
+
+        {jobs.length === 0 ? (
+          <div className="text-xs text-[var(--text-muted)] py-2">{t("scan.cron.noJobs")}</div>
+        ) : (
+          <div className="space-y-4">
+            {system.length > 0 && <CronJobGroup title={t("scan.cron.systemJobs")} jobs={system} t={t} />}
+            {user.length > 0 && <CronJobGroup title={t("scan.cron.userJobs")} jobs={user} t={t} />}
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+function CronJobGroup({ title, jobs, t }: { title: string; jobs: CronJob[]; t: (k: string) => string }) {
+  return (
+    <div>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
+        {title} <span className="opacity-60">({jobs.length})</span>
+      </span>
+      <div className="space-y-1.5">
+        {jobs.map((j, i) => (
+          <CronJobRow key={i} job={j} t={t} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CronJobRow({ job, t }: { job: CronJob; t: (k: string) => string }) {
+  const isTimer = job.kind === "timer";
+  const sourceLabel = job.source.startsWith("user:")
+    ? job.source.slice(5)
+    : job.source.startsWith("/etc/cron.d/")
+    ? job.source.slice("/etc/cron.d/".length)
+    : job.source;
+
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-2 px-2 py-1.5 rounded border border-[var(--border-subtle)]/50 ${
+        job.disabled ? "opacity-50" : ""
+      }`}
+    >
+      <span
+        className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[10px] text-[var(--text-secondary)] border border-[var(--border-default)]"
+        style={{ fontFamily: "var(--font-mono)" }}
+        title={isTimer ? t("scan.cron.timerUnit") : t("scan.cron.schedule")}
+      >
+        {job.schedule || "—"}
+      </span>
+      {job.user && (
+        <span
+          className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30"
+          title={t("scan.cron.runAs")}
+          style={{ fontFamily: "var(--font-mono)" }}
+        >
+          {job.user}
+        </span>
+      )}
+      <span
+        className="text-xs text-[var(--text-primary)] flex-1 min-w-0 truncate"
+        style={{ fontFamily: "var(--font-mono)" }}
+        title={job.command}
+      >
+        {job.command || "—"}
+      </span>
+      {job.disabled && (
+        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-slate-500/15 text-[10px] text-slate-300 light:text-slate-700 border border-slate-500/30">
+          {t("scan.cron.disabled")}
+        </span>
+      )}
+      {job.next_run && (
+        <span className="shrink-0 text-[10px] text-[var(--text-muted)]" title={t("scan.cron.nextRun")}>
+          → {job.next_run}
+        </span>
+      )}
+      <span
+        className="shrink-0 text-[10px] text-[var(--text-faint)]"
+        title={job.source}
+        style={{ fontFamily: "var(--font-mono)" }}
+      >
+        {sourceLabel}
+      </span>
+    </div>
+  );
+}
+
+/* ─── Management agents card ─── */
+
+const AGENT_CATEGORY_ORDER = [
+  "monitoring",
+  "logging",
+  "security",
+  "config-mgmt",
+  "inventory",
+  "backup",
+  "cloud",
+  "orchestration",
+  "remote-access",
+] as const;
+
+const AGENT_CATEGORY_ICON: Record<string, string> = {
+  monitoring: "📊",      // 📊
+  logging: "📝",         // 📝
+  security: "🛡️",  // 🛡️
+  "config-mgmt": "⚙️",   // ⚙️
+  inventory: "📋",       // 📋
+  backup: "💾",          // 💾
+  cloud: "☁️",           // ☁️
+  orchestration: "🚢",   // 🚢
+  "remote-access": "🔌", // 🔌
+};
+
+function agentStateClasses(state?: string): string {
+  switch (state) {
+    case "active":
+    case "running":
+      return "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40";
+    case "failed":
+      return "bg-red-500/15 text-red-300 light:text-red-800 border-red-500/40";
+    case "stopped":
+    case "inactive":
+      return "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40";
+    default:
+      return "bg-slate-500/15 text-slate-300 light:text-slate-700 border-slate-500/40";
+  }
+}
+
+function AgentsCard({ agents, t }: { agents: Agent[]; t: (k: string) => string }) {
+  // Bucket by category in a stable display order; trailing categories (any
+  // not in the canonical list) get appended alphabetically.
+  const buckets = new Map<string, Agent[]>();
+  for (const a of agents) {
+    const list = buckets.get(a.category) ?? [];
+    list.push(a);
+    buckets.set(a.category, list);
+  }
+  const ordered: [string, Agent[]][] = [];
+  for (const cat of AGENT_CATEGORY_ORDER) {
+    const list = buckets.get(cat);
+    if (list && list.length > 0) {
+      ordered.push([cat, list]);
+      buckets.delete(cat);
+    }
+  }
+  for (const [cat, list] of [...buckets.entries()].sort()) {
+    ordered.push([cat, list]);
+  }
+
+  const activeCount = agents.filter((a) => a.state === "active" || a.state === "running").length;
+
+  return (
+    <>
+      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">
+        {t("scan.agents.title")}
+      </h3>
+      <Card hover={false}>
+        <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
+          <span className="text-[10px] text-[var(--text-muted)]">
+            {t("scan.agents.summary")}
+          </span>
+          <span className="ml-auto text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+            {activeCount}/{agents.length} {t("scan.agents.activeOfTotal")}
+          </span>
+        </div>
+        <div className="space-y-4">
+          {ordered.map(([cat, list]) => (
+            <AgentCategoryGroup key={cat} category={cat} agents={list} t={t} />
+          ))}
+        </div>
+      </Card>
+    </>
+  );
+}
+
+function AgentCategoryGroup({ category, agents, t }: { category: string; agents: Agent[]; t: (k: string) => string }) {
+  const icon = AGENT_CATEGORY_ICON[category] ?? "⚙️";
+  // i18n key falls back to the raw category id when no translation exists.
+  const label = (() => {
+    const key = `scan.agents.category.${category}`;
+    const tr = t(key);
+    return tr === key ? category : tr;
+  })();
+
+  return (
+    <div>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
+        <span className="mr-1">{icon}</span>
+        {label} <span className="opacity-60">({agents.length})</span>
+      </span>
+      <div className="space-y-1.5">
+        {agents.map((a) => (
+          <AgentRow key={a.name} agent={a} t={t} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AgentRow({ agent, t }: { agent: Agent; t: (k: string) => string }) {
+  const stateLabel = agent.state ? t(`scan.agents.state.${agent.state}`) : t("scan.agents.state.unknown");
+  const stateText = stateLabel.startsWith("scan.agents.state.") ? agent.state ?? "—" : stateLabel;
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-2 py-1.5 rounded border border-[var(--border-subtle)]/50">
+      <span className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] border ${agentStateClasses(agent.state)}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${
+          agent.state === "active" || agent.state === "running"
+            ? "bg-emerald-400"
+            : agent.state === "failed"
+            ? "bg-red-400"
+            : agent.state === "stopped" || agent.state === "inactive"
+            ? "bg-amber-400"
+            : "bg-slate-400"
+        }`} />
+        {stateText}
+      </span>
+      <span className="text-xs text-[var(--text-primary)] font-medium">{agent.label}</span>
+      {agent.vendor && (
+        <span className="text-[10px] text-[var(--text-faint)]">— {agent.vendor}</span>
+      )}
+      {agent.version && (
+        <span
+          className="text-[10px] text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] border border-[var(--border-default)]"
+          style={{ fontFamily: "var(--font-mono)" }}
+          title={agent.package ? `${agent.package} ${agent.version}` : agent.version}
+        >
+          v{agent.version}
+        </span>
+      )}
+      {agent.enabled && (
+        <span
+          className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 text-[10px]"
+          title={t("scan.agents.enabledAtBootTooltip")}
+        >
+          {t("scan.agents.enabledAtBoot")}
+        </span>
+      )}
+      {agent.ports && agent.ports.length > 0 && (
+        <span
+          className="shrink-0 text-[10px] text-[var(--text-muted)]"
+          style={{ fontFamily: "var(--font-mono)" }}
+          title={t("scan.agents.portsTooltip")}
+        >
+          :{agent.ports.join(", :")}
+        </span>
+      )}
+      <span className="ml-auto flex items-center gap-1.5 flex-wrap">
+        {(agent.sources ?? []).map((src) => (
+          <span
+            key={src}
+            className="text-[10px] text-[var(--text-faint)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]"
+            style={{ fontFamily: "var(--font-mono)" }}
+            title={t(`scan.agents.source.${src}`)}
+          >
+            {src}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/* ─── Service inventory card (unified web/db/cache/queue/… taxonomy) ─── */
+
+const SERVICE_KIND_ORDER = [
+  "web",
+  "proxy",
+  "database",
+  "cache",
+  "queue",
+  "runtime",
+  "dns",
+  "mail",
+  "file-sharing",
+  "directory",
+  "analytics",
+  "logging",
+] as const;
+
+const SERVICE_KIND_ICON: Record<string, string> = {
+  web: "🌐",
+  proxy: "🔀",
+  database: "🗄️",
+  cache: "⚡",
+  queue: "📨",
+  runtime: "⚙️",
+  dns: "📡",
+  mail: "✉️",
+  "file-sharing": "📁",
+  directory: "🪪",
+  analytics: "📈",
+  logging: "📜",
+};
+
+function serviceStateClasses(state?: string): string {
+  switch (state) {
+    case "active":
+    case "running":
+      return "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40";
+    case "failed":
+      return "bg-red-500/15 text-red-300 light:text-red-800 border-red-500/40";
+    case "stopped":
+    case "inactive":
+      return "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40";
+    default:
+      return "bg-slate-500/15 text-slate-300 light:text-slate-700 border-slate-500/40";
+  }
+}
+
+function ServiceInventoryCard({ services, t }: { services: DiscoveredService[]; t: (k: string) => string }) {
+  const buckets = new Map<string, DiscoveredService[]>();
+  for (const s of services) {
+    const list = buckets.get(s.kind) ?? [];
+    list.push(s);
+    buckets.set(s.kind, list);
+  }
+  const ordered: [string, DiscoveredService[]][] = [];
+  for (const k of SERVICE_KIND_ORDER) {
+    const list = buckets.get(k);
+    if (list && list.length > 0) {
+      ordered.push([k, list]);
+      buckets.delete(k);
+    }
+  }
+  for (const [k, list] of [...buckets.entries()].sort()) {
+    ordered.push([k, list]);
+  }
+
+  const activeCount = services.filter((s) => s.state === "active" || s.state === "running").length;
+
+  return (
+    <>
+      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">
+        {t("scan.services.title")}
+      </h3>
+      <Card hover={false}>
+        <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
+          <span className="text-[10px] text-[var(--text-muted)]">{t("scan.services.summary")}</span>
+          <span className="ml-auto text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+            {activeCount}/{services.length} {t("scan.services.activeOfTotal")}
+          </span>
+        </div>
+        <div className="space-y-4">
+          {ordered.map(([kind, list]) => (
+            <ServiceKindGroup key={kind} kind={kind} services={list} t={t} />
+          ))}
+        </div>
+      </Card>
+    </>
+  );
+}
+
+function ServiceKindGroup({ kind, services, t }: { kind: string; services: DiscoveredService[]; t: (k: string) => string }) {
+  const icon = SERVICE_KIND_ICON[kind] ?? "🔧";
+  const label = (() => {
+    const key = `scan.services.kind.${kind}`;
+    const tr = t(key);
+    return tr === key ? kind : tr;
+  })();
+  return (
+    <div>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
+        <span className="mr-1">{icon}</span>
+        {label} <span className="opacity-60">({services.length})</span>
+      </span>
+      <div className="space-y-1.5">
+        {services.map((s) => (
+          <ServiceRow key={s.name} service={s} t={t} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string) => string }) {
+  const stateLabelKey = `scan.services.state.${service.state ?? "unknown"}`;
+  const stateLabel = t(stateLabelKey);
+  const stateText = stateLabel === stateLabelKey ? service.state ?? "—" : stateLabel;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-2 py-1.5 rounded border border-[var(--border-subtle)]/50">
+      <span className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] border ${serviceStateClasses(service.state)}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${
+          service.state === "active" || service.state === "running"
+            ? "bg-emerald-400"
+            : service.state === "failed"
+            ? "bg-red-400"
+            : service.state === "stopped" || service.state === "inactive"
+            ? "bg-amber-400"
+            : "bg-slate-400"
+        }`} />
+        {stateText}
+      </span>
+      <span className="text-xs text-[var(--text-primary)] font-medium">{service.label}</span>
+      {service.vendor && (
+        <span className="text-[10px] text-[var(--text-faint)]">— {service.vendor}</span>
+      )}
+      {service.version && (
+        <span
+          className="text-[10px] text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] border border-[var(--border-default)]"
+          style={{ fontFamily: "var(--font-mono)" }}
+          title={service.package ? `${service.package} ${service.version}` : service.version}
+        >
+          v{service.version}
+        </span>
+      )}
+      {service.enabled && (
+        <span
+          className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 text-[10px]"
+          title={t("scan.services.enabledAtBootTooltip")}
+        >
+          {t("scan.services.enabledAtBoot")}
+        </span>
+      )}
+      {service.container_image && (
+        <span
+          className="shrink-0 text-[10px] text-cyan-300 light:text-cyan-800 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30"
+          style={{ fontFamily: "var(--font-mono)" }}
+          title={service.container_id ? `${service.container_image} (${service.container_id.slice(0, 12)})` : service.container_image}
+        >
+          {service.container_image}
+        </span>
+      )}
+      {service.ports && service.ports.length > 0 && (
+        <span
+          className="shrink-0 text-[10px] text-[var(--text-muted)]"
+          style={{ fontFamily: "var(--font-mono)" }}
+          title={t("scan.services.portsTooltip")}
+        >
+          :{service.ports.join(", :")}
+        </span>
+      )}
+      <span className="ml-auto flex items-center gap-1.5 flex-wrap">
+        {(service.sources ?? []).map((src) => (
+          <span
+            key={src}
+            className="text-[10px] text-[var(--text-faint)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]"
+            style={{ fontFamily: "var(--font-mono)" }}
+            title={t(`scan.services.source.${src}`)}
+          >
+            {src}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/* ─── Resource top consumers (top 10 CPU / RAM / Disk) ─── */
+
+function ResourceTopPanel({
+  snapshot,
+  t,
+}: {
+  snapshot: ResourceUsageSnapshot;
+  t: (k: string) => string;
+}) {
+  const cpu = snapshot.top_cpu ?? [];
+  const mem = snapshot.top_mem ?? [];
+  const disk = snapshot.top_disk ?? [];
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {cpu.length > 0 && (
+        <ResourceTopList
+          title={t("scan.resourceTop.cpu")}
+          items={cpu.map((p) => ({
+            primary: truncateCommand(p.command),
+            secondary: `${p.user}  pid ${p.pid}`,
+            value: `${p.cpu_percent.toFixed(1)}%`,
+            tooltip: p.command,
+          }))}
+        />
+      )}
+      {mem.length > 0 && (
+        <ResourceTopList
+          title={t("scan.resourceTop.mem")}
+          items={mem.map((p) => ({
+            primary: truncateCommand(p.command),
+            secondary: `${p.user}  ${humanizeBytesUI(p.rss_bytes)} (${p.mem_percent.toFixed(1)}%)`,
+            value: humanizeBytesUI(p.rss_bytes),
+            tooltip: p.command,
+          }))}
+        />
+      )}
+      {disk.length > 0 && (
+        <ResourceTopList
+          title={t("scan.resourceTop.disk")}
+          items={disk.map((d) => ({
+            primary: d.path,
+            secondary: "",
+            value: d.human_size || humanizeBytesUI(d.size_bytes),
+            tooltip: d.path,
+          }))}
+        />
+      )}
+    </div>
+  );
+}
+
+function ResourceTopList({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ primary: string; secondary: string; value: string; tooltip?: string }>;
+}) {
+  return (
+    <div>
+      <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider mb-2">
+        {title}
+      </span>
+      <div className="space-y-1">
+        {items.map((it, i) => (
+          <div
+            key={i}
+            className="flex items-baseline gap-2 px-1.5 py-1 rounded hover:bg-[var(--bg-elevated)]/40 text-xs"
+            title={it.tooltip}
+          >
+            <span className="shrink-0 text-[10px] text-[var(--text-faint)] w-4 tabular-nums">{i + 1}</span>
+            <div className="flex-1 min-w-0">
+              <div
+                className="text-[var(--text-primary)] truncate"
+                style={{ fontFamily: "var(--font-mono)" }}
+              >
+                {it.primary || "—"}
+              </div>
+              {it.secondary && (
+                <div className="text-[10px] text-[var(--text-muted)] truncate">{it.secondary}</div>
+              )}
+            </div>
+            <span
+              className="shrink-0 text-[var(--text-secondary)] font-medium tabular-nums"
+              style={{ fontFamily: "var(--font-mono)" }}
+            >
+              {it.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// truncateCommand cuts excessively long argv strings (Java classpaths, etc)
+// to a 60-char preview so the rows stay aligned. The full string lives in
+// the row's tooltip via the `tooltip` field.
+function truncateCommand(cmd: string): string {
+  if (!cmd) return "";
+  if (cmd.length <= 60) return cmd;
+  return cmd.slice(0, 60) + "…";
+}
+
+function humanizeBytesUI(n: number): string {
+  if (!n || n < 1024) return `${n || 0} B`;
+  const units = ["KiB", "MiB", "GiB", "TiB", "PiB"];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toFixed(1)} ${units[i]}`;
 }

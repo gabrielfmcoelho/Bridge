@@ -15,6 +15,12 @@ interface InventoryContentProps<T extends { id: number }> {
   skeletonCount?: number;
   loadMoreRef?: RefObject<HTMLDivElement | null>;
   visibleCount?: number;
+  // Manual fallback for loading the next batch when the IntersectionObserver
+  // doesn't fire (offscreen sentinel, viewport snap, prefers-reduced-motion).
+  // Receives the same callback that the observer would invoke.
+  onLoadMore?: () => void;
+  loadingMoreLabel?: string;
+  loadMoreLabel?: string;
 }
 
 export default function InventoryContent<T extends { id: number }>({
@@ -30,6 +36,9 @@ export default function InventoryContent<T extends { id: number }>({
   skeletonCount = 6,
   loadMoreRef,
   visibleCount,
+  onLoadMore,
+  loadingMoreLabel,
+  loadMoreLabel,
 }: InventoryContentProps<T>) {
   if (isLoading) {
     return viewMode === "cards" ? (
@@ -68,7 +77,34 @@ export default function InventoryContent<T extends { id: number }>({
         ))}
       </div>
       {loadMoreRef && visibleCount != null && visibleCount < items.length && (
-        <div ref={loadMoreRef} className="h-1" />
+        // Footer that doubles as the IntersectionObserver sentinel. When it
+        // scrolls into view the parent's observer bumps visibleCount; the
+        // explicit button below it is the manual fallback for cases where
+        // the observer never fires (the spinner stays visible but never
+        // resolves into more cards).
+        <div
+          ref={loadMoreRef}
+          className="mt-6 flex flex-col items-center gap-3 py-4 text-sm text-[var(--text-muted)]"
+        >
+          <div className="inline-flex items-center gap-2">
+            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span>
+              {loadingMoreLabel ?? "Loading more..."} ({visibleCount}/{items.length})
+            </span>
+          </div>
+          {onLoadMore && (
+            <button
+              type="button"
+              onClick={onLoadMore}
+              className="px-3 py-1 rounded-[var(--radius-md)] border border-[var(--border-default)] text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              {loadMoreLabel ?? "Load more"}
+            </button>
+          )}
+        </div>
       )}
     </>
   );

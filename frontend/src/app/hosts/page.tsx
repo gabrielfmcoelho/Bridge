@@ -24,6 +24,10 @@ import HostCard from "./_components/HostCard";
 import InventoryFAB from "@/components/inventory/InventoryFAB";
 import KpiSection from "./_components/KpiSection";
 import BatchScanModal from "./_components/BatchScanModal";
+import BatchDockerSetupModal from "./_components/BatchDockerSetupModal";
+import BatchDockerLogsModal from "./_components/BatchDockerLogsModal";
+import BatchSudoNopasswdModal from "./_components/BatchSudoNopasswdModal";
+import BatchSetupKeyModal from "./_components/BatchSetupKeyModal";
 import HostsTableView from "./_components/HostsTableView";
 import type { Host, HostFilters, HostSortConfig } from "@/lib/types";
 
@@ -44,7 +48,36 @@ function activeMethodStatus(h: Host): "success" | "failed" | "" {
 }
 
 const SCAN_MAX_ATTEMPTS = 3; // 1 initial + 2 retries
-const SCAN_RETRY_BACKOFF_MS = [500, 1500];
+// Linear backoff (not exponential): every retry waits the same short
+// interval. Exponential made sense when a transient SSH dial failure
+// could clear up over a few seconds, but in practice most repeat
+// failures here are deterministic (auth, permissions, missing
+// credential), so a long backoff just wastes one of N parallel scan
+// slots on a host that will never succeed.
+const SCAN_RETRY_BACKOFF_MS = [200, 200];
+
+// Substrings that mark a fail-fast error: retrying won't change the
+// outcome, so we burn the host's slot on attempt 1 instead of paying
+// 3 × scan_time. Lowercased for case-insensitive matching.
+const FAIL_FAST_ERROR_SUBSTRINGS = [
+  "no password stored",
+  "no key configured",
+  "no key path configured",
+  "host has both auth methods",
+  "method must be",
+  "permission denied",
+  "publickey",
+  "authentication failed",
+  "auth failed",
+  "incorrect password",
+  "host has no password or key",
+  "failed to decrypt password",
+];
+
+function isFailFastError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return FAIL_FAST_ERROR_SUBSTRINGS.some((s) => lower.includes(s));
+}
 
 export default function HostsPage() {
   const { t } = useLocale();
@@ -65,11 +98,23 @@ export default function HostsPage() {
 
   // Scan state
   const [showScanModal, setShowScanModal] = useState(false);
+  const [showDockerModal, setShowDockerModal] = useState(false);
+  const [showDockerLogsModal, setShowDockerLogsModal] = useState(false);
+  const [showSudoModal, setShowSudoModal] = useState(false);
+  const [showSetupKeyModal, setShowSetupKeyModal] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress>({});
   const [scanConcurrency, setScanConcurrency] = useLocalStorage("hosts.scanConcurrency", 10);
   const [scanScope, setScanScope] = useLocalStorage<"all" | "failed" | "success" | "untested">("hosts.scanScope", "all");
+  // "auto"     → respect each host's preferred_auth (legacy behaviour)
+  // "password" → force password auth, skip hosts that have only a key
+  // "key"      → force key auth, skip hosts that have only a password
+  const [scanAuthMethod, setScanAuthMethod] = useLocalStorage<"auto" | "password" | "key">("hosts.scanAuthMethod", "auto");
+  // abortRef gates new dispatch (worker pool stops claiming hosts).
+  // abortControllerRef cancels in-flight HTTP requests so the operator
+  // doesn't have to wait the default 120s timeout per stuck scan.
   const abortRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Pinned search — restored from localStorage on mount, kept in sync via the pin button.
   const [pinnedSearch, setPinnedSearch] = useLocalStorage("hosts.pinnedSearch", "");
@@ -146,11 +191,25 @@ export default function HostsPage() {
     scanScope === "success" && successScannableHosts.length > 0 ? "success" :
     scanScope === "untested" && untestedScannableHosts.length > 0 ? "untested" :
     "all";
-  const targetHosts =
+  const scopedHosts =
     effectiveScope === "failed" ? failedScannableHosts :
     effectiveScope === "success" ? successScannableHosts :
     effectiveScope === "untested" ? untestedScannableHosts :
     scannableHosts;
+  // Method-based filter: "password" mode requires has_password, "key" mode
+  // requires has_key. "auto" keeps every scoped host. Falls back to "auto"
+  // when the picked method has zero candidates so the start button stays
+  // usable instead of mysteriously refusing to fire.
+  const passwordCapableHosts = scopedHosts.filter((h) => h.has_password);
+  const keyCapableHosts = scopedHosts.filter((h) => h.has_key);
+  const effectiveAuthMethod: "auto" | "password" | "key" =
+    scanAuthMethod === "password" && passwordCapableHosts.length > 0 ? "password" :
+    scanAuthMethod === "key" && keyCapableHosts.length > 0 ? "key" :
+    "auto";
+  const targetHosts =
+    effectiveAuthMethod === "password" ? passwordCapableHosts :
+    effectiveAuthMethod === "key" ? keyCapableHosts :
+    scopedHosts;
 
   const exportCSV = useExportCSV(
     hosts,
@@ -179,6 +238,8 @@ export default function HostsPage() {
   const startBatchScan = useCallback(async () => {
     if (scanning) return;
     abortRef.current = false;
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
     setScanning(true);
     const initial: ScanProgress = {};
     targetHosts.forEach(h => { initial[h.oficial_slug] = { status: "pending" }; });
@@ -196,16 +257,24 @@ export default function HostsPage() {
         const i = cursor++;
         if (i >= targetHosts.length) return;
         const host = targetHosts[i];
-        const method: "password" | "key" = host.has_key && host.has_password
-          ? (host.preferred_auth === "password" ? "password" : "key") : (host.has_key ? "key" : "password");
+        // When the operator picked an explicit method we honour it (the
+        // target list was already filtered to hosts that support it).
+        // Auto falls back to the per-host preferred_auth heuristic.
+        const method: "password" | "key" =
+          effectiveAuthMethod === "password" ? "password" :
+          effectiveAuthMethod === "key" ? "key" :
+          host.has_key && host.has_password
+            ? (host.preferred_auth === "password" ? "password" : "key")
+            : (host.has_key ? "key" : "password");
 
         let lastError = "Connection failed";
         let succeeded = false;
+        let aborted = false;
         for (let attempt = 1; attempt <= SCAN_MAX_ATTEMPTS; attempt++) {
-          if (abortRef.current) return;
+          if (abortRef.current) { aborted = true; break; }
           setScanProgress(prev => ({ ...prev, [host.oficial_slug]: { status: "scanning", attempt } }));
           try {
-            const res = await sshAPI.testConnection(host.oficial_slug, method, true);
+            const res = await sshAPI.testConnection(host.oficial_slug, method, true, signal);
             if (res.success) {
               setScanProgress(prev => ({ ...prev, [host.oficial_slug]: { status: "success", attempt } }));
               succeeded = true;
@@ -213,12 +282,32 @@ export default function HostsPage() {
             }
             lastError = res.error || "Connection failed";
           } catch (err: unknown) {
+            // Operator-initiated cancellation: surface as "skipped" rather
+            // than failed so the batch summary doesn't conflate user stops
+            // with real connection errors.
+            if (err instanceof Error && err.name === "AbortError") {
+              aborted = true;
+              break;
+            }
             lastError = err instanceof Error ? err.message : "Unknown error";
           }
-          // Backoff before next retry (skip after final attempt).
-          if (attempt < SCAN_MAX_ATTEMPTS) {
-            await new Promise(r => setTimeout(r, SCAN_RETRY_BACKOFF_MS[attempt - 1] ?? 1000));
+          // Bail fast on errors that retrying won't change. Auth/permission
+          // failures are deterministic — sitting in the backoff burns a
+          // worker slot on a host that will never succeed.
+          if (isFailFastError(lastError)) {
+            break;
           }
+          // Linear backoff before next retry (skip after final attempt).
+          // The abort flag is also checked post-sleep so a stop press
+          // mid-backoff lands within ~200ms instead of waiting 1.5s.
+          if (attempt < SCAN_MAX_ATTEMPTS) {
+            await new Promise(r => setTimeout(r, SCAN_RETRY_BACKOFF_MS[attempt - 1] ?? 200));
+            if (abortRef.current) { aborted = true; break; }
+          }
+        }
+        if (aborted) {
+          setScanProgress(prev => ({ ...prev, [host.oficial_slug]: { status: "skipped" } }));
+          return;
         }
         if (!succeeded) {
           setScanProgress(prev => ({ ...prev, [host.oficial_slug]: { status: "failed", error: lastError, attempt: SCAN_MAX_ATTEMPTS } }));
@@ -228,11 +317,31 @@ export default function HostsPage() {
     await Promise.all(workers);
 
     setScanning(false);
+    abortControllerRef.current = null;
     queryClient.invalidateQueries({ queryKey: ["hosts"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-  }, [scanning, targetHosts, scanConcurrency, queryClient]);
+  }, [scanning, targetHosts, scanConcurrency, effectiveAuthMethod, queryClient]);
 
-  const stopBatchScan = useCallback(() => { abortRef.current = true; }, []);
+  const stopBatchScan = useCallback(() => {
+    abortRef.current = true;
+    // Cancel in-flight HTTP requests so workers stuck waiting on a slow
+    // SSH op resolve immediately instead of running to the 120s timeout.
+    abortControllerRef.current?.abort();
+    // Mark every host that hadn't finished yet as "skipped" so the modal
+    // stops showing them as pending/scanning. Workers that were mid-flight
+    // will also write "skipped" via the catch block, but doing it here
+    // gives the operator instant visual feedback.
+    setScanProgress(prev => {
+      const next = { ...prev };
+      for (const slug in next) {
+        const status = next[slug]?.status;
+        if (status === "pending" || status === "scanning") {
+          next[slug] = { status: "skipped" };
+        }
+      }
+      return next;
+    });
+  }, []);
 
   const scanCounts = Object.values(scanProgress);
   const scannedCount = scanCounts.filter(s => s.status === "success" || s.status === "failed").length;
@@ -278,6 +387,18 @@ export default function HostsPage() {
             {canEdit && scannableHosts.length > 0 && (
               <ToolbarActionButton icon={ICON_PATHS.scan} label={t("host.scanAll")} onClick={() => setShowScanModal(true)} hideLabel="md" />
             )}
+            {canEdit && scannableHosts.length > 0 && (
+              <ToolbarActionButton icon={ICON_PATHS.cube} label={t("host.batchDocker")} onClick={() => setShowDockerModal(true)} hideLabel="md" />
+            )}
+            {canEdit && scannableHosts.length > 0 && (
+              <ToolbarActionButton icon={ICON_PATHS.document} label={t("host.batchDockerLogs")} onClick={() => setShowDockerLogsModal(true)} hideLabel="md" />
+            )}
+            {canEdit && hosts.some(h => h.has_password) && (
+              <ToolbarActionButton icon={ICON_PATHS.terminal} label={t("host.batchSudo")} onClick={() => setShowSudoModal(true)} hideLabel="md" />
+            )}
+            {canEdit && hosts.some(h => h.has_password) && (
+              <ToolbarActionButton icon={ICON_PATHS.key} label={t("host.batchKey")} onClick={() => setShowSetupKeyModal(true)} hideLabel="md" />
+            )}
           </div>
         }
       />
@@ -291,9 +412,12 @@ export default function HostsPage() {
         emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") : t("host.emptyStateAdd")}
         emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={() => setShowForm(true)}>+ {t("host.addHost")}</Button> : undefined}
         renderCard={(host) => <HostCard host={host} />}
-        renderTable={(items) => <HostsTableView hosts={items} tablePage={tablePage} onPageChange={setTablePage} t={t} />}
+        renderTable={(items) => <HostsTableView hosts={items} tablePage={tablePage} onPageChange={setTablePage} canEdit={canEdit} t={t} />}
         visibleCount={visibleCount}
         loadMoreRef={loadMoreRef}
+        onLoadMore={() => setVisibleCount((c) => c + 24)}
+        loadingMoreLabel={t("common.loadingMore")}
+        loadMoreLabel={t("common.loadMore")}
       />
 
       <Drawer open={showForm} onClose={() => setShowForm(false)} title={t("host.addHost")} subHeader={formSubHeader} footer={formFooter}>
@@ -306,6 +430,9 @@ export default function HostsPage() {
           scannedCount={scannedCount} successCount={successCount} failedCount={failedCount}
           concurrency={scanConcurrency} onConcurrencyChange={setScanConcurrency}
           scope={effectiveScope} onScopeChange={setScanScope}
+          authMethod={effectiveAuthMethod} onAuthMethodChange={setScanAuthMethod}
+          passwordCapableCount={passwordCapableHosts.length}
+          keyCapableCount={keyCapableHosts.length}
           allHostsCount={scannableHosts.length}
           failedHostsCount={failedScannableHosts.length}
           successHostsCount={successScannableHosts.length}
@@ -313,6 +440,22 @@ export default function HostsPage() {
           onStart={startBatchScan} onStop={stopBatchScan} onClose={() => setShowScanModal(false)}
           onViewFailed={() => { setFilters({ ...emptyFilters, scan_result: "failed" }); setShowScanModal(false); }}
           t={t} />
+      </ResponsiveModal>
+
+      <ResponsiveModal open={showDockerModal} onClose={() => setShowDockerModal(false)} title={t("host.batchDocker")}>
+        <BatchDockerSetupModal hosts={hosts} onClose={() => setShowDockerModal(false)} t={t} />
+      </ResponsiveModal>
+
+      <ResponsiveModal open={showDockerLogsModal} onClose={() => setShowDockerLogsModal(false)} title={t("host.batchDockerLogs")}>
+        <BatchDockerLogsModal hosts={hosts} onClose={() => setShowDockerLogsModal(false)} t={t} />
+      </ResponsiveModal>
+
+      <ResponsiveModal open={showSudoModal} onClose={() => setShowSudoModal(false)} title={t("host.batchSudo")}>
+        <BatchSudoNopasswdModal hosts={hosts} onClose={() => setShowSudoModal(false)} t={t} />
+      </ResponsiveModal>
+
+      <ResponsiveModal open={showSetupKeyModal} onClose={() => setShowSetupKeyModal(false)} title={t("host.batchKey")}>
+        <BatchSetupKeyModal hosts={hosts} onClose={() => setShowSetupKeyModal(false)} t={t} />
       </ResponsiveModal>
 
       <FilterDrawer open={showFilters} onClose={() => setShowFilters(false)} filters={filters} onFiltersChange={setFilters}
@@ -326,12 +469,38 @@ export default function HostsPage() {
         onFilter={() => setShowFilters(true)}
         onExport={exportCSV}
         addLabel={t("host.addHost")}
-        extraActions={canEdit && scannableHosts.length > 0 ? [{
-          label: t("host.scanAll"),
-          icon: ICON_PATHS.scan,
-          color: "#8b5cf6",
-          onClick: () => setShowScanModal(true),
-        }] : undefined}
+        extraActions={canEdit ? [
+          ...(scannableHosts.length > 0 ? [{
+            label: t("host.scanAll"),
+            icon: ICON_PATHS.scan,
+            color: "#8b5cf6",
+            onClick: () => setShowScanModal(true),
+          }] : []),
+          ...(scannableHosts.length > 0 ? [{
+            label: t("host.batchDocker"),
+            icon: ICON_PATHS.cube,
+            color: "#0ea5e9",
+            onClick: () => setShowDockerModal(true),
+          }] : []),
+          ...(scannableHosts.length > 0 ? [{
+            label: t("host.batchDockerLogs"),
+            icon: ICON_PATHS.document,
+            color: "#06b6d4",
+            onClick: () => setShowDockerLogsModal(true),
+          }] : []),
+          ...(hosts.some(h => h.has_password) ? [{
+            label: t("host.batchSudo"),
+            icon: ICON_PATHS.terminal,
+            color: "#f59e0b",
+            onClick: () => setShowSudoModal(true),
+          }] : []),
+          ...(hosts.some(h => h.has_password) ? [{
+            label: t("host.batchKey"),
+            icon: ICON_PATHS.key,
+            color: "#10b981",
+            onClick: () => setShowSetupKeyModal(true),
+          }] : []),
+        ] : undefined}
       />
     </PageShell>
   );

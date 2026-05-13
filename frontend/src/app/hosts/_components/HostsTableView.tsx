@@ -2,17 +2,20 @@ import SortableTable, { sortRows } from "@/components/ui/SortableTable";
 import Pagination from "@/components/ui/Pagination";
 import Badge from "@/components/ui/Badge";
 import ScanIndicator from "./ScanIndicator";
+import SituacaoCell from "./SituacaoCell";
 import type { Host } from "@/lib/types";
 
 export default function HostsTableView({
   hosts,
   tablePage,
   onPageChange,
+  canEdit,
   t,
 }: {
   hosts: Host[];
   tablePage: number;
   onPageChange: (page: number) => void;
+  canEdit: boolean;
   t: (key: string) => string;
 }) {
   return (
@@ -48,7 +51,9 @@ export default function HostsTableView({
               <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{host.nickname}</td>
               <td className="px-4 py-2.5 text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>{host.hostname || "-"}</td>
               <td className="px-4 py-2.5 text-[var(--text-secondary)]">{host.hospedagem || "-"}</td>
-              <td className="px-4 py-2.5"><Badge variant="situacao" situacao={host.situacao} dot>{host.situacao}</Badge></td>
+              <td className="px-4 py-2.5" onClick={(e) => { if (canEdit) e.stopPropagation(); }}>
+                <SituacaoCell host={host} canEdit={canEdit} t={t} />
+              </td>
               <td className="px-4 py-2.5 text-center"><ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} /></td>
               <td className="px-4 py-2.5">
                 <div className="flex flex-wrap gap-1">

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -102,6 +104,11 @@ type VMInfo struct {
 	SystemdServices   []SystemdService   `json:"systemd_services,omitempty"`
 	InstalledPackages []InstalledPackage  `json:"installed_packages,omitempty"`
 	CronJobs          []string           `json:"cron_jobs,omitempty"`
+	Cron              *CronInfo          `json:"cron,omitempty"`
+	Agents            []Agent            `json:"agents,omitempty"`
+	ServiceInventory  []DiscoveredService `json:"service_inventory,omitempty"`
+	ResourceTop       *ResourceUsageSnapshot `json:"resource_top,omitempty"`
+	Profile           *HostProfile       `json:"profile,omitempty"`
 	FirewallStatus    string             `json:"firewall_status,omitempty"`
 	RemoteUsers       []RemoteUserInfo   `json:"remote_users,omitempty"`
 	PortOwners        []PortOwner        `json:"port_owners,omitempty"`
@@ -174,6 +181,22 @@ type RemoteUserInfo struct {
 	// Cross-reference with SSHAuthPolicy.PasswordAuth to know whether this
 	// user can actually log in via password.
 	PasswordStatus string `json:"password_status,omitempty"`
+	// LastLogins holds up to 5 most-recent SSH logins for this user,
+	// extracted server-side from `last`'s output. Populated AFTER the
+	// account list (Session 7) finishes so we can attach logins only to
+	// recognized real users. Bookkeeping rows (reboot, shutdown, wtmp,
+	// runlevel) are filtered before grouping.
+	LastLogins []LoginEntry `json:"last_logins,omitempty"`
+}
+
+// LoginEntry is one parsed row from `last`. From is the source host
+// (column 3 of `last`'s tabular output); When carries the date+time
+// fragment plus any trailing markers like "still logged in" or
+// "(00:26)" so the frontend can render the same context the operator
+// would see at a terminal.
+type LoginEntry struct {
+	From string `json:"from"`
+	When string `json:"when"`
 }
 
 // ContainerInfo holds structured data about a running Docker container.
@@ -201,6 +224,83 @@ type SystemdService struct {
 	Unit        string `json:"unit"`
 	Description string `json:"description,omitempty"`
 	IsNative    bool   `json:"is_native"`
+}
+
+// CronJob represents one scheduled task discovered on the host. The Source
+// field disambiguates origin: "system" (/etc/crontab), "/etc/cron.d/<file>",
+// "/etc/cron.<period>" (drop-in directories), "user:<name>" (per-user
+// crontab in /var/spool/cron/), "anacron", or "timer" (systemd .timer unit).
+type CronJob struct {
+	Source   string `json:"source"`
+	Kind     string `json:"kind"` // "cron" | "anacron" | "timer"
+	Schedule string `json:"schedule"`
+	User     string `json:"user,omitempty"`
+	Command  string `json:"command"`
+	NextRun  string `json:"next_run,omitempty"`
+	LastRun  string `json:"last_run,omitempty"`
+	Disabled bool   `json:"disabled,omitempty"`
+}
+
+// CronInfo bundles cron daemon state and every scheduled task on the host
+// (cron + anacron + systemd timers, normalized into a single Jobs slice).
+// Replaces the prior raw-string CronJobs field for richer UI rendering.
+// CronJobs is still populated alongside this for backward compatibility
+// with older frontends and persisted scan records.
+type CronInfo struct {
+	DaemonInstalled bool      `json:"daemon_installed"`
+	DaemonActive    bool      `json:"daemon_active"`
+	DaemonEnabled   bool      `json:"daemon_enabled"`
+	DaemonName      string    `json:"daemon_name,omitempty"`
+	Jobs            []CronJob `json:"jobs,omitempty"`
+}
+
+// DiscoveredService represents one application service (web server,
+// database, cache, queue, mail server, …) detected on the host. The Sources
+// field records which signals fired during detection so the UI can show
+// e.g. "nginx: managed by systemd, listening on :80, version 1.24" as a
+// single row instead of duplicating the entry across the Systemd Services
+// and Running Services panels (which is what the prior split UI did).
+//
+// DiscoveredService and Agent are deliberately disjoint catalogs —
+// monitoring/security/EDR/cloud agents go in Agent; application servers
+// go here. captureServices skips any service whose canonical name has
+// already been classified as an agent so we never double-count.
+type DiscoveredService struct {
+	Name           string   `json:"name"`     // canonical key (e.g. "nginx", "postgresql")
+	Label          string   `json:"label"`    // display name
+	Kind           string   `json:"kind"`     // web|proxy|database|cache|queue|dns|mail|file-sharing|directory|runtime|analytics|logging
+	Vendor         string   `json:"vendor,omitempty"`
+	State          string   `json:"state,omitempty"`   // active|inactive|failed|running|stopped
+	Enabled        bool     `json:"enabled,omitempty"` // boot persistence
+	Unit           string   `json:"unit,omitempty"`
+	PID            int      `json:"pid,omitempty"`
+	Version        string   `json:"version,omitempty"` // package version when known
+	Package        string   `json:"package,omitempty"`
+	Ports          []int    `json:"ports,omitempty"`
+	ContainerID    string   `json:"container_id,omitempty"`
+	ContainerImage string   `json:"container_image,omitempty"`
+	Sources        []string `json:"sources,omitempty"` // ["systemd","process","package","port","container"]
+}
+
+// Agent represents a detected management/monitoring/security agent on the
+// host. Detection cross-references several signals (systemd unit files,
+// installed packages, running processes, listening ports) and records which
+// signals fired so the UI can show "this agent is installed but stopped"
+// distinctly from "this agent is actively running".
+type Agent struct {
+	Name       string   `json:"name"`              // catalog key (e.g. "zabbix-agent2")
+	Label      string   `json:"label"`             // display name
+	Vendor     string   `json:"vendor,omitempty"`
+	Category   string   `json:"category"`          // monitoring|logging|security|inventory|config-mgmt|backup|cloud|orchestration|remote-access
+	State      string   `json:"state,omitempty"`   // active|inactive|failed|running|stopped|""
+	Enabled    bool     `json:"enabled,omitempty"` // boot persistence (systemd is-enabled)
+	Unit       string   `json:"unit,omitempty"`    // matched systemd unit
+	PID        int      `json:"pid,omitempty"`
+	Version    string   `json:"version,omitempty"` // package version when known
+	Package    string   `json:"package,omitempty"`
+	Ports      []int    `json:"ports,omitempty"`
+	ConfigPath string   `json:"config_path,omitempty"` // documentation: standard config path for this agent
+	Sources    []string `json:"sources,omitempty"`     // ["systemd","process","package","port"]
 }
 
 // InstalledPackage holds info about a key package found on the host.
@@ -240,7 +340,20 @@ func Test(client *ssh.Client) error {
 // optional: when non-empty the SSH-key scan can read foreign users' homes
 // via `sudo -S`, which matters after create-remote-user because the login
 // user typically doesn't have NOPASSWD sudo.
-func TestCapture(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
+//
+// Panics inside captureVMInfo (parser bugs, slice out-of-bounds on weird
+// `last`/`ps` output, …) are caught here and converted into a normal
+// error return with the panic value + stack snippet, so the HTTP handler
+// can surface a real message instead of letting net/http close the
+// connection mid-response (which the proxy logs as "socket hang up").
+func TestCapture(client *ssh.Client, sudoPassword string) (info *VMInfo, retErr error) {
+	defer func() {
+		if rv := recover(); rv != nil {
+			log.Printf("[sshscan] panic during capture: %v\n%s", rv, debug.Stack())
+			info = nil
+			retErr = fmt.Errorf("scan capture panicked: %v", rv)
+		}
+	}()
 	return captureVMInfo(client, sudoPassword)
 }
 
@@ -335,7 +448,16 @@ func RunPrivilegedScript(client *ssh.Client, password, script string) (string, e
 // password via the session's stdin pipe. This avoids interpolating the password
 // into the command string (which would expose it in /proc/*/cmdline and break
 // on passwords containing shell metacharacters like single quotes).
+//
+// Returns immediately with an error when password is empty: sudo would
+// otherwise read an empty stdin, log "no password was provided", and
+// burn ~3 seconds on PAM's faildelay before failing. Callers that can
+// tolerate degraded data (key-enum, cron user crontabs, passwd -Sa,
+// sshd -T) are responsible for falling back to unprivileged paths.
 func runSudoCmd(client *ssh.Client, password, cmd string) (string, error) {
+	if password == "" {
+		return "", fmt.Errorf("sudo password not available")
+	}
 	session, err := client.NewSession()
 	if err != nil {
 		return "", err
@@ -1099,13 +1221,13 @@ func listRemoteKeys(client *ssh.Client) ([]RemoteKeyInfo, error) {
 // contains "permission denied" or "connect: ...", it retries with sudo -n
 // and sets a warning flag so the scan records the issue.
 func captureDocker(client *ssh.Client, cmd, sudoCmd string, warnings map[string]bool) string {
-	session, err := client.NewSession()
-	if err != nil {
-		return ""
-	}
-	defer session.Close()
-
-	out, execErr := session.CombinedOutput(cmd)
+	// Docker is non-essential to the scan — if the daemon hangs (busy
+	// engine, stale socket, network namespace issue) we don't want it to
+	// stall the entire capture. 8 seconds is long enough for `docker ps`
+	// on a host with hundreds of containers, short enough that two
+	// attempts (direct + sudo retry) can't blow past 16s.
+	const dockerTimeout = 8 * time.Second
+	out, execErr := runCmdWithDeadline(client, cmd, dockerTimeout)
 	raw := strings.TrimSpace(string(out))
 	lower := strings.ToLower(raw)
 
@@ -1121,13 +1243,15 @@ func captureDocker(client *ssh.Client, cmd, sudoCmd string, warnings map[string]
 			strings.Contains(lower, "cannot connect to the docker daemon"))
 
 	if needsSudo {
-		// Try with sudo — use runCmdRaw to distinguish "succeeded with empty output"
-		// (0 containers) from "sudo also failed"
-		sudoOut, sudoErr := runCmdRaw(client, sudoCmd)
+		// Try with sudo — bounded by the same docker timeout so a stuck
+		// daemon doesn't double the budget. runCmdWithDeadline already
+		// closes the session on timeout, so sudo's own prompt timeout
+		// can't pin the scan either.
+		sudoOut, sudoErr := runCmdWithDeadline(client, sudoCmd, dockerTimeout)
 		if sudoErr == nil {
 			// sudo worked (even if output is empty = 0 containers)
 			warnings["docker_requires_sudo"] = true
-			return sudoOut
+			return strings.TrimSpace(cleanCommandOutput(sudoOut, nil))
 		}
 		warnings["docker_permission_denied"] = true
 		return ""
@@ -1195,63 +1319,175 @@ func splitLines(s string) []string {
 	return lines
 }
 
+// nonUserLoginTokens are bookkeeping "users" that `last` emits for system
+// events rather than real sessions. Filtered out before per-user grouping
+// so reboots don't displace actual logins from the cap.
+var nonUserLoginTokens = map[string]bool{
+	"":         true,
+	"reboot":   true,
+	"shutdown": true,
+	"wtmp":     true,
+	"runlevel": true,
+}
+
+// groupLoginsByUser parses `last`'s flat output and returns up to perUser
+// most-recent entries for every real user. `last` orders newest-first, so
+// the first perUser entries we see for any given user are the most
+// recent. Each line's format is:
+//
+//	<user> <tty> <from> <Day> <Mon> <date> <time> [- <end> [(<dur>)] | still logged in]
+//
+// We keep `From` (column 3) and join columns 4..end as `When` so the
+// frontend can render the same context the operator sees at a terminal.
+func groupLoginsByUser(lines []string, perUser int) map[string][]LoginEntry {
+	out := map[string][]LoginEntry{}
+	if perUser <= 0 {
+		return out
+	}
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+		user := fields[0]
+		if nonUserLoginTokens[strings.ToLower(user)] {
+			continue
+		}
+		if len(out[user]) >= perUser {
+			continue
+		}
+		from := safeIndex(fields, 2)
+		when := strings.Join(fields[3:], " ")
+		out[user] = append(out[user], LoginEntry{From: from, When: when})
+	}
+	return out
+}
+
 func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	warnFlags := map[string]bool{}
 
-	// ── Session 0: measure CPU usage BEFORE the heavy scan commands ──
-	// Uses /proc/stat delta over 1 second for an accurate, uncontaminated reading.
-	// Falls back to top -bn2 (second iteration) if /proc/stat is unavailable.
-	cpuUsage := strings.TrimSpace(runCmd(client,
-		`if [ -f /proc/stat ]; then `+
-			`c1=$(awk '/^cpu /{print $2+$3+$4, $2+$3+$4+$5}' /proc/stat); `+
-			`sleep 1; `+
-			`c2=$(awk '/^cpu /{print $2+$3+$4, $2+$3+$4+$5}' /proc/stat); `+
-			`echo "$c1 $c2" | awk '{printf "%.0f%%", ($3-$1)/($4-$2)*100}'; `+
-			`else `+
-			`top -bn2 2>/dev/null | grep '^%Cpu' | tail -1 | awk '{printf "%.0f%%", 100-$8}'; `+
-			`fi`))
+	// Per-session timing helper so the operator (and future-me) can see
+	// which sessions dominate scan latency without needing to read this
+	// function. Logs only when a session takes more than a small floor —
+	// most healthy sessions complete in <100ms and aren't worth the noise.
+	scanStart := time.Now()
+	timeSession := func(name string, since time.Time) {
+		elapsed := time.Since(since)
+		if elapsed >= 200*time.Millisecond {
+			log.Printf("[sshscan] %s took %s", name, elapsed)
+		}
+	}
+	defer func() {
+		log.Printf("[sshscan] captureVMInfo total %s", time.Since(scanStart))
+	}()
 
-	// ── Session 1: batch all hardware/system metrics in one command ──
-	// Each field separated by a unique delimiter "---FIELD---"
+	// ── Sessions 0+1+2+3 collapsed into one SSH call ──
+	// Hosts with high per-channel SSH overhead (5s+ for PAM/auth) made
+	// the four startup probes cost ~16s sequentially even though their
+	// remote work is sub-second. By chaining everything through a
+	// single shell session, we pay the channel-open cost once and let
+	// the remote shell run all four probes back-to-back. The CPU delta
+	// (`sleep 1` for /proc/stat sampling) ends up bracketing the rest
+	// of the work — we capture the second sample at the end so the
+	// 1-second sleep is "free" (it overlaps with all subsequent probes
+	// in the same session).
+	const delimSession = "---SESSION---"
 	const delim = "---FIELD---"
-	batchCmd := `echo "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null)"` +
-		`; echo '` + delim + `'` +
-		`; free -h 2>/dev/null | awk '/^Mem:/{print $2}'` +
-		`; echo '` + delim + `'` +
-		`; free -h 2>/dev/null | awk '/^Mem:/{print $3}'` +
-		`; echo '` + delim + `'` +
-		"; free 2>/dev/null | awk '/^Mem:/{printf \"%.0f%%\", $3/$2*100}'" +
-		`; echo '` + delim + `'` +
-		`; df -h / 2>/dev/null | awk 'NR==2{print $2}'` +
-		`; echo '` + delim + `'` +
-		`; df -h / 2>/dev/null | awk 'NR==2{print $3}'` +
-		`; echo '` + delim + `'` +
-		`; df -h / 2>/dev/null | awk 'NR==2{print $5}'` +
-		`; echo '` + delim + `'` +
-		`; free -h 2>/dev/null | awk '/^Swap:/{print $2}'` +
-		`; echo '` + delim + `'` +
-		`; free -h 2>/dev/null | awk '/^Swap:/{print $3}'` +
-		`; echo '` + delim + `'` +
-		`; cat /etc/os-release 2>/dev/null | grep '^PRETTY_NAME=' | cut -d'"' -f2 || uname -s` +
-		`; echo '` + delim + `'` +
-		`; uname -r` +
-		`; echo '` + delim + `'` +
-		`; uptime -p 2>/dev/null || uptime` +
-		`; echo '` + delim + `'` +
-		`; hostname -f 2>/dev/null || hostname` +
-		`; echo '` + delim + `'` +
-		`; cat /proc/loadavg 2>/dev/null | awk '{print $1, $2, $3}'` +
-		`; echo '` + delim + `'` +
-		`; who 2>/dev/null | wc -l`
+	const delim2 = "---SECTION---"
 
-	batchRaw := runCmdWithWarnings(client, batchCmd, warnFlags)
-	fields := strings.Split(batchRaw, delim)
+	startupCmd := strings.Join([]string{
+		// Session 0: CPU usage. /proc/stat delta over the time it takes
+		// to run the rest of the batch (≥1s). Fallback to top -bn2 only
+		// when /proc/stat is unreadable.
+		`if [ -f /proc/stat ]; then C1=$(awk '/^cpu /{print $2+$3+$4, $2+$3+$4+$5}' /proc/stat); fi`,
+		`echo '` + delimSession + `'`,
+
+		// Session 1: hardware metrics, 14 fields delimited by FIELD.
+		`echo "$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null)"`,
+		`echo '` + delim + `'`,
+		`free -h 2>/dev/null | awk '/^Mem:/{print $2}'`,
+		`echo '` + delim + `'`,
+		`free -h 2>/dev/null | awk '/^Mem:/{print $3}'`,
+		`echo '` + delim + `'`,
+		`free 2>/dev/null | awk '/^Mem:/{printf "%.0f%%", $3/$2*100}'`,
+		`echo '` + delim + `'`,
+		`df -h / 2>/dev/null | awk 'NR==2{print $2}'`,
+		`echo '` + delim + `'`,
+		`df -h / 2>/dev/null | awk 'NR==2{print $3}'`,
+		`echo '` + delim + `'`,
+		`df -h / 2>/dev/null | awk 'NR==2{print $5}'`,
+		`echo '` + delim + `'`,
+		`free -h 2>/dev/null | awk '/^Swap:/{print $2}'`,
+		`echo '` + delim + `'`,
+		`free -h 2>/dev/null | awk '/^Swap:/{print $3}'`,
+		`echo '` + delim + `'`,
+		`cat /etc/os-release 2>/dev/null | grep '^PRETTY_NAME=' | cut -d'"' -f2 || uname -s`,
+		`echo '` + delim + `'`,
+		`uname -r`,
+		`echo '` + delim + `'`,
+		`uptime -p 2>/dev/null || uptime`,
+		`echo '` + delim + `'`,
+		`hostname -f 2>/dev/null || hostname`,
+		`echo '` + delim + `'`,
+		`cat /proc/loadavg 2>/dev/null | awk '{print $1, $2, $3}'`,
+		`echo '` + delim + `'`,
+		`who 2>/dev/null | wc -l`,
+		`echo '` + delimSession + `'`,
+
+		// Session 2: public IP. Tightened to 1.5s per attempt so a
+		// firewalled host doesn't burn 6s on the curl chain.
+		`curl -s --max-time 1.5 ifconfig.me 2>/dev/null || curl -s --max-time 1.5 icanhazip.com 2>/dev/null`,
+		`echo`,
+		`echo '` + delimSession + `'`,
+
+		// Session 3: logins + services + service-details + listening
+		// ports. last -500 gives per-user grouping enough headroom even
+		// for hosts where one busy account dominates.
+		`last -500 -w 2>/dev/null | head -500`,
+		`echo '` + delim2 + `'`,
+		`ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|docker|containerd|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{print $11}' | sort -u | head -15`,
+		`echo '` + delim2 + `'`,
+		`ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{printf "%s  CPU:%.1f%%  MEM:%.1f%%  RSS:%sMB\n", $11, $3, $4, int($6/1024)}' | head -15`,
+		`echo '` + delim2 + `'`,
+		`ss -tlnp 2>/dev/null | awk 'NR>1{split($4,a,":"); port=a[length(a)]; proc=$7; gsub(/.*users:\(\("/,"",proc); gsub(/".*/,"",proc); if(port+0>0) print port " " proc}' | sort -n -u | head -20`,
+		`echo '` + delimSession + `'`,
+
+		// Session 0 part 2: CPU sample after all the work above. The
+		// time spent on sessions 1-3 is the natural "delay" for the
+		// /proc/stat delta — guaranteed >= 1s on any real host, and we
+		// avoid the dedicated `sleep 1` that used to sit at the start.
+		`if [ -f /proc/stat ]; then ` +
+			`C2=$(awk '/^cpu /{print $2+$3+$4, $2+$3+$4+$5}' /proc/stat); ` +
+			`echo "$C1 $C2" | awk '{ if(($4-$2)>0) printf "%.0f%%", ($3-$1)/($4-$2)*100; else print "0%" }'; ` +
+			`else ` +
+			`top -bn2 2>/dev/null | grep '^%Cpu' | tail -1 | awk '{printf "%.0f%%", 100-$8}'; ` +
+			`fi`,
+	}, "; ")
+
+	sStartup := time.Now()
+	startupRaw := runCmdWithWarnings(client, startupCmd, warnFlags)
+	startupSections := strings.Split(startupRaw, delimSession)
+	startupSection := func(i int) string {
+		if i < len(startupSections) {
+			return strings.TrimSpace(startupSections[i])
+		}
+		return ""
+	}
+	timeSession("sessions 0-3 startup-batch", sStartup)
+
+	// Session 1: parse the 14 hardware fields.
+	hardwareRaw := startupSection(1)
+	fields := strings.Split(hardwareRaw, delim)
 	field := func(i int) string {
 		if i < len(fields) {
 			return strings.TrimSpace(fields[i])
 		}
 		return ""
 	}
+
+	// Session 0 (deferred): CPU usage from the post-batch /proc/stat
+	// delta. Empty when /proc/stat fallback failed.
+	cpuUsage := strings.TrimSpace(startupSection(4))
 
 	info := &VMInfo{
 		CPU:         field(0) + " vCPU",
@@ -1272,19 +1508,11 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		Users:       field(14),
 	}
 
-	// ── Session 2: public IP (separate because curl has a timeout) ──
-	info.PublicIP = runCmdWithWarnings(client, "curl -s --max-time 3 ifconfig.me 2>/dev/null || curl -s --max-time 3 icanhazip.com 2>/dev/null", warnFlags)
+	// Session 2: public IP (single line).
+	info.PublicIP = strings.TrimSpace(startupSection(2))
 
-	// ── Session 3: logins + services + ports (multi-line outputs, batched) ──
-	const delim2 = "---SECTION---"
-	listCmd := `last -5 -w 2>/dev/null | head -5` +
-		`; echo '` + delim2 + `'` +
-		`; ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|docker|containerd|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{print $11}' | sort -u | head -15` +
-		`; echo '` + delim2 + `'` +
-		"; ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{printf \"%s  CPU:%.1f%%  MEM:%.1f%%  RSS:%sMB\\n\", $11, $3, $4, int($6/1024)}' | head -15" +
-		`; echo '` + delim2 + `'` +
-		`; ss -tlnp 2>/dev/null | awk 'NR>1{split($4,a,":"); port=a[length(a)]; proc=$7; gsub(/.*users:\(\("/,"",proc); gsub(/".*/,"",proc); if(port+0>0) print port " " proc}' | sort -n -u | head -20`
-	listRaw := runCmdWithWarnings(client, listCmd, warnFlags)
+	// Session 3: logins + services + service-details + listening ports.
+	listRaw := startupSection(3)
 	sections := strings.Split(listRaw, delim2)
 	section := func(i int) string {
 		if i < len(sections) {
@@ -1297,49 +1525,43 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	info.ServiceDetails = splitLines(section(2))
 	info.Ports = splitLines(section(3))
 
-	// ── Sessions 4-5: Docker (needs special handling for sudo fallback) ──
-	// Enhanced format captures container ID and port mappings.
-	dockerRaw := captureDocker(client,
-		`docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'`,
-		`sudo -n docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null`,
-		warnFlags,
-	)
-	// Populate old string field for backward compatibility and parse structured data.
-	for _, line := range splitLines(dockerRaw) {
-		parts := strings.SplitN(line, "\t", 5)
-		if len(parts) >= 3 {
-			// Old format: "name (image) status"
-			info.Containers = append(info.Containers, parts[1]+" ("+parts[2]+") "+safeIndex(parts, 3))
-			info.ParsedContainers = append(info.ParsedContainers, ContainerInfo{
-				ID:     parts[0],
-				Name:   parts[1],
-				Image:  parts[2],
-				Status: safeIndex(parts, 3),
-				Ports:  safeIndex(parts, 4),
-			})
-		} else {
-			info.Containers = append(info.Containers, line)
+	// ── Sessions 4-9 + key-enum + remote users — all in one parallel block ──
+	//
+	// On hosts where each SSH channel-open carries 5+ seconds of PAM/auth
+	// overhead (we've seen this on AWS-heavy stacks with custom PAM
+	// stacks), running these sequentially is the dominant cost of the
+	// whole scan. Every session below is independent of the others —
+	// each writes to a private local variable and we fold the results
+	// into `info` after wg.Wait(). 9 goroutines stays under the OpenSSH
+	// stock MaxSessions=10 default; if a downstream sshd is more
+	// restrictive, channels just queue and we end up no slower than
+	// sequential.
+	//
+	// `collectHostInventory` only reads PortsByProc/ListenPorts derived
+	// from raw "<port> <proc>" rows, so we feed it a shadow PortOwner
+	// list built straight from info.Ports — no need to wait for the
+	// nginx/docker attribution that happens after the join.
+	shadowPortOwners := make([]PortOwner, 0, len(info.Ports))
+	for _, rawLine := range info.Ports {
+		fields := strings.Fields(rawLine)
+		if len(fields) == 0 {
+			continue
 		}
+		port, convErr := strconv.Atoi(fields[0])
+		if convErr != nil || port <= 0 {
+			continue
+		}
+		proc := ""
+		if len(fields) > 1 {
+			proc = fields[1]
+		}
+		shadowPortOwners = append(shadowPortOwners, PortOwner{Port: port, Process: proc})
 	}
-	info.ContainerStats = splitLines(captureDocker(client,
-		`docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}'`,
-		`sudo -n docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}' 2>/dev/null`,
-		warnFlags,
-	))
-	// Detailed process discovery (python, node, java — long-running interpreters)
-	info.ProcessDetails = captureProcessDetails(client)
 
 	// SSH keys per user — authorized_keys and ~/.ssh/id_* for every real
-	// account on the box. Falls back to `sudo -n` to read homes we don't own;
-	// if sudo isn't configured NOPASSWD, we silently skip those users (no
-	// secrets exfiltrated, partial data is better than a failed scan).
-	//
-	// When the host has a stored sudo password, we run the whole scan under
-	// `sudo -S` instead — root can read every home directly, so newly-created
-	// users (who don't grant the login user NOPASSWD sudo) still show up.
-	//
-	// Output lines are pipe-delimited with a fixed 5-field prefix so the
-	// fingerprint line (which never contains '|') stays intact as the tail:
+	// account on the box. Output lines are pipe-delimited with a fixed
+	// 5-field prefix so the fingerprint line (which never contains '|')
+	// stays intact as the tail:
 	//   KEY|<user>|<source>|<filename or empty>|<ssh-keygen -lf output>
 	keyScanCmd := `current=$(whoami 2>/dev/null); ` +
 		`getent passwd 2>/dev/null | awk -F: -v cur="$current" '($3 >= 1000 && $3 < 65534) || $3 == 0 || $1 == cur {print $1 ":" $6}' | sort -u | while IFS=: read -r usr home; do ` +
@@ -1378,22 +1600,157 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		`    fi; ` +
 		`  done; ` +
 		`done; true`
-	var keysRaw string
-	elevated := false
-	if sudoPassword != "" {
-		// Elevate: root can read every user's .ssh/ without the per-user
-		// NOPASSWD dance. Errors degrade to unprivileged mode below.
-		out, err := runSudoCmd(client, sudoPassword, keyScanCmd)
-		if err != nil {
-			log.Printf("[sshscan] key-enum sudo -S failed, falling back to unprivileged: %v", err)
+	const delimEnhanced = "---ENHANCED---"
+	enhancedCmd := `systemctl list-units --type=service --state=running --no-pager --plain 2>/dev/null | awk 'NR>0 && $1 ~ /\.service$/ {unit=$1; desc=""; for(i=5;i<=NF;i++) desc=desc" "$i; print unit "\t" desc}'` +
+		`; echo '` + delimEnhanced + `'` +
+		`; dpkg-query -W -f='${Package}\t${Version}\n' nginx apache2 postgresql mysql-server redis-server nodejs python3 php docker-ce 2>/dev/null || rpm -qa --queryformat '%{NAME}\t%{VERSION}\n' 2>/dev/null | grep -iE '(nginx|httpd|postgresql|mysql|redis|nodejs|python3|php|docker-ce)'` +
+		`; echo '` + delimEnhanced + `'` +
+		`; crontab -l 2>/dev/null` +
+		`; echo '` + delimEnhanced + `'` +
+		`; ufw status 2>/dev/null || iptables -L -n 2>/dev/null | head -20 || echo 'no firewall detected'`
+
+	parStart := time.Now()
+	var wg sync.WaitGroup
+	var (
+		// Goroutine outputs — each goroutine writes to its own variable.
+		// We fold these into `info` after wg.Wait() to avoid concurrent
+		// writes to the shared struct.
+		cronInfo       *CronInfo
+		sshPolicy      *SSHAuthPolicy
+		nginxConfig    string
+		hostInv        *hostInventory
+		dockerPsRaw    string
+		dockerStatsRaw string
+		procDetails    []ProcessDetail
+		keysRaw        string
+		keyElevated    bool
+		enhancedRaw    string
+		remoteUsersRaw string
+		resourceTop    *ResourceUsageSnapshot
+	)
+
+	wg.Add(10)
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		cronInfo = captureCronInfo(client, sudoPassword)
+		timeSession("[par] session 6b cron", s)
+	}()
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		sshPolicy = scanSSHAuthPolicy(client, sudoPassword)
+		timeSession("[par] session 7c sshd-policy", s)
+	}()
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		nginxConfig = runCmd(client, `nginx -T 2>/dev/null || sudo -n nginx -T 2>/dev/null || true`)
+		timeSession("[par] session 8 nginx-T", s)
+	}()
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		hostInv = collectHostInventory(client, shadowPortOwners)
+		timeSession("[par] session 9 host-inventory", s)
+	}()
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		dockerPsRaw = captureDocker(client,
+			`docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'`,
+			`sudo -n docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null`,
+			warnFlags,
+		)
+		dockerStatsRaw = captureDocker(client,
+			`docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}'`,
+			`sudo -n docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}' 2>/dev/null`,
+			warnFlags,
+		)
+		timeSession("[par] sessions 4-5 docker", s)
+	}()
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		procDetails = captureProcessDetails(client)
+		timeSession("[par] process-details", s)
+	}()
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		// Elevated read first (root sees every home), unprivileged
+		// fallback if no sudo password or sudo refuses it.
+		if sudoPassword != "" {
+			out, err := runSudoCmd(client, sudoPassword, keyScanCmd)
+			if err != nil {
+				log.Printf("[sshscan] key-enum sudo -S failed, falling back to unprivileged: %v", err)
+			} else {
+				keysRaw = out
+				keyElevated = true
+			}
+		}
+		if keysRaw == "" {
+			keysRaw = runCmd(client, keyScanCmd)
+		}
+		timeSession("[par] key-enum", s)
+	}()
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		enhancedRaw = runCmd(client, enhancedCmd)
+		timeSession("[par] session 6 enhanced-services", s)
+	}()
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		// Pulls real users (UID >= 1000, excluding `nobody` at 65534)
+		// from getent so wizards can show a picker. Shell drives the
+		// "no login shell" badge.
+		remoteUsersRaw = runCmd(client,
+			`current=$(whoami 2>/dev/null); `+
+				`getent passwd 2>/dev/null | `+
+				`awk -F: -v cur="$current" '$3 >= 1000 && $3 < 65534 {is=($1==cur)?"1":"0"; print $1"|"$3"|"$6"|"$7"|"is}'`)
+		timeSession("[par] session 7 remote-users", s)
+	}()
+	go func() {
+		defer wg.Done()
+		s := time.Now()
+		// Top 10 by CPU, MEM, and disk-bloat paths. Cheap probes wrapped
+		// in `timeout 10s` so a stuck filesystem can't pin the scan.
+		resourceTop = captureResourceTop(client)
+		timeSession("[par] resource-top", s)
+	}()
+	wg.Wait()
+	timeSession("parallel block (max of 10)", parStart)
+
+	// ── Fold parallel results into info ──
+	info.Cron = cronInfo
+	if sshPolicy != nil {
+		info.SSHAuthPolicy = sshPolicy
+	}
+	nginxPortMap := parseNginxListens(nginxConfig)
+	info.ProcessDetails = procDetails
+	info.ResourceTop = resourceTop
+
+	// Parse docker output (sessions 4-5).
+	for _, line := range splitLines(dockerPsRaw) {
+		parts := strings.SplitN(line, "\t", 5)
+		if len(parts) >= 3 {
+			info.Containers = append(info.Containers, parts[1]+" ("+parts[2]+") "+safeIndex(parts, 3))
+			info.ParsedContainers = append(info.ParsedContainers, ContainerInfo{
+				ID:     parts[0],
+				Name:   parts[1],
+				Image:  parts[2],
+				Status: safeIndex(parts, 3),
+				Ports:  safeIndex(parts, 4),
+			})
 		} else {
-			keysRaw = out
-			elevated = true
+			info.Containers = append(info.Containers, line)
 		}
 	}
-	if keysRaw == "" {
-		keysRaw = runCmd(client, keyScanCmd)
-	}
+	info.ContainerStats = splitLines(dockerStatsRaw)
+
+	// Parse key-enum output.
 	rawLines := splitLines(keysRaw)
 	dropped := 0
 	for _, line := range rawLines {
@@ -1404,11 +1761,9 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 			continue
 		}
 		if parts[0] == "DROPPED" {
-			// Sentinel emitted by the remote shell when `ssh-keygen -lf -` returned
-			// nothing for a candidate key. The payload is the base64-encoded raw
-			// input line (authorized_keys entry or .pub contents) so operators can
-			// see exactly what was unparseable (CRLF endings, merged lines,
-			// unsupported key types, etc.).
+			// Sentinel emitted by the remote shell when `ssh-keygen -lf -`
+			// returned nothing for a candidate key. Payload is base64-encoded
+			// raw input so operators can see what was unparseable.
 			dropped++
 			dUser, dSource, dFname, encoded := parts[1], parts[2], parts[3], parts[4]
 			if decoded, decErr := base64.StdEncoding.DecodeString(encoded); decErr == nil {
@@ -1430,8 +1785,6 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 			log.Printf("[sshscan] key-enum dropped line user=%s source=%s reason=malformed_ssh_keygen_output raw=%q", user, source, fpLine)
 			continue
 		}
-		// ssh-keygen output: "<bits> <fingerprint> <comment> (<type>)".
-		// Comment may be multi-word or "no comment" when absent.
 		keyType := strings.Trim(fields[len(fields)-1], "()")
 		var name string
 		if source == "private_key" {
@@ -1450,19 +1803,9 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 			Source:      source,
 		})
 	}
-	log.Printf("[sshscan] key-enum elevated=%t raw_lines=%d parsed=%d dropped=%d", elevated, len(rawLines), len(info.SSHKeys), dropped)
+	log.Printf("[sshscan] key-enum elevated=%t raw_lines=%d parsed=%d dropped=%d", keyElevated, len(rawLines), len(info.SSHKeys), dropped)
 
-	// ── Session 6: enhanced service discovery ──
-	const delimEnhanced = "---ENHANCED---"
-	enhancedCmd := `systemctl list-units --type=service --state=running --no-pager --plain 2>/dev/null | awk 'NR>0 && $1 ~ /\.service$/ {unit=$1; desc=""; for(i=5;i<=NF;i++) desc=desc" "$i; print unit "\t" desc}'` +
-		`; echo '` + delimEnhanced + `'` +
-		`; dpkg-query -W -f='${Package}\t${Version}\n' nginx apache2 postgresql mysql-server redis-server nodejs python3 php docker-ce 2>/dev/null || rpm -qa --queryformat '%{NAME}\t%{VERSION}\n' 2>/dev/null | grep -iE '(nginx|httpd|postgresql|mysql|redis|nodejs|python3|php|docker-ce)'` +
-		`; echo '` + delimEnhanced + `'` +
-		`; crontab -l 2>/dev/null` +
-		`; echo '` + delimEnhanced + `'` +
-		`; ufw status 2>/dev/null || iptables -L -n 2>/dev/null | head -20 || echo 'no firewall detected'`
-
-	enhancedRaw := runCmd(client, enhancedCmd)
+	// Parse session 6 enhanced output.
 	enhancedSections := strings.Split(enhancedRaw, delimEnhanced)
 	enhancedSection := func(i int) string {
 		if i < len(enhancedSections) {
@@ -1470,8 +1813,6 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		}
 		return ""
 	}
-
-	// Parse systemd services
 	for _, line := range splitLines(enhancedSection(0)) {
 		parts := strings.SplitN(line, "\t", 2)
 		if len(parts) == 0 || parts[0] == "" {
@@ -1484,11 +1825,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		info.SystemdServices = append(info.SystemdServices, SystemdService{
 			Unit:        parts[0],
 			Description: desc,
-			IsNative:    true, // default; will cross-reference with containers below
+			IsNative:    true, // default; cross-referenced with containers below
 		})
 	}
-
-	// Cross-reference systemd services with docker containers to flag native vs container
+	// Cross-reference systemd ↔ docker containers (now both are populated).
 	containerNames := map[string]bool{}
 	for _, c := range info.Containers {
 		parts := strings.SplitN(c, " ", 2)
@@ -1505,15 +1845,12 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 			}
 		}
 	}
-
-	// Parse installed packages
 	pkgSource := "apt"
 	for _, line := range splitLines(enhancedSection(1)) {
 		parts := strings.SplitN(line, "\t", 2)
 		if len(parts) != 2 || parts[0] == "" {
 			continue
 		}
-		// Detect if this looks like rpm output (no tab-separated version from dpkg)
 		if strings.Contains(parts[1], ".el") || strings.Contains(parts[1], ".fc") {
 			pkgSource = "rpm"
 		}
@@ -1523,23 +1860,11 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 			Source:  pkgSource,
 		})
 	}
-
-	// Parse cron jobs
 	info.CronJobs = splitLines(enhancedSection(2))
-
-	// Firewall status
 	info.FirewallStatus = enhancedSection(3)
 
-	// ── Session 7: non-system user accounts ──
-	// Pulls real users (UID >= 1000, excluding `nobody` at 65534) from getent
-	// so the remote-user wizards can show a picker instead of asking the
-	// operator to type the name. Shell is captured so the UI can badge
-	// accounts whose login shell is /sbin/nologin or /usr/sbin/nologin.
-	usersRaw := runCmd(client,
-		`current=$(whoami 2>/dev/null); `+
-			`getent passwd 2>/dev/null | `+
-			`awk -F: -v cur="$current" '$3 >= 1000 && $3 < 65534 {is=($1==cur)?"1":"0"; print $1"|"$3"|"$6"|"$7"|"is}'`)
-	for _, line := range splitLines(usersRaw) {
+	// Parse remote users (session 7).
+	for _, line := range splitLines(remoteUsersRaw) {
 		parts := strings.Split(line, "|")
 		if len(parts) < 5 || parts[0] == "" {
 			continue
@@ -1561,13 +1886,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	}
 
 	// ── Session 7b: per-user password status ──
-	// `passwd -S <user>` prints "<name> <status> ...", where status is:
-	//   P  = usable password set
-	//   L  = locked (`!` prefix in /etc/shadow)
-	//   NP = no password set
-	// Reading /etc/shadow requires root, so we prefer `sudo -S passwd -Sa`
-	// when a sudo password is available. Falls back to per-user `passwd -S`
-	// (which works for the current user even without sudo).
+	// Sequential after parallel because it depends on info.RemoteUsers.
+	// `passwd -S <user>` requires root for foreign users; `passwd -Sa`
+	// dumps everything via sudo when we have a working password.
+	sPasswd := time.Now()
 	passwdStatuses := map[string]string{}
 	if sudoPassword != "" {
 		if out, err := runSudoCmd(client, sudoPassword, "passwd -Sa 2>/dev/null"); err == nil {
@@ -1579,12 +1901,20 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 			}
 		}
 	}
-	if len(passwdStatuses) == 0 {
-		// Best-effort: query each known user individually. Without sudo,
-		// only the current user's status will come back populated.
+	if len(passwdStatuses) == 0 && len(info.RemoteUsers) > 0 {
+		// Best-effort: query every known user in a single SSH session.
+		// `passwd -S <other>` usually requires root and returns nothing
+		// for foreign accounts, but the current user's row always comes
+		// back, and that's enough to surface its password status.
+		var b strings.Builder
 		for _, u := range info.RemoteUsers {
-			out := runCmd(client, fmt.Sprintf("passwd -S %s 2>/dev/null", shellEscape(u.Name)))
-			fields := strings.Fields(out)
+			b.WriteString("passwd -S ")
+			b.WriteString(shellEscape(u.Name))
+			b.WriteString(" 2>/dev/null; ")
+		}
+		out := runCmd(client, b.String())
+		for _, line := range splitLines(out) {
+			fields := strings.Fields(line)
 			if len(fields) >= 2 {
 				passwdStatuses[fields[0]] = fields[1]
 			}
@@ -1595,22 +1925,15 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 			info.RemoteUsers[i].PasswordStatus = status
 		}
 	}
+	timeSession("session 7b passwd-statuses", sPasswd)
 
-	// ── Session 7c: SSH server auth policy ──
-	// `sshd -T` dumps the *effective* config (resolves Includes, defaults,
-	// per-Match overrides for the connecting user). It usually requires
-	// root; we try the unprivileged path first (works on some distros where
-	// the binary is suid or readable) and fall back to sudo.
-	policy := scanSSHAuthPolicy(client, sudoPassword)
-	if policy != nil {
-		info.SSHAuthPolicy = policy
+	// ── Session 7d: per-user SSH login history (in-memory) ──
+	loginsPerUser := groupLoginsByUser(info.LastLogins, 5)
+	for i, u := range info.RemoteUsers {
+		if entries, ok := loginsPerUser[u.Name]; ok {
+			info.RemoteUsers[i].LastLogins = entries
+		}
 	}
-
-	// ── Session 8: nginx server blocks ──
-	// `nginx -T` dumps every loaded config file (main + includes). Used to
-	// resolve "which server_name answers port N" for the port-owners panel.
-	nginxConfig := runCmd(client, `nginx -T 2>/dev/null || sudo -n nginx -T 2>/dev/null || true`)
-	nginxPortMap := parseNginxListens(nginxConfig)
 
 	// Build a map of docker host port → container for fast lookup.
 	dockerHostPorts := map[int]*ContainerInfo{}
@@ -1658,6 +1981,77 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		}
 		info.PortOwners = append(info.PortOwners, po)
 	}
+
+	// ── Catalog cross-reference (in-memory) ──
+	// Inventory was already collected in the parallel block above.
+	// captureAgents + captureServices intersect it with the catalogs;
+	// no extra SSH work happens here.
+	var agentPortClaims map[int]bool
+	info.Agents, agentPortClaims = captureAgents(hostInv)
+	agentNames := make(map[string]bool, len(info.Agents))
+	for _, a := range info.Agents {
+		agentNames[a.Name] = true
+	}
+	info.ServiceInventory = captureServices(hostInv, info.ParsedContainers, agentNames, agentPortClaims)
+
+	// Back-fill PortOwners with agent and service attribution. `ss -tlnp`
+	// only emits a process column when the scanning user can see the
+	// owning process — which fails when the workload runs as a dedicated
+	// user (zabbix on :10050, postgres on :5432, mongodb on :27017, …).
+	// The agent and service catalogs already cross-reference SignaturePorts
+	// against the host's listen set, so we use those records to label the
+	// chips in the Listening Ports panel. Existing attribution
+	// (container / nginx / docker-proxy) wins; we only fill in the gaps.
+	agentByPort := map[int]*Agent{}
+	for i := range info.Agents {
+		a := &info.Agents[i]
+		for _, p := range a.Ports {
+			if _, claimed := agentByPort[p]; !claimed {
+				agentByPort[p] = a
+			}
+		}
+	}
+	serviceByPort := map[int]*DiscoveredService{}
+	for i := range info.ServiceInventory {
+		s := &info.ServiceInventory[i]
+		for _, p := range s.Ports {
+			if _, claimed := serviceByPort[p]; !claimed {
+				serviceByPort[p] = s
+			}
+		}
+	}
+	for i := range info.PortOwners {
+		po := &info.PortOwners[i]
+		if po.OwnerType != "" && po.OwnerType != "process" {
+			continue
+		}
+		if po.OwnerName != "" && po.Process != "" {
+			continue
+		}
+		// Agent attribution takes precedence (catalogs are curated
+		// disjoint, but if both ever match the agent label is more
+		// useful: "Zabbix Agent 2" > generic "PostgreSQL").
+		if a, ok := agentByPort[po.Port]; ok {
+			po.OwnerType = "agent"
+			po.OwnerName = a.Label
+			if a.Vendor != "" {
+				po.Target = a.Vendor
+			}
+			continue
+		}
+		if s, ok := serviceByPort[po.Port]; ok {
+			po.OwnerType = "service"
+			po.OwnerName = s.Label
+			if s.Vendor != "" {
+				po.Target = s.Vendor
+			}
+		}
+	}
+
+	// ── Final pass: derive the idle-VM heuristic from everything above ──
+	// Runs after agents, services, containers, last_logins, and remote_users
+	// are all populated so the rules can read them in their final shape.
+	info.Profile = computeHostProfile(info, time.Now())
 
 	if info.CPU == " vCPU" {
 		info.CPU = ""
@@ -1876,37 +2270,39 @@ func shellEscape(s string) string {
 func scanSSHAuthPolicy(client *ssh.Client, sudoPassword string) *SSHAuthPolicy {
 	var raw, source string
 
-	// `sshd -T` is the canonical way; try the unprivileged path first since
-	// on many systemd-managed boxes the operator's user can run it.
-	if out := runCmd(client, "sshd -T 2>/dev/null"); strings.TrimSpace(out) != "" {
-		raw = out
+	// All non-sudo attempts are batched into one SSH session — earlier
+	// versions paid 3 SSH round trips (and the per-session PAM overhead
+	// some hosts have, which can be 5+ seconds each). Each branch emits
+	// a `###SRC:<tag>###` sentinel line so the Go side can attribute
+	// the source without re-running anything.
+	const (
+		srcSshdT      = "###SRC:sshd-T###"
+		srcSshdTSudoN = "###SRC:sshd-T-sudon###"
+		srcConfig     = "###SRC:config###"
+	)
+	combined := runCmd(client,
+		`out=$(sshd -T 2>/dev/null); if [ -n "$out" ]; then echo '`+srcSshdT+`'; echo "$out"; exit 0; fi; `+
+			`out=$(sudo -n sshd -T 2>/dev/null); if [ -n "$out" ]; then echo '`+srcSshdTSudoN+`'; echo "$out"; exit 0; fi; `+
+			`echo '`+srcConfig+`'; `+
+			`for f in /etc/ssh/sshd_config.d/*.conf /etc/ssh/sshd_config; do [ -r "$f" ] && cat "$f"; done 2>/dev/null`)
+	switch {
+	case strings.HasPrefix(combined, srcSshdT):
+		raw = strings.TrimSpace(strings.TrimPrefix(combined, srcSshdT))
 		source = "sshd -T"
+	case strings.HasPrefix(combined, srcSshdTSudoN):
+		raw = strings.TrimSpace(strings.TrimPrefix(combined, srcSshdTSudoN))
+		source = "sshd -T (sudo)"
+	case strings.HasPrefix(combined, srcConfig):
+		raw = strings.TrimSpace(strings.TrimPrefix(combined, srcConfig))
+		source = "sshd_config"
 	}
+	// Privileged attempt as a last resort, only when we have a valid
+	// sudo password (skipped otherwise — runSudoCmd short-circuits on
+	// empty password to avoid PAM faildelay).
 	if raw == "" && sudoPassword != "" {
 		if out, err := runSudoCmd(client, sudoPassword, "sshd -T 2>/dev/null"); err == nil && strings.TrimSpace(out) != "" {
 			raw = out
 			source = "sshd -T (sudo)"
-		}
-	}
-	if raw == "" {
-		// sudo -n in case NOPASSWD sudo is configured for sshd.
-		if out := runCmd(client, "sudo -n sshd -T 2>/dev/null"); strings.TrimSpace(out) != "" {
-			raw = out
-			source = "sshd -T (sudo)"
-		}
-	}
-	if raw == "" {
-		// Fallback: cat the main config and any drop-in fragments. We
-		// concatenate them so the parser sees one stream — last setting
-		// wins, matching sshd's "first occurrence wins" rule in reverse,
-		// so we read the main file *after* the Includes for parity.
-		out := runCmd(client,
-			`for f in /etc/ssh/sshd_config.d/*.conf /etc/ssh/sshd_config; do `+
-				`[ -r "$f" ] && cat "$f"; `+
-				`done 2>/dev/null`)
-		if strings.TrimSpace(out) != "" {
-			raw = out
-			source = "sshd_config"
 		}
 	}
 	if raw == "" {

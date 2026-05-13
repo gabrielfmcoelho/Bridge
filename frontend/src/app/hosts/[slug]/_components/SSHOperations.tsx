@@ -106,46 +106,51 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     queryClient.invalidateQueries({ queryKey: ["operation-logs", slug] });
   };
 
-  // Shared configuration for test-connection mutations. Each button gets its
-  // own mutation instance so rapid clicks across buttons can't drop a
-  // previous invocation's callbacks (which used to leave runningOp stuck,
-  // making the Run button appear permanently disabled).
-  const testMutationOptions = useMemo(() => ({
-    slug,
-    mutationFn: ({ method, capture }: { method: "password" | "key"; capture: boolean }) =>
-      sshAPI.testConnection(slug, method, capture),
-    label: t("operation.testConnection"),
-    pushConsole,
-    onAfterSuccess: (data: { success: boolean; error?: string; vm_info?: VMInfoType }) => setTestResult(data),
-    onResult: (data: { success: boolean; error?: string; vm_info?: VMInfoType }) => {
-      if (data.success && data.vm_info) {
-        const warnings = data.vm_info.warnings || [];
-        return {
-          status: warnings.length > 0 ? "warning" as const : "success" as const,
-          content: (
-            <div className="space-y-3">
-              {warnings.length > 0 && (
-                <div className="rounded-[var(--radius-md)] p-2.5 bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
-                  <p className="font-medium mb-1">{t("operation.scanWarnings")}</p>
-                  {warnings.map((w, i) => (
-                    <p key={i} className="leading-relaxed">{"\u2022"} {w}</p>
-                  ))}
-                </div>
-              )}
-              <VMInfoDisplay info={data.vm_info!} locale={locale} compact />
-              <p className="text-[var(--text-faint)] text-[10px]">{t("operation.scanSaved")}</p>
-            </div>
-          ),
-        };
-      }
-      if (data.success) return { status: "success" as const, content: t("operation.connectionSuccessful") };
-      return { status: "error" as const, content: data.error || "Failed" };
-    },
-  }), [slug, t, locale, pushConsole]);
+  // Shared configuration for test-connection mutations. Each button gets
+  // its own mutation instance with a distinct label so the Console panel
+  // shows the actual operation name (e.g. "Escanear & Capturar (Chave)")
+  // instead of always reading "Testar Conex\u00e3o". The factory captures the
+  // label so all three reuse the same onResult/onAfterSuccess machinery.
+  const buildTestMutationOptions = useCallback(
+    (label: string) => ({
+      slug,
+      mutationFn: ({ method, capture }: { method: "password" | "key"; capture: boolean }) =>
+        sshAPI.testConnection(slug, method, capture),
+      label,
+      pushConsole,
+      onAfterSuccess: (data: { success: boolean; error?: string; vm_info?: VMInfoType }) => setTestResult(data),
+      onResult: (data: { success: boolean; error?: string; vm_info?: VMInfoType }) => {
+        if (data.success && data.vm_info) {
+          const warnings = data.vm_info.warnings || [];
+          return {
+            status: warnings.length > 0 ? "warning" as const : "success" as const,
+            content: (
+              <div className="space-y-3">
+                {warnings.length > 0 && (
+                  <div className="rounded-[var(--radius-md)] p-2.5 bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+                    <p className="font-medium mb-1">{t("operation.scanWarnings")}</p>
+                    {warnings.map((w, i) => (
+                      <p key={i} className="leading-relaxed">{"\u2022"} {w}</p>
+                    ))}
+                  </div>
+                )}
+                <VMInfoDisplay info={data.vm_info!} locale={locale} compact />
+                <p className="text-[var(--text-faint)] text-[10px]">{t("operation.scanSaved")}</p>
+              </div>
+            ),
+          };
+        }
+        if (data.success) return { status: "success" as const, content: t("operation.connectionSuccessful") };
+        return { status: "error" as const, content: data.error || "Failed" };
+      },
+    }),
+    [slug, t, locale, pushConsole],
+  );
 
-  const testPasswordMutation = useSSHMutation(testMutationOptions);
-  const testKeyMutation = useSSHMutation(testMutationOptions);
-  const testCaptureMutation = useSSHMutation(testMutationOptions);
+  const testPasswordMutation = useSSHMutation(useMemo(() => buildTestMutationOptions(t("operation.testPassword")), [buildTestMutationOptions, t]));
+  const testKeyMutation = useSSHMutation(useMemo(() => buildTestMutationOptions(t("operation.testKey")), [buildTestMutationOptions, t]));
+  const testCapturePasswordMutation = useSSHMutation(useMemo(() => buildTestMutationOptions(t("operation.testCapturePassword")), [buildTestMutationOptions, t]));
+  const testCaptureKeyMutation = useSSHMutation(useMemo(() => buildTestMutationOptions(t("operation.testCaptureKey")), [buildTestMutationOptions, t]));
 
   const testAndSetupKey = async () => {
     setRunningOp("setup-key");
@@ -188,6 +193,36 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     pushConsole,
     onResult: (data) => ({
       status: data.success ? "success" : "warning",
+      content: <OperationOutput data={data} />,
+    }),
+  });
+
+  const dockerLogsInspectMutation = useSSHMutation({
+    slug,
+    mutationFn: () => sshAPI.dockerLogsInspect(slug),
+    label: t("operation.dockerLogsInspect"),
+    pushConsole,
+    onResult: (data) => {
+      if (!data.success) {
+        return { status: "error", content: <OperationOutput data={{ error: data.error }} /> };
+      }
+      const r = data.report;
+      if (!r) return { status: "warning", content: "No report returned." };
+      return {
+        status: r.risk_level === "critical" ? "error" : r.risk_level === "warning" ? "warning" : "success",
+        content: <DockerLogsReportView report={r} />,
+      };
+    },
+  });
+
+  const dockerLogsApplyRotationMutation = useSSHMutation({
+    slug,
+    mutationFn: (opts: { max_size?: string; max_file?: number; driver?: string }) =>
+      sshAPI.dockerLogsApplyRotation(slug, opts),
+    label: t("operation.dockerLogsApplyRotation"),
+    pushConsole,
+    onResult: (data) => ({
+      status: data.success ? "success" : "error",
       content: <OperationOutput data={data} />,
     }),
   });
@@ -442,13 +477,16 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   const anyMutationPending =
     testPasswordMutation.isPending ||
     testKeyMutation.isPending ||
-    testCaptureMutation.isPending ||
+    testCapturePasswordMutation.isPending ||
+    testCaptureKeyMutation.isPending ||
     fixDevNullMutation.isPending ||
     sudoNopasswdMutation.isPending ||
     createRemoteUserMutation.isPending ||
     deleteRemoteUserMutation.isPending ||
     listRemoteKeysMutation.isPending ||
     dockerSetupMutation.isPending ||
+    dockerLogsInspectMutation.isPending ||
+    dockerLogsApplyRotationMutation.isPending ||
     nginxCleanupMutation.isPending ||
     networkTestMutation.isPending ||
     grafanaAgentMutation.isPending;
@@ -505,20 +543,36 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       showStatus: true,
       onClick: () => { setRunningOp("test-key"); testKeyMutation.mutate({ method: "key", capture: false }); },
     },
+    // Scan-with-capture is split per auth method (password vs. key) so the
+    // operator picks the credential explicitly rather than relying on the
+    // host's preferred_auth. Each button is disabled when its credential
+    // isn't configured. This mirrors the test-password / test-key pair
+    // above for connection-only tests.
     {
-      id: "test-capture",
-      label: t("operation.testCapture"),
-      description: t("operation.testCaptureDesc"),
-      command: `ssh <user>@<host> "uname -a && free -h && df -h && docker ps --format '{{.Names}}' ..."`,
-      disabled: !hasPassword && !hasKey,
-      disabledReason: !hasPassword && !hasKey ? t("operation.noCreds") : undefined,
-      loading: testCaptureMutation.isPending,
-      onClick: () => { setRunningOp("test-capture"); testCaptureMutation.mutate({
-        method: hasPassword && hasKey
-          ? (preferredAuth === "password" ? "password" : "key")
-          : (hasPassword ? "password" : "key"),
-        capture: true,
-      }); },
+      id: "test-capture-password",
+      label: t("operation.testCapturePassword"),
+      description: t("operation.testCapturePasswordDesc"),
+      command: `ssh -o PreferredAuthentications=password <user>@<host> "uname -a && free -h && df -h && docker ps ..."`,
+      disabled: !hasPassword,
+      disabledReason: !hasPassword ? t("host.testPasswordDisabledNoPassword") : undefined,
+      loading: testCapturePasswordMutation.isPending,
+      onClick: () => {
+        setRunningOp("test-capture-password");
+        testCapturePasswordMutation.mutate({ method: "password", capture: true });
+      },
+    },
+    {
+      id: "test-capture-key",
+      label: t("operation.testCaptureKey"),
+      description: t("operation.testCaptureKeyDesc"),
+      command: `ssh -i <key_path> <user>@<host> "uname -a && free -h && df -h && docker ps ..."`,
+      disabled: !hasKey,
+      disabledReason: !hasKey ? t("host.testKeyDisabledNoKey") : undefined,
+      loading: testCaptureKeyMutation.isPending,
+      onClick: () => {
+        setRunningOp("test-capture-key");
+        testCaptureKeyMutation.mutate({ method: "key", capture: true });
+      },
     },
     ...(hasPassword ? [{
       id: "setup-key",
@@ -556,6 +610,26 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       status: dockerGroupStatus === "ok" || dockerGroupStatus === "fixed" ? "success" : dockerGroupStatus === "failed" || dockerGroupStatus === "needs_sudo" ? "failed" : null,
       showStatus: true,
       onClick: () => { setRunningOp("docker-setup"); dockerSetupMutation.mutate(true); },
+    } satisfies OpDef] : []),
+    {
+      id: "docker-logs-inspect",
+      label: t("operation.dockerLogsInspect"),
+      description: t("operation.dockerLogsInspectDesc"),
+      command: `docker info --format '{{json .}}' && docker ps -aq | xargs docker inspect ... && stat -c '%s %n' /var/lib/docker/containers/*/*-json.log`,
+      disabled: !hasPassword && !hasKey,
+      loading: runningOp === "docker-logs-inspect",
+      onClick: () => { setRunningOp("docker-logs-inspect"); dockerLogsInspectMutation.mutate(); },
+    },
+    ...(isAdmin && hasPassword ? [{
+      id: "docker-logs-apply-rotation",
+      label: t("operation.dockerLogsApplyRotation"),
+      description: t("operation.dockerLogsApplyRotationDesc"),
+      command: `cat /etc/docker/daemon.json # then merge log-driver+log-opts and systemctl reload docker`,
+      loading: runningOp === "docker-logs-apply-rotation",
+      onClick: () => {
+        setRunningOp("docker-logs-apply-rotation");
+        dockerLogsApplyRotationMutation.mutate({ max_size: "30m", max_file: 3, driver: "json-file" });
+      },
     } satisfies OpDef] : []),
     ...(isAdmin ? [{
       id: "nginx-cleanup",
@@ -1255,4 +1329,117 @@ function formatLogTime(dateStr: string, locale: string): string {
     day: "2-digit", month: "2-digit",
     hour: "2-digit", minute: "2-digit",
   });
+}
+
+/* ─── Docker logs report view ─── */
+
+function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLogsReport }) {
+  const riskClass =
+    report.risk_level === "critical"
+      ? "bg-red-500/15 text-red-300 light:text-red-800 border-red-500/40"
+      : report.risk_level === "warning"
+      ? "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40"
+      : "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40";
+  const totalHuman = humanizeBytesClient(report.total_log_bytes);
+  const largestHuman = humanizeBytesClient(report.largest_log_bytes);
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] border ${riskClass}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${
+            report.risk_level === "critical" ? "bg-red-400"
+              : report.risk_level === "warning" ? "bg-amber-400"
+              : "bg-emerald-400"
+          }`} />
+          {report.risk_level.toUpperCase()}
+        </span>
+        <span className="text-[10px] text-[var(--text-muted)]">
+          driver: <span style={{ fontFamily: "var(--font-mono)" }}>{report.log_driver || "—"}</span>
+          {" · "}rotation: <span style={{ fontFamily: "var(--font-mono)" }}>{report.rotation_configured ? "configured" : "missing"}</span>
+        </span>
+      </div>
+
+      {report.recommendation && (
+        <div className="rounded-[var(--radius-md)] p-2.5 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] leading-relaxed">
+          {report.recommendation}
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-3 text-xs">
+        <div>
+          <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider">Total log size</span>
+          <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{totalHuman}</span>
+        </div>
+        <div>
+          <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider">Largest container</span>
+          <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{largestHuman}</span>
+        </div>
+        <div>
+          <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider">Unbounded containers</span>
+          <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{report.unbounded_containers}</span>
+        </div>
+      </div>
+
+      {report.daemon_json_exists && (
+        <div className="text-[10px] text-[var(--text-muted)] leading-snug">
+          <span className="block">/etc/docker/daemon.json log-driver: <span style={{ fontFamily: "var(--font-mono)" }}>{report.daemon_log_driver || "(not set)"}</span></span>
+          {report.daemon_log_opts && Object.keys(report.daemon_log_opts).length > 0 && (
+            <span className="block">log-opts: <span style={{ fontFamily: "var(--font-mono)" }}>{JSON.stringify(report.daemon_log_opts)}</span></span>
+          )}
+          {report.daemon_json_unclean && (
+            <span className="block text-amber-400">daemon.json failed to parse — fix the syntax before applying rotation.</span>
+          )}
+        </div>
+      )}
+
+      {report.containers && report.containers.length > 0 && (
+        <div>
+          <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider mb-1.5">Containers (sorted by log size)</span>
+          <div className="space-y-1">
+            {report.containers.map((c) => (
+              <div
+                key={c.id}
+                className="flex flex-wrap items-center gap-2 px-2 py-1 rounded border border-[var(--border-subtle)]/50 text-xs"
+              >
+                <span className="font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>
+                  {c.name}
+                </span>
+                <span className="text-[10px] text-[var(--text-faint)]">{c.image}</span>
+                <span
+                  className={`ml-auto shrink-0 px-1.5 py-0.5 rounded text-[10px] ${
+                    c.has_rotation
+                      ? "bg-emerald-500/10 text-emerald-300 light:text-emerald-800 border border-emerald-500/30"
+                      : "bg-amber-500/10 text-amber-300 light:text-amber-800 border border-amber-500/30"
+                  }`}
+                  title={c.has_rotation ? "Container or daemon-level max-size set" : "No rotation — log can grow unboundedly"}
+                >
+                  {c.has_rotation ? "rotated" : "unbounded"}
+                </span>
+                <span
+                  className="shrink-0 text-[var(--text-secondary)]"
+                  style={{ fontFamily: "var(--font-mono)" }}
+                  title={c.log_path}
+                >
+                  {c.human_size || humanizeBytesClient(c.size_bytes)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function humanizeBytesClient(n: number): string {
+  if (!n || n < 1024) return `${n || 0} B`;
+  const units = ["KiB", "MiB", "GiB", "TiB", "PiB"];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toFixed(1)} ${units[i]}`;
 }

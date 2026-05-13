@@ -44,9 +44,36 @@ export default function HostCard({ host }: { host: Host }) {
           subtitle={host.oficial_slug}
           description={host.description || t("common.noDescription")}
           badge={
-            <Badge variant="situacao" situacao={host.situacao} compact>
-              {host.situacao}
-            </Badge>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Badge variant="situacao" situacao={host.situacao} compact>
+                {host.situacao}
+              </Badge>
+              {/* Idle-VM indicator — a single moon icon takes the chip slot
+                  whenever the host has been scanned. Filled slate when the
+                  heuristic flagged the host (host.idle=true); faded
+                  outline when the heuristic ran but didn't flag it. Hosts
+                  without scan data render nothing since the heuristic
+                  can't be evaluated. The native title tooltip carries the
+                  rule trail — passing reasons when idle, failing
+                  counterfacts when not. */}
+              {host.has_scan && (
+                <span
+                  className={`inline-flex items-center justify-center ${
+                    host.idle ? "text-slate-300 light:text-slate-700" : "text-[var(--text-faint)] opacity-40"
+                  }`}
+                  title={
+                    host.idle
+                      ? `${t("host.idle")}\n\n${(host.idle_reasons ?? []).join("\n") || "Host has no detected workloads or containers."}`
+                      : `${t("host.idle")}: ${t("host.idleNotFlagged")}\n\n${(host.idle_counterfacts ?? []).join("\n")}`
+                  }
+                  aria-label={t("host.idle")}
+                >
+                  <svg className="w-3.5 h-3.5" fill={host.idle ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                  </svg>
+                </span>
+              )}
+            </div>
           }
         />
 

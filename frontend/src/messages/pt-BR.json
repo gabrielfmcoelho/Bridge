@@ -29,7 +29,181 @@
     "hostCredentials": "Credenciais de Host",
     "serviceCredentials": "Credenciais de Servi\u00e7o",
     "toolsSection": "Ferramentas",
-    "modules": "M\u00f3dulos"
+    "modules": "M\u00f3dulos",
+    "atlas": "Atlas",
+    "lineage": "Linhagem",
+    "catalog": "Catálogo",
+    "pipeline": "Pipeline"
+  },
+  "atlas": {
+    "lineage": {
+      "title": "Linhagem de Dados",
+      "generatedAt": "Gerado em",
+      "notGenerated": "Os dados de linhagem ainda n\u00e3o foram gerados. Execute o parser com --sync-frontend.",
+      "namespace": "Dom\u00ednio",
+      "issuesHeader": "Problemas",
+      "domainsHeader": "Dom\u00ednios",
+      "layersHeader": "Camadas",
+      "tabs": {
+        "overview": "Vis\u00e3o geral",
+        "graph": "Grafo",
+        "tables": "Tabelas",
+        "issues": "Problemas"
+      },
+      "tables": {
+        "searchPlaceholder": "Buscar tabelas...",
+        "tablesLabel": "tabelas",
+        "layer": {
+          "source": "Origem",
+          "other": "Outras"
+        }
+      },
+      "cards": {
+        "nodes": "N\u00f3s",
+        "edges": "Arestas",
+        "columnEdges": "Arestas de coluna",
+        "modelsCovered": "Modelos cobertos",
+        "errors": "Erros",
+        "orphanTasks": "Tasks \u00f3rf\u00e3s",
+        "isolatedModels": "Modelos isolados",
+        "unusedSources": "Sources n\u00e3o usados",
+        "unusedMacros": "Macros n\u00e3o usados"
+      },
+      "drawer": {
+        "id": "ID",
+        "description": "Descri\u00e7\u00e3o",
+        "metadata": "Metadados",
+        "warnings": "Avisos",
+        "upstream": "Origem",
+        "downstream": "Destino",
+        "columns": "Colunas",
+        "openInGraph": "Abrir no grafo"
+      },
+      "toolbar": {
+        "namespace": "Dom\u00ednio",
+        "layer": "Camada",
+        "type": "Tipo",
+        "trace": "Rastrear",
+        "traceOff": "Desligado",
+        "traceUpstream": "Origem",
+        "traceDownstream": "Destino",
+        "showOnlyGaps": "S\u00f3 lacunas",
+        "showColumnEdges": "Mostrar arestas de coluna",
+        "search": "Buscar"
+      },
+      "issues": {
+        "errors": "Erros",
+        "warnings": "Avisos",
+        "coverageGaps": "Lacunas de cobertura"
+      },
+      "search": {
+        "placeholder": "Buscar n\u00f3s por r\u00f3tulo, id, camada..."
+      }
+    },
+    "catalog": {
+      "title": "Cat\u00e1logo de Dados",
+      "subtitle": "Navegue tabelas por dom\u00ednio. Clique numa coluna para ver exatamente como o valor \u00e9 constru\u00eddo.",
+      "modes": {
+        "tree": "\u00c1rvore + Lista",
+        "cards": "Cart\u00f5es",
+        "split": "Dividido"
+      },
+      "toolbar": {
+        "searchPlaceholder": "Buscar tabelas e colunas\u2026",
+        "domain": "Dom\u00ednio",
+        "layer": "Camada",
+        "role": "Papel",
+        "view": "Vis\u00e3o",
+        "allDomains": "Todos os dom\u00ednios",
+        "allLayers": "Todas as camadas",
+        "allRoles": "Todos os pap\u00e9is"
+      },
+      "role": {
+        "source": "Origem",
+        "built": "Constru\u00edda no datalake"
+      },
+      "empty": {
+        "title": "Nenhuma tabela combina com esses filtros",
+        "description": "Tente limpar um filtro ou ampliar a busca."
+      },
+      "list": {
+        "columnsLabel": "cols",
+        "tablesLabel": "tabelas"
+      },
+      "detail": {
+        "qualifiedName": "Nome qualificado",
+        "columnsCount": "Colunas",
+        "downstreamCount": "A jusante",
+        "lineageChain": "Como \u00e9 constru\u00edda",
+        "lineageChainHint": "Origem \u2192 Bronze \u2192 Silver \u2192 Gold",
+        "upstream": "Constru\u00edda a partir de",
+        "downstream": "Usada por",
+        "columnsSection": "Colunas",
+        "noUpstream": "Sem tabelas a montante.",
+        "noDownstream": "Nada a jusante.",
+        "noLineage": "Sem cadeia de linhagem \u2014 essa tabela n\u00e3o tem produtor ou \u00e9 uma fonte folha."
+      },
+      "column": {
+        "header": "Linhagem de coluna",
+        "backToTable": "Voltar para a tabela",
+        "upstreamTrail": "De onde vem",
+        "downstreamTrail": "Para onde vai",
+        "via": "via",
+        "dtype": "Tipo",
+        "tests": "Testes",
+        "inferred": "inferido",
+        "depth": "Profundidade",
+        "miniGraph": "Trilha visual",
+        "noUpstream": "Sem linhagem de coluna a montante \u2014 essa coluna \u00e9 folha ou s\u00f3 inferida.",
+        "noDownstream": "Essa coluna n\u00e3o \u00e9 usada a jusante."
+      }
+    },
+    "pipeline": {
+      "title": "Mapa do Pipeline",
+      "subtitle": "Vis\u00e3o hier\u00e1rquica de dom\u00ednios, DAGs, tasks e modelos dbt \u2014 com as tabelas que tocam.",
+      "modes": {
+        "groups": "Grupos aninhados",
+        "lanes": "Faixas"
+      },
+      "toolbar": {
+        "view": "Vis\u00e3o",
+        "domain": "Dom\u00ednio",
+        "layer": "Camada",
+        "allDomains": "Todos os dom\u00ednios",
+        "allLayers": "Todas as camadas"
+      },
+      "lane": {
+        "source": "Origens",
+        "bronze": "Bronze",
+        "silver": "Silver",
+        "gold": "Gold",
+        "misc": "Outros"
+      },
+      "group": {
+        "domain": "Dom\u00ednio",
+        "dag": "DAG",
+        "taskGroup": "Grupo de tasks",
+        "collapse": "Recolher",
+        "expand": "Expandir",
+        "nodes": "n\u00f3s"
+      },
+      "detail": {
+        "schedule": "Agenda",
+        "owner": "Respons\u00e1vel",
+        "tags": "Tags",
+        "taskCount": "Tasks",
+        "operator": "Operador",
+        "pythonCallable": "Callable",
+        "reads": "L\u00ea",
+        "writes": "Escreve",
+        "executes": "Executa",
+        "materialized": "Materializado",
+        "schema": "Schema",
+        "refs": "Refer\u00eancias",
+        "sources": "Sources",
+        "macros": "Macros"
+      }
+    }
   },
   "auth": {
     "login": "Entrar",
@@ -63,6 +237,8 @@
     "filter": "Filtrar",
     "noResults": "Nenhum resultado encontrado.",
     "loading": "Carregando...",
+    "loadingMore": "Carregando mais...",
+    "loadMore": "Carregar mais",
     "confirm": "Confirmar",
     "yes": "Sim",
     "no": "N\u00e3o",
@@ -100,7 +276,9 @@
     "copy": "Copiar",
     "copied": "Copiado!",
     "show": "Mostrar",
-    "hide": "Ocultar"
+    "hide": "Ocultar",
+    "more": "mais",
+    "error": "Erro"
   },
   "filters": {
     "title": "Filtros e Ordena\u00e7\u00e3o",
@@ -119,10 +297,19 @@
     "scan": "Scan",
     "success": "Sucesso",
     "failed": "Falhou",
-    "untested": "N\u00e3o testado"
+    "untested": "N\u00e3o testado",
+    "idleSection": "VMs ociosas",
+    "idleOnly": "Somente VMs ociosas",
+    "activeOnly": "Somente VMs ativas",
+    "idleHint": "Uma VM ociosa n\u00e3o tem servi\u00e7os de aplica\u00e7\u00e3o implantados pelo usu\u00e1rio e nenhum container Docker. Passe o mouse sobre a chip de cada card para ver as regras."
   },
   "host": {
     "title": "Hosts",
+    "idle": "VM ociosa",
+    "idleTooltipPrefix": "Sinalizado como ocioso:",
+    "idleRulesHeader": "Regras de ociosidade",
+    "idleNotFlagged": "O host tem pelo menos um sinal de carga — não foi sinalizado como ocioso.",
+    "changeSituacao": "Clique para alterar a situação",
     "addHost": "Adicionar Host",
     "addAlert": "Adicionar Alerta",
     "addIssue": "Adicionar Issue",
@@ -167,14 +354,55 @@
     "scopeFailed": "Apenas falhas",
     "scopeSuccess": "Apenas sucessos",
     "scopeUntested": "Não escaneados",
+    "scanAuthMethod": "Método de auth",
+    "scanAuthMethodAuto": "Auto",
+    "scanAuthMethodAutoTooltip": "Usar a autenticação preferida de cada host (chave quando ambas estão configuradas)",
+    "scanAuthMethodPassword": "Senha",
+    "scanAuthMethodKey": "Chave",
     "viewFailed": "Ver falhas",
     "pinSearch": "Fixar esta busca (restaurar na próxima visita)",
     "unpinSearch": "Desafixar busca",
     "scanProgress": "Escaneando...",
     "scanning": "Escaneando...",
+    "scanSkipped": "Ignorado",
     "startScan": "Iniciar Scan",
     "rescan": "Re-escanear",
     "stopScan": "Parar",
+    "batchRunning": "Executando...",
+    "batchDocker": "Configurar Docker",
+    "batchDockerDesc": "Instala/verifica Docker e adiciona o usuário remoto ao grupo docker nos hosts selecionados.",
+    "batchDockerStart": "Executar Configuração Docker",
+    "batchDockerScopeNeedsSetup": "Pendente",
+    "batchDockerScopeOk": "Já OK",
+    "batchDockerEmpty": "Nenhum host com credenciais configuradas.",
+    "batchDockerErrNotInstalled": "Docker não está instalado",
+    "batchDockerErrNeedsSudo": "Usuário ainda precisa de sudo para docker (re-login pode ser necessário)",
+    "batchDockerLogs": "Auditoria de Logs Docker",
+    "batchDockerLogsDesc": "Inspeciona driver de logs, política de rotação e tamanho dos arquivos de log por container nos hosts selecionados. Somente leitura.",
+    "batchDockerLogsStart": "Executar Auditoria de Logs",
+    "batchDockerLogsScopeWithContainers": "Com containers",
+    "batchDockerLogsScopeAll": "Todos elegíveis",
+    "batchDockerLogsScopeFlagged": "Sinalizados antes",
+    "batchDockerLogsEmpty": "Nenhum host elegível neste escopo. Faça um scan primeiro para sabermos quem tem containers, ou escolha \"Todos elegíveis\".",
+    "batchDockerLogsAnalysis": "Análise da frota",
+    "batchDockerLogsTotalSize": "Tamanho total dos logs",
+    "batchDockerLogsTotalContainers": "Total de containers",
+    "batchDockerLogsUnbounded": "Sem rotação",
+    "batchDockerLogsHostsScanned": "Hosts auditados",
+    "batchDockerLogsErrored": "com erro",
+    "batchDockerLogsHostsErrored": "hosts com erro ou sem docker",
+    "batchSudo": "Sudo sem Senha",
+    "batchSudoDesc": "Configura sudo sem senha para o usuário remoto nos hosts selecionados. Requer senha armazenada.",
+    "batchSudoStart": "Executar Configuração Sudo",
+    "batchSudoScopePasswordOnly": "Apenas senha",
+    "batchSudoScopeBoth": "Senha + chave",
+    "batchSudoEmpty": "Nenhum host com senha armazenada.",
+    "batchKey": "Configurar Chave",
+    "batchKeyDesc": "Gera um novo par de chaves ed25519 em cada host e o instala usando a senha armazenada. Chaves existentes são substituídas.",
+    "batchKeyStart": "Executar Configuração de Chave",
+    "batchKeyScopeNoKey": "Sem chave",
+    "batchKeyScopeWithKey": "Reconfigurar",
+    "batchKeyEmpty": "Nenhum host com senha armazenada.",
     "withCredentials": "Com Creds",
     "scanned": "Escaneados",
     "services": "Servi\u00e7os",
@@ -486,6 +714,14 @@
     "testKeyDesc": "Verificar conectividade SSH usando autentica\u00e7\u00e3o por chave.",
     "testCapture": "Testar & Capturar Specs",
     "testCaptureDesc": "Conectar e coletar informa\u00e7\u00f5es do sistema (CPU, RAM, disco, servi\u00e7os, containers).",
+    "testCapturePassword": "Escanear & Capturar (Senha)",
+    "testCapturePasswordDesc": "Conectar usando a senha salva do host e capturar informa\u00e7\u00f5es completas do sistema.",
+    "testCaptureKey": "Escanear & Capturar (Chave)",
+    "testCaptureKeyDesc": "Conectar usando a chave SSH salva do host e capturar informa\u00e7\u00f5es completas do sistema.",
+    "dockerLogsInspect": "Inspecionar Logs do Docker",
+    "dockerLogsInspectDesc": "Verifica\u00e7\u00e3o somente-leitura: driver de logs, pol\u00edtica de rota\u00e7\u00e3o, tamanhos por container. Sinaliza hosts com risco de vazamento de disco.",
+    "dockerLogsApplyRotation": "Aplicar Rota\u00e7\u00e3o de Logs do Docker",
+    "dockerLogsApplyRotationDesc": "Grava /etc/docker/daemon.json com driver json-file, max-size=30m, max-file=3 e recarrega o daemon.",
     "reSetupKey": "Reconfigurar Chave",
     "setupKey": "Testar & Configurar Chave",
     "setupKeyDesc": "Testar conex\u00e3o por senha, gerar e instalar uma chave SSH no host remoto.",
@@ -646,6 +882,7 @@
     "userNoLogin": "sem shell de login",
     "userNoKeys": "Nenhuma chave SSH encontrada para este usu\u00e1rio (diret\u00f3rio vazio ou sem permiss\u00e3o de leitura).",
     "userOrphanKeys": "Chaves sem dono identificado",
+    "userLastLogins": "Últimos logins",
     "systemdServices": "Servi\u00e7os Systemd",
     "installedPackages": "Pacotes Instalados",
     "cronJobs": "Tarefas Cron",
@@ -653,6 +890,100 @@
     "native": "nativo",
     "containerManaged": "container",
     "noCronJobs": "Nenhuma tarefa cron configurada",
+    "resourceTop": {
+      "cpu": "Top 10 por CPU",
+      "mem": "Top 10 por RAM",
+      "disk": "Top 10 caminhos em disco"
+    },
+    "cron": {
+      "daemonActive": "ativo",
+      "daemonInactive": "parado",
+      "daemonMissing": "não instalado",
+      "daemonEnabledAtBoot": "habilitado no boot",
+      "daemonNotEnabled": "não habilitado no boot",
+      "systemJobs": "Tarefas do sistema",
+      "userJobs": "Crontabs por usuário",
+      "timers": "Timers do systemd",
+      "noJobs": "Nenhuma tarefa agendada encontrada neste host.",
+      "schedule": "Agendamento",
+      "runAs": "Executa como",
+      "nextRun": "Próxima execução",
+      "lastRun": "Última execução",
+      "disabled": "desabilitado",
+      "timerUnit": "Unidade timer",
+      "jobSingular": "tarefa",
+      "jobPlural": "tarefas"
+    },
+    "agents": {
+      "title": "Agentes de Gestão",
+      "summary": "Agentes de monitoramento, segurança, configuração e acesso remoto instalados ou em execução neste host.",
+      "activeOfTotal": "ativos",
+      "enabledAtBoot": "boot",
+      "enabledAtBootTooltip": "Serviço habilitado para iniciar automaticamente no boot",
+      "portsTooltip": "Portas TCP em escuta atribuídas a este agente",
+      "category": {
+        "monitoring": "Monitoramento",
+        "logging": "Logs",
+        "security": "Segurança e EDR",
+        "config-mgmt": "Gestão de Configuração",
+        "inventory": "Inventário e ITSM",
+        "backup": "Backup",
+        "cloud": "Agentes de Cloud Provider",
+        "orchestration": "Orquestração",
+        "remote-access": "Acesso Remoto"
+      },
+      "state": {
+        "active": "ativo",
+        "running": "em execução",
+        "inactive": "inativo",
+        "failed": "falhou",
+        "stopped": "parado",
+        "unknown": "desconhecido"
+      },
+      "source": {
+        "systemd": "Detectado via unidade systemd",
+        "process": "Detectado via processo em execução",
+        "package": "Detectado via pacote instalado",
+        "port": "Detectado via porta em escuta"
+      }
+    },
+    "services": {
+      "title": "Serviços",
+      "summary": "Serviços de aplicação em execução neste host (servidores web, bancos de dados, caches, filas, …). Cada linha unifica sinais do systemd, processos, pacotes, portas em escuta e containers Docker.",
+      "activeOfTotal": "ativos",
+      "enabledAtBoot": "boot",
+      "enabledAtBootTooltip": "Serviço habilitado para iniciar automaticamente no boot",
+      "portsTooltip": "Portas TCP em escuta atribuídas a este serviço",
+      "kind": {
+        "web": "Servidores Web",
+        "proxy": "Proxies Reversos e Load Balancers",
+        "database": "Bancos de Dados",
+        "cache": "Caches e Key-Value Stores",
+        "queue": "Filas e Mensageria",
+        "runtime": "Runtimes de Aplicação",
+        "dns": "DNS",
+        "mail": "Mail",
+        "file-sharing": "Compartilhamento e Armazenamento",
+        "directory": "Diretório e Identidade",
+        "analytics": "Análise e Aplicações",
+        "logging": "Pipelines de Log"
+      },
+      "state": {
+        "active": "ativo",
+        "running": "em execução",
+        "inactive": "inativo",
+        "failed": "falhou",
+        "stopped": "parado",
+        "unknown": "desconhecido"
+      },
+      "source": {
+        "systemd": "Detectado via unidade systemd",
+        "process": "Detectado via processo em execução",
+        "package": "Detectado via pacote instalado",
+        "port": "Detectado via porta em escuta",
+        "container": "Detectado via container Docker"
+      }
+    },
     "packageName": "Pacote",
     "packageVersion": "Vers\u00e3o",
     "sshAuthPolicy": "Pol\u00edtica de Acesso SSH",

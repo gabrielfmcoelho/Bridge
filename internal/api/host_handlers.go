@@ -29,8 +29,19 @@ type scanResources struct {
 
 type scanFull struct {
 	scanResources
-	Services   []string `json:"services"`
-	Containers []string `json:"containers"`
+	Services   []string            `json:"services"`
+	Containers []string            `json:"containers"`
+	Profile    *hostProfileSummary `json:"profile,omitempty"`
+}
+
+// hostProfileSummary mirrors the relevant subset of sshtest.HostProfile —
+// only the fields needed to surface the idle verdict (and the operator's
+// "why" trail) on the host list. Defining a local twin keeps the api
+// package free of an internal/sshtest import.
+type hostProfileSummary struct {
+	Idle         bool     `json:"idle"`
+	Reasons      []string `json:"reasons,omitempty"`
+	Counterfacts []string `json:"counterfacts,omitempty"`
 }
 
 type hostAlert struct {
@@ -181,6 +192,9 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		DNSCount             int            `json:"dns_count"`
 		IssuesCount          int            `json:"issues_count"`
 		CanCompile           bool           `json:"can_compile"`
+		Idle                 bool           `json:"idle,omitempty"`
+		IdleReasons          []string       `json:"idle_reasons,omitempty"`
+		IdleCounterfacts     []string       `json:"idle_counterfacts,omitempty"`
 		Alerts               []hostAlert    `json:"alerts"`
 		MainResponsavelName  string         `json:"main_responsavel_name"`
 		MainEntidade         string         `json:"main_entidade"`
@@ -226,6 +240,11 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 				}
 				hwt.ContainersCount = len(sf.Containers)
 				hwt.ProcessesCount = len(sf.Services)
+				if sf.Profile != nil {
+					hwt.Idle = sf.Profile.Idle
+					hwt.IdleReasons = sf.Profile.Reasons
+					hwt.IdleCounterfacts = sf.Profile.Counterfacts
+				}
 				sfPtr = &sf
 			}
 		}
@@ -286,6 +305,24 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 						break
 					}
 				}
+			}
+		}
+		result = filtered
+	}
+
+	// Post-enrichment filter: idle. The idle flag comes from the
+	// HostProfile heuristic embedded in scan_data, so this filter has to
+	// run after we've unmarshalled the scan JSON for each host. "active"
+	// keeps only hosts that have scan data AND were classified as not
+	// idle — hosts with no scan are excluded (we can't tell either way).
+	idleFilter := r.URL.Query().Get("idle")
+	if idleFilter == "idle" || idleFilter == "active" {
+		filtered := result[:0]
+		for _, hwt := range result {
+			if idleFilter == "idle" && hwt.Idle {
+				filtered = append(filtered, hwt)
+			} else if idleFilter == "active" && hwt.HasScan && !hwt.Idle {
+				filtered = append(filtered, hwt)
 			}
 		}
 		result = filtered

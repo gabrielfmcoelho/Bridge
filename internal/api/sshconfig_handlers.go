@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -129,9 +130,17 @@ func (h *sshHandlers) resolveAuth(w http.ResponseWriter, host *models.Host, meth
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return "", sshtest.Auth{}, false
 		}
-		// Carry the password for sudo operations even with key auth
+		// Carry the password for sudo operations even with key auth — but
+		// only when the password actually works. If the last password test
+		// failed (or the password was never tested) the stored credential
+		// is likely stale, and feeding it to `sudo -S` makes every retry
+		// wait on PAM's ~3-second faildelay before falling through to the
+		// unprivileged path. Across the ~5 sudo sites in the capture
+		// (key-enum, cron user crontabs, passwd -Sa, sshd -T, …) that's
+		// enough cumulative slowdown to blow past the dev-proxy idle
+		// timeout and surface as a "socket hang up" / 500 to the user.
 		var pw string
-		if host.HasPassword {
+		if host.HasPassword && host.PasswordTestStatus != nil && *host.PasswordTestStatus == "success" {
 			pw, _ = h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
 		}
 		return "key", sshtest.KeyAuth(keyPEM, pw), true
@@ -400,6 +409,214 @@ func (h *sshHandlers) handleFixDevNull(w http.ResponseWriter, r *http.Request) {
 
 	h.logOperation(r, host.ID, "fix-dev-null", &method, "success", output)
 	jsonOK(w, map[string]any{"success": true, "method": method, "output": output, "message": "Remote /dev/null was validated and is now in expected state."})
+}
+
+// handleDockerLogsInspect runs the read-only docker log inspection: log
+// driver, daemon.json policy, per-container log file sizes, rotation
+// risk verdict. No host changes — pure observation.
+func (h *sshHandlers) handleDockerLogsInspect(w http.ResponseWriter, r *http.Request) {
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	user := h.requireUser(w, host)
+	if user == "" {
+		return
+	}
+	method, auth, ok := h.resolveAuth(w, host, "")
+	if !ok {
+		return
+	}
+	client := h.dial(w, host, user, auth)
+	if client == nil {
+		return
+	}
+	defer client.Close()
+
+	report, err := sshtest.CaptureDockerLogs(client, auth.Password())
+	if err != nil {
+		h.logOperation(r, host.ID, "docker-logs-inspect", &method, "failed", err.Error())
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	h.logOperation(r, host.ID, "docker-logs-inspect", &method, "success",
+		fmt.Sprintf("driver=%s rotation=%t containers=%d unbounded=%d total=%dB risk=%s",
+			report.LogDriver, report.RotationConfigured, len(report.Containers),
+			report.UnboundedContainers, report.TotalLogBytes, report.RiskLevel))
+
+	// Persist findings as a deduplicated host alert. The (external_source,
+	// external_id) pair makes a re-run for the same host UPDATE the
+	// existing row rather than spawning duplicates — operators see a
+	// stable alert per host that refreshes when state changes.
+	// risk=ok auto-resolves any prior alert for this host.
+	syncDockerLogsAlert(h.db.SQL, host.ID, report)
+
+	jsonOK(w, map[string]any{"success": true, "method": method, "report": report})
+}
+
+// dockerLogsAlertExternalSource keys docker-logs audit alerts so the bulk
+// list / GetExternalHostAlert lookup can find them. Per-host uniqueness
+// comes from external_id = host slug.
+const dockerLogsAlertExternalSource = "docker-logs-audit"
+
+// syncDockerLogsAlert mirrors the audit verdict into the host_alerts
+// table: upserts an auto alert when the host is at risk, resolves the
+// existing alert when the host is clean. Errors are logged but don't
+// fail the operation — the report is still returned to the caller.
+func syncDockerLogsAlert(db *sql.DB, hostID int64, report *sshtest.DockerLogsReport) {
+	externalID := strconv.FormatInt(hostID, 10)
+	switch report.RiskLevel {
+	case "warning", "critical":
+		level := report.RiskLevel
+		// Build a short message + a richer description. The message is
+		// what shows up on the host card / alert badge; the description
+		// (multi-line) is what the alert detail panel renders.
+		message := dockerLogsAlertMessage(report)
+		description := dockerLogsAlertDescription(report)
+		alert := &models.HostAlert{
+			HostID:         hostID,
+			Type:           "docker_logs_disk_leak",
+			Level:          level,
+			Message:        message,
+			Description:    description,
+			Source:         "auto",
+			Status:         "active",
+			ExternalSource: dockerLogsAlertExternalSource,
+			ExternalID:     externalID,
+		}
+		if _, err := models.UpsertExternalHostAlert(db, alert); err != nil {
+			log.Printf("[docker-logs] upsert alert host=%d failed: %v", hostID, err)
+		}
+	default: // "ok" or unknown
+		existing, err := models.GetExternalHostAlert(db, dockerLogsAlertExternalSource, externalID)
+		if err != nil {
+			log.Printf("[docker-logs] lookup existing alert host=%d failed: %v", hostID, err)
+			return
+		}
+		if existing != nil && existing.Status == "active" {
+			if rerr := models.ResolveHostAlert(db, existing.ID); rerr != nil {
+				log.Printf("[docker-logs] auto-resolve alert id=%d host=%d failed: %v", existing.ID, hostID, rerr)
+			}
+		}
+	}
+}
+
+// dockerLogsAlertMessage produces the one-liner shown on the host card.
+// Picks the most actionable framing depending on risk severity.
+func dockerLogsAlertMessage(r *sshtest.DockerLogsReport) string {
+	human := humanizeBytesAPI(r.TotalLogBytes)
+	if r.RiskLevel == "critical" {
+		return fmt.Sprintf("Docker logs at risk: %s across %d unbounded containers (no rotation)", human, r.UnboundedContainers)
+	}
+	if r.UnboundedContainers > 0 {
+		return fmt.Sprintf("%d Docker container(s) without log rotation (%s total)", r.UnboundedContainers, human)
+	}
+	return fmt.Sprintf("Docker daemon has no rotation policy (%s currently in container logs)", human)
+}
+
+// dockerLogsAlertDescription is the multi-line breakdown shown when the
+// operator opens the alert. We surface the top 5 offenders by size so
+// the fix path is obvious without needing to re-run the inspect.
+func dockerLogsAlertDescription(r *sshtest.DockerLogsReport) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Total docker log size: %s\n", humanizeBytesAPI(r.TotalLogBytes))
+	fmt.Fprintf(&b, "Largest container log: %s\n", humanizeBytesAPI(r.LargestLogBytes))
+	fmt.Fprintf(&b, "Containers without rotation: %d / %d\n", r.UnboundedContainers, len(r.Containers))
+	fmt.Fprintf(&b, "Daemon log driver: %s\n", r.LogDriver)
+	fmt.Fprintf(&b, "Rotation configured at daemon: %t\n", r.RotationConfigured)
+	if r.Recommendation != "" {
+		fmt.Fprintf(&b, "\nRecommendation: %s\n", r.Recommendation)
+	}
+	if len(r.Containers) > 0 {
+		b.WriteString("\nTop offenders (by log size):\n")
+		limit := 5
+		if len(r.Containers) < limit {
+			limit = len(r.Containers)
+		}
+		for i := 0; i < limit; i++ {
+			c := r.Containers[i]
+			rotMark := "✗ no rotation"
+			if c.HasRotation {
+				rotMark = "✓ rotated"
+			}
+			fmt.Fprintf(&b, "  • %s — %s (%s) %s\n", c.Name, humanizeBytesAPI(c.SizeBytes), c.Image, rotMark)
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+// humanizeBytesAPI mirrors the frontend humanizer (binary units) so the
+// numbers in alerts match what the UI shows for the same report.
+func humanizeBytesAPI(n int64) string {
+	if n < 1024 {
+		return fmt.Sprintf("%d B", n)
+	}
+	const unit = 1024.0
+	div, exp := unit, 0
+	for v := float64(n) / unit; v >= unit; v /= unit {
+		div *= unit
+		exp++
+	}
+	suffix := []string{"KiB", "MiB", "GiB", "TiB", "PiB"}[exp]
+	return fmt.Sprintf("%.1f %s", float64(n)/div, suffix)
+}
+
+// handleDockerLogsApplyRotation writes the recommended log-rotation policy
+// to /etc/docker/daemon.json and reloads the daemon. Requires admin role
+// because it modifies daemon configuration; sudo password must be on
+// file (this is purely a host-mutation operation).
+func (h *sshHandlers) handleDockerLogsApplyRotation(w http.ResponseWriter, r *http.Request) {
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	user := h.requireUser(w, host)
+	if user == "" {
+		return
+	}
+
+	var req struct {
+		MaxSize string `json:"max_size"`
+		MaxFile int    `json:"max_file"`
+		Driver  string `json:"driver"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+
+	if !host.HasPassword {
+		jsonError(w, http.StatusBadRequest, "host has no stored password — required to elevate for /etc/docker/daemon.json write")
+		return
+	}
+	password, decErr := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
+	if decErr != nil {
+		jsonServerError(w, r, "failed to decrypt password", decErr)
+		return
+	}
+
+	method, auth, ok := h.resolveAuth(w, host, "")
+	if !ok {
+		return
+	}
+	client := h.dial(w, host, user, auth)
+	if client == nil {
+		return
+	}
+	defer client.Close()
+
+	merged, msg, err := sshtest.DockerLogsApplyRotation(client, password, sshtest.DockerLogsRotationOptions{
+		MaxSize: req.MaxSize,
+		MaxFile: req.MaxFile,
+		Driver:  req.Driver,
+	})
+	if err != nil {
+		h.logOperation(r, host.ID, "docker-logs-apply-rotation", &method, "failed", err.Error())
+		jsonOK(w, map[string]any{"success": false, "error": err.Error(), "daemon_json": merged})
+		return
+	}
+	h.logOperation(r, host.ID, "docker-logs-apply-rotation", &method, "success", msg)
+	jsonOK(w, map[string]any{"success": true, "method": method, "message": msg, "daemon_json": merged})
 }
 
 // handleSetupKey sets up an SSH key for a host.

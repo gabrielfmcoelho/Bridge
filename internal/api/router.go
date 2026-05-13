@@ -148,6 +148,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/ssh/operation-logs/{slug}", authenticated(db, http.HandlerFunc(ssh.handleOperationLogs)))
 	mux.Handle("POST /api/ssh/list-remote-keys/{slug}", authedRole(db, "editor", http.HandlerFunc(ssh.handleListRemoteKeys)))
 	mux.Handle("POST /api/ssh/docker-setup/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleDockerSetup)))
+	mux.Handle("POST /api/ssh/docker-logs/{slug}", authedRole(db, "editor", http.HandlerFunc(ssh.handleDockerLogsInspect)))
+	mux.Handle("POST /api/ssh/docker-logs-rotation/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleDockerLogsApplyRotation)))
 	mux.Handle("POST /api/ssh/nginx-cleanup/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleNginxCleanup)))
 	mux.Handle("POST /api/ssh/grafana-agent-setup/{slug}", authedRole(db, "admin", http.HandlerFunc(ssh.handleGrafanaAgentSetup)))
 	mux.Handle("GET /api/ssh/host-config/{slug}", authenticated(db, http.HandlerFunc(ssh.handleHostSSHConfig)))

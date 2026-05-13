@@ -153,6 +153,28 @@ export default function HostDetail({ slug }: { slug: string }) {
             )}
             <div className="flex items-center gap-2 mt-2">
               <Badge variant="situacao" situacao={data.host.situacao} compact className="[&>span:first-child]:w-3 [&>span:first-child]:h-3">{data.host.situacao}</Badge>
+              {/* Idle-VM indicator — same crescent-moon pattern used on
+                  HostCard. Filled slate when the heuristic flagged the
+                  host (idle=true), faded outline when it ran but didn't
+                  flag. Hosts without scan data render nothing since the
+                  rules can't be evaluated. */}
+              {data.host.has_scan && (
+                <span
+                  className={`inline-flex items-center justify-center ${
+                    data.host.idle ? "text-slate-300 light:text-slate-700" : "text-[var(--text-faint)] opacity-40"
+                  }`}
+                  title={
+                    data.host.idle
+                      ? `${t("host.idle")}\n\n${(data.host.idle_reasons ?? []).join("\n") || "Host has no detected workloads or containers."}`
+                      : `${t("host.idle")}: ${t("host.idleNotFlagged")}\n\n${(data.host.idle_counterfacts ?? []).join("\n")}`
+                  }
+                  aria-label={t("host.idle")}
+                >
+                  <svg className="w-4 h-4" fill={data.host.idle ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                  </svg>
+                </span>
+              )}
               {/* Alerts */}
               <span className={`inline-flex items-center gap-1 text-xs ${alertCount > 0 ? "text-amber-400" : "text-[var(--text-faint)]"}`} title={`${alertCount} alerts`}>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

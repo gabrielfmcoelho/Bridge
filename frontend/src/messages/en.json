@@ -29,7 +29,181 @@
     "hostCredentials": "Host Credentials",
     "serviceCredentials": "Service Credentials",
     "toolsSection": "Tools",
-    "modules": "Modules"
+    "modules": "Modules",
+    "atlas": "Atlas",
+    "lineage": "Lineage",
+    "catalog": "Catalog",
+    "pipeline": "Pipeline"
+  },
+  "atlas": {
+    "lineage": {
+      "title": "Data Lineage",
+      "generatedAt": "Generated",
+      "notGenerated": "Lineage data has not been generated yet. Run the parser with --sync-frontend.",
+      "namespace": "Namespace",
+      "issuesHeader": "Issues",
+      "domainsHeader": "Domains",
+      "layersHeader": "Layers",
+      "tabs": {
+        "overview": "Overview",
+        "graph": "Graph",
+        "tables": "Tables",
+        "issues": "Issues"
+      },
+      "tables": {
+        "searchPlaceholder": "Search tables...",
+        "tablesLabel": "tables",
+        "layer": {
+          "source": "Source",
+          "other": "Other"
+        }
+      },
+      "cards": {
+        "nodes": "Nodes",
+        "edges": "Edges",
+        "columnEdges": "Column edges",
+        "modelsCovered": "Models covered",
+        "errors": "Errors",
+        "orphanTasks": "Orphan tasks",
+        "isolatedModels": "Isolated models",
+        "unusedSources": "Unused sources",
+        "unusedMacros": "Unused macros"
+      },
+      "drawer": {
+        "id": "ID",
+        "description": "Description",
+        "metadata": "Metadata",
+        "warnings": "Warnings",
+        "upstream": "Upstream",
+        "downstream": "Downstream",
+        "columns": "Columns",
+        "openInGraph": "Show in graph"
+      },
+      "toolbar": {
+        "namespace": "Namespace",
+        "layer": "Layer",
+        "type": "Type",
+        "trace": "Trace",
+        "traceOff": "Off",
+        "traceUpstream": "Upstream",
+        "traceDownstream": "Downstream",
+        "showOnlyGaps": "Show only gaps",
+        "showColumnEdges": "Show column edges",
+        "search": "Search"
+      },
+      "issues": {
+        "errors": "Errors",
+        "warnings": "Warnings",
+        "coverageGaps": "Coverage gaps"
+      },
+      "search": {
+        "placeholder": "Search nodes by label, id, layer..."
+      }
+    },
+    "catalog": {
+      "title": "Data Catalog",
+      "subtitle": "Browse tables by domain. Drill into columns to see exactly how each value flows.",
+      "modes": {
+        "tree": "Tree + List",
+        "cards": "Cards",
+        "split": "Split"
+      },
+      "toolbar": {
+        "searchPlaceholder": "Search tables and columns…",
+        "domain": "Domain",
+        "layer": "Layer",
+        "role": "Role",
+        "view": "View",
+        "allDomains": "All domains",
+        "allLayers": "All layers",
+        "allRoles": "All roles"
+      },
+      "role": {
+        "source": "Source",
+        "built": "Datalake-built"
+      },
+      "empty": {
+        "title": "No tables match these filters",
+        "description": "Try clearing a filter or broadening the search."
+      },
+      "list": {
+        "columnsLabel": "cols",
+        "tablesLabel": "tables"
+      },
+      "detail": {
+        "qualifiedName": "Fully qualified name",
+        "columnsCount": "Columns",
+        "downstreamCount": "Downstream",
+        "lineageChain": "How it's built",
+        "lineageChainHint": "Source → Bronze → Silver → Gold",
+        "upstream": "Built from",
+        "downstream": "Used by",
+        "columnsSection": "Columns",
+        "noUpstream": "No upstream tables.",
+        "noDownstream": "Nothing downstream.",
+        "noLineage": "No lineage chain — this table has no producer or it's a leaf source."
+      },
+      "column": {
+        "header": "Column lineage",
+        "backToTable": "Back to table",
+        "upstreamTrail": "Where it comes from",
+        "downstreamTrail": "Where it flows",
+        "via": "via",
+        "dtype": "Type",
+        "tests": "Tests",
+        "inferred": "inferred",
+        "depth": "Depth",
+        "miniGraph": "Visual trail",
+        "noUpstream": "No upstream column lineage — this column is a leaf or inferred only.",
+        "noDownstream": "This column is not used downstream."
+      }
+    },
+    "pipeline": {
+      "title": "Pipeline Map",
+      "subtitle": "Hierarchical view of domains, DAGs, tasks and dbt models — with the tables they touch.",
+      "modes": {
+        "groups": "Nested groups",
+        "lanes": "Swimlanes"
+      },
+      "toolbar": {
+        "view": "View",
+        "domain": "Domain",
+        "layer": "Layer",
+        "allDomains": "All domains",
+        "allLayers": "All layers"
+      },
+      "lane": {
+        "source": "Sources",
+        "bronze": "Bronze",
+        "silver": "Silver",
+        "gold": "Gold",
+        "misc": "Other"
+      },
+      "group": {
+        "domain": "Domain",
+        "dag": "DAG",
+        "taskGroup": "Task group",
+        "collapse": "Collapse",
+        "expand": "Expand",
+        "nodes": "nodes"
+      },
+      "detail": {
+        "schedule": "Schedule",
+        "owner": "Owner",
+        "tags": "Tags",
+        "taskCount": "Tasks",
+        "operator": "Operator",
+        "pythonCallable": "Callable",
+        "reads": "Reads",
+        "writes": "Writes",
+        "executes": "Executes",
+        "materialized": "Materialized",
+        "schema": "Schema",
+        "refs": "References",
+        "sources": "Sources",
+        "macros": "Macros"
+      }
+    }
   },
   "auth": {
     "login": "Login",
@@ -63,6 +237,8 @@
     "filter": "Filter",
     "noResults": "No results found.",
     "loading": "Loading...",
+    "loadingMore": "Loading more...",
+    "loadMore": "Load more",
     "confirm": "Confirm",
     "yes": "Yes",
     "no": "No",
@@ -100,7 +276,9 @@
     "copy": "Copy",
     "copied": "Copied!",
     "show": "Show",
-    "hide": "Hide"
+    "hide": "Hide",
+    "more": "more",
+    "error": "Error"
   },
   "filters": {
     "title": "Filters & Sort",
@@ -119,10 +297,19 @@
     "scan": "Scan",
     "success": "Success",
     "failed": "Failed",
-    "untested": "Untested"
+    "untested": "Untested",
+    "idleSection": "Idle VMs",
+    "idleOnly": "Only idle VMs",
+    "activeOnly": "Only active VMs",
+    "idleHint": "An idle VM has no user-deployed application services and no Docker containers. Hover the chip on each card for the rule trail."
   },
   "host": {
     "title": "Hosts",
+    "idle": "Idle VM",
+    "idleTooltipPrefix": "Flagged as idle:",
+    "idleRulesHeader": "Idleness rules",
+    "idleNotFlagged": "Host has at least one workload signal — not flagged as idle.",
+    "changeSituacao": "Click to change status",
     "addHost": "Add Host",
     "addAlert": "Add Alert",
     "addIssue": "Add Issue",
@@ -167,14 +354,55 @@
     "scopeFailed": "Failed only",
     "scopeSuccess": "Success only",
     "scopeUntested": "Untested only",
+    "scanAuthMethod": "Auth method",
+    "scanAuthMethodAuto": "Auto",
+    "scanAuthMethodAutoTooltip": "Use each host's preferred authentication (key when both are configured)",
+    "scanAuthMethodPassword": "Password",
+    "scanAuthMethodKey": "Key",
     "viewFailed": "View failed",
     "pinSearch": "Pin this search (restore on next visit)",
     "unpinSearch": "Unpin search",
     "scanProgress": "Scanning...",
     "scanning": "Scanning...",
+    "scanSkipped": "Skipped",
     "startScan": "Start Scan",
     "rescan": "Rescan",
     "stopScan": "Stop",
+    "batchRunning": "Running...",
+    "batchDocker": "Setup Docker",
+    "batchDockerDesc": "Install/check Docker and add the remote user to the docker group across the selected hosts.",
+    "batchDockerStart": "Run Docker Setup",
+    "batchDockerScopeNeedsSetup": "Needs setup",
+    "batchDockerScopeOk": "Already OK",
+    "batchDockerEmpty": "No hosts with credentials configured.",
+    "batchDockerErrNotInstalled": "Docker is not installed",
+    "batchDockerErrNeedsSudo": "User still needs sudo for docker (re-login may be required)",
+    "batchDockerLogs": "Docker Logs Audit",
+    "batchDockerLogsDesc": "Inspect docker log driver, rotation policy and per-container log file sizes across the selected hosts. Read-only.",
+    "batchDockerLogsStart": "Run Docker Logs Audit",
+    "batchDockerLogsScopeWithContainers": "Has containers",
+    "batchDockerLogsScopeAll": "All eligible",
+    "batchDockerLogsScopeFlagged": "Previously flagged",
+    "batchDockerLogsEmpty": "No eligible hosts in this scope. Run a scan first so we know which hosts have containers, or pick \"All eligible\".",
+    "batchDockerLogsAnalysis": "Fleet analysis",
+    "batchDockerLogsTotalSize": "Total log size",
+    "batchDockerLogsTotalContainers": "Total containers",
+    "batchDockerLogsUnbounded": "Unbounded",
+    "batchDockerLogsHostsScanned": "Hosts scanned",
+    "batchDockerLogsErrored": "errored",
+    "batchDockerLogsHostsErrored": "hosts that errored or had no docker",
+    "batchSudo": "Sudo NOPASSWD",
+    "batchSudoDesc": "Configure passwordless sudo for the remote user on the selected hosts. Requires a stored password.",
+    "batchSudoStart": "Run Sudo Setup",
+    "batchSudoScopePasswordOnly": "Password only",
+    "batchSudoScopeBoth": "Password + key",
+    "batchSudoEmpty": "No hosts with a stored password.",
+    "batchKey": "Setup Key",
+    "batchKeyDesc": "Generate a new ed25519 keypair on each host and install it via the stored password. Existing keys are replaced.",
+    "batchKeyStart": "Run Key Setup",
+    "batchKeyScopeNoKey": "Without key",
+    "batchKeyScopeWithKey": "Re-setup",
+    "batchKeyEmpty": "No hosts with a stored password.",
     "withCredentials": "With Creds",
     "scanned": "Scanned",
     "services": "Services",
@@ -486,6 +714,14 @@
     "testKeyDesc": "Verify SSH connectivity using key-based authentication.",
     "testCapture": "Test & Capture Specs",
     "testCaptureDesc": "Connect and collect system information (CPU, RAM, disk, services, containers).",
+    "testCapturePassword": "Scan & Capture (Password)",
+    "testCapturePasswordDesc": "Connect using the host's saved password and capture full system information.",
+    "testCaptureKey": "Scan & Capture (Key)",
+    "testCaptureKeyDesc": "Connect using the host's saved SSH key and capture full system information.",
+    "dockerLogsInspect": "Inspect Docker Logs",
+    "dockerLogsInspectDesc": "Read-only check: log driver, rotation policy, per-container log file sizes. Flags hosts at risk of disk leak.",
+    "dockerLogsApplyRotation": "Apply Docker Log Rotation",
+    "dockerLogsApplyRotationDesc": "Write /etc/docker/daemon.json with json-file log-driver, max-size=30m, max-file=3, then reload the daemon.",
     "reSetupKey": "Re-setup Key",
     "setupKey": "Test & Setup Key",
     "setupKeyDesc": "Test password connection, then generate and install an SSH key on the remote host.",
@@ -646,6 +882,7 @@
     "userNoLogin": "no login shell",
     "userNoKeys": "No SSH keys found for this user (either the home directory is empty or we lack read access).",
     "userOrphanKeys": "Keys without an owner",
+    "userLastLogins": "Last logins",
     "systemdServices": "Systemd Services",
     "installedPackages": "Installed Packages",
     "cronJobs": "Cron Jobs",
@@ -653,6 +890,100 @@
     "native": "native",
     "containerManaged": "container",
     "noCronJobs": "No cron jobs configured",
+    "resourceTop": {
+      "cpu": "Top 10 by CPU",
+      "mem": "Top 10 by RAM",
+      "disk": "Top 10 disk paths"
+    },
+    "cron": {
+      "daemonActive": "running",
+      "daemonInactive": "stopped",
+      "daemonMissing": "not installed",
+      "daemonEnabledAtBoot": "enabled at boot",
+      "daemonNotEnabled": "not enabled at boot",
+      "systemJobs": "System scheduled tasks",
+      "userJobs": "Per-user crontabs",
+      "timers": "Systemd timers",
+      "noJobs": "No scheduled tasks found on this host.",
+      "schedule": "Schedule",
+      "runAs": "Runs as",
+      "nextRun": "Next run",
+      "lastRun": "Last run",
+      "disabled": "disabled",
+      "timerUnit": "Timer unit",
+      "jobSingular": "task",
+      "jobPlural": "tasks"
+    },
+    "agents": {
+      "title": "Management Agents",
+      "summary": "Monitoring, security, configuration and remote-access agents installed or running on this host.",
+      "activeOfTotal": "active",
+      "enabledAtBoot": "boot",
+      "enabledAtBootTooltip": "Service is enabled to start automatically at boot",
+      "portsTooltip": "Listening TCP ports owned by this agent",
+      "category": {
+        "monitoring": "Monitoring",
+        "logging": "Logging",
+        "security": "Security & EDR",
+        "config-mgmt": "Configuration Management",
+        "inventory": "Inventory & ITSM",
+        "backup": "Backup",
+        "cloud": "Cloud Provider Agents",
+        "orchestration": "Orchestration",
+        "remote-access": "Remote Access"
+      },
+      "state": {
+        "active": "active",
+        "running": "running",
+        "inactive": "inactive",
+        "failed": "failed",
+        "stopped": "stopped",
+        "unknown": "unknown"
+      },
+      "source": {
+        "systemd": "Detected via systemd unit",
+        "process": "Detected via running process",
+        "package": "Detected via installed package",
+        "port": "Detected via listening port"
+      }
+    },
+    "services": {
+      "title": "Services",
+      "summary": "Application services running on this host (web servers, databases, caches, queues, …). Each row merges signals from systemd, processes, packages, listening ports, and Docker containers.",
+      "activeOfTotal": "active",
+      "enabledAtBoot": "boot",
+      "enabledAtBootTooltip": "Service is enabled to start automatically at boot",
+      "portsTooltip": "Listening TCP ports attributed to this service",
+      "kind": {
+        "web": "Web Servers",
+        "proxy": "Reverse Proxies & Load Balancers",
+        "database": "Databases",
+        "cache": "Caches & Key-Value Stores",
+        "queue": "Queues & Message Brokers",
+        "runtime": "Application Runtimes",
+        "dns": "DNS",
+        "mail": "Mail",
+        "file-sharing": "File Sharing & Storage",
+        "directory": "Directory & Identity",
+        "analytics": "Analytics & Apps",
+        "logging": "Logging Pipelines"
+      },
+      "state": {
+        "active": "active",
+        "running": "running",
+        "inactive": "inactive",
+        "failed": "failed",
+        "stopped": "stopped",
+        "unknown": "unknown"
+      },
+      "source": {
+        "systemd": "Detected via systemd unit",
+        "process": "Detected via running process",
+        "package": "Detected via installed package",
+        "port": "Detected via listening port",
+        "container": "Detected via Docker container"
+      }
+    },
     "packageName": "Package",
     "packageVersion": "Version",
     "sshAuthPolicy": "SSH Access Policy",
