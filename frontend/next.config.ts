@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  allowedDevOrigins: ['192.168.15.90'],
+  allowedDevOrigins: ['192.168.15.90', '100.78.26.92', '100.74.185.3'],
   async rewrites() {
     return [
       {

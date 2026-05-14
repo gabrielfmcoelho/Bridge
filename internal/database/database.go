@@ -3,7 +3,9 @@ package database
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -78,6 +80,11 @@ func Open(configDir string) (*DB, error) {
 		return nil, fmt.Errorf("database: migrations: %w", err)
 	}
 
+	if err := d.guardAgainstLostKey(); err != nil {
+		db.Close()
+		return nil, err
+	}
+
 	// Recompute SSH key fingerprints that used the old hex format.
 	d.fixSSHKeyFingerprints()
 
@@ -114,6 +121,132 @@ func (d *DB) ConfigDir() string {
 // DBPath returns the full path to the SQLite database file.
 func (d *DB) DBPath() string {
 	return filepath.Join(d.configDir, "sshcm.db")
+}
+
+// guardAgainstLostKey protects against silent data loss when the encryption
+// key changes. It runs in two modes:
+//
+//  1. If SSHCM_RESET_ENCRYPTED_SETTINGS=true, it attempts to decrypt every
+//     *_cipher value in app_settings with the current key and DELETEs the
+//     rows that fail (along with their paired *_nonce row). This is the
+//     escape hatch for "I lost the old key and want to start fresh without
+//     hand-editing the database". Settings outside app_settings (host
+//     passwords, SSH keys, tool credentials, OAuth tokens) are left alone —
+//     wiping those carries much bigger blast radius and should be a
+//     deliberate manual operation.
+//
+//  2. Otherwise, if the key was freshly generated this run AND app_settings
+//     already contains encrypted rows, startup aborts. That combination
+//     means the previous key was lost (e.g. a redeploy without a persistent
+//     volume or SSHCM_SECRET_KEY) and existing ciphertext is unreadable —
+//     continuing would silently break OAuth and integrations.
+func (d *DB) guardAgainstLostKey() error {
+	if envFlag("SSHCM_RESET_ENCRYPTED_SETTINGS") {
+		return d.purgeUndecryptableSettings()
+	}
+
+	if d.Encryptor.Source() != KeySourceGenerated {
+		return nil
+	}
+
+	var count int
+	err := d.SQL.QueryRow(`
+		SELECT COUNT(*) FROM app_settings
+		WHERE key LIKE '%_cipher' AND value IS NOT NULL AND value <> ''
+	`).Scan(&count)
+	if err != nil {
+		// If the check itself fails we'd rather start than refuse — the worst
+		// case here is the user gets the original decrypt errors back.
+		return nil
+	}
+	if count == 0 {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"database: encryption key was just generated but %d encrypted setting(s) already exist in the database — "+
+			"the previous key is gone and existing ciphertext cannot be decrypted. "+
+			"Set SSHCM_SECRET_KEY to the previous base64 key (or mount the prior secret.key into %s) and restart. "+
+			"To wipe the unreadable settings and start fresh, set SSHCM_RESET_ENCRYPTED_SETTINGS=true",
+		count, d.configDir,
+	)
+}
+
+// purgeUndecryptableSettings tries to decrypt every encrypted row in
+// app_settings with the active key. Rows that fail (wrong key, corrupt data)
+// are deleted together with their paired _nonce row. The action is logged so
+// operators can audit what was wiped.
+func (d *DB) purgeUndecryptableSettings() error {
+	rows, err := d.SQL.Query(`
+		SELECT key, value FROM app_settings
+		WHERE key LIKE '%_cipher' AND value IS NOT NULL AND value <> ''
+	`)
+	if err != nil {
+		return fmt.Errorf("purge encrypted settings: query: %w", err)
+	}
+
+	type entry struct{ key, value string }
+	var ciphers []entry
+	for rows.Next() {
+		var e entry
+		if err := rows.Scan(&e.key, &e.value); err != nil {
+			rows.Close()
+			return fmt.Errorf("purge encrypted settings: scan: %w", err)
+		}
+		ciphers = append(ciphers, e)
+	}
+	rows.Close()
+
+	var doomed []string
+	for _, c := range ciphers {
+		nonceKey := strings.TrimSuffix(c.key, "_cipher") + "_nonce"
+		var nonceHex string
+		if err := d.SQL.QueryRow(`SELECT value FROM app_settings WHERE key = ?`, nonceKey).Scan(&nonceHex); err != nil {
+			// Cipher without a nonce is already broken — purge it.
+			doomed = append(doomed, c.key, nonceKey)
+			continue
+		}
+		cipherBytes, errC := hex.DecodeString(c.value)
+		nonceBytes, errN := hex.DecodeString(nonceHex)
+		if errC != nil || errN != nil {
+			doomed = append(doomed, c.key, nonceKey)
+			continue
+		}
+		if _, err := d.Encryptor.Decrypt(cipherBytes, nonceBytes); err != nil {
+			doomed = append(doomed, c.key, nonceKey)
+		}
+	}
+
+	if len(doomed) == 0 {
+		log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: every encrypted setting decrypted cleanly, nothing to purge")
+		return nil
+	}
+
+	tx, err := d.SQL.Begin()
+	if err != nil {
+		return fmt.Errorf("purge encrypted settings: begin: %w", err)
+	}
+	for _, k := range doomed {
+		if _, err := tx.Exec(`DELETE FROM app_settings WHERE key = ?`, k); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("purge encrypted settings: delete %q: %w", k, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("purge encrypted settings: commit: %w", err)
+	}
+
+	log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: deleted %d undecryptable app_settings row(s): %v",
+		len(doomed), doomed)
+	return nil
+}
+
+func envFlag(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 // fixSSHKeyFingerprints recomputes fingerprints for SSH keys that need it:

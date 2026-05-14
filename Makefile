@@ -9,7 +9,7 @@ dev-api:
 	go run . web --port 8080
 
 dev-frontend:
-	cd frontend && npm run dev -- -p 3000
+	cd frontend && npm run dev -- -p 3000 --hostname 0.0.0.0
 
 # Production: build Go binary (frontend served separately via `npm start` in frontend/)
 build: build-frontend build-go
@@ -28,7 +28,7 @@ start-api:
 	./sshcm web --port 8080
 
 start-frontend:
-	cd frontend && npm start -- -p 3000
+	cd frontend && npm start -- -p 3000 --hostname 0.0.0.0
 
 clean:
 	rm -rf frontend/.next sshcm
