@@ -1,0 +1,8 @@
+{
+  "name": "Bridge",
+  "version": "0.1.0",
+  "description": "Go backend + Next.js frontend",
+  "skills": [
+    "./skills/"
+  ]
+}

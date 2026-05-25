@@ -54,3 +54,7 @@ Thumbs.db
 
 # Claude
 .claude/
+
+# Harness (per-developer state and one-off output)
+.harness-mem/
+/out/
