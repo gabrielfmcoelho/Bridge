@@ -944,4 +944,86 @@ var migrationsPostgres = []string{
 	INSERT INTO host_entidades (host_id, entidade, is_main)
 		SELECT id, setor_responsavel, TRUE FROM hosts WHERE setor_responsavel != ''
 	ON CONFLICT DO NOTHING;`,
+
+	// Version 61: unified secrets manager (Phase 1.3) — see migrations_sqlite.go
+	// for full rationale. Same schema, postgres syntax.
+	//
+	// Translation notes:
+	//   - INTEGER PRIMARY KEY AUTOINCREMENT  -> BIGSERIAL PRIMARY KEY
+	//   - INTEGER FK columns                 -> BIGINT
+	//   - BLOB                               -> BYTEA
+	//   - DATETIME                           -> TIMESTAMPTZ
+	//   - metadata stays TEXT for portability with sqlite; can be migrated to
+	//     JSONB later if server-side querying is needed.
+	`CREATE TABLE IF NOT EXISTS secrets (
+		id                 BIGSERIAL PRIMARY KEY,
+		type               TEXT NOT NULL,
+		scope              TEXT NOT NULL,
+		visibility         TEXT NOT NULL,
+		parent_id          BIGINT,
+		owner_user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		name               TEXT NOT NULL,
+		group_label        TEXT,
+		description        TEXT,
+		payload_ciphertext BYTEA NOT NULL,
+		payload_nonce      BYTEA NOT NULL,
+		key_version        INTEGER NOT NULL DEFAULT 1,
+		created_by         BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		created_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at         TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		deleted_at         TIMESTAMPTZ,
+		CHECK (type IN ('cred','sshkey','password','app_login','env_var')),
+		CHECK (scope IN ('service','host','tool','avulso')),
+		CHECK (visibility IN ('personal','shared')),
+		CHECK ((scope = 'avulso' AND parent_id IS NULL) OR (scope <> 'avulso' AND parent_id IS NOT NULL)),
+		CHECK (key_version >= 1)
+	);
+
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_secrets_shared_unique
+		ON secrets (scope, COALESCE(parent_id, 0), name, COALESCE(group_label, ''))
+		WHERE visibility = 'shared' AND deleted_at IS NULL;
+
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_secrets_personal_unique
+		ON secrets (scope, COALESCE(parent_id, 0), owner_user_id, name, COALESCE(group_label, ''))
+		WHERE visibility = 'personal' AND deleted_at IS NULL;
+
+	CREATE INDEX IF NOT EXISTS idx_secrets_owner_live
+		ON secrets (owner_user_id) WHERE deleted_at IS NULL;
+
+	CREATE INDEX IF NOT EXISTS idx_secrets_scope_parent_live
+		ON secrets (scope, parent_id) WHERE deleted_at IS NULL;
+
+	CREATE INDEX IF NOT EXISTS idx_secrets_trash
+		ON secrets (deleted_at) WHERE deleted_at IS NOT NULL;
+
+	CREATE TABLE IF NOT EXISTS secret_share_links (
+		id              BIGSERIAL PRIMARY KEY,
+		secret_id       BIGINT NOT NULL REFERENCES secrets(id) ON DELETE CASCADE,
+		token_hash      BYTEA NOT NULL,
+		expires_at      TIMESTAMPTZ NOT NULL,
+		passphrase_hash BYTEA,
+		max_views       INTEGER,
+		view_count      INTEGER NOT NULL DEFAULT 0,
+		created_by      BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		revoked_at      TIMESTAMPTZ
+	);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_secret_share_links_token   ON secret_share_links(token_hash);
+	CREATE INDEX        IF NOT EXISTS idx_secret_share_links_secret  ON secret_share_links(secret_id);
+	CREATE INDEX        IF NOT EXISTS idx_secret_share_links_expires ON secret_share_links(expires_at);
+
+	CREATE TABLE IF NOT EXISTS secret_audit_log (
+		id            BIGSERIAL PRIMARY KEY,
+		secret_id     BIGINT NOT NULL,
+		action        TEXT NOT NULL,
+		actor_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		actor_ip      TEXT,
+		share_link_id BIGINT,
+		metadata      TEXT,
+		at            TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		CHECK (action IN ('create','reveal','update','delete','restore','share_create','share_redeem','share_revoke'))
+	);
+	CREATE INDEX IF NOT EXISTS idx_secret_audit_log_secret ON secret_audit_log(secret_id, at);
+	CREATE INDEX IF NOT EXISTS idx_secret_audit_log_actor  ON secret_audit_log(actor_user_id, at);`,
+
 }
