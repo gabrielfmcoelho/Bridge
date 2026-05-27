@@ -217,7 +217,8 @@ func (h *serviceHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	models.DeleteTags(h.db.SQL, "service", id)
-	if err := models.DeleteService(h.db.SQL, id); err != nil {
+	if err := cascadeParentDelete(r, h.db, models.SecretScopeService, id,
+		`DELETE FROM services WHERE id = ?`); err != nil {
 		jsonServerError(w, r, "failed to delete service", err)
 		return
 	}

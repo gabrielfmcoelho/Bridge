@@ -102,7 +102,8 @@ func (h *toolHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := models.DeleteExternalTool(h.db.SQL, id); err != nil {
+	if err := cascadeParentDelete(r, h.db, models.SecretScopeTool, id,
+		`DELETE FROM external_tools WHERE id = ?`); err != nil {
 		jsonServerError(w, r, "failed to delete tool", err)
 		return
 	}

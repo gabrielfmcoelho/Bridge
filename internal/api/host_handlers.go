@@ -719,7 +719,8 @@ func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	models.DeleteTags(h.db.SQL, "host", host.ID)
-	if err := models.DeleteHost(h.db.SQL, host.ID); err != nil {
+	if err := cascadeParentDelete(r, h.db, models.SecretScopeHost, host.ID,
+		`DELETE FROM hosts WHERE id = ?`); err != nil {
 		jsonServerError(w, r, "failed to delete host", err)
 		return
 	}
