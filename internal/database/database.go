@@ -80,6 +80,13 @@ func Open(configDir string) (*DB, error) {
 		return nil, fmt.Errorf("database: migrations: %w", err)
 	}
 
+	// Env-gated legacy-schema purge (Task 1.9 partial). Off by default;
+	// deployments opt in by setting MIGRATE_DROP_LEGACY_SECRETS=1.
+	if err := d.maybeDropLegacySecrets(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("database: legacy purge: %w", err)
+	}
+
 	if err := d.guardAgainstLostKey(); err != nil {
 		db.Close()
 		return nil, err
