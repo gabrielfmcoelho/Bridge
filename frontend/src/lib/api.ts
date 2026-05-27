@@ -552,7 +552,6 @@ export const servicesAPI = {
       dns_ids: number[];
       depends_on_ids: number[];
       dependent_ids: number[];
-      credentials: import("./types").ServiceCredential[];
       responsaveis: import("./types").EntityResponsavel[];
     }>(`/api/services/${id}`),
   create: (data: Partial<import("./types").Service> & { tags?: string[]; host_ids?: number[]; dns_ids?: number[]; depends_on_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
@@ -560,12 +559,6 @@ export const servicesAPI = {
   update: (id: number, data: Partial<import("./types").Service> & { tags?: string[]; host_ids?: number[]; dns_ids?: number[]; depends_on_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.put<import("./types").Service>(`/api/services/${id}`, data),
   delete: (id: number) => api.delete(`/api/services/${id}`),
-  createCredential: (serviceId: number, data: { role_name: string; credentials: string }) =>
-    api.post(`/api/services/${serviceId}/credentials`, data),
-  getCredential: (serviceId: number, credId: number) =>
-    api.get<import("./types").ServiceCredential>(`/api/services/${serviceId}/credentials/${credId}`),
-  deleteCredential: (serviceId: number, credId: number) =>
-    api.delete(`/api/services/${serviceId}/credentials/${credId}`),
   fixate: (id: number) =>
     api.post<import("./types").Service>(`/api/services/${id}/fixate`),
   updateContainer: (id: number, data: { container_name: string; container_id: string }) =>
@@ -786,15 +779,44 @@ export const toolsAPI = {
   syncFromService: (data: { service_id: number; dns_id: number; embed_enabled?: boolean; icon?: string; sort_order?: number }) =>
     api.post<import("./types").ExternalTool>("/api/tools/sync-service", data),
   unsyncService: (id: number) => api.delete(`/api/tools/sync-service/${id}`),
-  listToolCredentials: (toolId: number) =>
-    api.get<import("./types").ServiceCredential[]>(`/api/tools/${toolId}/credentials`),
-  getToolCredential: (toolId: number, credId: number) =>
-    api.get<import("./types").ServiceCredential>(`/api/tools/${toolId}/credentials/${credId}`),
+  restore: (id: number) => api.post(`/api/tools/${id}/restore`),
 };
 
-// Service credentials (all services)
-export const serviceCredentialsAPI = {
-  listAll: () => api.get<import("./types").ServiceWithCredentials[]>("/api/services/credentials/all"),
+// Unified secrets — replaces the legacy serviceCredentialsAPI and the
+// service/tool credential endpoints. Backend: vault.SecretRepo, see spec
+// internal/spec/secrets-manager.md §6 for the full surface.
+export const secretsAPI = {
+  list: (params: { scope?: string; parent_id?: number; type?: string; visibility?: string; group_label?: string; include_deleted?: boolean } = {}) => {
+    const q = new URLSearchParams();
+    if (params.scope) q.set("scope", params.scope);
+    if (params.parent_id != null) q.set("parent_id", String(params.parent_id));
+    if (params.type) q.set("type", params.type);
+    if (params.visibility) q.set("visibility", params.visibility);
+    if (params.group_label) q.set("group_label", params.group_label);
+    if (params.include_deleted) q.set("include_deleted", "1");
+    const qs = q.toString();
+    return api.get<import("./types").Secret[]>(`/api/secrets${qs ? `?${qs}` : ""}`);
+  },
+  mine: () => api.get<import("./types").Secret[]>("/api/secrets/mine"),
+  trash: () => api.get<import("./types").Secret[]>("/api/secrets/trash"),
+  get: (id: number) => api.get<import("./types").Secret>(`/api/secrets/${id}`),
+  reveal: (id: number) => api.get<import("./types").SecretReveal>(`/api/secrets/${id}/reveal`),
+  create: (data: {
+    type: string;
+    scope: string;
+    visibility: string;
+    parent_id?: number;
+    owner_user_id?: number;
+    name: string;
+    group_label?: string;
+    description?: string;
+    payload: string;
+  }) => api.post<{ id: number }>("/api/secrets", data),
+  update: (id: number, data: { name?: string; description?: string; group_label?: string; payload?: string }) =>
+    api.put<{ id: number }>(`/api/secrets/${id}`, data),
+  delete: (id: number) => api.delete(`/api/secrets/${id}`),
+  restore: (id: number) => api.post(`/api/secrets/${id}/restore`),
+  history: (id: number) => api.get<{ id: number; secret_id: number; action: string; actor_user_id?: number; at: string; metadata?: unknown }[]>(`/api/secrets/${id}/history`),
 };
 
 // Appearance settings

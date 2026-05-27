@@ -255,10 +255,28 @@ export interface Orchestrator {
   updated_at: string;
 }
 
-export interface ServiceCredential {
+// Secret mirrors the backend vault.SecretView metadata shape returned by
+// /api/secrets — metadata only, never plaintext. Plaintext arrives via
+// /api/secrets/{id}/reveal which returns { payload: string } in SecretReveal.
+export interface Secret {
   id: number;
-  role_name: string;
-  credentials?: string;
+  type: "cred" | "sshkey" | "password" | "app_login" | "env_var";
+  scope: "service" | "host" | "tool" | "avulso";
+  visibility: "personal" | "shared";
+  parent_id?: number | null;
+  owner_user_id: number;
+  name: string;
+  group_label?: string | null;
+  description?: string | null;
+  key_version: number;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+}
+
+export interface SecretReveal {
+  payload: string;
 }
 
 export interface EnumOption {
@@ -340,13 +358,6 @@ export interface ExternalTool {
   has_credentials: boolean;
   created_at: string;
   updated_at: string;
-}
-
-export interface ServiceWithCredentials {
-  service_id: number;
-  service_nickname: string;
-  service_type: string;
-  credentials: ServiceCredential[];
 }
 
 export interface Contact {

@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toolsAPI, servicesAPI } from "@/lib/api";
+import { toolsAPI, servicesAPI, secretsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import type { ExternalTool, ServiceCredential } from "@/lib/types";
+import type { ExternalTool, Secret } from "@/lib/types";
 import PageShell from "@/components/layout/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -525,10 +525,15 @@ function SyncForm({ onSuccess }: { onSuccess: () => void }) {
 function CredentialsModal({ tool, onClose }: { tool: ExternalTool | null; onClose: () => void }) {
   const { t } = useLocale();
 
+  // The "tool credentials" view shows the linked service's shared secrets —
+  // a tool itself is a UI catalog row, not a secret container. We pivot
+  // through tool.service_id and query /api/secrets directly.
   const { data: credentials = [] } = useQuery({
-    queryKey: ["tool-credentials", tool?.id],
-    queryFn: () => toolsAPI.listToolCredentials(tool!.id),
-    enabled: !!tool,
+    queryKey: ["tool-secrets", tool?.service_id],
+    queryFn: () => tool?.service_id
+      ? secretsAPI.list({ scope: "service", parent_id: tool.service_id, visibility: "shared" })
+      : Promise.resolve([] as Secret[]),
+    enabled: !!tool && tool.service_id != null,
   });
 
   return (
@@ -538,7 +543,7 @@ function CredentialsModal({ tool, onClose }: { tool: ExternalTool | null; onClos
       ) : (
         <div className="space-y-2">
           {credentials.map((cred) => (
-            <CredentialRow key={cred.id} toolId={tool!.id} credential={cred} />
+            <CredentialRow key={cred.id} secret={cred} />
           ))}
         </div>
       )}
@@ -551,10 +556,15 @@ function CredentialsModal({ tool, onClose }: { tool: ExternalTool | null; onClos
 function CredentialsDrawer({ tool, onClose }: { tool: ExternalTool | null; onClose: () => void }) {
   const { t } = useLocale();
 
+  // The "tool credentials" view shows the linked service's shared secrets —
+  // a tool itself is a UI catalog row, not a secret container. We pivot
+  // through tool.service_id and query /api/secrets directly.
   const { data: credentials = [] } = useQuery({
-    queryKey: ["tool-credentials", tool?.id],
-    queryFn: () => toolsAPI.listToolCredentials(tool!.id),
-    enabled: !!tool,
+    queryKey: ["tool-secrets", tool?.service_id],
+    queryFn: () => tool?.service_id
+      ? secretsAPI.list({ scope: "service", parent_id: tool.service_id, visibility: "shared" })
+      : Promise.resolve([] as Secret[]),
+    enabled: !!tool && tool.service_id != null,
   });
 
   return (
@@ -564,7 +574,7 @@ function CredentialsDrawer({ tool, onClose }: { tool: ExternalTool | null; onClo
       ) : (
         <div className="space-y-2">
           {credentials.map((cred) => (
-            <CredentialRow key={cred.id} toolId={tool!.id} credential={cred} />
+            <CredentialRow key={cred.id} secret={cred} />
           ))}
         </div>
       )}
@@ -572,7 +582,7 @@ function CredentialsDrawer({ tool, onClose }: { tool: ExternalTool | null; onClo
   );
 }
 
-function CredentialRow({ toolId, credential }: { toolId: number; credential: ServiceCredential }) {
+function CredentialRow({ secret }: { secret: Secret }) {
   const { t } = useLocale();
   const [revealed, setRevealed] = useState(false);
   const [value, setValue] = useState<string | null>(null);
@@ -586,8 +596,8 @@ function CredentialRow({ toolId, credential }: { toolId: number; credential: Ser
     }
     setLoading(true);
     try {
-      const data = await toolsAPI.getToolCredential(toolId, credential.id);
-      setValue(data.credentials || "");
+      const data = await secretsAPI.reveal(secret.id);
+      setValue(data.payload || "");
       setRevealed(true);
     } catch {
       // ignore
@@ -599,7 +609,7 @@ function CredentialRow({ toolId, credential }: { toolId: number; credential: Ser
   return (
     <div className="bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-[var(--text-primary)]">{credential.role_name}</span>
+        <span className="text-sm font-medium text-[var(--text-primary)]">{secret.name}</span>
         <button
           onClick={reveal}
           disabled={loading}

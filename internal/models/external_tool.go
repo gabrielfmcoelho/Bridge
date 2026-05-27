@@ -44,7 +44,7 @@ func GetExternalTool(db *sql.DB, id int64) (*ExternalTool, error) {
 	err := db.QueryRow(
 		`SELECT t.id, t.name, t.description, t.url, t.icon, t.embed_enabled, t.sort_order,
 			t.service_id, t.dns_id, t.source,
-			(CASE WHEN t.service_id IS NOT NULL AND EXISTS (SELECT 1 FROM service_credentials sc WHERE sc.service_id = t.service_id) THEN 1 ELSE 0 END),
+			(CASE WHEN t.service_id IS NOT NULL AND EXISTS (SELECT 1 FROM secrets s WHERE s.scope = 'service' AND s.parent_id = t.service_id AND s.deleted_at IS NULL) THEN 1 ELSE 0 END),
 			t.created_at, t.updated_at
 		FROM external_tools t WHERE t.id = ? AND t.deleted_at IS NULL`, id,
 	).Scan(&t.ID, &t.Name, &t.Description, &t.URL, &t.Icon, &t.EmbedEnabled, &t.SortOrder,
@@ -59,7 +59,7 @@ func ListExternalTools(db *sql.DB) ([]ExternalTool, error) {
 	rows, err := db.Query(
 		`SELECT t.id, t.name, t.description, t.url, t.icon, t.embed_enabled, t.sort_order,
 			t.service_id, t.dns_id, t.source,
-			(CASE WHEN t.service_id IS NOT NULL AND EXISTS (SELECT 1 FROM service_credentials sc WHERE sc.service_id = t.service_id) THEN 1 ELSE 0 END),
+			(CASE WHEN t.service_id IS NOT NULL AND EXISTS (SELECT 1 FROM secrets s WHERE s.scope = 'service' AND s.parent_id = t.service_id AND s.deleted_at IS NULL) THEN 1 ELSE 0 END),
 			t.created_at, t.updated_at
 		FROM external_tools t WHERE t.deleted_at IS NULL ORDER BY t.sort_order, t.name`,
 	)

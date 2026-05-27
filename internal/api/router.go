@@ -120,12 +120,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("POST /api/services/{id}/fixate", authedRole(db, "editor", http.HandlerFunc(sh.handleFixate)))
 	mux.Handle("PUT /api/services/{id}/container", authedRole(db, "editor", http.HandlerFunc(sh.handleUpdateContainer)))
 
-	// Service credentials
-	mux.Handle("GET /api/services/credentials/all", authenticated(db, http.HandlerFunc(sh.handleListAllCredentials)))
-	mux.Handle("GET /api/services/{id}/credentials", authenticated(db, http.HandlerFunc(sh.handleListCredentials)))
-	mux.Handle("POST /api/services/{id}/credentials", authedRole(db, "editor", http.HandlerFunc(sh.handleCreateCredential)))
-	mux.Handle("GET /api/services/{id}/credentials/{credId}", authenticated(db, http.HandlerFunc(sh.handleGetCredential)))
-	mux.Handle("DELETE /api/services/{id}/credentials/{credId}", authedRole(db, "admin", http.HandlerFunc(sh.handleDeleteCredential)))
+	// (Legacy /api/services/{id}/credentials and /api/services/credentials/all
+	// were removed in Phase 1 cutover — callers use /api/secrets directly.)
 
 	// Unified secrets (Phase 1 — spec §6). Auth at the perimeter only;
 	// per-row ACL (RBAC for shared, ownership for personal) lives in vault.
@@ -202,8 +198,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("POST /api/tools/sync-service", authedRole(db, "admin", http.HandlerFunc(th.handleSyncFromService)))
 	mux.Handle("DELETE /api/tools/sync-service/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleUnsyncService)))
 	mux.Handle("GET /api/tools/{id}", authenticated(db, http.HandlerFunc(th.handleGet)))
-	mux.Handle("GET /api/tools/{id}/credentials", authenticated(db, http.HandlerFunc(th.handleListToolCredentials)))
-	mux.Handle("GET /api/tools/{id}/credentials/{credId}", authenticated(db, http.HandlerFunc(th.handleGetToolCredential)))
+	// (Legacy /api/tools/{id}/credentials* removed in Phase 1 cutover —
+	// callers query /api/secrets?scope=service&parent_id=<tool.service_id>.)
 	mux.Handle("PUT /api/tools/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleUpdate)))
 	mux.Handle("DELETE /api/tools/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleDelete)))
 	mux.Handle("POST /api/tools/{id}/restore", authedRole(db, "admin", http.HandlerFunc(th.handleRestore)))

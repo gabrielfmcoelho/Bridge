@@ -221,7 +221,6 @@ export default function ServiceDetail({ id }: { id: number }) {
 
           {activeTab === "credentials" && (
             <CredentialsTab
-              credentials={data.credentials}
               serviceId={id}
               isAdmin={isAdmin}
               t={t}

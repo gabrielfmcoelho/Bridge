@@ -68,16 +68,8 @@ func (h *serviceHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	dependsOnIDs, _ := models.GetServiceDependencyIDs(h.db.SQL, id)
 	dependentIDs, _ := models.GetServiceDependentIDs(h.db.SQL, id)
 
-	// List credentials (role names only).
-	creds, _ := models.ListServiceCredentials(h.db.SQL, id)
-	type credSummary struct {
-		ID       int64  `json:"id"`
-		RoleName string `json:"role_name"`
-	}
-	credList := make([]credSummary, len(creds))
-	for i, c := range creds {
-		credList[i] = credSummary{ID: c.ID, RoleName: c.RoleName}
-	}
+	// Credentials are fetched separately by the frontend via /api/secrets —
+	// the legacy inline credentials[] field was removed in Phase 1 cutover.
 
 	responsaveis, _ := models.ListServiceResponsaveis(h.db.SQL, id)
 
@@ -88,7 +80,6 @@ func (h *serviceHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		"dns_ids":        dnsIDs,
 		"depends_on_ids": dependsOnIDs,
 		"dependent_ids":  dependentIDs,
-		"credentials":    credList,
 		"responsaveis":   responsaveis,
 	})
 }
@@ -225,112 +216,9 @@ func (h *serviceHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
-// Service credentials
-
-func (h *serviceHandlers) handleListCredentials(w http.ResponseWriter, r *http.Request) {
-	serviceID, err := pathInt64(r, "id")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid service id", err)
-		return
-	}
-
-	creds, err := models.ListServiceCredentials(h.db.SQL, serviceID)
-	if err != nil {
-		jsonServerError(w, r, "failed to list credentials", err)
-		return
-	}
-
-	// Return role names only (not decrypted secrets).
-	type credSummary struct {
-		ID       int64  `json:"id"`
-		RoleName string `json:"role_name"`
-	}
-	result := make([]credSummary, len(creds))
-	for i, c := range creds {
-		result[i] = credSummary{ID: c.ID, RoleName: c.RoleName}
-	}
-	jsonOK(w, result)
-}
-
-func (h *serviceHandlers) handleCreateCredential(w http.ResponseWriter, r *http.Request) {
-	serviceID, err := pathInt64(r, "id")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid service id", err)
-		return
-	}
-
-	var req struct {
-		RoleName    string `json:"role_name"`
-		Credentials string `json:"credentials"`
-	}
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
-		return
-	}
-	if req.RoleName == "" || req.Credentials == "" {
-		jsonError(w, http.StatusBadRequest, "role_name and credentials are required")
-		return
-	}
-
-	ct, nonce, err := h.db.Encryptor.Encrypt(req.Credentials)
-	if err != nil {
-		jsonServerError(w, r, "failed to encrypt credentials", err)
-		return
-	}
-
-	sc := &models.ServiceCredential{
-		ServiceID:             serviceID,
-		RoleName:              req.RoleName,
-		CredentialsCiphertext: ct,
-		CredentialsNonce:      nonce,
-	}
-	if err := models.CreateServiceCredential(h.db.SQL, sc); err != nil {
-		jsonError(w, http.StatusConflict, "credential role already exists for this service")
-		return
-	}
-
-	jsonCreated(w, map[string]any{"id": sc.ID, "role_name": sc.RoleName})
-}
-
-func (h *serviceHandlers) handleGetCredential(w http.ResponseWriter, r *http.Request) {
-	credID, err := pathInt64(r, "credId")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid credential id", err)
-		return
-	}
-
-	cred, err := models.GetServiceCredential(h.db.SQL, credID)
-	if err != nil || cred == nil {
-		jsonError(w, http.StatusNotFound, "credential not found")
-		return
-	}
-
-	plaintext, err := h.db.Encryptor.Decrypt(cred.CredentialsCiphertext, cred.CredentialsNonce)
-	if err != nil {
-		jsonServerError(w, r, "failed to decrypt credentials", err)
-		return
-	}
-
-	jsonOK(w, map[string]any{
-		"id":          cred.ID,
-		"role_name":   cred.RoleName,
-		"credentials": plaintext,
-	})
-}
-
-func (h *serviceHandlers) handleDeleteCredential(w http.ResponseWriter, r *http.Request) {
-	credID, err := pathInt64(r, "credId")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid credential id", err)
-		return
-	}
-
-	if err := models.DeleteServiceCredential(h.db.SQL, credID); err != nil {
-		jsonServerError(w, r, "failed to delete credential", err)
-		return
-	}
-	jsonOK(w, map[string]string{"status": "deleted"})
-}
+// Legacy service-credential handlers were removed in the Phase 1 cutover.
+// Callers query /api/secrets?scope=service&parent_id=<id> (list metadata)
+// and /api/secrets/{id}/reveal (decrypt) instead.
 
 // handleFixate converts an auto-discovered service to a fixed service.
 func (h *serviceHandlers) handleFixate(w http.ResponseWriter, r *http.Request) {
@@ -396,48 +284,6 @@ func (h *serviceHandlers) handleUpdateContainer(w http.ResponseWriter, r *http.R
 	jsonOK(w, svc)
 }
 
-// handleListAllCredentials returns all services that have credentials, with role summaries.
-func (h *serviceHandlers) handleListAllCredentials(w http.ResponseWriter, r *http.Request) {
-	services, err := models.ListServices(h.db.SQL)
-	if err != nil {
-		jsonServerError(w, r, "failed to list services", err)
-		return
-	}
-
-	type credSummary struct {
-		ID       int64  `json:"id"`
-		RoleName string `json:"role_name"`
-	}
-	type serviceWithCreds struct {
-		ServiceID       int64         `json:"service_id"`
-		ServiceNickname string        `json:"service_nickname"`
-		ServiceType     string        `json:"service_type"`
-		Credentials     []credSummary `json:"credentials"`
-	}
-
-	var result []serviceWithCreds
-	for _, svc := range services {
-		creds, err := models.ListServiceCredentials(h.db.SQL, svc.ID)
-		if err != nil {
-			jsonServerError(w, r, "failed to list credentials", err)
-			return
-		}
-		if len(creds) == 0 {
-			continue
-		}
-		summaries := make([]credSummary, len(creds))
-		for i, c := range creds {
-			summaries[i] = credSummary{ID: c.ID, RoleName: c.RoleName}
-		}
-		result = append(result, serviceWithCreds{
-			ServiceID:       svc.ID,
-			ServiceNickname: svc.Nickname,
-			ServiceType:     svc.ServiceType,
-			Credentials:     summaries,
-		})
-	}
-	if result == nil {
-		result = []serviceWithCreds{}
-	}
-	jsonOK(w, result)
-}
+// handleListAllCredentials was removed in the Phase 1 cutover. The
+// frontend now grouping-by-service is done client-side on top of
+// /api/secrets?scope=service&visibility=shared + /api/services.

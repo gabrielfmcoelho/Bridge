@@ -1,20 +1,26 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import type { ServiceCredential } from "@/lib/types";
+import { secretsAPI } from "@/lib/api";
 
 interface CredentialsTabProps {
-  credentials: ServiceCredential[];
   serviceId: number;
   isAdmin: boolean;
   t: (key: string) => string;
 }
 
-export default function CredentialsTab({ credentials, serviceId, isAdmin, t }: CredentialsTabProps) {
+export default function CredentialsTab({ serviceId, isAdmin, t }: CredentialsTabProps) {
   const router = useRouter();
+  // Fetch shared service-scoped secrets via the unified vault. The legacy
+  // /api/services/{id}/credentials route was removed in the Phase 1 cutover.
+  const { data: secrets = [] } = useQuery({
+    queryKey: ["service-secrets", serviceId],
+    queryFn: () => secretsAPI.list({ scope: "service", parent_id: serviceId, visibility: "shared" }),
+  });
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -25,17 +31,17 @@ export default function CredentialsTab({ credentials, serviceId, isAdmin, t }: C
         >
           {t("service.credentials")}
         </h2>
-        {credentials && credentials.length > 0 ? (
+        {secrets.length > 0 ? (
           <div className="space-y-2">
-            {credentials.map((cred) => (
+            {secrets.map((s) => (
               <div
-                key={cred.id}
+                key={s.id}
                 className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] bg-[var(--bg-elevated)]"
               >
                 <svg className="w-4 h-4 text-purple-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
                 </svg>
-                <Badge>{cred.role_name}</Badge>
+                <Badge>{s.name}</Badge>
               </div>
             ))}
           </div>
@@ -47,7 +53,7 @@ export default function CredentialsTab({ credentials, serviceId, isAdmin, t }: C
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => router.push(`/services/${serviceId}/credentials/new`)}
+              onClick={() => router.push(`/secrets?scope=service&parent_id=${serviceId}`)}
             >
               Add Credential
             </Button>

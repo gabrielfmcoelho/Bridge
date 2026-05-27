@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { serviceCredentialsAPI, servicesAPI } from "@/lib/api";
+import { secretsAPI, servicesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
-import type { ServiceCredential } from "@/lib/types";
+import type { Secret } from "@/lib/types";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
@@ -12,13 +12,38 @@ import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 
+// ServiceCredentialsPage groups shared service-scoped secrets by parent
+// service. The unified vault (/api/secrets) doesn't ship a server-side
+// group-by-service shape (the old serviceCredentialsAPI.listAll did), so
+// this page joins two queries on the client: all shared service secrets
+// + the services list (for nicknames + types).
 export default function ServiceCredentialsPage() {
   const { t } = useLocale();
 
-  const { data: servicesWithCreds = [], isLoading } = useQuery({
-    queryKey: ["service-credentials-all"],
-    queryFn: serviceCredentialsAPI.listAll,
+  const { data: secrets = [], isLoading: secretsLoading } = useQuery({
+    queryKey: ["secrets", "service", "shared"],
+    queryFn: () => secretsAPI.list({ scope: "service", visibility: "shared" }),
   });
+
+  const { data: services = [], isLoading: servicesLoading } = useQuery({
+    queryKey: ["services-list"],
+    queryFn: servicesAPI.list,
+  });
+
+  const isLoading = secretsLoading || servicesLoading;
+
+  const grouped = useMemo(() => {
+    const byID = new Map<number, { service: typeof services[number]; secrets: Secret[] }>();
+    for (const s of services) {
+      byID.set(s.id, { service: s, secrets: [] });
+    }
+    for (const sec of secrets) {
+      if (sec.parent_id == null) continue;
+      const bucket = byID.get(sec.parent_id);
+      if (bucket) bucket.secrets.push(sec);
+    }
+    return Array.from(byID.values()).filter((g) => g.secrets.length > 0);
+  }, [secrets, services]);
 
   return (
     <PageShell>
@@ -29,7 +54,7 @@ export default function ServiceCredentialsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
-      ) : servicesWithCreds.length === 0 ? (
+      ) : grouped.length === 0 ? (
         <EmptyState
           icon="key"
           title={t("serviceCredentials.noServices")}
@@ -37,13 +62,12 @@ export default function ServiceCredentialsPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {servicesWithCreds.map((svc, i) => (
-            <div key={svc.service_id} className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" }}>
+          {grouped.map((g, i) => (
+            <div key={g.service.id} className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" }}>
               <ServiceCredentialCard
-                serviceId={svc.service_id}
-                nickname={svc.service_nickname}
-                serviceType={svc.service_type}
-                credentials={svc.credentials}
+                nickname={g.service.nickname}
+                serviceType={g.service.service_type || ""}
+                secrets={g.secrets}
               />
             </div>
           ))}
@@ -54,15 +78,13 @@ export default function ServiceCredentialsPage() {
 }
 
 function ServiceCredentialCard({
-  serviceId,
   nickname,
   serviceType,
-  credentials,
+  secrets,
 }: {
-  serviceId: number;
   nickname: string;
   serviceType: string;
-  credentials: ServiceCredential[];
+  secrets: Secret[];
 }) {
   const { t } = useLocale();
 
@@ -79,22 +101,22 @@ function ServiceCredentialCard({
           <div className="flex items-center gap-2 mt-0.5">
             {serviceType && <Badge color="amber">{serviceType}</Badge>}
             <span className="text-xs text-[var(--text-faint)]">
-              {credentials.length} {t("serviceCredentials.credentials")}
+              {secrets.length} {t("serviceCredentials.credentials")}
             </span>
           </div>
         </div>
       </div>
 
       <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] space-y-2">
-        {credentials.map((cred) => (
-          <CredentialRow key={cred.id} serviceId={serviceId} credential={cred} />
+        {secrets.map((s) => (
+          <SecretRow key={s.id} secret={s} />
         ))}
       </div>
     </Card>
   );
 }
 
-function CredentialRow({ serviceId, credential }: { serviceId: number; credential: ServiceCredential }) {
+function SecretRow({ secret }: { secret: Secret }) {
   const { t } = useLocale();
   const [revealed, setRevealed] = useState(false);
   const [value, setValue] = useState<string | null>(null);
@@ -108,8 +130,8 @@ function CredentialRow({ serviceId, credential }: { serviceId: number; credentia
     }
     setLoading(true);
     try {
-      const data = await servicesAPI.getCredential(serviceId, credential.id);
-      setValue(data.credentials || "");
+      const data = await secretsAPI.reveal(secret.id);
+      setValue(data.payload || "");
       setRevealed(true);
     } catch {
       // ignore
@@ -121,7 +143,7 @@ function CredentialRow({ serviceId, credential }: { serviceId: number; credentia
   return (
     <div className="bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-2.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-[var(--text-primary)]">{credential.role_name}</span>
+        <span className="text-xs font-medium text-[var(--text-primary)]">{secret.name}</span>
         <button
           onClick={reveal}
           disabled={loading}
