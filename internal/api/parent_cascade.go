@@ -48,3 +48,51 @@ func cascadeParentDelete(
 	}
 	return tx.Commit()
 }
+
+// cascadeParentSoftDelete is the soft-delete counterpart: it cascade-soft-
+// deletes child secrets and then runs parentSoftDeleteSQL (one `?` for
+// parent id) — typically `UPDATE <table> SET deleted_at = CURRENT_TIMESTAMP
+// WHERE id = ?`. Both rows-affected counts commit in the same transaction.
+//
+// Used by parent tables that support soft-delete (currently only
+// external_tools after migration v62). Services + hosts remain
+// hard-delete-only and route through cascadeParentDelete.
+func cascadeParentSoftDelete(
+	r *http.Request,
+	db *database.DB,
+	scope models.SecretScope,
+	parentID int64,
+	parentSoftDeleteSQL string,
+) error {
+	return cascadeParentDelete(r, db, scope, parentID, parentSoftDeleteSQL)
+}
+
+// cascadeParentRestore is the inverse: cascade-restores child secrets, then
+// runs parentRestoreSQL — typically `UPDATE <table> SET deleted_at = NULL
+// WHERE id = ?`. Both commits happen atomically.
+//
+// Activates vault.CascadeRestore which until v62 had no live caller.
+func cascadeParentRestore(
+	r *http.Request,
+	db *database.DB,
+	scope models.SecretScope,
+	parentID int64,
+	parentRestoreSQL string,
+) error {
+	var actor vault.ActorContext
+	if u := auth.UserFromContext(r.Context()); u != nil {
+		actor = vault.ActorContext{UserID: u.ID, Role: u.Role}
+	}
+	tx, err := db.SQL.BeginTx(r.Context(), nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := vault.CascadeRestore(r.Context(), tx, scope, parentID, actor); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(r.Context(), parentRestoreSQL, parentID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

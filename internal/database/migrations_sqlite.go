@@ -1104,4 +1104,12 @@ var migrationsSQLite = []string{
 	CREATE INDEX IF NOT EXISTS idx_secret_audit_log_secret ON secret_audit_log(secret_id, at);
 	CREATE INDEX IF NOT EXISTS idx_secret_audit_log_actor  ON secret_audit_log(actor_user_id, at);`,
 
+	// Version 62: soft-delete for external_tools (Phase 1.7b).
+	// Activates vault.CascadeRestore which until now had no live caller —
+	// when an external tool is restored, its child secrets are restored in
+	// the same transaction. services + hosts remain hard-delete-only;
+	// expanding soft-delete to them is a deferred follow-up.
+	`ALTER TABLE external_tools ADD COLUMN deleted_at DATETIME;
+	CREATE INDEX IF NOT EXISTS idx_external_tools_live    ON external_tools (id) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_external_tools_trash   ON external_tools (deleted_at) WHERE deleted_at IS NOT NULL;`,
 }

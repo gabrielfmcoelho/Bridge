@@ -206,6 +206,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/tools/{id}/credentials/{credId}", authenticated(db, http.HandlerFunc(th.handleGetToolCredential)))
 	mux.Handle("PUT /api/tools/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleUpdate)))
 	mux.Handle("DELETE /api/tools/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleDelete)))
+	mux.Handle("POST /api/tools/{id}/restore", authedRole(db, "admin", http.HandlerFunc(th.handleRestore)))
 
 	// App settings (appearance)
 	// GET is public (no auth) so login/setup pages can load branding

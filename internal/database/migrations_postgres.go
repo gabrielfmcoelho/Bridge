@@ -1026,4 +1026,9 @@ var migrationsPostgres = []string{
 	CREATE INDEX IF NOT EXISTS idx_secret_audit_log_secret ON secret_audit_log(secret_id, at);
 	CREATE INDEX IF NOT EXISTS idx_secret_audit_log_actor  ON secret_audit_log(actor_user_id, at);`,
 
+	// Version 62: soft-delete for external_tools — see migrations_sqlite.go
+	// for the design rationale.
+	`ALTER TABLE external_tools ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	CREATE INDEX IF NOT EXISTS idx_external_tools_live    ON external_tools (id) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_external_tools_trash   ON external_tools (deleted_at) WHERE deleted_at IS NOT NULL;`,
 }

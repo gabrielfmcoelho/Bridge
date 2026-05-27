@@ -102,12 +102,33 @@ func (h *toolHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := cascadeParentDelete(r, h.db, models.SecretScopeTool, id,
-		`DELETE FROM external_tools WHERE id = ?`); err != nil {
+	// Soft delete (v62): flip external_tools.deleted_at and cascade-soft-
+	// delete child secrets in the same transaction. Reachable via
+	// /api/tools/{id}/restore.
+	if err := cascadeParentSoftDelete(r, h.db, models.SecretScopeTool, id,
+		`UPDATE external_tools SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`); err != nil {
 		jsonServerError(w, r, "failed to delete tool", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// handleRestore reverses a soft delete on the external_tool and cascade-
+// restores any child secrets that were soft-deleted by the parent's
+// previous delete (matched by audit metadata or just by being currently
+// soft-deleted with the same parent — CascadeRestore is idempotent).
+func (h *toolHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
+	id, err := pathInt64(r, "id")
+	if err != nil {
+		jsonBadRequest(w, r, "invalid id", err)
+		return
+	}
+	if err := cascadeParentRestore(r, h.db, models.SecretScopeTool, id,
+		`UPDATE external_tools SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL`); err != nil {
+		jsonServerError(w, r, "failed to restore tool", err)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "restored"})
 }
 
 // handleSyncFromService creates or updates a tool entry linked to a service+DNS pair.

@@ -46,7 +46,7 @@ func GetExternalTool(db *sql.DB, id int64) (*ExternalTool, error) {
 			t.service_id, t.dns_id, t.source,
 			(CASE WHEN t.service_id IS NOT NULL AND EXISTS (SELECT 1 FROM service_credentials sc WHERE sc.service_id = t.service_id) THEN 1 ELSE 0 END),
 			t.created_at, t.updated_at
-		FROM external_tools t WHERE t.id = ?`, id,
+		FROM external_tools t WHERE t.id = ? AND t.deleted_at IS NULL`, id,
 	).Scan(&t.ID, &t.Name, &t.Description, &t.URL, &t.Icon, &t.EmbedEnabled, &t.SortOrder,
 		&t.ServiceID, &t.DNSID, &t.Source, &t.HasCredentials, &t.CreatedAt, &t.UpdatedAt)
 	if err == sql.ErrNoRows {
@@ -61,7 +61,7 @@ func ListExternalTools(db *sql.DB) ([]ExternalTool, error) {
 			t.service_id, t.dns_id, t.source,
 			(CASE WHEN t.service_id IS NOT NULL AND EXISTS (SELECT 1 FROM service_credentials sc WHERE sc.service_id = t.service_id) THEN 1 ELSE 0 END),
 			t.created_at, t.updated_at
-		FROM external_tools t ORDER BY t.sort_order, t.name`,
+		FROM external_tools t WHERE t.deleted_at IS NULL ORDER BY t.sort_order, t.name`,
 	)
 	if err != nil {
 		return nil, err
@@ -97,12 +97,15 @@ func DeleteExternalTool(db *sql.DB, id int64) error {
 }
 
 // GetToolByServiceAndDNS looks up an existing synced tool for a service+DNS pair.
+// Excludes soft-deleted rows so a sync against a (service, dns) pair whose
+// previous tool was trashed re-creates a fresh row instead of resurrecting
+// the soft-deleted one with stale fields.
 func GetToolByServiceAndDNS(db *sql.DB, serviceID, dnsID int64) (*ExternalTool, error) {
 	t := &ExternalTool{}
 	err := db.QueryRow(
 		`SELECT t.id, t.name, t.description, t.url, t.icon, t.embed_enabled, t.sort_order,
 			t.service_id, t.dns_id, t.source, 0, t.created_at, t.updated_at
-		FROM external_tools t WHERE t.service_id = ? AND t.dns_id = ?`, serviceID, dnsID,
+		FROM external_tools t WHERE t.service_id = ? AND t.dns_id = ? AND t.deleted_at IS NULL`, serviceID, dnsID,
 	).Scan(&t.ID, &t.Name, &t.Description, &t.URL, &t.Icon, &t.EmbedEnabled, &t.SortOrder,
 		&t.ServiceID, &t.DNSID, &t.Source, &t.HasCredentials, &t.CreatedAt, &t.UpdatedAt)
 	if err == sql.ErrNoRows {
