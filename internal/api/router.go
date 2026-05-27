@@ -10,6 +10,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	glpiclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/glpi"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 // NewRouter creates the API mux with all routes and middleware.
@@ -125,6 +126,11 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("POST /api/services/{id}/credentials", authedRole(db, "editor", http.HandlerFunc(sh.handleCreateCredential)))
 	mux.Handle("GET /api/services/{id}/credentials/{credId}", authenticated(db, http.HandlerFunc(sh.handleGetCredential)))
 	mux.Handle("DELETE /api/services/{id}/credentials/{credId}", authedRole(db, "admin", http.HandlerFunc(sh.handleDeleteCredential)))
+
+	// Unified secrets (Phase 1 — spec §6). Auth at the perimeter only;
+	// per-row ACL (RBAC for shared, ownership for personal) lives in vault.
+	secretH := &secretHandlers{db: db, repo: vault.NewSecretRepo(db)}
+	secretH.register(mux, func(next http.Handler) http.Handler { return authenticated(db, next) })
 
 	// Orchestrators
 	mux.Handle("GET /api/orchestrators", authenticated(db, http.HandlerFunc(oh.handleList)))

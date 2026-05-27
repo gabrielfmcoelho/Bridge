@@ -18,6 +18,14 @@ func UserFromContext(ctx context.Context) *models.User {
 	return u
 }
 
+// WithUser returns a context carrying u as the authenticated user. This is
+// the inverse of UserFromContext and exists to let tests fabricate an
+// authenticated request without going through the full session lookup. The
+// production auth flow constructs the same context inside RequireAuth.
+func WithUser(ctx context.Context, u *models.User) context.Context {
+	return context.WithValue(ctx, userContextKey, u)
+}
+
 // RequireAuth is middleware that rejects unauthenticated requests with 401.
 func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
