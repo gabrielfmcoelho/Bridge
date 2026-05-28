@@ -16,6 +16,7 @@ import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import ShareLinkModal from "./_components/ShareLinkModal";
 import HistoryDrawer from "./_components/HistoryDrawer";
+import NewSecretModal from "./_components/NewSecretModal";
 
 // Page contract (Plans.md Task 4.1):
 //   - Single API call (/api/secrets) hydrates the list; filtering is
@@ -58,6 +59,7 @@ function SecretsPageInner() {
   const [typeF, setTypeF] = useState<TypeFilter>(initialType);
   const [shareTarget, setShareTarget] = useState<number | null>(null);
   const [historyTarget, setHistoryTarget] = useState<number | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
 
   const { data: rawSecrets = [], isLoading, refetch } = useQuery({
     queryKey: ["secrets-all"],
@@ -79,13 +81,18 @@ function SecretsPageInner() {
   return (
     <PageShell>
       <PageHeader title="Vault" />
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-[var(--text-muted)]">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <p className="text-sm text-[var(--text-muted)] flex-1 min-w-[200px]">
           All secrets you can access. Personal secrets are owner-only; shared secrets follow role-based ACL.
         </p>
-        <Link href="/secrets/trash" className="text-xs text-[var(--accent)] hover:underline">
-          View trash →
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/secrets/trash" className="text-xs text-[var(--accent)] hover:underline">
+            View trash →
+          </Link>
+          <Button size="sm" onClick={() => setNewOpen(true)}>
+            + New secret
+          </Button>
+        </div>
       </div>
 
       <Card className="mb-4">
@@ -130,6 +137,7 @@ function SecretsPageInner() {
 
       <ShareLinkModal secretID={shareTarget} onClose={() => setShareTarget(null)} />
       <HistoryDrawer secretID={historyTarget} onClose={() => setHistoryTarget(null)} />
+      <NewSecretModal open={newOpen} onClose={() => setNewOpen(false)} />
     </PageShell>
   );
 }
