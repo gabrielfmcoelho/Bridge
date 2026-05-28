@@ -35,11 +35,14 @@ func (h *secretHandlers) register(mux *http.ServeMux, wrap func(http.Handler) ht
 	}
 	mux.Handle("GET /api/secrets", wrap(http.HandlerFunc(h.handleList)))
 	mux.Handle("POST /api/secrets", wrap(http.HandlerFunc(h.handleCreate)))
-	// Literal sub-paths (mine, trash) must be registered before the
+	// Literal sub-paths (mine, trash, env) must be registered before the
 	// catch-all /{id} pattern. Go 1.22+ mux specificity picks the literal
 	// match automatically, but listing them first keeps the intent obvious.
 	mux.Handle("GET /api/secrets/mine", wrap(http.HandlerFunc(h.handleMine)))
 	mux.Handle("GET /api/secrets/trash", wrap(http.HandlerFunc(h.handleTrash)))
+	// Env-var bundle endpoints (Phase 2 — Tasks 2.2 + 2.3).
+	mux.Handle("POST /api/secrets/env/bulk", wrap(http.HandlerFunc(h.handleEnvBulk)))
+	mux.Handle("GET /api/secrets/env", wrap(http.HandlerFunc(h.handleEnvList)))
 	mux.Handle("GET /api/secrets/{id}", wrap(http.HandlerFunc(h.handleGetMetadata)))
 	mux.Handle("GET /api/secrets/{id}/reveal", wrap(http.HandlerFunc(h.handleReveal)))
 	mux.Handle("GET /api/secrets/{id}/history", wrap(http.HandlerFunc(h.handleHistory)))
