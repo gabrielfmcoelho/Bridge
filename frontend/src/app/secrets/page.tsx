@@ -15,6 +15,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import ShareLinkModal from "./_components/ShareLinkModal";
+import HistoryDrawer from "./_components/HistoryDrawer";
 
 // Page contract (Plans.md Task 4.1):
 //   - Single API call (/api/secrets) hydrates the list; filtering is
@@ -56,6 +57,7 @@ function SecretsPageInner() {
   const [visibility, setVisibility] = useState<VisibilityFilter>(initialVisibility);
   const [typeF, setTypeF] = useState<TypeFilter>(initialType);
   const [shareTarget, setShareTarget] = useState<number | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<number | null>(null);
 
   const { data: rawSecrets = [], isLoading, refetch } = useQuery({
     queryKey: ["secrets-all"],
@@ -119,6 +121,7 @@ function SecretsPageInner() {
               key={s.id}
               secret={s}
               onShare={() => setShareTarget(s.id)}
+              onHistory={() => setHistoryTarget(s.id)}
               onDeleted={refetch}
             />
           ))}
@@ -126,6 +129,7 @@ function SecretsPageInner() {
       )}
 
       <ShareLinkModal secretID={shareTarget} onClose={() => setShareTarget(null)} />
+      <HistoryDrawer secretID={historyTarget} onClose={() => setHistoryTarget(null)} />
     </PageShell>
   );
 }
@@ -165,10 +169,12 @@ function Chip({
 function SecretRow({
   secret,
   onShare,
+  onHistory,
   onDeleted,
 }: {
   secret: Secret;
   onShare: () => void;
+  onHistory: () => void;
   onDeleted: () => void;
 }) {
   const { user } = useAuth();
@@ -242,6 +248,9 @@ function SecretRow({
               Share
             </Button>
           )}
+          <Button size="sm" variant="ghost" onClick={onHistory}>
+            History
+          </Button>
           <Button size="sm" variant="danger" onClick={() => del.mutate()} disabled={del.isPending}>
             Delete
           </Button>
