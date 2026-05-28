@@ -27,8 +27,14 @@ const (
 )
 
 // Encryptor provides AES-256-GCM encryption for sensitive data.
+//
+// The raw master key bytes are retained on the struct (in addition to the
+// derived AEAD cipher) so callers like internal/secretshare can derive
+// per-link keys via HKDF. The raw key never leaves the process and is
+// returned by MasterKey() only to subsystems inside the same binary.
 type Encryptor struct {
 	aead   cipher.AEAD
+	key    []byte
 	source KeySource
 }
 
@@ -52,7 +58,18 @@ func NewEncryptor(keyPath string) (*Encryptor, error) {
 		return nil, err
 	}
 
-	return &Encryptor{aead: aead, source: source}, nil
+	return &Encryptor{aead: aead, key: key, source: source}, nil
+}
+
+// MasterKey returns the raw 32-byte AES master key. Used by internal
+// subsystems that need to derive per-link/per-tenant keys (HKDF input).
+// Callers MUST NOT log, persist, or transmit this value — it's a process-
+// local secret. The returned slice is a copy so the caller can't mutate
+// the Encryptor's internal state.
+func (e *Encryptor) MasterKey() []byte {
+	out := make([]byte, len(e.key))
+	copy(out, e.key)
+	return out
 }
 
 // Source reports where the active key came from. Useful to detect the
