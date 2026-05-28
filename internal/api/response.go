@@ -4,7 +4,24 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 )
+
+// scrubPath redacts share-link tokens from URL paths before they hit logs.
+// /api/share/{token} contains the SECRET CAPABILITY for the share link
+// (the token is also the HKDF salt — see secretshare). Logging it would
+// hand a copy to anyone with log access, defeating the D4 property.
+//
+// Returns "/api/share/[REDACTED]" for any path under /api/share/; passes
+// other paths through unchanged. Cheap enough to apply unconditionally
+// at every log call site.
+func scrubPath(path string) string {
+	const prefix = "/api/share/"
+	if strings.HasPrefix(path, prefix) {
+		return prefix + "[REDACTED]"
+	}
+	return path
+}
 
 func jsonOK(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -28,7 +45,7 @@ func jsonError(w http.ResponseWriter, status int, msg string) {
 // request context so operators can diagnose production failures. The client
 // only sees the sanitized `msg`; the real `err` stays in server logs.
 func jsonServerError(w http.ResponseWriter, r *http.Request, msg string, err error) {
-	log.Printf("[api] %s %s: %s: %v", r.Method, r.URL.Path, msg, err)
+	log.Printf("[api] %s %s: %s: %v", r.Method, scrubPath(r.URL.Path), msg, err)
 	jsonError(w, http.StatusInternalServerError, msg)
 }
 
@@ -36,7 +53,7 @@ func jsonServerError(w http.ResponseWriter, r *http.Request, msg string, err err
 // server-side diagnostics (e.g. JSON decode failures, validation surprises).
 func jsonBadRequest(w http.ResponseWriter, r *http.Request, msg string, err error) {
 	if err != nil {
-		log.Printf("[api] %s %s: bad request: %s: %v", r.Method, r.URL.Path, msg, err)
+		log.Printf("[api] %s %s: bad request: %s: %v", r.Method, scrubPath(r.URL.Path), msg, err)
 	}
 	jsonError(w, http.StatusBadRequest, msg)
 }

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/api"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +30,10 @@ var webCmd = &cobra.Command{
 			return fmt.Errorf("opening database: %w", err)
 		}
 		defer db.Close()
+
+		// Background: clean up expired share links every hour (Phase 3 Task 3.4).
+		// Cancelled when web's parent context is cancelled — process exit.
+		vault.NewShareLinkJanitor(db.SQL).Start(context.Background())
 
 		apiRouter := api.NewRouter(db, configPath)
 
