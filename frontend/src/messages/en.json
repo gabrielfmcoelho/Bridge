@@ -28,6 +28,7 @@
     "credentials": "Credentials",
     "hostCredentials": "Host Credentials",
     "serviceCredentials": "Service Credentials",
+    "vault": "Vault",
     "toolsSection": "Tools",
     "modules": "Modules",
     "atlas": "Atlas",
