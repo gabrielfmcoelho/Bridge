@@ -166,7 +166,11 @@ func (h *projectHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	models.DeleteTags(h.db.SQL, "project", id)
-	if err := models.DeleteProject(h.db.SQL, id); err != nil {
+	// Cascade-soft-delete any vault entries attached to this project,
+	// then hard-delete the project row — same one-tx pattern as
+	// service/host/tool deletes (Phase 1.7).
+	if err := cascadeParentDelete(r, h.db, models.SecretScopeProjeto, id,
+		`DELETE FROM projects WHERE id = ?`); err != nil {
 		jsonServerError(w, r, "failed to delete project", err)
 		return
 	}

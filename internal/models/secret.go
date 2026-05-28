@@ -43,13 +43,14 @@ const (
 	SecretScopeService SecretScope = "service"
 	SecretScopeHost    SecretScope = "host"
 	SecretScopeTool    SecretScope = "tool"
+	SecretScopeProjeto SecretScope = "projeto"
 	SecretScopeAvulso  SecretScope = "avulso"
 )
 
 // Valid reports whether s is one of the known SecretScope values.
 func (s SecretScope) Valid() bool {
 	switch s {
-	case SecretScopeService, SecretScopeHost, SecretScopeTool, SecretScopeAvulso:
+	case SecretScopeService, SecretScopeHost, SecretScopeTool, SecretScopeProjeto, SecretScopeAvulso:
 		return true
 	}
 	return false

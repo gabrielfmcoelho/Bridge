@@ -12,7 +12,7 @@ import EmptyState from "@/components/ui/EmptyState";
 
 interface EnvVarBundleEditorProps {
   // Where the bundle is attached. avulso means no parent.
-  scope: "service" | "host" | "tool" | "avulso";
+  scope: "service" | "host" | "tool" | "projeto" | "avulso";
   parentID?: number;
   // Restrict the editor to one visibility — typically "shared" for service
   // env_var bundles; the personal counterpart can be embedded separately.

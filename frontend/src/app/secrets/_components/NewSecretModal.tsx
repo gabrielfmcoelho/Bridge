@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { secretsAPI, servicesAPI, hostsAPI, toolsAPI } from "@/lib/api";
+import { secretsAPI, servicesAPI, hostsAPI, toolsAPI, projectsAPI } from "@/lib/api";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -15,7 +15,7 @@ interface NewSecretModalProps {
 }
 
 type SecretType = "password" | "cred" | "sshkey" | "app_login" | "env_var";
-type Scope = "service" | "host" | "tool" | "avulso";
+type Scope = "service" | "host" | "tool" | "projeto" | "avulso";
 type Visibility = "personal" | "shared";
 
 // FormRow is a thin label + input wrapper. ui/Field is read-only display;
@@ -107,6 +107,11 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
     queryFn: toolsAPI.list,
     enabled: open && scope === "tool",
   });
+  const projects = useQuery({
+    queryKey: ["projects-list"],
+    queryFn: projectsAPI.list,
+    enabled: open && scope === "projeto",
+  });
 
   // Build the parent options array for whichever scope is active. Label
   // shape varies per parent: services + hosts use nickname; tools use name.
@@ -123,10 +128,12 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
         ];
       case "tool":
         return [empty, ...(tools.data ?? []).map((t) => ({ value: String(t.id), label: t.name }))];
+      case "projeto":
+        return [empty, ...(projects.data ?? []).map((p) => ({ value: String(p.id), label: p.name }))];
       default:
         return [empty];
     }
-  }, [scope, services.data, hosts.data, tools.data]);
+  }, [scope, services.data, hosts.data, tools.data, projects.data]);
 
   const reset = () => {
     setType("password");
@@ -324,6 +331,7 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
                   { value: "service", label: "service" },
                   { value: "host", label: "host" },
                   { value: "tool", label: "tool" },
+                  { value: "projeto", label: "projeto" },
                 ]}
               />
             </FormRow>
@@ -350,7 +358,8 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
               </FormRow>
               {(scope === "service" && services.isLoading) ||
               (scope === "host" && hosts.isLoading) ||
-              (scope === "tool" && tools.isLoading) ? (
+              (scope === "tool" && tools.isLoading) ||
+              (scope === "projeto" && projects.isLoading) ? (
                 <p className="text-[10px] text-[var(--text-faint)] mt-1">Loading {scope}s…</p>
               ) : null}
             </div>

@@ -30,11 +30,11 @@ import NewSecretModal from "./_components/NewSecretModal";
 //
 // The page itself reads ?scope/?visibility from URL so deep links work.
 
-type ScopeFilter = "all" | "service" | "host" | "tool" | "avulso";
+type ScopeFilter = "all" | "service" | "host" | "tool" | "projeto" | "avulso";
 type VisibilityFilter = "all" | "personal" | "shared";
 type TypeFilter = "all" | "cred" | "sshkey" | "password" | "app_login" | "env_var";
 
-const SCOPES: ScopeFilter[] = ["all", "service", "host", "tool", "avulso"];
+const SCOPES: ScopeFilter[] = ["all", "service", "host", "tool", "projeto", "avulso"];
 const VISIBILITIES: VisibilityFilter[] = ["all", "personal", "shared"];
 const TYPES: TypeFilter[] = ["all", "cred", "sshkey", "password", "app_login", "env_var"];
 

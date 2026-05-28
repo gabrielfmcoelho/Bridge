@@ -30,9 +30,11 @@ func TestSecretScope_Valid(t *testing.T) {
 		SecretScopeService: true,
 		SecretScopeHost:    true,
 		SecretScopeTool:    true,
+		SecretScopeProjeto: true,
 		SecretScopeAvulso:  true,
 		SecretScope("user"):       false, // D7: dropped
 		SecretScope("standalone"): false, // D7: replaced by avulso
+		SecretScope("project"):    false, // canonical Portuguese form 'projeto'
 		SecretScope(""):           false,
 	}
 	for in, want := range cases {

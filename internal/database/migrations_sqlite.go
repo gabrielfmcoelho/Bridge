@@ -1122,4 +1122,63 @@ var migrationsSQLite = []string{
 	// practice — share links ship in Phase 3, after this migration).
 	`ALTER TABLE secret_share_links ADD COLUMN payload_ciphertext BLOB;
 	ALTER TABLE secret_share_links ADD COLUMN payload_nonce BLOB;`,
+
+	// Version 64: extend scope enum to include 'projeto' (Plans roadmap
+	// extension — projects-as-parent for secrets).
+	//
+	// SQLite can't ALTER a CHECK constraint in place; the standard
+	// workaround is the table-rebuild dance. foreign_keys is toggled off
+	// so secret_share_links / secret_audit_log FK references survive the
+	// DROP+rename. After the rebuild, the index set is recreated to
+	// exactly match v61's shape (anything missed here would silently
+	// regress query performance + uniqueness enforcement).
+	//
+	// secret_share_links.secret_id retains its ON DELETE CASCADE to the
+	// renamed table because FK lookups are by table name, not by the
+	// internal rowid the old table held.
+	`PRAGMA foreign_keys=OFF;
+	CREATE TABLE secrets_v64 (
+		id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+		type               TEXT NOT NULL,
+		scope              TEXT NOT NULL,
+		visibility         TEXT NOT NULL,
+		parent_id          INTEGER,
+		owner_user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		name               TEXT NOT NULL,
+		group_label        TEXT,
+		description        TEXT,
+		payload_ciphertext BLOB NOT NULL,
+		payload_nonce      BLOB NOT NULL,
+		key_version        INTEGER NOT NULL DEFAULT 1,
+		created_by         INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+		deleted_at         DATETIME,
+		CHECK (type IN ('cred','sshkey','password','app_login','env_var')),
+		CHECK (scope IN ('service','host','tool','avulso','projeto')),
+		CHECK (visibility IN ('personal','shared')),
+		CHECK ((scope = 'avulso' AND parent_id IS NULL) OR (scope <> 'avulso' AND parent_id IS NOT NULL)),
+		CHECK (key_version >= 1)
+	);
+	INSERT INTO secrets_v64 SELECT * FROM secrets;
+	DROP TABLE secrets;
+	ALTER TABLE secrets_v64 RENAME TO secrets;
+
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_secrets_shared_unique
+		ON secrets (scope, COALESCE(parent_id, 0), name, COALESCE(group_label, ''))
+		WHERE visibility = 'shared' AND deleted_at IS NULL;
+
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_secrets_personal_unique
+		ON secrets (scope, COALESCE(parent_id, 0), owner_user_id, name, COALESCE(group_label, ''))
+		WHERE visibility = 'personal' AND deleted_at IS NULL;
+
+	CREATE INDEX IF NOT EXISTS idx_secrets_owner_live
+		ON secrets (owner_user_id) WHERE deleted_at IS NULL;
+
+	CREATE INDEX IF NOT EXISTS idx_secrets_scope_parent_live
+		ON secrets (scope, parent_id) WHERE deleted_at IS NULL;
+
+	CREATE INDEX IF NOT EXISTS idx_secrets_trash
+		ON secrets (deleted_at) WHERE deleted_at IS NOT NULL;
+	PRAGMA foreign_keys=ON;`,
 }

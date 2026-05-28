@@ -1036,4 +1036,13 @@ var migrationsPostgres = []string{
 	// migrations_sqlite.go for the D4 design rationale.
 	`ALTER TABLE secret_share_links ADD COLUMN IF NOT EXISTS payload_ciphertext BYTEA;
 	ALTER TABLE secret_share_links ADD COLUMN IF NOT EXISTS payload_nonce BYTEA;`,
+
+	// Version 64: extend scope enum to include 'projeto'. Postgres lets
+	// us swap the CHECK constraint in place — no table-rebuild needed.
+	// The constraint name follows the postgres default
+	// (<table>_<column>_check) but we DROP IF EXISTS in case a future
+	// schema dump produced a non-default name.
+	`ALTER TABLE secrets DROP CONSTRAINT IF EXISTS secrets_scope_check;
+	ALTER TABLE secrets ADD CONSTRAINT secrets_scope_check
+		CHECK (scope IN ('service','host','tool','avulso','projeto'));`,
 }

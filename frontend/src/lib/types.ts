@@ -261,7 +261,7 @@ export interface Orchestrator {
 export interface Secret {
   id: number;
   type: "cred" | "sshkey" | "password" | "app_login" | "env_var";
-  scope: "service" | "host" | "tool" | "avulso";
+  scope: "service" | "host" | "tool" | "projeto" | "avulso";
   visibility: "personal" | "shared";
   parent_id?: number | null;
   owner_user_id: number;
