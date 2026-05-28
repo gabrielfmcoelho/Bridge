@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { secretsAPI } from "@/lib/api";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { secretsAPI, servicesAPI, hostsAPI, toolsAPI } from "@/lib/api";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -43,14 +43,24 @@ function FormRow({
   );
 }
 
+// EnvVarRow is one row in the bulk env-var entry table. The parent owns
+// the array of rows and forwards changes back so add/remove stays in
+// the modal's state.
+interface EnvVarRow {
+  name: string;
+  value: string;
+  description: string;
+}
+
 // NewSecretModal — single entry point for adding any of the five secret
 // types via the unified /api/secrets POST endpoint. Payload shape is
 // per-type (spec §4.2); this component builds the JSON envelope and
-// hands it to secretsAPI.create.
+// hands it to secretsAPI.create — EXCEPT env_var which uses the bulk
+// endpoint (/api/secrets/env/bulk) so multiple vars commit atomically.
 //
-// Defaults bias toward "personal avulso" because that's the most common
-// shape for a quick personal note. Operators creating shared secrets
-// against a service/host/tool fill the parent_id field.
+// Parent selection: when scope != avulso we fetch the relevant list
+// (services / hosts / external_tools) and surface it as a dropdown so
+// operators don't need to remember numeric IDs.
 export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
   const qc = useQueryClient();
 
@@ -58,13 +68,12 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
   const [type, setType] = useState<SecretType>("password");
   const [scope, setScope] = useState<Scope>("avulso");
   const [visibility, setVisibility] = useState<Visibility>("personal");
-  const [parentID, setParentID] = useState("");
+  const [parentID, setParentID] = useState<string>(""); // stored as string for Select compat
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  // Per-type payload fields. Only the ones relevant to the active type
-  // contribute to the final JSON.
-  const [valueField, setValueField] = useState(""); // password / env_var.value
+  // Per-type single-value payload fields.
+  const [valueField, setValueField] = useState(""); // password
   const [credUsername, setCredUsername] = useState("");
   const [credPassword, setCredPassword] = useState("");
   const [sshUsername, setSshUsername] = useState("");
@@ -75,7 +84,49 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
   const [appUsername, setAppUsername] = useState("");
   const [appPassword, setAppPassword] = useState("");
   const [appNotes, setAppNotes] = useState("");
-  const [groupLabel, setGroupLabel] = useState(""); // env_var
+
+  // env_var: bulk rows + the shared group_label.
+  const [groupLabel, setGroupLabel] = useState("");
+  const [envVars, setEnvVars] = useState<EnvVarRow[]>([{ name: "", value: "", description: "" }]);
+
+  // Parent list: fetch only when scope needs one. Each useQuery has
+  // enabled: scope === ... so we don't hit /api/hosts when the user is
+  // creating an avulso personal secret.
+  const services = useQuery({
+    queryKey: ["services-list"],
+    queryFn: servicesAPI.list,
+    enabled: open && scope === "service",
+  });
+  const hosts = useQuery({
+    queryKey: ["hosts-list"],
+    queryFn: () => hostsAPI.list(),
+    enabled: open && scope === "host",
+  });
+  const tools = useQuery({
+    queryKey: ["tools-list"],
+    queryFn: toolsAPI.list,
+    enabled: open && scope === "tool",
+  });
+
+  // Build the parent options array for whichever scope is active. Label
+  // shape varies per parent: services + hosts use nickname; tools use name.
+  const parentOptions = useMemo(() => {
+    type Opt = { value: string; label: string };
+    const empty: Opt = { value: "", label: scope === "avulso" ? "—" : `Select a ${scope}…` };
+    switch (scope) {
+      case "service":
+        return [empty, ...(services.data ?? []).map((s) => ({ value: String(s.id), label: s.nickname }))];
+      case "host":
+        return [
+          empty,
+          ...(hosts.data ?? []).map((h) => ({ value: String(h.id), label: `${h.nickname} (${h.oficial_slug})` })),
+        ];
+      case "tool":
+        return [empty, ...(tools.data ?? []).map((t) => ({ value: String(t.id), label: t.name }))];
+      default:
+        return [empty];
+    }
+  }, [scope, services.data, hosts.data, tools.data]);
 
   const reset = () => {
     setType("password");
@@ -96,6 +147,7 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
     setAppPassword("");
     setAppNotes("");
     setGroupLabel("");
+    setEnvVars([{ name: "", value: "", description: "" }]);
   };
 
   const buildPayload = (): string => {
@@ -121,7 +173,10 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
         return JSON.stringify(payload);
       }
       case "env_var":
-        return JSON.stringify({ value: valueField });
+        // env_var doesn't go through buildPayload — the bulk endpoint
+        // ships rows of {name, value, description}. The branch in
+        // create.mutationFn handles env_var separately.
+        return "";
     }
   };
 
@@ -130,13 +185,32 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
   // so users see the same rejection messages without a server round-trip
   // for the obvious cases.
   const validate = (): string | null => {
-    if (!name.trim()) return "Name is required.";
-    if (scope !== "avulso" && !parentID.trim()) {
-      return `Parent ID is required when scope is ${scope}.`;
+    if (scope !== "avulso" && !parentID) {
+      return `Pick a ${scope} to attach this secret to.`;
     }
+    if (type === "env_var") {
+      // env_var doesn't use the top-level `name` (each var has its own
+      // name); only group_label is required at the bundle level.
+      if (!groupLabel || !/^[a-z][a-z0-9-]*$/.test(groupLabel)) {
+        return "Group label must match ^[a-z][a-z0-9-]*$ (lowercase only).";
+      }
+      const filled = envVars.filter((v) => v.name.trim() || v.value);
+      if (filled.length === 0) return "Add at least one env var.";
+      const seen = new Set<string>();
+      for (const v of filled) {
+        if (!v.name) return "Every env var needs a name.";
+        if (!/^[A-Z_][A-Z0-9_]*$/.test(v.name)) {
+          return `env_var name "${v.name}" must match ^[A-Z_][A-Z0-9_]*$ (uppercase only).`;
+        }
+        if (!v.value) return `env_var "${v.name}" needs a value.`;
+        if (seen.has(v.name)) return `env_var "${v.name}" appears twice — names must be unique.`;
+        seen.add(v.name);
+      }
+      return null;
+    }
+    if (!name.trim()) return "Name is required.";
     switch (type) {
       case "password":
-      case "env_var":
         if (!valueField) return "Value is required.";
         break;
       case "cred":
@@ -151,14 +225,6 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
         }
         break;
     }
-    if (type === "env_var") {
-      if (!/^[A-Z_][A-Z0-9_]*$/.test(name)) {
-        return "env_var name must match ^[A-Z_][A-Z0-9_]*$ (uppercase only).";
-      }
-      if (!groupLabel || !/^[a-z][a-z0-9-]*$/.test(groupLabel)) {
-        return "env_var group label must match ^[a-z][a-z0-9-]*$ (lowercase only).";
-      }
-    }
     return null;
   };
 
@@ -166,6 +232,22 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
     mutationFn: async () => {
       const reason = validate();
       if (reason) throw new Error(reason);
+      const parsedParent = parentID ? Number(parentID) : undefined;
+
+      if (type === "env_var") {
+        // Bulk path — one tx for the whole batch (Plans.md Task 2.2).
+        const vars = envVars
+          .filter((v) => v.name.trim() && v.value)
+          .map((v) => ({ name: v.name, value: v.value, description: v.description || undefined }));
+        return secretsAPI.envBulk({
+          scope,
+          parent_id: parsedParent,
+          visibility,
+          group_label: groupLabel.trim(),
+          vars,
+        });
+      }
+
       const body: Parameters<typeof secretsAPI.create>[0] = {
         type,
         scope,
@@ -174,11 +256,8 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
         description: description.trim() || undefined,
         payload: buildPayload(),
       };
-      if (scope !== "avulso") {
-        body.parent_id = Number(parentID);
-      }
-      if (type === "env_var") {
-        body.group_label = groupLabel.trim();
+      if (parsedParent != null) {
+        body.parent_id = parsedParent;
       }
       return secretsAPI.create(body);
     },
@@ -192,6 +271,21 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
   const handleClose = () => {
     reset();
     onClose();
+  };
+
+  // env_var row manipulation helpers.
+  const updateRow = (idx: number, patch: Partial<EnvVarRow>) => {
+    setEnvVars(envVars.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  };
+  const addRow = () => setEnvVars([...envVars, { name: "", value: "", description: "" }]);
+  const removeRow = (idx: number) => {
+    if (envVars.length === 1) {
+      // Clear instead of removing the only row so the table doesn't
+      // disappear entirely.
+      setEnvVars([{ name: "", value: "", description: "" }]);
+      return;
+    }
+    setEnvVars(envVars.filter((_, i) => i !== idx));
   };
 
   return (
@@ -214,14 +308,17 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
                   { value: "cred", label: "cred" },
                   { value: "sshkey", label: "sshkey" },
                   { value: "app_login", label: "app_login" },
-                  { value: "env_var", label: "env_var" },
+                  { value: "env_var", label: "env_var (bulk)" },
                 ]}
               />
             </FormRow>
             <FormRow label="Scope" required>
               <Select
                 value={scope}
-                onChange={(e) => setScope(e.target.value as Scope)}
+                onChange={(e) => {
+                  setScope(e.target.value as Scope);
+                  setParentID(""); // dropping the previous selection avoids stale FK reference
+                }}
                 options={[
                   { value: "avulso", label: "avulso" },
                   { value: "service", label: "service" },
@@ -244,46 +341,40 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
 
           {scope !== "avulso" && (
             <div className="mt-3">
-              <FormRow
-                label={`Parent ${scope} ID`}
-                required
-                hint="Numeric id of the parent service/host/tool this secret attaches to."
-              >
-                <Input
-                  type="number"
+              <FormRow label={`Parent ${scope}`} required hint="Pick from the list of existing rows.">
+                <Select
                   value={parentID}
                   onChange={(e) => setParentID(e.target.value)}
-                  placeholder="e.g. 42"
+                  options={parentOptions}
                 />
               </FormRow>
+              {(scope === "service" && services.isLoading) ||
+              (scope === "host" && hosts.isLoading) ||
+              (scope === "tool" && tools.isLoading) ? (
+                <p className="text-[10px] text-[var(--text-faint)] mt-1">Loading {scope}s…</p>
+              ) : null}
             </div>
           )}
 
-          <div className="mt-3 space-y-3">
-            <FormRow
-              label="Name"
-              required
-              hint={
-                type === "env_var"
-                  ? "Uppercase only (e.g. DB_URL). Matches ^[A-Z_][A-Z0-9_]*$."
-                  : "Human-readable label."
-              }
-            >
-              <Input
-                value={name}
-                onChange={(e) => setName(type === "env_var" ? e.target.value.toUpperCase() : e.target.value)}
-                placeholder={type === "env_var" ? "DB_URL" : "primary"}
-              />
-            </FormRow>
-            <FormRow label="Description" hint="Optional. Visible to anyone who can see the secret metadata.">
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} />
-            </FormRow>
-          </div>
+          {/* env_var hides the single-name field — each var-row carries its own. */}
+          {type !== "env_var" && (
+            <div className="mt-3 space-y-3">
+              <FormRow label="Name" required hint="Human-readable label.">
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="primary" />
+              </FormRow>
+              <FormRow label="Description" hint="Optional. Visible to anyone who can see the secret metadata.">
+                <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+              </FormRow>
+            </div>
+          )}
         </Card>
 
         {/* Per-type payload section */}
         <Card>
-          <h3 className="text-sm font-semibold mb-3">Payload</h3>
+          <h3 className="text-sm font-semibold mb-3">
+            {type === "env_var" ? "Variables" : "Payload"}
+          </h3>
+
           {type === "password" && (
             <FormRow label="Value" required>
               <Input
@@ -378,24 +469,67 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
                   placeholder="prod"
                 />
               </FormRow>
-              <FormRow label="Value" required>
-                <Input
-                  type="password"
-                  value={valueField}
-                  onChange={(e) => setValueField(e.target.value)}
-                  autoComplete="new-password"
-                />
-              </FormRow>
-              <p className="text-[10px] text-[var(--text-faint)]">
-                Tip: for bulk env-var saves use the EnvVarBundleEditor (multi-var tabbed view).
-              </p>
+
+              <div className="space-y-2">
+                <div className="grid grid-cols-12 gap-2 text-[10px] font-medium text-[var(--text-faint)] uppercase tracking-wider">
+                  <span className="col-span-4">Name</span>
+                  <span className="col-span-4">Value</span>
+                  <span className="col-span-3">Description</span>
+                  <span className="col-span-1"></span>
+                </div>
+                {envVars.map((row, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-4">
+                      <Input
+                        value={row.name}
+                        onChange={(e) => updateRow(idx, { name: e.target.value.toUpperCase() })}
+                        placeholder="DB_URL"
+                      />
+                    </div>
+                    <div className="col-span-4">
+                      <Input
+                        type="password"
+                        value={row.value}
+                        onChange={(e) => updateRow(idx, { value: e.target.value })}
+                        placeholder="value"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        value={row.description}
+                        onChange={(e) => updateRow(idx, { description: e.target.value })}
+                        placeholder="(optional)"
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeRow(idx)}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button type="button" size="sm" variant="secondary" onClick={addRow}>
+                  + Add var
+                </Button>
+                <p className="text-[10px] text-[var(--text-faint)]">
+                  All vars commit in one transaction — partial failure rolls back the whole batch.
+                </p>
+              </div>
             </div>
           )}
         </Card>
 
         <div className="flex items-center gap-2">
           <Button type="submit" size="sm" disabled={create.isPending}>
-            {create.isPending ? "Saving..." : "Create secret"}
+            {create.isPending ? "Saving..." : type === "env_var" ? "Save bundle" : "Create secret"}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={handleClose}>
             Cancel
