@@ -10,6 +10,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"time"
 )
 
@@ -100,6 +101,73 @@ type Secret struct {
 	DeletedAt         *time.Time       `json:"deleted_at,omitempty"`
 }
 
+// envVarNameRe matches POSIX-style env var names (Task 2.1 / spec §4.2):
+// must begin with an uppercase letter or underscore, then uppercase letters,
+// digits, or underscores. Rejects lowercase to prevent the foot-gun where
+// `db_url` and `DB_URL` are treated as distinct vars by the unique index.
+var envVarNameRe = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
+
+// envVarGroupRe matches the kebab-case environment label used by env_var
+// bundling (Task 2.1). Lowercase only so URLs and filter chips render
+// uniformly, no underscores so it's visually distinct from var names.
+var envVarGroupRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+// ValidateEnvVarName reports whether s satisfies the env_var.name contract.
+// Exported so the bulk-upsert handler can validate each item in a batch
+// before opening a transaction.
+func ValidateEnvVarName(s string) error {
+	if s == "" {
+		return fmt.Errorf("env_var name required")
+	}
+	if !envVarNameRe.MatchString(s) {
+		return fmt.Errorf("env_var name %q must match %s", s, envVarNameRe.String())
+	}
+	return nil
+}
+
+// ValidateEnvVarGroupLabel reports whether s satisfies env_var.group_label.
+// Empty/nil is rejected — env_var rows are required to declare which
+// environment they belong to (D5).
+func ValidateEnvVarGroupLabel(s string) error {
+	if s == "" {
+		return fmt.Errorf("env_var group_label required")
+	}
+	if !envVarGroupRe.MatchString(s) {
+		return fmt.Errorf("env_var group_label %q must match %s", s, envVarGroupRe.String())
+	}
+	return nil
+}
+
+// ValidateAppLoginPayload (Task 2.4) decodes the spec §4.2 app_login JSON
+// shape `{app_name,url?,username,password,notes?}` and checks that the
+// three required fields are non-empty. Called by the create/update handlers
+// before encryption; the encrypted blob itself is opaque to the repo.
+func ValidateAppLoginPayload(plaintext string) error {
+	var p struct {
+		AppName  string `json:"app_name"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+		// url + notes are optional — declared here so unknown-field strictness
+		// (if ever enabled) wouldn't reject them; values themselves are not
+		// validated beyond their absence in the required-set check.
+		URL   string `json:"url,omitempty"`
+		Notes string `json:"notes,omitempty"`
+	}
+	if err := json.Unmarshal([]byte(plaintext), &p); err != nil {
+		return fmt.Errorf("app_login payload: invalid JSON: %w", err)
+	}
+	if p.AppName == "" {
+		return fmt.Errorf("app_login payload: app_name required")
+	}
+	if p.Username == "" {
+		return fmt.Errorf("app_login payload: username required")
+	}
+	if p.Password == "" {
+		return fmt.Errorf("app_login payload: password required")
+	}
+	return nil
+}
+
 // Validate enforces the invariants from docs/spec/secrets-manager.md §4.1.
 // Called by repository Create/Update before any DB write.
 func (s *Secret) Validate() error {
@@ -127,6 +195,21 @@ func (s *Secret) Validate() error {
 	}
 	if s.KeyVersion < 1 {
 		return fmt.Errorf("key_version must be >= 1, got %d", s.KeyVersion)
+	}
+	// Type-specific metadata validation (Task 2.1).
+	// The payload itself isn't visible here — handlers that encrypt and
+	// pass the ciphertext are responsible for validating payload content
+	// via ValidateEnvVarName/ValidateAppLoginPayload before they reach Create.
+	if s.Type == SecretTypeEnvVar {
+		if err := ValidateEnvVarName(s.Name); err != nil {
+			return err
+		}
+		if s.GroupLabel == nil {
+			return fmt.Errorf("env_var requires group_label")
+		}
+		if err := ValidateEnvVarGroupLabel(*s.GroupLabel); err != nil {
+			return err
+		}
 	}
 	return nil
 }

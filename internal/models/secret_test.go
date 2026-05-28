@@ -228,6 +228,97 @@ func TestSecretShareLink_JSON_HidesTokenHash(t *testing.T) {
 	}
 }
 
+func TestValidateEnvVarName(t *testing.T) {
+	cases := map[string]bool{
+		"DB_URL":     true,
+		"_PRIVATE":   true,
+		"FOO_2":      true,
+		"X":          true,
+		"db_url":     false, // lowercase rejected — Task 2.1 foot-gun guard
+		"2FOO":       false, // can't start with digit
+		"FOO-BAR":    false, // no hyphens
+		"":           false,
+		"FOO.BAR":    false,
+		"FOO BAR":    false, // no whitespace
+	}
+	for in, want := range cases {
+		err := ValidateEnvVarName(in)
+		if (err == nil) != want {
+			t.Errorf("ValidateEnvVarName(%q): err=%v, want valid=%v", in, err, want)
+		}
+	}
+}
+
+func TestValidateEnvVarGroupLabel(t *testing.T) {
+	cases := map[string]bool{
+		"prod":       true,
+		"staging":    true,
+		"prod-eu-1":  true,
+		"a":          true,
+		"PROD":       false, // uppercase rejected
+		"-prod":      false, // can't start with hyphen
+		"prod_eu":    false, // no underscores
+		"":           false,
+		"1prod":      false,
+		"prod.local": false,
+	}
+	for in, want := range cases {
+		err := ValidateEnvVarGroupLabel(in)
+		if (err == nil) != want {
+			t.Errorf("ValidateEnvVarGroupLabel(%q): err=%v, want valid=%v", in, err, want)
+		}
+	}
+}
+
+func TestValidate_EnvVarRequiresGroupAndMatchingName(t *testing.T) {
+	parent := int64(1)
+	mk := func(name string, group *string) *Secret {
+		return &Secret{
+			Type:        SecretTypeEnvVar,
+			Scope:       SecretScopeService,
+			Visibility:  SecretVisibilityShared,
+			ParentID:    &parent,
+			OwnerUserID: 1,
+			Name:        name,
+			GroupLabel:  group,
+			KeyVersion:  1,
+		}
+	}
+	prod := "prod"
+	if err := mk("DB_URL", &prod).Validate(); err != nil {
+		t.Errorf("valid env_var should pass: %v", err)
+	}
+	if err := mk("db_url", &prod).Validate(); err == nil {
+		t.Error("lowercase env_var name should fail")
+	}
+	if err := mk("DB_URL", nil).Validate(); err == nil {
+		t.Error("env_var without group_label should fail")
+	}
+	bad := "PROD"
+	if err := mk("DB_URL", &bad).Validate(); err == nil {
+		t.Error("uppercase group_label should fail")
+	}
+}
+
+func TestValidateAppLoginPayload(t *testing.T) {
+	good := `{"app_name":"Jira","username":"alice","password":"s3cret","url":"https://jira"}`
+	if err := ValidateAppLoginPayload(good); err != nil {
+		t.Errorf("valid app_login payload should pass: %v", err)
+	}
+	cases := map[string]string{
+		"missing app_name": `{"username":"alice","password":"x"}`,
+		"missing username": `{"app_name":"Jira","password":"x"}`,
+		"missing password": `{"app_name":"Jira","username":"alice"}`,
+		"empty app_name":   `{"app_name":"","username":"a","password":"p"}`,
+		"not json":         `not json`,
+	}
+	for label, body := range cases {
+		if err := ValidateAppLoginPayload(body); err == nil {
+			t.Errorf("%s: should have rejected %q", label, body)
+		}
+	}
+}
+
 func TestSecretAuditLog_MetadataRoundTrip(t *testing.T) {
 	// Metadata should be preserved as raw JSON (not double-encoded as base64).
 	entry := SecretAuditLog{
