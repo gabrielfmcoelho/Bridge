@@ -414,27 +414,16 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Key material only comes from the ssh_keys table via linkSSHKey. Callers
-	// cannot set a filesystem path on the host row — the DB blob is the only
-	// source of truth so backups restore cleanly onto any machine.
+	// Key material is attached via linkSSHKey (post-create) which writes
+	// to the unified vault. Callers cannot set a filesystem path on the
+	// host row — the vault is the source of truth so backups restore
+	// cleanly onto any machine.
 	req.Host.KeyPath = ""
 	req.Host.HasKey = false
-	req.Host.PubKeyCiphertext = nil
-	req.Host.PubKeyNonce = nil
-	req.Host.PrivKeyCiphertext = nil
-	req.Host.PrivKeyNonce = nil
 
-	// Handle password encryption.
-	if req.Password != "" {
-		ct, nonce, err := h.db.Encryptor.Encrypt(req.Password)
-		if err != nil {
-			jsonServerError(w, r, "failed to encrypt password", err)
-			return
-		}
-		req.Host.HasPassword = true
-		req.Host.PasswordCiphertext = ct
-		req.Host.PasswordNonce = nonce
-	}
+	// has_password is a cached flag; the actual password payload is
+	// stored in the vault by the post-CreateHost dual-write below.
+	req.Host.HasPassword = req.Password != ""
 
 	preferredAuth, prefErr := normalizePreferredAuth(req.Host.HasPassword, req.Host.HasKey || req.SSHKeyID > 0, req.Host.PreferredAuth)
 	if prefErr != nil {
@@ -603,41 +592,24 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Preserve existing password if not provided.
+	// Flag updates. Actual payloads live in the vault — the post-Update
+	// dual-write below calls vault.HostSetPassword / HostSetSSHKey when
+	// the request changes them. Carrying-forward an unchanged secret
+	// requires no action because the vault row already holds it.
 	if req.Password != "" {
-		ct, nonce, err := h.db.Encryptor.Encrypt(req.Password)
-		if err != nil {
-			jsonServerError(w, r, "failed to encrypt password", err)
-			return
-		}
 		req.Host.HasPassword = true
-		req.Host.PasswordCiphertext = ct
-		req.Host.PasswordNonce = nonce
 	} else {
 		req.Host.HasPassword = existing.HasPassword
-		req.Host.PasswordCiphertext = existing.PasswordCiphertext
-		req.Host.PasswordNonce = existing.PasswordNonce
 	}
 
-	// Handle key data.
 	if req.ClearKey {
-		// Clear all key fields
 		req.Host.HasKey = false
 		req.Host.KeyPath = ""
 		req.Host.IdentitiesOnly = ""
-		req.Host.PubKeyCiphertext = nil
-		req.Host.PubKeyNonce = nil
-		req.Host.PrivKeyCiphertext = nil
-		req.Host.PrivKeyNonce = nil
 	} else {
-		// Preserve existing key data (managed via setup-key endpoint, not direct edit).
 		req.Host.HasKey = existing.HasKey
 		req.Host.KeyPath = existing.KeyPath
 		req.Host.IdentitiesOnly = existing.IdentitiesOnly
-		req.Host.PubKeyCiphertext = existing.PubKeyCiphertext
-		req.Host.PubKeyNonce = existing.PubKeyNonce
-		req.Host.PrivKeyCiphertext = existing.PrivKeyCiphertext
-		req.Host.PrivKeyNonce = existing.PrivKeyNonce
 	}
 
 	if req.Host.PreferredAuth == "" {
@@ -814,35 +786,33 @@ func (h *hostHandlers) linkSSHKey(hostID, sshKeyID int64, slug string) error {
 			slug, sshKeyID, k.Name, k.CredentialType)
 		return fmt.Errorf("ssh key %q has no stored private key — add a private key to the entry or pick a different key", k.Name)
 	}
-	if err := models.UpdateHostKey(h.db.SQL, hostID, true, "", "yes",
-		k.PubKeyCiphertext, k.PubKeyNonce, k.PrivKeyCiphertext, k.PrivKeyNonce); err != nil {
-		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: UpdateHostKey error: %v", slug, sshKeyID, err)
-		return fmt.Errorf("update host key: %w", err)
+	// Update the host flag + path metadata (the encrypted payload lives
+	// in the vault). identities_only="yes" forces SSH to use only the
+	// host's linked key rather than agent or other identities.
+	if err := models.UpdateHostKeyMeta(h.db.SQL, hostID, true, "", "yes"); err != nil {
+		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: UpdateHostKeyMeta error: %v", slug, sshKeyID, err)
+		return fmt.Errorf("update host key flags: %w", err)
 	}
 
-	// Stage 1 dual-write: mirror the linked key into the unified vault.
-	// Decrypts in this binary so the vault sees plaintext sealed under
-	// the master key (matching every other host secret), regardless of
-	// which ssh_keys row was the source.
+	// Decrypt the ssh_keys row and re-seal into the host's vault entry.
 	priv, perr := h.db.Encryptor.Decrypt(k.PrivKeyCiphertext, k.PrivKeyNonce)
 	if perr != nil {
-		log.Printf("[hosts] linkSSHKey vault-mirror decrypt priv slug=%s: %v", slug, perr)
-	} else {
-		pub := ""
-		if len(k.PubKeyCiphertext) > 0 {
-			if p, derr := h.db.Encryptor.Decrypt(k.PubKeyCiphertext, k.PubKeyNonce); derr == nil {
-				pub = p
-			}
+		log.Printf("[hosts] linkSSHKey decrypt priv slug=%s: %v", slug, perr)
+		return fmt.Errorf("decrypt ssh key %d private payload: %w", sshKeyID, perr)
+	}
+	pub := ""
+	if len(k.PubKeyCiphertext) > 0 {
+		if p, derr := h.db.Encryptor.Decrypt(k.PubKeyCiphertext, k.PubKeyNonce); derr == nil {
+			pub = p
 		}
-		// actor_user_id=0 because linkSSHKey is called from several paths
-		// (create + update + sync from coolify) where the caller's user
-		// isn't easily threaded down. The audit row's actor_user_id ends
-		// up NULL, which is acceptable for this mirror write — the
-		// originating SSH key has its own audit trail via ssh_keys.
-		if vErr := vault.HostSetSSHKey(context.Background(), h.db, hostID, 0,
-			vault.HostSSHKey{PrivateKeyPEM: priv, PublicKey: pub}); vErr != nil {
-			log.Printf("[hosts] linkSSHKey vault-mirror slug=%s: %v", slug, vErr)
-		}
+	}
+	// actor_user_id=0 falls through to the vault's resolveSystemActor —
+	// linkSSHKey is called from several paths (create + update + sync
+	// from coolify) where the caller's user isn't easily threaded down.
+	if vErr := vault.HostSetSSHKey(context.Background(), h.db, hostID, 0,
+		vault.HostSSHKey{PrivateKeyPEM: priv, PublicKey: pub}); vErr != nil {
+		log.Printf("[hosts] linkSSHKey vault write slug=%s: %v", slug, vErr)
+		return fmt.Errorf("store host ssh key in vault: %w", vErr)
 	}
 
 	log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: linked key %q (fingerprint=%s)", slug, sshKeyID, k.Name, k.Fingerprint)

@@ -112,3 +112,58 @@ func TestMaybeDropLegacySecrets_EnvGated(t *testing.T) {
 		_ = os.Unsetenv(MigrateDropLegacySecretsEnv)
 	})
 }
+
+// TestDropLegacyHostSecretColumns asserts each of the six legacy secret
+// columns on `hosts` is gone after the purge, while the cached boolean
+// flags (has_password, has_key) survive.
+func TestDropLegacyHostSecretColumns(t *testing.T) {
+	dir := t.TempDir()
+	d, err := Open(dir)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer d.Close()
+
+	// Pre-drop: all 6 columns present.
+	for _, col := range hostSecretColumns {
+		if !columnExists(t, d, "hosts", col) {
+			t.Fatalf("setup: hosts.%s should exist before drop", col)
+		}
+	}
+
+	if err := DropLegacyHostSecretColumns(d.SQL); err != nil {
+		t.Fatalf("drop: %v", err)
+	}
+
+	// Post-drop: secret columns gone, flags survive.
+	for _, col := range hostSecretColumns {
+		if columnExists(t, d, "hosts", col) {
+			t.Errorf("hosts.%s should be gone after drop", col)
+		}
+	}
+	for _, col := range []string{"has_password", "has_key"} {
+		if !columnExists(t, d, "hosts", col) {
+			t.Errorf("hosts.%s should survive the purge", col)
+		}
+	}
+
+	// Idempotent: a second call on already-dropped columns is a no-op.
+	if err := DropLegacyHostSecretColumns(d.SQL); err != nil {
+		t.Errorf("second purge should be a no-op, got %v", err)
+	}
+}
+
+// columnExists is a sqlite-specific helper that uses PRAGMA table_info to
+// check for column presence. Postgres parity isn't needed for this test
+// because the host_secret_columns drop uses portable `DROP COLUMN IF
+// EXISTS` and TestDropLegacyHostSecretColumns asserts the behavioral
+// outcome (column gone) — not the dialect.
+func columnExists(t *testing.T, d *DB, table, col string) bool {
+	t.Helper()
+	rows, err := d.SQL.Query(`SELECT name FROM pragma_table_info(?) WHERE name = ?`, table, col)
+	if err != nil {
+		t.Fatalf("pragma table_info(%s): %v", table, err)
+	}
+	defer rows.Close()
+	return rows.Next()
+}

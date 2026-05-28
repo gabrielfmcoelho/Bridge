@@ -8,16 +8,32 @@ import (
 )
 
 // MigrateDropLegacySecretsEnv toggles the legacy-secret-schema purge. Set
-// MIGRATE_DROP_LEGACY_SECRETS=1 in the deployment environment to drop the
-// `service_credentials` table at startup. Idempotent (DROP IF EXISTS), so
-// leaving the flag on across multiple boots is safe.
+// MIGRATE_DROP_LEGACY_SECRETS=1 in the deployment environment to drop:
 //
-// The host password and SSH key columns on the `hosts` table are *not*
-// purged by this hook — they're still actively consumed by host_handlers,
-// coolify_handlers, sshconfig_handlers, sshkey_handlers, and import_handlers.
-// A separate task that migrates those callers off the legacy columns must
-// land before that part of the schema can drop.
+//   - `service_credentials` table (already cut over to /api/secrets)
+//   - `hosts.password_ciphertext` + `password_nonce`
+//   - `hosts.pub_key_ciphertext`  + `pub_key_nonce`
+//   - `hosts.priv_key_ciphertext` + `priv_key_nonce`
+//
+// All of these have been replaced by rows in the unified `secrets` table.
+// Idempotent (DROP IF EXISTS / DROP COLUMN IF EXISTS), so leaving the flag
+// on across multiple boots is safe.
+//
+// `has_password` and `has_key` are intentionally retained — they're cached
+// flags used by host list/filter queries, not secret payloads.
 const MigrateDropLegacySecretsEnv = "MIGRATE_DROP_LEGACY_SECRETS"
+
+// hostSecretColumns is the canonical list of legacy column drops applied
+// by the env-gated purge. Kept as a package var so tests can verify each
+// drop independently.
+var hostSecretColumns = []string{
+	"password_ciphertext",
+	"password_nonce",
+	"pub_key_ciphertext",
+	"pub_key_nonce",
+	"priv_key_ciphertext",
+	"priv_key_nonce",
+}
 
 // DropLegacyServiceCredentialsTable drops the `service_credentials` table.
 // Safe to call repeatedly. Callers that have already migrated their data
@@ -34,6 +50,55 @@ func DropLegacyServiceCredentialsTable(db *sql.DB) error {
 	return nil
 }
 
+// DropLegacyHostSecretColumns drops the six legacy secret-payload columns
+// from `hosts`. Companion to DropLegacyServiceCredentialsTable; same
+// env-gating + idempotency contract.
+//
+// SQLite doesn't support `DROP COLUMN IF EXISTS` (only `DROP COLUMN`,
+// since 3.35), so we probe each column via pragma_table_info before
+// issuing the drop. The probe + drop pair is portable across SQLite and
+// Postgres (Postgres has a `pg_attribute` equivalent we'd use instead if
+// we needed it, but Postgres DOES support `DROP COLUMN IF EXISTS` so a
+// dialect switch covers the gap).
+func DropLegacyHostSecretColumns(db *sql.DB) error {
+	for _, col := range hostSecretColumns {
+		exists, err := hostColumnExists(db, col)
+		if err != nil {
+			return fmt.Errorf("probe hosts.%s: %w", col, err)
+		}
+		if !exists {
+			continue
+		}
+		stmt := fmt.Sprintf(`ALTER TABLE hosts DROP COLUMN %s`, col)
+		if _, err := db.Exec(stmt); err != nil {
+			return fmt.Errorf("drop hosts.%s: %w", col, err)
+		}
+	}
+	return nil
+}
+
+// hostColumnExists is a portability shim for the column-existence probe.
+// Uses information_schema on Postgres and pragma_table_info on SQLite —
+// both queries take a column name parameter and return at least one row
+// when the column exists.
+func hostColumnExists(db *sql.DB, col string) (bool, error) {
+	var query string
+	if active == DialectPostgres {
+		query = `SELECT 1 FROM information_schema.columns WHERE table_name = 'hosts' AND column_name = $1`
+	} else {
+		query = `SELECT 1 FROM pragma_table_info('hosts') WHERE name = ?`
+	}
+	var dummy int
+	err := db.QueryRow(query, col).Scan(&dummy)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // maybeDropLegacySecrets runs the env-gated purge after migrations apply.
 // Logs the action (or skip) so operators can confirm the gate fired during
 // deploy. Failures bubble up to Open() so the process exits noisily rather
@@ -46,5 +111,9 @@ func (d *DB) maybeDropLegacySecrets() error {
 		return err
 	}
 	log.Printf("[db] %s=1: dropped legacy service_credentials table", MigrateDropLegacySecretsEnv)
+	if err := DropLegacyHostSecretColumns(d.SQL); err != nil {
+		return err
+	}
+	log.Printf("[db] %s=1: dropped legacy hosts.{password,pub_key,priv_key}_* columns (6 total)", MigrateDropLegacySecretsEnv)
 	return nil
 }

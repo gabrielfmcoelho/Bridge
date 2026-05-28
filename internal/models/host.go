@@ -9,6 +9,12 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 )
 
+// Host represents a managed SSH target. As of Phase 1.9 Stage 2 the
+// encrypted password / SSH-key blobs no longer live on this struct —
+// they're stored in the unified `secrets` table and accessed via
+// vault.HostGetPassword / vault.HostGetSSHKey. The boolean flags
+// (HasPassword, HasKey) remain as cached metadata so list/filter
+// queries can answer "does this host have credentials" without a join.
 type Host struct {
 	ID                        int64     `json:"id"`
 	Nickname                  string    `json:"nickname"`
@@ -18,14 +24,8 @@ type Host struct {
 	TipoMaquina               string    `json:"tipo_maquina"`
 	User                      string    `json:"user"`
 	HasPassword               bool      `json:"has_password"`
-	PasswordCiphertext        []byte    `json:"-"`
-	PasswordNonce             []byte    `json:"-"`
 	HasKey                    bool      `json:"has_key"`
 	KeyPath                   string    `json:"key_path"`
-	PubKeyCiphertext          []byte    `json:"-"`
-	PubKeyNonce               []byte    `json:"-"`
-	PrivKeyCiphertext         []byte    `json:"-"`
-	PrivKeyNonce              []byte    `json:"-"`
 	Port                      string    `json:"port"`
 	IdentitiesOnly            string    `json:"identities_only"`
 	ProxyJump                 string    `json:"proxy_jump"`
@@ -73,21 +73,25 @@ type HostFilter struct {
 }
 
 func CreateHost(db *sql.DB, h *Host) error {
+	// password_*/pub_key_*/priv_key_* columns intentionally absent — the
+	// payloads live in `secrets` (vault.HostSetPassword/HostSetSSHKey).
+	// has_password / has_key remain as cached flags so list/filter queries
+	// stay a single table scan.
 	id, err := database.InsertReturningID(db,
 		`INSERT INTO hosts (
 			nickname, oficial_slug, hostname, hospedagem, tipo_maquina,
-			ssh_user, has_password, password_ciphertext, password_nonce,
-			has_key, key_path, pub_key_ciphertext, pub_key_nonce, priv_key_ciphertext, priv_key_nonce,
+			ssh_user, has_password,
+			has_key, key_path,
 			port, identities_only, proxy_jump, forward_agent,
 			description, setor_responsavel, responsavel_interno, contato_responsavel_interno,
 			acesso_empresa_externa, empresa_responsavel, responsavel_externo, contato_responsavel_externo,
 			recurso_cpu, recurso_ram, recurso_armazenamento,
 			situacao, precisa_manutencao, preferred_auth, connections_failed, password_test_status, key_test_status, docker_group_status, observacoes,
 			grafana_dashboard_uid
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		h.Nickname, h.OficialSlug, h.Hostname, h.Hospedagem, h.TipoMaquina,
-		h.User, h.HasPassword, h.PasswordCiphertext, h.PasswordNonce,
-		h.HasKey, h.KeyPath, h.PubKeyCiphertext, h.PubKeyNonce, h.PrivKeyCiphertext, h.PrivKeyNonce,
+		h.User, h.HasPassword,
+		h.HasKey, h.KeyPath,
 		h.Port, h.IdentitiesOnly, h.ProxyJump, h.ForwardAgent,
 		h.Description, h.SetorResponsavel, h.ResponsavelInterno, h.ContatoResponsavelInterno,
 		h.AcessoEmpresaExterna, h.EmpresaResponsavel, h.ResponsavelExterno, h.ContatoResponsavelExterno,
@@ -268,12 +272,12 @@ func CountHosts(db *sql.DB, f HostFilter) (int, error) {
 }
 
 func UpdateHost(db *sql.DB, h *Host) error {
+	// Secret-payload columns intentionally absent (see CreateHost).
 	_, err := db.Exec(
 		`UPDATE hosts SET
 			nickname = ?, oficial_slug = ?, hostname = ?, hospedagem = ?, tipo_maquina = ?,
-			ssh_user = ?, has_password = ?, password_ciphertext = ?, password_nonce = ?,
-			has_key = ?, key_path = ?, pub_key_ciphertext = ?, pub_key_nonce = ?,
-			priv_key_ciphertext = ?, priv_key_nonce = ?,
+			ssh_user = ?, has_password = ?,
+			has_key = ?, key_path = ?,
 			port = ?, identities_only = ?, proxy_jump = ?, forward_agent = ?,
 			description = ?, setor_responsavel = ?, responsavel_interno = ?, contato_responsavel_interno = ?,
 			acesso_empresa_externa = ?, empresa_responsavel = ?, responsavel_externo = ?, contato_responsavel_externo = ?,
@@ -283,9 +287,8 @@ func UpdateHost(db *sql.DB, h *Host) error {
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		h.Nickname, h.OficialSlug, h.Hostname, h.Hospedagem, h.TipoMaquina,
-		h.User, h.HasPassword, h.PasswordCiphertext, h.PasswordNonce,
-		h.HasKey, h.KeyPath, h.PubKeyCiphertext, h.PubKeyNonce,
-		h.PrivKeyCiphertext, h.PrivKeyNonce,
+		h.User, h.HasPassword,
+		h.HasKey, h.KeyPath,
 		h.Port, h.IdentitiesOnly, h.ProxyJump, h.ForwardAgent,
 		h.Description, h.SetorResponsavel, h.ResponsavelInterno, h.ContatoResponsavelInterno,
 		h.AcessoEmpresaExterna, h.EmpresaResponsavel, h.ResponsavelExterno, h.ContatoResponsavelExterno,
@@ -359,22 +362,22 @@ func HostCountByHospedagem(db *sql.DB) (map[string]int, error) {
 }
 
 func hostColumns() string {
+	// Secret-payload columns intentionally absent — read via the vault.
 	return `id, nickname, oficial_slug, hostname, hospedagem, tipo_maquina,
-		ssh_user, has_password, password_ciphertext, password_nonce,
+		ssh_user, has_password,
 		has_key, key_path, port, identities_only, proxy_jump, forward_agent,
 		description, setor_responsavel, responsavel_interno, contato_responsavel_interno,
 		acesso_empresa_externa, empresa_responsavel, responsavel_externo, contato_responsavel_externo,
 		recurso_cpu, recurso_ram, recurso_armazenamento,
 		situacao, precisa_manutencao, preferred_auth, connections_failed, password_test_status, key_test_status, docker_group_status, coolify_server_uuid, observacoes,
 		grafana_dashboard_uid,
-		created_at, updated_at,
-		pub_key_ciphertext, pub_key_nonce, priv_key_ciphertext, priv_key_nonce`
+		created_at, updated_at`
 }
 
 func hostScanDest(h *Host) []any {
 	return []any{
 		&h.ID, &h.Nickname, &h.OficialSlug, &h.Hostname, &h.Hospedagem, &h.TipoMaquina,
-		&h.User, &h.HasPassword, &h.PasswordCiphertext, &h.PasswordNonce,
+		&h.User, &h.HasPassword,
 		&h.HasKey, &h.KeyPath, &h.Port, &h.IdentitiesOnly, &h.ProxyJump, &h.ForwardAgent,
 		&h.Description, &h.SetorResponsavel, &h.ResponsavelInterno, &h.ContatoResponsavelInterno,
 		&h.AcessoEmpresaExterna, &h.EmpresaResponsavel, &h.ResponsavelExterno, &h.ContatoResponsavelExterno,
@@ -382,7 +385,6 @@ func hostScanDest(h *Host) []any {
 		&h.Situacao, &h.PrecisaManutencao, &h.PreferredAuth, &h.ConnectionsFailed, &h.PasswordTestStatus, &h.KeyTestStatus, &h.DockerGroupStatus, &h.CoolifyServerUUID, &h.Observacoes,
 		&h.GrafanaDashboardUID,
 		&h.CreatedAt, &h.UpdatedAt,
-		&h.PubKeyCiphertext, &h.PubKeyNonce, &h.PrivKeyCiphertext, &h.PrivKeyNonce,
 	}
 }
 
@@ -401,26 +403,26 @@ func ListHostsForSSHConfig(db *sql.DB) ([]Host, error) {
 	return ListHosts(db, HostFilter{Situacao: "active"})
 }
 
-// UpdateHostPassword updates only the password fields for a host.
-func UpdateHostPassword(db *sql.DB, id int64, hasPassword bool, ciphertext, nonce []byte) error {
+// UpdateHostHasPassword flips the host's has_password flag. The actual
+// password payload lives in `secrets` (vault.HostSetPassword); this
+// function only maintains the cached boolean used by list/filter queries.
+func UpdateHostHasPassword(db *sql.DB, id int64, hasPassword bool) error {
 	_, err := db.Exec(
-		`UPDATE hosts SET has_password = ?, password_ciphertext = ?, password_nonce = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-		hasPassword, ciphertext, nonce, id,
+		`UPDATE hosts SET has_password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		hasPassword, id,
 	)
 	return err
 }
 
-// UpdateHostKey updates only the key fields for a host, including encrypted key content.
-func UpdateHostKey(db *sql.DB, id int64, hasKey bool, keyPath, identitiesOnly string,
-	pubKeyCT, pubKeyNonce, privKeyCT, privKeyNonce []byte) error {
+// UpdateHostKeyMeta sets has_key + key_path + identities_only without
+// touching the encrypted payload (which lives in `secrets` and is written
+// via vault.HostSetSSHKey). Replaces the legacy UpdateHostKey that took
+// the ciphertext/nonce blobs directly.
+func UpdateHostKeyMeta(db *sql.DB, id int64, hasKey bool, keyPath, identitiesOnly string) error {
 	_, err := db.Exec(
 		`UPDATE hosts SET has_key = ?, key_path = ?, identities_only = ?,
-		 pub_key_ciphertext = ?, pub_key_nonce = ?,
-		 priv_key_ciphertext = ?, priv_key_nonce = ?,
 		 updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-		hasKey, keyPath, identitiesOnly,
-		pubKeyCT, pubKeyNonce, privKeyCT, privKeyNonce,
-		id,
+		hasKey, keyPath, identitiesOnly, id,
 	)
 	return err
 }

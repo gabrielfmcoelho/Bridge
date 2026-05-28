@@ -692,13 +692,14 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	method := auth.Method()
 	h.logOperation(r, host.ID, "setup-key", &method, "success", fmt.Sprintf("mode=%s generated=%v", req.Mode, result.Generated))
 
-	// Encrypt key material and store in DB — nothing touches the filesystem.
-	privKeyCT, privKeyNonce, _ := h.db.Encryptor.Encrypt(string(result.PrivKeyPEM))
-	pubKeyCT, pubKeyNonce, _ := h.db.Encryptor.Encrypt(result.PubKeyLine)
-
-	// key_path is empty — keys live only in the encrypted DB blob.
-	models.UpdateHostKey(h.db.SQL, host.ID, true, "", "yes",
-		pubKeyCT, pubKeyNonce, privKeyCT, privKeyNonce)
+	// Flag bookkeeping + vault write. identities_only="yes" forces SSH to
+	// use the host's linked key only. key_path is empty — keys live only
+	// in the unified vault, never on the filesystem.
+	_ = models.UpdateHostKeyMeta(h.db.SQL, host.ID, true, "", "yes")
+	if vErr := vault.HostSetSSHKey(r.Context(), h.db, host.ID, actorUserID(r),
+		vault.HostSSHKey{PrivateKeyPEM: string(result.PrivKeyPEM), PublicKey: result.PubKeyLine}); vErr != nil {
+		log.Printf("[ssh] setup-key vault write slug=%s: %v", host.OficialSlug, vErr)
+	}
 
 	jsonOK(w, map[string]any{
 		"success":   true,

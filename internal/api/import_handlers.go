@@ -76,18 +76,11 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 
-		// Encrypt password if provided
-		if item.Password != "" {
-			ct, nonce, err := h.db.Encryptor.Encrypt(item.Password)
-			if err != nil {
-				result.Failed++
-				result.Errors = append(result.Errors, importItemResult{Index: i, Name: name, Error: "failed to encrypt password"})
-				continue
-			}
-			item.Host.HasPassword = true
-			item.Host.PasswordCiphertext = ct
-			item.Host.PasswordNonce = nonce
-		}
+		// Flag-only: the actual password payload is written to the vault
+		// by the post-CreateHost step below. The encrypt step is gone
+		// because Encryptor is no longer the storage layer for host
+		// secrets — the vault is.
+		item.Host.HasPassword = item.Password != ""
 
 		// Normalize preferred auth
 		preferredAuth, prefErr := normalizePreferredAuth(item.Host.HasPassword, item.Host.HasKey, item.Host.PreferredAuth)
