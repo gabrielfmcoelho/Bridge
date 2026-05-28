@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/coolify"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -251,14 +253,14 @@ func (h *coolifyHandlers) selectRegistrationKey(host *models.Host, sshKeyID int6
 		}
 	}
 
-	if len(host.PrivKeyCiphertext) == 0 {
+	key, ok, derr := vault.HostGetSSHKey(context.Background(), h.db, host.ID)
+	if derr != nil {
+		return "", "", "", fmt.Errorf("load host key: %w", derr)
+	}
+	if !ok || key.PrivateKeyPEM == "" {
 		return "", "", "", fmt.Errorf("host has no private key stored and no linked ssh key available")
 	}
-	plain, derr := h.db.Encryptor.Decrypt(host.PrivKeyCiphertext, host.PrivKeyNonce)
-	if derr != nil {
-		return "", "", "", fmt.Errorf("decrypt host key: %w", derr)
-	}
-	return plain, fmt.Sprintf("sshcm-%s", host.OficialSlug), fmt.Sprintf("Managed by SSHCM for host %s", host.Nickname), nil
+	return key.PrivateKeyPEM, fmt.Sprintf("sshcm-%s", host.OficialSlug), fmt.Sprintf("Managed by SSHCM for host %s", host.Nickname), nil
 }
 
 // coolifyManagedKeyName produces a Coolify-side name for an sshcm key that is

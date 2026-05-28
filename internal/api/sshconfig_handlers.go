@@ -27,6 +27,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshkeys"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshsetup"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 // validLinuxUsername matches POSIX portable usernames: starts with lowercase
@@ -109,13 +110,13 @@ func (h *sshHandlers) resolveAuth(w http.ResponseWriter, host *models.Host, meth
 
 	switch method {
 	case "password":
-		if !host.HasPassword {
-			jsonError(w, http.StatusBadRequest, "no password stored for this host")
-			return "", sshtest.Auth{}, false
-		}
-		pw, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
+		pw, ok, err := vault.HostGetPassword(context.Background(), h.db, host.ID)
 		if err != nil {
 			jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
+			return "", sshtest.Auth{}, false
+		}
+		if !ok {
+			jsonError(w, http.StatusBadRequest, "no password stored for this host")
 			return "", sshtest.Auth{}, false
 		}
 		return "password", sshtest.PasswordAuth(pw), true
@@ -141,7 +142,7 @@ func (h *sshHandlers) resolveAuth(w http.ResponseWriter, host *models.Host, meth
 		// timeout and surface as a "socket hang up" / 500 to the user.
 		var pw string
 		if host.HasPassword && host.PasswordTestStatus != nil && *host.PasswordTestStatus == "success" {
-			pw, _ = h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
+			pw, _, _ = vault.HostGetPassword(context.Background(), h.db, host.ID)
 		}
 		return "key", sshtest.KeyAuth(keyPEM, pw), true
 
@@ -585,13 +586,13 @@ func (h *sshHandlers) handleDockerLogsApplyRotation(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if !host.HasPassword {
-		jsonError(w, http.StatusBadRequest, "host has no stored password — required to elevate for /etc/docker/daemon.json write")
-		return
-	}
-	password, decErr := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
+	password, ok, decErr := vault.HostGetPassword(r.Context(), h.db, host.ID)
 	if decErr != nil {
 		jsonServerError(w, r, "failed to decrypt password", decErr)
+		return
+	}
+	if !ok {
+		jsonError(w, http.StatusBadRequest, "host has no stored password — required to elevate for /etc/docker/daemon.json write")
 		return
 	}
 
@@ -642,7 +643,7 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 
 	password := req.Password
 	if req.UseSavedPassword && host.HasPassword {
-		pw, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
+		pw, _, err := vault.HostGetPassword(r.Context(), h.db, host.ID)
 		if err != nil {
 			jsonServerError(w, r, "failed to decrypt password", err)
 			return
@@ -1185,14 +1186,11 @@ var identityFileNameSanitizer = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 func (h *sshHandlers) resolveIdentityFile(host *models.Host) string {
 	fallback := "~/.ssh/id_ed25519_" + identityFileNameSanitizer.ReplaceAllString(host.OficialSlug, "_")
 
-	if len(host.PubKeyCiphertext) == 0 {
+	key, ok, err := vault.HostGetSSHKey(context.Background(), h.db, host.ID)
+	if err != nil || !ok || key.PublicKey == "" {
 		return fallback
 	}
-	pubPEM, err := h.db.Encryptor.Decrypt(host.PubKeyCiphertext, host.PubKeyNonce)
-	if err != nil {
-		return fallback
-	}
-	pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pubPEM))
+	pub, _, _, _, err := ssh.ParseAuthorizedKey([]byte(key.PublicKey))
 	if err != nil {
 		return fallback
 	}

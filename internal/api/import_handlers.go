@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 func readCloser(b []byte) io.ReadCloser {
@@ -100,6 +102,16 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 			result.Failed++
 			result.Errors = append(result.Errors, importItemResult{Index: i, Name: name, Error: fmt.Sprintf("create failed: %v", err)})
 			continue
+		}
+
+		// Stage 1 dual-write: mirror the password to the unified vault.
+		// actorUserID=0 because bulk import doesn't carry a request actor
+		// — secret_audit_log.actor_user_id ends up NULL for these rows,
+		// matching the legacy migration's import provenance.
+		if item.Password != "" {
+			if err := vault.HostSetPassword(r.Context(), h.db, item.Host.ID, 0, item.Password); err != nil {
+				log.Printf("[import] vault dual-write host slug=%s: %v", item.Host.OficialSlug, err)
+			}
 		}
 
 		// Set tags

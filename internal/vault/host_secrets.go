@@ -133,6 +133,25 @@ func decryptHostSecret(
 	return out, true, nil
 }
 
+// resolveSystemActor falls back to a deterministic user id when the caller
+// didn't supply one. Tries username='sead-manutencao' (the maintenance
+// user seeded by seed-maintenance-user) first, then any admin user, then
+// any user at all. Required because secrets.owner_user_id is NOT NULL +
+// FK — every host-secret write must point at a real user.
+func resolveSystemActor(ctx context.Context, db *database.DB) int64 {
+	var id int64
+	if err := db.SQL.QueryRowContext(ctx,
+		`SELECT id FROM users WHERE username = 'sead-manutencao' LIMIT 1`).Scan(&id); err == nil && id > 0 {
+		return id
+	}
+	if err := db.SQL.QueryRowContext(ctx,
+		`SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1`).Scan(&id); err == nil && id > 0 {
+		return id
+	}
+	_ = db.SQL.QueryRowContext(ctx, `SELECT id FROM users ORDER BY id LIMIT 1`).Scan(&id)
+	return id
+}
+
 // upsertHostSecret writes/updates/clears the (type, name) secret for the
 // host inside a single transaction. Empty plaintext soft-deletes any
 // existing row; non-empty inserts or updates.
@@ -144,6 +163,12 @@ func upsertHostSecret(
 	name string,
 	plaintext string,
 ) error {
+	if actorUserID <= 0 {
+		actorUserID = resolveSystemActor(ctx, db)
+		if actorUserID == 0 {
+			return fmt.Errorf("host secret write: no users exist to attribute the secret to")
+		}
+	}
 	tx, err := db.SQL.BeginTx(ctx, nil)
 	if err != nil {
 		return err

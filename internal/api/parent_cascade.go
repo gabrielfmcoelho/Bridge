@@ -9,6 +9,17 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
+// actorUserID extracts the authenticated user's id from the request context,
+// returning 0 when no user is attached (e.g. before auth middleware fires,
+// or in tests). Useful for dual-write paths that need an audit-row actor
+// without re-doing the full auth boilerplate.
+func actorUserID(r *http.Request) int64 {
+	if u := auth.UserFromContext(r.Context()); u != nil {
+		return u.ID
+	}
+	return 0
+}
+
 // cascadeParentDelete soft-deletes every child secret attached to the given
 // (scope, parentID) and then executes parentDeleteSQL (one `?` placeholder
 // for parent id) within the SAME transaction. Used by the existing service/

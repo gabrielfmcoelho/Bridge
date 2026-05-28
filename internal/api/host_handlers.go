@@ -12,6 +12,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 type hostHandlers struct {
@@ -447,6 +448,17 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Stage 1 dual-write: mirror the password to the unified vault so
+	// SSH/Coolify/import handlers reading via vault.HostGetPassword see
+	// it. Stage 2 will drop the column-side write and the host row will
+	// only carry the has_password boolean.
+	if req.Password != "" {
+		actorID := actorUserID(r)
+		if err := vault.HostSetPassword(r.Context(), h.db, req.Host.ID, actorID, req.Password); err != nil {
+			log.Printf("[hosts] vault dual-write on create slug=%s: %v", req.OficialSlug, err)
+		}
+	}
+
 	if len(req.Tags) > 0 {
 		models.SetTags(h.db.SQL, "host", req.Host.ID, req.Tags)
 	}
@@ -643,6 +655,22 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Stage 1 dual-write: keep the vault row in sync. Password rotation
+	// upserts; clearing the key removes the vault row. SSH key linking
+	// (req.SSHKeyID > 0) flows through linkSSHKey which writes to vault
+	// inside that helper.
+	actorID := actorUserID(r)
+	if req.Password != "" {
+		if err := vault.HostSetPassword(r.Context(), h.db, existing.ID, actorID, req.Password); err != nil {
+			log.Printf("[hosts] vault dual-write on update slug=%s: %v", existing.OficialSlug, err)
+		}
+	}
+	if req.ClearKey {
+		if err := vault.HostSetSSHKey(r.Context(), h.db, existing.ID, actorID, vault.HostSSHKey{}); err != nil {
+			log.Printf("[hosts] vault clear-key on update slug=%s: %v", existing.OficialSlug, err)
+		}
+	}
+
 	if req.Tags != nil {
 		models.SetTags(h.db.SQL, "host", existing.ID, req.Tags)
 	}
@@ -734,13 +762,13 @@ func (h *hostHandlers) handleGetPassword(w http.ResponseWriter, r *http.Request)
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
 	}
-	if !host.HasPassword {
-		jsonError(w, http.StatusNotFound, "no password stored")
+	password, ok, err := vault.HostGetPassword(r.Context(), h.db, host.ID)
+	if err != nil {
+		jsonServerError(w, r, "failed to load host password", err)
 		return
 	}
-	password, err := h.db.Encryptor.Decrypt(host.PasswordCiphertext, host.PasswordNonce)
-	if err != nil {
-		jsonServerError(w, r, "failed to decrypt password", err)
+	if !ok {
+		jsonError(w, http.StatusNotFound, "no password stored")
 		return
 	}
 	jsonOK(w, map[string]string{"password": password})
@@ -751,14 +779,17 @@ func (h *hostHandlers) handleGetPassword(w http.ResponseWriter, r *http.Request)
 // never touched — this is what keeps key-auth working after a DB backup is
 // restored onto a machine where host.key_path no longer exists.
 func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
-	if host == nil || len(host.PrivKeyCiphertext) == 0 {
+	if host == nil {
 		return nil, fmt.Errorf("host has no stored private key — link an SSH key via the host editor")
 	}
-	plain, err := db.Encryptor.Decrypt(host.PrivKeyCiphertext, host.PrivKeyNonce)
+	key, ok, err := vault.HostGetSSHKey(context.Background(), db, host.ID)
 	if err != nil {
-		return nil, fmt.Errorf("decrypt host key: %w", err)
+		return nil, fmt.Errorf("load host key: %w", err)
 	}
-	return []byte(plain), nil
+	if !ok || key.PrivateKeyPEM == "" {
+		return nil, fmt.Errorf("host has no stored private key — link an SSH key via the host editor")
+	}
+	return []byte(key.PrivateKeyPEM), nil
 }
 
 // linkSSHKey copies the encrypted key blob from the ssh_keys table onto the
@@ -788,6 +819,32 @@ func (h *hostHandlers) linkSSHKey(hostID, sshKeyID int64, slug string) error {
 		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: UpdateHostKey error: %v", slug, sshKeyID, err)
 		return fmt.Errorf("update host key: %w", err)
 	}
+
+	// Stage 1 dual-write: mirror the linked key into the unified vault.
+	// Decrypts in this binary so the vault sees plaintext sealed under
+	// the master key (matching every other host secret), regardless of
+	// which ssh_keys row was the source.
+	priv, perr := h.db.Encryptor.Decrypt(k.PrivKeyCiphertext, k.PrivKeyNonce)
+	if perr != nil {
+		log.Printf("[hosts] linkSSHKey vault-mirror decrypt priv slug=%s: %v", slug, perr)
+	} else {
+		pub := ""
+		if len(k.PubKeyCiphertext) > 0 {
+			if p, derr := h.db.Encryptor.Decrypt(k.PubKeyCiphertext, k.PubKeyNonce); derr == nil {
+				pub = p
+			}
+		}
+		// actor_user_id=0 because linkSSHKey is called from several paths
+		// (create + update + sync from coolify) where the caller's user
+		// isn't easily threaded down. The audit row's actor_user_id ends
+		// up NULL, which is acceptable for this mirror write — the
+		// originating SSH key has its own audit trail via ssh_keys.
+		if vErr := vault.HostSetSSHKey(context.Background(), h.db, hostID, 0,
+			vault.HostSSHKey{PrivateKeyPEM: priv, PublicKey: pub}); vErr != nil {
+			log.Printf("[hosts] linkSSHKey vault-mirror slug=%s: %v", slug, vErr)
+		}
+	}
+
 	log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: linked key %q (fingerprint=%s)", slug, sshKeyID, k.Name, k.Fingerprint)
 	return nil
 }
