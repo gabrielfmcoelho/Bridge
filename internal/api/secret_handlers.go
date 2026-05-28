@@ -43,6 +43,12 @@ func (h *secretHandlers) register(mux *http.ServeMux, wrap func(http.Handler) ht
 	// Env-var bundle endpoints (Phase 2 — Tasks 2.2 + 2.3).
 	mux.Handle("POST /api/secrets/env/bulk", wrap(http.HandlerFunc(h.handleEnvBulk)))
 	mux.Handle("GET /api/secrets/env", wrap(http.HandlerFunc(h.handleEnvList)))
+	// Share-link endpoints — owner-only mgmt (Phase 3 Task 3.3). The
+	// public redemption GET /api/share/{token} is wired in router.go
+	// outside the auth wrapper.
+	mux.Handle("POST /api/secrets/{id}/share-links", wrap(http.HandlerFunc(h.handleCreateShareLink)))
+	mux.Handle("GET /api/secrets/{id}/share-links", wrap(http.HandlerFunc(h.handleListShareLinks)))
+	mux.Handle("DELETE /api/secrets/{id}/share-links/{linkId}", wrap(http.HandlerFunc(h.handleRevokeShareLink)))
 	mux.Handle("GET /api/secrets/{id}", wrap(http.HandlerFunc(h.handleGetMetadata)))
 	mux.Handle("GET /api/secrets/{id}/reveal", wrap(http.HandlerFunc(h.handleReveal)))
 	mux.Handle("GET /api/secrets/{id}/history", wrap(http.HandlerFunc(h.handleHistory)))

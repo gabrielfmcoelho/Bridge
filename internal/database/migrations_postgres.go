@@ -1031,4 +1031,9 @@ var migrationsPostgres = []string{
 	`ALTER TABLE external_tools ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	CREATE INDEX IF NOT EXISTS idx_external_tools_live    ON external_tools (id) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_external_tools_trash   ON external_tools (deleted_at) WHERE deleted_at IS NOT NULL;`,
+
+	// Version 63: payload columns on secret_share_links — see
+	// migrations_sqlite.go for the D4 design rationale.
+	`ALTER TABLE secret_share_links ADD COLUMN IF NOT EXISTS payload_ciphertext BYTEA;
+	ALTER TABLE secret_share_links ADD COLUMN IF NOT EXISTS payload_nonce BYTEA;`,
 }

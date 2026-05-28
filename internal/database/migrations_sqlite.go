@@ -1112,4 +1112,14 @@ var migrationsSQLite = []string{
 	`ALTER TABLE external_tools ADD COLUMN deleted_at DATETIME;
 	CREATE INDEX IF NOT EXISTS idx_external_tools_live    ON external_tools (id) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_external_tools_trash   ON external_tools (deleted_at) WHERE deleted_at IS NOT NULL;`,
+
+	// Version 63: payload columns on secret_share_links (Phase 3.3 / D4).
+	// Each share link stores its OWN ciphertext, encrypted under a per-
+	// link HKDF-derived key (salt = raw token). The token never reaches
+	// the DB, so DB compromise alone cannot decrypt this payload — the
+	// property D4 was designed to provide. Nullable for backward compat
+	// with rows seeded before this migration (none should exist in
+	// practice — share links ship in Phase 3, after this migration).
+	`ALTER TABLE secret_share_links ADD COLUMN payload_ciphertext BLOB;
+	ALTER TABLE secret_share_links ADD COLUMN payload_nonce BLOB;`,
 }

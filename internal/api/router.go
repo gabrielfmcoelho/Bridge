@@ -125,8 +125,15 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 
 	// Unified secrets (Phase 1 — spec §6). Auth at the perimeter only;
 	// per-row ACL (RBAC for shared, ownership for personal) lives in vault.
-	secretH := &secretHandlers{db: db, repo: vault.NewSecretRepo(db)}
+	secretRepo := vault.NewSecretRepo(db)
+	secretH := &secretHandlers{db: db, repo: secretRepo}
 	secretH.register(mux, func(next http.Handler) http.Handler { return authenticated(db, next) })
+
+	// Public share-link redemption (Phase 3 Task 3.3). NO auth — the
+	// token in the URL is the capability. Response hardening lives in
+	// the handler itself (Task 3.5).
+	publicShareH := &publicShareHandlers{repo: secretRepo}
+	mux.HandleFunc("GET /api/share/{token}", publicShareH.handleRedeem)
 
 	// Orchestrators
 	mux.Handle("GET /api/orchestrators", authenticated(db, http.HandlerFunc(oh.handleList)))
