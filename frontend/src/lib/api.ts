@@ -817,6 +817,22 @@ export const secretsAPI = {
   delete: (id: number) => api.delete(`/api/secrets/${id}`),
   restore: (id: number) => api.post(`/api/secrets/${id}/restore`),
   history: (id: number) => api.get<{ id: number; secret_id: number; action: string; actor_user_id?: number; at: string; metadata?: unknown }[]>(`/api/secrets/${id}/history`),
+  // Env-var bundle endpoints (Phase 2 — Tasks 2.2/2.3).
+  envBulk: (data: {
+    scope: string;
+    parent_id?: number;
+    visibility?: string;
+    group_label: string;
+    vars: { name: string; value: string; description?: string }[];
+  }) => api.post<{ created: number; updated: number }>("/api/secrets/env/bulk", data),
+  envList: (params: { scope?: string; parent_id?: number; group_label?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.scope) q.set("scope", params.scope);
+    if (params.parent_id != null) q.set("parent_id", String(params.parent_id));
+    if (params.group_label) q.set("group_label", params.group_label);
+    const qs = q.toString();
+    return api.get<Record<string, import("./types").Secret[]>>(`/api/secrets/env${qs ? `?${qs}` : ""}`);
+  },
 };
 
 // Appearance settings
