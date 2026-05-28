@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toolsAPI, servicesAPI, secretsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSecretReveal } from "@/hooks/useSecretReveal";
 import type { ExternalTool, Secret } from "@/lib/types";
 import PageShell from "@/components/layout/PageShell";
 import Card from "@/components/ui/Card";
@@ -584,44 +585,46 @@ function CredentialsDrawer({ tool, onClose }: { tool: ExternalTool | null; onClo
 
 function CredentialRow({ secret }: { secret: Secret }) {
   const { t } = useLocale();
-  const [revealed, setRevealed] = useState(false);
-  const [value, setValue] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const r = useSecretReveal();
 
-  const reveal = async () => {
-    if (revealed) {
-      setRevealed(false);
-      setValue(null);
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await secretsAPI.reveal(secret.id);
-      setValue(data.payload || "");
-      setRevealed(true);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
+  const toggle = () => {
+    if (r.revealed) r.hide();
+    else r.reveal(secret.id);
   };
 
   return (
     <div className="bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-[var(--text-primary)]">{secret.name}</span>
-        <button
-          onClick={reveal}
-          disabled={loading}
-          className="text-xs text-[var(--accent)] hover:underline disabled:opacity-50"
-        >
-          {loading ? t("common.loading") : revealed ? t("serviceCredentials.hide") : t("serviceCredentials.reveal")}
-        </button>
+        <div className="flex items-center gap-2">
+          {r.revealed && (
+            <button
+              onClick={r.copy}
+              className="text-xs text-[var(--accent)] hover:underline"
+            >
+              {r.copyState === "copied" ? "Copied" : r.copyState === "cleared" ? "Cleared" : "Copy"}
+            </button>
+          )}
+          <button
+            onClick={toggle}
+            disabled={r.loading}
+            className="text-xs text-[var(--accent)] hover:underline disabled:opacity-50"
+          >
+            {r.loading
+              ? t("common.loading")
+              : r.revealed
+              ? `${t("serviceCredentials.hide")} (${Math.ceil(r.remainingMs / 1000)}s)`
+              : t("serviceCredentials.reveal")}
+          </button>
+        </div>
       </div>
-      {revealed && value !== null && (
+      {r.revealed && r.value !== null && (
         <pre className="mt-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface)] rounded-[var(--radius-sm)] p-2 overflow-x-auto whitespace-pre-wrap break-all border border-[var(--border-subtle)]">
-          {value}
+          {r.value}
         </pre>
+      )}
+      {r.error && (
+        <p className="text-xs text-red-400 mt-1">{r.error}</p>
       )}
     </div>
   );
