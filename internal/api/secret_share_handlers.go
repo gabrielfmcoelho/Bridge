@@ -59,7 +59,10 @@ func (h *secretHandlers) handleCreateShareLink(w http.ResponseWriter, r *http.Re
 			"max_views":      view.MaxViews,
 			"has_passphrase": view.HasPassphrase,
 			"token":          tok,
-			"url":            fmt.Sprintf("/api/share/%s", tok),
+			// Human-facing link: points at the frontend /share/{token} page
+			// (passphrase prompt + reveal UI), NOT the raw /api/share JSON
+			// redemption endpoint. The page fetches /api/share/{token} itself.
+			"url":            fmt.Sprintf("/share/%s", tok),
 		})
 	case errors.Is(err, vault.ErrShareTargetNotPersonal):
 		jsonError(w, http.StatusBadRequest, "share links may only be created against personal secrets")

@@ -60,6 +60,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/atlas/lineage", label: "nav.lineage", icon: "GitBranch" },
       { href: "/atlas/catalog", label: "nav.catalog", icon: "Database" },
       { href: "/atlas/pipeline", label: "nav.pipeline", icon: "Workflow" },
+      { href: "/atlas/apis", label: "nav.apis", icon: "Plug" },
     ],
   },
   {

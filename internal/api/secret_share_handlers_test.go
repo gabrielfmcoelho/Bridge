@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -83,19 +82,18 @@ func extractToken(t *testing.T, rec *httptest.ResponseRecorder) string {
 // POST /api/secrets/{id}/share-links
 // ---------------------------------------------------------------------------
 
-func TestShareLink_RejectsSharedSecret(t *testing.T) {
+func TestShareLink_AllowsSharedSecret(t *testing.T) {
 	env := newSecretShareEnv(t)
-	// env.sharedID is visibility=shared — Phase 3 §5.3 says create must
-	// return 400 with an explanatory body.
+	// Policy relaxation: a shared secret IS now externally shareable by
+	// anyone who can reveal it (env.bob can reveal shared secrets).
 	rec := env.do(env.bob, "POST",
 		fmt.Sprintf("/api/secrets/%d/share-links", env.sharedID),
 		`{"ttl_seconds":3600}`)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("got %d, want 400; body=%s", rec.Code, rec.Body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("got %d, want 201; body=%s", rec.Code, rec.Body)
 	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "personal") {
-		t.Errorf("response should explain that personal-only is required; got %s", body)
+	if tok, _ := decodeMap(t, rec)["token"].(string); tok == "" {
+		t.Errorf("expected a token in the response; got %s", rec.Body)
 	}
 }
 

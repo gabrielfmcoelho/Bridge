@@ -1181,4 +1181,104 @@ var migrationsSQLite = []string{
 	CREATE INDEX IF NOT EXISTS idx_secrets_trash
 		ON secrets (deleted_at) WHERE deleted_at IS NOT NULL;
 	PRAGMA foreign_keys=ON;`,
+
+	// Version 65: Atlas REST API catalog (Phase A). Stores imported
+	// OpenAPI/Swagger specs. scope/parent_id mirror the secrets pattern:
+	// 'projeto' attaches to projects.id, 'avulso' is standalone. spec_json
+	// holds the canonical normalized JSON (source of truth for rendering);
+	// spec_hash is sha256(spec_json) for re-fetch change detection. Text
+	// columns default to '' (never NULL) so the model layer scans into
+	// plain strings without sql.NullString juggling.
+	`CREATE TABLE IF NOT EXISTS api_catalog (
+		id            INTEGER PRIMARY KEY AUTOINCREMENT,
+		scope         TEXT NOT NULL,
+		parent_id     INTEGER,
+		name          TEXT NOT NULL,
+		description   TEXT NOT NULL DEFAULT '',
+		source_type   TEXT NOT NULL,
+		source_url    TEXT NOT NULL DEFAULT '',
+		external_url  TEXT NOT NULL DEFAULT '',
+		spec_version  TEXT NOT NULL DEFAULT '',
+		spec_json     TEXT NOT NULL,
+		spec_hash     TEXT NOT NULL DEFAULT '',
+		title         TEXT NOT NULL DEFAULT '',
+		version_label TEXT NOT NULL DEFAULT '',
+		owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		created_by    INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+		deleted_at    DATETIME,
+		CHECK (scope IN ('projeto','avulso')),
+		CHECK (source_type IN ('upload','url')),
+		CHECK ((scope = 'avulso' AND parent_id IS NULL) OR (scope = 'projeto' AND parent_id IS NOT NULL))
+	);
+	CREATE INDEX IF NOT EXISTS idx_api_catalog_scope_parent ON api_catalog (scope, parent_id) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_api_catalog_owner        ON api_catalog (owner_user_id) WHERE deleted_at IS NULL;`,
+
+	// Version 66: derived operation index for the API catalog. Rebuilt on
+	// every (re-)import. op_key is the stable selector used by partial
+	// share bundles (Phase D): operationId when present, else "METHOD path".
+	// tags is a JSON array string. The unique (api_id, op_key) index keeps
+	// a re-import idempotent and gives partial-share selectors a stable key.
+	`CREATE TABLE IF NOT EXISTS api_operations (
+		id           INTEGER PRIMARY KEY AUTOINCREMENT,
+		api_id       INTEGER NOT NULL REFERENCES api_catalog(id) ON DELETE CASCADE,
+		method       TEXT NOT NULL,
+		path         TEXT NOT NULL,
+		operation_id TEXT NOT NULL DEFAULT '',
+		summary      TEXT NOT NULL DEFAULT '',
+		description  TEXT NOT NULL DEFAULT '',
+		tags         TEXT NOT NULL DEFAULT '[]',
+		op_key       TEXT NOT NULL,
+		sort_order   INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX        IF NOT EXISTS idx_api_operations_api ON api_operations (api_id);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_api_operations_key ON api_operations (api_id, op_key);`,
+
+	// Version 67: generic share bundles (Phase D). A bundle is a single
+	// public link (token is the capability, like secret_share_links) that
+	// can carry MULTIPLE heterogeneous items — secrets and/or API docs.
+	// Unlike secret_share_links there is NO sealed payload column: bundles
+	// resolve their contents LIVE at redeem time (the deliberate Phase D/E
+	// decision), so a valid unexpired token always exposes the *current*
+	// secret value / API spec, and revoke/expiry is the only kill switch.
+	`CREATE TABLE IF NOT EXISTS share_bundles (
+		id              INTEGER PRIMARY KEY AUTOINCREMENT,
+		token_hash      BLOB NOT NULL,
+		title           TEXT NOT NULL DEFAULT '',
+		expires_at      DATETIME NOT NULL,
+		passphrase_hash BLOB,
+		max_views       INTEGER,
+		view_count      INTEGER NOT NULL DEFAULT 0,
+		created_by      INTEGER NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+		revoked_at      DATETIME
+	);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_share_bundles_token   ON share_bundles (token_hash);
+	CREATE INDEX        IF NOT EXISTS idx_share_bundles_expires ON share_bundles (expires_at);
+	CREATE INDEX        IF NOT EXISTS idx_share_bundles_creator ON share_bundles (created_by);`,
+
+	// Version 68: the items carried by a bundle. ref_id is intentionally NOT
+	// a foreign key (it points polymorphically at secrets.id or
+	// api_catalog.id) so a bundle survives the source being deleted — the
+	// redeem path resolves live and simply skips items that no longer
+	// resolve. selector (api_doc only) is JSON: {mode,op_keys,tags}.
+	`CREATE TABLE IF NOT EXISTS share_bundle_items (
+		id         INTEGER PRIMARY KEY AUTOINCREMENT,
+		bundle_id  INTEGER NOT NULL REFERENCES share_bundles(id) ON DELETE CASCADE,
+		item_type  TEXT NOT NULL,
+		ref_id     INTEGER NOT NULL,
+		selector   TEXT,
+		sort_order INTEGER NOT NULL DEFAULT 0,
+		CHECK (item_type IN ('secret','api_doc'))
+	);
+	CREATE INDEX IF NOT EXISTS idx_share_bundle_items_bundle ON share_bundle_items (bundle_id);`,
+
+	// Version 69: explicit base_url + docs_url on api_catalog. base_url is the
+	// real API host — injected as the rendered spec's server so the Scalar
+	// "Test Request" hits the live API rather than this app's origin. docs_url
+	// is a human-facing docs page used for "open externally". Both optional
+	// (default ''); when base_url is blank the spec's own servers are used.
+	`ALTER TABLE api_catalog ADD COLUMN base_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE api_catalog ADD COLUMN docs_url TEXT NOT NULL DEFAULT '';`,
 }

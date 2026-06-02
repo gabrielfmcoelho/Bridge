@@ -1045,4 +1045,82 @@ var migrationsPostgres = []string{
 	`ALTER TABLE secrets DROP CONSTRAINT IF EXISTS secrets_scope_check;
 	ALTER TABLE secrets ADD CONSTRAINT secrets_scope_check
 		CHECK (scope IN ('service','host','tool','avulso','projeto'));`,
+
+	// Version 65: Atlas REST API catalog (Phase A) — see migrations_sqlite.go
+	// for the design rationale.
+	`CREATE TABLE IF NOT EXISTS api_catalog (
+		id            BIGSERIAL PRIMARY KEY,
+		scope         TEXT NOT NULL,
+		parent_id     BIGINT,
+		name          TEXT NOT NULL,
+		description   TEXT NOT NULL DEFAULT '',
+		source_type   TEXT NOT NULL,
+		source_url    TEXT NOT NULL DEFAULT '',
+		external_url  TEXT NOT NULL DEFAULT '',
+		spec_version  TEXT NOT NULL DEFAULT '',
+		spec_json     TEXT NOT NULL,
+		spec_hash     TEXT NOT NULL DEFAULT '',
+		title         TEXT NOT NULL DEFAULT '',
+		version_label TEXT NOT NULL DEFAULT '',
+		owner_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		created_by    BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		deleted_at    TIMESTAMPTZ,
+		CHECK (scope IN ('projeto','avulso')),
+		CHECK (source_type IN ('upload','url')),
+		CHECK ((scope = 'avulso' AND parent_id IS NULL) OR (scope = 'projeto' AND parent_id IS NOT NULL))
+	);
+	CREATE INDEX IF NOT EXISTS idx_api_catalog_scope_parent ON api_catalog (scope, parent_id) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_api_catalog_owner        ON api_catalog (owner_user_id) WHERE deleted_at IS NULL;`,
+
+	// Version 66: derived operation index — see migrations_sqlite.go.
+	`CREATE TABLE IF NOT EXISTS api_operations (
+		id           BIGSERIAL PRIMARY KEY,
+		api_id       BIGINT NOT NULL REFERENCES api_catalog(id) ON DELETE CASCADE,
+		method       TEXT NOT NULL,
+		path         TEXT NOT NULL,
+		operation_id TEXT NOT NULL DEFAULT '',
+		summary      TEXT NOT NULL DEFAULT '',
+		description  TEXT NOT NULL DEFAULT '',
+		tags         TEXT NOT NULL DEFAULT '[]',
+		op_key       TEXT NOT NULL,
+		sort_order   INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX        IF NOT EXISTS idx_api_operations_api ON api_operations (api_id);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_api_operations_key ON api_operations (api_id, op_key);`,
+
+	// Version 67: generic share bundles (Phase D) — see migrations_sqlite.go
+	// for the design rationale (live-resolve, no sealed payload).
+	`CREATE TABLE IF NOT EXISTS share_bundles (
+		id              BIGSERIAL PRIMARY KEY,
+		token_hash      BYTEA NOT NULL,
+		title           TEXT NOT NULL DEFAULT '',
+		expires_at      TIMESTAMPTZ NOT NULL,
+		passphrase_hash BYTEA,
+		max_views       INTEGER,
+		view_count      INTEGER NOT NULL DEFAULT 0,
+		created_by      BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+		created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		revoked_at      TIMESTAMPTZ
+	);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_share_bundles_token   ON share_bundles (token_hash);
+	CREATE INDEX        IF NOT EXISTS idx_share_bundles_expires ON share_bundles (expires_at);
+	CREATE INDEX        IF NOT EXISTS idx_share_bundles_creator ON share_bundles (created_by);`,
+
+	// Version 68: bundle items — see migrations_sqlite.go.
+	`CREATE TABLE IF NOT EXISTS share_bundle_items (
+		id         BIGSERIAL PRIMARY KEY,
+		bundle_id  BIGINT NOT NULL REFERENCES share_bundles(id) ON DELETE CASCADE,
+		item_type  TEXT NOT NULL,
+		ref_id     BIGINT NOT NULL,
+		selector   TEXT,
+		sort_order INTEGER NOT NULL DEFAULT 0,
+		CHECK (item_type IN ('secret','api_doc'))
+	);
+	CREATE INDEX IF NOT EXISTS idx_share_bundle_items_bundle ON share_bundle_items (bundle_id);`,
+
+	// Version 69: base_url + docs_url on api_catalog — see migrations_sqlite.go.
+	`ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS base_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS docs_url TEXT NOT NULL DEFAULT '';`,
 }

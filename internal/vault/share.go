@@ -112,15 +112,14 @@ func (r *SecretRepo) CreateShareLink(
 	secretID int64,
 	opts CreateShareLinkOpts,
 ) (rawToken string, view *SecretShareLinkView, err error) {
-	// Load + ACL check the target. Note: ErrSecretForbidden bubbles up
-	// directly because the handler maps it to 403 — distinct from the
-	// shared-visibility rejection which is a 400.
+	// Load + ACL check the target. Any secret the actor can REVEAL may be
+	// shared externally: personal secrets are owner-only (decideAccess
+	// enforces that), and shared secrets are shareable by anyone who can
+	// reveal them (viewer+). This is a deliberate relaxation of the original
+	// personal-only rule — shared secrets are now externally shareable too.
 	v, err := r.loadView(ctx, secretID, false)
 	if err != nil {
 		return "", nil, err
-	}
-	if v.Visibility != models.SecretVisibilityPersonal {
-		return "", nil, ErrShareTargetNotPersonal
 	}
 	dec := decideAccess(actor, v.Visibility, v.OwnerUserID)
 	if !dec.canSeeMetadata {

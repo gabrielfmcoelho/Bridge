@@ -25,6 +25,14 @@ const TTL_SECONDS: Record<Exclude<TTLPreset, "custom">, number> = {
   "7d": 7 * 24 * 3600,
 };
 
+function shareBaseUrl(): string {
+  const configured_url = process.env.NEXT_PUBLIC_BASE_URL;
+  if (!configured_url) {
+    throw new Error("NEXT_PUBLIC_BASE_URL is not defined");
+  }
+  return configured_url;
+}
+
 // ShareLinkModal — Phase 3 Task 3.6. Personal secrets only. Surfaces TTL
 // preset selection + optional passphrase + optional max-views, lists
 // existing live + revoked links so the owner can copy a previously-issued
@@ -93,7 +101,7 @@ export default function ShareLinkModal({ secretID, onClose }: ShareLinkModalProp
   const handleCopy = async () => {
     if (!justCreated) return;
     try {
-      const fullURL = window.location.origin + justCreated.url;
+      const fullURL = shareBaseUrl() + justCreated.url;
       await navigator.clipboard.writeText(fullURL);
       setCopyState("copied");
       setTimeout(() => setCopyState("idle"), 2000);
@@ -148,11 +156,10 @@ export default function ShareLinkModal({ secretID, onClose }: ShareLinkModalProp
                     key={preset}
                     type="button"
                     onClick={() => setTTLPreset(preset)}
-                    className={`px-3 py-1 rounded-[var(--radius-md)] text-xs border transition-colors ${
-                      ttlPreset === preset
-                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/50"
-                        : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)]"
-                    }`}
+                    className={`px-3 py-1 rounded-[var(--radius-md)] text-xs border transition-colors ${ttlPreset === preset
+                      ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/50"
+                      : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)]"
+                      }`}
                   >
                     {preset}
                   </button>

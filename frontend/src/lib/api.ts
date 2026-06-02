@@ -861,6 +861,96 @@ export const secretsAPI = {
     api.delete(`/api/secrets/${secretID}/share-links/${linkID}`),
 };
 
+// Atlas REST API catalog (Phase A–C). Mirrors secretsAPI: list/search/get +
+// import (upload or URL) + lifecycle. getSpec/filterSpec return the raw
+// OpenAPI document for the renderer.
+export const apiCatalogAPI = {
+  list: (params: { scope?: string; parent_id?: number; q?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.scope) q.set("scope", params.scope);
+    if (params.parent_id != null) q.set("parent_id", String(params.parent_id));
+    if (params.q) q.set("q", params.q);
+    const qs = q.toString();
+    return api.get<import("./types").ApiCatalog[]>(`/api/api-catalog${qs ? `?${qs}` : ""}`);
+  },
+  searchOperations: (params: { q?: string; scope?: string; parent_id?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.q) q.set("q", params.q);
+    if (params.scope) q.set("scope", params.scope);
+    if (params.parent_id != null) q.set("parent_id", String(params.parent_id));
+    const qs = q.toString();
+    return api.get<import("./types").OperationSearchResult[]>(`/api/api-catalog/search${qs ? `?${qs}` : ""}`);
+  },
+  get: (id: number) => api.get<import("./types").ApiCatalog>(`/api/api-catalog/${id}`),
+  getSpec: (id: number) => api.get<Record<string, unknown>>(`/api/api-catalog/${id}/spec`),
+  filterSpec: (id: number, body: { mode: string; op_keys?: string[]; tags?: string[] }) =>
+    api.post<Record<string, unknown>>(`/api/api-catalog/${id}/spec/filter`, body),
+  importURL: (body: {
+    name?: string;
+    description?: string;
+    scope: string;
+    parent_id?: number;
+    source_url: string;
+    base_url?: string;
+    docs_url?: string;
+  }) => api.post<import("./types").ApiCatalog>("/api/api-catalog/import/url", body),
+  importUpload: async (
+    file: File,
+    meta: { name?: string; description?: string; scope: string; parent_id?: number; base_url?: string; docs_url?: string }
+  ): Promise<import("./types").ApiCatalog> => {
+    const form = new FormData();
+    form.append("spec", file);
+    if (meta.name) form.append("name", meta.name);
+    if (meta.description) form.append("description", meta.description);
+    form.append("scope", meta.scope);
+    if (meta.parent_id != null) form.append("parent_id", String(meta.parent_id));
+    if (meta.base_url) form.append("base_url", meta.base_url);
+    if (meta.docs_url) form.append("docs_url", meta.docs_url);
+    const res = await fetch(`${API_BASE}/api/api-catalog/import/upload`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      throw new Error(b.error || `Request failed: ${res.status}`);
+    }
+    return res.json();
+  },
+  update: (id: number, body: { name: string; description?: string; base_url?: string; docs_url?: string }) =>
+    api.put<import("./types").ApiCatalog>(`/api/api-catalog/${id}`, body),
+  refetch: (id: number) => api.post<import("./types").ApiCatalog>(`/api/api-catalog/${id}/refetch`),
+  remove: (id: number) => api.delete(`/api/api-catalog/${id}`),
+};
+
+// Share bundles (Phase D–E). A single public link carrying secrets and/or
+// (whole or partial) API docs. create() emits the raw token ONCE — surface it
+// to the operator immediately (copy-to-clipboard) or it's lost.
+export const shareBundlesAPI = {
+  create: (body: {
+    title?: string;
+    ttl_seconds?: number;
+    max_views?: number;
+    passphrase?: string;
+    items: {
+      type: "secret" | "api_doc";
+      ref_id: number;
+      selector?: { mode: string; op_keys?: string[]; tags?: string[] };
+    }[];
+  }) =>
+    api.post<{
+      id: number;
+      title: string;
+      token: string;
+      url: string;
+      expires_at: string;
+      has_passphrase: boolean;
+      items: import("./types").ShareBundleItemView[];
+    }>("/api/share-bundles", body),
+  list: () => api.get<import("./types").ShareBundleView[]>("/api/share-bundles"),
+  revoke: (id: number) => api.delete(`/api/share-bundles/${id}`),
+};
+
 // Appearance settings
 export const appearanceAPI = {
   get: () => api.get<{ app_name: string; app_color: string; app_logo: string }>("/api/settings/appearance"),

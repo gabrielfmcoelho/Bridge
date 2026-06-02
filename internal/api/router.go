@@ -135,6 +135,27 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	publicShareH := &publicShareHandlers{repo: secretRepo}
 	mux.HandleFunc("GET /api/share/{token}", publicShareH.handleRedeem)
 
+	// Atlas REST API catalog (Phase A/B). Browsing is authenticated;
+	// import/mutate is editor; delete is admin — applied per-route inside
+	// register.
+	apiCatalogH := &apiCatalogHandlers{db: db, allowPrivateFetch: atlasAllowPrivateFetch()}
+	apiCatalogH.register(mux, func(role string, next http.Handler) http.Handler {
+		if role == "" {
+			return authenticated(db, next)
+		}
+		return authedRole(db, role, next)
+	})
+
+	// Share bundles (Phase D). Authenticated owner routes + a public,
+	// unwrapped redemption sibling to /api/share/{token}. Bundles reuse the
+	// secret repo for crypto/ACL/reveal.
+	bundleH := &bundleHandlers{repo: secretRepo}
+	mux.Handle("POST /api/share-bundles", authenticated(db, http.HandlerFunc(bundleH.handleCreate)))
+	mux.Handle("GET /api/share-bundles", authenticated(db, http.HandlerFunc(bundleH.handleList)))
+	mux.Handle("DELETE /api/share-bundles/{id}", authenticated(db, http.HandlerFunc(bundleH.handleRevoke)))
+	publicBundleH := &publicBundleHandlers{repo: secretRepo}
+	mux.HandleFunc("GET /api/share-bundle/{token}", publicBundleH.handleRedeem)
+
 	// Orchestrators
 	mux.Handle("GET /api/orchestrators", authenticated(db, http.HandlerFunc(oh.handleList)))
 	mux.Handle("POST /api/orchestrators", authedRole(db, "editor", http.HandlerFunc(oh.handleCreate)))

@@ -29,6 +29,7 @@ const icons: Record<string, string> = {
   GitBranch: "M6 3v12m0 0a3 3 0 100 6 3 3 0 000-6zm12-12a3 3 0 11-6 0 3 3 0 016 0zm0 0v6a3 3 0 01-3 3H9",
   Database: "M4 7c0-1.66 3.58-3 8-3s8 1.34 8 3-3.58 3-8 3-8-1.34-8-3zm0 0v5c0 1.66 3.58 3 8 3s8-1.34 8-3V7M4 12v5c0 1.66 3.58 3 8 3s8-1.34 8-3v-5",
   Workflow: "M3 5a2 2 0 012-2h3a2 2 0 012 2v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm0 11a2 2 0 012-2h3a2 2 0 012 2v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3zm11-11a2 2 0 012-2h3a2 2 0 012 2v3a2 2 0 01-2 2h-3a2 2 0 01-2-2V5zM6.5 10v4m0 0h6a2 2 0 002-2v-2",
+  Plug: "M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 01-4 4h-4a4 4 0 01-4-4V8z",
 };
 
 function SvgIcon({ name }: { name: string }) {

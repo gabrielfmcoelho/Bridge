@@ -449,3 +449,105 @@ export interface DashboardStats {
   open_issues: number;
 }
 
+
+// --- Atlas REST API catalog (Phase A–C) ---
+
+export interface ApiOperation {
+  id: number;
+  api_id: number;
+  method: string;
+  path: string;
+  operation_id?: string;
+  summary?: string;
+  description?: string;
+  tags: string[];
+  op_key: string;
+  sort_order: number;
+}
+
+export interface ApiCatalog {
+  id: number;
+  scope: string; // "projeto" | "avulso"
+  parent_id?: number | null;
+  name: string;
+  description: string;
+  source_type: string; // "upload" | "url"
+  source_url?: string;
+  external_url?: string;
+  base_url?: string;
+  docs_url?: string;
+  spec_version: string;
+  spec_hash: string;
+  title: string;
+  version_label: string;
+  owner_user_id: number;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+  operation_count: number;
+  operations?: ApiOperation[];
+}
+
+export interface OperationSearchResult {
+  api_id: number;
+  api_name: string;
+  scope: string;
+  method: string;
+  path: string;
+  op_key: string;
+  summary?: string;
+  description?: string;
+  tags: string[];
+}
+
+// ApiDocSelector describes which slice of an API doc a share bundle exposes
+// (Phase D). Defined here so the share UI and partial-spec preview agree.
+export interface ApiDocSelector {
+  mode: "all" | "operations" | "tags";
+  op_keys?: string[];
+  tags?: string[];
+}
+
+// --- Share bundles (Phase D–E) ---
+
+export interface ShareBundleItemView {
+  type: "secret" | "api_doc";
+  ref_id: number;
+  label: string;
+  selector?: string; // raw JSON selector for api_doc items
+}
+
+export interface ShareBundleView {
+  id: number;
+  title: string;
+  expires_at: string;
+  max_views?: number | null;
+  view_count: number;
+  created_by: number;
+  created_at: string;
+  revoked_at?: string | null;
+  has_passphrase: boolean;
+  items: ShareBundleItemView[];
+}
+
+// BundlePayload is the resolved, guest-facing content returned by the public
+// GET /api/share-bundle/{token} endpoint.
+export interface BundleSecretItem {
+  name: string;
+  type: string;
+  payload: string;
+}
+
+export interface BundleApiDocItem {
+  name: string;
+  title: string;
+  version?: string;
+  external_url?: string;
+  spec: Record<string, unknown>;
+}
+
+export interface BundlePayload {
+  title: string;
+  secrets: BundleSecretItem[];
+  api_docs: BundleApiDocItem[];
+}
