@@ -1,12 +1,13 @@
 package grafana
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // Settings is the resolved Grafana configuration. Empty strings mean "not set";
@@ -28,10 +29,10 @@ type Settings struct {
 // three secrets. Mirrors gitlab.LoadSettings / handleTestLDAP pattern.
 func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 	get := func(k string) string {
-		return strings.TrimSpace(models.GetAppSettingValue(db, k))
+		return strings.TrimSpace(store.NewAppSettingsRepo(db).Value(context.Background(), k))
 	}
 	s := Settings{
-		Enabled:                    models.GetAppSettingValue(db, "grafana_enabled") == "true",
+		Enabled:                    store.NewAppSettingsRepo(db).Value(context.Background(), "grafana_enabled") == "true",
 		BaseURL:                    strings.TrimRight(get("grafana_base_url"), "/"),
 		HostDefaultDashboardUID:    get("grafana_host_default_dashboard_uid"),
 		ServiceDefaultDashboardUID: get("grafana_service_default_dashboard_uid"),
@@ -59,8 +60,8 @@ func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 }
 
 func decryptSecret(db *sql.DB, enc *database.Encryptor, prefix string) (string, error) {
-	cipherHex := models.GetAppSettingValue(db, prefix+"_cipher")
-	nonceHex := models.GetAppSettingValue(db, prefix+"_nonce")
+	cipherHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_cipher")
+	nonceHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_nonce")
 	if cipherHex == "" || nonceHex == "" {
 		return "", nil
 	}

@@ -134,7 +134,7 @@ func (h *authHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// Fallback to local auth if configured (e.g., LDAP unreachable).
 			fallbackKey := "auth_" + req.Provider + "_fallback_to_local"
-			if models.GetAppSettingValue(h.db.SQL, fallbackKey) == "true" {
+			if store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), fallbackKey) == "true" {
 				u, localErr := auth.Login(h.db.SQL, req.Username, req.Password)
 				if localErr == nil {
 					user = u
@@ -194,13 +194,13 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 	}
 
 	// Check if auto-provisioning is enabled.
-	autoProvision := models.GetAppSettingValue(h.db.SQL, "auth_auto_provision")
+	autoProvision := store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), "auth_auto_provision")
 	if autoProvision != "true" {
 		return nil, fmt.Errorf("account not linked and auto-provisioning is disabled")
 	}
 
 	// Determine the default role.
-	defaultRole := models.GetAppSettingValue(h.db.SQL, "auth_default_role")
+	defaultRole := store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), "auth_default_role")
 	if defaultRole == "" {
 		defaultRole = "viewer"
 	}
@@ -247,7 +247,7 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 
 // syncExternalRole updates the user's role from external groups if role sync is enabled.
 func (h *authHandlers) syncExternalRole(user *models.User, identity *auth.ExternalIdentity) {
-	syncEnabled := models.GetAppSettingValue(h.db.SQL, "auth_role_sync_enabled")
+	syncEnabled := store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), "auth_role_sync_enabled")
 	if syncEnabled != "true" || len(identity.Groups) == 0 {
 		return
 	}

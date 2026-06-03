@@ -15,6 +15,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/llm"
 	outlineclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/outline"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type integrationSettingsHandlers struct {
@@ -123,14 +124,14 @@ func (h *integrationSettingsHandlers) handleGetIntegrations(w http.ResponseWrite
 		for _, key := range keys {
 			if secretKeys[key] {
 				// For secrets, just indicate whether a value is set (never return the actual value).
-				cipher := models.GetAppSettingValue(h.db.SQL, key+"_cipher")
+				cipher := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), key+"_cipher")
 				if cipher != "" {
 					settings[key] = "••••••••"
 				} else {
 					settings[key] = ""
 				}
 			} else {
-				settings[key] = models.GetAppSettingValue(h.db.SQL, key)
+				settings[key] = store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), key)
 			}
 		}
 		result[group] = settings
@@ -179,10 +180,10 @@ func (h *integrationSettingsHandlers) handleUpdateIntegrationGroup(w http.Respon
 				jsonServerError(w, r, "failed to encrypt "+key, err)
 				return
 			}
-			models.SetAppSettingValue(h.db.SQL, key+"_cipher", hex.EncodeToString(cipher))
-			models.SetAppSettingValue(h.db.SQL, key+"_nonce", hex.EncodeToString(nonce))
+			store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key+"_cipher", hex.EncodeToString(cipher))
+			store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key+"_nonce", hex.EncodeToString(nonce))
 		} else {
-			models.SetAppSettingValue(h.db.SQL, key, value)
+			store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key, value)
 		}
 	}
 
@@ -243,8 +244,8 @@ func (h *integrationSettingsHandlers) handleClearIntegrationSecret(w http.Respon
 		return
 	}
 
-	models.SetAppSettingValue(h.db.SQL, key+"_cipher", "")
-	models.SetAppSettingValue(h.db.SQL, key+"_nonce", "")
+	store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key+"_cipher", "")
+	store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key+"_nonce", "")
 	jsonOK(w, map[string]string{"status": "cleared"})
 }
 
@@ -431,7 +432,7 @@ func (h *integrationSettingsHandlers) handleTestLLM(w http.ResponseWriter, r *ht
 	apiKey := req.APIKey
 	model := req.Model
 
-	get := func(key string) string { return models.GetAppSettingValue(h.db.SQL, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), key) }
 	if baseURL == "" {
 		baseURL = get("llm_base_url")
 	}

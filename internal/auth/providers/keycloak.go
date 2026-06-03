@@ -10,7 +10,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"golang.org/x/oauth2"
 )
 
@@ -29,7 +29,7 @@ func (p *KeycloakProvider) Name() string             { return "keycloak" }
 func (p *KeycloakProvider) SupportsDirectLogin() bool { return false }
 
 func (p *KeycloakProvider) Enabled() bool {
-	return models.GetAppSettingValue(p.db, "auth_active_provider") == "keycloak"
+	return store.NewAppSettingsRepo(p.db).Value(context.Background(), "auth_active_provider") == "keycloak"
 }
 
 func (p *KeycloakProvider) DisplayInfo() auth.ProviderDisplayInfo {
@@ -52,7 +52,7 @@ type keycloakConfig struct {
 }
 
 func (p *KeycloakProvider) loadConfig() (*keycloakConfig, error) {
-	get := func(key string) string { return models.GetAppSettingValue(p.db, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(p.db).Value(context.Background(), key) }
 
 	clientSecret, err := p.decryptSetting("auth_keycloak_client_secret")
 	if err != nil {
@@ -77,8 +77,8 @@ func (p *KeycloakProvider) loadConfig() (*keycloakConfig, error) {
 }
 
 func (p *KeycloakProvider) decryptSetting(prefix string) (string, error) {
-	cipherHex := models.GetAppSettingValue(p.db, prefix+"_cipher")
-	nonceHex := models.GetAppSettingValue(p.db, prefix+"_nonce")
+	cipherHex := store.NewAppSettingsRepo(p.db).Value(context.Background(), prefix+"_cipher")
+	nonceHex := store.NewAppSettingsRepo(p.db).Value(context.Background(), prefix+"_nonce")
 	if cipherHex == "" || nonceHex == "" {
 		return "", nil
 	}

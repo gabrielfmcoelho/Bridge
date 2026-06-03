@@ -1,12 +1,13 @@
 package glpi
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // Settings captures the instance-level GLPI configuration. User tokens (one per
@@ -20,9 +21,9 @@ type Settings struct {
 
 // LoadSettings reads the glpi_* keys from app_settings, decrypting the App-Token.
 func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
-	get := func(k string) string { return strings.TrimSpace(models.GetAppSettingValue(db, k)) }
+	get := func(k string) string { return strings.TrimSpace(store.NewAppSettingsRepo(db).Value(context.Background(), k)) }
 	s := Settings{
-		Enabled: models.GetAppSettingValue(db, "glpi_enabled") == "true",
+		Enabled: store.NewAppSettingsRepo(db).Value(context.Background(), "glpi_enabled") == "true",
 		BaseURL: strings.TrimRight(get("glpi_base_url"), "/"),
 	}
 	appTok, err := decryptSecret(db, enc, "glpi_app_token")
@@ -47,8 +48,8 @@ func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 }
 
 func decryptSecret(db *sql.DB, enc *database.Encryptor, prefix string) (string, error) {
-	cipherHex := models.GetAppSettingValue(db, prefix+"_cipher")
-	nonceHex := models.GetAppSettingValue(db, prefix+"_nonce")
+	cipherHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_cipher")
+	nonceHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_nonce")
 	if cipherHex == "" || nonceHex == "" {
 		return "", nil
 	}

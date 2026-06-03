@@ -21,7 +21,7 @@ func (h *gitlabHandlers) getClientForUser(r *http.Request) (*gitlabclient.Client
 		return nil, "", http.ErrNoCookie
 	}
 
-	baseURL := models.GetAppSettingValue(h.db.SQL, "auth_gitlab_base_url")
+	baseURL := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "auth_gitlab_base_url")
 	if baseURL == "" {
 		baseURL = "https://gitlab.com"
 	}
@@ -81,7 +81,7 @@ func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if req.BaseURL == "" {
-		req.BaseURL = models.GetAppSettingValue(h.db.SQL, "auth_gitlab_base_url")
+		req.BaseURL = store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "auth_gitlab_base_url")
 		if req.BaseURL == "" {
 			req.BaseURL = "https://gitlab.com"
 		}
@@ -126,7 +126,7 @@ func (h *gitlabHandlers) handleDeleteToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	baseURL := models.GetAppSettingValue(h.db.SQL, "auth_gitlab_base_url")
+	baseURL := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "auth_gitlab_base_url")
 	if baseURL == "" {
 		baseURL = "https://gitlab.com"
 	}

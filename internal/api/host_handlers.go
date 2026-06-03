@@ -510,7 +510,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 // the integration is enabled. Keep the call site cheap — a couple of DB reads
 // worst case when it's disabled.
 func (h *hostHandlers) maybeProvisionGrafanaDashboard(host models.Host) {
-	if models.GetAppSettingValue(h.db.SQL, "grafana_enabled") != "true" {
+	if store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), "grafana_enabled") != "true" {
 		return
 	}
 	go func(host models.Host) {

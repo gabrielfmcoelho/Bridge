@@ -133,7 +133,7 @@ func (h *serviceHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 // maybeProvisionGrafanaDashboard runs ProvisionServiceDashboard in a goroutine
 // if the integration is enabled. Failures only log — creation never blocks.
 func (h *serviceHandlers) maybeProvisionGrafanaDashboard(svc models.Service) {
-	if models.GetAppSettingValue(h.db.SQL, "grafana_enabled") != "true" {
+	if store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), "grafana_enabled") != "true" {
 		return
 	}
 	go func(svc models.Service) {

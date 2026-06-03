@@ -11,7 +11,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/go-ldap/ldap/v3"
 )
 
@@ -32,7 +32,7 @@ func (p *LDAPProvider) Name() string             { return "ldap" }
 func (p *LDAPProvider) SupportsDirectLogin() bool { return true }
 
 func (p *LDAPProvider) Enabled() bool {
-	return models.GetAppSettingValue(p.db, "auth_active_provider") == "ldap"
+	return store.NewAppSettingsRepo(p.db).Value(context.Background(), "auth_active_provider") == "ldap"
 }
 
 func (p *LDAPProvider) DisplayInfo() auth.ProviderDisplayInfo {
@@ -67,7 +67,7 @@ type ldapConfig struct {
 }
 
 func (p *LDAPProvider) loadConfig() (*ldapConfig, error) {
-	get := func(key string) string { return models.GetAppSettingValue(p.db, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(p.db).Value(context.Background(), key) }
 
 	bindPassword, err := p.decryptSetting("auth_ldap_bind_password")
 	if err != nil {
@@ -112,8 +112,8 @@ func (p *LDAPProvider) loadConfig() (*ldapConfig, error) {
 
 // decryptSetting decrypts a setting stored as hex-encoded _cipher/_nonce pair in app_settings.
 func (p *LDAPProvider) decryptSetting(prefix string) (string, error) {
-	cipherHex := models.GetAppSettingValue(p.db, prefix+"_cipher")
-	nonceHex := models.GetAppSettingValue(p.db, prefix+"_nonce")
+	cipherHex := store.NewAppSettingsRepo(p.db).Value(context.Background(), prefix+"_cipher")
+	nonceHex := store.NewAppSettingsRepo(p.db).Value(context.Background(), prefix+"_nonce")
 	if cipherHex == "" || nonceHex == "" {
 		return "", nil // not configured
 	}

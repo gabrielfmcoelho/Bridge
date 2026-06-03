@@ -24,7 +24,7 @@ type aiHandlers struct {
 }
 
 func (h *aiHandlers) getClient() (*llm.Client, error) {
-	get := func(key string) string { return models.GetAppSettingValue(h.db.SQL, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), key) }
 
 	if get("llm_enabled") != "true" {
 		return nil, http.ErrAbortHandler
@@ -56,12 +56,12 @@ func (h *aiHandlers) getClient() (*llm.Client, error) {
 
 // handleStatus checks if the LLM integration is configured.
 func (h *aiHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
-	enabled := models.GetAppSettingValue(h.db.SQL, "llm_enabled") == "true"
-	configured := models.GetAppSettingValue(h.db.SQL, "llm_api_key_cipher") != ""
+	enabled := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_enabled") == "true"
+	configured := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_api_key_cipher") != ""
 	jsonOK(w, map[string]any{
 		"enabled":    enabled,
 		"configured": configured,
-		"model":      models.GetAppSettingValue(h.db.SQL, "llm_model_text"),
+		"model":      store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_model_text"),
 	})
 }
 

@@ -17,7 +17,7 @@ type settingsHandlers struct {
 }
 
 func (h *settingsHandlers) handleGetAppearance(w http.ResponseWriter, r *http.Request) {
-	s, err := models.GetAppSettings(h.db.SQL)
+	s, err := store.NewAppSettingsRepo(h.db.SQL).Get(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load settings", err)
 		return
@@ -38,7 +38,7 @@ func (h *settingsHandlers) handleUpdateAppearance(w http.ResponseWriter, r *http
 	if req.AppColor == "" {
 		req.AppColor = "#06b6d4"
 	}
-	if err := models.UpdateAppSettings(h.db.SQL, &req); err != nil {
+	if err := store.NewAppSettingsRepo(h.db.SQL).Update(r.Context(), &req); err != nil {
 		jsonServerError(w, r, "failed to save settings", err)
 		return
 	}
@@ -75,13 +75,13 @@ func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Reque
 
 	dataURI := fmt.Sprintf("data:%s;base64,%s", ct, base64.StdEncoding.EncodeToString(data))
 
-	s, err := models.GetAppSettings(h.db.SQL)
+	s, err := store.NewAppSettingsRepo(h.db.SQL).Get(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load settings", err)
 		return
 	}
 	s.AppLogo = dataURI
-	if err := models.UpdateAppSettings(h.db.SQL, s); err != nil {
+	if err := store.NewAppSettingsRepo(h.db.SQL).Update(r.Context(), s); err != nil {
 		jsonServerError(w, r, "failed to save logo", err)
 		return
 	}
@@ -118,13 +118,13 @@ func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r 
 }
 
 func (h *settingsHandlers) handleDeleteLogo(w http.ResponseWriter, r *http.Request) {
-	s, err := models.GetAppSettings(h.db.SQL)
+	s, err := store.NewAppSettingsRepo(h.db.SQL).Get(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load settings", err)
 		return
 	}
 	s.AppLogo = ""
-	if err := models.UpdateAppSettings(h.db.SQL, s); err != nil {
+	if err := store.NewAppSettingsRepo(h.db.SQL).Update(r.Context(), s); err != nil {
 		jsonServerError(w, r, "failed to remove logo", err)
 		return
 	}

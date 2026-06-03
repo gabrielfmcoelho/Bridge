@@ -23,7 +23,7 @@ type coolifyHandlers struct {
 }
 
 func (h *coolifyHandlers) getClient() (*coolify.Client, error) {
-	get := func(key string) string { return models.GetAppSettingValue(h.db.SQL, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), key) }
 
 	if get("coolify_enabled") != "true" {
 		return nil, fmt.Errorf("coolify integration is not enabled")
@@ -64,8 +64,8 @@ func (h *coolifyHandlers) logOp(r *http.Request, hostID int64, opType, status, o
 
 // handleStatus returns whether the Coolify integration is enabled and configured.
 func (h *coolifyHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
-	enabled := models.GetAppSettingValue(h.db.SQL, "coolify_enabled") == "true"
-	configured := models.GetAppSettingValue(h.db.SQL, "coolify_api_token_cipher") != ""
+	enabled := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_enabled") == "true"
+	configured := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_api_token_cipher") != ""
 	jsonOK(w, map[string]any{
 		"enabled":    enabled,
 		"configured": configured,
@@ -299,7 +299,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Coolify rejects usernames with dots. Use configured default user or "root".
-	coolifyUser := models.GetAppSettingValue(h.db.SQL, "coolify_default_user")
+	coolifyUser := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_default_user")
 	if coolifyUser == "" {
 		coolifyUser = "root"
 	}
@@ -455,7 +455,7 @@ func (h *coolifyHandlers) handleSyncHost(w http.ResponseWriter, r *http.Request)
 		port = p
 	}
 
-	coolifyUser := models.GetAppSettingValue(h.db.SQL, "coolify_default_user")
+	coolifyUser := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_default_user")
 	if coolifyUser == "" {
 		coolifyUser = "root"
 	}
