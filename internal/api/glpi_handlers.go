@@ -447,8 +447,8 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 			if u := auth.UserFromContext(r.Context()); u != nil {
 				userID = u.ID
 			}
-			cid, cerr := models.CreateExternalHostChamado(
-				h.db.SQL,
+			cid, cerr := store.NewHostChamadoRepo(h.db.SQL).CreateExternal(
+				r.Context(),
 				host.ID,
 				userID,
 				strconv.Itoa(ticketID),
@@ -494,7 +494,7 @@ func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
 	}
-	chamado, err := models.GetHostChamado(h.db.SQL, chamadoID)
+	chamado, err := store.NewHostChamadoRepo(h.db.SQL).Get(r.Context(), chamadoID)
 	if err != nil || chamado == nil || chamado.HostID != host.ID {
 		jsonError(w, http.StatusNotFound, "chamado not found for this host")
 		return
@@ -530,7 +530,7 @@ func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.
 	}
 
 	ticketURL := fmt.Sprintf("%s/front/ticket.form.php?id=%d", client.WebBaseURL(), t.ID)
-	if err := models.UpdateChamadoCache(h.db.SQL, chamadoID, "glpi", ticketURL, t.Name, glpiclient.StatusSlug(t.Status)); err != nil {
+	if err := store.NewHostChamadoRepo(h.db.SQL).UpdateCache(r.Context(), chamadoID, "glpi", ticketURL, t.Name, glpiclient.StatusSlug(t.Status)); err != nil {
 		jsonServerError(w, r, "cache update failed", err)
 		return
 	}

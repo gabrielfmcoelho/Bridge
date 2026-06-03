@@ -5,6 +5,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type hostChamadoHandlers struct {
@@ -27,7 +28,7 @@ func (h *hostChamadoHandlers) handleList(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	chamados, err := models.ListHostChamados(h.db.SQL, host.ID)
+	chamados, err := store.NewHostChamadoRepo(h.db.SQL).ListByHost(r.Context(), host.ID)
 	if err != nil {
 		jsonServerError(w, r, "failed to list chamados", err)
 		return
@@ -48,13 +49,13 @@ func (h *hostChamadoHandlers) handleCreate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	id, err := models.CreateHostChamado(h.db.SQL, host.ID, &req)
+	id, err := store.NewHostChamadoRepo(h.db.SQL).Create(r.Context(), host.ID, &req)
 	if err != nil {
 		jsonServerError(w, r, "failed to create chamado", err)
 		return
 	}
 
-	chamado, err := models.GetHostChamado(h.db.SQL, id)
+	chamado, err := store.NewHostChamadoRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || chamado == nil {
 		jsonCreated(w, map[string]int64{"id": id})
 		return
@@ -75,7 +76,7 @@ func (h *hostChamadoHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	existing, err := models.GetHostChamado(h.db.SQL, chamadoID)
+	existing, err := store.NewHostChamadoRepo(h.db.SQL).Get(r.Context(), chamadoID)
 	if err != nil || existing == nil || existing.HostID != host.ID {
 		jsonError(w, http.StatusNotFound, "chamado not found")
 		return
@@ -87,12 +88,12 @@ func (h *hostChamadoHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := models.UpdateHostChamado(h.db.SQL, chamadoID, &req); err != nil {
+	if err := store.NewHostChamadoRepo(h.db.SQL).Update(r.Context(), chamadoID, &req); err != nil {
 		jsonServerError(w, r, "failed to update chamado", err)
 		return
 	}
 
-	updated, _ := models.GetHostChamado(h.db.SQL, chamadoID)
+	updated, _ := store.NewHostChamadoRepo(h.db.SQL).Get(r.Context(), chamadoID)
 	jsonOK(w, updated)
 }
 
@@ -108,13 +109,13 @@ func (h *hostChamadoHandlers) handleDelete(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	existing, err := models.GetHostChamado(h.db.SQL, chamadoID)
+	existing, err := store.NewHostChamadoRepo(h.db.SQL).Get(r.Context(), chamadoID)
 	if err != nil || existing == nil || existing.HostID != host.ID {
 		jsonError(w, http.StatusNotFound, "chamado not found")
 		return
 	}
 
-	if err := models.DeleteHostChamado(h.db.SQL, chamadoID); err != nil {
+	if err := store.NewHostChamadoRepo(h.db.SQL).Delete(r.Context(), chamadoID); err != nil {
 		jsonServerError(w, r, "failed to delete chamado", err)
 		return
 	}

@@ -370,7 +370,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	projects, _ := models.ListProjectsByHost(h.db.SQL, host.ID)
 	lastScan, _ := store.NewHostScanRepo(h.db.SQL).GetLatest(r.Context(), host.ID)
 	responsaveis, _ := models.ListHostResponsaveis(h.db.SQL, host.ID)
-	chamados, _ := models.ListHostChamados(h.db.SQL, host.ID)
+	chamados, _ := store.NewHostChamadoRepo(h.db.SQL).ListByHost(r.Context(), host.ID)
 	entidades, _ := store.NewHostEntidadeRepo(h.db.SQL).List(r.Context(), host.ID)
 
 	jsonOK(w, map[string]any{
@@ -460,7 +460,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(req.Chamados) > 0 {
-		if err := models.SyncHostChamados(h.db.SQL, req.Host.ID, req.Chamados); err != nil {
+		if err := store.NewHostChamadoRepo(h.db.SQL).Sync(r.Context(), req.Host.ID, req.Chamados); err != nil {
 			log.Printf("[hosts] SyncHostChamados error on create: %v", err)
 		}
 	}
@@ -655,7 +655,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.Chamados != nil {
-		if err := models.SyncHostChamados(h.db.SQL, existing.ID, *req.Chamados); err != nil {
+		if err := store.NewHostChamadoRepo(h.db.SQL).Sync(r.Context(), existing.ID, *req.Chamados); err != nil {
 			log.Printf("[hosts] SyncHostChamados error on update: %v", err)
 		}
 	}
