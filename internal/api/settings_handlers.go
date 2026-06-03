@@ -9,6 +9,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type settingsHandlers struct {
@@ -89,7 +90,7 @@ func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *settingsHandlers) handleGetAlertThresholds(w http.ResponseWriter, r *http.Request) {
-	t, err := models.GetAlertThresholds(h.db.SQL)
+	t, err := store.NewAlertSettingsRepo(h.db.SQL).GetThresholds(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load alert thresholds", err)
 		return
@@ -109,7 +110,7 @@ func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r 
 		jsonError(w, http.StatusBadRequest, "threshold values must be between 0 and 100")
 		return
 	}
-	if err := models.UpdateAlertThresholds(h.db.SQL, &req); err != nil {
+	if err := store.NewAlertSettingsRepo(h.db.SQL).UpdateThresholds(r.Context(), &req); err != nil {
 		jsonServerError(w, r, "failed to save alert thresholds", err)
 		return
 	}

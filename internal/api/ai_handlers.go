@@ -16,6 +16,7 @@ import (
 	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/llm"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type aiHandlers struct {
@@ -331,14 +332,14 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 		CommitsUsed:  len(all),
 		ReposUsed:    len(targets),
 	}
-	if err := models.UpsertProjectAIAnalysis(h.db.SQL, record); err != nil {
+	if err := store.NewProjectAIAnalysisRepo(h.db.SQL).Upsert(r.Context(), record); err != nil {
 		// Persistence failure shouldn't hide the freshly-generated result from the user,
 		// so log and still return the analysis. Next visit will see no cached version.
 		log.Printf("[ai] failed to cache project analysis project=%d: %v", projectID, err)
 	}
 
 	// Re-read to get the DB-generated generated_at timestamp.
-	if saved, err := models.GetProjectAIAnalysis(h.db.SQL, projectID); err == nil && saved != nil {
+	if saved, err := store.NewProjectAIAnalysisRepo(h.db.SQL).Get(r.Context(), projectID); err == nil && saved != nil {
 		jsonOK(w, saved)
 		return
 	}
@@ -361,7 +362,7 @@ func (h *aiHandlers) handleGetProjectAnalysis(w http.ResponseWriter, r *http.Req
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	cached, err := models.GetProjectAIAnalysis(h.db.SQL, projectID)
+	cached, err := store.NewProjectAIAnalysisRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "failed to read cached analysis", err)
 		return

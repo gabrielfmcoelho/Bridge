@@ -176,7 +176,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[hosts] Found %d hosts, %d scan statuses, %d scan data entries", len(hosts), len(scanStatuses), len(scanDataBulk))
 
-	thresholds, thErr := models.GetAlertThresholds(h.db.SQL)
+	thresholds, thErr := store.NewAlertSettingsRepo(h.db.SQL).GetThresholds(r.Context())
 	if thErr != nil {
 		log.Printf("[hosts] GetAlertThresholds error: %v", thErr)
 		thresholds = &models.AlertThresholds{ResourceCritical: 80, ResourceWarning: 60, ResourceInfoLow: 5}

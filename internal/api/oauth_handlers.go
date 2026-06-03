@@ -8,7 +8,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type oauthHandlers struct {
@@ -46,7 +46,7 @@ func (h *oauthHandlers) handleAuthorize(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Create an OAuth state for CSRF protection.
-	state, err := models.CreateOAuthState(h.db.SQL, providerName)
+	state, err := store.NewOAuthStateRepo(h.db.SQL).Create(r.Context(), providerName)
 	if err != nil {
 		http.Redirect(w, r, "/login?auth=error&message=internal+error", http.StatusFound)
 		return
@@ -84,7 +84,7 @@ func (h *oauthHandlers) handleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate the OAuth state (CSRF protection).
-	oauthState, err := models.ValidateOAuthState(h.db.SQL, stateParam)
+	oauthState, err := store.NewOAuthStateRepo(h.db.SQL).Validate(r.Context(), stateParam)
 	if err != nil || oauthState == nil {
 		http.Redirect(w, r, "/login?auth=error&message=invalid+or+expired+state", http.StatusFound)
 		return
