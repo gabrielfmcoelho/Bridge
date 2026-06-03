@@ -16,6 +16,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	glpiclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/glpi"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type glpiHandlers struct {
@@ -47,7 +48,7 @@ func (h *glpiHandlers) resolveClient() (*glpiclient.Client, glpiclient.Settings,
 // stored user token on demand.
 func (h *glpiHandlers) sessionFor(ctx context.Context, client *glpiclient.Client, profileID int64) (string, error) {
 	return h.cache.Get(ctx, client, profileID, func(id int64) (string, error) {
-		tok, err := models.GetGlpiToken(h.db.SQL, id)
+		tok, err := store.NewGlpiTokenRepo(h.db.SQL).Get(ctx, id)
 		if err != nil {
 			return "", err
 		}
@@ -64,7 +65,7 @@ func (h *glpiHandlers) sessionFor(ctx context.Context, client *glpiclient.Client
 // ─── Admin CRUD for token profiles ───────────────────────────────────────────
 
 func (h *glpiHandlers) handleListTokenProfiles(w http.ResponseWriter, r *http.Request) {
-	tokens, err := models.ListGlpiTokens(h.db.SQL)
+	tokens, err := store.NewGlpiTokenRepo(h.db.SQL).List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list profiles", err)
 		return
@@ -104,7 +105,7 @@ func (h *glpiHandlers) handleCreateTokenProfile(w http.ResponseWriter, r *http.R
 		UserTokenNonce:  nonce,
 		DefaultEntityID: req.DefaultEntityID,
 	}
-	if err := models.CreateGlpiToken(h.db.SQL, tok); err != nil {
+	if err := store.NewGlpiTokenRepo(h.db.SQL).Create(r.Context(), tok); err != nil {
 		jsonErrorLogged(w, r, http.StatusConflict, "could not create GLPI token (name already in use?)", err)
 		return
 	}
@@ -118,7 +119,7 @@ func (h *glpiHandlers) handleUpdateTokenProfile(w http.ResponseWriter, r *http.R
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	existing, err := models.GetGlpiToken(h.db.SQL, id)
+	existing, err := store.NewGlpiTokenRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "lookup failed", err)
 		return
@@ -154,7 +155,7 @@ func (h *glpiHandlers) handleUpdateTokenProfile(w http.ResponseWriter, r *http.R
 		update.UserTokenCipher = cipher
 		update.UserTokenNonce = nonce
 	}
-	if err := models.UpdateGlpiToken(h.db.SQL, update); err != nil {
+	if err := store.NewGlpiTokenRepo(h.db.SQL).Update(r.Context(), update); err != nil {
 		jsonServerError(w, r, "update failed", err)
 		return
 	}
@@ -169,7 +170,7 @@ func (h *glpiHandlers) handleDeleteTokenProfile(w http.ResponseWriter, r *http.R
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	if err := models.DeleteGlpiToken(h.db.SQL, id); err != nil {
+	if err := store.NewGlpiTokenRepo(h.db.SQL).Delete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "delete failed", err)
 		return
 	}
@@ -222,7 +223,7 @@ func (h *glpiHandlers) handleTestTokenProfile(w http.ResponseWriter, r *http.Req
 // updated). The full options payload isn't in this response — it's only
 // fetched when the admin opens the editor for one row.
 func (h *glpiHandlers) handleListDropdownCatalogues(w http.ResponseWriter, r *http.Request) {
-	list, err := models.ListGlpiDropdownCatalogues(h.db.SQL)
+	list, err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list catalogues", err)
 		return
@@ -244,7 +245,7 @@ func (h *glpiHandlers) handleGetDropdownCatalogue(w http.ResponseWriter, r *http
 		jsonError(w, http.StatusBadRequest, "itemtype not allowed")
 		return
 	}
-	cat, err := models.GetGlpiDropdownCatalogue(h.db.SQL, itemtype)
+	cat, err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Get(r.Context(), itemtype)
 	if err != nil {
 		jsonServerError(w, r, "catalogue lookup failed", err)
 		return
@@ -307,7 +308,7 @@ func (h *glpiHandlers) handleUpsertDropdownCatalogue(w http.ResponseWriter, r *h
 		id := u.ID
 		userID = &id
 	}
-	if err := models.UpsertGlpiDropdownCatalogue(h.db.SQL, itemtype, payload, len(clean), userID); err != nil {
+	if err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Upsert(r.Context(), itemtype, payload, len(clean), userID); err != nil {
 		jsonServerError(w, r, "catalogue save failed", err)
 		return
 	}
@@ -325,7 +326,7 @@ func (h *glpiHandlers) handleDeleteDropdownCatalogue(w http.ResponseWriter, r *h
 		jsonError(w, http.StatusBadRequest, "itemtype not allowed")
 		return
 	}
-	if err := models.DeleteGlpiDropdownCatalogue(h.db.SQL, itemtype); err != nil {
+	if err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Delete(r.Context(), itemtype); err != nil {
 		jsonServerError(w, r, "catalogue delete failed", err)
 		return
 	}
@@ -393,7 +394,7 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 	entityID := req.EntityID
 	if entityID == 0 {
 		// Fall back to profile default → instance default.
-		tok, _ := models.GetGlpiToken(h.db.SQL, req.ProfileID)
+		tok, _ := store.NewGlpiTokenRepo(h.db.SQL).Get(r.Context(), req.ProfileID)
 		if tok != nil && tok.DefaultEntityID > 0 {
 			entityID = tok.DefaultEntityID
 		} else {
@@ -1044,7 +1045,7 @@ type catalogueOption struct {
 // if present and non-empty, writes the filtered response and returns ok=true.
 // A nil/empty catalogue returns ok=false so the caller falls through to REST.
 func (h *glpiHandlers) serveDropdownFromCatalogue(w http.ResponseWriter, r *http.Request, itemtype, query string) ([]map[string]any, bool) {
-	cat, err := models.GetGlpiDropdownCatalogue(h.db.SQL, itemtype)
+	cat, err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Get(r.Context(), itemtype)
 	if err != nil || cat == nil || len(cat.Options) == 0 {
 		return nil, false
 	}
@@ -1176,7 +1177,7 @@ func (h *glpiHandlers) handleSearchUsers(w http.ResponseWriter, r *http.Request)
 // writes the response and returns true. The shape maps {name → display,
 // completename → login} so callers can swap seamlessly between sources.
 func (h *glpiHandlers) serveUsersFromCatalogue(w http.ResponseWriter, query string) bool {
-	cat, err := models.GetGlpiDropdownCatalogue(h.db.SQL, "User")
+	cat, err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Get(context.Background(), "User")
 	if err != nil || cat == nil || len(cat.Options) == 0 {
 		return false
 	}
