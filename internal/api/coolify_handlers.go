@@ -13,6 +13,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/coolify"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 	gossh "golang.org/x/crypto/ssh"
 )
@@ -56,7 +57,7 @@ func (h *coolifyHandlers) logOp(r *http.Request, hostID int64, opType, status, o
 		Status:        status,
 		Output:        output,
 	}
-	if err := models.CreateOperationLog(h.db.SQL, ol); err != nil {
+	if err := store.NewOperationLogRepo(h.db.SQL).Create(r.Context(), ol); err != nil {
 		log.Printf("[coolify] failed to log operation: %v", err)
 	}
 }

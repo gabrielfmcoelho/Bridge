@@ -23,6 +23,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshconfig"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshkeys"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshsetup"
@@ -57,7 +58,7 @@ func (h *sshHandlers) logOperation(r *http.Request, hostID int64, opType string,
 		Status:        status,
 		Output:        output,
 	}
-	if err := models.CreateOperationLog(h.db.SQL, ol); err != nil {
+	if err := store.NewOperationLogRepo(h.db.SQL).Create(r.Context(), ol); err != nil {
 		log.Printf("[ssh] failed to log operation: %v", err)
 	}
 }
@@ -1257,7 +1258,7 @@ func (h *sshHandlers) handleOperationLogs(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	logs, err := models.ListOperationLogs(h.db.SQL, host.ID, limit)
+	logs, err := store.NewOperationLogRepo(h.db.SQL).ListByHost(r.Context(), host.ID, limit)
 	if err != nil {
 		jsonServerError(w, r, "failed to load operation logs", err)
 		return

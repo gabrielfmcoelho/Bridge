@@ -34,7 +34,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	ssh := &sshHandlers{db: db, configPath: configPath}
 	gh := &graphHandlers{db: db}
 	dash := &dashboardHandlers{db: db}
-	eh := &enumHandlers{db: db}
+	eh := &enumHandlers{enum: store.NewEnumOptionRepo(db.SQL)}
 	sth := &settingsHandlers{db: db}
 	ih := &issueHandlers{db: db}
 	rh := &releaseHandlers{db: db}
