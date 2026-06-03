@@ -166,11 +166,11 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 
 	// Attach tags, scan status, and scan resource summary for each host.
 	tagMap, _ := models.GetAllTags(h.db.SQL, "host")
-	scanStatuses, scanErr := models.GetHostScanStatuses(h.db.SQL)
+	scanStatuses, scanErr := store.NewHostScanRepo(h.db.SQL).Statuses(r.Context())
 	if scanErr != nil {
 		log.Printf("[hosts] GetHostScanStatuses error: %v", scanErr)
 	}
-	scanDataBulk, bulkErr := models.GetLatestScanDataBulk(h.db.SQL)
+	scanDataBulk, bulkErr := store.NewHostScanRepo(h.db.SQL).LatestDataBulk(r.Context())
 	if bulkErr != nil {
 		log.Printf("[hosts] GetLatestScanDataBulk error: %v", bulkErr)
 	}
@@ -368,7 +368,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	dns, _ := models.GetHostDNSRecords(h.db.SQL, host.ID)
 	services, _ := models.ListServicesByHost(h.db.SQL, host.ID)
 	projects, _ := models.ListProjectsByHost(h.db.SQL, host.ID)
-	lastScan, _ := models.GetLatestHostScan(h.db.SQL, host.ID)
+	lastScan, _ := store.NewHostScanRepo(h.db.SQL).GetLatest(r.Context(), host.ID)
 	responsaveis, _ := models.ListHostResponsaveis(h.db.SQL, host.ID)
 	chamados, _ := models.ListHostChamados(h.db.SQL, host.ID)
 	entidades, _ := models.ListHostEntidades(h.db.SQL, host.ID)

@@ -336,7 +336,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		}
 		// Store scan snapshot in DB
 		if scanJSON, err := json.Marshal(vmInfo); err == nil {
-			if dbErr := models.CreateHostScan(h.db.SQL, host.ID, string(scanJSON)); dbErr != nil {
+			if dbErr := store.NewHostScanRepo(h.db.SQL).Create(r.Context(), host.ID, string(scanJSON)); dbErr != nil {
 				result["scan_save_error"] = dbErr.Error()
 			} else {
 				result["scan_saved"] = true
