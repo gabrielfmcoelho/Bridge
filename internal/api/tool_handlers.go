@@ -7,6 +7,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type toolHandlers struct {
@@ -103,10 +104,11 @@ func (h *toolHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Soft delete (v62): flip external_tools.deleted_at and cascade-soft-
-	// delete child secrets in the same transaction. Reachable via
+	// delete child secrets in the same transaction. The tool scope is
+	// registered as SoftDelete in the store cascade registry. Reachable via
 	// /api/tools/{id}/restore.
-	if err := cascadeParentSoftDelete(r, h.db, models.SecretScopeTool, id,
-		`UPDATE external_tools SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`); err != nil {
+	actor, _ := actorFrom(r)
+	if err := store.DeleteParent(r.Context(), h.db.SQL, actor, models.SecretScopeTool, id); err != nil {
 		jsonServerError(w, r, "failed to delete tool", err)
 		return
 	}
@@ -123,8 +125,8 @@ func (h *toolHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	if err := cascadeParentRestore(r, h.db, models.SecretScopeTool, id,
-		`UPDATE external_tools SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL`); err != nil {
+	actor, _ := actorFrom(r)
+	if err := store.RestoreParent(r.Context(), h.db.SQL, actor, models.SecretScopeTool, id); err != nil {
 		jsonServerError(w, r, "failed to restore tool", err)
 		return
 	}

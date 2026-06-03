@@ -8,6 +8,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type serviceHandlers struct {
@@ -208,8 +209,8 @@ func (h *serviceHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	models.DeleteTags(h.db.SQL, "service", id)
-	if err := cascadeParentDelete(r, h.db, models.SecretScopeService, id,
-		`DELETE FROM services WHERE id = ?`); err != nil {
+	actor, _ := actorFrom(r)
+	if err := store.DeleteParent(r.Context(), h.db.SQL, actor, models.SecretScopeService, id); err != nil {
 		jsonServerError(w, r, "failed to delete service", err)
 		return
 	}

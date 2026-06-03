@@ -5,6 +5,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type projectHandlers struct {
@@ -166,11 +167,11 @@ func (h *projectHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	models.DeleteTags(h.db.SQL, "project", id)
-	// Cascade-soft-delete any vault entries attached to this project,
-	// then hard-delete the project row — same one-tx pattern as
-	// service/host/tool deletes (Phase 1.7).
-	if err := cascadeParentDelete(r, h.db, models.SecretScopeProjeto, id,
-		`DELETE FROM projects WHERE id = ?`); err != nil {
+	// Cascade-soft-delete any vault entries attached to this project, then
+	// hard-delete the project row — atomically, via the store cascade
+	// registry (parent table resolved from the registered scope).
+	actor, _ := actorFrom(r)
+	if err := store.DeleteParent(r.Context(), h.db.SQL, actor, models.SecretScopeProjeto, id); err != nil {
 		jsonServerError(w, r, "failed to delete project", err)
 		return
 	}

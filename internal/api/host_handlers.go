@@ -12,6 +12,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -719,8 +720,8 @@ func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	models.DeleteTags(h.db.SQL, "host", host.ID)
-	if err := cascadeParentDelete(r, h.db, models.SecretScopeHost, host.ID,
-		`DELETE FROM hosts WHERE id = ?`); err != nil {
+	actor, _ := actorFrom(r)
+	if err := store.DeleteParent(r.Context(), h.db.SQL, actor, models.SecretScopeHost, host.ID); err != nil {
 		jsonServerError(w, r, "failed to delete host", err)
 		return
 	}
