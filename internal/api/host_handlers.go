@@ -364,7 +364,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tags, _ := models.GetTags(h.db.SQL, "host", host.ID)
-	orch, _ := models.GetOrchestratorByHost(h.db.SQL, host.ID)
+	orch, _ := store.NewOrchestratorRepo(h.db.SQL).GetByHost(r.Context(), host.ID)
 	dns, _ := models.GetHostDNSRecords(h.db.SQL, host.ID)
 	services, _ := models.ListServicesByHost(h.db.SQL, host.ID)
 	projects, _ := models.ListProjectsByHost(h.db.SQL, host.ID)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type dashboardHandlers struct {
@@ -21,7 +22,7 @@ func (h *dashboardHandlers) handleDashboard(w http.ResponseWriter, r *http.Reque
 	dnsCount, _ := models.DNSRecordCount(h.db.SQL)
 	projectCount, _ := models.ProjectCount(h.db.SQL)
 	serviceCount, _ := models.ServiceCount(h.db.SQL)
-	orchestratorCount, _ := models.OrchestratorCount(h.db.SQL)
+	orchestratorCount, _ := store.NewOrchestratorRepo(h.db.SQL).Count(r.Context())
 	openIssues, _ := models.OpenIssueCount(h.db.SQL)
 
 	jsonOK(w, map[string]any{
