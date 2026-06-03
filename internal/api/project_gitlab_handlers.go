@@ -10,6 +10,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type projectGitLabHandlers struct {
@@ -51,7 +52,7 @@ func (h *projectGitLabHandlers) handleListLinks(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	raw, err := models.ListProjectGitLabLinks(h.db.SQL, projectID)
+	raw, err := store.NewProjectGitLabLinkRepo(h.db.SQL).List(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "failed to list gitlab links", err)
 		return
@@ -180,7 +181,7 @@ func (h *projectGitLabHandlers) handleCreateLink(w http.ResponseWriter, r *http.
 		log.Printf("[gitlab-links] resolved project id=%d path=%q name=%q", project.ID, project.PathWithNamespace, project.Name)
 	}
 
-	if err := models.CreateProjectGitLabLink(h.db.SQL, link); err != nil {
+	if err := store.NewProjectGitLabLinkRepo(h.db.SQL).Create(r.Context(), link); err != nil {
 		log.Printf("[gitlab-links] create db insert failed project=%d gitlab_id=%d path=%q: %v", projectID, link.GitLabProjectID, link.GitLabPath, err)
 		jsonError(w, http.StatusConflict, "link already exists or failed to create")
 		return
@@ -200,7 +201,7 @@ func (h *projectGitLabHandlers) handleDeleteLink(w http.ResponseWriter, r *http.
 		jsonBadRequest(w, r, "invalid link id", err)
 		return
 	}
-	ok, err := models.DeleteProjectGitLabLinkByID(h.db.SQL, linkID, projectID)
+	ok, err := store.NewProjectGitLabLinkRepo(h.db.SQL).DeleteByID(r.Context(), linkID, projectID)
 	if err != nil {
 		jsonServerError(w, r, "failed to delete link", err)
 		return
@@ -264,7 +265,7 @@ func (h *projectGitLabHandlers) handleListCommits(w http.ResponseWriter, r *http
 		return
 	}
 
-	links, err := models.ListProjectGitLabLinks(h.db.SQL, projectID)
+	links, err := store.NewProjectGitLabLinkRepo(h.db.SQL).List(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "failed to list gitlab links", err)
 		return

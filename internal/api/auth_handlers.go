@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type authHandlers struct {
@@ -172,7 +174,7 @@ func (h *authHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
 // resolveOrProvisionUser looks up a local user by external identity, or auto-provisions one.
 func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (*models.User, error) {
 	// Check if this external identity is already linked to a local user.
-	existing, err := models.GetIdentityByProviderAndExternalID(h.db.SQL, identity.ProviderName, identity.ExternalID)
+	existing, err := store.NewUserIdentityRepo(h.db.SQL).GetByProviderAndExternalID(context.Background(), identity.ProviderName, identity.ExternalID)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +238,7 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 		ProviderName: identity.ProviderName,
 		ExternalID:   identity.ExternalID,
 	}
-	if err := models.CreateUserExternalIdentity(h.db.SQL, link); err != nil {
+	if err := store.NewUserIdentityRepo(h.db.SQL).Create(context.Background(), link); err != nil {
 		return nil, fmt.Errorf("link identity: %w", err)
 	}
 
@@ -302,7 +304,7 @@ func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch external identities.
-	identities, _ := models.ListIdentitiesByUser(h.db.SQL, user.ID)
+	identities, _ := store.NewUserIdentityRepo(h.db.SQL).ListByUser(r.Context(), user.ID)
 
 	type identitySummary struct {
 		Provider   string `json:"provider"`

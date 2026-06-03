@@ -190,7 +190,7 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	links, err := models.ListProjectGitLabLinks(h.db.SQL, projectID)
+	links, err := store.NewProjectGitLabLinkRepo(h.db.SQL).List(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "failed to list project links", err)
 		return
