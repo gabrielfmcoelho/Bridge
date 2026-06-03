@@ -219,7 +219,7 @@ func (h *coolifyHandlers) resolvePrivateKeyUUID(client *coolify.Client, privKey,
 // text, the Coolify key name to use, and a description.
 func (h *coolifyHandlers) selectRegistrationKey(host *models.Host, sshKeyID int64, targetUser string) (privKey, keyName, description string, err error) {
 	load := func(id int64) (*models.SSHKey, string, error) {
-		k, gerr := models.GetSSHKey(h.db.SQL, id)
+		k, gerr := store.NewSSHKeyRepo(h.db.SQL).Get(context.Background(), id)
 		if gerr != nil {
 			return nil, "", gerr
 		}
@@ -516,7 +516,7 @@ func (h *coolifyHandlers) handleCheckKey(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	key, err := models.GetSSHKey(h.db.SQL, id)
+	key, err := store.NewSSHKeyRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || key == nil {
 		jsonError(w, http.StatusNotFound, "key not found")
 		return
@@ -556,7 +556,7 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	key, err := models.GetSSHKey(h.db.SQL, id)
+	key, err := store.NewSSHKeyRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || key == nil {
 		jsonError(w, http.StatusNotFound, "key not found")
 		return

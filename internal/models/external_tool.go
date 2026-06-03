@@ -1,12 +1,10 @@
 package models
 
-import (
-	"database/sql"
-	"time"
+import "time"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-)
-
+// ExternalTool is an embeddable third-party tool/dashboard link, optionally
+// bound to a service + DNS record. Persistence lives in
+// internal/store.ExternalToolRepo — this file is the pure data type only.
 type ExternalTool struct {
 	ID             int64     `json:"id"`
 	Name           string    `json:"name"`
@@ -21,95 +19,4 @@ type ExternalTool struct {
 	HasCredentials bool      `json:"has_credentials"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
-}
-
-func CreateExternalTool(db *sql.DB, t *ExternalTool) error {
-	if t.Source == "" {
-		t.Source = "manual"
-	}
-	id, err := database.InsertReturningID(db,
-		`INSERT INTO external_tools (name, description, url, icon, embed_enabled, sort_order, service_id, dns_id, source)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.Name, t.Description, t.URL, t.Icon, t.EmbedEnabled, t.SortOrder, t.ServiceID, t.DNSID, t.Source,
-	)
-	if err != nil {
-		return err
-	}
-	t.ID = id
-	return nil
-}
-
-func GetExternalTool(db *sql.DB, id int64) (*ExternalTool, error) {
-	t := &ExternalTool{}
-	err := db.QueryRow(
-		`SELECT t.id, t.name, t.description, t.url, t.icon, t.embed_enabled, t.sort_order,
-			t.service_id, t.dns_id, t.source,
-			(CASE WHEN t.service_id IS NOT NULL AND EXISTS (SELECT 1 FROM secrets s WHERE s.scope = 'service' AND s.parent_id = t.service_id AND s.deleted_at IS NULL) THEN 1 ELSE 0 END),
-			t.created_at, t.updated_at
-		FROM external_tools t WHERE t.id = ? AND t.deleted_at IS NULL`, id,
-	).Scan(&t.ID, &t.Name, &t.Description, &t.URL, &t.Icon, &t.EmbedEnabled, &t.SortOrder,
-		&t.ServiceID, &t.DNSID, &t.Source, &t.HasCredentials, &t.CreatedAt, &t.UpdatedAt)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	return t, err
-}
-
-func ListExternalTools(db *sql.DB) ([]ExternalTool, error) {
-	rows, err := db.Query(
-		`SELECT t.id, t.name, t.description, t.url, t.icon, t.embed_enabled, t.sort_order,
-			t.service_id, t.dns_id, t.source,
-			(CASE WHEN t.service_id IS NOT NULL AND EXISTS (SELECT 1 FROM secrets s WHERE s.scope = 'service' AND s.parent_id = t.service_id AND s.deleted_at IS NULL) THEN 1 ELSE 0 END),
-			t.created_at, t.updated_at
-		FROM external_tools t WHERE t.deleted_at IS NULL ORDER BY t.sort_order, t.name`,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var tools []ExternalTool
-	for rows.Next() {
-		var t ExternalTool
-		if err := rows.Scan(&t.ID, &t.Name, &t.Description, &t.URL, &t.Icon, &t.EmbedEnabled, &t.SortOrder,
-			&t.ServiceID, &t.DNSID, &t.Source, &t.HasCredentials, &t.CreatedAt, &t.UpdatedAt); err != nil {
-			return nil, err
-		}
-		tools = append(tools, t)
-	}
-	return tools, rows.Err()
-}
-
-func UpdateExternalTool(db *sql.DB, t *ExternalTool) error {
-	_, err := db.Exec(
-		`UPDATE external_tools SET name = ?, description = ?, url = ?, icon = ?, embed_enabled = ?, sort_order = ?,
-			service_id = ?, dns_id = ?, source = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`,
-		t.Name, t.Description, t.URL, t.Icon, t.EmbedEnabled, t.SortOrder,
-		t.ServiceID, t.DNSID, t.Source, t.ID,
-	)
-	return err
-}
-
-func DeleteExternalTool(db *sql.DB, id int64) error {
-	_, err := db.Exec(`DELETE FROM external_tools WHERE id = ?`, id)
-	return err
-}
-
-// GetToolByServiceAndDNS looks up an existing synced tool for a service+DNS pair.
-// Excludes soft-deleted rows so a sync against a (service, dns) pair whose
-// previous tool was trashed re-creates a fresh row instead of resurrecting
-// the soft-deleted one with stale fields.
-func GetToolByServiceAndDNS(db *sql.DB, serviceID, dnsID int64) (*ExternalTool, error) {
-	t := &ExternalTool{}
-	err := db.QueryRow(
-		`SELECT t.id, t.name, t.description, t.url, t.icon, t.embed_enabled, t.sort_order,
-			t.service_id, t.dns_id, t.source, 0, t.created_at, t.updated_at
-		FROM external_tools t WHERE t.service_id = ? AND t.dns_id = ? AND t.deleted_at IS NULL`, serviceID, dnsID,
-	).Scan(&t.ID, &t.Name, &t.Description, &t.URL, &t.Icon, &t.EmbedEnabled, &t.SortOrder,
-		&t.ServiceID, &t.DNSID, &t.Source, &t.HasCredentials, &t.CreatedAt, &t.UpdatedAt)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	return t, err
 }

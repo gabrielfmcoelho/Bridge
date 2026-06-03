@@ -5,6 +5,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -13,7 +14,7 @@ type sshKeyHandlers struct {
 }
 
 func (h *sshKeyHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	keys, err := models.ListSSHKeys(h.db.SQL)
+	keys, err := store.NewSSHKeyRepo(h.db.SQL).List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list credentials", err)
 		return
@@ -114,7 +115,7 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		k.PasswordNonce = nonce
 	}
 
-	if err := models.CreateSSHKey(h.db.SQL, k); err != nil {
+	if err := store.NewSSHKeyRepo(h.db.SQL).Create(r.Context(), k); err != nil {
 		jsonServerError(w, r, "failed to create credential", err)
 		return
 	}
@@ -127,7 +128,7 @@ func (h *sshKeyHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	k, err := models.GetSSHKey(h.db.SQL, id)
+	k, err := store.NewSSHKeyRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || k == nil {
 		jsonError(w, http.StatusNotFound, "key not found")
 		return
@@ -164,7 +165,7 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	existing, err := models.GetSSHKey(h.db.SQL, id)
+	existing, err := store.NewSSHKeyRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || existing == nil {
 		jsonError(w, http.StatusNotFound, "key not found")
 		return
@@ -240,7 +241,7 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		k.PasswordNonce = nonce
 	}
 
-	if err := models.UpdateSSHKey(h.db.SQL, k); err != nil {
+	if err := store.NewSSHKeyRepo(h.db.SQL).Update(r.Context(), k); err != nil {
 		jsonServerError(w, r, "failed to update credential", err)
 		return
 	}
@@ -253,7 +254,7 @@ func (h *sshKeyHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	if err := models.DeleteSSHKey(h.db.SQL, id); err != nil {
+	if err := store.NewSSHKeyRepo(h.db.SQL).Delete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "failed to delete key", err)
 		return
 	}

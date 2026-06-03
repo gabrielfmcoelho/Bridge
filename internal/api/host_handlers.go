@@ -773,7 +773,7 @@ func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
 // previous silent-return behavior that made "I selected a key but it didn't
 // save" bugs impossible to diagnose in production.
 func (h *hostHandlers) linkSSHKey(hostID, sshKeyID int64, slug string) error {
-	k, err := models.GetSSHKey(h.db.SQL, sshKeyID)
+	k, err := store.NewSSHKeyRepo(h.db.SQL).Get(context.Background(), sshKeyID)
 	if err != nil {
 		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: GetSSHKey error: %v", slug, sshKeyID, err)
 		return fmt.Errorf("load ssh key %d: %w", sshKeyID, err)

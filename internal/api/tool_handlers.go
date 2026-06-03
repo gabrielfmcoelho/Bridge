@@ -15,7 +15,7 @@ type toolHandlers struct {
 }
 
 func (h *toolHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	tools, err := models.ListExternalTools(h.db.SQL)
+	tools, err := store.NewExternalToolRepo(h.db.SQL).List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list tools", err)
 		return
@@ -33,7 +33,7 @@ func (h *toolHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tool, err := models.GetExternalTool(h.db.SQL, id)
+	tool, err := store.NewExternalToolRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || tool == nil {
 		jsonError(w, http.StatusNotFound, "tool not found")
 		return
@@ -52,7 +52,7 @@ func (h *toolHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := models.CreateExternalTool(h.db.SQL, &req); err != nil {
+	if err := store.NewExternalToolRepo(h.db.SQL).Create(r.Context(), &req); err != nil {
 		jsonServerError(w, r, "failed to create tool", err)
 		return
 	}
@@ -66,7 +66,7 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, err := models.GetExternalTool(h.db.SQL, id)
+	existing, err := store.NewExternalToolRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || existing == nil {
 		jsonError(w, http.StatusNotFound, "tool not found")
 		return
@@ -89,7 +89,7 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		req.Source = existing.Source
 	}
 
-	if err := models.UpdateExternalTool(h.db.SQL, &req); err != nil {
+	if err := store.NewExternalToolRepo(h.db.SQL).Update(r.Context(), &req); err != nil {
 		jsonServerError(w, r, "failed to update tool", err)
 		return
 	}
@@ -184,7 +184,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 	url := fmt.Sprintf("%s://%s", scheme, dns.Domain)
 
 	// Check for existing synced tool.
-	existing, err := models.GetToolByServiceAndDNS(h.db.SQL, req.ServiceID, req.DNSID)
+	existing, err := store.NewExternalToolRepo(h.db.SQL).GetByServiceAndDNS(r.Context(), req.ServiceID, req.DNSID)
 	if err != nil {
 		jsonServerError(w, r, "failed to check existing tool", err)
 		return
@@ -200,7 +200,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 			existing.Icon = req.Icon
 		}
 		existing.SortOrder = req.SortOrder
-		if err := models.UpdateExternalTool(h.db.SQL, existing); err != nil {
+		if err := store.NewExternalToolRepo(h.db.SQL).Update(r.Context(), existing); err != nil {
 			jsonServerError(w, r, "failed to update synced tool", err)
 			return
 		}
@@ -220,7 +220,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 		DNSID:        &req.DNSID,
 		Source:       "service",
 	}
-	if err := models.CreateExternalTool(h.db.SQL, tool); err != nil {
+	if err := store.NewExternalToolRepo(h.db.SQL).Create(r.Context(), tool); err != nil {
 		jsonServerError(w, r, "failed to create synced tool", err)
 		return
 	}
@@ -235,7 +235,7 @@ func (h *toolHandlers) handleUnsyncService(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tool, err := models.GetExternalTool(h.db.SQL, id)
+	tool, err := store.NewExternalToolRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || tool == nil {
 		jsonError(w, http.StatusNotFound, "tool not found")
 		return
@@ -245,7 +245,7 @@ func (h *toolHandlers) handleUnsyncService(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := models.DeleteExternalTool(h.db.SQL, id); err != nil {
+	if err := store.NewExternalToolRepo(h.db.SQL).Delete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "failed to delete synced tool", err)
 		return
 	}

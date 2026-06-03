@@ -315,7 +315,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		h.logOperation(r, host.ID, "test", &method, "success", "")
 		// Annotate scanned SSH keys with managed status from DB
 		if len(vmInfo.SSHKeys) > 0 {
-			dbKeys, _ := models.ListSSHKeys(h.db.SQL)
+			dbKeys, _ := store.NewSSHKeyRepo(h.db.SQL).List(r.Context())
 			matched := 0
 			for i, sk := range vmInfo.SSHKeys {
 				for _, dk := range dbKeys {
@@ -1198,7 +1198,7 @@ func (h *sshHandlers) resolveIdentityFile(host *models.Host) string {
 	}
 	fp := ssh.FingerprintSHA256(pub)
 
-	keys, err := models.ListSSHKeys(h.db.SQL)
+	keys, err := store.NewSSHKeyRepo(h.db.SQL).List(context.Background())
 	if err != nil {
 		return fallback
 	}
