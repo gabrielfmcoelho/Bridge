@@ -159,7 +159,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Validate DNS exists.
-	dns, err := models.GetDNSRecord(h.db.SQL, req.DNSID)
+	dns, err := store.NewDNSRepo(h.db.SQL).Get(r.Context(), req.DNSID)
 	if err != nil || dns == nil {
 		jsonError(w, http.StatusNotFound, "dns record not found")
 		return

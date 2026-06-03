@@ -10,7 +10,6 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	glpiclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/glpi"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 // NewRouter creates the API mux with all routes and middleware.
@@ -24,9 +23,13 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	registry.Register(providers.NewKeycloakProvider(db.SQL, db.Encryptor))
 	registry.Register(providers.NewGitLabProvider(db.SQL, db.Encryptor))
 
+	// DI container: shared singletons + domain services (Phase 2). Converted
+	// handlers pull their service from here; the rest still take deps.DB.
+	deps := NewDeps(db)
+
 	ah := &authHandlers{db: db, registry: registry}
 	hh := &hostHandlers{db: db}
-	dh := &dnsHandlers{db: db}
+	dh := &dnsHandlers{dns: deps.DNS}
 	ph := &projectHandlers{db: db}
 	sh := &serviceHandlers{db: db}
 	oh := &orchestratorHandlers{db: db}
@@ -125,7 +128,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 
 	// Unified secrets (Phase 1 — spec §6). Auth at the perimeter only;
 	// per-row ACL (RBAC for shared, ownership for personal) lives in vault.
-	secretRepo := vault.NewSecretRepo(db)
+	secretRepo := deps.Secrets
 	secretH := &secretHandlers{db: db, repo: secretRepo}
 	secretH.register(mux, func(next http.Handler) http.Handler { return authenticated(db, next) })
 

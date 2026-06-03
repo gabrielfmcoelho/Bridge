@@ -19,7 +19,7 @@ func (h *dashboardHandlers) handleDashboard(w http.ResponseWriter, r *http.Reque
 	hostsWithScans, _ := store.NewHostScanRepo(h.db.SQL).CountHostsWithScans(r.Context())
 	hostsMaintenance, _ := models.HostsNeedingMaintenanceCount(h.db.SQL)
 	recentScans, _ := store.NewHostScanRepo(h.db.SQL).RecentWithHost(r.Context(), 5)
-	dnsCount, _ := models.DNSRecordCount(h.db.SQL)
+	dnsCount, _ := store.NewDNSRepo(h.db.SQL).Count(r.Context())
 	projectCount, _ := models.ProjectCount(h.db.SQL)
 	serviceCount, _ := models.ServiceCount(h.db.SQL)
 	orchestratorCount, _ := store.NewOrchestratorRepo(h.db.SQL).Count(r.Context())

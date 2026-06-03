@@ -6,6 +6,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type graphHandlers struct {
@@ -50,7 +51,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// DNS records
-	dnsRecords, _ := models.ListDNSRecords(h.db.SQL)
+	dnsRecords, _ := store.NewDNSRepo(h.db.SQL).List(r.Context())
 	dnsIDMap := make(map[int64]string)
 	for _, dns := range dnsRecords {
 		nid := fmt.Sprintf("dns-%d", dns.ID)
@@ -66,7 +67,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		})
 
 		// DNS -> Host edges
-		hostIDs, _ := models.GetDNSHostIDs(h.db.SQL, dns.ID)
+		hostIDs, _ := store.NewDNSRepo(h.db.SQL).HostIDs(r.Context(), dns.ID)
 		for _, hid := range hostIDs {
 			if target, ok := hostIDMap[hid]; ok {
 				edges = append(edges, graphEdge{Source: nid, Target: target, Label: "points to"})

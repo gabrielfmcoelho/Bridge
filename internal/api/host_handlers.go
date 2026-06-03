@@ -206,7 +206,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 
 	projCounts, _ := models.GetProjectCountsByHost(h.db.SQL)
 	svcCounts, _ := models.GetServiceCountsByHost(h.db.SQL)
-	dnsCounts, _ := models.GetDNSCountsByHost(h.db.SQL)
+	dnsCounts, _ := store.NewDNSRepo(h.db.SQL).CountsByHost(r.Context())
 	issueCounts, _ := models.GetIssueCountsByEntity(h.db.SQL, "host")
 	mainRespNames, _ := models.GetMainResponsavelNamesBulk(h.db.SQL)
 	mainEntidades, _ := store.NewHostEntidadeRepo(h.db.SQL).MainBulk(r.Context())
@@ -365,7 +365,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	tags, _ := store.NewTagRepo(h.db.SQL).Get(r.Context(), "host", host.ID)
 	orch, _ := store.NewOrchestratorRepo(h.db.SQL).GetByHost(r.Context(), host.ID)
-	dns, _ := models.GetHostDNSRecords(h.db.SQL, host.ID)
+	dns, _ := store.NewDNSRepo(h.db.SQL).RecordsByHost(r.Context(), host.ID)
 	services, _ := models.ListServicesByHost(h.db.SQL, host.ID)
 	projects, _ := models.ListProjectsByHost(h.db.SQL, host.ID)
 	lastScan, _ := store.NewHostScanRepo(h.db.SQL).GetLatest(r.Context(), host.ID)
@@ -483,7 +483,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 	// Link DNS records and services if provided.
 	if len(req.DNSIDs) > 0 {
-		if err := models.SetHostDNSLinks(h.db.SQL, req.Host.ID, req.DNSIDs); err != nil {
+		if err := store.NewDNSRepo(h.db.SQL).SetLinksForHost(r.Context(), req.Host.ID, req.DNSIDs); err != nil {
 			log.Printf("[hosts] SetHostDNSLinks error on create: %v", err)
 		}
 	}
@@ -677,7 +677,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	// Sync DNS and service links if provided.
 	if req.DNSIDs != nil {
-		if err := models.SetHostDNSLinks(h.db.SQL, existing.ID, *req.DNSIDs); err != nil {
+		if err := store.NewDNSRepo(h.db.SQL).SetLinksForHost(r.Context(), existing.ID, *req.DNSIDs); err != nil {
 			log.Printf("[hosts] SetHostDNSLinks error on update: %v", err)
 		}
 	}

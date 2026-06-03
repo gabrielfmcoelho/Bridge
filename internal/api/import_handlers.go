@@ -150,7 +150,7 @@ func (h *importHandlers) handleImportDNS(w http.ResponseWriter, r *http.Request)
 		}
 
 		// Try to create — unique constraint on domain will reject duplicates
-		if err := models.CreateDNSRecord(h.db.SQL, &item.DNSRecord); err != nil {
+		if err := store.NewDNSRepo(h.db.SQL).Create(r.Context(), &item.DNSRecord); err != nil {
 			result.Skipped++
 			result.Errors = append(result.Errors, importItemResult{Index: i, Name: name, Error: "domain already exists (skipped)"})
 			continue
@@ -160,7 +160,7 @@ func (h *importHandlers) handleImportDNS(w http.ResponseWriter, r *http.Request)
 			store.NewTagRepo(h.db.SQL).Set(r.Context(), "dns", item.DNSRecord.ID, item.Tags)
 		}
 		if len(item.HostIDs) > 0 {
-			models.SetDNSHostLinks(h.db.SQL, item.DNSRecord.ID, item.HostIDs)
+			store.NewDNSRepo(h.db.SQL).SetHostLinks(r.Context(), item.DNSRecord.ID, item.HostIDs)
 		}
 
 		result.Created++
