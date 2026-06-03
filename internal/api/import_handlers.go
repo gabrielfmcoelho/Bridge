@@ -10,6 +10,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -109,7 +110,7 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 
 		// Set tags
 		if len(item.Tags) > 0 {
-			models.SetTags(h.db.SQL, "host", item.Host.ID, item.Tags)
+			store.NewTagRepo(h.db.SQL).Set(r.Context(), "host", item.Host.ID, item.Tags)
 		}
 
 		result.Created++
@@ -156,7 +157,7 @@ func (h *importHandlers) handleImportDNS(w http.ResponseWriter, r *http.Request)
 		}
 
 		if len(item.Tags) > 0 {
-			models.SetTags(h.db.SQL, "dns", item.DNSRecord.ID, item.Tags)
+			store.NewTagRepo(h.db.SQL).Set(r.Context(), "dns", item.DNSRecord.ID, item.Tags)
 		}
 		if len(item.HostIDs) > 0 {
 			models.SetDNSHostLinks(h.db.SQL, item.DNSRecord.ID, item.HostIDs)

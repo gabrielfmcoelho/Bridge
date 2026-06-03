@@ -165,7 +165,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Attach tags, scan status, and scan resource summary for each host.
-	tagMap, _ := models.GetAllTags(h.db.SQL, "host")
+	tagMap, _ := store.NewTagRepo(h.db.SQL).GetAll(r.Context(), "host")
 	scanStatuses, scanErr := store.NewHostScanRepo(h.db.SQL).Statuses(r.Context())
 	if scanErr != nil {
 		log.Printf("[hosts] GetHostScanStatuses error: %v", scanErr)
@@ -363,7 +363,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tags, _ := models.GetTags(h.db.SQL, "host", host.ID)
+	tags, _ := store.NewTagRepo(h.db.SQL).Get(r.Context(), "host", host.ID)
 	orch, _ := store.NewOrchestratorRepo(h.db.SQL).GetByHost(r.Context(), host.ID)
 	dns, _ := models.GetHostDNSRecords(h.db.SQL, host.ID)
 	services, _ := models.ListServicesByHost(h.db.SQL, host.ID)
@@ -450,7 +450,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Tags) > 0 {
-		models.SetTags(h.db.SQL, "host", req.Host.ID, req.Tags)
+		store.NewTagRepo(h.db.SQL).Set(r.Context(), "host", req.Host.ID, req.Tags)
 	}
 
 	// Sync responsaveis and chamados
@@ -645,7 +645,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Tags != nil {
-		models.SetTags(h.db.SQL, "host", existing.ID, req.Tags)
+		store.NewTagRepo(h.db.SQL).Set(r.Context(), "host", existing.ID, req.Tags)
 	}
 
 	// Sync responsaveis and chamados if provided
@@ -719,7 +719,7 @@ func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	models.DeleteTags(h.db.SQL, "host", host.ID)
+	store.NewTagRepo(h.db.SQL).Delete(r.Context(), "host", host.ID)
 	actor, _ := actorFrom(r)
 	if err := store.DeleteParent(r.Context(), h.db.SQL, actor, models.SecretScopeHost, host.ID); err != nil {
 		jsonServerError(w, r, "failed to delete host", err)

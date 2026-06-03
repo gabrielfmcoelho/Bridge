@@ -290,19 +290,19 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 			host.PrecisaManutencao = true
 			updated = true
 			result["resource_alert"] = true
-			models.AddTag(h.db.SQL, "host", host.ID, "alerta-recursos")
-			models.RemoveTag(h.db.SQL, "host", host.ID, "sub-utilizado")
+			store.NewTagRepo(h.db.SQL).Add(r.Context(), "host", host.ID, "alerta-recursos")
+			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "sub-utilizado")
 		} else if cpuPct > 0 && cpuPct < 5 && ramPct > 0 && ramPct < 5 && diskPct > 0 && diskPct < 5 {
 			result["sub_utilized"] = true
-			models.AddTag(h.db.SQL, "host", host.ID, "sub-utilizado")
-			models.RemoveTag(h.db.SQL, "host", host.ID, "alerta-recursos")
+			store.NewTagRepo(h.db.SQL).Add(r.Context(), "host", host.ID, "sub-utilizado")
+			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "alerta-recursos")
 			if host.PrecisaManutencao {
 				host.PrecisaManutencao = false
 				updated = true
 			}
 		} else {
-			models.RemoveTag(h.db.SQL, "host", host.ID, "alerta-recursos")
-			models.RemoveTag(h.db.SQL, "host", host.ID, "sub-utilizado")
+			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "alerta-recursos")
+			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "sub-utilizado")
 			if host.PrecisaManutencao {
 				host.PrecisaManutencao = false
 				updated = true

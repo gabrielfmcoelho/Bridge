@@ -5,6 +5,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type dnsHandlers struct {
@@ -18,7 +19,7 @@ func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tagMap, _ := models.GetAllTags(h.db.SQL, "dns")
+	tagMap, _ := store.NewTagRepo(h.db.SQL).GetAll(r.Context(), "dns")
 	mainRespNames, _ := models.GetDNSMainResponsavelNamesBulk(h.db.SQL)
 	type dnsWithTags struct {
 		models.DNSRecord
@@ -53,7 +54,7 @@ func (h *dnsHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tags, _ := models.GetTags(h.db.SQL, "dns", rec.ID)
+	tags, _ := store.NewTagRepo(h.db.SQL).Get(r.Context(), "dns", rec.ID)
 	hostIDs, _ := models.GetDNSHostIDs(h.db.SQL, rec.ID)
 	responsaveis, _ := models.ListDNSResponsaveis(h.db.SQL, rec.ID)
 
@@ -87,7 +88,7 @@ func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Tags) > 0 {
-		models.SetTags(h.db.SQL, "dns", req.DNSRecord.ID, req.Tags)
+		store.NewTagRepo(h.db.SQL).Set(r.Context(), "dns", req.DNSRecord.ID, req.Tags)
 	}
 	if len(req.HostIDs) > 0 {
 		models.SetDNSHostLinks(h.db.SQL, req.DNSRecord.ID, req.HostIDs)
@@ -130,7 +131,7 @@ func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Tags != nil {
-		models.SetTags(h.db.SQL, "dns", id, req.Tags)
+		store.NewTagRepo(h.db.SQL).Set(r.Context(), "dns", id, req.Tags)
 	}
 	if req.HostIDs != nil {
 		models.SetDNSHostLinks(h.db.SQL, id, req.HostIDs)
@@ -149,7 +150,7 @@ func (h *dnsHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	models.DeleteTags(h.db.SQL, "dns", id)
+	store.NewTagRepo(h.db.SQL).Delete(r.Context(), "dns", id)
 	if err := models.DeleteDNSRecord(h.db.SQL, id); err != nil {
 		jsonServerError(w, r, "failed to delete DNS record", err)
 		return

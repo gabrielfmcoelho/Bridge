@@ -19,7 +19,7 @@ func (h *projectHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tagMap, _ := models.GetAllTags(h.db.SQL, "project")
+	tagMap, _ := store.NewTagRepo(h.db.SQL).GetAll(r.Context(), "project")
 	mainRespNames, _ := models.GetProjectMainResponsavelNamesBulk(h.db.SQL)
 	type projectWithTags struct {
 		models.Project
@@ -55,7 +55,7 @@ func (h *projectHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tags, _ := models.GetTags(h.db.SQL, "project", id)
+	tags, _ := store.NewTagRepo(h.db.SQL).Get(r.Context(), "project", id)
 	responsaveis, _ := models.ListProjectResponsaveisContact(h.db.SQL, id)
 	services, _ := models.ListServicesByProject(h.db.SQL, id)
 
@@ -111,7 +111,7 @@ func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Tags) > 0 {
-		models.SetTags(h.db.SQL, "project", req.Project.ID, req.Tags)
+		store.NewTagRepo(h.db.SQL).Set(r.Context(), "project", req.Project.ID, req.Tags)
 	}
 	if len(req.Responsaveis) > 0 {
 		models.SyncProjectResponsaveisContact(h.db.SQL, req.Project.ID, req.Responsaveis)
@@ -150,7 +150,7 @@ func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Tags != nil {
-		models.SetTags(h.db.SQL, "project", id, req.Tags)
+		store.NewTagRepo(h.db.SQL).Set(r.Context(), "project", id, req.Tags)
 	}
 	if req.Responsaveis != nil {
 		models.SyncProjectResponsaveisContact(h.db.SQL, id, *req.Responsaveis)
@@ -166,7 +166,7 @@ func (h *projectHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	models.DeleteTags(h.db.SQL, "project", id)
+	store.NewTagRepo(h.db.SQL).Delete(r.Context(), "project", id)
 	// Cascade-soft-delete any vault entries attached to this project, then
 	// hard-delete the project row — atomically, via the store cascade
 	// registry (parent table resolved from the registered scope).

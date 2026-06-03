@@ -22,7 +22,7 @@ func (h *serviceHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tagMap, _ := models.GetAllTags(h.db.SQL, "service")
+	tagMap, _ := store.NewTagRepo(h.db.SQL).GetAll(r.Context(), "service")
 	mainRespNames, _ := models.GetServiceMainResponsavelNamesBulk(h.db.SQL)
 	type serviceWithMeta struct {
 		models.Service
@@ -63,7 +63,7 @@ func (h *serviceHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tags, _ := models.GetTags(h.db.SQL, "service", id)
+	tags, _ := store.NewTagRepo(h.db.SQL).Get(r.Context(), "service", id)
 	hostIDs, _ := models.GetServiceHostIDs(h.db.SQL, id)
 	dnsIDs, _ := models.GetServiceDNSIDs(h.db.SQL, id)
 	dependsOnIDs, _ := models.GetServiceDependencyIDs(h.db.SQL, id)
@@ -109,7 +109,7 @@ func (h *serviceHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req.Tags) > 0 {
-		models.SetTags(h.db.SQL, "service", req.Service.ID, req.Tags)
+		store.NewTagRepo(h.db.SQL).Set(r.Context(), "service", req.Service.ID, req.Tags)
 	}
 	if len(req.HostIDs) > 0 {
 		models.SetServiceHostLinks(h.db.SQL, req.Service.ID, req.HostIDs)
@@ -183,7 +183,7 @@ func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Tags != nil {
-		models.SetTags(h.db.SQL, "service", id, req.Tags)
+		store.NewTagRepo(h.db.SQL).Set(r.Context(), "service", id, req.Tags)
 	}
 	if req.HostIDs != nil {
 		models.SetServiceHostLinks(h.db.SQL, id, req.HostIDs)
@@ -208,7 +208,7 @@ func (h *serviceHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	models.DeleteTags(h.db.SQL, "service", id)
+	store.NewTagRepo(h.db.SQL).Delete(r.Context(), "service", id)
 	actor, _ := actorFrom(r)
 	if err := store.DeleteParent(r.Context(), h.db.SQL, actor, models.SecretScopeService, id); err != nil {
 		jsonServerError(w, r, "failed to delete service", err)

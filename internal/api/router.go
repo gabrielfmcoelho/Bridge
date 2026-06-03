@@ -9,7 +9,6 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth/providers"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	glpiclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/glpi"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
@@ -370,9 +369,9 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 		tags := []string{}
 		var err error
 		if entityType != "" {
-			tags, err = models.GetDistinctTags(db.SQL, entityType)
+			tags, err = store.NewTagRepo(db.SQL).Distinct(r.Context(), entityType)
 		} else {
-			tags, err = models.GetAllDistinctTags(db.SQL)
+			tags, err = store.NewTagRepo(db.SQL).AllDistinct(r.Context())
 		}
 		if err != nil {
 			jsonError(w, http.StatusInternalServerError, "failed to list tags")
