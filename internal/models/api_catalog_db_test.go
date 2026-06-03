@@ -1,10 +1,12 @@
 package models_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // newCatalogDB opens a fresh migrated sqlite DB and returns it plus a user id
@@ -18,7 +20,7 @@ func newCatalogDB(t *testing.T) (*database.DB, int64) {
 	t.Cleanup(func() { d.Close() })
 
 	u := &models.User{Username: "owner", DisplayName: "Owner", Role: "editor", Email: "o@example.com"}
-	if err := models.CreateUser(d.SQL, u); err != nil {
+	if err := store.NewUserRepo(d.SQL).Create(context.Background(), u); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 	return d, u.ID

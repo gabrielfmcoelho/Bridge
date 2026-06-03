@@ -15,6 +15,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -153,7 +154,7 @@ func newSecretAPIEnv(t *testing.T) *secretAPIEnv {
 			http.Error(w, `{"error":"bad test user header"}`, http.StatusUnauthorized)
 			return
 		}
-		u, err := models.GetUserByID(d.SQL, uid)
+		u, err := store.NewUserRepo(d.SQL).GetByID(context.Background(), uid)
 		if err != nil || u == nil {
 			http.Error(w, `{"error":"test user not found"}`, http.StatusUnauthorized)
 			return

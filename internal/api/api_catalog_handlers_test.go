@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 const testOpenAPI30 = `openapi: 3.0.1
@@ -49,7 +51,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	t.Cleanup(func() { d.Close() })
 
 	u := &models.User{Username: "editor", DisplayName: "Editor", Role: "editor", Email: "e@example.com"}
-	if err := models.CreateUser(d.SQL, u); err != nil {
+	if err := store.NewUserRepo(d.SQL).Create(context.Background(), u); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 

@@ -612,13 +612,13 @@ func (h *integrationSettingsHandlers) handleTestGitLabCode(w http.ResponseWriter
 
 // handleGetPermissions returns all permissions and the role-permission matrix.
 func (h *integrationSettingsHandlers) handleGetPermissions(w http.ResponseWriter, r *http.Request) {
-	perms, err := models.ListPermissions(h.db.SQL)
+	perms, err := store.NewPermissionRepo(h.db.SQL).ListPermissions(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list permissions", err)
 		return
 	}
 
-	rolePerms, err := models.ListAllRolePermissions(h.db.SQL)
+	rolePerms, err := store.NewPermissionRepo(h.db.SQL).ListAllRolePermissions(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list role permissions", err)
 		return
@@ -656,7 +656,7 @@ func (h *integrationSettingsHandlers) handleUpdatePermissions(w http.ResponseWri
 		return
 	}
 
-	if err := models.SetRolePermissions(h.db.SQL, req.Role, req.Permissions); err != nil {
+	if err := store.NewPermissionRepo(h.db.SQL).SetForRole(r.Context(), req.Role, req.Permissions); err != nil {
 		jsonServerError(w, r, "failed to update permissions", err)
 		return
 	}
@@ -668,7 +668,7 @@ func (h *integrationSettingsHandlers) handleUpdatePermissions(w http.ResponseWri
 
 // handleGetRoleMappings returns all external group-to-role mappings.
 func (h *integrationSettingsHandlers) handleGetRoleMappings(w http.ResponseWriter, r *http.Request) {
-	mappings, err := models.ListAuthRoleMappings(h.db.SQL)
+	mappings, err := store.NewPermissionRepo(h.db.SQL).ListRoleMappings(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list role mappings", err)
 		return
@@ -691,7 +691,7 @@ func (h *integrationSettingsHandlers) handleCreateRoleMapping(w http.ResponseWri
 		return
 	}
 
-	if err := models.CreateAuthRoleMapping(h.db.SQL, &req); err != nil {
+	if err := store.NewPermissionRepo(h.db.SQL).CreateRoleMapping(r.Context(), &req); err != nil {
 		jsonError(w, http.StatusConflict, "mapping already exists or failed to create")
 		return
 	}
@@ -707,7 +707,7 @@ func (h *integrationSettingsHandlers) handleDeleteRoleMapping(w http.ResponseWri
 		return
 	}
 
-	if err := models.DeleteAuthRoleMapping(h.db.SQL, id); err != nil {
+	if err := store.NewPermissionRepo(h.db.SQL).DeleteRoleMapping(r.Context(), id); err != nil {
 		jsonServerError(w, r, "failed to delete mapping", err)
 		return
 	}

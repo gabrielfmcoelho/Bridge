@@ -7,6 +7,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type contextKey string
@@ -42,7 +43,7 @@ func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 			return
 		}
 
-		user, err := models.GetUserByID(db, userID)
+		user, err := store.NewUserRepo(db).GetByID(r.Context(), userID)
 		if err != nil || user == nil {
 			httpx.WriteError(w, http.StatusUnauthorized, "user not found")
 			return
@@ -91,7 +92,7 @@ func RequirePermission(db *sql.DB, permission string, next http.Handler) http.Ha
 			return
 		}
 
-		if !models.HasPermission(db, user.Role, permission) {
+		if !store.NewPermissionRepo(db).Has(r.Context(), user.Role, permission) {
 			httpx.WriteError(w, http.StatusForbidden, "insufficient permissions")
 			return
 		}

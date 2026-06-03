@@ -179,7 +179,7 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 		return nil, err
 	}
 	if existing != nil {
-		user, err := models.GetUserByID(h.db.SQL, existing.UserID)
+		user, err := store.NewUserRepo(h.db.SQL).GetByID(context.Background(), existing.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -207,7 +207,7 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 
 	// Check if external groups map to a specific role.
 	if len(identity.Groups) > 0 {
-		mappedRole := models.ResolveRoleFromExternalGroups(h.db.SQL, identity.ProviderName, identity.Groups)
+		mappedRole := store.NewPermissionRepo(h.db.SQL).ResolveRoleFromExternalGroups(context.Background(), identity.ProviderName, identity.Groups)
 		if mappedRole != "" {
 			defaultRole = mappedRole
 		}
@@ -228,7 +228,7 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 		AuthProvider: identity.ProviderName,
 		Email:        identity.Email,
 	}
-	if err := models.CreateUser(h.db.SQL, user); err != nil {
+	if err := store.NewUserRepo(h.db.SQL).Create(context.Background(), user); err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
@@ -252,10 +252,10 @@ func (h *authHandlers) syncExternalRole(user *models.User, identity *auth.Extern
 		return
 	}
 
-	mappedRole := models.ResolveRoleFromExternalGroups(h.db.SQL, identity.ProviderName, identity.Groups)
+	mappedRole := store.NewPermissionRepo(h.db.SQL).ResolveRoleFromExternalGroups(context.Background(), identity.ProviderName, identity.Groups)
 	if mappedRole != "" && mappedRole != user.Role {
 		user.Role = mappedRole
-		models.UpdateUser(h.db.SQL, user)
+		store.NewUserRepo(h.db.SQL).Update(context.Background(), user)
 	}
 }
 
@@ -264,7 +264,7 @@ func (h *authHandlers) ensureUniqueUsername(username string) string {
 	candidate := username
 	suffix := 2
 	for {
-		existing, _ := models.GetUserByUsername(h.db.SQL, candidate)
+		existing, _ := store.NewUserRepo(h.db.SQL).GetByUsername(context.Background(), candidate)
 		if existing == nil {
 			return candidate
 		}
@@ -290,10 +290,10 @@ func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch permissions for this user's role.
-	permissions, _ := models.ListPermissionsForRole(h.db.SQL, user.Role)
+	permissions, _ := store.NewPermissionRepo(h.db.SQL).ListForRole(r.Context(), user.Role)
 	if user.Role == "admin" {
 		// Admin gets all permissions.
-		allPerms, _ := models.ListPermissions(h.db.SQL)
+		allPerms, _ := store.NewPermissionRepo(h.db.SQL).ListPermissions(r.Context())
 		permissions = make([]string, len(allPerms))
 		for i, p := range allPerms {
 			permissions[i] = p.Code
@@ -338,7 +338,7 @@ func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 // User management (admin only)
 
 func (h *authHandlers) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := models.ListUsers(h.db.SQL)
+	users, err := store.NewUserRepo(h.db.SQL).List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list users", err)
 		return
@@ -377,7 +377,7 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		DisplayName:  req.DisplayName,
 		Role:         req.Role,
 	}
-	if err := models.CreateUser(h.db.SQL, u); err != nil {
+	if err := store.NewUserRepo(h.db.SQL).Create(r.Context(), u); err != nil {
 		jsonError(w, http.StatusConflict, "username already exists")
 		return
 	}
@@ -403,7 +403,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user, err := models.GetUserByID(h.db.SQL, id)
+	user, err := store.NewUserRepo(h.db.SQL).GetByID(r.Context(), id)
 	if err != nil || user == nil {
 		jsonError(w, http.StatusNotFound, "user not found")
 		return
@@ -418,7 +418,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 	if req.Role != "" {
 		user.Role = req.Role
 	}
-	if err := models.UpdateUser(h.db.SQL, user); err != nil {
+	if err := store.NewUserRepo(h.db.SQL).Update(r.Context(), user); err != nil {
 		jsonServerError(w, r, "failed to update user", err)
 		return
 	}
@@ -429,7 +429,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 			jsonServerError(w, r, "failed to hash password", err)
 			return
 		}
-		if err := models.UpdateUserPassword(h.db.SQL, id, hash); err != nil {
+		if err := store.NewUserRepo(h.db.SQL).UpdatePassword(r.Context(), id, hash); err != nil {
 			jsonServerError(w, r, "failed to update password", err)
 			return
 		}
@@ -452,7 +452,7 @@ func (h *authHandlers) handleDeleteUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := models.DeleteUser(h.db.SQL, id); err != nil {
+	if err := store.NewUserRepo(h.db.SQL).Delete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "failed to delete user", err)
 		return
 	}
