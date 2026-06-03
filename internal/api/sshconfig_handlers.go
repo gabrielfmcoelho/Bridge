@@ -869,7 +869,7 @@ func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Requ
 		id := req.SSHKeyID
 		keyIDArg = &id
 	}
-	if linkErr := models.CreateOrUpdateHostRemoteUser(h.db.SQL, host.ID, req.Username, keyIDArg); linkErr != nil {
+	if linkErr := store.NewHostRemoteUserRepo(h.db.SQL).CreateOrUpdate(r.Context(), host.ID, req.Username, keyIDArg); linkErr != nil {
 		log.Printf("[sshcm] create-remote-user host=%d user=%s link-persist error=%v", host.ID, req.Username, linkErr)
 	}
 
@@ -939,7 +939,7 @@ func (h *sshHandlers) handleDeleteRemoteUser(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if linkErr := models.DeleteHostRemoteUser(h.db.SQL, host.ID, req.Username); linkErr != nil {
+	if linkErr := store.NewHostRemoteUserRepo(h.db.SQL).Delete(r.Context(), host.ID, req.Username); linkErr != nil {
 		log.Printf("[sshcm] delete-remote-user host=%d user=%s link-cleanup error=%v", host.ID, req.Username, linkErr)
 	}
 

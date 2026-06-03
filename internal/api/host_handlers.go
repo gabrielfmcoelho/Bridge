@@ -209,7 +209,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	dnsCounts, _ := models.GetDNSCountsByHost(h.db.SQL)
 	issueCounts, _ := models.GetIssueCountsByEntity(h.db.SQL, "host")
 	mainRespNames, _ := models.GetMainResponsavelNamesBulk(h.db.SQL)
-	mainEntidades, _ := models.GetMainEntidadeBulk(h.db.SQL)
+	mainEntidades, _ := store.NewHostEntidadeRepo(h.db.SQL).MainBulk(r.Context())
 	chamadosCounts, _ := models.GetChamadosCountsBulk(h.db.SQL)
 	manualAlertsBulk, _ := models.ListHostAlertsBulk(h.db.SQL)
 	alertLinkedIssues, _ := models.GetAlertLinkedIssueIDsBulk(h.db.SQL)
@@ -371,7 +371,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	lastScan, _ := store.NewHostScanRepo(h.db.SQL).GetLatest(r.Context(), host.ID)
 	responsaveis, _ := models.ListHostResponsaveis(h.db.SQL, host.ID)
 	chamados, _ := models.ListHostChamados(h.db.SQL, host.ID)
-	entidades, _ := models.ListHostEntidades(h.db.SQL, host.ID)
+	entidades, _ := store.NewHostEntidadeRepo(h.db.SQL).List(r.Context(), host.ID)
 
 	jsonOK(w, map[string]any{
 		"host":         host,
@@ -465,7 +465,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(req.Entidades) > 0 {
-		if err := models.SyncHostEntidades(h.db.SQL, req.Host.ID, req.Entidades); err != nil {
+		if err := store.NewHostEntidadeRepo(h.db.SQL).Sync(r.Context(), req.Host.ID, req.Entidades); err != nil {
 			log.Printf("[hosts] SyncHostEntidades error on create: %v", err)
 		}
 	}
@@ -660,7 +660,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.Entidades != nil {
-		if err := models.SyncHostEntidades(h.db.SQL, existing.ID, *req.Entidades); err != nil {
+		if err := store.NewHostEntidadeRepo(h.db.SQL).Sync(r.Context(), existing.ID, *req.Entidades); err != nil {
 			log.Printf("[hosts] SyncHostEntidades error on update: %v", err)
 		}
 	}

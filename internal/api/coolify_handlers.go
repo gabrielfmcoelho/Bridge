@@ -245,7 +245,7 @@ func (h *coolifyHandlers) selectRegistrationKey(host *models.Host, sshKeyID int6
 	}
 
 	if targetUser != "" {
-		if link, lerr := models.GetHostRemoteUserByUsername(h.db.SQL, host.ID, targetUser); lerr == nil && link != nil && link.SSHKeyID != nil {
+		if link, lerr := store.NewHostRemoteUserRepo(h.db.SQL).GetByUsername(context.Background(), host.ID, targetUser); lerr == nil && link != nil && link.SSHKeyID != nil {
 			k, plain, lderr := load(*link.SSHKeyID)
 			if lderr == nil {
 				return plain, coolifyManagedKeyName(k), fmt.Sprintf("Managed by SSHCM key %q (remote user %s)", k.Name, targetUser), nil
