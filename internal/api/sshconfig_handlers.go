@@ -696,7 +696,7 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	// use the host's linked key only. key_path is empty — keys live only
 	// in the unified vault, never on the filesystem.
 	_ = models.UpdateHostKeyMeta(h.db.SQL, host.ID, true, "", "yes")
-	if vErr := vault.HostSetSSHKey(r.Context(), h.db, host.ID, actorUserID(r),
+	if vErr := vault.HostSetSSHKey(r.Context(), h.db, host.ID, actorID(r),
 		vault.HostSSHKey{PrivateKeyPEM: string(result.PrivKeyPEM), PublicKey: result.PubKeyLine}); vErr != nil {
 		log.Printf("[ssh] setup-key vault write slug=%s: %v", host.OficialSlug, vErr)
 	}

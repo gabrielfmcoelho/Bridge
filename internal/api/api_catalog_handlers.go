@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/apicatalog"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 )
@@ -60,14 +59,6 @@ func (h *apiCatalogHandlers) register(mux *http.ServeMux, wrap func(role string,
 	mux.Handle("POST /api/api-catalog/{id}/refetch", wrap("editor", http.HandlerFunc(h.handleRefetch)))
 	mux.Handle("PUT /api/api-catalog/{id}", wrap("editor", http.HandlerFunc(h.handleUpdate)))
 	mux.Handle("DELETE /api/api-catalog/{id}", wrap("admin", http.HandlerFunc(h.handleDelete)))
-}
-
-func (h *apiCatalogHandlers) ownerID(r *http.Request) (int64, bool) {
-	u := auth.UserFromContext(r.Context())
-	if u == nil {
-		return 0, false
-	}
-	return u.ID, true
 }
 
 // --- list / search ----------------------------------------------------------
@@ -193,11 +184,12 @@ func (h *apiCatalogHandlers) handleFilterSpec(w http.ResponseWriter, r *http.Req
 // --- import -----------------------------------------------------------------
 
 func (h *apiCatalogHandlers) handleImportUpload(w http.ResponseWriter, r *http.Request) {
-	owner, ok := h.ownerID(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
+	owner := actor.UserID
 	r.Body = http.MaxBytesReader(w, r.Body, apicatalog.MaxSpecBytes+1<<20)
 	if err := r.ParseMultipartForm(apicatalog.MaxSpecBytes + 1<<20); err != nil {
 		jsonBadRequest(w, r, "spec file too large or malformed form", err)
@@ -234,18 +226,17 @@ type importURLRequest struct {
 }
 
 func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Request) {
-	owner, ok := h.ownerID(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
+	owner := actor.UserID
 	var req importURLRequest
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
+	if !decodeBody(w, r, &req) {
 		return
 	}
-	if strings.TrimSpace(req.SourceURL) == "" {
-		jsonError(w, http.StatusBadRequest, "source_url is required")
+	if !requireFields(w, map[string]string{"source_url": req.SourceURL}) {
 		return
 	}
 	raw, err := apicatalog.FetchSpec(r.Context(), req.SourceURL, h.allowPrivateFetch)

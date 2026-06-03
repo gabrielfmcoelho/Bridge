@@ -21,7 +21,7 @@ type createShareLinkRequest struct {
 }
 
 func (h *secretHandlers) handleCreateShareLink(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -76,7 +76,7 @@ func (h *secretHandlers) handleCreateShareLink(w http.ResponseWriter, r *http.Re
 }
 
 func (h *secretHandlers) handleListShareLinks(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -88,7 +88,7 @@ func (h *secretHandlers) handleListShareLinks(w http.ResponseWriter, r *http.Req
 	}
 	links, err := h.repo.ListShareLinks(r.Context(), actor, id)
 	if err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	if links == nil {
@@ -98,7 +98,7 @@ func (h *secretHandlers) handleListShareLinks(w http.ResponseWriter, r *http.Req
 }
 
 func (h *secretHandlers) handleRevokeShareLink(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -119,7 +119,7 @@ func (h *secretHandlers) handleRevokeShareLink(w http.ResponseWriter, r *http.Re
 	case errors.Is(err, vault.ErrShareLinkNotFound):
 		jsonError(w, http.StatusNotFound, "share link not found")
 	default:
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 	}
 }
 

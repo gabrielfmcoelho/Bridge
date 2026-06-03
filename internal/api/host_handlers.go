@@ -442,7 +442,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	// it. Stage 2 will drop the column-side write and the host row will
 	// only carry the has_password boolean.
 	if req.Password != "" {
-		actorID := actorUserID(r)
+		actorID := actorID(r)
 		if err := vault.HostSetPassword(r.Context(), h.db, req.Host.ID, actorID, req.Password); err != nil {
 			log.Printf("[hosts] vault dual-write on create slug=%s: %v", req.OficialSlug, err)
 		}
@@ -631,7 +631,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	// upserts; clearing the key removes the vault row. SSH key linking
 	// (req.SSHKeyID > 0) flows through linkSSHKey which writes to vault
 	// inside that helper.
-	actorID := actorUserID(r)
+	actorID := actorID(r)
 	if req.Password != "" {
 		if err := vault.HostSetPassword(r.Context(), h.db, existing.ID, actorID, req.Password); err != nil {
 			log.Printf("[hosts] vault dual-write on update slug=%s: %v", existing.OficialSlug, err)

@@ -36,7 +36,7 @@ type createBundleRequest struct {
 }
 
 func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -80,7 +80,7 @@ func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *bundleHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -97,7 +97,7 @@ func (h *bundleHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *bundleHandlers) handleRevoke(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return

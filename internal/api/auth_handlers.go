@@ -79,7 +79,7 @@ func (h *authHandlers) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 	user, err := auth.SetupMasterUser(h.db.SQL, req.Username, req.Password, req.DisplayName)
 	if err != nil {
-		jsonError(w, http.StatusConflict, err.Error())
+		jsonErrorLogged(w, r, http.StatusConflict, "could not complete setup (already initialized?)", err)
 		return
 	}
 

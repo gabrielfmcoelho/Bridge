@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 )
 
@@ -31,19 +32,19 @@ func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := GetSessionToken(r)
 		if token == "" {
-			http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+			httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
 
 		userID, err := ValidateSession(db, token)
 		if err != nil {
-			http.Error(w, `{"error":"invalid or expired session"}`, http.StatusUnauthorized)
+			httpx.WriteError(w, http.StatusUnauthorized, "invalid or expired session")
 			return
 		}
 
 		user, err := models.GetUserByID(db, userID)
 		if err != nil || user == nil {
-			http.Error(w, `{"error":"user not found"}`, http.StatusUnauthorized)
+			httpx.WriteError(w, http.StatusUnauthorized, "user not found")
 			return
 		}
 
@@ -58,12 +59,12 @@ func RequireRole(minRole string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+			httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
 
 		if !hasMinRole(user.Role, minRole) {
-			http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+			httpx.WriteError(w, http.StatusForbidden, "insufficient permissions")
 			return
 		}
 
@@ -86,12 +87,12 @@ func RequirePermission(db *sql.DB, permission string, next http.Handler) http.Ha
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
-			http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+			httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
 
 		if !models.HasPermission(db, user.Role, permission) {
-			http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+			httpx.WriteError(w, http.StatusForbidden, "insufficient permissions")
 			return
 		}
 

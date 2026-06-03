@@ -105,7 +105,7 @@ func (h *glpiHandlers) handleCreateTokenProfile(w http.ResponseWriter, r *http.R
 		DefaultEntityID: req.DefaultEntityID,
 	}
 	if err := models.CreateGlpiToken(h.db.SQL, tok); err != nil {
-		jsonError(w, http.StatusConflict, "create failed (name conflict?): "+err.Error())
+		jsonErrorLogged(w, r, http.StatusConflict, "could not create GLPI token (name already in use?)", err)
 		return
 	}
 	tok.HasToken = true

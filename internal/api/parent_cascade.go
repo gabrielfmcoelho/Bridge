@@ -3,22 +3,10 @@ package api
 import (
 	"net/http"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
-
-// actorUserID extracts the authenticated user's id from the request context,
-// returning 0 when no user is attached (e.g. before auth middleware fires,
-// or in tests). Useful for dual-write paths that need an audit-row actor
-// without re-doing the full auth boilerplate.
-func actorUserID(r *http.Request) int64 {
-	if u := auth.UserFromContext(r.Context()); u != nil {
-		return u.ID
-	}
-	return 0
-}
 
 // cascadeParentDelete soft-deletes every child secret attached to the given
 // (scope, parentID) and then executes parentDeleteSQL (one `?` placeholder
@@ -42,10 +30,7 @@ func cascadeParentDelete(
 	parentID int64,
 	parentDeleteSQL string,
 ) error {
-	var actor vault.ActorContext
-	if u := auth.UserFromContext(r.Context()); u != nil {
-		actor = vault.ActorContext{UserID: u.ID, Role: u.Role}
-	}
+	actor, _ := actorFrom(r)
 	tx, err := db.SQL.BeginTx(r.Context(), nil)
 	if err != nil {
 		return err
@@ -90,10 +75,7 @@ func cascadeParentRestore(
 	parentID int64,
 	parentRestoreSQL string,
 ) error {
-	var actor vault.ActorContext
-	if u := auth.UserFromContext(r.Context()); u != nil {
-		actor = vault.ActorContext{UserID: u.ID, Role: u.Role}
-	}
+	actor, _ := actorFrom(r)
 	tx, err := db.SQL.BeginTx(r.Context(), nil)
 	if err != nil {
 		return err
