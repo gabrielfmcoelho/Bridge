@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 func TestParentRegistry_KnownScopes(t *testing.T) {
@@ -39,7 +38,7 @@ func TestParentRegistry_KnownScopes(t *testing.T) {
 // DeleteParent must reject an unregistered scope BEFORE touching the DB, so a
 // nil *sql.DB is safe here and proves the guard short-circuits.
 func TestDeleteParent_UnregisteredScopeErrors(t *testing.T) {
-	err := DeleteParent(context.Background(), nil, vault.ActorContext{}, models.SecretScopeAvulso, 1)
+	err := DeleteParent(context.Background(), nil, models.ActorContext{}, models.SecretScopeAvulso, 1)
 	if err == nil || !strings.Contains(err.Error(), "not a registered") {
 		t.Fatalf("err = %v, want 'not a registered' guard", err)
 	}
@@ -47,7 +46,7 @@ func TestDeleteParent_UnregisteredScopeErrors(t *testing.T) {
 
 // RestoreParent on a hard-delete scope must fail fast (guard before DB).
 func TestRestoreParent_HardDeleteScopeErrors(t *testing.T) {
-	err := RestoreParent(context.Background(), nil, vault.ActorContext{}, models.SecretScopeHost, 1)
+	err := RestoreParent(context.Background(), nil, models.ActorContext{}, models.SecretScopeHost, 1)
 	if err == nil || !strings.Contains(err.Error(), "cannot be restored") {
 		t.Fatalf("err = %v, want 'cannot be restored' guard", err)
 	}

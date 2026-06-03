@@ -10,8 +10,8 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/apicatalog"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/secretshare"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // Share bundles (Phase D) — a single public link carrying multiple
@@ -138,7 +138,7 @@ func (r *SecretRepo) CreateBundle(ctx context.Context, actor ActorContext, items
 			}
 			itemViews = append(itemViews, BundleItemView{Type: it.Type, RefID: it.RefID, Label: v.Name})
 		case BundleItemAPIDoc:
-			a, err := models.GetAPICatalog(r.db, it.RefID)
+			a, err := store.NewAPICatalogRepo(r.db).Get(ctx, it.RefID)
 			if err != nil {
 				return "", nil, err
 			}
@@ -301,11 +301,11 @@ func (r *SecretRepo) RedeemBundle(ctx context.Context, token, passphrase string)
 				Name: v.Name, Type: string(v.Type), Payload: plain,
 			})
 		case BundleItemAPIDoc:
-			a, err := models.GetAPICatalog(r.db, it.refID)
+			a, err := store.NewAPICatalogRepo(r.db).Get(ctx, it.refID)
 			if err != nil || a == nil {
 				continue
 			}
-			spec, err := models.GetAPICatalogSpec(r.db, it.refID)
+			spec, err := store.NewAPICatalogRepo(r.db).GetSpec(ctx, it.refID)
 			if err != nil || spec == "" {
 				continue
 			}
@@ -382,12 +382,12 @@ func (r *SecretRepo) ListBundles(ctx context.Context, actor ActorContext) ([]Bun
 	var out []BundleView
 	for rows.Next() {
 		var (
-			v          BundleView
-			passHash   []byte
-			maxViews   sql.NullInt64
-			revoked    sql.NullTime
-			created    string
-			expires    string
+			v        BundleView
+			passHash []byte
+			maxViews sql.NullInt64
+			revoked  sql.NullTime
+			created  string
+			expires  string
 		)
 		if err := rows.Scan(&v.ID, &v.Title, &expires, &passHash, &maxViews,
 			&v.ViewCount, &v.CreatedBy, &created, &revoked); err != nil {
@@ -431,7 +431,7 @@ func (r *SecretRepo) labelItems(ctx context.Context, items []bundleItemRow) []Bu
 				bv.Label = v.Name
 			}
 		case BundleItemAPIDoc:
-			if a, err := models.GetAPICatalog(r.db, it.refID); err == nil && a != nil {
+			if a, err := store.NewAPICatalogRepo(r.db).Get(ctx, it.refID); err == nil && a != nil {
 				bv.Label = a.Name
 			}
 			if it.selector != "" {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/apicatalog"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -29,7 +30,7 @@ func seedAPI(t *testing.T, env *secretTestEnv, owner int64) int64 {
 		{Method: "GET", Path: "/things", OperationID: "listThings", OpKey: "listThings"},
 		{Method: "DELETE", Path: "/things/{id}", OpKey: "DELETE /things/{id}"},
 	}
-	if err := models.CreateAPICatalog(env.d.SQL, a, ops); err != nil {
+	if err := store.NewAPICatalogRepo(env.d.SQL).Create(context.Background(), a, ops); err != nil {
 		t.Fatalf("seed api: %v", err)
 	}
 	return a.ID

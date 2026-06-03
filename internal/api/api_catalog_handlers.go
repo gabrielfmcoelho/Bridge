@@ -11,6 +11,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/apicatalog"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // apiCatalogHandlers serves the Atlas REST API catalog surface
@@ -73,7 +74,7 @@ func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) 
 			f.ParentID = &pid
 		}
 	}
-	list, err := models.ListAPICatalog(h.db.SQL, f)
+	list, err := store.NewAPICatalogRepo(h.db.SQL).List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "list api catalog", err)
 		return
@@ -91,7 +92,7 @@ func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *ht
 			parentID = &pid
 		}
 	}
-	hits, err := models.SearchOperations(h.db.SQL, r.URL.Query().Get("q"), r.URL.Query().Get("scope"), parentID)
+	hits, err := store.NewAPICatalogRepo(h.db.SQL).SearchOperations(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("scope"), parentID)
 	if err != nil {
 		jsonServerError(w, r, "search operations", err)
 		return
@@ -110,7 +111,7 @@ func (h *apiCatalogHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	a, err := models.GetAPICatalog(h.db.SQL, id)
+	a, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "get api catalog", err)
 		return
@@ -129,7 +130,7 @@ func (h *apiCatalogHandlers) handleGetSpec(w http.ResponseWriter, r *http.Reques
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	spec, err := models.GetAPICatalogSpec(h.db.SQL, id)
+	spec, err := store.NewAPICatalogRepo(h.db.SQL).GetSpec(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "get api spec", err)
 		return
@@ -162,7 +163,7 @@ func (h *apiCatalogHandlers) handleFilterSpec(w http.ResponseWriter, r *http.Req
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
-	spec, err := models.GetAPICatalogSpec(h.db.SQL, id)
+	spec, err := store.NewAPICatalogRepo(h.db.SQL).GetSpec(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "get api spec", err)
 		return
@@ -278,11 +279,11 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
-	if err := models.UpdateAPICatalogMeta(h.db.SQL, id, req.Name, req.Description, strings.TrimSpace(req.BaseURL), strings.TrimSpace(req.DocsURL)); err != nil {
+	if err := store.NewAPICatalogRepo(h.db.SQL).UpdateMeta(r.Context(), id, req.Name, req.Description, strings.TrimSpace(req.BaseURL), strings.TrimSpace(req.DocsURL)); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
-	a, err := models.GetAPICatalog(h.db.SQL, id)
+	a, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "reload api catalog", err)
 		return
@@ -302,7 +303,7 @@ func (h *apiCatalogHandlers) handleRefetch(w http.ResponseWriter, r *http.Reques
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	a, err := models.GetAPICatalog(h.db.SQL, id)
+	a, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "get api catalog", err)
 		return
@@ -325,12 +326,12 @@ func (h *apiCatalogHandlers) handleRefetch(w http.ResponseWriter, r *http.Reques
 		jsonBadRequest(w, r, "could not parse spec: "+err.Error(), err)
 		return
 	}
-	if err := models.UpdateAPICatalogSpec(h.db.SQL, id, string(ps.SpecJSON), ps.SpecHash, ps.SpecVersion,
+	if err := store.NewAPICatalogRepo(h.db.SQL).UpdateSpec(r.Context(), id, string(ps.SpecJSON), ps.SpecHash, ps.SpecVersion,
 		ps.Title, ps.VersionLabel, ps.ExternalURL, toModelOps(ps.Operations)); err != nil {
 		jsonServerError(w, r, "update api spec", err)
 		return
 	}
-	reloaded, err := models.GetAPICatalog(h.db.SQL, id)
+	reloaded, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "reload api catalog", err)
 		return
@@ -344,7 +345,7 @@ func (h *apiCatalogHandlers) handleDelete(w http.ResponseWriter, r *http.Request
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	if err := models.SoftDeleteAPICatalog(h.db.SQL, id); err != nil {
+	if err := store.NewAPICatalogRepo(h.db.SQL).SoftDelete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "delete api catalog", err)
 		return
 	}
@@ -423,11 +424,11 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 		OwnerUserID:  owner,
 		CreatedBy:    owner,
 	}
-	if err := models.CreateAPICatalog(h.db.SQL, a, toModelOps(ps.Operations)); err != nil {
+	if err := store.NewAPICatalogRepo(h.db.SQL).Create(r.Context(), a, toModelOps(ps.Operations)); err != nil {
 		jsonBadRequest(w, r, "could not save api: "+err.Error(), err)
 		return
 	}
-	reloaded, err := models.GetAPICatalog(h.db.SQL, a.ID)
+	reloaded, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), a.ID)
 	if err != nil {
 		jsonServerError(w, r, "reload api catalog", err)
 		return

@@ -9,11 +9,11 @@ import (
 
 func TestSecretType_Valid(t *testing.T) {
 	cases := map[SecretType]bool{
-		SecretTypeCred:     true,
-		SecretTypeSSHKey:   true,
-		SecretTypePassword: true,
-		SecretTypeAppLogin: true,
-		SecretTypeEnvVar:   true,
+		SecretTypeCred:           true,
+		SecretTypeSSHKey:         true,
+		SecretTypePassword:       true,
+		SecretTypeAppLogin:       true,
+		SecretTypeEnvVar:         true,
 		SecretType("env_bundle"): false, // D5: removed in favor of per-var rows
 		SecretType("user"):       false,
 		SecretType(""):           false,
@@ -27,11 +27,11 @@ func TestSecretType_Valid(t *testing.T) {
 
 func TestSecretScope_Valid(t *testing.T) {
 	cases := map[SecretScope]bool{
-		SecretScopeService: true,
-		SecretScopeHost:    true,
-		SecretScopeTool:    true,
-		SecretScopeProjeto: true,
-		SecretScopeAvulso:  true,
+		SecretScopeService:        true,
+		SecretScopeHost:           true,
+		SecretScopeTool:           true,
+		SecretScopeProjeto:        true,
+		SecretScopeAvulso:         true,
 		SecretScope("user"):       false, // D7: dropped
 		SecretScope("standalone"): false, // D7: replaced by avulso
 		SecretScope("project"):    false, // canonical Portuguese form 'projeto'
@@ -46,9 +46,9 @@ func TestSecretScope_Valid(t *testing.T) {
 
 func TestSecretVisibility_Valid(t *testing.T) {
 	cases := map[SecretVisibility]bool{
-		SecretVisibilityPersonal: true,
-		SecretVisibilityShared:   true,
-		SecretVisibility(""):       false,
+		SecretVisibilityPersonal:    true,
+		SecretVisibilityShared:      true,
+		SecretVisibility(""):        false,
 		SecretVisibility("private"): false,
 	}
 	for in, want := range cases {
@@ -232,16 +232,16 @@ func TestSecretShareLink_JSON_HidesTokenHash(t *testing.T) {
 
 func TestValidateEnvVarName(t *testing.T) {
 	cases := map[string]bool{
-		"DB_URL":     true,
-		"_PRIVATE":   true,
-		"FOO_2":      true,
-		"X":          true,
-		"db_url":     false, // lowercase rejected — Task 2.1 foot-gun guard
-		"2FOO":       false, // can't start with digit
-		"FOO-BAR":    false, // no hyphens
-		"":           false,
-		"FOO.BAR":    false,
-		"FOO BAR":    false, // no whitespace
+		"DB_URL":   true,
+		"_PRIVATE": true,
+		"FOO_2":    true,
+		"X":        true,
+		"db_url":   false, // lowercase rejected — Task 2.1 foot-gun guard
+		"2FOO":     false, // can't start with digit
+		"FOO-BAR":  false, // no hyphens
+		"":         false,
+		"FOO.BAR":  false,
+		"FOO BAR":  false, // no whitespace
 	}
 	for in, want := range cases {
 		err := ValidateEnvVarName(in)

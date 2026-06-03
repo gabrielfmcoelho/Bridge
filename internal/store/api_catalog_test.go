@@ -1,4 +1,4 @@
-package models_test
+package store_test
 
 import (
 	"context"
@@ -9,16 +9,11 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
-// newCatalogDB opens a fresh migrated sqlite DB and returns it plus a user id
-// to satisfy the owner_user_id / created_by foreign keys.
+// newCatalogDB opens a fresh migrated DB and returns it plus a user id to
+// satisfy the owner_user_id / created_by foreign keys.
 func newCatalogDB(t *testing.T) (*database.DB, int64) {
 	t.Helper()
-	d, err := database.Open(t.TempDir())
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { d.Close() })
-
+	d := openDB(t)
 	u := &models.User{Username: "owner", DisplayName: "Owner", Role: "editor", Email: "o@example.com"}
 	if err := store.NewUserRepo(d.SQL).Create(context.Background(), u); err != nil {
 		t.Fatalf("create user: %v", err)
@@ -48,18 +43,20 @@ func sampleCatalog(scope string, parentID *int64, owner int64) (*models.APICatal
 	return a, ops
 }
 
-func TestCreateAndGetAPICatalog(t *testing.T) {
+func TestAPICatalogRepo_CreateAndGet(t *testing.T) {
+	ctx := context.Background()
 	d, owner := newCatalogDB(t)
+	repo := store.NewAPICatalogRepo(d.SQL)
 
 	a, ops := sampleCatalog(models.APICatalogScopeAvulso, nil, owner)
-	if err := models.CreateAPICatalog(d.SQL, a, ops); err != nil {
+	if err := repo.Create(ctx, a, ops); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	if a.ID == 0 {
 		t.Fatal("expected assigned id")
 	}
 
-	got, err := models.GetAPICatalog(d.SQL, a.ID)
+	got, err := repo.Get(ctx, a.ID)
 	if err != nil || got == nil {
 		t.Fatalf("get: %v (nil=%v)", err, got == nil)
 	}
@@ -73,37 +70,40 @@ func TestCreateAndGetAPICatalog(t *testing.T) {
 		t.Errorf("tags not round-tripped: %v", got.Operations[0].Tags)
 	}
 
-	spec, err := models.GetAPICatalogSpec(d.SQL, a.ID)
+	spec, err := repo.GetSpec(ctx, a.ID)
 	if err != nil || spec != a.SpecJSON {
 		t.Errorf("spec mismatch: err=%v", err)
 	}
 }
 
-func TestAPICatalogScopeValidation(t *testing.T) {
+func TestAPICatalogRepo_ScopeValidation(t *testing.T) {
+	ctx := context.Background()
 	d, owner := newCatalogDB(t)
+	repo := store.NewAPICatalogRepo(d.SQL)
 
 	// projeto without parent_id must be rejected by Validate (before DB).
 	bad, ops := sampleCatalog(models.APICatalogScopeProjeto, nil, owner)
-	if err := models.CreateAPICatalog(d.SQL, bad, ops); err == nil {
+	if err := repo.Create(ctx, bad, ops); err == nil {
 		t.Error("expected projeto-without-parent to be rejected")
 	}
-
 	// avulso with a parent_id must be rejected too.
 	pid := int64(99)
 	bad2, ops2 := sampleCatalog(models.APICatalogScopeAvulso, &pid, owner)
-	if err := models.CreateAPICatalog(d.SQL, bad2, ops2); err == nil {
+	if err := repo.Create(ctx, bad2, ops2); err == nil {
 		t.Error("expected avulso-with-parent to be rejected")
 	}
 }
 
-func TestListSearchAndSoftDelete(t *testing.T) {
+func TestAPICatalogRepo_ListSearchAndSoftDelete(t *testing.T) {
+	ctx := context.Background()
 	d, owner := newCatalogDB(t)
+	repo := store.NewAPICatalogRepo(d.SQL)
 	a, ops := sampleCatalog(models.APICatalogScopeAvulso, nil, owner)
-	if err := models.CreateAPICatalog(d.SQL, a, ops); err != nil {
+	if err := repo.Create(ctx, a, ops); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
-	list, err := models.ListAPICatalog(d.SQL, models.APICatalogFilter{Query: "pet"})
+	list, err := repo.List(ctx, models.APICatalogFilter{Query: "pet"})
 	if err != nil || len(list) != 1 {
 		t.Fatalf("list query: err=%v n=%d", err, len(list))
 	}
@@ -111,7 +111,7 @@ func TestListSearchAndSoftDelete(t *testing.T) {
 		t.Errorf("op count in list = %d", list[0].OperationCount)
 	}
 
-	hits, err := models.SearchOperations(d.SQL, "listPets", "", nil)
+	hits, err := repo.SearchOperations(ctx, "listPets", "", nil)
 	if err != nil || len(hits) != 1 {
 		t.Fatalf("search ops: err=%v n=%d", err, len(hits))
 	}
@@ -121,7 +121,7 @@ func TestListSearchAndSoftDelete(t *testing.T) {
 
 	// Documentation (description) is searchable: the word lives ONLY in the
 	// POST op's description, nowhere in its path/summary/tags.
-	docHits, err := models.SearchOperations(d.SQL, "brandnewzebra", "", nil)
+	docHits, err := repo.SearchOperations(ctx, "brandnewzebra", "", nil)
 	if err != nil || len(docHits) != 1 {
 		t.Fatalf("description search: err=%v n=%d", err, len(docHits))
 	}
@@ -129,10 +129,10 @@ func TestListSearchAndSoftDelete(t *testing.T) {
 		t.Errorf("description hit unexpected: %+v", docHits[0])
 	}
 
-	if err := models.SoftDeleteAPICatalog(d.SQL, a.ID); err != nil {
+	if err := repo.SoftDelete(ctx, a.ID); err != nil {
 		t.Fatalf("soft delete: %v", err)
 	}
-	got, err := models.GetAPICatalog(d.SQL, a.ID)
+	got, err := repo.Get(ctx, a.ID)
 	if err != nil {
 		t.Fatalf("get after delete: %v", err)
 	}

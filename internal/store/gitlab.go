@@ -69,7 +69,9 @@ type ProjectGitLabLinkRepo struct {
 }
 
 // NewProjectGitLabLinkRepo constructs the repo over the given DB handle.
-func NewProjectGitLabLinkRepo(db *sql.DB) *ProjectGitLabLinkRepo { return &ProjectGitLabLinkRepo{db: db} }
+func NewProjectGitLabLinkRepo(db *sql.DB) *ProjectGitLabLinkRepo {
+	return &ProjectGitLabLinkRepo{db: db}
+}
 
 const projectGitLabLinkCols = `id, project_id, gitlab_project_id, gitlab_base_url, gitlab_path,
 	kind, ref_name, display_name, sync_issues, last_synced_at, created_at`
