@@ -8,6 +8,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type globalIssueHandlers struct {
@@ -184,7 +185,7 @@ func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 
 	// Auto-resolve linked alerts when issue is done
 	if req.Status == "done" {
-		if err := models.ResolveAlertsByIssueID(h.db.SQL, issueID); err != nil {
+		if err := store.NewHostAlertRepo(h.db.SQL).ResolveByIssue(r.Context(), issueID); err != nil {
 			log.Printf("[issues] ResolveAlertsByIssueID error: %v", err)
 		}
 	}
@@ -219,7 +220,7 @@ func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request)
 
 	// Auto-resolve linked alerts when issue is moved to done
 	if req.Status == "done" {
-		if err := models.ResolveAlertsByIssueID(h.db.SQL, issueID); err != nil {
+		if err := store.NewHostAlertRepo(h.db.SQL).ResolveByIssue(r.Context(), issueID); err != nil {
 			log.Printf("[issues] ResolveAlertsByIssueID error: %v", err)
 		}
 	}

@@ -486,17 +486,17 @@ func syncDockerLogsAlert(db *sql.DB, hostID int64, report *sshtest.DockerLogsRep
 			ExternalSource: dockerLogsAlertExternalSource,
 			ExternalID:     externalID,
 		}
-		if _, err := models.UpsertExternalHostAlert(db, alert); err != nil {
+		if _, err := store.NewHostAlertRepo(db).UpsertExternal(context.Background(), alert); err != nil {
 			log.Printf("[docker-logs] upsert alert host=%d failed: %v", hostID, err)
 		}
 	default: // "ok" or unknown
-		existing, err := models.GetExternalHostAlert(db, dockerLogsAlertExternalSource, externalID)
+		existing, err := store.NewHostAlertRepo(db).GetExternal(context.Background(), dockerLogsAlertExternalSource, externalID)
 		if err != nil {
 			log.Printf("[docker-logs] lookup existing alert host=%d failed: %v", hostID, err)
 			return
 		}
 		if existing != nil && existing.Status == "active" {
-			if rerr := models.ResolveHostAlert(db, existing.ID); rerr != nil {
+			if rerr := store.NewHostAlertRepo(db).Resolve(context.Background(), existing.ID); rerr != nil {
 				log.Printf("[docker-logs] auto-resolve alert id=%d host=%d failed: %v", existing.ID, hostID, rerr)
 			}
 		}

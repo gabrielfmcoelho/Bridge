@@ -14,6 +14,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type grafanaWebhookHandlers struct {
@@ -121,7 +122,7 @@ func (h *grafanaWebhookHandlers) handleAlertWebhook(w http.ResponseWriter, r *ht
 			ExternalID:     alert.Fingerprint,
 			ExternalSource: "grafana",
 		}
-		if _, err := models.UpsertExternalHostAlert(h.db.SQL, record); err != nil {
+		if _, err := store.NewHostAlertRepo(h.db.SQL).UpsertExternal(r.Context(), record); err != nil {
 			log.Printf("[grafana-webhook] upsert for host %s fp=%s: %v", host.OficialSlug, alert.Fingerprint, err)
 			skipped++
 			continue

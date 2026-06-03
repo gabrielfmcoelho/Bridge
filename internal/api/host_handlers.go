@@ -211,8 +211,8 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	mainRespNames, _ := models.GetMainResponsavelNamesBulk(h.db.SQL)
 	mainEntidades, _ := store.NewHostEntidadeRepo(h.db.SQL).MainBulk(r.Context())
 	chamadosCounts, _ := models.GetChamadosCountsBulk(h.db.SQL)
-	manualAlertsBulk, _ := models.ListHostAlertsBulk(h.db.SQL)
-	alertLinkedIssues, _ := models.GetAlertLinkedIssueIDsBulk(h.db.SQL)
+	manualAlertsBulk, _ := store.NewHostAlertRepo(h.db.SQL).ListBulk(r.Context())
+	alertLinkedIssues, _ := store.NewHostAlertRepo(h.db.SQL).LinkedIssueIDsBulk(r.Context())
 
 	result := make([]hostWithExtra, len(hosts))
 	for i, host := range hosts {
