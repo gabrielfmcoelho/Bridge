@@ -10,6 +10,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	glpiclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/glpi"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -38,7 +39,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	ih := &issueHandlers{db: db}
 	rh := &releaseHandlers{db: db}
 	th := &toolHandlers{db: db}
-	ch := &contactHandlers{db: db}
+	ch := &contactHandlers{contacts: store.NewContactRepo(db.SQL)}
 	skh := &sshKeyHandlers{db: db}
 	imh := &importHandlers{db: db}
 	bkh := &backupHandlers{db: db}
