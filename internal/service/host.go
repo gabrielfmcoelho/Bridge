@@ -4,21 +4,30 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
+
+// ErrHostKeyLink wraps an SSH-key link failure so the handler can surface it as
+// a partial-success (the host row was already created/updated).
+var ErrHostKeyLink = errors.New("ssh key link failed")
 
 // HostService owns host read enrichment: the list view's bulk-loaded
 // composition (tags + scan summary + counts + alerts) and the single-host
 // detail view. Write paths (create/update with vault dual-writes, SSH-key
 // resealing, Grafana provisioning) remain in the handler pending a later phase.
 type HostService struct {
-	db        *sql.DB
+	db        *database.DB // needed for vault dual-writes + the encryptor (ssh-key reseal)
+	sqlDB     *sql.DB
 	hosts     *store.HostRepo
 	tags      *store.TagRepo
 	scans     *store.HostScanRepo
@@ -30,23 +39,26 @@ type HostService struct {
 	entidades *store.HostEntidadeRepo
 	chamados  *store.HostChamadoRepo
 	orch      *store.OrchestratorRepo
+	sshKeys   *store.SSHKeyRepo
 }
 
 // NewHostService constructs a HostService over the given DB handle.
-func NewHostService(db *sql.DB) *HostService {
+func NewHostService(db *database.DB) *HostService {
 	return &HostService{
 		db:        db,
-		hosts:     store.NewHostRepo(db),
-		tags:      store.NewTagRepo(db),
-		scans:     store.NewHostScanRepo(db),
-		alerts:    store.NewHostAlertRepo(db),
-		alertCfg:  store.NewAlertSettingsRepo(db),
-		services:  store.NewServiceRepo(db),
-		dns:       store.NewDNSRepo(db),
-		projects:  store.NewProjectRepo(db),
-		entidades: store.NewHostEntidadeRepo(db),
-		chamados:  store.NewHostChamadoRepo(db),
-		orch:      store.NewOrchestratorRepo(db),
+		sqlDB:     db.SQL,
+		hosts:     store.NewHostRepo(db.SQL),
+		tags:      store.NewTagRepo(db.SQL),
+		scans:     store.NewHostScanRepo(db.SQL),
+		alerts:    store.NewHostAlertRepo(db.SQL),
+		alertCfg:  store.NewAlertSettingsRepo(db.SQL),
+		services:  store.NewServiceRepo(db.SQL),
+		dns:       store.NewDNSRepo(db.SQL),
+		projects:  store.NewProjectRepo(db.SQL),
+		entidades: store.NewHostEntidadeRepo(db.SQL),
+		chamados:  store.NewHostChamadoRepo(db.SQL),
+		orch:      store.NewOrchestratorRepo(db.SQL),
+		sshKeys:   store.NewSSHKeyRepo(db.SQL),
 	}
 }
 
@@ -142,7 +154,7 @@ func (s *HostService) Get(ctx context.Context, slug string) (*HostDetail, error)
 	services, _ := s.services.ListByHost(ctx, host.ID)
 	projects, _ := s.projects.ProjectsByHost(ctx, host.ID)
 	lastScan, _ := s.scans.GetLatest(ctx, host.ID)
-	responsaveis, _ := models.ListHostResponsaveis(s.db, host.ID)
+	responsaveis, _ := models.ListHostResponsaveis(s.sqlDB, host.ID)
 	chamados, _ := s.chamados.ListByHost(ctx, host.ID)
 	entidades, _ := s.entidades.List(ctx, host.ID)
 
@@ -184,10 +196,10 @@ func (s *HostService) List(ctx context.Context, f models.HostFilter) ([]HostList
 	projCounts, _ := s.services.ProjectCountsByHost(ctx)
 	svcCounts, _ := s.services.CountsByHost(ctx)
 	dnsCounts, _ := s.dns.CountsByHost(ctx)
-	issueCounts, _ := models.GetIssueCountsByEntity(s.db, "host")
-	mainRespNames, _ := models.GetMainResponsavelNamesBulk(s.db)
+	issueCounts, _ := models.GetIssueCountsByEntity(s.sqlDB, "host")
+	mainRespNames, _ := models.GetMainResponsavelNamesBulk(s.sqlDB)
 	mainEntidades, _ := s.entidades.MainBulk(ctx)
-	chamadosCounts, _ := models.GetChamadosCountsBulk(s.db)
+	chamadosCounts, _ := models.GetChamadosCountsBulk(s.sqlDB)
 	manualAlertsBulk, _ := s.alerts.ListBulk(ctx)
 	alertLinkedIssues, _ := s.alerts.LinkedIssueIDsBulk(ctx)
 
@@ -336,4 +348,174 @@ func computeAlerts(_ *ScanResources, sf *scanFull, host models.Host, t *models.A
 	}
 
 	return alerts
+}
+
+// HostWrite carries a host create/update payload: the host row plus secrets
+// (password / linked SSH key) and relation sets. Relation pointers distinguish
+// "absent" from "present" — Create applies only non-empty sets; Update applies
+// any non-nil set (nil = leave unchanged).
+type HostWrite struct {
+	Host         models.Host
+	Tags         *[]string
+	Password     string
+	SSHKeyID     int64
+	ClearKey     bool
+	Responsaveis *[]models.HostResponsavelInput
+	Chamados     *[]models.HostChamadoInput
+	Entidades    *[]models.HostEntidadeInput
+	DNSIDs       *[]int64
+	ServiceIDs   *[]int64
+	ProjectIDs   *[]int64
+}
+
+func present[T any](p *[]T, requireNonEmpty bool) bool {
+	if p == nil {
+		return false
+	}
+	if requireNonEmpty {
+		return len(*p) > 0
+	}
+	return true
+}
+
+// Create persists a new host (already flag-normalized by the caller): the row,
+// the vault password dual-write (best-effort), relation sets, and the linked
+// SSH key. A key-link failure is returned wrapped in ErrHostKeyLink with the
+// host still created. w.Host.ID is set on success.
+func (s *HostService) Create(ctx context.Context, actorID int64, w *HostWrite) (*models.Host, error) {
+	if err := s.hosts.Create(ctx, &w.Host); err != nil {
+		return nil, err
+	}
+	if w.Password != "" {
+		if err := vault.HostSetPassword(ctx, s.db, w.Host.ID, actorID, w.Password); err != nil {
+			log.Printf("[hosts] vault password dual-write on create slug=%s: %v", w.Host.OficialSlug, err)
+		}
+	}
+	s.applyMetaRelations(ctx, w.Host.ID, w, true)
+	if w.SSHKeyID > 0 {
+		if err := s.LinkSSHKey(ctx, w.Host.ID, w.SSHKeyID, w.Host.OficialSlug); err != nil {
+			return &w.Host, fmt.Errorf("%w: %w", ErrHostKeyLink, err)
+		}
+	}
+	s.applyLinkRelations(ctx, w.Host.ID, w, true)
+	return &w.Host, nil
+}
+
+// Update persists host changes (already flag-normalized by the caller): the row,
+// vault password rotation / key clearing (best-effort), relation sets, and an
+// optional SSH-key relink. A relink failure is returned wrapped in
+// ErrHostKeyLink with the host already updated.
+func (s *HostService) Update(ctx context.Context, actorID int64, w *HostWrite) (*models.Host, error) {
+	if err := s.hosts.Update(ctx, &w.Host); err != nil {
+		return nil, err
+	}
+	if w.Password != "" {
+		if err := vault.HostSetPassword(ctx, s.db, w.Host.ID, actorID, w.Password); err != nil {
+			log.Printf("[hosts] vault password dual-write on update slug=%s: %v", w.Host.OficialSlug, err)
+		}
+	}
+	if w.ClearKey {
+		if err := vault.HostSetSSHKey(ctx, s.db, w.Host.ID, actorID, vault.HostSSHKey{}); err != nil {
+			log.Printf("[hosts] vault clear-key on update slug=%s: %v", w.Host.OficialSlug, err)
+		}
+	}
+	s.applyMetaRelations(ctx, w.Host.ID, w, false)
+	if w.SSHKeyID > 0 {
+		if err := s.LinkSSHKey(ctx, w.Host.ID, w.SSHKeyID, w.Host.OficialSlug); err != nil {
+			return &w.Host, fmt.Errorf("%w: %w", ErrHostKeyLink, err)
+		}
+	}
+	s.applyLinkRelations(ctx, w.Host.ID, w, false)
+	return &w.Host, nil
+}
+
+// Delete removes the host's tags then cascade-deletes the host (and any vault
+// secrets scoped to it) via the store cascade registry, atomically.
+func (s *HostService) Delete(ctx context.Context, actor models.ActorContext, hostID int64) error {
+	if err := s.tags.Delete(ctx, "host", hostID); err != nil {
+		return err
+	}
+	return store.DeleteParent(ctx, s.sqlDB, actor, models.SecretScopeHost, hostID)
+}
+
+// LinkSSHKey copies the encrypted key blob from the ssh_keys table into the
+// host's vault entry and flips the host's has_key flag. The key is never
+// materialized to the filesystem — key-auth decrypts the vault blob in-memory at
+// connection time. actor_user_id=0 falls through to the vault's system actor
+// (linkSSHKey runs from create/update/coolify-sync where the caller's user
+// isn't threaded down).
+func (s *HostService) LinkSSHKey(ctx context.Context, hostID, sshKeyID int64, slug string) error {
+	k, err := s.sshKeys.Get(ctx, sshKeyID)
+	if err != nil {
+		return fmt.Errorf("load ssh key %d: %w", sshKeyID, err)
+	}
+	if k == nil {
+		return fmt.Errorf("ssh key %d not found", sshKeyID)
+	}
+	if len(k.PrivKeyCiphertext) == 0 {
+		return fmt.Errorf("ssh key %q has no stored private key — add a private key to the entry or pick a different key", k.Name)
+	}
+	if err := s.hosts.UpdateKeyMeta(ctx, hostID, true, "", "yes"); err != nil {
+		return fmt.Errorf("update host key flags: %w", err)
+	}
+	priv, perr := s.db.Encryptor.Decrypt(k.PrivKeyCiphertext, k.PrivKeyNonce)
+	if perr != nil {
+		return fmt.Errorf("decrypt ssh key %d private payload: %w", sshKeyID, perr)
+	}
+	pub := ""
+	if len(k.PubKeyCiphertext) > 0 {
+		if p, derr := s.db.Encryptor.Decrypt(k.PubKeyCiphertext, k.PubKeyNonce); derr == nil {
+			pub = p
+		}
+	}
+	if vErr := vault.HostSetSSHKey(ctx, s.db, hostID, 0, vault.HostSSHKey{PrivateKeyPEM: priv, PublicKey: pub}); vErr != nil {
+		return fmt.Errorf("store host ssh key in vault: %w", vErr)
+	}
+	return nil
+}
+
+// applyMetaRelations syncs tags + responsáveis + chamados + entidades.
+// Best-effort: an individual sync failure is logged, not fatal (matching prior
+// handler behavior). requireNonEmpty selects create (len>0) vs update (non-nil)
+// semantics.
+func (s *HostService) applyMetaRelations(ctx context.Context, hostID int64, w *HostWrite, requireNonEmpty bool) {
+	if present(w.Tags, requireNonEmpty) {
+		if err := s.tags.Set(ctx, "host", hostID, *w.Tags); err != nil {
+			log.Printf("[hosts] set tags id=%d: %v", hostID, err)
+		}
+	}
+	if present(w.Responsaveis, requireNonEmpty) {
+		if err := models.SyncHostResponsaveis(s.sqlDB, hostID, *w.Responsaveis); err != nil {
+			log.Printf("[hosts] SyncHostResponsaveis id=%d: %v", hostID, err)
+		}
+	}
+	if present(w.Chamados, requireNonEmpty) {
+		if err := s.chamados.Sync(ctx, hostID, *w.Chamados); err != nil {
+			log.Printf("[hosts] SyncHostChamados id=%d: %v", hostID, err)
+		}
+	}
+	if present(w.Entidades, requireNonEmpty) {
+		if err := s.entidades.Sync(ctx, hostID, *w.Entidades); err != nil {
+			log.Printf("[hosts] SyncHostEntidades id=%d: %v", hostID, err)
+		}
+	}
+}
+
+// applyLinkRelations syncs the host's dns / service / project link sets.
+func (s *HostService) applyLinkRelations(ctx context.Context, hostID int64, w *HostWrite, requireNonEmpty bool) {
+	if present(w.DNSIDs, requireNonEmpty) {
+		if err := s.dns.SetLinksForHost(ctx, hostID, *w.DNSIDs); err != nil {
+			log.Printf("[hosts] SetHostDNSLinks id=%d: %v", hostID, err)
+		}
+	}
+	if present(w.ServiceIDs, requireNonEmpty) {
+		if err := s.services.SetServicesForHost(ctx, hostID, *w.ServiceIDs); err != nil {
+			log.Printf("[hosts] SetServicesForHost id=%d: %v", hostID, err)
+		}
+	}
+	if present(w.ProjectIDs, requireNonEmpty) {
+		if err := s.projects.SetProjectsForHost(ctx, hostID, *w.ProjectIDs); err != nil {
+			log.Printf("[hosts] SetProjectsForHost id=%d: %v", hostID, err)
+		}
+	}
 }

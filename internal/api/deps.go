@@ -35,6 +35,6 @@ func NewDeps(db *database.DB) *Deps {
 		DNS:     service.NewDNSService(db.SQL),
 		Project: service.NewProjectService(db.SQL),
 		Service: service.NewServiceService(db.SQL),
-		Host:    service.NewHostService(db.SQL),
+		Host:    service.NewHostService(db),
 	}
 }

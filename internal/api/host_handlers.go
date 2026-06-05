@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -155,17 +156,12 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Key material is attached via linkSSHKey (post-create) which writes
-	// to the unified vault. Callers cannot set a filesystem path on the
-	// host row — the vault is the source of truth so backups restore
-	// cleanly onto any machine.
+	// Flag derivation (transport-input shaping). Key material is attached via
+	// the vault by the service's SSH-key link — callers can't set a filesystem
+	// path; has_password is a cached flag for the vault payload.
 	req.Host.KeyPath = ""
 	req.Host.HasKey = false
-
-	// has_password is a cached flag; the actual password payload is
-	// stored in the vault by the post-CreateHost dual-write below.
 	req.Host.HasPassword = req.Password != ""
-
 	preferredAuth, prefErr := normalizePreferredAuth(req.Host.HasPassword, req.Host.HasKey || req.SSHKeyID > 0, req.Host.PreferredAuth)
 	if prefErr != nil {
 		jsonError(w, http.StatusBadRequest, prefErr.Error())
@@ -173,77 +169,32 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Host.PreferredAuth = preferredAuth
 
-	if err := store.NewHostRepo(h.db.SQL).Create(r.Context(), &req.Host); err != nil {
+	w2 := &service.HostWrite{
+		Host:         req.Host,
+		Password:     req.Password,
+		SSHKeyID:     req.SSHKeyID,
+		Tags:         &req.Tags,
+		Responsaveis: &req.Responsaveis,
+		Chamados:     &req.Chamados,
+		Entidades:    &req.Entidades,
+		DNSIDs:       &req.DNSIDs,
+		ServiceIDs:   &req.ServiceIDs,
+		ProjectIDs:   &req.ProjectIDs,
+	}
+	host, err := h.host.Create(r.Context(), actorID(r), w2)
+	if errors.Is(err, service.ErrHostKeyLink) {
+		jsonServerError(w, r, "host created but "+err.Error(), err)
+		return
+	}
+	if err != nil {
 		jsonServerError(w, r, "failed to create host", err)
 		return
 	}
 
-	// Stage 1 dual-write: mirror the password to the unified vault so
-	// SSH/Coolify/import handlers reading via vault.HostGetPassword see
-	// it. Stage 2 will drop the column-side write and the host row will
-	// only carry the has_password boolean.
-	if req.Password != "" {
-		actorID := actorID(r)
-		if err := vault.HostSetPassword(r.Context(), h.db, req.Host.ID, actorID, req.Password); err != nil {
-			log.Printf("[hosts] vault dual-write on create slug=%s: %v", req.OficialSlug, err)
-		}
-	}
+	// Fire-and-forget: auto-provision a default Grafana dashboard if enabled.
+	h.maybeProvisionGrafanaDashboard(*host)
 
-	if len(req.Tags) > 0 {
-		store.NewTagRepo(h.db.SQL).Set(r.Context(), "host", req.Host.ID, req.Tags)
-	}
-
-	// Sync responsaveis and chamados
-	if len(req.Responsaveis) > 0 {
-		if err := models.SyncHostResponsaveis(h.db.SQL, req.Host.ID, req.Responsaveis); err != nil {
-			log.Printf("[hosts] SyncHostResponsaveis error on create: %v", err)
-		}
-	}
-	if len(req.Chamados) > 0 {
-		if err := store.NewHostChamadoRepo(h.db.SQL).Sync(r.Context(), req.Host.ID, req.Chamados); err != nil {
-			log.Printf("[hosts] SyncHostChamados error on create: %v", err)
-		}
-	}
-	if len(req.Entidades) > 0 {
-		if err := store.NewHostEntidadeRepo(h.db.SQL).Sync(r.Context(), req.Host.ID, req.Entidades); err != nil {
-			log.Printf("[hosts] SyncHostEntidades error on create: %v", err)
-		}
-	}
-
-	// Link SSH key from DB if provided. A failure here doesn't abort host
-	// creation (the host row already exists at this point) but it MUST be
-	// surfaced to the client so the user isn't misled into thinking the key
-	// was attached. See linkSSHKey for the silent-failure modes this guards.
-	if req.SSHKeyID > 0 {
-		if linkErr := h.linkSSHKey(req.Host.ID, req.SSHKeyID, req.OficialSlug); linkErr != nil {
-			jsonServerError(w, r, "host created but ssh key link failed: "+linkErr.Error(), linkErr)
-			return
-		}
-	}
-
-	// Link DNS records and services if provided.
-	if len(req.DNSIDs) > 0 {
-		if err := store.NewDNSRepo(h.db.SQL).SetLinksForHost(r.Context(), req.Host.ID, req.DNSIDs); err != nil {
-			log.Printf("[hosts] SetHostDNSLinks error on create: %v", err)
-		}
-	}
-	if len(req.ServiceIDs) > 0 {
-		if err := store.NewServiceRepo(h.db.SQL).SetServicesForHost(r.Context(), req.Host.ID, req.ServiceIDs); err != nil {
-			log.Printf("[hosts] SetServicesForHost error on create: %v", err)
-		}
-	}
-	if len(req.ProjectIDs) > 0 {
-		if err := store.NewProjectRepo(h.db.SQL).SetProjectsForHost(r.Context(), req.Host.ID, req.ProjectIDs); err != nil {
-			log.Printf("[hosts] SetProjectsForHost error on create: %v", err)
-		}
-	}
-
-	// Fire-and-forget: if Grafana integration is fully configured, auto-provision
-	// a default dashboard for this new host in the background. Failures just log —
-	// we never block host creation on Grafana being reachable.
-	h.maybeProvisionGrafanaDashboard(req.Host)
-
-	jsonCreated(w, req.Host)
+	jsonCreated(w, *host)
 }
 
 // maybeProvisionGrafanaDashboard runs ProvisionHostDashboard in a goroutine if
@@ -296,7 +247,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	// If only ssh_key_id is provided (no host data), just link the key and return.
 	if req.SSHKeyID > 0 && req.Nickname == "" {
-		if linkErr := h.linkSSHKey(existing.ID, req.SSHKeyID, existing.OficialSlug); linkErr != nil {
+		if linkErr := h.host.LinkSSHKey(r.Context(), existing.ID, req.SSHKeyID, existing.OficialSlug); linkErr != nil {
 			jsonServerError(w, r, "failed to link ssh key: "+linkErr.Error(), linkErr)
 			return
 		}
@@ -363,76 +314,33 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Host.PreferredAuth = preferredAuth
 
-	if err := store.NewHostRepo(h.db.SQL).Update(r.Context(), &req.Host); err != nil {
+	w2 := &service.HostWrite{
+		Host:         req.Host,
+		Password:     req.Password,
+		SSHKeyID:     req.SSHKeyID,
+		ClearKey:     req.ClearKey,
+		Responsaveis: req.Responsaveis,
+		Chamados:     req.Chamados,
+		Entidades:    req.Entidades,
+		DNSIDs:       req.DNSIDs,
+		ServiceIDs:   req.ServiceIDs,
+		ProjectIDs:   req.ProjectIDs,
+	}
+	// Tags is a non-pointer slice here; apply only when present in the request.
+	if req.Tags != nil {
+		w2.Tags = &req.Tags
+	}
+	host, err := h.host.Update(r.Context(), actorID(r), w2)
+	if errors.Is(err, service.ErrHostKeyLink) {
+		jsonServerError(w, r, "host updated but "+err.Error(), err)
+		return
+	}
+	if err != nil {
 		jsonServerError(w, r, "failed to update host", err)
 		return
 	}
 
-	// Stage 1 dual-write: keep the vault row in sync. Password rotation
-	// upserts; clearing the key removes the vault row. SSH key linking
-	// (req.SSHKeyID > 0) flows through linkSSHKey which writes to vault
-	// inside that helper.
-	actorID := actorID(r)
-	if req.Password != "" {
-		if err := vault.HostSetPassword(r.Context(), h.db, existing.ID, actorID, req.Password); err != nil {
-			log.Printf("[hosts] vault dual-write on update slug=%s: %v", existing.OficialSlug, err)
-		}
-	}
-	if req.ClearKey {
-		if err := vault.HostSetSSHKey(r.Context(), h.db, existing.ID, actorID, vault.HostSSHKey{}); err != nil {
-			log.Printf("[hosts] vault clear-key on update slug=%s: %v", existing.OficialSlug, err)
-		}
-	}
-
-	if req.Tags != nil {
-		store.NewTagRepo(h.db.SQL).Set(r.Context(), "host", existing.ID, req.Tags)
-	}
-
-	// Sync responsaveis and chamados if provided
-	if req.Responsaveis != nil {
-		if err := models.SyncHostResponsaveis(h.db.SQL, existing.ID, *req.Responsaveis); err != nil {
-			log.Printf("[hosts] SyncHostResponsaveis error on update: %v", err)
-		}
-	}
-	if req.Chamados != nil {
-		if err := store.NewHostChamadoRepo(h.db.SQL).Sync(r.Context(), existing.ID, *req.Chamados); err != nil {
-			log.Printf("[hosts] SyncHostChamados error on update: %v", err)
-		}
-	}
-	if req.Entidades != nil {
-		if err := store.NewHostEntidadeRepo(h.db.SQL).Sync(r.Context(), existing.ID, *req.Entidades); err != nil {
-			log.Printf("[hosts] SyncHostEntidades error on update: %v", err)
-		}
-	}
-
-	// Link SSH key from DB if provided. Host was already updated above with
-	// the preserved key data, so this will overwrite with the selected key.
-	// Failure must be surfaced so the client knows the link didn't stick.
-	if req.SSHKeyID > 0 {
-		if linkErr := h.linkSSHKey(existing.ID, req.SSHKeyID, existing.OficialSlug); linkErr != nil {
-			jsonServerError(w, r, "host updated but ssh key link failed: "+linkErr.Error(), linkErr)
-			return
-		}
-	}
-
-	// Sync DNS and service links if provided.
-	if req.DNSIDs != nil {
-		if err := store.NewDNSRepo(h.db.SQL).SetLinksForHost(r.Context(), existing.ID, *req.DNSIDs); err != nil {
-			log.Printf("[hosts] SetHostDNSLinks error on update: %v", err)
-		}
-	}
-	if req.ServiceIDs != nil {
-		if err := store.NewServiceRepo(h.db.SQL).SetServicesForHost(r.Context(), existing.ID, *req.ServiceIDs); err != nil {
-			log.Printf("[hosts] SetServicesForHost error on update: %v", err)
-		}
-	}
-	if req.ProjectIDs != nil {
-		if err := store.NewProjectRepo(h.db.SQL).SetProjectsForHost(r.Context(), existing.ID, *req.ProjectIDs); err != nil {
-			log.Printf("[hosts] SetProjectsForHost error on update: %v", err)
-		}
-	}
-
-	jsonOK(w, req.Host)
+	jsonOK(w, *host)
 }
 
 func normalizePreferredAuth(hasPassword, hasKey bool, preferredAuth string) (string, error) {
@@ -459,9 +367,8 @@ func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store.NewTagRepo(h.db.SQL).Delete(r.Context(), "host", host.ID)
 	actor, _ := actorFrom(r)
-	if err := store.DeleteParent(r.Context(), h.db.SQL, actor, models.SecretScopeHost, host.ID); err != nil {
+	if err := h.host.Delete(r.Context(), actor, host.ID); err != nil {
 		jsonServerError(w, r, "failed to delete host", err)
 		return
 	}
@@ -503,59 +410,4 @@ func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
 		return nil, fmt.Errorf("host has no stored private key — link an SSH key via the host editor")
 	}
 	return []byte(key.PrivateKeyPEM), nil
-}
-
-// linkSSHKey copies the encrypted key blob from the ssh_keys table onto the
-// host row. It does NOT materialize the key to the filesystem — key-auth SSH
-// decrypts the blob in-memory at connection time via resolveHostKeyPEM.
-//
-// Returns an error so callers can surface linking failures instead of the
-// previous silent-return behavior that made "I selected a key but it didn't
-// save" bugs impossible to diagnose in production.
-func (h *hostHandlers) linkSSHKey(hostID, sshKeyID int64, slug string) error {
-	k, err := store.NewSSHKeyRepo(h.db.SQL).Get(context.Background(), sshKeyID)
-	if err != nil {
-		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: GetSSHKey error: %v", slug, sshKeyID, err)
-		return fmt.Errorf("load ssh key %d: %w", sshKeyID, err)
-	}
-	if k == nil {
-		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: ssh key not found", slug, sshKeyID)
-		return fmt.Errorf("ssh key %d not found", sshKeyID)
-	}
-	if len(k.PrivKeyCiphertext) == 0 {
-		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: ssh key has no private key stored (name=%q, credential_type=%q)",
-			slug, sshKeyID, k.Name, k.CredentialType)
-		return fmt.Errorf("ssh key %q has no stored private key — add a private key to the entry or pick a different key", k.Name)
-	}
-	// Update the host flag + path metadata (the encrypted payload lives
-	// in the vault). identities_only="yes" forces SSH to use only the
-	// host's linked key rather than agent or other identities.
-	if err := store.NewHostRepo(h.db.SQL).UpdateKeyMeta(context.Background(), hostID, true, "", "yes"); err != nil {
-		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: UpdateHostKeyMeta error: %v", slug, sshKeyID, err)
-		return fmt.Errorf("update host key flags: %w", err)
-	}
-
-	// Decrypt the ssh_keys row and re-seal into the host's vault entry.
-	priv, perr := h.db.Encryptor.Decrypt(k.PrivKeyCiphertext, k.PrivKeyNonce)
-	if perr != nil {
-		log.Printf("[hosts] linkSSHKey decrypt priv slug=%s: %v", slug, perr)
-		return fmt.Errorf("decrypt ssh key %d private payload: %w", sshKeyID, perr)
-	}
-	pub := ""
-	if len(k.PubKeyCiphertext) > 0 {
-		if p, derr := h.db.Encryptor.Decrypt(k.PubKeyCiphertext, k.PubKeyNonce); derr == nil {
-			pub = p
-		}
-	}
-	// actor_user_id=0 falls through to the vault's resolveSystemActor —
-	// linkSSHKey is called from several paths (create + update + sync
-	// from coolify) where the caller's user isn't easily threaded down.
-	if vErr := vault.HostSetSSHKey(context.Background(), h.db, hostID, 0,
-		vault.HostSSHKey{PrivateKeyPEM: priv, PublicKey: pub}); vErr != nil {
-		log.Printf("[hosts] linkSSHKey vault write slug=%s: %v", slug, vErr)
-		return fmt.Errorf("store host ssh key in vault: %w", vErr)
-	}
-
-	log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: linked key %q (fingerprint=%s)", slug, sshKeyID, k.Name, k.Fingerprint)
-	return nil
 }
