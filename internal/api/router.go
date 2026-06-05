@@ -124,61 +124,27 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/ssh/host-config/{slug}", authenticated(db, http.HandlerFunc(ssh.handleHostSSHConfig)))
 
 	// Graph & Dashboard
-	mux.Handle("GET /api/graph", authenticated(db, http.HandlerFunc(gh.handleGraph)))
-	mux.Handle("GET /api/dashboard", authenticated(db, http.HandlerFunc(dash.handleDashboard)))
+	gh.registerRoutes(rr)   // /api/graph
+	dash.registerRoutes(rr) // /api/dashboard
 
 	// Enums
-	mux.Handle("GET /api/enums", authenticated(db, http.HandlerFunc(eh.handleListAll)))
-	mux.Handle("GET /api/enums/{category}", authenticated(db, http.HandlerFunc(eh.handleList)))
-	mux.Handle("POST /api/enums/{category}", authedRole(db, "admin", http.HandlerFunc(eh.handleCreate)))
-	mux.Handle("PUT /api/enums/{category}/{value}", authedRole(db, "admin", http.HandlerFunc(eh.handleUpdate)))
-	mux.Handle("DELETE /api/enums/{category}/{value}", authedRole(db, "admin", http.HandlerFunc(eh.handleDelete)))
+	eh.registerRoutes(rr) // /api/enums/*
 
-	// Issues (nested under projects)
-	mux.Handle("GET /api/projects/{id}/issues", authenticated(db, http.HandlerFunc(ih.handleList)))
-	mux.Handle("POST /api/projects/{id}/issues", authedRole(db, "editor", http.HandlerFunc(ih.handleCreate)))
-	mux.Handle("PUT /api/projects/{id}/issues/{issueId}", authedRole(db, "editor", http.HandlerFunc(ih.handleUpdate)))
-	mux.Handle("PATCH /api/projects/{id}/issues/{issueId}/move", authedRole(db, "editor", http.HandlerFunc(ih.handleMove)))
-	mux.Handle("DELETE /api/projects/{id}/issues/{issueId}", authedRole(db, "admin", http.HandlerFunc(ih.handleDelete)))
-
-	// Issues by service
-	mux.Handle("GET /api/services/{id}/issues", authenticated(db, http.HandlerFunc(ih.handleListByService)))
+	// Issues (project board + by-service)
+	ih.registerRoutes(rr) // /api/projects/{id}/issues/*, /api/services/{id}/issues
 
 	// Global issues
-	mux.Handle("GET /api/issues", authenticated(db, http.HandlerFunc(gih.handleList)))
-	mux.Handle("POST /api/issues", authedRole(db, "editor", http.HandlerFunc(gih.handleCreate)))
-	mux.Handle("PUT /api/issues/{id}", authedRole(db, "editor", http.HandlerFunc(gih.handleUpdate)))
-	mux.Handle("PATCH /api/issues/{id}/move", authedRole(db, "editor", http.HandlerFunc(gih.handleMove)))
-	mux.Handle("PATCH /api/issues/{id}/archive", authedRole(db, "editor", http.HandlerFunc(gih.handleArchive)))
-	mux.Handle("DELETE /api/issues/{id}", authedRole(db, "admin", http.HandlerFunc(gih.handleDelete)))
+	gih.registerRoutes(rr) // /api/issues/*
 
 	// Releases (public GET for timeline, auth for management)
-	mux.HandleFunc("GET /api/releases", rh.handleList)
-	mux.Handle("POST /api/releases", authedRole(db, "editor", http.HandlerFunc(rh.handleCreate)))
-	mux.HandleFunc("GET /api/releases/{id}", rh.handleGet)
-	mux.Handle("PUT /api/releases/{id}", authedRole(db, "editor", http.HandlerFunc(rh.handleUpdate)))
-	mux.Handle("DELETE /api/releases/{id}", authedRole(db, "admin", http.HandlerFunc(rh.handleDelete)))
+	rh.registerRoutes(rr) // /api/releases/*
 
-	// External tools
-	mux.Handle("GET /api/tools", authenticated(db, http.HandlerFunc(th.handleList)))
-	mux.Handle("POST /api/tools", authedRole(db, "admin", http.HandlerFunc(th.handleCreate)))
-	mux.Handle("POST /api/tools/sync-service", authedRole(db, "admin", http.HandlerFunc(th.handleSyncFromService)))
-	mux.Handle("DELETE /api/tools/sync-service/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleUnsyncService)))
-	mux.Handle("GET /api/tools/{id}", authenticated(db, http.HandlerFunc(th.handleGet)))
-	// (Legacy /api/tools/{id}/credentials* removed in Phase 1 cutover —
-	// callers query /api/secrets?scope=service&parent_id=<tool.service_id>.)
-	mux.Handle("PUT /api/tools/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleUpdate)))
-	mux.Handle("DELETE /api/tools/{id}", authedRole(db, "admin", http.HandlerFunc(th.handleDelete)))
-	mux.Handle("POST /api/tools/{id}/restore", authedRole(db, "admin", http.HandlerFunc(th.handleRestore)))
+	// External tools (legacy /api/tools/{id}/credentials* removed in Phase 1 —
+	// callers query /api/secrets?scope=service&parent_id=<tool.service_id>).
+	th.registerRoutes(rr) // /api/tools/*
 
-	// App settings (appearance)
-	// GET is public (no auth) so login/setup pages can load branding
-	mux.HandleFunc("GET /api/settings/appearance", sth.handleGetAppearance)
-	mux.Handle("PUT /api/settings/appearance", authedRole(db, "admin", http.HandlerFunc(sth.handleUpdateAppearance)))
-	mux.Handle("POST /api/settings/appearance/logo", authedRole(db, "admin", http.HandlerFunc(sth.handleUploadLogo)))
-	mux.Handle("DELETE /api/settings/appearance/logo", authedRole(db, "admin", http.HandlerFunc(sth.handleDeleteLogo)))
-	mux.Handle("GET /api/settings/alerts", authenticated(db, http.HandlerFunc(sth.handleGetAlertThresholds)))
-	mux.Handle("PUT /api/settings/alerts", authedRole(db, "admin", http.HandlerFunc(sth.handleUpdateAlertThresholds)))
+	// App settings (appearance + alert thresholds)
+	sth.registerRoutes(rr) // /api/settings/appearance*, /api/settings/alerts
 
 	// Integration settings (admin only)
 	mux.Handle("GET /api/settings/integrations", authedRole(db, "admin", http.HandlerFunc(ish.handleGetIntegrations)))
@@ -214,12 +180,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/projects/{id}/gitlab/commits", authenticated(db, http.HandlerFunc(pglh.handleListCommits)))
 
 	// AI / LLM integration
-	mux.Handle("GET /api/ai/status", authenticated(db, http.HandlerFunc(aih.handleStatus)))
-	mux.Handle("POST /api/ai/assist/issue", authedPermission(db, "ai.use", http.HandlerFunc(aih.handleAssistIssue)))
-	mux.Handle("POST /api/ai/assist/host-doc", authedPermission(db, "ai.use", http.HandlerFunc(aih.handleAssistHostDoc)))
-	mux.Handle("POST /api/ai/chat", authedPermission(db, "ai.use", http.HandlerFunc(aih.handleChat)))
-	mux.Handle("GET /api/projects/{id}/ai/analyze", authenticated(db, http.HandlerFunc(aih.handleGetProjectAnalysis)))
-	mux.Handle("POST /api/projects/{id}/ai/analyze", authedPermission(db, "ai.use", http.HandlerFunc(aih.handleAnalyzeProject)))
+	aih.registerRoutes(rr) // /api/ai/*, /api/projects/{id}/ai/analyze
 
 	// Grafana integration
 	mux.Handle("GET /api/grafana/embed-url", authenticated(db, http.HandlerFunc(grh.handleEmbedURL)))
@@ -281,26 +242,16 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("POST /api/coolify/keys/{id}/sync", authedRole(db, "admin", http.HandlerFunc(clh.handleSyncKey)))
 
 	// Contacts
-	mux.Handle("GET /api/contacts", authenticated(db, http.HandlerFunc(ch.handleList)))
-	mux.Handle("POST /api/contacts", authedRole(db, "editor", http.HandlerFunc(ch.handleCreate)))
-	mux.Handle("PUT /api/contacts/{id}", authedRole(db, "editor", http.HandlerFunc(ch.handleUpdate)))
-	mux.Handle("DELETE /api/contacts/{id}", authedRole(db, "admin", http.HandlerFunc(ch.handleDelete)))
+	ch.registerRoutes(rr) // /api/contacts/*
 
 	// SSH Keys (managed in DB)
-	mux.Handle("GET /api/ssh-keys", authenticated(db, http.HandlerFunc(skh.handleList)))
-	mux.Handle("POST /api/ssh-keys", authedRole(db, "editor", http.HandlerFunc(skh.handleCreate)))
-	mux.Handle("GET /api/ssh-keys/{id}", authenticated(db, http.HandlerFunc(skh.handleGet)))
-	mux.Handle("PUT /api/ssh-keys/{id}", authedRole(db, "editor", http.HandlerFunc(skh.handleUpdate)))
-	mux.Handle("DELETE /api/ssh-keys/{id}", authedRole(db, "admin", http.HandlerFunc(skh.handleDelete)))
+	skh.registerRoutes(rr) // /api/ssh-keys/*
 
 	// Bulk import (admin only)
-	mux.Handle("POST /api/import", authedRole(db, "admin", http.HandlerFunc(imh.handleImport)))
-	mux.Handle("POST /api/import/hosts", authedRole(db, "admin", http.HandlerFunc(imh.handleImportHosts)))
-	mux.Handle("POST /api/import/dns", authedRole(db, "admin", http.HandlerFunc(imh.handleImportDNS)))
+	imh.registerRoutes(rr) // /api/import/*
 
 	// Database backup/restore (admin only)
-	mux.Handle("GET /api/backup", authedRole(db, "admin", http.HandlerFunc(bkh.handleBackup)))
-	mux.Handle("POST /api/restore", authedRole(db, "admin", http.HandlerFunc(bkh.handleRestore)))
+	bkh.registerRoutes(rr) // /api/backup, /api/restore
 
 	// Tags
 	mux.Handle("GET /api/tags", authenticated(db, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

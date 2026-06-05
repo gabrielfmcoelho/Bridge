@@ -78,3 +78,9 @@ func dialectString(k database.DialectKind) string {
 	}
 	return "sqlite"
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *backupHandlers) registerRoutes(rr routeRegistrar) {
+	rr.role("admin", "GET /api/backup", h.handleBackup)
+	rr.role("admin", "POST /api/restore", h.handleRestore)
+}

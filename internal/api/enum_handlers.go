@@ -93,3 +93,12 @@ func (h *enumHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *enumHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/enums", h.handleListAll)
+	rr.auth("GET /api/enums/{category}", h.handleList)
+	rr.role("admin", "POST /api/enums/{category}", h.handleCreate)
+	rr.role("admin", "PUT /api/enums/{category}/{value}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/enums/{category}/{value}", h.handleDelete)
+}

@@ -255,3 +255,15 @@ func (h *toolHandlers) handleUnsyncService(w http.ResponseWriter, r *http.Reques
 // Legacy tool credential handlers were removed in the Phase 1 cutover.
 // Callers query /api/secrets?scope=service&parent_id=<tool.service_id> for
 // list, and /api/secrets/{id}/reveal for plaintext.
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *toolHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/tools", h.handleList)
+	rr.role("admin", "POST /api/tools", h.handleCreate)
+	rr.role("admin", "POST /api/tools/sync-service", h.handleSyncFromService)
+	rr.role("admin", "DELETE /api/tools/sync-service/{id}", h.handleUnsyncService)
+	rr.auth("GET /api/tools/{id}", h.handleGet)
+	rr.role("admin", "PUT /api/tools/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/tools/{id}", h.handleDelete)
+	rr.role("admin", "POST /api/tools/{id}/restore", h.handleRestore)
+}

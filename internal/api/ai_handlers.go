@@ -418,3 +418,13 @@ func (h *aiHandlers) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	jsonOK(w, map[string]string{"response": result})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *aiHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/ai/status", h.handleStatus)
+	rr.perm("ai.use", "POST /api/ai/assist/issue", h.handleAssistIssue)
+	rr.perm("ai.use", "POST /api/ai/assist/host-doc", h.handleAssistHostDoc)
+	rr.perm("ai.use", "POST /api/ai/chat", h.handleChat)
+	rr.auth("GET /api/projects/{id}/ai/analyze", h.handleGetProjectAnalysis)
+	rr.perm("ai.use", "POST /api/projects/{id}/ai/analyze", h.handleAnalyzeProject)
+}

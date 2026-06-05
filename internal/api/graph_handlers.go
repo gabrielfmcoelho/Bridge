@@ -156,3 +156,8 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		"edges": edges,
 	})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *graphHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/graph", h.handleGraph)
+}

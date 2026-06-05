@@ -200,3 +200,10 @@ func (h *importHandlers) handleImport(w http.ResponseWriter, r *http.Request) {
 
 	jsonError(w, http.StatusBadRequest, "expected JSON object with 'type' ('hosts' or 'dns') and 'data' (array) fields")
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *importHandlers) registerRoutes(rr routeRegistrar) {
+	rr.role("admin", "POST /api/import", h.handleImport)
+	rr.role("admin", "POST /api/import/hosts", h.handleImportHosts)
+	rr.role("admin", "POST /api/import/dns", h.handleImportDNS)
+}

@@ -260,3 +260,12 @@ func (h *sshKeyHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *sshKeyHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/ssh-keys", h.handleList)
+	rr.role("editor", "POST /api/ssh-keys", h.handleCreate)
+	rr.auth("GET /api/ssh-keys/{id}", h.handleGet)
+	rr.role("editor", "PUT /api/ssh-keys/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/ssh-keys/{id}", h.handleDelete)
+}

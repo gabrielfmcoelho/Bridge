@@ -167,3 +167,13 @@ func (h *issueHandlers) handleListByService(w http.ResponseWriter, r *http.Reque
 
 	jsonOK(w, issues)
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *issueHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/projects/{id}/issues", h.handleList)
+	rr.role("editor", "POST /api/projects/{id}/issues", h.handleCreate)
+	rr.role("editor", "PUT /api/projects/{id}/issues/{issueId}", h.handleUpdate)
+	rr.role("editor", "PATCH /api/projects/{id}/issues/{issueId}/move", h.handleMove)
+	rr.role("admin", "DELETE /api/projects/{id}/issues/{issueId}", h.handleDelete)
+	rr.auth("GET /api/services/{id}/issues", h.handleListByService)
+}

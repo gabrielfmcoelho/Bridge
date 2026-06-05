@@ -135,3 +135,12 @@ func (h *releaseHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *releaseHandlers) registerRoutes(rr routeRegistrar) {
+	rr.public("GET /api/releases", h.handleList)
+	rr.role("editor", "POST /api/releases", h.handleCreate)
+	rr.public("GET /api/releases/{id}", h.handleGet)
+	rr.role("editor", "PUT /api/releases/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/releases/{id}", h.handleDelete)
+}

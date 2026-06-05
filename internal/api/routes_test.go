@@ -36,6 +36,21 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/orchestrators"},
 		{"GET", "/api/users"},
 		{"GET", "/api/auth/me"},
+		{"GET", "/api/graph"},
+		{"GET", "/api/dashboard"},
+		{"GET", "/api/enums"},
+		{"GET", "/api/projects/1/issues"},
+		{"GET", "/api/services/1/issues"},
+		{"GET", "/api/issues"},
+		{"POST", "/api/releases"},
+		{"GET", "/api/tools"},
+		{"GET", "/api/settings/alerts"},
+		{"GET", "/api/contacts"},
+		{"GET", "/api/ssh-keys"},
+		{"POST", "/api/import"},
+		{"GET", "/api/backup"},
+		{"GET", "/api/ai/status"},
+		{"POST", "/api/ai/chat"},
 	}
 	for _, rt := range protected {
 		rec := httptest.NewRecorder()
@@ -51,6 +66,8 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 	// Public routes must be reachable without auth (not 401, not 404).
 	public := []struct{ method, path string }{
 		{"GET", "/api/auth/status"},
+		{"GET", "/api/releases"},
+		{"GET", "/api/settings/appearance"},
 	}
 	for _, rt := range public {
 		rec := httptest.NewRecorder()

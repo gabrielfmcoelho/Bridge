@@ -41,3 +41,8 @@ func (h *dashboardHandlers) handleDashboard(w http.ResponseWriter, r *http.Reque
 		"open_issues":    openIssues,
 	})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *dashboardHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/dashboard", h.handleDashboard)
+}

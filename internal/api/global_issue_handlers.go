@@ -264,3 +264,13 @@ func (h *globalIssueHandlers) handleDelete(w http.ResponseWriter, r *http.Reques
 
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *globalIssueHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/issues", h.handleList)
+	rr.role("editor", "POST /api/issues", h.handleCreate)
+	rr.role("editor", "PUT /api/issues/{id}", h.handleUpdate)
+	rr.role("editor", "PATCH /api/issues/{id}/move", h.handleMove)
+	rr.role("editor", "PATCH /api/issues/{id}/archive", h.handleArchive)
+	rr.role("admin", "DELETE /api/issues/{id}", h.handleDelete)
+}

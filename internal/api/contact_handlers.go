@@ -70,3 +70,11 @@ func (h *contactHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *contactHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/contacts", h.handleList)
+	rr.role("editor", "POST /api/contacts", h.handleCreate)
+	rr.role("editor", "PUT /api/contacts/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/contacts/{id}", h.handleDelete)
+}

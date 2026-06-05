@@ -130,3 +130,14 @@ func (h *settingsHandlers) handleDeleteLogo(w http.ResponseWriter, r *http.Reque
 	}
 	jsonOK(w, map[string]string{"status": "ok"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *settingsHandlers) registerRoutes(rr routeRegistrar) {
+	// GET appearance is public so login/setup pages can load branding.
+	rr.public("GET /api/settings/appearance", h.handleGetAppearance)
+	rr.role("admin", "PUT /api/settings/appearance", h.handleUpdateAppearance)
+	rr.role("admin", "POST /api/settings/appearance/logo", h.handleUploadLogo)
+	rr.role("admin", "DELETE /api/settings/appearance/logo", h.handleDeleteLogo)
+	rr.auth("GET /api/settings/alerts", h.handleGetAlertThresholds)
+	rr.role("admin", "PUT /api/settings/alerts", h.handleUpdateAlertThresholds)
+}
