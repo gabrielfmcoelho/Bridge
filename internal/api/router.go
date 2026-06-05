@@ -3,12 +3,9 @@ package api
 import (
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth/providers"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	glpiclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/glpi"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -16,49 +13,41 @@ import (
 func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux := http.NewServeMux()
 
-	// Build the auth provider registry.
-	registry := auth.NewProviderRegistry()
-	registry.Register(providers.NewLocalProvider(db.SQL))
-	registry.Register(providers.NewLDAPProvider(db.SQL, db.Encryptor))
-	registry.Register(providers.NewKeycloakProvider(db.SQL, db.Encryptor))
-	registry.Register(providers.NewGitLabProvider(db.SQL, db.Encryptor))
-
-	// DI container: shared singletons + domain services (Phase 2). Converted
-	// handlers pull their service from here; the rest still take deps.DB.
-	deps := NewDeps(db)
-
-	ah := &authHandlers{db: db, registry: registry}
-	hh := &hostHandlers{host: deps.Host, db: db}
-	dh := &dnsHandlers{dns: deps.DNS}
-	ph := &projectHandlers{project: deps.Project}
-	sh := &serviceHandlers{service: deps.Service, db: db}
-	oh := &orchestratorHandlers{db: db}
-	ssh := &sshHandlers{db: db, configPath: configPath}
-	gh := &graphHandlers{db: db}
-	dash := &dashboardHandlers{db: db}
-	eh := &enumHandlers{enum: store.NewEnumOptionRepo(db.SQL)}
-	sth := &settingsHandlers{db: db}
-	ih := &issueHandlers{db: db}
-	rh := &releaseHandlers{db: db}
-	th := &toolHandlers{db: db}
-	ch := &contactHandlers{contacts: store.NewContactRepo(db.SQL)}
-	skh := &sshKeyHandlers{db: db}
-	imh := &importHandlers{db: db}
-	bkh := &backupHandlers{db: db}
-	gih := &globalIssueHandlers{db: db}
-	hah := &hostAlertHandlers{db: db}
-	hch := &hostChamadoHandlers{db: db}
-	ish := &integrationSettingsHandlers{db: db, registry: registry}
-	oah := &oauthHandlers{db: db, registry: registry, ah: ah}
-	glh := &gitlabHandlers{db: db}
-	pglh := &projectGitLabHandlers{db: db}
-	aih := &aiHandlers{db: db}
-	clh := &coolifyHandlers{db: db}
-	grh := &grafanaHandlers{db: db}
-	gwh := &grafanaWebhookHandlers{db: db}
-	olh := &outlineHandlers{db: db}
-	glpiSessionCache := glpiclient.NewSessionCache(30 * time.Minute)
-	glpih := &glpiHandlers{db: db, cache: glpiSessionCache}
+	// Wire the whole graph once (db → registry → deps → handlers), then bind the
+	// short names the route table below uses to the container's handler fields.
+	app := newApp(db, configPath)
+	deps := app.deps
+	ah := app.auth
+	hh := app.host
+	dh := app.dns
+	ph := app.project
+	sh := app.service
+	oh := app.orchestrator
+	ssh := app.ssh
+	gh := app.graph
+	dash := app.dashboard
+	eh := app.enum
+	sth := app.settings
+	ih := app.issue
+	rh := app.release
+	th := app.tool
+	ch := app.contact
+	skh := app.sshKey
+	imh := app.importH
+	bkh := app.backup
+	gih := app.globalIssue
+	hah := app.hostAlert
+	hch := app.hostChamado
+	ish := app.integrationSettings
+	oah := app.oauth
+	glh := app.gitlab
+	pglh := app.projectGitlab
+	aih := app.ai
+	clh := app.coolify
+	grh := app.grafana
+	gwh := app.grafanaWebhook
+	olh := app.outline
+	glpih := app.glpi
 
 	// Auth routes (no auth required)
 	mux.HandleFunc("GET /api/auth/status", ah.handleStatus)
