@@ -67,7 +67,7 @@ func (h *sshHandlers) logOperation(r *http.Request, hostID int64, opType string,
 // writes an HTTP error if not found.
 func (h *sshHandlers) requireHost(w http.ResponseWriter, r *http.Request) *models.Host {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return nil
@@ -166,7 +166,7 @@ func (h *sshHandlers) dial(w http.ResponseWriter, host *models.Host, user string
 
 // handlePreviewConfig renders the SSH config that would be generated.
 func (h *sshHandlers) handlePreviewConfig(w http.ResponseWriter, r *http.Request) {
-	hosts, err := models.ListHostsForSSHConfig(h.db.SQL)
+	hosts, err := store.NewHostRepo(h.db.SQL).ListForSSHConfig(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load hosts", err)
 		return
@@ -180,7 +180,7 @@ func (h *sshHandlers) handlePreviewConfig(w http.ResponseWriter, r *http.Request
 
 // handleGenerateConfig writes the SSH config file from DB data.
 func (h *sshHandlers) handleGenerateConfig(w http.ResponseWriter, r *http.Request) {
-	hosts, err := models.ListHostsForSSHConfig(h.db.SQL)
+	hosts, err := store.NewHostRepo(h.db.SQL).ListForSSHConfig(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load hosts", err)
 		return
@@ -241,7 +241,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 	if dialErr != nil {
 		host.ConnectionsFailed++
 		setTestStatus("failed")
-		models.UpdateHost(h.db.SQL, host)
+		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 		h.logOperation(r, host.ID, "test", &method, "failed", dialErr.Error())
 		jsonOK(w, map[string]any{"success": false, "error": "SSH connect: " + dialErr.Error()})
 		return
@@ -255,7 +255,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		if testErr != nil {
 			host.ConnectionsFailed++
 			setTestStatus("failed")
-			models.UpdateHost(h.db.SQL, host)
+			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
 			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
 			return
@@ -310,7 +310,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		}
 
 		if updated {
-			models.UpdateHost(h.db.SQL, host)
+			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 		}
 		h.logOperation(r, host.ID, "test", &method, "success", "")
 		// Annotate scanned SSH keys with managed status from DB
@@ -356,7 +356,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		if testErr != nil {
 			host.ConnectionsFailed++
 			setTestStatus("failed")
-			models.UpdateHost(h.db.SQL, host)
+			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
 			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
 			return
@@ -366,7 +366,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 			host.ConnectionsFailed = 0
 		}
 		setTestStatus("success")
-		models.UpdateHost(h.db.SQL, host)
+		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 		h.logOperation(r, host.ID, "test", &method, "success", "")
 	}
 
@@ -624,7 +624,7 @@ func (h *sshHandlers) handleDockerLogsApplyRotation(w http.ResponseWriter, r *ht
 // handleSetupKey sets up an SSH key for a host.
 func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -696,7 +696,7 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	// Flag bookkeeping + vault write. identities_only="yes" forces SSH to
 	// use the host's linked key only. key_path is empty — keys live only
 	// in the unified vault, never on the filesystem.
-	_ = models.UpdateHostKeyMeta(h.db.SQL, host.ID, true, "", "yes")
+	_ = store.NewHostRepo(h.db.SQL).UpdateKeyMeta(r.Context(), host.ID, true, "", "yes")
 	if vErr := vault.HostSetSSHKey(r.Context(), h.db, host.ID, actorID(r),
 		vault.HostSSHKey{PrivateKeyPEM: string(result.PrivKeyPEM), PublicKey: result.PubKeyLine}); vErr != nil {
 		log.Printf("[ssh] setup-key vault write slug=%s: %v", host.OficialSlug, vErr)
@@ -720,7 +720,7 @@ func (h *sshHandlers) handleListKeys(w http.ResponseWriter, r *http.Request) {
 
 // handleDownloadConfig returns the SSH config as a downloadable file.
 func (h *sshHandlers) handleDownloadConfig(w http.ResponseWriter, r *http.Request) {
-	hosts, err := models.ListHostsForSSHConfig(h.db.SQL)
+	hosts, err := store.NewHostRepo(h.db.SQL).ListForSSHConfig(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load hosts", err)
 		return
@@ -977,7 +977,7 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 	if opErr != nil {
 		s := "failed"
 		host.DockerGroupStatus = &s
-		models.UpdateHost(h.db.SQL, host)
+		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 		h.logOperation(r, host.ID, "docker-setup", &method, "failed", opErr.Error())
 		jsonOK(w, map[string]any{"success": false, "error": opErr.Error()})
 		return
@@ -996,7 +996,7 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 		dockerStatus = "needs_sudo"
 	}
 	host.DockerGroupStatus = &dockerStatus
-	models.UpdateHost(h.db.SQL, host)
+	store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 
 	logStatus := "success"
 	if status.NeedsSudo && !status.GroupFixApplied {
@@ -1213,7 +1213,7 @@ func (h *sshHandlers) resolveIdentityFile(host *models.Host) string {
 // handleHostSSHConfig returns the SSH config snippet for a single host.
 func (h *sshHandlers) handleHostSSHConfig(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -1245,7 +1245,7 @@ func (h *sshHandlers) handleHostSSHConfig(w http.ResponseWriter, r *http.Request
 // handleOperationLogs returns operation logs for a host.
 func (h *sshHandlers) handleOperationLogs(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return

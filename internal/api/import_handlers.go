@@ -70,7 +70,7 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 		}
 
 		// Check slug uniqueness
-		exists, _ := models.HostSlugExists(h.db.SQL, item.OficialSlug, 0)
+		exists, _ := store.NewHostRepo(h.db.SQL).SlugExists(r.Context(), item.OficialSlug, 0)
 		if exists {
 			result.Skipped++
 			result.Errors = append(result.Errors, importItemResult{Index: i, Name: name, Error: "slug already exists (skipped)"})
@@ -92,7 +92,7 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 		item.Host.PreferredAuth = preferredAuth
 
 		// Create host
-		if err := models.CreateHost(h.db.SQL, &item.Host); err != nil {
+		if err := store.NewHostRepo(h.db.SQL).Create(r.Context(), &item.Host); err != nil {
 			result.Failed++
 			result.Errors = append(result.Errors, importItemResult{Index: i, Name: name, Error: fmt.Sprintf("create failed: %v", err)})
 			continue

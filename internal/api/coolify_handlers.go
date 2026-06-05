@@ -89,7 +89,7 @@ func (h *coolifyHandlers) handleTestConnection(w http.ResponseWriter, r *http.Re
 // handleGetServerStatus fetches the current status of a host's linked Coolify server.
 func (h *coolifyHandlers) handleGetServerStatus(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -119,7 +119,7 @@ func (h *coolifyHandlers) handleGetServerStatus(w http.ResponseWriter, r *http.R
 // handleCheckHost searches Coolify for a server matching this host's IP.
 func (h *coolifyHandlers) handleCheckHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -140,7 +140,7 @@ func (h *coolifyHandlers) handleCheckHost(w http.ResponseWriter, r *http.Request
 
 	if server != nil {
 		// Store the UUID on the host for future operations
-		models.SetHostCoolifyUUID(h.db.SQL, host.ID, &server.UUID)
+		store.NewHostRepo(h.db.SQL).SetCoolifyUUID(r.Context(), host.ID, &server.UUID)
 		h.logOp(r, host.ID, "coolify-check", "success", fmt.Sprintf("found server %s (%s)", server.UUID, server.Name))
 		jsonOK(w, map[string]any{"found": true, "server": server})
 		return
@@ -280,7 +280,7 @@ func coolifyManagedKeyName(k *models.SSHKey) string {
 // handleRegisterHost uploads the chosen SSH key and creates a server in Coolify.
 func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -341,7 +341,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	models.SetHostCoolifyUUID(h.db.SQL, host.ID, &serverUUID)
+	store.NewHostRepo(h.db.SQL).SetCoolifyUUID(r.Context(), host.ID, &serverUUID)
 	h.logOp(r, host.ID, "coolify-register", "success", fmt.Sprintf("created server %s with key %s", serverUUID, privateKeyUUID))
 	jsonOK(w, map[string]any{"uuid": serverUUID})
 }
@@ -349,7 +349,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 // handleValidateHost triggers Coolify server validation.
 func (h *coolifyHandlers) handleValidateHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -380,7 +380,7 @@ func (h *coolifyHandlers) handleValidateHost(w http.ResponseWriter, r *http.Requ
 // match), then PATCHes the server with the new key's UUID.
 func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -434,7 +434,7 @@ func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.R
 // handleSyncHost updates the Coolify server with current host info.
 func (h *coolifyHandlers) handleSyncHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -479,7 +479,7 @@ func (h *coolifyHandlers) handleSyncHost(w http.ResponseWriter, r *http.Request)
 // handleDeleteHost removes the server from Coolify and clears the UUID.
 func (h *coolifyHandlers) handleDeleteHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -502,7 +502,7 @@ func (h *coolifyHandlers) handleDeleteHost(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	models.SetHostCoolifyUUID(h.db.SQL, host.ID, nil)
+	store.NewHostRepo(h.db.SQL).SetCoolifyUUID(r.Context(), host.ID, nil)
 	h.logOp(r, host.ID, "coolify-delete", "success", "deleted server "+uuid)
 	jsonOK(w, map[string]any{"success": true})
 }

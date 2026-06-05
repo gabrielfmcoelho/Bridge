@@ -13,11 +13,11 @@ type dashboardHandlers struct {
 }
 
 func (h *dashboardHandlers) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	hostCount, _ := models.HostCount(h.db.SQL)
-	hostBySituacao, _ := models.HostCountBySituacao(h.db.SQL)
-	hostByHospedagem, _ := models.HostCountByHospedagem(h.db.SQL)
+	hostCount, _ := store.NewHostRepo(h.db.SQL).CountAll(r.Context())
+	hostBySituacao, _ := store.NewHostRepo(h.db.SQL).CountBySituacao(r.Context())
+	hostByHospedagem, _ := store.NewHostRepo(h.db.SQL).CountByHospedagem(r.Context())
 	hostsWithScans, _ := store.NewHostScanRepo(h.db.SQL).CountHostsWithScans(r.Context())
-	hostsMaintenance, _ := models.HostsNeedingMaintenanceCount(h.db.SQL)
+	hostsMaintenance, _ := store.NewHostRepo(h.db.SQL).NeedingMaintenanceCount(r.Context())
 	recentScans, _ := store.NewHostScanRepo(h.db.SQL).RecentWithHost(r.Context(), 5)
 	dnsCount, _ := store.NewDNSRepo(h.db.SQL).Count(r.Context())
 	projectCount, _ := store.NewProjectRepo(h.db.SQL).Count(r.Context())

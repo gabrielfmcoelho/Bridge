@@ -45,7 +45,7 @@ func (h *grafanaHandlers) handleEmbedURL(w http.ResponseWriter, r *http.Request)
 
 	switch entity {
 	case "host":
-		host, err := models.GetHostBySlug(h.db.SQL, id)
+		host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), id)
 		if err != nil {
 			jsonServerError(w, r, "host lookup failed", err)
 			return
@@ -148,7 +148,7 @@ type hostLiveMetrics struct {
 // as an external label, so all selectors use {host=<slug>}.
 func (h *grafanaHandlers) handleHostLiveMetrics(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil {
 		jsonServerError(w, r, "host lookup failed", err)
 		return
@@ -318,7 +318,7 @@ func ProvisionHostDashboard(ctx context.Context, db *database.DB, host *models.H
 
 	// Persist the UID so the Metrics tab picks it up immediately.
 	host.GrafanaDashboardUID = returnedUID
-	if err := models.UpdateHost(db.SQL, host); err != nil {
+	if err := store.NewHostRepo(db.SQL).Update(ctx, host); err != nil {
 		log.Printf("[grafana-provision] host %d: uploaded dashboard %s but failed to persist UID: %v", host.ID, returnedUID, err)
 	}
 	return returnedUID, nil
@@ -377,7 +377,7 @@ func ProvisionServiceDashboard(ctx context.Context, db *database.DB, svc *models
 // default dashboard" button in the host form. Synchronous; returns the new UID.
 func (h *grafanaHandlers) handleProvisionHostDashboard(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil {
 		jsonServerError(w, r, "host lookup failed", err)
 		return

@@ -118,7 +118,7 @@ func (h *aiHandlers) handleAssistHostDoc(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Fetch host data.
-	host, err := models.GetHostBySlug(h.db.SQL, req.HostSlug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), req.HostSlug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return

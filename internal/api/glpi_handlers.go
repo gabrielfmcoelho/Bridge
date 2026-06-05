@@ -427,7 +427,7 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 
 	// Optional link to a GLPI Computer asset (matched by slug or hostname).
 	if req.HostSlug != "" && req.LinkComputer {
-		host, _ := models.GetHostBySlug(h.db.SQL, req.HostSlug)
+		host, _ := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), req.HostSlug)
 		if host != nil {
 			if comp, cerr := client.FindComputerByName(ctx, session, host.OficialSlug); cerr == nil && comp != nil {
 				if lerr := client.LinkComputerToTicket(ctx, session, ticketID, comp.ID); lerr == nil {
@@ -441,7 +441,7 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 
 	// Persist as host_chamado when we have a host context.
 	if req.HostSlug != "" {
-		host, _ := models.GetHostBySlug(h.db.SQL, req.HostSlug)
+		host, _ := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), req.HostSlug)
 		if host != nil {
 			userID := int64(0)
 			if u := auth.UserFromContext(r.Context()); u != nil {
@@ -489,7 +489,7 @@ func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.
 		jsonBadRequest(w, r, "invalid chamado id", err)
 		return
 	}
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -1521,7 +1521,7 @@ func parseRange(s string) (int, int, bool) {
 // chamado block on the host detail page.
 func (h *glpiHandlers) handleListHostTickets(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return

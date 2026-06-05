@@ -25,7 +25,7 @@ var listCmd = &cobra.Command{
 		}
 		defer db.Close()
 
-		hosts, err := models.ListHosts(db.SQL, models.HostFilter{})
+		hosts, err := store.NewHostRepo(db.SQL).List(context.Background(), models.HostFilter{})
 		if err != nil {
 			return fmt.Errorf("listing hosts: %w", err)
 		}

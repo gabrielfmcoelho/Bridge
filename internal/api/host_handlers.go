@@ -158,7 +158,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hosts, err := models.ListHosts(h.db.SQL, f)
+	hosts, err := store.NewHostRepo(h.db.SQL).List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "failed to list hosts", err)
 		return
@@ -332,7 +332,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 
 	// If paginated, wrap in envelope with total count
 	if f.PerPage > 0 {
-		total, _ := models.CountHosts(h.db.SQL, f)
+		total, _ := store.NewHostRepo(h.db.SQL).Count(r.Context(), f)
 		totalPages := (total + f.PerPage - 1) / f.PerPage
 		page := f.Page
 		if page < 1 {
@@ -353,7 +353,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 
 func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil {
 		jsonServerError(w, r, "database error", err)
 		return
@@ -409,7 +409,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, _ := models.HostSlugExists(h.db.SQL, req.OficialSlug, 0)
+	exists, _ := store.NewHostRepo(h.db.SQL).SlugExists(r.Context(), req.OficialSlug, 0)
 	if exists {
 		jsonError(w, http.StatusConflict, "slug already exists")
 		return
@@ -433,7 +433,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Host.PreferredAuth = preferredAuth
 
-	if err := models.CreateHost(h.db.SQL, &req.Host); err != nil {
+	if err := store.NewHostRepo(h.db.SQL).Create(r.Context(), &req.Host); err != nil {
 		jsonServerError(w, r, "failed to create host", err)
 		return
 	}
@@ -529,7 +529,7 @@ func (h *hostHandlers) maybeProvisionGrafanaDashboard(host models.Host) {
 
 func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	existing, err := models.GetHostBySlug(h.db.SQL, slug)
+	existing, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || existing == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -560,12 +560,12 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 			jsonServerError(w, r, "failed to link ssh key: "+linkErr.Error(), linkErr)
 			return
 		}
-		updatedHost, getErr := models.GetHostByID(h.db.SQL, existing.ID)
+		updatedHost, getErr := store.NewHostRepo(h.db.SQL).GetByID(r.Context(), existing.ID)
 		if getErr == nil && updatedHost != nil {
 			preferredAuth, normErr := normalizePreferredAuth(updatedHost.HasPassword, updatedHost.HasKey, updatedHost.PreferredAuth)
 			if normErr == nil && preferredAuth != updatedHost.PreferredAuth {
 				updatedHost.PreferredAuth = preferredAuth
-				_ = models.UpdateHost(h.db.SQL, updatedHost)
+				_ = store.NewHostRepo(h.db.SQL).Update(r.Context(), updatedHost)
 			}
 		}
 		jsonOK(w, existing)
@@ -582,7 +582,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Host.OficialSlug != existing.OficialSlug {
-		exists, slugErr := models.HostSlugExists(h.db.SQL, req.Host.OficialSlug, existing.ID)
+		exists, slugErr := store.NewHostRepo(h.db.SQL).SlugExists(r.Context(), req.Host.OficialSlug, existing.ID)
 		if slugErr != nil {
 			jsonServerError(w, r, "failed to validate slug", slugErr)
 			return
@@ -623,7 +623,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Host.PreferredAuth = preferredAuth
 
-	if err := models.UpdateHost(h.db.SQL, &req.Host); err != nil {
+	if err := store.NewHostRepo(h.db.SQL).Update(r.Context(), &req.Host); err != nil {
 		jsonServerError(w, r, "failed to update host", err)
 		return
 	}
@@ -713,7 +713,7 @@ func normalizePreferredAuth(hasPassword, hasKey bool, preferredAuth string) (str
 
 func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -730,7 +730,7 @@ func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 func (h *hostHandlers) handleGetPassword(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -790,7 +790,7 @@ func (h *hostHandlers) linkSSHKey(hostID, sshKeyID int64, slug string) error {
 	// Update the host flag + path metadata (the encrypted payload lives
 	// in the vault). identities_only="yes" forces SSH to use only the
 	// host's linked key rather than agent or other identities.
-	if err := models.UpdateHostKeyMeta(h.db.SQL, hostID, true, "", "yes"); err != nil {
+	if err := store.NewHostRepo(h.db.SQL).UpdateKeyMeta(context.Background(), hostID, true, "", "yes"); err != nil {
 		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: UpdateHostKeyMeta error: %v", slug, sshKeyID, err)
 		return fmt.Errorf("update host key flags: %w", err)
 	}

@@ -14,7 +14,7 @@ type hostChamadoHandlers struct {
 
 func (h *hostChamadoHandlers) resolveHost(w http.ResponseWriter, r *http.Request) *models.Host {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return nil

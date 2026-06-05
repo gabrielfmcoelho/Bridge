@@ -32,7 +32,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	edges := []graphEdge{}
 
 	// Hosts
-	hosts, _ := models.ListHosts(h.db.SQL, models.HostFilter{})
+	hosts, _ := store.NewHostRepo(h.db.SQL).List(r.Context(), models.HostFilter{})
 	hostIDMap := make(map[int64]string)
 	for _, host := range hosts {
 		nid := fmt.Sprintf("host-%d", host.ID)
