@@ -94,6 +94,30 @@ frontend grouping concept derived from `GROUP BY group_label`.
 
 ---
 
+## 🏗️ Refactor Roadmap — Transport → Service → Store Architecture
+
+> **📝 後追いドキュメント (harness-sync 2026-06-05)**: この節は Plans.md とは別に
+> `~/.claude/plans/wiggly-snuggling-biscuit.md` で進行していた **アーキテクチャ
+> リファクタ** を、現行ブランチ `refactor/phase-0-transport-helpers`（main から
+> 20 commits）と照合して in-repo の SSOT に取り込んだもの。上の Phase 1–5 は
+> *secrets-manager 機能* の番号体系で、本節とは無関係。衝突を避けるため本節は
+> **R0–R5** で採番する。
+>
+> 方針（2026-06-03 決定）: execute roadmap · aggressive/greenfield scope（schema +
+> API breaking OK）· NO backward-compat layers。各フェーズは独立して shippable で
+> tree を green に保つ。詳細根拠は外部ロードマップ参照。
+
+| Task | 内容 | DoD | Depends | Status |
+|------|------|-----|---------|--------|
+| R0 | 共有トランスポートヘルパー（NON-BREAKING）: `actorFrom` でアクター抽出 3 種を統一、`httpx` の `decodeBody`/`pathID`/`requireFields`、`errmap` の `DomainError`+`writeErr`、auth middleware のレスポンス形状統一、エラー開示リーク封じ | `go build`/`go vet` clean; 既存 API テスト green; `errmap`+`actorFrom` ユニットテスト追加 | — | cc:完了 [c9b345b] |
+| R1 | リポジトリ層（NON-BREAKING）: `internal/models/*.go` の SQL を全て `internal/store/` へ移設しモデルを純 DTO 化。`vault.SecretRepo` を雛形に ~25 エンティティの repo を抽出（1a 基盤+cascade registry → 1b Contact … 1p APICatalog）。3 つの手書き cascade を cascade registry に置換。store↔vault 循環を ActorContext 移動で解消 | 全 `models` 呼び出し元が repo 経由でコンパイル; `vault`/`api`/`models` テスト green; `store/*_test.go` の round-trip（create→get→update→softdelete→restore→audit）追加; 9 packages green | R0 | cc:完了 [ef49af6 → 144821a, +f42d362 cycle fix] |
+| R2 | サービス層 + DI コンテナ（NON-BREAKING）: `internal/service/` に Host/Service/Project/DNS… を作成しハンドラから enrichment ループ・tag/responsável 同期・alert/usage 計算・cross-entity orchestration を移設（silent error swallow も修正）。`cmd/app.go` で `db→Encryptor→repos→services→handlers` を一括 wiring。`secretHandlers.register(mux,wrap)` の自己登録パターンを全ハンドラ群へ一般化。ハンドラを thin 化 | ハンドラテストを service mock 化; `go test ./...` green; golden response 比較で behavior-identical | R1 | cc:WIP（foundation 着手済 [d8a0cb0]: `internal/service` + `internal/api/deps.go` DI、**DNS のみ migrated**。残: Host/Service/Project ほか各 service、`cmd/app.go` container、自己登録一般化、全ハンドラ thin 化） |
+| R3 | スキーマ正規化（**BREAKING** / forward-only, no compat retention）: 死んだ credential 列の drop（`hosts.{password,pub,priv}_*`、legacy `ssh_keys`）、`secret_share_links`→`share_bundles` への集約、4 つの `*_responsaveis` junction を polymorphic `responsaveis(entity_type,…)` に統一、`app_settings` cipher sprawl を `app_secrets(key,ciphertext,nonce)` へ集約。(任意) hosts/services/projects への soft-delete 拡張 | dual-dialect migration テスト; backup round-trip で no data loss; `TestCrossDialectRestore` fixture 拡張 | R2 | cc:TODO |
+| R4 | API 一貫性（**BREAKING** / in-place、frontend を同一 change set で更新）: レスポンスエンベロープを `{data, meta:{page,per_page,total}}` に統一し全 list endpoint+frontend fetch を同時移行、共有 `PageParams` で pagination/filtering を全 list に適用、god-handler（glpi 1618 LoC ほか）を分割し integration protocol ロジックを `internal/integrations/<provider>/` へ移設 | API contract テストが新エンベロープを検証; frontend を lockstep 更新し Playwright smoke（`/secrets`,`/atlas/apis`, host/service/project lists）; grep で旧形状依存が無いことを確認 | R3 | cc:TODO |
+| R5 | ライフサイクル & 運用堅牢化（NON-BREAKING）: graceful shutdown（cancellable context + SIGTERM → `Server.Shutdown()` + janitor 停止）、リクエストロギング middleware（method/scrubbed path/status/latency/actor）、失敗 auth 試行の監査ログ | SIGTERM in-flight drain（手動 + shutdown unit test）; ログ行が存在しトークン scrub 済 | R1 | cc:TODO |
+
+---
+
 ## 📦 アーカイブ
 
 _(none yet)_
