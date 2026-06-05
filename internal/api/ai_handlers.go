@@ -298,7 +298,7 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 	}
 
 	// Build the user prompt with the locale instruction up front so the model can't miss it.
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	projectName := ""
 	if err == nil && project != nil {
 		projectName = project.Name

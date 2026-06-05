@@ -1375,7 +1375,7 @@ func (h *glpiHandlers) handleListProjectTickets(w http.ResponseWriter, r *http.R
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil || project == nil {
 		jsonError(w, http.StatusNotFound, "project not found")
 		return

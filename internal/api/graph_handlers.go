@@ -76,7 +76,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Projects
-	projects, _ := models.ListProjects(h.db.SQL)
+	projects, _ := store.NewProjectRepo(h.db.SQL).List(r.Context())
 	projectIDMap := make(map[int64]string)
 	for _, p := range projects {
 		nid := fmt.Sprintf("project-%d", p.ID)
@@ -132,7 +132,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 
 	// Direct Host -> Project edges
 	for _, p := range projects {
-		hostIDs, _ := models.GetProjectHostIDs(h.db.SQL, p.ID)
+		hostIDs, _ := store.NewProjectRepo(h.db.SQL).HostIDs(r.Context(), p.ID)
 		for _, hid := range hostIDs {
 			if target, ok := hostIDMap[hid]; ok {
 				edges = append(edges, graphEdge{Source: target, Target: projectIDMap[p.ID], Label: "part of"})

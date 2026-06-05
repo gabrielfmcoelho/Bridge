@@ -3,175 +3,103 @@ package api
 import (
 	"net/http"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 )
 
+// projectHandlers is a Phase 2 (R2) handler: it holds a domain service (not a
+// raw *database.DB), and each method is parse → call service → render. The
+// enrichment/orchestration lives in service.ProjectService.
 type projectHandlers struct {
-	db *database.DB
+	project *service.ProjectService
 }
 
 func (h *projectHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	projects, err := models.ListProjects(h.db.SQL)
+	projects, err := h.project.List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list projects", err)
 		return
 	}
-
-	tagMap, _ := store.NewTagRepo(h.db.SQL).GetAll(r.Context(), "project")
-	mainRespNames, _ := models.GetProjectMainResponsavelNamesBulk(h.db.SQL)
-	type projectWithTags struct {
-		models.Project
-		Tags                  []string `json:"tags"`
-		MainResponsavelName   string   `json:"main_responsavel_name"`
-	}
-	result := make([]projectWithTags, len(projects))
-	for i, p := range projects {
-		result[i] = projectWithTags{
-			Project:             p,
-			Tags:                tagMap[p.ID],
-			MainResponsavelName: mainRespNames[p.ID],
-		}
-	}
-
-	jsonOK(w, result)
+	jsonOK(w, projects)
 }
 
 func (h *projectHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
-	id, err := pathInt64(r, "id")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid id", err)
+	id, ok := pathID(w, r, "id")
+	if !ok {
 		return
 	}
-
-	project, err := models.GetProject(h.db.SQL, id)
+	detail, err := h.project.Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "project lookup failed", err)
 		return
 	}
-	if project == nil {
+	if detail == nil {
 		jsonError(w, http.StatusNotFound, "project not found")
 		return
 	}
+	jsonOK(w, detail)
+}
 
-	tags, _ := store.NewTagRepo(h.db.SQL).Get(r.Context(), "project", id)
-	responsaveis, _ := models.ListProjectResponsaveisContact(h.db.SQL, id)
-	services, _ := models.ListServicesByProject(h.db.SQL, id)
+// projectWriteRequest is the create/update wire shape: a Project plus its
+// relations. Pointer slices distinguish "absent" (leave unchanged) from
+// "present" (set) on update.
+type projectWriteRequest struct {
+	models.Project
+	Tags         *[]string                         `json:"tags"`
+	Responsaveis *[]models.ProjectResponsavelInput `json:"responsaveis"`
+}
 
-	// Collect all host IDs and DNS IDs from project services
-	hostIDSet := map[int64]bool{}
-	dnsIDSet := map[int64]bool{}
-	for _, svc := range services {
-		hids, _ := models.GetServiceHostIDs(h.db.SQL, svc.ID)
-		for _, hid := range hids {
-			hostIDSet[hid] = true
-		}
-		dids, _ := models.GetServiceDNSIDs(h.db.SQL, svc.ID)
-		for _, did := range dids {
-			dnsIDSet[did] = true
-		}
-	}
-	var hostIDs, dnsIDs []int64
-	for id := range hostIDSet {
-		hostIDs = append(hostIDs, id)
-	}
-	for id := range dnsIDSet {
-		dnsIDs = append(dnsIDs, id)
-	}
-
-	jsonOK(w, map[string]any{
-		"project":       project,
-		"tags":          tags,
-		"responsaveis":  responsaveis,
-		"services":      services,
-		"host_ids":      hostIDs,
-		"dns_ids":       dnsIDs,
-	})
+func (req *projectWriteRequest) toWrite() *service.ProjectWrite {
+	return &service.ProjectWrite{Project: req.Project, Tags: req.Tags, Responsaveis: req.Responsaveis}
 }
 
 func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		models.Project
-		Tags         []string                        `json:"tags"`
-		Responsaveis []models.ProjectResponsavelInput `json:"responsaveis"`
-	}
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
+	var req projectWriteRequest
+	if !decodeBody(w, r, &req) {
 		return
 	}
-	if req.Name == "" {
-		jsonError(w, http.StatusBadRequest, "name is required")
+	if !requireFields(w, map[string]string{"name": req.Name}) {
 		return
 	}
-
-	if err := models.CreateProject(h.db.SQL, &req.Project); err != nil {
+	wr := req.toWrite()
+	if err := h.project.Create(r.Context(), wr); err != nil {
 		jsonServerError(w, r, "failed to create project", err)
 		return
 	}
-
-	if len(req.Tags) > 0 {
-		store.NewTagRepo(h.db.SQL).Set(r.Context(), "project", req.Project.ID, req.Tags)
-	}
-	if len(req.Responsaveis) > 0 {
-		models.SyncProjectResponsaveisContact(h.db.SQL, req.Project.ID, req.Responsaveis)
-	}
-
-	jsonCreated(w, req.Project)
+	jsonCreated(w, wr.Project)
 }
 
 func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := pathInt64(r, "id")
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req projectWriteRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	wr := req.toWrite()
+	found, err := h.project.Update(r.Context(), id, wr)
 	if err != nil {
-		jsonBadRequest(w, r, "invalid id", err)
-		return
-	}
-
-	existing, err := models.GetProject(h.db.SQL, id)
-	if err != nil || existing == nil {
-		jsonError(w, http.StatusNotFound, "project not found")
-		return
-	}
-
-	var req struct {
-		models.Project
-		Tags         []string                          `json:"tags"`
-		Responsaveis *[]models.ProjectResponsavelInput `json:"responsaveis"`
-	}
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
-		return
-	}
-
-	req.Project.ID = id
-	if err := models.UpdateProject(h.db.SQL, &req.Project); err != nil {
 		jsonServerError(w, r, "failed to update project", err)
 		return
 	}
-
-	if req.Tags != nil {
-		store.NewTagRepo(h.db.SQL).Set(r.Context(), "project", id, req.Tags)
+	if !found {
+		jsonError(w, http.StatusNotFound, "project not found")
+		return
 	}
-	if req.Responsaveis != nil {
-		models.SyncProjectResponsaveisContact(h.db.SQL, id, *req.Responsaveis)
-	}
-
-	jsonOK(w, req.Project)
+	jsonOK(w, wr.Project)
 }
 
 func (h *projectHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := pathInt64(r, "id")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid id", err)
+	id, ok := pathID(w, r, "id")
+	if !ok {
 		return
 	}
-
-	store.NewTagRepo(h.db.SQL).Delete(r.Context(), "project", id)
-	// Cascade-soft-delete any vault entries attached to this project, then
-	// hard-delete the project row — atomically, via the store cascade
-	// registry (parent table resolved from the registered scope).
+	// Cascade-soft-delete any vault entries scoped to this project, then
+	// hard-delete the project row — atomically, via the store cascade registry.
 	actor, _ := actorFrom(r)
-	if err := store.DeleteParent(r.Context(), h.db.SQL, actor, models.SecretScopeProjeto, id); err != nil {
+	if err := h.project.Delete(r.Context(), actor, id); err != nil {
 		jsonServerError(w, r, "failed to delete project", err)
 		return
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	outlineclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/outline"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type outlineHandlers struct {
@@ -49,7 +49,7 @@ func (h *outlineHandlers) handleListProjectWiki(w http.ResponseWriter, r *http.R
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "project lookup failed", err)
 		return
@@ -245,7 +245,7 @@ func (h *outlineHandlers) handleCreateProjectDocument(w http.ResponseWriter, r *
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "project lookup failed", err)
 		return
@@ -394,7 +394,7 @@ func (h *outlineHandlers) handleSearchProjectWiki(w http.ResponseWriter, r *http
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "project lookup failed", err)
 		return

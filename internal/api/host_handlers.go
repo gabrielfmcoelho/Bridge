@@ -367,7 +367,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	orch, _ := store.NewOrchestratorRepo(h.db.SQL).GetByHost(r.Context(), host.ID)
 	dns, _ := store.NewDNSRepo(h.db.SQL).RecordsByHost(r.Context(), host.ID)
 	services, _ := models.ListServicesByHost(h.db.SQL, host.ID)
-	projects, _ := models.ListProjectsByHost(h.db.SQL, host.ID)
+	projects, _ := store.NewProjectRepo(h.db.SQL).ProjectsByHost(r.Context(), host.ID)
 	lastScan, _ := store.NewHostScanRepo(h.db.SQL).GetLatest(r.Context(), host.ID)
 	responsaveis, _ := models.ListHostResponsaveis(h.db.SQL, host.ID)
 	chamados, _ := store.NewHostChamadoRepo(h.db.SQL).ListByHost(r.Context(), host.ID)
@@ -493,8 +493,8 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(req.ProjectIDs) > 0 {
-		if err := models.SetHostProjectLinks(h.db.SQL, req.Host.ID, req.ProjectIDs); err != nil {
-			log.Printf("[hosts] SetHostProjectLinks error on create: %v", err)
+		if err := store.NewProjectRepo(h.db.SQL).SetProjectsForHost(r.Context(), req.Host.ID, req.ProjectIDs); err != nil {
+			log.Printf("[hosts] SetProjectsForHost error on create: %v", err)
 		}
 	}
 
@@ -687,8 +687,8 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.ProjectIDs != nil {
-		if err := models.SetHostProjectLinks(h.db.SQL, existing.ID, *req.ProjectIDs); err != nil {
-			log.Printf("[hosts] SetHostProjectLinks error on update: %v", err)
+		if err := store.NewProjectRepo(h.db.SQL).SetProjectsForHost(r.Context(), existing.ID, *req.ProjectIDs); err != nil {
+			log.Printf("[hosts] SetProjectsForHost error on update: %v", err)
 		}
 	}
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -389,7 +390,7 @@ func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL str
 // createFromSpec parses raw, validates the parent (for projeto scope), and
 // persists the catalog + operation index.
 func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Request, raw []byte, meta catalogMeta, owner int64) {
-	if err := h.validateParent(meta.Scope, meta.ParentID); err != nil {
+	if err := h.validateParent(r.Context(), meta.Scope, meta.ParentID); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
@@ -436,14 +437,14 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 	jsonCreated(w, reloaded)
 }
 
-func (h *apiCatalogHandlers) validateParent(scope string, parentID *int64) error {
+func (h *apiCatalogHandlers) validateParent(ctx context.Context, scope string, parentID *int64) error {
 	if scope != models.APICatalogScopeProjeto {
 		return nil
 	}
 	if parentID == nil {
 		return fmt.Errorf("parent_id is required for projeto scope")
 	}
-	p, err := models.GetProject(h.db.SQL, *parentID)
+	p, err := store.NewProjectRepo(h.db.SQL).Get(ctx, *parentID)
 	if err != nil {
 		return err
 	}
