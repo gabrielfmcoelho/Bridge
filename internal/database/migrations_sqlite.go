@@ -1281,4 +1281,32 @@ var migrationsSQLite = []string{
 	// (default ''); when base_url is blank the spec's own servers are used.
 	`ALTER TABLE api_catalog ADD COLUMN base_url TEXT NOT NULL DEFAULT '';
 	ALTER TABLE api_catalog ADD COLUMN docs_url TEXT NOT NULL DEFAULT '';`,
+
+	// Version 70 (R3): unify the four *_responsaveis junctions into one
+	// polymorphic `responsaveis` table (mirrors the `tags` table). Rows are
+	// migrated from each legacy table tagged with its entity_type, then the
+	// legacy tables are dropped. is_externo on the old tables was dead
+	// (is_external is read from contacts), so it is not carried over. INSERT OR
+	// IGNORE guards against duplicate (entity,contact) rows in dirty data.
+	`CREATE TABLE IF NOT EXISTS responsaveis (
+		id          INTEGER PRIMARY KEY AUTOINCREMENT,
+		entity_type TEXT NOT NULL CHECK (entity_type IN ('host','dns','service','project')),
+		entity_id   INTEGER NOT NULL,
+		contact_id  INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+		is_main     INTEGER NOT NULL DEFAULT 0,
+		UNIQUE(entity_type, entity_id, contact_id)
+	);
+	INSERT OR IGNORE INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'host', host_id, contact_id, is_main FROM host_responsaveis WHERE contact_id > 0;
+	INSERT OR IGNORE INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'dns', dns_id, contact_id, is_main FROM dns_responsaveis WHERE contact_id > 0;
+	INSERT OR IGNORE INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'service', service_id, contact_id, is_main FROM service_responsaveis WHERE contact_id > 0;
+	INSERT OR IGNORE INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'project', project_id, contact_id, is_main FROM project_responsaveis WHERE contact_id > 0;
+	DROP TABLE host_responsaveis;
+	DROP TABLE dns_responsaveis;
+	DROP TABLE service_responsaveis;
+	DROP TABLE project_responsaveis;
+	CREATE INDEX IF NOT EXISTS idx_responsaveis_entity ON responsaveis (entity_type, entity_id);`,
 }

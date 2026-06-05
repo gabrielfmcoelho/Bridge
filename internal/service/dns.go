@@ -21,15 +21,21 @@ import (
 // host links + responsáveis). It composes the DNS repo, the tag repo, and the
 // responsável model helpers (the latter migrate to store in Phase 3).
 type DNSService struct {
-	db   *sql.DB
-	dns  *store.DNSRepo
-	tags *store.TagRepo
+	db           *sql.DB
+	dns          *store.DNSRepo
+	tags         *store.TagRepo
+	responsaveis *store.ResponsavelRepo
 }
 
 // NewDNSService constructs a DNSService over the given DB handle. (Until the DI
 // container is fully populated, it builds the repos it needs.)
 func NewDNSService(db *sql.DB) *DNSService {
-	return &DNSService{db: db, dns: store.NewDNSRepo(db), tags: store.NewTagRepo(db)}
+	return &DNSService{
+		db:           db,
+		dns:          store.NewDNSRepo(db),
+		tags:         store.NewTagRepo(db),
+		responsaveis: store.NewResponsavelRepo(db),
+	}
 }
 
 // DNSListItem is an enriched DNS record for the list view.
@@ -42,10 +48,10 @@ type DNSListItem struct {
 
 // DNSDetail is the full single-record view (record + relations).
 type DNSDetail struct {
-	Record       *models.DNSRecord       `json:"dns_record"`
-	Tags         []string                `json:"tags"`
-	HostIDs      []int64                 `json:"host_ids"`
-	Responsaveis []models.DNSResponsavel `json:"responsaveis"`
+	Record       *models.DNSRecord    `json:"dns_record"`
+	Tags         []string             `json:"tags"`
+	HostIDs      []int64              `json:"host_ids"`
+	Responsaveis []models.Responsavel `json:"responsaveis"`
 }
 
 // DNSWrite carries the create/update payload (record + relations). For update,
@@ -54,7 +60,7 @@ type DNSWrite struct {
 	Record       models.DNSRecord
 	Tags         *[]string
 	HostIDs      *[]int64
-	Responsaveis *[]models.DNSResponsavelInput
+	Responsaveis *[]models.ResponsavelInput
 }
 
 // List returns all DNS records enriched with tags, host links, and the main
@@ -68,7 +74,7 @@ func (s *DNSService) List(ctx context.Context) ([]DNSListItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	mainNames, err := models.GetDNSMainResponsavelNamesBulk(s.db)
+	mainNames, err := s.responsaveis.MainNamesBulk(ctx, "dns")
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +108,7 @@ func (s *DNSService) Get(ctx context.Context, id int64) (*DNSDetail, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := models.ListDNSResponsaveis(s.db, id)
+	resp, err := s.responsaveis.List(ctx, "dns", id)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +132,7 @@ func (s *DNSService) Create(ctx context.Context, w *DNSWrite) error {
 		}
 	}
 	if w.Responsaveis != nil && len(*w.Responsaveis) > 0 {
-		if err := models.SyncDNSResponsaveis(s.db, w.Record.ID, *w.Responsaveis); err != nil {
+		if err := s.responsaveis.Sync(ctx, "dns", w.Record.ID, *w.Responsaveis); err != nil {
 			return err
 		}
 	}
@@ -155,7 +161,7 @@ func (s *DNSService) Update(ctx context.Context, id int64, w *DNSWrite) (bool, e
 		}
 	}
 	if w.Responsaveis != nil {
-		if err := models.SyncDNSResponsaveis(s.db, id, *w.Responsaveis); err != nil {
+		if err := s.responsaveis.Sync(ctx, "dns", id, *w.Responsaveis); err != nil {
 			return true, err
 		}
 	}

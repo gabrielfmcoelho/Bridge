@@ -15,19 +15,21 @@ import (
 // repo, and the responsável/service model helpers (the latter migrate to store
 // in a later phase).
 type ProjectService struct {
-	db       *sql.DB
-	projects *store.ProjectRepo
-	services *store.ServiceRepo
-	tags     *store.TagRepo
+	db           *sql.DB
+	projects     *store.ProjectRepo
+	services     *store.ServiceRepo
+	tags         *store.TagRepo
+	responsaveis *store.ResponsavelRepo
 }
 
 // NewProjectService constructs a ProjectService over the given DB handle.
 func NewProjectService(db *sql.DB) *ProjectService {
 	return &ProjectService{
-		db:       db,
-		projects: store.NewProjectRepo(db),
-		services: store.NewServiceRepo(db),
-		tags:     store.NewTagRepo(db),
+		db:           db,
+		projects:     store.NewProjectRepo(db),
+		services:     store.NewServiceRepo(db),
+		tags:         store.NewTagRepo(db),
+		responsaveis: store.NewResponsavelRepo(db),
 	}
 }
 
@@ -41,12 +43,12 @@ type ProjectListItem struct {
 // ProjectDetail is the full single-project view (project + relations). HostIDs
 // and DNSIDs are aggregated (deduplicated, sorted) across the project's services.
 type ProjectDetail struct {
-	Project      *models.Project                    `json:"project"`
-	Tags         []string                           `json:"tags"`
-	Responsaveis []models.ProjectResponsavelContact `json:"responsaveis"`
-	Services     []models.Service                   `json:"services"`
-	HostIDs      []int64                            `json:"host_ids"`
-	DNSIDs       []int64                            `json:"dns_ids"`
+	Project      *models.Project      `json:"project"`
+	Tags         []string             `json:"tags"`
+	Responsaveis []models.Responsavel `json:"responsaveis"`
+	Services     []models.Service     `json:"services"`
+	HostIDs      []int64              `json:"host_ids"`
+	DNSIDs       []int64              `json:"dns_ids"`
 }
 
 // ProjectWrite carries the create/update payload (project + relations). For
@@ -55,7 +57,7 @@ type ProjectDetail struct {
 type ProjectWrite struct {
 	Project      models.Project
 	Tags         *[]string
-	Responsaveis *[]models.ProjectResponsavelInput
+	Responsaveis *[]models.ResponsavelInput
 }
 
 // List returns all projects enriched with tags and the main responsável name
@@ -69,7 +71,7 @@ func (s *ProjectService) List(ctx context.Context) ([]ProjectListItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	mainNames, err := models.GetProjectMainResponsavelNamesBulk(s.db)
+	mainNames, err := s.responsaveis.MainNamesBulk(ctx, "project")
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +96,7 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	if err != nil {
 		return nil, err
 	}
-	resp, err := models.ListProjectResponsaveisContact(s.db, id)
+	resp, err := s.responsaveis.List(ctx, "project", id)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +167,7 @@ func (s *ProjectService) Create(ctx context.Context, w *ProjectWrite) error {
 		}
 	}
 	if w.Responsaveis != nil && len(*w.Responsaveis) > 0 {
-		if err := models.SyncProjectResponsaveisContact(s.db, w.Project.ID, *w.Responsaveis); err != nil {
+		if err := s.responsaveis.Sync(ctx, "project", w.Project.ID, *w.Responsaveis); err != nil {
 			return err
 		}
 	}
@@ -189,7 +191,7 @@ func (s *ProjectService) Update(ctx context.Context, id int64, w *ProjectWrite) 
 		}
 	}
 	if w.Responsaveis != nil {
-		if err := models.SyncProjectResponsaveisContact(s.db, id, *w.Responsaveis); err != nil {
+		if err := s.responsaveis.Sync(ctx, "project", id, *w.Responsaveis); err != nil {
 			return true, err
 		}
 	}

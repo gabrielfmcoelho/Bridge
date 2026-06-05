@@ -46,7 +46,7 @@ func (h *projectHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 type projectWriteRequest struct {
 	models.Project
 	Tags         *[]string                         `json:"tags"`
-	Responsaveis *[]models.ProjectResponsavelInput `json:"responsaveis"`
+	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 }
 
 func (req *projectWriteRequest) toWrite() *service.ProjectWrite {

@@ -28,7 +28,7 @@ func TestProjectService_CreateEnrichesListAndGet(t *testing.T) {
 	contactID, _ := cr.LastInsertId()
 
 	tags := []string{"infra", "core"}
-	resp := []models.ProjectResponsavelInput{{ContactID: contactID, IsMain: true}}
+	resp := []models.ResponsavelInput{{ContactID: contactID, IsMain: true}}
 	w := &service.ProjectWrite{
 		Project:      models.Project{Name: "Atlas", Description: "catalog", Situacao: "active"},
 		Tags:         &tags,

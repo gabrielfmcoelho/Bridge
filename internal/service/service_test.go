@@ -41,7 +41,7 @@ func TestServiceService_CreateEnrichesListAndGet(t *testing.T) {
 	hosts := []int64{hostID}
 	dnss := []int64{dnsID}
 	deps := []int64{depW.Service.ID}
-	resp := []models.ServiceResponsavelInput{{ContactID: contactID, IsMain: true}}
+	resp := []models.ResponsavelInput{{ContactID: contactID, IsMain: true}}
 	w := &service.ServiceWrite{
 		Service:      models.Service{Nickname: "api"},
 		Tags:         &tags,

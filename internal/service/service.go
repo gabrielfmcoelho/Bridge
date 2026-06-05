@@ -23,14 +23,20 @@ var (
 // and the auto/fixed lifecycle rules). It composes the service repo, the tag
 // repo, and the responsável model helpers (the latter migrate to store later).
 type ServiceService struct {
-	db       *sql.DB
-	services *store.ServiceRepo
-	tags     *store.TagRepo
+	db           *sql.DB
+	services     *store.ServiceRepo
+	tags         *store.TagRepo
+	responsaveis *store.ResponsavelRepo
 }
 
 // NewServiceService constructs a ServiceService over the given DB handle.
 func NewServiceService(db *sql.DB) *ServiceService {
-	return &ServiceService{db: db, services: store.NewServiceRepo(db), tags: store.NewTagRepo(db)}
+	return &ServiceService{
+		db:           db,
+		services:     store.NewServiceRepo(db),
+		tags:         store.NewTagRepo(db),
+		responsaveis: store.NewResponsavelRepo(db),
+	}
 }
 
 // ServiceListItem is an enriched service for the list view.
@@ -45,13 +51,13 @@ type ServiceListItem struct {
 
 // ServiceDetail is the full single-service view (service + relations).
 type ServiceDetail struct {
-	Service      *models.Service             `json:"service"`
-	Tags         []string                    `json:"tags"`
-	HostIDs      []int64                     `json:"host_ids"`
-	DNSIDs       []int64                     `json:"dns_ids"`
-	DependsOnIDs []int64                     `json:"depends_on_ids"`
-	DependentIDs []int64                     `json:"dependent_ids"`
-	Responsaveis []models.ServiceResponsavel `json:"responsaveis"`
+	Service      *models.Service      `json:"service"`
+	Tags         []string             `json:"tags"`
+	HostIDs      []int64              `json:"host_ids"`
+	DNSIDs       []int64              `json:"dns_ids"`
+	DependsOnIDs []int64              `json:"depends_on_ids"`
+	DependentIDs []int64              `json:"dependent_ids"`
+	Responsaveis []models.Responsavel `json:"responsaveis"`
 }
 
 // ServiceWrite carries the create/update payload (service + relations). For
@@ -63,7 +69,7 @@ type ServiceWrite struct {
 	HostIDs      *[]int64
 	DNSIDs       *[]int64
 	DependsOnIDs *[]int64
-	Responsaveis *[]models.ServiceResponsavelInput
+	Responsaveis *[]models.ResponsavelInput
 }
 
 // List returns all services enriched with tags, link ids, and the main
@@ -77,7 +83,7 @@ func (s *ServiceService) List(ctx context.Context) ([]ServiceListItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	mainNames, err := models.GetServiceMainResponsavelNamesBulk(s.db)
+	mainNames, err := s.responsaveis.MainNamesBulk(ctx, "service")
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +139,7 @@ func (s *ServiceService) Get(ctx context.Context, id int64) (*ServiceDetail, err
 	if err != nil {
 		return nil, err
 	}
-	resp, err := models.ListServiceResponsaveis(s.db, id)
+	resp, err := s.responsaveis.List(ctx, "service", id)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +182,7 @@ func (s *ServiceService) Create(ctx context.Context, w *ServiceWrite) error {
 		}
 	}
 	if w.Responsaveis != nil && len(*w.Responsaveis) > 0 {
-		if err := models.SyncServiceResponsaveis(s.db, id, *w.Responsaveis); err != nil {
+		if err := s.responsaveis.Sync(ctx, "service", id, *w.Responsaveis); err != nil {
 			return err
 		}
 	}
@@ -215,7 +221,7 @@ func (s *ServiceService) Update(ctx context.Context, id int64, w *ServiceWrite) 
 		}
 	}
 	if w.Responsaveis != nil {
-		if err := models.SyncServiceResponsaveis(s.db, id, *w.Responsaveis); err != nil {
+		if err := s.responsaveis.Sync(ctx, "service", id, *w.Responsaveis); err != nil {
 			return true, err
 		}
 	}

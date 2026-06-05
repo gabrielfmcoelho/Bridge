@@ -134,7 +134,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Tags         []string                      `json:"tags"`
 		Password     string                        `json:"password"`
 		SSHKeyID     int64                         `json:"ssh_key_id"`
-		Responsaveis []models.HostResponsavelInput `json:"responsaveis"`
+		Responsaveis []models.ResponsavelInput `json:"responsaveis"`
 		Chamados     []models.HostChamadoInput     `json:"chamados"`
 		Entidades    []models.HostEntidadeInput    `json:"entidades"`
 		DNSIDs       []int64                       `json:"dns_ids"`
@@ -232,7 +232,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		Password     string                         `json:"password"`
 		SSHKeyID     int64                          `json:"ssh_key_id"`
 		ClearKey     bool                           `json:"clear_key"`
-		Responsaveis *[]models.HostResponsavelInput `json:"responsaveis"`
+		Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 		Chamados     *[]models.HostChamadoInput     `json:"chamados"`
 		Entidades    *[]models.HostEntidadeInput    `json:"entidades"`
 		DNSIDs       *[]int64                       `json:"dns_ids"`

@@ -57,7 +57,7 @@ type serviceWriteRequest struct {
 	HostIDs      *[]int64                          `json:"host_ids"`
 	DNSIDs       *[]int64                          `json:"dns_ids"`
 	DependsOnIDs *[]int64                          `json:"depends_on_ids"`
-	Responsaveis *[]models.ServiceResponsavelInput `json:"responsaveis"`
+	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 }
 
 func (req *serviceWriteRequest) toWrite() *service.ServiceWrite {

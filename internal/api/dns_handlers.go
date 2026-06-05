@@ -47,7 +47,7 @@ type dnsWriteRequest struct {
 	models.DNSRecord
 	Tags         *[]string                     `json:"tags"`
 	HostIDs      *[]int64                      `json:"host_ids"`
-	Responsaveis *[]models.DNSResponsavelInput `json:"responsaveis"`
+	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 }
 
 func (req *dnsWriteRequest) toWrite() *service.DNSWrite {

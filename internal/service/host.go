@@ -26,39 +26,41 @@ var ErrHostKeyLink = errors.New("ssh key link failed")
 // detail view. Write paths (create/update with vault dual-writes, SSH-key
 // resealing, Grafana provisioning) remain in the handler pending a later phase.
 type HostService struct {
-	db        *database.DB // needed for vault dual-writes + the encryptor (ssh-key reseal)
-	sqlDB     *sql.DB
-	hosts     *store.HostRepo
-	tags      *store.TagRepo
-	scans     *store.HostScanRepo
-	alerts    *store.HostAlertRepo
-	alertCfg  *store.AlertSettingsRepo
-	services  *store.ServiceRepo
-	dns       *store.DNSRepo
-	projects  *store.ProjectRepo
-	entidades *store.HostEntidadeRepo
-	chamados  *store.HostChamadoRepo
-	orch      *store.OrchestratorRepo
-	sshKeys   *store.SSHKeyRepo
+	db           *database.DB // needed for vault dual-writes + the encryptor (ssh-key reseal)
+	sqlDB        *sql.DB
+	hosts        *store.HostRepo
+	tags         *store.TagRepo
+	scans        *store.HostScanRepo
+	alerts       *store.HostAlertRepo
+	alertCfg     *store.AlertSettingsRepo
+	services     *store.ServiceRepo
+	dns          *store.DNSRepo
+	projects     *store.ProjectRepo
+	entidades    *store.HostEntidadeRepo
+	chamados     *store.HostChamadoRepo
+	orch         *store.OrchestratorRepo
+	sshKeys      *store.SSHKeyRepo
+	responsaveis *store.ResponsavelRepo
 }
 
 // NewHostService constructs a HostService over the given DB handle.
 func NewHostService(db *database.DB) *HostService {
 	return &HostService{
-		db:        db,
-		sqlDB:     db.SQL,
-		hosts:     store.NewHostRepo(db.SQL),
-		tags:      store.NewTagRepo(db.SQL),
-		scans:     store.NewHostScanRepo(db.SQL),
-		alerts:    store.NewHostAlertRepo(db.SQL),
-		alertCfg:  store.NewAlertSettingsRepo(db.SQL),
-		services:  store.NewServiceRepo(db.SQL),
-		dns:       store.NewDNSRepo(db.SQL),
-		projects:  store.NewProjectRepo(db.SQL),
-		entidades: store.NewHostEntidadeRepo(db.SQL),
-		chamados:  store.NewHostChamadoRepo(db.SQL),
-		orch:      store.NewOrchestratorRepo(db.SQL),
-		sshKeys:   store.NewSSHKeyRepo(db.SQL),
+		db:           db,
+		sqlDB:        db.SQL,
+		hosts:        store.NewHostRepo(db.SQL),
+		tags:         store.NewTagRepo(db.SQL),
+		scans:        store.NewHostScanRepo(db.SQL),
+		alerts:       store.NewHostAlertRepo(db.SQL),
+		alertCfg:     store.NewAlertSettingsRepo(db.SQL),
+		services:     store.NewServiceRepo(db.SQL),
+		dns:          store.NewDNSRepo(db.SQL),
+		projects:     store.NewProjectRepo(db.SQL),
+		entidades:    store.NewHostEntidadeRepo(db.SQL),
+		chamados:     store.NewHostChamadoRepo(db.SQL),
+		orch:         store.NewOrchestratorRepo(db.SQL),
+		sshKeys:      store.NewSSHKeyRepo(db.SQL),
+		responsaveis: store.NewResponsavelRepo(db.SQL),
 	}
 }
 
@@ -125,16 +127,16 @@ type HostListItem struct {
 
 // HostDetail is the full single-host view (host + relations).
 type HostDetail struct {
-	Host         *models.Host             `json:"host"`
-	Tags         []string                 `json:"tags"`
-	Orchestrator *models.Orchestrator     `json:"orchestrator"`
-	DNSRecords   []models.DNSRecord       `json:"dns_records"`
-	Services     []models.Service         `json:"services"`
-	Projects     []models.Project         `json:"projects"`
-	LastScan     *models.HostScan         `json:"last_scan"`
-	Responsaveis []models.HostResponsavel `json:"responsaveis"`
-	Chamados     []models.HostChamado     `json:"chamados"`
-	Entidades    []models.HostEntidade    `json:"entidades"`
+	Host         *models.Host          `json:"host"`
+	Tags         []string              `json:"tags"`
+	Orchestrator *models.Orchestrator  `json:"orchestrator"`
+	DNSRecords   []models.DNSRecord    `json:"dns_records"`
+	Services     []models.Service      `json:"services"`
+	Projects     []models.Project      `json:"projects"`
+	LastScan     *models.HostScan      `json:"last_scan"`
+	Responsaveis []models.Responsavel  `json:"responsaveis"`
+	Chamados     []models.HostChamado  `json:"chamados"`
+	Entidades    []models.HostEntidade `json:"entidades"`
 }
 
 // Count returns the number of hosts matching the filter (for pagination).
@@ -154,7 +156,7 @@ func (s *HostService) Get(ctx context.Context, slug string) (*HostDetail, error)
 	services, _ := s.services.ListByHost(ctx, host.ID)
 	projects, _ := s.projects.ProjectsByHost(ctx, host.ID)
 	lastScan, _ := s.scans.GetLatest(ctx, host.ID)
-	responsaveis, _ := models.ListHostResponsaveis(s.sqlDB, host.ID)
+	responsaveis, _ := s.responsaveis.List(ctx, "host", host.ID)
 	chamados, _ := s.chamados.ListByHost(ctx, host.ID)
 	entidades, _ := s.entidades.List(ctx, host.ID)
 
@@ -197,9 +199,9 @@ func (s *HostService) List(ctx context.Context, f models.HostFilter) ([]HostList
 	svcCounts, _ := s.services.CountsByHost(ctx)
 	dnsCounts, _ := s.dns.CountsByHost(ctx)
 	issueCounts, _ := models.GetIssueCountsByEntity(s.sqlDB, "host")
-	mainRespNames, _ := models.GetMainResponsavelNamesBulk(s.sqlDB)
+	mainRespNames, _ := s.responsaveis.MainNamesBulk(ctx, "host")
 	mainEntidades, _ := s.entidades.MainBulk(ctx)
-	chamadosCounts, _ := models.GetChamadosCountsBulk(s.sqlDB)
+	chamadosCounts, _ := s.chamados.CountsBulk(ctx)
 	manualAlertsBulk, _ := s.alerts.ListBulk(ctx)
 	alertLinkedIssues, _ := s.alerts.LinkedIssueIDsBulk(ctx)
 
@@ -360,7 +362,7 @@ type HostWrite struct {
 	Password     string
 	SSHKeyID     int64
 	ClearKey     bool
-	Responsaveis *[]models.HostResponsavelInput
+	Responsaveis *[]models.ResponsavelInput
 	Chamados     *[]models.HostChamadoInput
 	Entidades    *[]models.HostEntidadeInput
 	DNSIDs       *[]int64
@@ -485,7 +487,7 @@ func (s *HostService) applyMetaRelations(ctx context.Context, hostID int64, w *H
 		}
 	}
 	if present(w.Responsaveis, requireNonEmpty) {
-		if err := models.SyncHostResponsaveis(s.sqlDB, hostID, *w.Responsaveis); err != nil {
+		if err := s.responsaveis.Sync(ctx, "host", hostID, *w.Responsaveis); err != nil {
 			log.Printf("[hosts] SyncHostResponsaveis id=%d: %v", hostID, err)
 		}
 	}

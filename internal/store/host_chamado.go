@@ -137,3 +137,12 @@ func (r *HostChamadoRepo) Sync(ctx context.Context, hostID int64, inputs []model
 	}
 	return tx.Commit()
 }
+
+// CountsBulk returns host_id → number of chamados, for the host list view.
+func (r *HostChamadoRepo) CountsBulk(ctx context.Context) (map[int64]int, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT host_id, COUNT(*) FROM host_chamados GROUP BY host_id`)
+	if err != nil {
+		return nil, err
+	}
+	return scanCountMap(rows)
+}
