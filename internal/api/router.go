@@ -28,7 +28,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	deps := NewDeps(db)
 
 	ah := &authHandlers{db: db, registry: registry}
-	hh := &hostHandlers{db: db}
+	hh := &hostHandlers{host: deps.Host, db: db}
 	dh := &dnsHandlers{dns: deps.DNS}
 	ph := &projectHandlers{project: deps.Project}
 	sh := &serviceHandlers{service: deps.Service, db: db}

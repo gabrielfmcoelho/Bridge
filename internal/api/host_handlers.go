@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,122 +11,17 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
+// hostHandlers retains db for the write paths (create/update with vault
+// dual-writes, SSH-key resealing, Grafana provisioning) which are not yet
+// lifted into the service. Read paths (list/get) delegate to host.
 type hostHandlers struct {
-	db *database.DB
-}
-
-type scanResources struct {
-	CPU        string `json:"cpu,omitempty"`
-	CPUUsage   string `json:"cpu_usage,omitempty"`
-	RAM        string `json:"ram,omitempty"`
-	RAMPercent string `json:"ram_percent,omitempty"`
-	Storage    string `json:"storage,omitempty"`
-	DiskPct    string `json:"disk_percent,omitempty"`
-}
-
-type scanFull struct {
-	scanResources
-	Services   []string            `json:"services"`
-	Containers []string            `json:"containers"`
-	Profile    *hostProfileSummary `json:"profile,omitempty"`
-}
-
-// hostProfileSummary mirrors the relevant subset of sshtest.HostProfile —
-// only the fields needed to surface the idle verdict (and the operator's
-// "why" trail) on the host list. Defining a local twin keeps the api
-// package free of an internal/sshtest import.
-type hostProfileSummary struct {
-	Idle         bool     `json:"idle"`
-	Reasons      []string `json:"reasons,omitempty"`
-	Counterfacts []string `json:"counterfacts,omitempty"`
-}
-
-type hostAlert struct {
-	ID            int64  `json:"id"`
-	Type          string `json:"type"`
-	Level         string `json:"level"`
-	Message       string `json:"message"`
-	Description   string `json:"description,omitempty"`
-	Source        string `json:"source"`
-	Status        string `json:"status"`
-	LinkedIssueID *int64 `json:"linked_issue_id,omitempty"`
-}
-
-func computeAlerts(_ *scanResources, sf *scanFull, host models.Host, t *models.AlertThresholds) []hostAlert {
-	var alerts []hostAlert
-
-	parseUsagePct := func(s string) (int, bool) {
-		s = strings.TrimSuffix(strings.TrimSpace(s), "%")
-		v, err := strconv.Atoi(s)
-		return v, err == nil
-	}
-
-	if sf != nil {
-		// Resource alerts
-		for _, r := range []struct {
-			typ, label, usage string
-		}{
-			{"resource_cpu", "CPU", sf.CPUUsage},
-			{"resource_ram", "RAM", sf.RAMPercent},
-			{"resource_disk", "Disk", sf.DiskPct},
-		} {
-			if r.usage == "" {
-				continue
-			}
-			pct, ok := parseUsagePct(r.usage)
-			if !ok {
-				continue
-			}
-			var level, msg string
-			switch {
-			case pct >= t.ResourceCritical:
-				level = "critical"
-				msg = fmt.Sprintf("%s at %d%% (critical: %d%%)", r.label, pct, t.ResourceCritical)
-			case pct >= t.ResourceWarning:
-				level = "warning"
-				msg = fmt.Sprintf("%s at %d%% (warning: %d%%)", r.label, pct, t.ResourceWarning)
-			case pct <= t.ResourceInfoLow:
-				level = "info"
-				msg = fmt.Sprintf("%s at %d%% (sub-utilized)", r.label, pct)
-			}
-			if level != "" {
-				alerts = append(alerts, hostAlert{Type: r.typ, Level: level, Message: msg, Source: "auto", Status: "active"})
-			}
-		}
-
-		// /dev/null alert
-		allFields := sf.CPU + sf.CPUUsage + sf.RAM + sf.RAMPercent + sf.Storage + sf.DiskPct
-		lower := strings.ToLower(allFields)
-		if strings.Contains(lower, "/dev/null") || strings.Contains(lower, "permission denied") {
-			alerts = append(alerts, hostAlert{
-				Type:    "dev_null",
-				Level:   "warning",
-				Message: "Scan returned /dev/null permission warning",
-				Source:  "auto",
-			})
-		}
-	}
-
-	// Auth failed alert — only fires when all *tested* credentials failed
-	pwdTestedFailed := host.HasPassword && host.PasswordTestStatus != nil && *host.PasswordTestStatus == "failed"
-	keyTestedFailed := host.HasKey && host.KeyTestStatus != nil && *host.KeyTestStatus == "failed"
-	pwdTestedOK := host.HasPassword && host.PasswordTestStatus != nil && *host.PasswordTestStatus == "success"
-	keyTestedOK := host.HasKey && host.KeyTestStatus != nil && *host.KeyTestStatus == "success"
-
-	if (pwdTestedFailed || keyTestedFailed) && !pwdTestedOK && !keyTestedOK {
-		alerts = append(alerts, hostAlert{
-			Type:    "auth_failed",
-			Level:   "warning",
-			Message: "No authentication method is working",
-			Source:  "auto",
-		})
-	}
-
-	return alerts
+	host *service.HostService
+	db   *database.DB
 }
 
 func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
@@ -145,8 +39,6 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		SortBy:              r.URL.Query().Get("sort_by"),
 		SortDir:             r.URL.Query().Get("sort_dir"),
 	}
-
-	// Parse pagination
 	if p := r.URL.Query().Get("page"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil && v > 0 {
 			f.Page = v
@@ -158,142 +50,14 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hosts, err := store.NewHostRepo(h.db.SQL).List(r.Context(), f)
+	result, err := h.host.List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "failed to list hosts", err)
 		return
 	}
 
-	// Attach tags, scan status, and scan resource summary for each host.
-	tagMap, _ := store.NewTagRepo(h.db.SQL).GetAll(r.Context(), "host")
-	scanStatuses, scanErr := store.NewHostScanRepo(h.db.SQL).Statuses(r.Context())
-	if scanErr != nil {
-		log.Printf("[hosts] GetHostScanStatuses error: %v", scanErr)
-	}
-	scanDataBulk, bulkErr := store.NewHostScanRepo(h.db.SQL).LatestDataBulk(r.Context())
-	if bulkErr != nil {
-		log.Printf("[hosts] GetLatestScanDataBulk error: %v", bulkErr)
-	}
-	log.Printf("[hosts] Found %d hosts, %d scan statuses, %d scan data entries", len(hosts), len(scanStatuses), len(scanDataBulk))
-
-	thresholds, thErr := store.NewAlertSettingsRepo(h.db.SQL).GetThresholds(r.Context())
-	if thErr != nil {
-		log.Printf("[hosts] GetAlertThresholds error: %v", thErr)
-		thresholds = &models.AlertThresholds{ResourceCritical: 80, ResourceWarning: 60, ResourceInfoLow: 5}
-	}
-
-	type hostWithExtra struct {
-		models.Host
-		Tags                 []string       `json:"tags"`
-		HasScan              bool           `json:"has_scan"`
-		LastScanAt           *time.Time     `json:"last_scan_at,omitempty"`
-		ScanRes              *scanResources `json:"scan_resources,omitempty"`
-		ContainersCount      int            `json:"containers_count"`
-		ProcessesCount       int            `json:"processes_count"`
-		ServicesCount        int            `json:"services_count"`
-		DNSCount             int            `json:"dns_count"`
-		IssuesCount          int            `json:"issues_count"`
-		CanCompile           bool           `json:"can_compile"`
-		Idle                 bool           `json:"idle,omitempty"`
-		IdleReasons          []string       `json:"idle_reasons,omitempty"`
-		IdleCounterfacts     []string       `json:"idle_counterfacts,omitempty"`
-		Alerts               []hostAlert    `json:"alerts"`
-		MainResponsavelName  string         `json:"main_responsavel_name"`
-		MainEntidade         string         `json:"main_entidade"`
-		ChamadosCount        int            `json:"chamados_count"`
-		ProjectsCount        int            `json:"projects_count"`
-	}
-
-	projCounts, _ := store.NewServiceRepo(h.db.SQL).ProjectCountsByHost(r.Context())
-	svcCounts, _ := store.NewServiceRepo(h.db.SQL).CountsByHost(r.Context())
-	dnsCounts, _ := store.NewDNSRepo(h.db.SQL).CountsByHost(r.Context())
-	issueCounts, _ := models.GetIssueCountsByEntity(h.db.SQL, "host")
-	mainRespNames, _ := models.GetMainResponsavelNamesBulk(h.db.SQL)
-	mainEntidades, _ := store.NewHostEntidadeRepo(h.db.SQL).MainBulk(r.Context())
-	chamadosCounts, _ := models.GetChamadosCountsBulk(h.db.SQL)
-	manualAlertsBulk, _ := store.NewHostAlertRepo(h.db.SQL).ListBulk(r.Context())
-	alertLinkedIssues, _ := store.NewHostAlertRepo(h.db.SQL).LinkedIssueIDsBulk(r.Context())
-
-	result := make([]hostWithExtra, len(hosts))
-	for i, host := range hosts {
-		hwt := hostWithExtra{Host: host, Tags: tagMap[host.ID]}
-		hwt.ServicesCount = svcCounts[host.ID]
-		hwt.DNSCount = dnsCounts[host.ID]
-		hwt.IssuesCount = issueCounts[host.ID]
-		hwt.MainResponsavelName = mainRespNames[host.ID]
-		hwt.MainEntidade = mainEntidades[host.ID]
-		hwt.ChamadosCount = chamadosCounts[host.ID]
-		hwt.ProjectsCount = projCounts[host.ID]
-		hwt.CanCompile = host.Hostname != "" && host.User != ""
-		if scanTime, ok := scanStatuses[host.ID]; ok {
-			hwt.HasScan = true
-			t := scanTime
-			hwt.LastScanAt = &t
-		}
-		var sfPtr *scanFull
-		if data, ok := scanDataBulk[host.ID]; ok {
-			var sf scanFull
-			if err := json.Unmarshal([]byte(data), &sf); err != nil {
-				log.Printf("[hosts] Host %d: JSON unmarshal error: %v", host.ID, err)
-			} else {
-				if sf.CPU != "" || sf.RAM != "" || sf.Storage != "" {
-					sr := sf.scanResources
-					hwt.ScanRes = &sr
-				}
-				hwt.ContainersCount = len(sf.Containers)
-				hwt.ProcessesCount = len(sf.Services)
-				if sf.Profile != nil {
-					hwt.Idle = sf.Profile.Idle
-					hwt.IdleReasons = sf.Profile.Reasons
-					hwt.IdleCounterfacts = sf.Profile.Counterfacts
-				}
-				sfPtr = &sf
-			}
-		}
-		hwt.Alerts = computeAlerts(hwt.ScanRes, sfPtr, host, thresholds)
-		// Build set of auto-computed alert types for dedup
-		autoTypes := make(map[string]bool, len(hwt.Alerts))
-		for _, a := range hwt.Alerts {
-			autoTypes[a.Type] = true
-		}
-		// Merge DB alerts, enriched with linked issue IDs.
-		// For source="auto" DB alerts that duplicate a computed alert of the
-		// same type, replace the computed one (so the DB ID + issue link show up)
-		// instead of appending a second copy.
-		if manualAlerts, ok := manualAlertsBulk[host.ID]; ok {
-			for _, ma := range manualAlerts {
-				ha := hostAlert{
-					ID:          ma.ID,
-					Type:        ma.Type,
-					Level:       ma.Level,
-					Message:     ma.Message,
-					Description: ma.Description,
-					Source:      ma.Source,
-					Status:      ma.Status,
-				}
-				if issueID, ok := alertLinkedIssues[ma.ID]; ok {
-					id := issueID
-					ha.LinkedIssueID = &id
-				}
-				if ma.Source == "auto" && autoTypes[ma.Type] {
-					// Replace the computed alert with the persisted one
-					for j, ca := range hwt.Alerts {
-						if ca.Source == "auto" && ca.Type == ma.Type && ca.ID == 0 {
-							hwt.Alerts[j] = ha
-							break
-						}
-					}
-				} else {
-					hwt.Alerts = append(hwt.Alerts, ha)
-				}
-			}
-		}
-		result[i] = hwt
-	}
-
-	// Post-enrichment filter: alert_level
-	alertLevelFilter := r.URL.Query().Get("alert_level")
-	if alertLevelFilter != "" {
+	// Post-enrichment filter: alert_level (operates on the computed alerts).
+	if alertLevelFilter := r.URL.Query().Get("alert_level"); alertLevelFilter != "" {
 		filtered := result[:0]
 		for _, hwt := range result {
 			if alertLevelFilter == "none" {
@@ -312,13 +76,11 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		result = filtered
 	}
 
-	// Post-enrichment filter: idle. The idle flag comes from the
-	// HostProfile heuristic embedded in scan_data, so this filter has to
-	// run after we've unmarshalled the scan JSON for each host. "active"
-	// keeps only hosts that have scan data AND were classified as not
-	// idle — hosts with no scan are excluded (we can't tell either way).
-	idleFilter := r.URL.Query().Get("idle")
-	if idleFilter == "idle" || idleFilter == "active" {
+	// Post-enrichment filter: idle. The idle flag comes from the HostProfile
+	// heuristic embedded in scan_data, so it runs after enrichment. "active"
+	// keeps only hosts that have scan data AND were classified not-idle; hosts
+	// with no scan are excluded (we can't tell either way).
+	if idleFilter := r.URL.Query().Get("idle"); idleFilter == "idle" || idleFilter == "active" {
 		filtered := result[:0]
 		for _, hwt := range result {
 			if idleFilter == "idle" && hwt.Idle {
@@ -330,9 +92,9 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		result = filtered
 	}
 
-	// If paginated, wrap in envelope with total count
+	// If paginated, wrap in an envelope with the total count.
 	if f.PerPage > 0 {
-		total, _ := store.NewHostRepo(h.db.SQL).Count(r.Context(), f)
+		total, _ := h.host.Count(r.Context(), f)
 		totalPages := (total + f.PerPage - 1) / f.PerPage
 		page := f.Page
 		if page < 1 {
@@ -353,38 +115,16 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 
 func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
+	detail, err := h.host.Get(r.Context(), slug)
 	if err != nil {
 		jsonServerError(w, r, "database error", err)
 		return
 	}
-	if host == nil {
+	if detail == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
 	}
-
-	tags, _ := store.NewTagRepo(h.db.SQL).Get(r.Context(), "host", host.ID)
-	orch, _ := store.NewOrchestratorRepo(h.db.SQL).GetByHost(r.Context(), host.ID)
-	dns, _ := store.NewDNSRepo(h.db.SQL).RecordsByHost(r.Context(), host.ID)
-	services, _ := store.NewServiceRepo(h.db.SQL).ListByHost(r.Context(), host.ID)
-	projects, _ := store.NewProjectRepo(h.db.SQL).ProjectsByHost(r.Context(), host.ID)
-	lastScan, _ := store.NewHostScanRepo(h.db.SQL).GetLatest(r.Context(), host.ID)
-	responsaveis, _ := models.ListHostResponsaveis(h.db.SQL, host.ID)
-	chamados, _ := store.NewHostChamadoRepo(h.db.SQL).ListByHost(r.Context(), host.ID)
-	entidades, _ := store.NewHostEntidadeRepo(h.db.SQL).List(r.Context(), host.ID)
-
-	jsonOK(w, map[string]any{
-		"host":         host,
-		"tags":         tags,
-		"orchestrator": orch,
-		"dns_records":  dns,
-		"services":     services,
-		"projects":     projects,
-		"last_scan":    lastScan,
-		"responsaveis": responsaveis,
-		"chamados":     chamados,
-		"entidades":    entidades,
-	})
+	jsonOK(w, detail)
 }
 
 func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
