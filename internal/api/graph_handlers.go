@@ -90,7 +90,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Services
-	services, _ := models.ListServices(h.db.SQL)
+	services, _ := store.NewServiceRepo(h.db.SQL).List(r.Context())
 	serviceIDMap := make(map[int64]string)
 	for _, svc := range services {
 		nid := fmt.Sprintf("service-%d", svc.ID)
@@ -114,7 +114,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Service -> Host edges
-		hostIDs, _ := models.GetServiceHostIDs(h.db.SQL, svc.ID)
+		hostIDs, _ := store.NewServiceRepo(h.db.SQL).HostIDs(r.Context(), svc.ID)
 		for _, hid := range hostIDs {
 			if target, ok := hostIDMap[hid]; ok {
 				edges = append(edges, graphEdge{Source: nid, Target: target, Label: "runs on"})
@@ -122,7 +122,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Service -> DNS edges
-		dnsIDs, _ := models.GetServiceDNSIDs(h.db.SQL, svc.ID)
+		dnsIDs, _ := store.NewServiceRepo(h.db.SQL).DNSIDs(r.Context(), svc.ID)
 		for _, did := range dnsIDs {
 			if target, ok := dnsIDMap[did]; ok {
 				edges = append(edges, graphEdge{Source: nid, Target: target, Label: "served at"})
@@ -142,7 +142,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 
 	// Service dependency edges
 	for _, svc := range services {
-		depIDs, _ := models.GetServiceDependencyIDs(h.db.SQL, svc.ID)
+		depIDs, _ := store.NewServiceRepo(h.db.SQL).DependencyIDs(r.Context(), svc.ID)
 		for _, depID := range depIDs {
 			src := serviceIDMap[svc.ID]
 			if target, ok := serviceIDMap[depID]; ok {

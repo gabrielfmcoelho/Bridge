@@ -13,6 +13,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type grafanaHandlers struct {
@@ -66,7 +67,7 @@ func (h *grafanaHandlers) handleEmbedURL(w http.ResponseWriter, r *http.Request)
 			jsonError(w, http.StatusBadRequest, "service id must be numeric")
 			return
 		}
-		svc, err := models.GetService(h.db.SQL, sid)
+		svc, err := store.NewServiceRepo(h.db.SQL).Get(r.Context(), sid)
 		if err != nil {
 			jsonServerError(w, r, "service lookup failed", err)
 			return
@@ -366,7 +367,7 @@ func ProvisionServiceDashboard(ctx context.Context, db *database.DB, svc *models
 	}
 
 	svc.GrafanaDashboardUID = returnedUID
-	if err := models.UpdateService(db.SQL, svc); err != nil {
+	if err := store.NewServiceRepo(db.SQL).Update(ctx, svc); err != nil {
 		log.Printf("[grafana-provision] service %d: uploaded dashboard %s but failed to persist UID: %v", svc.ID, returnedUID, err)
 	}
 	return returnedUID, nil
@@ -409,7 +410,7 @@ func (h *grafanaHandlers) handleProvisionServiceDashboard(w http.ResponseWriter,
 		jsonBadRequest(w, r, "invalid service id", err)
 		return
 	}
-	svc, err := models.GetService(h.db.SQL, id)
+	svc, err := store.NewServiceRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "service lookup failed", err)
 		return

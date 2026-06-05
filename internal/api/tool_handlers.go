@@ -152,7 +152,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Validate service exists.
-	svc, err := models.GetService(h.db.SQL, req.ServiceID)
+	svc, err := store.NewServiceRepo(h.db.SQL).Get(r.Context(), req.ServiceID)
 	if err != nil || svc == nil {
 		jsonError(w, http.StatusNotFound, "service not found")
 		return
@@ -166,7 +166,7 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Verify DNS is linked to the service.
-	dnsIDs, err := models.GetServiceDNSIDs(h.db.SQL, req.ServiceID)
+	dnsIDs, err := store.NewServiceRepo(h.db.SQL).DNSIDs(r.Context(), req.ServiceID)
 	if err != nil {
 		jsonServerError(w, r, "failed to check service-dns links", err)
 		return

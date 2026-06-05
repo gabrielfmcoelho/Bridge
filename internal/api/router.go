@@ -31,7 +31,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	hh := &hostHandlers{db: db}
 	dh := &dnsHandlers{dns: deps.DNS}
 	ph := &projectHandlers{project: deps.Project}
-	sh := &serviceHandlers{db: db}
+	sh := &serviceHandlers{service: deps.Service, db: db}
 	oh := &orchestratorHandlers{db: db}
 	ssh := &sshHandlers{db: db, configPath: configPath}
 	gh := &graphHandlers{db: db}

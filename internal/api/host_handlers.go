@@ -204,8 +204,8 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		ProjectsCount        int            `json:"projects_count"`
 	}
 
-	projCounts, _ := models.GetProjectCountsByHost(h.db.SQL)
-	svcCounts, _ := models.GetServiceCountsByHost(h.db.SQL)
+	projCounts, _ := store.NewServiceRepo(h.db.SQL).ProjectCountsByHost(r.Context())
+	svcCounts, _ := store.NewServiceRepo(h.db.SQL).CountsByHost(r.Context())
 	dnsCounts, _ := store.NewDNSRepo(h.db.SQL).CountsByHost(r.Context())
 	issueCounts, _ := models.GetIssueCountsByEntity(h.db.SQL, "host")
 	mainRespNames, _ := models.GetMainResponsavelNamesBulk(h.db.SQL)
@@ -366,7 +366,7 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	tags, _ := store.NewTagRepo(h.db.SQL).Get(r.Context(), "host", host.ID)
 	orch, _ := store.NewOrchestratorRepo(h.db.SQL).GetByHost(r.Context(), host.ID)
 	dns, _ := store.NewDNSRepo(h.db.SQL).RecordsByHost(r.Context(), host.ID)
-	services, _ := models.ListServicesByHost(h.db.SQL, host.ID)
+	services, _ := store.NewServiceRepo(h.db.SQL).ListByHost(r.Context(), host.ID)
 	projects, _ := store.NewProjectRepo(h.db.SQL).ProjectsByHost(r.Context(), host.ID)
 	lastScan, _ := store.NewHostScanRepo(h.db.SQL).GetLatest(r.Context(), host.ID)
 	responsaveis, _ := models.ListHostResponsaveis(h.db.SQL, host.ID)
@@ -488,8 +488,8 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(req.ServiceIDs) > 0 {
-		if err := models.SetHostServiceLinks(h.db.SQL, req.Host.ID, req.ServiceIDs); err != nil {
-			log.Printf("[hosts] SetHostServiceLinks error on create: %v", err)
+		if err := store.NewServiceRepo(h.db.SQL).SetServicesForHost(r.Context(), req.Host.ID, req.ServiceIDs); err != nil {
+			log.Printf("[hosts] SetServicesForHost error on create: %v", err)
 		}
 	}
 	if len(req.ProjectIDs) > 0 {
@@ -682,8 +682,8 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.ServiceIDs != nil {
-		if err := models.SetHostServiceLinks(h.db.SQL, existing.ID, *req.ServiceIDs); err != nil {
-			log.Printf("[hosts] SetHostServiceLinks error on update: %v", err)
+		if err := store.NewServiceRepo(h.db.SQL).SetServicesForHost(r.Context(), existing.ID, *req.ServiceIDs); err != nil {
+			log.Printf("[hosts] SetServicesForHost error on update: %v", err)
 		}
 	}
 	if req.ProjectIDs != nil {

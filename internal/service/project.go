@@ -17,12 +17,18 @@ import (
 type ProjectService struct {
 	db       *sql.DB
 	projects *store.ProjectRepo
+	services *store.ServiceRepo
 	tags     *store.TagRepo
 }
 
 // NewProjectService constructs a ProjectService over the given DB handle.
 func NewProjectService(db *sql.DB) *ProjectService {
-	return &ProjectService{db: db, projects: store.NewProjectRepo(db), tags: store.NewTagRepo(db)}
+	return &ProjectService{
+		db:       db,
+		projects: store.NewProjectRepo(db),
+		services: store.NewServiceRepo(db),
+		tags:     store.NewTagRepo(db),
+	}
 }
 
 // ProjectListItem is an enriched project for the list view.
@@ -92,11 +98,11 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	if err != nil {
 		return nil, err
 	}
-	services, err := models.ListServicesByProject(s.db, id)
+	services, err := s.services.ListByProject(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	hostIDs, dnsIDs, err := s.aggregateServiceLinks(services)
+	hostIDs, dnsIDs, err := s.aggregateServiceLinks(ctx, services)
 	if err != nil {
 		return nil, err
 	}
@@ -113,18 +119,18 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 // aggregateServiceLinks collects the deduplicated, sorted host and dns ids
 // reachable through a project's services. Unlike the old handler (which
 // swallowed each lookup error with `_`), it propagates failures.
-func (s *ProjectService) aggregateServiceLinks(services []models.Service) (hostIDs, dnsIDs []int64, err error) {
+func (s *ProjectService) aggregateServiceLinks(ctx context.Context, services []models.Service) (hostIDs, dnsIDs []int64, err error) {
 	hostSet := map[int64]struct{}{}
 	dnsSet := map[int64]struct{}{}
 	for _, svc := range services {
-		hids, err := models.GetServiceHostIDs(s.db, svc.ID)
+		hids, err := s.services.HostIDs(ctx, svc.ID)
 		if err != nil {
 			return nil, nil, err
 		}
 		for _, hid := range hids {
 			hostSet[hid] = struct{}{}
 		}
-		dids, err := models.GetServiceDNSIDs(s.db, svc.ID)
+		dids, err := s.services.DNSIDs(ctx, svc.ID)
 		if err != nil {
 			return nil, nil, err
 		}

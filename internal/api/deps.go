@@ -22,6 +22,7 @@ type Deps struct {
 	// Domain services (Phase 2). One field per service as entities migrate.
 	DNS     *service.DNSService
 	Project *service.ProjectService
+	Service *service.ServiceService
 }
 
 // NewDeps wires the container from a database handle. Construction order:
@@ -32,5 +33,6 @@ func NewDeps(db *database.DB) *Deps {
 		Secrets: vault.NewSecretRepo(db),
 		DNS:     service.NewDNSService(db.SQL),
 		Project: service.NewProjectService(db.SQL),
+		Service: service.NewServiceService(db.SQL),
 	}
 }
