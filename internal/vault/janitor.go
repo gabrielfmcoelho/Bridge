@@ -86,7 +86,7 @@ func (j *ShareLinkJanitor) Start(ctx context.Context) {
 func (j *ShareLinkJanitor) RunOnce(ctx context.Context) (int64, error) {
 	threshold := time.Now().Add(-j.grace).UTC().Format(time.RFC3339Nano)
 	res, err := j.db.ExecContext(ctx,
-		`DELETE FROM secret_share_links WHERE expires_at < ?`,
+		`DELETE FROM share_bundles WHERE expires_at < ?`,
 		threshold,
 	)
 	if err != nil {

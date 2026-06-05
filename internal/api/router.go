@@ -53,14 +53,14 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	// handler (R2). The integration/misc groups further below are not yet
 	// migrated and remain inline.
 	rr := routeRegistrar{mux: mux, db: db}
-	ah.registerRoutes(rr)   // /api/auth/*, /api/users/*
-	oah.registerRoutes(rr)  // /api/auth/oauth/*
-	hh.registerRoutes(rr)   // /api/hosts/*
-	hah.registerRoutes(rr)  // /api/hosts/{slug}/alerts/*
-	hch.registerRoutes(rr)  // /api/hosts/{slug}/chamados/*
-	dh.registerRoutes(rr)   // /api/dns/*
-	ph.registerRoutes(rr)   // /api/projects/*
-	sh.registerRoutes(rr)   // /api/services/*
+	ah.registerRoutes(rr)  // /api/auth/*, /api/users/*
+	oah.registerRoutes(rr) // /api/auth/oauth/*
+	hh.registerRoutes(rr)  // /api/hosts/*
+	hah.registerRoutes(rr) // /api/hosts/{slug}/alerts/*
+	hch.registerRoutes(rr) // /api/hosts/{slug}/chamados/*
+	dh.registerRoutes(rr)  // /api/dns/*
+	ph.registerRoutes(rr)  // /api/projects/*
+	sh.registerRoutes(rr)  // /api/services/*
 
 	// (Legacy /api/services/{id}/credentials and /api/services/credentials/all
 	// were removed in Phase 1 cutover — callers use /api/secrets directly.)
@@ -71,11 +71,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	secretH := &secretHandlers{db: db, repo: secretRepo}
 	secretH.register(mux, func(next http.Handler) http.Handler { return authenticated(db, next) })
 
-	// Public share-link redemption (Phase 3 Task 3.3). NO auth — the
-	// token in the URL is the capability. Response hardening lives in
-	// the handler itself (Task 3.5).
-	publicShareH := &publicShareHandlers{repo: secretRepo}
-	mux.HandleFunc("GET /api/share/{token}", publicShareH.handleRedeem)
+	// (Per-secret /api/share/{token} retired in R3 — single-secret shares are
+	// now bundles; redemption is GET /api/share-bundle/{token} below.)
 
 	// Atlas REST API catalog (Phase A/B). Browsing is authenticated;
 	// import/mutate is editor; delete is admin — applied per-route inside

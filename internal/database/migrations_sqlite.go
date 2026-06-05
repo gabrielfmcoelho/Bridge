@@ -1327,4 +1327,10 @@ var migrationsSQLite = []string{
 		JOIN app_settings n ON n.key = substr(c.key, 1, length(c.key) - 7) || '_nonce'
 		WHERE c.key LIKE '%\_cipher' ESCAPE '\' AND c.value <> '';
 	DELETE FROM app_settings WHERE key LIKE '%\_cipher' ESCAPE '\' OR key LIKE '%\_nonce' ESCAPE '\';`,
+
+	// Version 72 (R3): retire secret_share_links. The two parallel public-link
+	// mechanisms collapse onto the newer generic share_bundles (a single-secret
+	// share is a one-item bundle). Existing links are transient (TTL'd
+	// capabilities), so they are dropped rather than migrated.
+	`DROP TABLE IF EXISTS secret_share_links;`,
 }

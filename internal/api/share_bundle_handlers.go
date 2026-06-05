@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
@@ -28,11 +29,11 @@ func (h *bundleHandlers) actor(r *http.Request) (vault.ActorContext, bool) {
 }
 
 type createBundleRequest struct {
-	Title      string                   `json:"title"`
-	TTLSeconds int                      `json:"ttl_seconds"`
-	MaxViews   int                      `json:"max_views"`
-	Passphrase string                   `json:"passphrase"`
-	Items      []vault.BundleItemInput  `json:"items"`
+	Title      string                  `json:"title"`
+	TTLSeconds int                     `json:"ttl_seconds"`
+	MaxViews   int                     `json:"max_views"`
+	Passphrase string                  `json:"passphrase"`
+	Items      []vault.BundleItemInput `json:"items"`
 }
 
 func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +90,20 @@ func (h *bundleHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		jsonServerError(w, r, "list share bundles", err)
 		return
+	}
+	// Optional ?secret_id= filter: return only the single-secret bundles for
+	// that secret — the per-secret "active share links" list the secret UI
+	// shows (the R3 replacement for GET /api/secrets/{id}/share-links).
+	if sid := r.URL.Query().Get("secret_id"); sid != "" {
+		if secretID, perr := strconv.ParseInt(sid, 10, 64); perr == nil {
+			filtered := make([]vault.BundleView, 0, len(bundles))
+			for _, b := range bundles {
+				if len(b.Items) == 1 && b.Items[0].Type == "secret" && b.Items[0].RefID == secretID {
+					filtered = append(filtered, b)
+				}
+			}
+			bundles = filtered
+		}
 	}
 	if bundles == nil {
 		bundles = []vault.BundleView{}

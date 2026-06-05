@@ -1166,4 +1166,7 @@ var migrationsPostgres = []string{
 		WHERE c.key LIKE '%\_cipher' ESCAPE '\' AND c.value <> ''
 		ON CONFLICT (key) DO NOTHING;
 	DELETE FROM app_settings WHERE key LIKE '%\_cipher' ESCAPE '\' OR key LIKE '%\_nonce' ESCAPE '\';`,
+
+	// Version 72 (R3): retire secret_share_links — see migrations_sqlite.go.
+	`DROP TABLE IF EXISTS secret_share_links;`,
 }

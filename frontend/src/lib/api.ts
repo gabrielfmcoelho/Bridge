@@ -833,9 +833,11 @@ export const secretsAPI = {
     const qs = q.toString();
     return api.get<Record<string, import("./types").Secret[]>>(`/api/secrets/env${qs ? `?${qs}` : ""}`);
   },
-  // Share-link endpoints (Phase 3). createShareLink returns the raw token
-  // ONLY here — it never resurfaces. Callers must surface it to the
-  // operator immediately (copy-to-clipboard) or it's lost.
+  // Single-secret public sharing. R3 retired the dedicated secret_share_links
+  // table — a single-secret share is now a one-item share bundle, so these
+  // delegate to /api/share-bundles (the redeem page already handles bundle
+  // tokens). The shapes stay link-compatible for ShareLinkModal. create()
+  // returns the raw token ONLY here — surface it immediately or it's lost.
   createShareLink: (id: number, body: { ttl_seconds?: number; max_views?: number; passphrase?: string }) =>
     api.post<{
       id: number;
@@ -844,11 +846,10 @@ export const secretsAPI = {
       expires_at: string;
       max_views?: number | null;
       has_passphrase: boolean;
-    }>(`/api/secrets/${id}/share-links`, body),
+    }>(`/api/share-bundles`, { ...body, items: [{ type: "secret", ref_id: id }] }),
   listShareLinks: (id: number) =>
     api.get<{
       id: number;
-      secret_id: number;
       expires_at: string;
       max_views?: number | null;
       view_count: number;
@@ -856,9 +857,9 @@ export const secretsAPI = {
       created_at: string;
       revoked_at?: string | null;
       has_passphrase: boolean;
-    }[]>(`/api/secrets/${id}/share-links`),
-  revokeShareLink: (secretID: number, linkID: number) =>
-    api.delete(`/api/secrets/${secretID}/share-links/${linkID}`),
+    }[]>(`/api/share-bundles?secret_id=${id}`),
+  revokeShareLink: (_secretID: number, linkID: number) =>
+    api.delete(`/api/share-bundles/${linkID}`),
 };
 
 // Atlas REST API catalog (Phase A–C). Mirrors secretsAPI: list/search/get +

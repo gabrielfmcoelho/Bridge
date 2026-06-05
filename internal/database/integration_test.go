@@ -261,38 +261,13 @@ func TestSecretsSchemaShape(t *testing.T) {
 		t.Errorf("T7 same var in different env should succeed: %v", err)
 	}
 
-	// T8: sibling tables exist (smoke test — counts return 0 cleanly)
-	for _, table := range []string{"secret_share_links", "secret_audit_log"} {
+	// T8: sibling tables exist (smoke test — counts return 0 cleanly).
+	// (secret_share_links was retired in R3 — single-secret shares are bundles.)
+	for _, table := range []string{"secret_audit_log"} {
 		var n int
 		if err := d.SQL.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
 			t.Errorf("table %s should exist: %v", table, err)
 		}
-	}
-
-	// T9: secret_share_links FK CASCADE works on hard delete (sanity check
-	// the eventual hard-purge path; soft delete is handled at the app layer).
-	sid, err := ins("password", "avulso", "personal", nil, owner1, "to-share", nil)
-	if err != nil {
-		t.Fatalf("T9 seed secret: %v", err)
-	}
-	if _, err := d.SQL.Exec(
-		`INSERT INTO secret_share_links (secret_id, token_hash, expires_at, created_by)
-		 VALUES (?,?,?,?)`,
-		sid, []byte{0xab, 0xcd}, "2099-01-01T00:00:00Z", owner1,
-	); err != nil {
-		t.Fatalf("T9 insert share link: %v", err)
-	}
-	if _, err := d.SQL.Exec(`DELETE FROM secrets WHERE id = ?`, sid); err != nil {
-		t.Fatalf("T9 hard delete: %v", err)
-	}
-	var linkCount int
-	if err := d.SQL.QueryRow(
-		`SELECT COUNT(*) FROM secret_share_links WHERE secret_id = ?`, sid,
-	).Scan(&linkCount); err != nil {
-		t.Fatalf("T9 count links: %v", err)
-	}
-	if linkCount != 0 {
-		t.Errorf("T9 ON DELETE CASCADE should have removed share link; got %d", linkCount)
 	}
 
 	// T10: audit log survives parent deletion (secret_id intentionally not FK)
