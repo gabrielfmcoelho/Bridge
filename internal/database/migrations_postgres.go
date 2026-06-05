@@ -1151,4 +1151,19 @@ var migrationsPostgres = []string{
 	DROP TABLE service_responsaveis;
 	DROP TABLE project_responsaveis;
 	CREATE INDEX IF NOT EXISTS idx_responsaveis_entity ON responsaveis (entity_type, entity_id);`,
+
+	// Version 71 (R3): app_settings cipher sprawl → app_secrets — see
+	// migrations_sqlite.go.
+	`CREATE TABLE IF NOT EXISTS app_secrets (
+		key    TEXT PRIMARY KEY,
+		cipher TEXT NOT NULL DEFAULT '',
+		nonce  TEXT NOT NULL DEFAULT ''
+	);
+	INSERT INTO app_secrets (key, cipher, nonce)
+		SELECT substr(c.key, 1, length(c.key) - 7), c.value, n.value
+		FROM app_settings c
+		JOIN app_settings n ON n.key = substr(c.key, 1, length(c.key) - 7) || '_nonce'
+		WHERE c.key LIKE '%\_cipher' ESCAPE '\' AND c.value <> ''
+		ON CONFLICT (key) DO NOTHING;
+	DELETE FROM app_settings WHERE key LIKE '%\_cipher' ESCAPE '\' OR key LIKE '%\_nonce' ESCAPE '\';`,
 }

@@ -3,7 +3,6 @@ package providers
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -25,7 +24,7 @@ func NewKeycloakProvider(db *sql.DB, enc *database.Encryptor) *KeycloakProvider 
 	return &KeycloakProvider{db: db, enc: enc}
 }
 
-func (p *KeycloakProvider) Name() string             { return "keycloak" }
+func (p *KeycloakProvider) Name() string              { return "keycloak" }
 func (p *KeycloakProvider) SupportsDirectLogin() bool { return false }
 
 func (p *KeycloakProvider) Enabled() bool {
@@ -77,20 +76,8 @@ func (p *KeycloakProvider) loadConfig() (*keycloakConfig, error) {
 }
 
 func (p *KeycloakProvider) decryptSetting(prefix string) (string, error) {
-	cipherHex := store.NewAppSettingsRepo(p.db).Value(context.Background(), prefix+"_cipher")
-	nonceHex := store.NewAppSettingsRepo(p.db).Value(context.Background(), prefix+"_nonce")
-	if cipherHex == "" || nonceHex == "" {
-		return "", nil
-	}
-	cipher, err := hex.DecodeString(cipherHex)
-	if err != nil {
-		return "", err
-	}
-	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil {
-		return "", err
-	}
-	return p.enc.Decrypt(cipher, nonce)
+	v, _, err := store.NewAppSecretRepo(p.db).Reveal(context.Background(), p.enc, prefix)
+	return v, err
 }
 
 func (p *KeycloakProvider) issuerURL(cfg *keycloakConfig) string {
@@ -153,10 +140,10 @@ func (p *KeycloakProvider) ExchangeCode(ctx context.Context, code, callbackURL s
 
 	// Extract claims.
 	var claims struct {
-		Sub               string   `json:"sub"`
-		PreferredUsername  string   `json:"preferred_username"`
-		Name              string   `json:"name"`
-		Email             string   `json:"email"`
+		Sub               string `json:"sub"`
+		PreferredUsername string `json:"preferred_username"`
+		Name              string `json:"name"`
+		Email             string `json:"email"`
 		RealmAccess       struct {
 			Roles []string `json:"roles"`
 		} `json:"realm_access"`

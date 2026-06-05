@@ -3,7 +3,6 @@ package glpi
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -13,15 +12,17 @@ import (
 // Settings captures the instance-level GLPI configuration. User tokens (one per
 // profile) live in the glpi_tokens table — not here — because we support multiple.
 type Settings struct {
-	Enabled          bool
-	BaseURL          string
-	AppToken         string
-	DefaultEntityID  int
+	Enabled         bool
+	BaseURL         string
+	AppToken        string
+	DefaultEntityID int
 }
 
 // LoadSettings reads the glpi_* keys from app_settings, decrypting the App-Token.
 func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
-	get := func(k string) string { return strings.TrimSpace(store.NewAppSettingsRepo(db).Value(context.Background(), k)) }
+	get := func(k string) string {
+		return strings.TrimSpace(store.NewAppSettingsRepo(db).Value(context.Background(), k))
+	}
 	s := Settings{
 		Enabled: store.NewAppSettingsRepo(db).Value(context.Background(), "glpi_enabled") == "true",
 		BaseURL: strings.TrimRight(get("glpi_base_url"), "/"),
@@ -48,20 +49,8 @@ func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 }
 
 func decryptSecret(db *sql.DB, enc *database.Encryptor, prefix string) (string, error) {
-	cipherHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_cipher")
-	nonceHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_nonce")
-	if cipherHex == "" || nonceHex == "" {
-		return "", nil
-	}
-	cipher, err := hex.DecodeString(cipherHex)
-	if err != nil {
-		return "", err
-	}
-	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil {
-		return "", err
-	}
-	return enc.Decrypt(cipher, nonce)
+	v, _, err := store.NewAppSecretRepo(db).Reveal(context.Background(), enc, prefix)
+	return v, err
 }
 
 // NewServiceClient returns a ready-to-use client if the minimum config is present.

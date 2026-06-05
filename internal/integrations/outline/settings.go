@@ -3,7 +3,6 @@ package outline
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -22,7 +21,9 @@ type Settings struct {
 // LoadSettings reads all outline_* settings from app_settings, decrypting the API token.
 // Mirrors grafana.LoadSettings.
 func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
-	get := func(k string) string { return strings.TrimSpace(store.NewAppSettingsRepo(db).Value(context.Background(), k)) }
+	get := func(k string) string {
+		return strings.TrimSpace(store.NewAppSettingsRepo(db).Value(context.Background(), k))
+	}
 	s := Settings{
 		Enabled:             store.NewAppSettingsRepo(db).Value(context.Background(), "outline_enabled") == "true",
 		BaseURL:             normaliseOutlineBaseURL(get("outline_base_url")),
@@ -54,20 +55,8 @@ func parseCommonCollectionIDs(raw string) []string {
 }
 
 func decryptSecret(db *sql.DB, enc *database.Encryptor, prefix string) (string, error) {
-	cipherHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_cipher")
-	nonceHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_nonce")
-	if cipherHex == "" || nonceHex == "" {
-		return "", nil
-	}
-	cipher, err := hex.DecodeString(cipherHex)
-	if err != nil {
-		return "", err
-	}
-	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil {
-		return "", err
-	}
-	return enc.Decrypt(cipher, nonce)
+	v, _, err := store.NewAppSecretRepo(db).Reveal(context.Background(), enc, prefix)
+	return v, err
 }
 
 // NewServiceClient returns a ready-to-use client backed by the stored service token,

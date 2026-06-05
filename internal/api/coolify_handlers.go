@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -30,16 +29,12 @@ func (h *coolifyHandlers) getClient() (*coolify.Client, error) {
 	}
 
 	baseURL := get("coolify_base_url")
-	cipherHex := get("coolify_api_token_cipher")
-	nonceHex := get("coolify_api_token_nonce")
-	if cipherHex == "" || nonceHex == "" || baseURL == "" {
-		return nil, fmt.Errorf("coolify integration is not configured")
-	}
-	cipher, _ := hex.DecodeString(cipherHex)
-	nonce, _ := hex.DecodeString(nonceHex)
-	apiToken, err := h.db.Encryptor.Decrypt(cipher, nonce)
+	apiToken, ok, err := store.NewAppSecretRepo(h.db.SQL).Reveal(context.Background(), h.db.Encryptor, "coolify_api_token")
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt coolify token: %w", err)
+	}
+	if !ok || baseURL == "" {
+		return nil, fmt.Errorf("coolify integration is not configured")
 	}
 
 	return coolify.NewClient(baseURL, apiToken), nil
@@ -65,7 +60,7 @@ func (h *coolifyHandlers) logOp(r *http.Request, hostID int64, opType, status, o
 // handleStatus returns whether the Coolify integration is enabled and configured.
 func (h *coolifyHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	enabled := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_enabled") == "true"
-	configured := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_api_token_cipher") != ""
+	configured := store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), "coolify_api_token")
 	jsonOK(w, map[string]any{
 		"enabled":    enabled,
 		"configured": configured,
@@ -602,4 +597,3 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 
 	jsonOK(w, map[string]any{"uuid": uuid, "name": keyName, "already_existed": false})
 }
-

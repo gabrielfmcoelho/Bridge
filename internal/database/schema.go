@@ -12,6 +12,7 @@ var TableCopyOrder = []string{
 	"users",
 	"enum_options",
 	"app_settings",
+	"app_secrets",
 	"permissions",
 	"contacts",
 	"hosts",

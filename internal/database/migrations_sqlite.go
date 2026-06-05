@@ -1309,4 +1309,22 @@ var migrationsSQLite = []string{
 	DROP TABLE service_responsaveis;
 	DROP TABLE project_responsaveis;
 	CREATE INDEX IF NOT EXISTS idx_responsaveis_entity ON responsaveis (entity_type, entity_id);`,
+
+	// Version 71 (R3): de-sprawl encrypted integration secrets out of
+	// app_settings into a structured app_secrets(key, cipher, nonce) table.
+	// Each secret was two rows (<key>_cipher, <key>_nonce) holding hex strings;
+	// they collapse to one app_secrets row per logical key. Values stay hex
+	// (a pure text move — portable, no decode needed); the encryption itself is
+	// unchanged. app_settings is left holding plaintext config only.
+	`CREATE TABLE IF NOT EXISTS app_secrets (
+		key    TEXT PRIMARY KEY,
+		cipher TEXT NOT NULL DEFAULT '',
+		nonce  TEXT NOT NULL DEFAULT ''
+	);
+	INSERT OR IGNORE INTO app_secrets (key, cipher, nonce)
+		SELECT substr(c.key, 1, length(c.key) - 7), c.value, n.value
+		FROM app_settings c
+		JOIN app_settings n ON n.key = substr(c.key, 1, length(c.key) - 7) || '_nonce'
+		WHERE c.key LIKE '%\_cipher' ESCAPE '\' AND c.value <> '';
+	DELETE FROM app_settings WHERE key LIKE '%\_cipher' ESCAPE '\' OR key LIKE '%\_nonce' ESCAPE '\';`,
 }

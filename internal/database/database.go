@@ -153,8 +153,7 @@ func (d *DB) guardAgainstLostKey() error {
 
 	var count int
 	err := d.SQL.QueryRow(`
-		SELECT COUNT(*) FROM app_settings
-		WHERE key LIKE '%_cipher' AND value IS NOT NULL AND value <> ''
+		SELECT COUNT(*) FROM app_secrets WHERE cipher IS NOT NULL AND cipher <> ''
 	`).Scan(&count)
 	if err != nil {
 		// If the check itself fails we'd rather start than refuse — the worst
@@ -174,53 +173,42 @@ func (d *DB) guardAgainstLostKey() error {
 	)
 }
 
-// purgeUndecryptableSettings tries to decrypt every encrypted row in
-// app_settings with the active key. Rows that fail (wrong key, corrupt data)
-// are deleted together with their paired _nonce row. The action is logged so
-// operators can audit what was wiped.
+// purgeUndecryptableSettings tries to decrypt every secret in app_secrets with
+// the active key. Rows that fail (wrong key, corrupt data) are deleted. The
+// action is logged so operators can audit what was wiped.
 func (d *DB) purgeUndecryptableSettings() error {
-	rows, err := d.SQL.Query(`
-		SELECT key, value FROM app_settings
-		WHERE key LIKE '%_cipher' AND value IS NOT NULL AND value <> ''
-	`)
+	rows, err := d.SQL.Query(`SELECT key, cipher, nonce FROM app_secrets WHERE cipher <> ''`)
 	if err != nil {
 		return fmt.Errorf("purge encrypted settings: query: %w", err)
 	}
 
-	type entry struct{ key, value string }
-	var ciphers []entry
+	type entry struct{ key, cipher, nonce string }
+	var secrets []entry
 	for rows.Next() {
 		var e entry
-		if err := rows.Scan(&e.key, &e.value); err != nil {
+		if err := rows.Scan(&e.key, &e.cipher, &e.nonce); err != nil {
 			rows.Close()
 			return fmt.Errorf("purge encrypted settings: scan: %w", err)
 		}
-		ciphers = append(ciphers, e)
+		secrets = append(secrets, e)
 	}
 	rows.Close()
 
 	var doomed []string
-	for _, c := range ciphers {
-		nonceKey := strings.TrimSuffix(c.key, "_cipher") + "_nonce"
-		var nonceHex string
-		if err := d.SQL.QueryRow(`SELECT value FROM app_settings WHERE key = ?`, nonceKey).Scan(&nonceHex); err != nil {
-			// Cipher without a nonce is already broken — purge it.
-			doomed = append(doomed, c.key, nonceKey)
-			continue
-		}
-		cipherBytes, errC := hex.DecodeString(c.value)
-		nonceBytes, errN := hex.DecodeString(nonceHex)
+	for _, s := range secrets {
+		cipherBytes, errC := hex.DecodeString(s.cipher)
+		nonceBytes, errN := hex.DecodeString(s.nonce)
 		if errC != nil || errN != nil {
-			doomed = append(doomed, c.key, nonceKey)
+			doomed = append(doomed, s.key)
 			continue
 		}
 		if _, err := d.Encryptor.Decrypt(cipherBytes, nonceBytes); err != nil {
-			doomed = append(doomed, c.key, nonceKey)
+			doomed = append(doomed, s.key)
 		}
 	}
 
 	if len(doomed) == 0 {
-		log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: every encrypted setting decrypted cleanly, nothing to purge")
+		log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: every encrypted secret decrypted cleanly, nothing to purge")
 		return nil
 	}
 
@@ -229,7 +217,7 @@ func (d *DB) purgeUndecryptableSettings() error {
 		return fmt.Errorf("purge encrypted settings: begin: %w", err)
 	}
 	for _, k := range doomed {
-		if _, err := tx.Exec(`DELETE FROM app_settings WHERE key = ?`, k); err != nil {
+		if _, err := tx.Exec(`DELETE FROM app_secrets WHERE key = ?`, k); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("purge encrypted settings: delete %q: %w", k, err)
 		}
@@ -238,7 +226,7 @@ func (d *DB) purgeUndecryptableSettings() error {
 		return fmt.Errorf("purge encrypted settings: commit: %w", err)
 	}
 
-	log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: deleted %d undecryptable app_settings row(s): %v",
+	log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: deleted %d undecryptable app_secrets row(s): %v",
 		len(doomed), doomed)
 	return nil
 }

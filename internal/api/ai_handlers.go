@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -38,17 +37,13 @@ func (h *aiHandlers) getClient() (*llm.Client, error) {
 		maxTokens = n
 	}
 
-	// Decrypt API key.
-	cipherHex := get("llm_api_key_cipher")
-	nonceHex := get("llm_api_key_nonce")
-	if cipherHex == "" || nonceHex == "" || baseURL == "" {
-		return nil, http.ErrAbortHandler
-	}
-	cipher, _ := hex.DecodeString(cipherHex)
-	nonce, _ := hex.DecodeString(nonceHex)
-	apiKey, err := h.db.Encryptor.Decrypt(cipher, nonce)
+	// Decrypt API key (now stored in app_secrets).
+	apiKey, ok, err := store.NewAppSecretRepo(h.db.SQL).Reveal(context.Background(), h.db.Encryptor, "llm_api_key")
 	if err != nil {
 		return nil, err
+	}
+	if !ok || baseURL == "" {
+		return nil, http.ErrAbortHandler
 	}
 
 	return llm.NewClient(baseURL, apiKey, model, maxTokens), nil
@@ -57,7 +52,7 @@ func (h *aiHandlers) getClient() (*llm.Client, error) {
 // handleStatus checks if the LLM integration is configured.
 func (h *aiHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	enabled := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_enabled") == "true"
-	configured := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_api_key_cipher") != ""
+	configured := store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), "llm_api_key")
 	jsonOK(w, map[string]any{
 		"enabled":    enabled,
 		"configured": configured,
@@ -326,11 +321,11 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 
 	analysis := strings.TrimSpace(reply)
 	record := &models.ProjectAIAnalysis{
-		ProjectID:    projectID,
-		Content:      analysis,
-		Locale:       locale,
-		CommitsUsed:  len(all),
-		ReposUsed:    len(targets),
+		ProjectID:   projectID,
+		Content:     analysis,
+		Locale:      locale,
+		CommitsUsed: len(all),
+		ReposUsed:   len(targets),
 	}
 	if err := store.NewProjectAIAnalysisRepo(h.db.SQL).Upsert(r.Context(), record); err != nil {
 		// Persistence failure shouldn't hide the freshly-generated result from the user,
@@ -344,12 +339,12 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 		return
 	}
 	jsonOK(w, map[string]any{
-		"project_id":    projectID,
-		"content":       analysis,
-		"locale":        locale,
-		"commits_used":  len(all),
-		"repos_used":    len(targets),
-		"generated_at":  time.Now().UTC().Format(time.RFC3339),
+		"project_id":   projectID,
+		"content":      analysis,
+		"locale":       locale,
+		"commits_used": len(all),
+		"repos_used":   len(targets),
+		"generated_at": time.Now().UTC().Format(time.RFC3339),
 	})
 }
 

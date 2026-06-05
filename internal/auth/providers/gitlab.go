@@ -3,7 +3,6 @@ package providers
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,7 +25,7 @@ func NewGitLabProvider(db *sql.DB, enc *database.Encryptor) *GitLabProvider {
 	return &GitLabProvider{db: db, enc: enc}
 }
 
-func (p *GitLabProvider) Name() string             { return "gitlab" }
+func (p *GitLabProvider) Name() string              { return "gitlab" }
 func (p *GitLabProvider) SupportsDirectLogin() bool { return false }
 
 func (p *GitLabProvider) Enabled() bool {
@@ -79,20 +78,8 @@ func (p *GitLabProvider) loadConfig() (*gitlabConfig, error) {
 }
 
 func (p *GitLabProvider) decryptSetting(prefix string) (string, error) {
-	cipherHex := store.NewAppSettingsRepo(p.db).Value(context.Background(), prefix+"_cipher")
-	nonceHex := store.NewAppSettingsRepo(p.db).Value(context.Background(), prefix+"_nonce")
-	if cipherHex == "" || nonceHex == "" {
-		return "", nil
-	}
-	cipher, err := hex.DecodeString(cipherHex)
-	if err != nil {
-		return "", err
-	}
-	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil {
-		return "", err
-	}
-	return p.enc.Decrypt(cipher, nonce)
+	v, _, err := store.NewAppSecretRepo(p.db).Reveal(context.Background(), p.enc, prefix)
+	return v, err
 }
 
 func (p *GitLabProvider) oauthConfig(cfg *gitlabConfig, callbackURL string) *oauth2.Config {

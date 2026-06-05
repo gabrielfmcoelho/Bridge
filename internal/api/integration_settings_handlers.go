@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"net/http"
 	"strings"
 	"time"
@@ -102,17 +101,17 @@ var integrationGroups = map[string][]string{
 
 // secretKeys are settings that need encryption (stored as _cipher/_nonce pairs).
 var secretKeys = map[string]bool{
-	"auth_ldap_bind_password":              true,
-	"auth_keycloak_client_secret":          true,
-	"auth_gitlab_client_secret":            true,
-	"gitlab_code_service_token":            true,
-	"llm_api_key":                          true,
-	"coolify_api_token":                    true,
-	"grafana_api_token":                    true,
-	"grafana_webhook_secret":               true,
-	"grafana_prom_remote_write_password":   true,
-	"outline_api_token":                    true,
-	"glpi_app_token":                       true,
+	"auth_ldap_bind_password":            true,
+	"auth_keycloak_client_secret":        true,
+	"auth_gitlab_client_secret":          true,
+	"gitlab_code_service_token":          true,
+	"llm_api_key":                        true,
+	"coolify_api_token":                  true,
+	"grafana_api_token":                  true,
+	"grafana_webhook_secret":             true,
+	"grafana_prom_remote_write_password": true,
+	"outline_api_token":                  true,
+	"glpi_app_token":                     true,
 }
 
 // handleGetIntegrations returns all integration settings grouped by provider.
@@ -124,8 +123,7 @@ func (h *integrationSettingsHandlers) handleGetIntegrations(w http.ResponseWrite
 		for _, key := range keys {
 			if secretKeys[key] {
 				// For secrets, just indicate whether a value is set (never return the actual value).
-				cipher := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), key+"_cipher")
-				if cipher != "" {
+				if store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), key) {
 					settings[key] = "••••••••"
 				} else {
 					settings[key] = ""
@@ -174,14 +172,11 @@ func (h *integrationSettingsHandlers) handleUpdateIntegrationGroup(w http.Respon
 			if value == "" || value == "••••••••" {
 				continue
 			}
-			// Encrypt the secret value.
-			cipher, nonce, err := h.db.Encryptor.Encrypt(value)
-			if err != nil {
+			// Encrypt + persist the secret in app_secrets.
+			if err := store.NewAppSecretRepo(h.db.SQL).Store(r.Context(), h.db.Encryptor, key, value); err != nil {
 				jsonServerError(w, r, "failed to encrypt "+key, err)
 				return
 			}
-			store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key+"_cipher", hex.EncodeToString(cipher))
-			store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key+"_nonce", hex.EncodeToString(nonce))
 		} else {
 			store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key, value)
 		}
@@ -244,8 +239,7 @@ func (h *integrationSettingsHandlers) handleClearIntegrationSecret(w http.Respon
 		return
 	}
 
-	store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key+"_cipher", "")
-	store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key+"_nonce", "")
+	store.NewAppSecretRepo(h.db.SQL).Clear(r.Context(), key)
 	jsonOK(w, map[string]string{"status": "cleared"})
 }
 
@@ -299,11 +293,11 @@ func (h *integrationSettingsHandlers) handleTestOutline(w http.ResponseWriter, r
 	}
 
 	jsonOK(w, map[string]any{
-		"success":        true,
-		"user":           info.User.Name,
-		"user_email":     info.User.Email,
-		"workspace":      info.Team.Name,
-		"workspace_url":  info.Team.URL,
+		"success":       true,
+		"user":          info.User.Name,
+		"user_email":    info.User.Email,
+		"workspace":     info.Team.Name,
+		"workspace_url": info.Team.URL,
 	})
 }
 
@@ -440,16 +434,8 @@ func (h *integrationSettingsHandlers) handleTestLLM(w http.ResponseWriter, r *ht
 		model = get("llm_model_text")
 	}
 	if apiKey == "" {
-		cipherHex := get("llm_api_key_cipher")
-		nonceHex := get("llm_api_key_nonce")
-		if cipherHex != "" && nonceHex != "" {
-			cipher, err1 := hex.DecodeString(cipherHex)
-			nonce, err2 := hex.DecodeString(nonceHex)
-			if err1 == nil && err2 == nil {
-				if decrypted, err := h.db.Encryptor.Decrypt(cipher, nonce); err == nil {
-					apiKey = decrypted
-				}
-			}
+		if decrypted, ok, err := store.NewAppSecretRepo(h.db.SQL).Reveal(r.Context(), h.db.Encryptor, "llm_api_key"); ok && err == nil {
+			apiKey = decrypted
 		}
 	}
 

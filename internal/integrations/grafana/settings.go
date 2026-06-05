@@ -3,7 +3,6 @@ package grafana
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -13,16 +12,16 @@ import (
 // Settings is the resolved Grafana configuration. Empty strings mean "not set";
 // callers should treat missing pieces as "not configured" rather than erroring.
 type Settings struct {
-	Enabled                       bool
-	BaseURL                       string
-	APIToken                      string
-	WebhookSecret                 string
-	HostDefaultDashboardUID       string
-	ServiceDefaultDashboardUID    string
-	PromRemoteWriteURL            string
-	PromRemoteWriteUsername       string
-	PromRemoteWritePassword       string
-	DatasourceUID                 string
+	Enabled                    bool
+	BaseURL                    string
+	APIToken                   string
+	WebhookSecret              string
+	HostDefaultDashboardUID    string
+	ServiceDefaultDashboardUID string
+	PromRemoteWriteURL         string
+	PromRemoteWriteUsername    string
+	PromRemoteWritePassword    string
+	DatasourceUID              string
 }
 
 // LoadSettings reads every grafana_* key from app_settings, decrypting the
@@ -60,20 +59,8 @@ func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 }
 
 func decryptSecret(db *sql.DB, enc *database.Encryptor, prefix string) (string, error) {
-	cipherHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_cipher")
-	nonceHex := store.NewAppSettingsRepo(db).Value(context.Background(), prefix+"_nonce")
-	if cipherHex == "" || nonceHex == "" {
-		return "", nil
-	}
-	cipher, err := hex.DecodeString(cipherHex)
-	if err != nil {
-		return "", err
-	}
-	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil {
-		return "", err
-	}
-	return enc.Decrypt(cipher, nonce)
+	v, _, err := store.NewAppSecretRepo(db).Reveal(context.Background(), enc, prefix)
+	return v, err
 }
 
 // NewServiceClient returns a Client using the resolved settings, or nil if the

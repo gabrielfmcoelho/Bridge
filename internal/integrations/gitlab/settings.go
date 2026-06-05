@@ -3,7 +3,6 @@ package gitlab
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -33,21 +32,7 @@ func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 		s.BaseURL = DefaultBaseURL
 	}
 
-	cipherHex := store.NewAppSettingsRepo(db).Value(context.Background(), "gitlab_code_service_token_cipher")
-	nonceHex := store.NewAppSettingsRepo(db).Value(context.Background(), "gitlab_code_service_token_nonce")
-	if cipherHex == "" || nonceHex == "" {
-		return s, nil
-	}
-
-	cipher, err := hex.DecodeString(cipherHex)
-	if err != nil {
-		return s, err
-	}
-	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil {
-		return s, err
-	}
-	token, err := enc.Decrypt(cipher, nonce)
+	token, _, err := store.NewAppSecretRepo(db).Reveal(context.Background(), enc, "gitlab_code_service_token")
 	if err != nil {
 		return s, err
 	}
