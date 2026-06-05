@@ -122,3 +122,11 @@ func (h *hostChamadoHandlers) handleDelete(w http.ResponseWriter, r *http.Reques
 
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *hostChamadoHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/hosts/{slug}/chamados", h.handleList)
+	rr.role("editor", "POST /api/hosts/{slug}/chamados", h.handleCreate)
+	rr.role("editor", "PUT /api/hosts/{slug}/chamados/{chamadoId}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/hosts/{slug}/chamados/{chamadoId}", h.handleDelete)
+}

@@ -124,3 +124,9 @@ func (h *oauthHandlers) handleCallback(w http.ResponseWriter, r *http.Request) {
 	auth.SetSessionCookie(w, token, expiresAt)
 	http.Redirect(w, r, "/login?auth=success", http.StatusFound)
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *oauthHandlers) registerRoutes(rr routeRegistrar) {
+	rr.public("GET /api/auth/oauth/{provider}/authorize", h.handleAuthorize)
+	rr.public("GET /api/auth/oauth/{provider}/callback", h.handleCallback)
+}

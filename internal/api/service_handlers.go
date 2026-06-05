@@ -194,3 +194,14 @@ func (h *serviceHandlers) handleUpdateContainer(w http.ResponseWriter, r *http.R
 	}
 	jsonOK(w, svc)
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *serviceHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/services", h.handleList)
+	rr.role("editor", "POST /api/services", h.handleCreate)
+	rr.auth("GET /api/services/{id}", h.handleGet)
+	rr.role("editor", "PUT /api/services/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/services/{id}", h.handleDelete)
+	rr.role("editor", "POST /api/services/{id}/fixate", h.handleFixate)
+	rr.role("editor", "PUT /api/services/{id}/container", h.handleUpdateContainer)
+}

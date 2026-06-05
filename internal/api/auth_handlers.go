@@ -458,3 +458,16 @@ func (h *authHandlers) handleDeleteUser(w http.ResponseWriter, r *http.Request) 
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *authHandlers) registerRoutes(rr routeRegistrar) {
+	rr.public("GET /api/auth/status", h.handleStatus)
+	rr.public("POST /api/auth/setup", h.handleSetup)
+	rr.public("POST /api/auth/login", h.handleLogin)
+	rr.auth("POST /api/auth/logout", h.handleLogout)
+	rr.auth("GET /api/auth/me", h.handleMe)
+	rr.role("admin", "GET /api/users", h.handleListUsers)
+	rr.role("admin", "POST /api/users", h.handleCreateUser)
+	rr.role("admin", "PUT /api/users/{id}", h.handleUpdateUser)
+	rr.role("admin", "DELETE /api/users/{id}", h.handleDeleteUser)
+}

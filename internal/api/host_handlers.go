@@ -411,3 +411,13 @@ func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
 	}
 	return []byte(key.PrivateKeyPEM), nil
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *hostHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/hosts", h.handleList)
+	rr.role("editor", "POST /api/hosts", h.handleCreate)
+	rr.auth("GET /api/hosts/{slug}", h.handleGet)
+	rr.role("editor", "PUT /api/hosts/{slug}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/hosts/{slug}", h.handleDelete)
+	rr.role("admin", "GET /api/hosts/{slug}/password", h.handleGetPassword)
+}

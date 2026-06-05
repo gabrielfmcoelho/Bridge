@@ -77,3 +77,11 @@ func (h *orchestratorHandlers) handleDelete(w http.ResponseWriter, r *http.Reque
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *orchestratorHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/orchestrators", h.handleList)
+	rr.role("editor", "POST /api/orchestrators", h.handleCreate)
+	rr.role("editor", "PUT /api/orchestrators/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/orchestrators/{id}", h.handleDelete)
+}

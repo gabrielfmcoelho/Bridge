@@ -193,3 +193,12 @@ func (h *hostAlertHandlers) handleDelete(w http.ResponseWriter, r *http.Request)
 
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *hostAlertHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/hosts/{slug}/alerts", h.handleList)
+	rr.role("editor", "POST /api/hosts/{slug}/alerts", h.handleCreate)
+	rr.role("editor", "PUT /api/hosts/{slug}/alerts/{alertId}", h.handleUpdate)
+	rr.role("editor", "POST /api/hosts/{slug}/alerts/{alertId}/conclude", h.handleConclude)
+	rr.role("admin", "DELETE /api/hosts/{slug}/alerts/{alertId}", h.handleDelete)
+}

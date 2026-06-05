@@ -103,3 +103,12 @@ func (h *dnsHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *dnsHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/dns", h.handleList)
+	rr.role("editor", "POST /api/dns", h.handleCreate)
+	rr.auth("GET /api/dns/{id}", h.handleGet)
+	rr.role("editor", "PUT /api/dns/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/dns/{id}", h.handleDelete)
+}

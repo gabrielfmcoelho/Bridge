@@ -49,68 +49,18 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	olh := app.outline
 	glpih := app.glpi
 
-	// Auth routes (no auth required)
-	mux.HandleFunc("GET /api/auth/status", ah.handleStatus)
-	mux.HandleFunc("POST /api/auth/setup", ah.handleSetup)
-	mux.HandleFunc("POST /api/auth/login", ah.handleLogin)
-
-	// OAuth routes (no auth — they ARE the auth)
-	mux.HandleFunc("GET /api/auth/oauth/{provider}/authorize", oah.handleAuthorize)
-	mux.HandleFunc("GET /api/auth/oauth/{provider}/callback", oah.handleCallback)
-
-	// Auth routes (auth required)
-	mux.Handle("POST /api/auth/logout", authenticated(db, http.HandlerFunc(ah.handleLogout)))
-	mux.Handle("GET /api/auth/me", authenticated(db, http.HandlerFunc(ah.handleMe)))
-
-	// User management (admin only)
-	mux.Handle("GET /api/users", authedRole(db, "admin", http.HandlerFunc(ah.handleListUsers)))
-	mux.Handle("POST /api/users", authedRole(db, "admin", http.HandlerFunc(ah.handleCreateUser)))
-	mux.Handle("PUT /api/users/{id}", authedRole(db, "admin", http.HandlerFunc(ah.handleUpdateUser)))
-	mux.Handle("DELETE /api/users/{id}", authedRole(db, "admin", http.HandlerFunc(ah.handleDeleteUser)))
-
-	// Hosts
-	mux.Handle("GET /api/hosts", authenticated(db, http.HandlerFunc(hh.handleList)))
-	mux.Handle("POST /api/hosts", authedRole(db, "editor", http.HandlerFunc(hh.handleCreate)))
-	mux.Handle("GET /api/hosts/{slug}", authenticated(db, http.HandlerFunc(hh.handleGet)))
-	mux.Handle("PUT /api/hosts/{slug}", authedRole(db, "editor", http.HandlerFunc(hh.handleUpdate)))
-	mux.Handle("DELETE /api/hosts/{slug}", authedRole(db, "admin", http.HandlerFunc(hh.handleDelete)))
-	mux.Handle("GET /api/hosts/{slug}/password", authedRole(db, "admin", http.HandlerFunc(hh.handleGetPassword)))
-
-	// Host alerts (manual)
-	mux.Handle("GET /api/hosts/{slug}/alerts", authenticated(db, http.HandlerFunc(hah.handleList)))
-	mux.Handle("POST /api/hosts/{slug}/alerts", authedRole(db, "editor", http.HandlerFunc(hah.handleCreate)))
-	mux.Handle("PUT /api/hosts/{slug}/alerts/{alertId}", authedRole(db, "editor", http.HandlerFunc(hah.handleUpdate)))
-	mux.Handle("POST /api/hosts/{slug}/alerts/{alertId}/conclude", authedRole(db, "editor", http.HandlerFunc(hah.handleConclude)))
-	mux.Handle("DELETE /api/hosts/{slug}/alerts/{alertId}", authedRole(db, "admin", http.HandlerFunc(hah.handleDelete)))
-
-	// Host chamados
-	mux.Handle("GET /api/hosts/{slug}/chamados", authenticated(db, http.HandlerFunc(hch.handleList)))
-	mux.Handle("POST /api/hosts/{slug}/chamados", authedRole(db, "editor", http.HandlerFunc(hch.handleCreate)))
-	mux.Handle("PUT /api/hosts/{slug}/chamados/{chamadoId}", authedRole(db, "editor", http.HandlerFunc(hch.handleUpdate)))
-	mux.Handle("DELETE /api/hosts/{slug}/chamados/{chamadoId}", authedRole(db, "admin", http.HandlerFunc(hch.handleDelete)))
-
-	// DNS
-	mux.Handle("GET /api/dns", authenticated(db, http.HandlerFunc(dh.handleList)))
-	mux.Handle("POST /api/dns", authedRole(db, "editor", http.HandlerFunc(dh.handleCreate)))
-	mux.Handle("GET /api/dns/{id}", authenticated(db, http.HandlerFunc(dh.handleGet)))
-	mux.Handle("PUT /api/dns/{id}", authedRole(db, "editor", http.HandlerFunc(dh.handleUpdate)))
-	mux.Handle("DELETE /api/dns/{id}", authedRole(db, "admin", http.HandlerFunc(dh.handleDelete)))
-
-	// Projects
-	mux.Handle("GET /api/projects", authenticated(db, http.HandlerFunc(ph.handleList)))
-	mux.Handle("POST /api/projects", authedRole(db, "editor", http.HandlerFunc(ph.handleCreate)))
-	mux.Handle("GET /api/projects/{id}", authenticated(db, http.HandlerFunc(ph.handleGet)))
-	mux.Handle("PUT /api/projects/{id}", authedRole(db, "editor", http.HandlerFunc(ph.handleUpdate)))
-	mux.Handle("DELETE /api/projects/{id}", authedRole(db, "admin", http.HandlerFunc(ph.handleDelete)))
-
-	// Services
-	mux.Handle("GET /api/services", authenticated(db, http.HandlerFunc(sh.handleList)))
-	mux.Handle("POST /api/services", authedRole(db, "editor", http.HandlerFunc(sh.handleCreate)))
-	mux.Handle("GET /api/services/{id}", authenticated(db, http.HandlerFunc(sh.handleGet)))
-	mux.Handle("PUT /api/services/{id}", authedRole(db, "editor", http.HandlerFunc(sh.handleUpdate)))
-	mux.Handle("DELETE /api/services/{id}", authedRole(db, "admin", http.HandlerFunc(sh.handleDelete)))
-	mux.Handle("POST /api/services/{id}/fixate", authedRole(db, "editor", http.HandlerFunc(sh.handleFixate)))
-	mux.Handle("PUT /api/services/{id}/container", authedRole(db, "editor", http.HandlerFunc(sh.handleUpdateContainer)))
+	// Self-registering handler groups own their route+role tables next to their
+	// handler (R2). The integration/misc groups further below are not yet
+	// migrated and remain inline.
+	rr := routeRegistrar{mux: mux, db: db}
+	ah.registerRoutes(rr)   // /api/auth/*, /api/users/*
+	oah.registerRoutes(rr)  // /api/auth/oauth/*
+	hh.registerRoutes(rr)   // /api/hosts/*
+	hah.registerRoutes(rr)  // /api/hosts/{slug}/alerts/*
+	hch.registerRoutes(rr)  // /api/hosts/{slug}/chamados/*
+	dh.registerRoutes(rr)   // /api/dns/*
+	ph.registerRoutes(rr)   // /api/projects/*
+	sh.registerRoutes(rr)   // /api/services/*
 
 	// (Legacy /api/services/{id}/credentials and /api/services/credentials/all
 	// were removed in Phase 1 cutover — callers use /api/secrets directly.)
@@ -149,10 +99,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.HandleFunc("GET /api/share-bundle/{token}", publicBundleH.handleRedeem)
 
 	// Orchestrators
-	mux.Handle("GET /api/orchestrators", authenticated(db, http.HandlerFunc(oh.handleList)))
-	mux.Handle("POST /api/orchestrators", authedRole(db, "editor", http.HandlerFunc(oh.handleCreate)))
-	mux.Handle("PUT /api/orchestrators/{id}", authedRole(db, "editor", http.HandlerFunc(oh.handleUpdate)))
-	mux.Handle("DELETE /api/orchestrators/{id}", authedRole(db, "admin", http.HandlerFunc(oh.handleDelete)))
+	oh.registerRoutes(rr) // /api/orchestrators/*
 
 	// SSH operations
 	mux.Handle("GET /api/ssh/preview-config", authenticated(db, http.HandlerFunc(ssh.handlePreviewConfig)))
