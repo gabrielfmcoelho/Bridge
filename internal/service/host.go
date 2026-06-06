@@ -521,3 +521,13 @@ func (s *HostService) applyLinkRelations(ctx context.Context, hostID int64, w *H
 		}
 	}
 }
+
+// ListTrash returns soft-deleted hosts (the trash view).
+func (s *HostService) ListTrash(ctx context.Context) ([]models.Host, error) {
+	return s.hosts.ListTrash(ctx)
+}
+
+// Restore un-deletes a host (and cascade-restores its secrets) by id.
+func (s *HostService) Restore(ctx context.Context, actor models.ActorContext, id int64) error {
+	return store.RestoreParent(ctx, s.sqlDB, actor, models.SecretScopeHost, id)
+}

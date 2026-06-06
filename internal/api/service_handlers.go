@@ -53,10 +53,10 @@ func (h *serviceHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 // "present" (set) on update.
 type serviceWriteRequest struct {
 	models.Service
-	Tags         *[]string                         `json:"tags"`
-	HostIDs      *[]int64                          `json:"host_ids"`
-	DNSIDs       *[]int64                          `json:"dns_ids"`
-	DependsOnIDs *[]int64                          `json:"depends_on_ids"`
+	Tags         *[]string                  `json:"tags"`
+	HostIDs      *[]int64                   `json:"host_ids"`
+	DNSIDs       *[]int64                   `json:"dns_ids"`
+	DependsOnIDs *[]int64                   `json:"depends_on_ids"`
 	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 }
 
@@ -198,10 +198,37 @@ func (h *serviceHandlers) handleUpdateContainer(w http.ResponseWriter, r *http.R
 // registerRoutes wires this group's routes (self-registration, R2).
 func (h *serviceHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/services", h.handleList)
+	rr.auth("GET /api/services/trash", h.handleListTrash)
+	rr.role("admin", "POST /api/services/{id}/restore", h.handleRestore)
 	rr.role("editor", "POST /api/services", h.handleCreate)
 	rr.auth("GET /api/services/{id}", h.handleGet)
 	rr.role("editor", "PUT /api/services/{id}", h.handleUpdate)
 	rr.role("admin", "DELETE /api/services/{id}", h.handleDelete)
 	rr.role("editor", "POST /api/services/{id}/fixate", h.handleFixate)
 	rr.role("editor", "PUT /api/services/{id}/container", h.handleUpdateContainer)
+}
+
+func (h *serviceHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
+	items, err := h.service.ListTrash(r.Context())
+	if err != nil {
+		jsonServerError(w, r, "failed to list service trash", err)
+		return
+	}
+	if items == nil {
+		items = []models.Service{}
+	}
+	jsonOK(w, items)
+}
+
+func (h *serviceHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	actor, _ := actorFrom(r)
+	if err := h.service.Restore(r.Context(), actor, id); err != nil {
+		jsonServerError(w, r, "failed to restore service", err)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "restored"})
 }

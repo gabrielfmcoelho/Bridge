@@ -131,15 +131,15 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		models.Host
-		Tags         []string                      `json:"tags"`
-		Password     string                        `json:"password"`
-		SSHKeyID     int64                         `json:"ssh_key_id"`
-		Responsaveis []models.ResponsavelInput `json:"responsaveis"`
-		Chamados     []models.HostChamadoInput     `json:"chamados"`
-		Entidades    []models.HostEntidadeInput    `json:"entidades"`
-		DNSIDs       []int64                       `json:"dns_ids"`
-		ServiceIDs   []int64                       `json:"service_ids"`
-		ProjectIDs   []int64                       `json:"project_ids"`
+		Tags         []string                   `json:"tags"`
+		Password     string                     `json:"password"`
+		SSHKeyID     int64                      `json:"ssh_key_id"`
+		Responsaveis []models.ResponsavelInput  `json:"responsaveis"`
+		Chamados     []models.HostChamadoInput  `json:"chamados"`
+		Entidades    []models.HostEntidadeInput `json:"entidades"`
+		DNSIDs       []int64                    `json:"dns_ids"`
+		ServiceIDs   []int64                    `json:"service_ids"`
+		ProjectIDs   []int64                    `json:"project_ids"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -228,16 +228,16 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		models.Host
-		Tags         []string                       `json:"tags"`
-		Password     string                         `json:"password"`
-		SSHKeyID     int64                          `json:"ssh_key_id"`
-		ClearKey     bool                           `json:"clear_key"`
-		Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
-		Chamados     *[]models.HostChamadoInput     `json:"chamados"`
-		Entidades    *[]models.HostEntidadeInput    `json:"entidades"`
-		DNSIDs       *[]int64                       `json:"dns_ids"`
-		ServiceIDs   *[]int64                       `json:"service_ids"`
-		ProjectIDs   *[]int64                       `json:"project_ids"`
+		Tags         []string                    `json:"tags"`
+		Password     string                      `json:"password"`
+		SSHKeyID     int64                       `json:"ssh_key_id"`
+		ClearKey     bool                        `json:"clear_key"`
+		Responsaveis *[]models.ResponsavelInput  `json:"responsaveis"`
+		Chamados     *[]models.HostChamadoInput  `json:"chamados"`
+		Entidades    *[]models.HostEntidadeInput `json:"entidades"`
+		DNSIDs       *[]int64                    `json:"dns_ids"`
+		ServiceIDs   *[]int64                    `json:"service_ids"`
+		ProjectIDs   *[]int64                    `json:"project_ids"`
 	}
 	req.Host = *existing
 	if err := decodeJSON(r, &req); err != nil {
@@ -415,9 +415,36 @@ func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
 // registerRoutes wires this group's routes (self-registration, R2).
 func (h *hostHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/hosts", h.handleList)
+	rr.auth("GET /api/hosts/trash", h.handleListTrash)
+	rr.role("admin", "POST /api/hosts/{id}/restore", h.handleRestore)
 	rr.role("editor", "POST /api/hosts", h.handleCreate)
 	rr.auth("GET /api/hosts/{slug}", h.handleGet)
 	rr.role("editor", "PUT /api/hosts/{slug}", h.handleUpdate)
 	rr.role("admin", "DELETE /api/hosts/{slug}", h.handleDelete)
 	rr.role("admin", "GET /api/hosts/{slug}/password", h.handleGetPassword)
+}
+
+func (h *hostHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
+	items, err := h.host.ListTrash(r.Context())
+	if err != nil {
+		jsonServerError(w, r, "failed to list host trash", err)
+		return
+	}
+	if items == nil {
+		items = []models.Host{}
+	}
+	jsonOK(w, items)
+}
+
+func (h *hostHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	actor, _ := actorFrom(r)
+	if err := h.host.Restore(r.Context(), actor, id); err != nil {
+		jsonServerError(w, r, "failed to restore host", err)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "restored"})
 }

@@ -206,3 +206,13 @@ func (s *ProjectService) Delete(ctx context.Context, actor models.ActorContext, 
 	}
 	return store.DeleteParent(ctx, s.db, actor, models.SecretScopeProjeto, id)
 }
+
+// ListTrash returns soft-deleted projects (the trash view).
+func (s *ProjectService) ListTrash(ctx context.Context) ([]models.Project, error) {
+	return s.projects.ListTrash(ctx)
+}
+
+// Restore un-deletes a project (and cascade-restores its secrets) by id.
+func (s *ProjectService) Restore(ctx context.Context, actor models.ActorContext, id int64) error {
+	return store.RestoreParent(ctx, s.db, actor, models.SecretScopeProjeto, id)
+}

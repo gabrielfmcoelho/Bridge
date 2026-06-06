@@ -163,3 +163,21 @@ func (r *ProjectRepo) HostIDs(ctx context.Context, projectID int64) ([]int64, er
 	}
 	return scanInt64s(rows)
 }
+
+// ListTrash returns soft-deleted projects (deleted_at set).
+func (r *ProjectRepo) ListTrash(ctx context.Context) ([]models.Project, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+projectCols+` FROM projects WHERE deleted_at IS NOT NULL ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var projects []models.Project
+	for rows.Next() {
+		var p models.Project
+		if err := scanProject(rows, &p); err != nil {
+			return nil, err
+		}
+		projects = append(projects, p)
+	}
+	return projects, rows.Err()
+}

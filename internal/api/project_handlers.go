@@ -45,7 +45,7 @@ func (h *projectHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 // "present" (set) on update.
 type projectWriteRequest struct {
 	models.Project
-	Tags         *[]string                         `json:"tags"`
+	Tags         *[]string                  `json:"tags"`
 	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 }
 
@@ -109,8 +109,35 @@ func (h *projectHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 // registerRoutes wires this group's routes (self-registration, R2).
 func (h *projectHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/projects", h.handleList)
+	rr.auth("GET /api/projects/trash", h.handleListTrash)
+	rr.role("admin", "POST /api/projects/{id}/restore", h.handleRestore)
 	rr.role("editor", "POST /api/projects", h.handleCreate)
 	rr.auth("GET /api/projects/{id}", h.handleGet)
 	rr.role("editor", "PUT /api/projects/{id}", h.handleUpdate)
 	rr.role("admin", "DELETE /api/projects/{id}", h.handleDelete)
+}
+
+func (h *projectHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
+	items, err := h.project.ListTrash(r.Context())
+	if err != nil {
+		jsonServerError(w, r, "failed to list project trash", err)
+		return
+	}
+	if items == nil {
+		items = []models.Project{}
+	}
+	jsonOK(w, items)
+}
+
+func (h *projectHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	actor, _ := actorFrom(r)
+	if err := h.project.Restore(r.Context(), actor, id); err != nil {
+		jsonServerError(w, r, "failed to restore project", err)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "restored"})
 }

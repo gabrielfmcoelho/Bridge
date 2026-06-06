@@ -410,3 +410,12 @@ func extractFirstHostPort(ports string) string {
 	}
 	return ""
 }
+
+// ListTrash returns soft-deleted services (deleted_at set).
+func (r *ServiceRepo) ListTrash(ctx context.Context) ([]models.Service, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE deleted_at IS NOT NULL ORDER BY nickname`)
+	if err != nil {
+		return nil, err
+	}
+	return scanServices(rows)
+}

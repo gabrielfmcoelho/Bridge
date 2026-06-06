@@ -363,3 +363,21 @@ func scanStringCountMap(rows *sql.Rows) (map[string]int, error) {
 	}
 	return m, rows.Err()
 }
+
+// ListTrash returns soft-deleted hosts (deleted_at set), newest-slug order.
+func (r *HostRepo) ListTrash(ctx context.Context) ([]models.Host, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE deleted_at IS NOT NULL ORDER BY oficial_slug`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var hosts []models.Host
+	for rows.Next() {
+		var h models.Host
+		if err := rows.Scan(hostScanDest(&h)...); err != nil {
+			return nil, err
+		}
+		hosts = append(hosts, h)
+	}
+	return hosts, rows.Err()
+}

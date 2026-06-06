@@ -273,3 +273,13 @@ func (s *ServiceService) UpdateContainer(ctx context.Context, id int64, containe
 	svc.ContainerID = containerID
 	return svc, nil
 }
+
+// ListTrash returns soft-deleted services (the trash view).
+func (s *ServiceService) ListTrash(ctx context.Context) ([]models.Service, error) {
+	return s.services.ListTrash(ctx)
+}
+
+// Restore un-deletes a service (and cascade-restores its secrets) by id.
+func (s *ServiceService) Restore(ctx context.Context, actor models.ActorContext, id int64) error {
+	return store.RestoreParent(ctx, s.db, actor, models.SecretScopeService, id)
+}
