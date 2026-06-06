@@ -83,7 +83,7 @@ func (r *HostRepo) Create(ctx context.Context, h *models.Host) error {
 // GetBySlug returns a host by oficial_slug, or (nil, nil) if absent.
 func (r *HostRepo) GetBySlug(ctx context.Context, slug string) (*models.Host, error) {
 	h := &models.Host{}
-	err := r.db.QueryRowContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE oficial_slug = ?`, slug).Scan(hostScanDest(h)...)
+	err := r.db.QueryRowContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE oficial_slug = ? AND deleted_at IS NULL`, slug).Scan(hostScanDest(h)...)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -93,7 +93,7 @@ func (r *HostRepo) GetBySlug(ctx context.Context, slug string) (*models.Host, er
 // GetByID returns a host by id, or (nil, nil) if absent.
 func (r *HostRepo) GetByID(ctx context.Context, id int64) (*models.Host, error) {
 	h := &models.Host{}
-	err := r.db.QueryRowContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE id = ?`, id).Scan(hostScanDest(h)...)
+	err := r.db.QueryRowContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE id = ? AND deleted_at IS NULL`, id).Scan(hostScanDest(h)...)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -104,7 +104,7 @@ func (r *HostRepo) GetByID(ctx context.Context, id int64) (*models.Host, error) 
 func (r *HostRepo) List(ctx context.Context, f models.HostFilter) ([]models.Host, error) {
 	query := `SELECT ` + hostColumns() + ` FROM hosts`
 	var args []any
-	var where []string
+	where := []string{"deleted_at IS NULL"}
 
 	if f.Situacao != "" {
 		where = append(where, "situacao = ?")
@@ -219,7 +219,7 @@ func (r *HostRepo) ListForSSHConfig(ctx context.Context) ([]models.Host, error) 
 func (r *HostRepo) Count(ctx context.Context, f models.HostFilter) (int, error) {
 	query := `SELECT COUNT(*) FROM hosts`
 	var args []any
-	var where []string
+	where := []string{"deleted_at IS NULL"}
 
 	if f.Situacao != "" {
 		where = append(where, "situacao = ?")
@@ -251,13 +251,13 @@ func (r *HostRepo) Count(ctx context.Context, f models.HostFilter) (int, error) 
 // CountAll returns the total number of hosts.
 func (r *HostRepo) CountAll(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM hosts`).Scan(&n)
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM hosts WHERE deleted_at IS NULL`).Scan(&n)
 	return n, err
 }
 
 // CountBySituacao returns situacao → host count.
 func (r *HostRepo) CountBySituacao(ctx context.Context) (map[string]int, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT situacao, COUNT(*) FROM hosts GROUP BY situacao`)
+	rows, err := r.db.QueryContext(ctx, `SELECT situacao, COUNT(*) FROM hosts WHERE deleted_at IS NULL GROUP BY situacao`)
 	if err != nil {
 		return nil, err
 	}
@@ -267,13 +267,13 @@ func (r *HostRepo) CountBySituacao(ctx context.Context) (map[string]int, error) 
 // NeedingMaintenanceCount returns the number of hosts flagged precisa_manutencao.
 func (r *HostRepo) NeedingMaintenanceCount(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM hosts WHERE precisa_manutencao`).Scan(&n)
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM hosts WHERE precisa_manutencao AND deleted_at IS NULL`).Scan(&n)
 	return n, err
 }
 
 // CountByHospedagem returns hospedagem (Unknown when empty) → host count.
 func (r *HostRepo) CountByHospedagem(ctx context.Context) (map[string]int, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT COALESCE(NULLIF(hospedagem, ''), 'Unknown'), COUNT(*) FROM hosts GROUP BY COALESCE(NULLIF(hospedagem, ''), 'Unknown')`)
+	rows, err := r.db.QueryContext(ctx, `SELECT COALESCE(NULLIF(hospedagem, ''), 'Unknown'), COUNT(*) FROM hosts WHERE deleted_at IS NULL GROUP BY COALESCE(NULLIF(hospedagem, ''), 'Unknown')`)
 	if err != nil {
 		return nil, err
 	}
@@ -325,6 +325,9 @@ func (r *HostRepo) Delete(ctx context.Context, id int64) error {
 // SlugExists reports whether a slug is taken, optionally excluding one host id.
 func (r *HostRepo) SlugExists(ctx context.Context, slug string, excludeID int64) (bool, error) {
 	var n int
+	// NOTE: no deleted_at filter — a soft-deleted host keeps its slug reserved
+	// (the unique index still covers it), so creating a new host with that slug
+	// is correctly rejected; restore the soft-deleted host instead.
 	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM hosts WHERE oficial_slug = ? AND id != ?`, slug, excludeID).Scan(&n)
 	return n > 0, err
 }

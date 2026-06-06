@@ -42,7 +42,7 @@ func auditCount(t *testing.T, d *database.DB, secretID int64, action string) int
 	return n
 }
 
-func TestDeleteParent_HardDeleteCascadesChildSecrets(t *testing.T) {
+func TestDeleteParent_SoftDeleteCascadesChildSecrets(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
 	ures, _ := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin')`)
@@ -58,11 +58,12 @@ func TestDeleteParent_HardDeleteCascadesChildSecrets(t *testing.T) {
 		t.Fatalf("DeleteParent: %v", err)
 	}
 
-	// Parent hard-deleted.
-	var n int
-	d.SQL.QueryRow(`SELECT COUNT(*) FROM hosts WHERE id = ?`, hostID).Scan(&n)
-	if n != 0 {
-		t.Fatalf("host still present after hard DeleteParent")
+	// R3: host is now soft-deleted (row remains, deleted_at set), not hard-deleted.
+	var live, total int
+	d.SQL.QueryRow(`SELECT COUNT(*) FROM hosts WHERE id = ? AND deleted_at IS NULL`, hostID).Scan(&live)
+	d.SQL.QueryRow(`SELECT COUNT(*) FROM hosts WHERE id = ?`, hostID).Scan(&total)
+	if live != 0 || total != 1 {
+		t.Fatalf("host should be soft-deleted (live=%d total=%d, want 0/1)", live, total)
 	}
 	// Both child secrets soft-deleted, each with a `delete` audit row.
 	if !deletedAt(t, d, s1) || !deletedAt(t, d, s2) {

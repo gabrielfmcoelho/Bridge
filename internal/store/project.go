@@ -59,7 +59,7 @@ func (r *ProjectRepo) Create(ctx context.Context, p *models.Project) error {
 // Get returns a project by id, or (nil, nil) if absent.
 func (r *ProjectRepo) Get(ctx context.Context, id int64) (*models.Project, error) {
 	p := &models.Project{}
-	err := scanProject(r.db.QueryRowContext(ctx, `SELECT `+projectCols+` FROM projects WHERE id = ?`, id), p)
+	err := scanProject(r.db.QueryRowContext(ctx, `SELECT `+projectCols+` FROM projects WHERE id = ? AND deleted_at IS NULL`, id), p)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -68,7 +68,7 @@ func (r *ProjectRepo) Get(ctx context.Context, id int64) (*models.Project, error
 
 // List returns all projects ordered by name.
 func (r *ProjectRepo) List(ctx context.Context) ([]models.Project, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+projectCols+` FROM projects ORDER BY name`)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+projectCols+` FROM projects WHERE deleted_at IS NULL ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (r *ProjectRepo) Delete(ctx context.Context, id int64) error {
 // Count returns the total number of projects.
 func (r *ProjectRepo) Count(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM projects`).Scan(&n)
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM projects WHERE deleted_at IS NULL`).Scan(&n)
 	return n, err
 }
 
@@ -139,7 +139,7 @@ func (r *ProjectRepo) ProjectsByHost(ctx context.Context, hostID int64) ([]model
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+projectColsP+`
 		 FROM projects p JOIN project_host_links l ON p.id = l.project_id
-		 WHERE l.host_id = ? ORDER BY p.name`, hostID)
+		 WHERE l.host_id = ? AND p.deleted_at IS NULL ORDER BY p.name`, hostID)
 	if err != nil {
 		return nil, err
 	}

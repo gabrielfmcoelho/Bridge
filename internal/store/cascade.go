@@ -33,9 +33,9 @@ var parentRegistry = map[models.SecretScope]ParentSpec{}
 func init() {
 	// The four secret-bearing parents that exist today. Adding a fifth means
 	// adding one line here (or a RegisterParent call in the entity's repo).
-	RegisterParent(models.SecretScopeService, ParentSpec{Table: "services", SoftDelete: false})
-	RegisterParent(models.SecretScopeHost, ParentSpec{Table: "hosts", SoftDelete: false})
-	RegisterParent(models.SecretScopeProjeto, ParentSpec{Table: "projects", SoftDelete: false})
+	RegisterParent(models.SecretScopeService, ParentSpec{Table: "services", SoftDelete: true})
+	RegisterParent(models.SecretScopeHost, ParentSpec{Table: "hosts", SoftDelete: true})
+	RegisterParent(models.SecretScopeProjeto, ParentSpec{Table: "projects", SoftDelete: true})
 	RegisterParent(models.SecretScopeTool, ParentSpec{Table: "external_tools", SoftDelete: true})
 }
 

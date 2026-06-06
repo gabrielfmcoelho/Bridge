@@ -1333,4 +1333,18 @@ var migrationsSQLite = []string{
 	// share is a one-item bundle). Existing links are transient (TTL'd
 	// capabilities), so they are dropped rather than migrated.
 	`DROP TABLE IF EXISTS secret_share_links;`,
+
+	// Version 73 (R3 optional): extend soft-delete to hosts/services/projects
+	// for consistency with secrets/external_tools/api_catalog and the cascade
+	// registry (DeleteParent now flips deleted_at instead of hard-DELETE; the
+	// repos filter deleted_at IS NULL on every read). Just adding the column —
+	// deliberately NOT reshaping hosts.oficial_slug's UNIQUE into a partial
+	// index: that needs a full hosts rebuild whose column set is
+	// non-deterministic (legacy credential columns may or may not be present)
+	// and would break the still-tested legacy-migration code. Instead a slug
+	// stays reserved while a host is soft-deleted — you restore the host rather
+	// than recreate it with the same slug.
+	`ALTER TABLE hosts    ADD COLUMN deleted_at DATETIME;
+	ALTER TABLE services ADD COLUMN deleted_at DATETIME;
+	ALTER TABLE projects ADD COLUMN deleted_at DATETIME;`,
 }

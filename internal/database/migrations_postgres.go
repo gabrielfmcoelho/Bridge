@@ -1169,4 +1169,11 @@ var migrationsPostgres = []string{
 
 	// Version 72 (R3): retire secret_share_links — see migrations_sqlite.go.
 	`DROP TABLE IF EXISTS secret_share_links;`,
+
+	// Version 73 (R3 optional): extend soft-delete to hosts/services/projects —
+	// see migrations_sqlite.go. Symmetric with sqlite: just add the column; the
+	// slug stays reserved while soft-deleted (restore, don't recreate).
+	`ALTER TABLE hosts    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`,
 }

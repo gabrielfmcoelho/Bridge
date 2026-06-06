@@ -96,7 +96,7 @@ func (r *ServiceRepo) Create(ctx context.Context, s *models.Service) error {
 // Get returns a service by id, or (nil, nil) if absent.
 func (r *ServiceRepo) Get(ctx context.Context, id int64) (*models.Service, error) {
 	s := &models.Service{}
-	err := scanService(r.db.QueryRowContext(ctx, `SELECT `+serviceCols+` FROM services WHERE id = ?`, id), s)
+	err := scanService(r.db.QueryRowContext(ctx, `SELECT `+serviceCols+` FROM services WHERE id = ? AND deleted_at IS NULL`, id), s)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -105,7 +105,7 @@ func (r *ServiceRepo) Get(ctx context.Context, id int64) (*models.Service, error
 
 // List returns all services ordered by nickname.
 func (r *ServiceRepo) List(ctx context.Context) ([]models.Service, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services ORDER BY nickname`)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE deleted_at IS NULL ORDER BY nickname`)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (r *ServiceRepo) List(ctx context.Context) ([]models.Service, error) {
 
 // ListByProject returns services belonging to a project, ordered by nickname.
 func (r *ServiceRepo) ListByProject(ctx context.Context, projectID int64) ([]models.Service, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE project_id = ? ORDER BY nickname`, projectID)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE project_id = ? AND deleted_at IS NULL ORDER BY nickname`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (r *ServiceRepo) ListByHost(ctx context.Context, hostID int64) ([]models.Se
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+serviceColsS+`
 		 FROM services s JOIN service_host_links l ON s.id = l.service_id
-		 WHERE l.host_id = ? ORDER BY s.nickname`, hostID)
+		 WHERE l.host_id = ? AND s.deleted_at IS NULL ORDER BY s.nickname`, hostID)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (r *ServiceRepo) ListContainerServicesByHost(ctx context.Context, hostID in
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+serviceColsS+`
 		 FROM services s JOIN service_host_links l ON s.id = l.service_id
-		 WHERE l.host_id = ? AND s.source IN ('auto', 'fixed') AND s.container_name != ''
+		 WHERE l.host_id = ? AND s.deleted_at IS NULL AND s.source IN ('auto', 'fixed') AND s.container_name != ''
 		 ORDER BY s.nickname`, hostID)
 	if err != nil {
 		return nil, err
@@ -194,13 +194,13 @@ func (r *ServiceRepo) Delete(ctx context.Context, id int64) error {
 // Count returns the total number of services.
 func (r *ServiceRepo) Count(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM services`).Scan(&n)
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM services WHERE deleted_at IS NULL`).Scan(&n)
 	return n, err
 }
 
 // CountsByHost returns host_id → number of linked services.
 func (r *ServiceRepo) CountsByHost(ctx context.Context) (map[int64]int, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT host_id, COUNT(*) FROM service_host_links GROUP BY host_id`)
+	rows, err := r.db.QueryContext(ctx, `SELECT l.host_id, COUNT(*) FROM service_host_links l JOIN services s ON s.id = l.service_id WHERE s.deleted_at IS NULL GROUP BY l.host_id`)
 	if err != nil {
 		return nil, err
 	}
@@ -212,11 +212,13 @@ func (r *ServiceRepo) CountsByHost(ctx context.Context) (map[int64]int, error) {
 func (r *ServiceRepo) ProjectCountsByHost(ctx context.Context) (map[int64]int, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT host_id, COUNT(DISTINCT project_id) FROM (
-			SELECT host_id, project_id FROM project_host_links
+			SELECT l.host_id, l.project_id FROM project_host_links l
+				JOIN projects p ON p.id = l.project_id
+				WHERE p.deleted_at IS NULL
 			UNION
 			SELECT l.host_id, s.project_id FROM service_host_links l
 				JOIN services s ON l.service_id = s.id
-				WHERE s.project_id IS NOT NULL
+				WHERE s.project_id IS NOT NULL AND s.deleted_at IS NULL
 		) GROUP BY host_id`)
 	if err != nil {
 		return nil, err
