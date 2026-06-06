@@ -420,6 +420,10 @@ export const hostsAPI = {
     api.put<import("./types").Host>(`/api/hosts/${slug}`, data),
   delete: (slug: string) => api.delete(`/api/hosts/${slug}`),
   getPassword: (slug: string) => api.get<{ password: string }>(`/api/hosts/${slug}/password`),
+  // Soft-delete trash (R3). delete() now soft-deletes; trash() lists the
+  // soft-deleted rows and restore() un-deletes one (cascade-restoring secrets).
+  trash: () => api.get<import("./types").Host[]>("/api/hosts/trash"),
+  restore: (id: number) => api.post(`/api/hosts/${id}/restore`),
 };
 
 // Host Alerts (manual)
@@ -539,6 +543,8 @@ export const projectsAPI = {
   update: (id: number, data: Partial<import("./types").Project> & { tags?: string[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.put<import("./types").Project>(`/api/projects/${id}`, data),
   delete: (id: number) => api.delete(`/api/projects/${id}`),
+  trash: () => api.get<import("./types").Project[]>("/api/projects/trash"),
+  restore: (id: number) => api.post(`/api/projects/${id}/restore`),
 };
 
 // Services
@@ -563,6 +569,8 @@ export const servicesAPI = {
     api.post<import("./types").Service>(`/api/services/${id}/fixate`),
   updateContainer: (id: number, data: { container_name: string; container_id: string }) =>
     api.put<import("./types").Service>(`/api/services/${id}/container`, data),
+  trash: () => api.get<import("./types").Service[]>("/api/services/trash"),
+  restore: (id: number) => api.post(`/api/services/${id}/restore`),
 };
 
 // Orchestrators
