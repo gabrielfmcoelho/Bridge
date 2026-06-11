@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -82,6 +84,93 @@ func (r *ProjectRepo) List(ctx context.Context) ([]models.Project, error) {
 		projects = append(projects, p)
 	}
 	return projects, rows.Err()
+}
+
+// projectWhere builds the shared WHERE predicates (and bound args) for the
+// filtered list/count queries. Mirrors HostRepo's filter assembly: dynamic
+// clauses with `?` placeholders (the driver rebinds `?`→$N), ILIKE search via
+// database.LikeOp(), and a tag subquery against the unified tags table.
+func projectWhere(f models.ProjectFilter) ([]string, []any) {
+	var args []any
+	where := []string{"deleted_at IS NULL"}
+
+	if f.Search != "" {
+		op := database.LikeOp()
+		where = append(where, "(name "+op+" ? OR description "+op+" ? OR setor_responsavel "+op+" ?)")
+		s := "%" + f.Search + "%"
+		args = append(args, s, s, s)
+	}
+	if f.Situacao != "" {
+		where = append(where, "situacao = ?")
+		args = append(args, f.Situacao)
+	}
+	if f.Tag != "" {
+		where = append(where, "id IN (SELECT entity_id FROM tags WHERE entity_type = 'project' AND tag = ?)")
+		args = append(args, f.Tag)
+	}
+	return where, args
+}
+
+// ListFiltered returns projects matching the filter, with sort + pagination
+// applied. Mirrors HostRepo.List. When f.PerPage <= 0 the result is unbounded
+// (no LIMIT) — the path the frontend's full-list query uses.
+func (r *ProjectRepo) ListFiltered(ctx context.Context, f models.ProjectFilter) ([]models.Project, error) {
+	query := `SELECT ` + projectCols + ` FROM projects`
+	where, args := projectWhere(f)
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+
+	allowedSorts := map[string]string{
+		"name":     "name",
+		"situacao": "situacao",
+		"setor":    "setor_responsavel",
+	}
+	sortCol := "name"
+	if col, ok := allowedSorts[f.SortBy]; ok {
+		sortCol = col
+	}
+	sortDir := "ASC"
+	if f.SortDir == "desc" {
+		sortDir = "DESC"
+	}
+	query += " ORDER BY " + sortCol + " " + sortDir
+
+	if f.PerPage > 0 {
+		offset := 0
+		if f.Page > 1 {
+			offset = (f.Page - 1) * f.PerPage
+		}
+		query += fmt.Sprintf(" LIMIT %d OFFSET %d", f.PerPage, offset)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var projects []models.Project
+	for rows.Next() {
+		var p models.Project
+		if err := scanProject(rows, &p); err != nil {
+			return nil, err
+		}
+		projects = append(projects, p)
+	}
+	return projects, rows.Err()
+}
+
+// CountFiltered returns the number of projects matching the same predicates
+// ListFiltered paginates over (no order/limit).
+func (r *ProjectRepo) CountFiltered(ctx context.Context, f models.ProjectFilter) (int, error) {
+	query := `SELECT COUNT(*) FROM projects`
+	where, args := projectWhere(f)
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	var count int
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	return count, err
 }
 
 // Update writes the mutable fields of a project by id.

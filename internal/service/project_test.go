@@ -46,7 +46,7 @@ func TestProjectService_CreateEnrichesListAndGet(t *testing.T) {
 	projID := w.Project.ID
 
 	// List is enriched with sorted tags + main responsável name.
-	list, err := svc.List(ctx)
+	list, err := svc.List(ctx, models.ProjectFilter{})
 	if err != nil || len(list) != 1 {
 		t.Fatalf("list = %+v, %v", list, err)
 	}

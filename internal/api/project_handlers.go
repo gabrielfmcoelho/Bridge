@@ -15,12 +15,30 @@ type projectHandlers struct {
 }
 
 func (h *projectHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	projects, err := h.project.List(r.Context())
+	pp := parsePageParams(r)
+	f := models.ProjectFilter{
+		Search:   r.URL.Query().Get("search"),
+		Situacao: r.URL.Query().Get("situacao"),
+		Tag:      r.URL.Query().Get("tag"),
+		SortBy:   r.URL.Query().Get("sort_by"),
+		SortDir:  r.URL.Query().Get("sort_dir"),
+		Page:     pp.Page,
+		PerPage:  pp.PerPage,
+	}
+	items, err := h.project.List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "failed to list projects", err)
 		return
 	}
-	jsonPaged(w, r, projects)
+	// Real server-side pagination (R4 envelope). When per_page is set we report
+	// the matching Count; an unbounded request reports the returned length.
+	total := len(items)
+	if !pp.Unbounded() {
+		if n, err := h.project.Count(r.Context(), f); err == nil {
+			total = n
+		}
+	}
+	jsonList(w, items, metaFor(pp, total))
 }
 
 func (h *projectHandlers) handleGet(w http.ResponseWriter, r *http.Request) {

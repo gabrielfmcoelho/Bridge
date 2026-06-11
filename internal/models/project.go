@@ -25,3 +25,15 @@ type Project struct {
 	CreatedAt                    time.Time `json:"created_at"`
 	UpdatedAt                    time.Time `json:"updated_at"`
 }
+
+// ProjectFilter is the value object describing list/count predicates, sort, and
+// pagination for projects. Consumed by store.ProjectRepo.ListFiltered / CountFiltered.
+type ProjectFilter struct {
+	Search   string
+	Situacao string
+	Tag      string
+	SortBy   string
+	SortDir  string
+	Page     int
+	PerPage  int
+}

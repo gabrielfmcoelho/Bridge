@@ -60,10 +60,11 @@ type ProjectWrite struct {
 	Responsaveis *[]models.ResponsavelInput
 }
 
-// List returns all projects enriched with tags and the main responsável name
-// (bulk-loaded to avoid N+1 on the shared maps).
-func (s *ProjectService) List(ctx context.Context) ([]ProjectListItem, error) {
-	projects, err := s.projects.List(ctx)
+// List returns the projects matching the filter (server-side filter/sort/
+// pagination), enriched with tags and the main responsável name. The tag and
+// main-name maps are bulk-by-id, so enriching just the returned page is fine.
+func (s *ProjectService) List(ctx context.Context, f models.ProjectFilter) ([]ProjectListItem, error) {
+	projects, err := s.projects.ListFiltered(ctx, f)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +85,12 @@ func (s *ProjectService) List(ctx context.Context) ([]ProjectListItem, error) {
 		}
 	}
 	return out, nil
+}
+
+// Count returns the number of projects matching the filter (the predicates the
+// list view paginates over).
+func (s *ProjectService) Count(ctx context.Context, f models.ProjectFilter) (int, error) {
+	return s.projects.CountFiltered(ctx, f)
 }
 
 // Get returns the enriched single project, or (nil, nil) if not found.

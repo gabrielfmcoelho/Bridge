@@ -1,30 +1,49 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import SortableTable from "@/components/ui/SortableTable";
+import Pagination from "@/components/ui/Pagination";
 import Badge from "@/components/ui/Badge";
 import type { Project } from "@/lib/types";
 
+// Server-driven table (inventory pagination). `projects` is ONE server page
+// (filtered+sorted+limited by the parent's paginated query), `total` is the full
+// match count for the pager, and column-header clicks drive the page-level sort
+// via onSortChange (→ server refetch). description/tags aren't server-sortable.
+const PER_PAGE = 20;
+type Sort = { field: string; direction: "asc" | "desc" };
+type ColKey = "name" | "description" | "situacao" | "tags";
+
 interface ProjectsTableViewProps {
   projects: Project[];
+  total: number;
+  tablePage: number;
+  onPageChange: (page: number) => void;
+  sort: Sort;
+  onSortChange: (s: Sort) => void;
   t: (key: string) => string;
 }
 
-export default function ProjectsTableView({ projects, t }: ProjectsTableViewProps) {
+export default function ProjectsTableView({ projects, total, tablePage, onPageChange, sort, onSortChange, t }: ProjectsTableViewProps) {
   const router = useRouter();
-
   return (
-    <div className="bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] overflow-x-auto animate-fade-in">
-      <table className="w-full text-sm min-w-[600px]">
-        <thead>
-          <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
-            <th className="text-left px-4 py-3 font-semibold">{t("project.name")}</th>
-            <th className="text-left px-4 py-3 font-semibold">{t("common.description")}</th>
-            <th className="text-left px-4 py-3 font-semibold">{t("common.status")}</th>
-            <th className="text-left px-4 py-3 font-semibold">{t("common.tags")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {projects.map((project, i) => (
+    <div className="animate-fade-in">
+      <SortableTable
+        columns={[
+          { key: "name" as ColKey, label: t("project.name") },
+          { key: "description" as ColKey, label: t("common.description"), sortable: false },
+          { key: "situacao" as ColKey, label: t("common.status") },
+          { key: "tags" as ColKey, label: t("common.tags"), sortable: false },
+        ]}
+        sortKey={sort.field as ColKey}
+        sortDir={sort.direction}
+        onSortChange={(key, dir) => {
+          if (key === "description" || key === "tags") return; // not server-sortable
+          onSortChange({ field: key, direction: dir });
+        }}
+      >
+        {() =>
+          projects.map((project, i) => (
             <tr
               key={project.id}
               className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
@@ -40,9 +59,10 @@ export default function ProjectsTableView({ projects, t }: ProjectsTableViewProp
                 </div>
               </td>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          ))
+        }
+      </SortableTable>
+      <Pagination page={tablePage} totalPages={Math.max(1, Math.ceil(total / PER_PAGE))} total={total} perPage={PER_PAGE} onChange={onPageChange} />
     </div>
   );
 }

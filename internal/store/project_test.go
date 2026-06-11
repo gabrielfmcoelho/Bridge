@@ -78,6 +78,87 @@ func TestProjectRepo_CRUDRoundTrip(t *testing.T) {
 	}
 }
 
+// ListFiltered / CountFiltered: server-side search, situacao, tag filters plus
+// sort + window. Mirrors the host filter test shape.
+func TestProjectRepo_ListFiltered(t *testing.T) {
+	ctx := context.Background()
+	repo, d := newProjectRepo(t)
+
+	// Seed 4 projects with distinct names / situacao.
+	seed := []models.Project{
+		{Name: "Alpha", Description: "first project", Situacao: "active", SetorResponsavel: "eng"},
+		{Name: "Beta", Description: "second", Situacao: "archived", SetorResponsavel: "ops"},
+		{Name: "Gamma", Description: "third alpha-ish", Situacao: "active", SetorResponsavel: "eng"},
+		{Name: "Delta", Description: "fourth", Situacao: "active", SetorResponsavel: "sec"},
+	}
+	for i := range seed {
+		if err := repo.Create(ctx, &seed[i]); err != nil {
+			t.Fatalf("create %s: %v", seed[i].Name, err)
+		}
+	}
+	// Tag exactly one project (Beta) with 'x'.
+	if _, err := d.SQL.Exec(`INSERT INTO tags (entity_type, entity_id, tag) VALUES ('project', ?, 'x')`, seed[1].ID); err != nil {
+		t.Fatalf("seed tag: %v", err)
+	}
+
+	names := func(ps []models.Project) []string {
+		out := make([]string, len(ps))
+		for i, p := range ps {
+			out[i] = p.Name
+		}
+		return out
+	}
+
+	// Search matches name OR description (case-insensitive ILIKE). "alpha"
+	// hits Alpha (name) and Gamma (description "third alpha-ish").
+	got, err := repo.ListFiltered(ctx, models.ProjectFilter{Search: "alpha", SortBy: "name"})
+	if err != nil {
+		t.Fatalf("ListFiltered(search): %v", err)
+	}
+	if g := names(got); len(g) != 2 || g[0] != "Alpha" || g[1] != "Gamma" {
+		t.Fatalf("search 'alpha' = %v, want [Alpha Gamma]", g)
+	}
+	if n, err := repo.CountFiltered(ctx, models.ProjectFilter{Search: "alpha"}); err != nil || n != 2 {
+		t.Fatalf("CountFiltered(search) = %d, %v; want 2", n, err)
+	}
+
+	// Situacao filter.
+	if n, err := repo.CountFiltered(ctx, models.ProjectFilter{Situacao: "active"}); err != nil || n != 3 {
+		t.Fatalf("CountFiltered(situacao=active) = %d, %v; want 3", n, err)
+	}
+
+	// Tag filter returns only the tagged project.
+	got, err = repo.ListFiltered(ctx, models.ProjectFilter{Tag: "x"})
+	if err != nil {
+		t.Fatalf("ListFiltered(tag): %v", err)
+	}
+	if g := names(got); len(g) != 1 || g[0] != "Beta" {
+		t.Fatalf("tag 'x' = %v, want [Beta]", g)
+	}
+
+	// Sort by name desc.
+	got, err = repo.ListFiltered(ctx, models.ProjectFilter{SortBy: "name", SortDir: "desc"})
+	if err != nil {
+		t.Fatalf("ListFiltered(sort desc): %v", err)
+	}
+	if g := names(got); len(g) != 4 || g[0] != "Gamma" || g[3] != "Alpha" {
+		t.Fatalf("sort name desc = %v, want [Gamma Delta Beta Alpha]", g)
+	}
+
+	// Pagination: name asc → [Alpha Beta Delta Gamma]; PerPage=2 Page=2 → [Delta Gamma].
+	got, err = repo.ListFiltered(ctx, models.ProjectFilter{SortBy: "name", PerPage: 2, Page: 2})
+	if err != nil {
+		t.Fatalf("ListFiltered(page2): %v", err)
+	}
+	if g := names(got); len(g) != 2 || g[0] != "Delta" || g[1] != "Gamma" {
+		t.Fatalf("page2 = %v, want [Delta Gamma]", g)
+	}
+	// CountFiltered ignores the window: full match count.
+	if n, err := repo.CountFiltered(ctx, models.ProjectFilter{SortBy: "name", PerPage: 2, Page: 2}); err != nil || n != 4 {
+		t.Fatalf("CountFiltered(page2) = %d, %v; want 4", n, err)
+	}
+}
+
 // Host-link round trip. This also guards against the column-count bug in the
 // legacy models.ListProjectsByHost (SELECT had 14 cols, Scan read 18): the
 // repo's ProjectsByHost must return fully-populated project rows.

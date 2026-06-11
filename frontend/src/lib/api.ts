@@ -538,6 +538,10 @@ export const alertSettingsAPI = {
 // Projects
 export const projectsAPI = {
   list: () => api.getList<import("./types").Project>("/api/projects"),
+  // Server-side filtered/sorted/paginated page (table view). Params: search,
+  // situacao, tag, sort_by, sort_dir, page, per_page.
+  listPaginated: (params: Record<string, string>) =>
+    api.getListPaginated<import("./types").Project>(`/api/projects?${new URLSearchParams(params).toString()}`),
   get: (id: number) =>
     api.get<{
       project: import("./types").Project;
