@@ -15,3 +15,18 @@ type DNSRecord struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
+
+// DNSFilter is the value object describing list/count predicates, sort, and
+// pagination for DNS records. Consumed by store.DNSRepo.ListFiltered /
+// CountFiltered. HasHTTPS is tri-state: "" (any), "yes", "no".
+type DNSFilter struct {
+	Search      string
+	Situacao    string
+	Tag         string
+	Responsavel string
+	HasHTTPS    string
+	SortBy      string
+	SortDir     string
+	Page        int
+	PerPage     int
+}

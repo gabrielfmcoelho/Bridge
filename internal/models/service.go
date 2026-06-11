@@ -43,3 +43,19 @@ type Service struct {
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }
+
+// ServiceFilter is the value object describing list/count predicates, sort, and
+// pagination for services. Consumed by store.ServiceRepo.ListFiltered /
+// CountFiltered. IsExternalDependency and OrchestratorManaged are tri-state
+// strings: "" (any), "yes" (true), or "no" (false).
+type ServiceFilter struct {
+	Search               string
+	Tag                  string
+	DevelopedBy          string
+	IsExternalDependency string
+	OrchestratorManaged  string
+	SortBy               string
+	SortDir              string
+	Page                 int
+	PerPage              int
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { servicesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -36,13 +36,40 @@ export default function ServicesPage() {
   const [showForm, setShowForm] = useState(false);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [tablePage, setTablePage] = useState(1);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
+  // Full list — feeds KPIs, CSV export, and the card view (which client-filters).
   const { data: allServices = [], isLoading } = useQuery({
     queryKey: ["services"],
     queryFn: servicesAPI.list,
   });
+
+  // Table view drives REAL server-side filtering+sort+pagination (one page at a
+  // time). Enabled only in table mode; KPIs/export/cards keep using allServices.
+  const TABLE_PER_PAGE = 20;
+  const tableQuery = useQuery({
+    queryKey: ["services-table", search, filters, sort, tablePage],
+    enabled: viewMode === "table",
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (search) params.search = search;
+      if (filters.tag) params.tag = filters.tag;
+      if (filters.developed_by) params.developed_by = filters.developed_by;
+      if (filters.is_external_dependency) params.is_external_dependency = filters.is_external_dependency;
+      if (filters.orchestrator_managed) params.orchestrator_managed = filters.orchestrator_managed;
+      params.sort_by = sort.field;
+      params.sort_dir = sort.direction;
+      params.page = String(tablePage);
+      params.per_page = String(TABLE_PER_PAGE);
+      return servicesAPI.listPaginated(params);
+    },
+  });
+  const tableServices = tableQuery.data?.data ?? [];
+  const tableTotal = tableQuery.data?.meta.total ?? 0;
+
+  useEffect(() => { setTablePage(1); }, [search, filters, sort]);
 
   const services = useMemo(() => {
     let filtered = allServices;
@@ -126,8 +153,8 @@ export default function ServicesPage() {
       />
 
       <InventoryContent
-        isLoading={isLoading}
-        items={services}
+        isLoading={viewMode === "table" ? tableQuery.isLoading : isLoading}
+        items={viewMode === "table" ? tableServices : services}
         viewMode={viewMode}
         emptyIcon="box"
         emptyTitle={t("common.noResults")}
@@ -136,7 +163,7 @@ export default function ServicesPage() {
           <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("service.addService")}</Button>
         ) : undefined}
         renderCard={(svc) => <ServiceCard svc={svc} />}
-        renderTable={(items) => <ServicesTableView services={items} t={t} />}
+        renderTable={(items) => <ServicesTableView services={items} total={tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}
       />
 
       {/* Create modal */}

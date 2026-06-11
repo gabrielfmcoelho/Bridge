@@ -51,7 +51,7 @@ func TestDNSService_CreateEnrichesListAndGet(t *testing.T) {
 	}
 
 	// List is enriched with tags (sorted) + host links.
-	list, err := svc.List(ctx)
+	list, err := svc.List(ctx, models.DNSFilter{})
 	if err != nil || len(list) != 1 {
 		t.Fatalf("list = %+v, %v", list, err)
 	}

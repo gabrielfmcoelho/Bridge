@@ -464,6 +464,7 @@ export const hostChamadosAPI = {
 // DNS
 export const dnsAPI = {
   list: () => api.getList<import("./types").DNSRecord>("/api/dns"),
+  listPaginated: (params: Record<string, string>) => api.getListPaginated<import("./types").DNSRecord>(`/api/dns?${new URLSearchParams(params).toString()}`),
   get: (id: number) => api.get<{ dns_record: import("./types").DNSRecord; tags: string[]; host_ids: number[]; responsaveis: import("./types").EntityResponsavel[] }>(`/api/dns/${id}`),
   create: (data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.post<import("./types").DNSRecord>("/api/dns", data),
@@ -563,6 +564,8 @@ export const projectsAPI = {
 // Services
 export const servicesAPI = {
   list: () => api.getList<import("./types").Service>("/api/services"),
+  listPaginated: (params: Record<string, string>) =>
+    api.getListPaginated<import("./types").Service>(`/api/services?${new URLSearchParams(params).toString()}`),
   get: (id: number) =>
     api.get<{
       service: import("./types").Service;

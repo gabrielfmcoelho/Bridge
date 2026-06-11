@@ -72,10 +72,12 @@ type ServiceWrite struct {
 	Responsaveis *[]models.ResponsavelInput
 }
 
-// List returns all services enriched with tags, link ids, and the main
-// responsável name (bulk-loaded to avoid N+1 on the shared maps).
-func (s *ServiceService) List(ctx context.Context) ([]ServiceListItem, error) {
-	services, err := s.services.List(ctx)
+// List returns the services matching the filter (server-side filter/sort/
+// pagination), enriched with tags, link ids, and the main responsável name. The
+// tag and main-name maps are bulk-by-id, so enriching just the returned page is
+// fine.
+func (s *ServiceService) List(ctx context.Context, f models.ServiceFilter) ([]ServiceListItem, error) {
+	services, err := s.services.ListFiltered(ctx, f)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +113,12 @@ func (s *ServiceService) List(ctx context.Context) ([]ServiceListItem, error) {
 		}
 	}
 	return out, nil
+}
+
+// Count returns the number of services matching the filter (the predicates the
+// list view paginates over).
+func (s *ServiceService) Count(ctx context.Context, f models.ServiceFilter) (int, error) {
+	return s.services.CountFiltered(ctx, f)
 }
 
 // Get returns the enriched single service, or (nil, nil) if not found.

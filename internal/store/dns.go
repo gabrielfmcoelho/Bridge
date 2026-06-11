@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -62,6 +64,104 @@ func (r *DNSRepo) List(ctx context.Context) ([]models.DNSRecord, error) {
 		records = append(records, d)
 	}
 	return records, rows.Err()
+}
+
+// dnsWhere builds the shared WHERE predicates (and bound args) for the filtered
+// list/count queries. Mirrors projectWhere, minus the soft-delete clause:
+// dns_records has no deleted_at column. Dynamic clauses use `?` placeholders
+// (the driver rebinds `?`→$N), ILIKE search via database.LikeOp(), and a tag
+// subquery against the unified tags table.
+func dnsWhere(f models.DNSFilter) ([]string, []any) {
+	var where []string
+	var args []any
+
+	if f.Search != "" {
+		op := database.LikeOp()
+		where = append(where, "(domain "+op+" ? OR responsavel "+op+" ?)")
+		s := "%" + f.Search + "%"
+		args = append(args, s, s)
+	}
+	if f.Situacao != "" {
+		where = append(where, "situacao = ?")
+		args = append(args, f.Situacao)
+	}
+	if f.Tag != "" {
+		where = append(where, "id IN (SELECT entity_id FROM tags WHERE entity_type = 'dns' AND tag = ?)")
+		args = append(args, f.Tag)
+	}
+	if f.Responsavel != "" {
+		where = append(where, "responsavel = ?")
+		args = append(args, f.Responsavel)
+	}
+	switch f.HasHTTPS {
+	case "yes":
+		where = append(where, "has_https = true")
+	case "no":
+		where = append(where, "has_https = false")
+	}
+	return where, args
+}
+
+// ListFiltered returns DNS records matching the filter, with sort + pagination
+// applied. Mirrors ProjectRepo.ListFiltered. When f.PerPage <= 0 the result is
+// unbounded (no LIMIT) — the path the frontend's full-list query uses.
+func (r *DNSRepo) ListFiltered(ctx context.Context, f models.DNSFilter) ([]models.DNSRecord, error) {
+	query := `SELECT ` + dnsCols + ` FROM dns_records`
+	where, args := dnsWhere(f)
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+
+	allowedSorts := map[string]string{
+		"domain":      "domain",
+		"situacao":    "situacao",
+		"responsavel": "responsavel",
+	}
+	sortCol := "domain"
+	if col, ok := allowedSorts[f.SortBy]; ok {
+		sortCol = col
+	}
+	sortDir := "ASC"
+	if f.SortDir == "desc" {
+		sortDir = "DESC"
+	}
+	query += " ORDER BY " + sortCol + " " + sortDir
+
+	if f.PerPage > 0 {
+		offset := 0
+		if f.Page > 1 {
+			offset = (f.Page - 1) * f.PerPage
+		}
+		query += fmt.Sprintf(" LIMIT %d OFFSET %d", f.PerPage, offset)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var records []models.DNSRecord
+	for rows.Next() {
+		var d models.DNSRecord
+		if err := scanDNS(rows, &d); err != nil {
+			return nil, err
+		}
+		records = append(records, d)
+	}
+	return records, rows.Err()
+}
+
+// CountFiltered returns the number of DNS records matching the same predicates
+// ListFiltered paginates over (no order/limit).
+func (r *DNSRepo) CountFiltered(ctx context.Context, f models.DNSFilter) (int, error) {
+	query := `SELECT COUNT(*) FROM dns_records`
+	where, args := dnsWhere(f)
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	var count int
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	return count, err
 }
 
 // Update writes the mutable fields of a DNS record by id.

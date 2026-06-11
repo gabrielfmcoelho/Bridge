@@ -15,12 +15,32 @@ type dnsHandlers struct {
 }
 
 func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	records, err := h.dns.List(r.Context())
+	pp := parsePageParams(r)
+	f := models.DNSFilter{
+		Search:      r.URL.Query().Get("search"),
+		Situacao:    r.URL.Query().Get("situacao"),
+		Tag:         r.URL.Query().Get("tag"),
+		Responsavel: r.URL.Query().Get("responsavel"),
+		HasHTTPS:    r.URL.Query().Get("has_https"),
+		SortBy:      r.URL.Query().Get("sort_by"),
+		SortDir:     r.URL.Query().Get("sort_dir"),
+		Page:        pp.Page,
+		PerPage:     pp.PerPage,
+	}
+	items, err := h.dns.List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "failed to list DNS records", err)
 		return
 	}
-	jsonPaged(w, r, records)
+	// Real server-side pagination (R4 envelope). When per_page is set we report
+	// the matching Count; an unbounded request reports the returned length.
+	total := len(items)
+	if !pp.Unbounded() {
+		if n, err := h.dns.Count(r.Context(), f); err == nil {
+			total = n
+		}
+	}
+	jsonList(w, items, metaFor(pp, total))
 }
 
 func (h *dnsHandlers) handleGet(w http.ResponseWriter, r *http.Request) {

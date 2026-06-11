@@ -23,12 +23,32 @@ type serviceHandlers struct {
 }
 
 func (h *serviceHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	services, err := h.service.List(r.Context())
+	pp := parsePageParams(r)
+	f := models.ServiceFilter{
+		Search:               r.URL.Query().Get("search"),
+		Tag:                  r.URL.Query().Get("tag"),
+		DevelopedBy:          r.URL.Query().Get("developed_by"),
+		IsExternalDependency: r.URL.Query().Get("is_external_dependency"),
+		OrchestratorManaged:  r.URL.Query().Get("orchestrator_managed"),
+		SortBy:               r.URL.Query().Get("sort_by"),
+		SortDir:              r.URL.Query().Get("sort_dir"),
+		Page:                 pp.Page,
+		PerPage:              pp.PerPage,
+	}
+	items, err := h.service.List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "failed to list services", err)
 		return
 	}
-	jsonPaged(w, r, services)
+	// Real server-side pagination (R4 envelope). When per_page is set we report
+	// the matching Count; an unbounded request reports the returned length.
+	total := len(items)
+	if !pp.Unbounded() {
+		if n, err := h.service.Count(r.Context(), f); err == nil {
+			total = n
+		}
+	}
+	jsonList(w, items, metaFor(pp, total))
 }
 
 func (h *serviceHandlers) handleGet(w http.ResponseWriter, r *http.Request) {

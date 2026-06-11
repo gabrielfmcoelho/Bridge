@@ -71,6 +71,109 @@ func TestServiceRepo_CRUDRoundTrip(t *testing.T) {
 	}
 }
 
+// ListFiltered / CountFiltered: server-side search, tag, developed_by, and the
+// tri-state boolean filters (is_external_dependency / orchestrator_managed) plus
+// sort + window. Mirrors the project filter test shape.
+func TestServiceRepo_ListFiltered(t *testing.T) {
+	ctx := context.Background()
+	repo, d := newServiceRepo(t)
+
+	// Seed 4 services with varied nickname / technology_stack and booleans.
+	seed := []models.Service{
+		{Nickname: "alpha-api", Description: "first", TechnologyStack: "go", DevelopedBy: "team-a", IsExternalDependency: true, OrchestratorManaged: true},
+		{Nickname: "beta-worker", Description: "second alpha-ish", TechnologyStack: "python", DevelopedBy: "team-b", IsExternalDependency: false, OrchestratorManaged: false},
+		{Nickname: "gamma-db", Description: "third", TechnologyStack: "postgres", DevelopedBy: "team-a", IsExternalDependency: true, OrchestratorManaged: false},
+		{Nickname: "delta-cache", Description: "fourth", TechnologyStack: "redis", DevelopedBy: "team-c", IsExternalDependency: false, OrchestratorManaged: true},
+	}
+	for i := range seed {
+		if err := repo.Create(ctx, &seed[i]); err != nil {
+			t.Fatalf("create %s: %v", seed[i].Nickname, err)
+		}
+	}
+	// Tag exactly one service (beta-worker) with 'x'.
+	if _, err := d.SQL.Exec(`INSERT INTO tags (entity_type, entity_id, tag) VALUES ('service', ?, 'x')`, seed[1].ID); err != nil {
+		t.Fatalf("seed tag: %v", err)
+	}
+
+	nicks := func(ss []models.Service) []string {
+		out := make([]string, len(ss))
+		for i, s := range ss {
+			out[i] = s.Nickname
+		}
+		return out
+	}
+
+	// Search matches nickname OR description OR technology_stack (ILIKE). "alpha"
+	// hits alpha-api (nickname) and beta-worker (description "second alpha-ish").
+	got, err := repo.ListFiltered(ctx, models.ServiceFilter{Search: "alpha", SortBy: "nickname"})
+	if err != nil {
+		t.Fatalf("ListFiltered(search): %v", err)
+	}
+	if g := nicks(got); len(g) != 2 || g[0] != "alpha-api" || g[1] != "beta-worker" {
+		t.Fatalf("search 'alpha' = %v, want [alpha-api beta-worker]", g)
+	}
+	if n, err := repo.CountFiltered(ctx, models.ServiceFilter{Search: "alpha"}); err != nil || n != 2 {
+		t.Fatalf("CountFiltered(search) = %d, %v; want 2", n, err)
+	}
+
+	// Tag filter returns only the tagged service.
+	got, err = repo.ListFiltered(ctx, models.ServiceFilter{Tag: "x"})
+	if err != nil {
+		t.Fatalf("ListFiltered(tag): %v", err)
+	}
+	if g := nicks(got); len(g) != 1 || g[0] != "beta-worker" {
+		t.Fatalf("tag 'x' = %v, want [beta-worker]", g)
+	}
+
+	// DevelopedBy filter.
+	if n, err := repo.CountFiltered(ctx, models.ServiceFilter{DevelopedBy: "team-a"}); err != nil || n != 2 {
+		t.Fatalf("CountFiltered(developed_by=team-a) = %d, %v; want 2", n, err)
+	}
+
+	// IsExternalDependency tri-state: yes (alpha-api, gamma-db) / no (beta-worker, delta-cache).
+	if n, err := repo.CountFiltered(ctx, models.ServiceFilter{IsExternalDependency: "yes"}); err != nil || n != 2 {
+		t.Fatalf("CountFiltered(is_external=yes) = %d, %v; want 2", n, err)
+	}
+	if n, err := repo.CountFiltered(ctx, models.ServiceFilter{IsExternalDependency: "no"}); err != nil || n != 2 {
+		t.Fatalf("CountFiltered(is_external=no) = %d, %v; want 2", n, err)
+	}
+
+	// OrchestratorManaged tri-state: yes (alpha-api, delta-cache) / no (beta-worker, gamma-db).
+	got, err = repo.ListFiltered(ctx, models.ServiceFilter{OrchestratorManaged: "yes", SortBy: "nickname"})
+	if err != nil {
+		t.Fatalf("ListFiltered(orchestrator=yes): %v", err)
+	}
+	if g := nicks(got); len(g) != 2 || g[0] != "alpha-api" || g[1] != "delta-cache" {
+		t.Fatalf("orchestrator=yes = %v, want [alpha-api delta-cache]", g)
+	}
+	if n, err := repo.CountFiltered(ctx, models.ServiceFilter{OrchestratorManaged: "no"}); err != nil || n != 2 {
+		t.Fatalf("CountFiltered(orchestrator=no) = %d, %v; want 2", n, err)
+	}
+
+	// Sort by nickname desc → [gamma-db delta-cache beta-worker alpha-api].
+	got, err = repo.ListFiltered(ctx, models.ServiceFilter{SortBy: "nickname", SortDir: "desc"})
+	if err != nil {
+		t.Fatalf("ListFiltered(sort desc): %v", err)
+	}
+	if g := nicks(got); len(g) != 4 || g[0] != "gamma-db" || g[3] != "alpha-api" {
+		t.Fatalf("sort nickname desc = %v, want [gamma-db delta-cache beta-worker alpha-api]", g)
+	}
+
+	// Pagination: nickname asc → [alpha-api beta-worker delta-cache gamma-db];
+	// PerPage=2 Page=2 → [delta-cache gamma-db].
+	got, err = repo.ListFiltered(ctx, models.ServiceFilter{SortBy: "nickname", PerPage: 2, Page: 2})
+	if err != nil {
+		t.Fatalf("ListFiltered(page2): %v", err)
+	}
+	if g := nicks(got); len(g) != 2 || g[0] != "delta-cache" || g[1] != "gamma-db" {
+		t.Fatalf("page2 = %v, want [delta-cache gamma-db]", g)
+	}
+	// CountFiltered ignores the window: full match count.
+	if n, err := repo.CountFiltered(ctx, models.ServiceFilter{SortBy: "nickname", PerPage: 2, Page: 2}); err != nil || n != 4 {
+		t.Fatalf("CountFiltered(page2) = %d, %v; want 4", n, err)
+	}
+}
+
 func TestServiceRepo_LinksAndDeps(t *testing.T) {
 	ctx := context.Background()
 	repo, d := newServiceRepo(t)

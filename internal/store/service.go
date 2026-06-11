@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 
@@ -110,6 +111,96 @@ func (r *ServiceRepo) List(ctx context.Context) ([]models.Service, error) {
 		return nil, err
 	}
 	return scanServices(rows)
+}
+
+// serviceWhere builds the shared WHERE predicates (and bound args) for the
+// filtered list/count queries. Mirrors ProjectRepo's filter assembly: dynamic
+// clauses with `?` placeholders (the driver rebinds `?`→$N), ILIKE search via
+// database.LikeOp(), a tag subquery against the unified tags table, and
+// tri-state boolean filters inlined as literal true/false (no bound arg).
+func serviceWhere(f models.ServiceFilter) ([]string, []any) {
+	var args []any
+	where := []string{"deleted_at IS NULL"}
+
+	if f.Search != "" {
+		op := database.LikeOp()
+		where = append(where, "(nickname "+op+" ? OR description "+op+" ? OR technology_stack "+op+" ?)")
+		s := "%" + f.Search + "%"
+		args = append(args, s, s, s)
+	}
+	if f.Tag != "" {
+		where = append(where, "id IN (SELECT entity_id FROM tags WHERE entity_type = 'service' AND tag = ?)")
+		args = append(args, f.Tag)
+	}
+	if f.DevelopedBy != "" {
+		where = append(where, "developed_by = ?")
+		args = append(args, f.DevelopedBy)
+	}
+	switch f.IsExternalDependency {
+	case "yes":
+		where = append(where, "is_external_dependency = true")
+	case "no":
+		where = append(where, "is_external_dependency = false")
+	}
+	switch f.OrchestratorManaged {
+	case "yes":
+		where = append(where, "orchestrator_managed = true")
+	case "no":
+		where = append(where, "orchestrator_managed = false")
+	}
+	return where, args
+}
+
+// ListFiltered returns services matching the filter, with sort + pagination
+// applied. Mirrors ProjectRepo.ListFiltered. When f.PerPage <= 0 the result is
+// unbounded (no LIMIT) — the path the frontend's full-list query uses.
+func (r *ServiceRepo) ListFiltered(ctx context.Context, f models.ServiceFilter) ([]models.Service, error) {
+	query := `SELECT ` + serviceCols + ` FROM services`
+	where, args := serviceWhere(f)
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+
+	allowedSorts := map[string]string{
+		"nickname":         "nickname",
+		"technology_stack": "technology_stack",
+	}
+	sortCol := "nickname"
+	if col, ok := allowedSorts[f.SortBy]; ok {
+		sortCol = col
+	}
+	sortDir := "ASC"
+	if f.SortDir == "desc" {
+		sortDir = "DESC"
+	}
+	query += " ORDER BY " + sortCol + " " + sortDir
+
+	if f.PerPage > 0 {
+		offset := 0
+		if f.Page > 1 {
+			offset = (f.Page - 1) * f.PerPage
+		}
+		query += fmt.Sprintf(" LIMIT %d OFFSET %d", f.PerPage, offset)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return scanServices(rows)
+}
+
+// CountFiltered returns the number of services matching the same predicates
+// ListFiltered paginates over (no order/limit).
+func (r *ServiceRepo) CountFiltered(ctx context.Context, f models.ServiceFilter) (int, error) {
+	query := `SELECT COUNT(*) FROM services`
+	where, args := serviceWhere(f)
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	var count int
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	return count, err
 }
 
 // ListByProject returns services belonging to a project, ordered by nickname.

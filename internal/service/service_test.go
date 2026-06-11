@@ -62,7 +62,7 @@ func TestServiceService_CreateEnrichesListAndGet(t *testing.T) {
 	}
 	apiID := w.Service.ID
 
-	list, err := svc.List(ctx)
+	list, err := svc.List(ctx, models.ServiceFilter{})
 	if err != nil || len(list) != 2 {
 		t.Fatalf("list = %d items, %v", len(list), err)
 	}

@@ -63,10 +63,12 @@ type DNSWrite struct {
 	Responsaveis *[]models.ResponsavelInput
 }
 
-// List returns all DNS records enriched with tags, host links, and the main
-// responsável name (bulk-loaded to avoid N+1 on the shared maps).
-func (s *DNSService) List(ctx context.Context) ([]DNSListItem, error) {
-	records, err := s.dns.List(ctx)
+// List returns the DNS records matching the filter (server-side filter/sort/
+// pagination), enriched with tags, host links, and the main responsável name.
+// The tag and main-name maps are bulk-by-id, so enriching just the returned
+// page is fine.
+func (s *DNSService) List(ctx context.Context, f models.DNSFilter) ([]DNSListItem, error) {
+	records, err := s.dns.ListFiltered(ctx, f)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +94,12 @@ func (s *DNSService) List(ctx context.Context) ([]DNSListItem, error) {
 		}
 	}
 	return out, nil
+}
+
+// Count returns the number of DNS records matching the filter (the predicates
+// the list view paginates over).
+func (s *DNSService) Count(ctx context.Context, f models.DNSFilter) (int, error) {
+	return s.dns.CountFiltered(ctx, f)
 }
 
 // Get returns the enriched single record, or (nil, nil) if not found.
