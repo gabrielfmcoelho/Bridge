@@ -13,31 +13,22 @@ const (
 	DialectPostgres
 )
 
-// active is the package-wide dialect set by Open(). Model code that needs
-// dialect-specific SQL fragments (e.g. LIKE vs ILIKE) reads this via helpers.
-var active DialectKind = DialectSQLite
+// active is the package-wide dialect. The app is Postgres-only; DialectSQLite
+// remains defined only so the portable backup/restore code (which still carries
+// dialect-tagged branches) compiles — it is never selected at runtime.
+var active DialectKind = DialectPostgres
 
 // Active returns the currently-selected dialect.
 func Active() DialectKind { return active }
 
-// LikeOp returns the case-insensitive string-match operator for the active
-// dialect. SQLite's LIKE is already case-insensitive for ASCII; Postgres
-// requires ILIKE to match that behavior.
-func LikeOp() string {
-	if active == DialectPostgres {
-		return "ILIKE"
-	}
-	return "LIKE"
-}
+// LikeOp returns the case-insensitive string-match operator (Postgres ILIKE).
+func LikeOp() string { return "ILIKE" }
 
-// Rebind rewrites "?" placeholders in a SQL string to the positional form
-// expected by the active driver. For SQLite it is a no-op. For Postgres it
-// converts each "?" to "$1", "$2", ... respecting single-quoted string
-// literals so "?" inside a string is left alone.
+// Rebind rewrites "?" placeholders to Postgres positional form "$1","$2",...,
+// respecting single-quoted string literals so a "?" inside a string is left
+// alone. The pgx-rebind driver calls this on every statement, so model code
+// stays placeholder-portable.
 func Rebind(query string) string {
-	if active != DialectPostgres {
-		return query
-	}
 	var b strings.Builder
 	b.Grow(len(query) + 8)
 	inString := false
@@ -88,24 +79,16 @@ type driverConfig struct {
 	dsn    string // data source name
 }
 
-// resolveDriverConfig inspects environment variables and returns the driver
-// config plus the dialect. Defaults to SQLite at configDir/sshcm.db.
-//
-// Environment variables:
-//
-//	SSHCM_DB_DRIVER  "sqlite" (default) or "postgres"
-//	SSHCM_DB_DSN     driver-specific DSN; required for postgres
-func resolveDriverConfig(configDir string) driverConfig {
+// resolveDriverConfig returns the Postgres driver config. The app is
+// Postgres-only: SSHCM_DB_DSN must be a pgx-compatible DSN (SSHCM_DB_DRIVER is
+// accepted for back-compat but only "postgres"/"pg"/"postgresql"/"" are valid).
+func resolveDriverConfig() driverConfig {
 	drv := strings.ToLower(strings.TrimSpace(os.Getenv("SSHCM_DB_DRIVER")))
-	dsn := os.Getenv("SSHCM_DB_DSN")
 	switch drv {
-	case "postgres", "pg", "postgresql":
-		return driverConfig{kind: DialectPostgres, driver: "pgx", dsn: dsn}
+	case "", "postgres", "pg", "postgresql":
+		return driverConfig{kind: DialectPostgres, driver: "pgx", dsn: os.Getenv("SSHCM_DB_DSN")}
 	default:
-		return driverConfig{
-			kind:   DialectSQLite,
-			driver: "sqlite",
-			dsn:    configDir + "/sshcm.db",
-		}
+		// Unknown driver (e.g. legacy "sqlite") — surface a clear error at Open.
+		return driverConfig{kind: DialectPostgres, driver: "pgx", dsn: ""}
 	}
 }

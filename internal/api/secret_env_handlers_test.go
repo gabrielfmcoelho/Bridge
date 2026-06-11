@@ -15,11 +15,10 @@ type secretEnvEnv struct {
 
 func newSecretEnvEnv(t *testing.T) *secretEnvEnv {
 	base := newSecretAPIEnv(t)
-	r, err := base.d.SQL.Exec(`INSERT INTO services (nickname) VALUES (?)`, "env-test-svc")
-	if err != nil {
+	var id int64
+	if err := base.d.SQL.QueryRow(`INSERT INTO services (nickname) VALUES (?) RETURNING id`, "env-test-svc").Scan(&id); err != nil {
 		t.Fatalf("seed service: %v", err)
 	}
-	id, _ := r.LastInsertId()
 	return &secretEnvEnv{secretAPIEnv: base, serviceID: id}
 }
 

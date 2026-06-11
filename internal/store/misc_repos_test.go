@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 func openDB(t *testing.T) *database.DB {
 	t.Helper()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -48,11 +49,10 @@ func TestProjectAIAnalysisRepo_UpsertOverwrites(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
 	// project_ai_analyses.project_id FKs projects; seed one.
-	res, err := d.SQL.Exec(`INSERT INTO projects (name) VALUES ('p')`)
-	if err != nil {
+	var pid int64
+	if err := d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('p') RETURNING id`).Scan(&pid); err != nil {
 		t.Fatalf("seed project: %v", err)
 	}
-	pid, _ := res.LastInsertId()
 	repo := store.NewProjectAIAnalysisRepo(d.SQL)
 
 	if got, _ := repo.Get(ctx, pid); got != nil {

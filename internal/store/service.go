@@ -348,7 +348,7 @@ func (r *ServiceRepo) ReconcileContainers(ctx context.Context, hostID int64, con
 			`INSERT INTO services (nickname, description, service_type, service_subtype,
 				source, container_status, container_id, container_name, container_image, container_ports,
 				port, orchestrator_managed, discovered_at, last_seen_at)
-			VALUES (?, ?, ?, ?, 'auto', 'online', ?, ?, ?, ?, ?, 1, ?, ?)
+			VALUES (?, ?, ?, ?, 'auto', 'online', ?, ?, ?, ?, ?, true, ?, ?)
 			RETURNING id`,
 			inf.Nickname, "Auto-discovered from container "+c.Name,
 			inf.ServiceType, inf.ServiceSubtype,

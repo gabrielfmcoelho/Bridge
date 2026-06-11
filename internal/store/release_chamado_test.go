@@ -51,10 +51,14 @@ func TestReleaseRepo_CRUD(t *testing.T) {
 func TestHostChamadoRepo_CRUDSyncCache(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	hres, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h')`)
-	hostID, _ := hres.LastInsertId()
-	ures, _ := d.SQL.Exec(`INSERT INTO users (username, password_hash, role, display_name) VALUES ('u','x','admin','User U')`)
-	userID, _ := ures.LastInsertId()
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
+	var userID int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role, display_name) VALUES ('u','x','admin','User U') RETURNING id`).Scan(&userID); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
 	repo := store.NewHostChamadoRepo(d.SQL)
 
 	id, err := repo.Create(ctx, hostID, &models.HostChamadoInput{ChamadoID: "T-1", Title: "fix", UserID: userID, Date: "01/01/2026"})

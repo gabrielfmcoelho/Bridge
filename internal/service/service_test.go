@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 )
 
 func newServiceService(t *testing.T) (*service.ServiceService, *database.DB) {
 	t.Helper()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -24,12 +25,18 @@ func TestServiceService_CreateEnrichesListAndGet(t *testing.T) {
 	ctx := context.Background()
 	svc, d := newServiceService(t)
 
-	cr, _ := d.SQL.Exec(`INSERT INTO contacts (name, phone) VALUES ('Ada','555')`)
-	contactID, _ := cr.LastInsertId()
-	hr, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1','h1')`)
-	hostID, _ := hr.LastInsertId()
-	dr, _ := d.SQL.Exec(`INSERT INTO dns_records (domain) VALUES ('x.com')`)
-	dnsID, _ := dr.LastInsertId()
+	var contactID int64
+	if err := d.SQL.QueryRow(`INSERT INTO contacts (name, phone) VALUES ('Ada','555') RETURNING id`).Scan(&contactID); err != nil {
+		t.Fatalf("seed contact: %v", err)
+	}
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1','h1') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
+	var dnsID int64
+	if err := d.SQL.QueryRow(`INSERT INTO dns_records (domain) VALUES ('x.com') RETURNING id`).Scan(&dnsID); err != nil {
+		t.Fatalf("seed dns: %v", err)
+	}
 
 	// A dependency target.
 	depW := &service.ServiceWrite{Service: models.Service{Nickname: "db"}}

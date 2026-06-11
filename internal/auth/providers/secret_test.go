@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -13,7 +13,7 @@ import (
 // still resolve its stored secret to plaintext through the new AppSecretRepo.
 // (No provider-path coverage existed before this change.)
 func TestProviders_DecryptSetting_RoundTrip(t *testing.T) {
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

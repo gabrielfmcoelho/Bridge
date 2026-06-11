@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 func newResponsavelRepo(t *testing.T) (*store.ResponsavelRepo, *database.DB) {
 	t.Helper()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -24,10 +25,14 @@ func TestResponsavelRepo_SyncListAndMainNames(t *testing.T) {
 	repo, d := newResponsavelRepo(t)
 
 	// Two contacts: one internal (main), one external.
-	cr1, _ := d.SQL.Exec(`INSERT INTO contacts (name, phone, is_external) VALUES ('Ada','1',0)`)
-	internalID, _ := cr1.LastInsertId()
-	cr2, _ := d.SQL.Exec(`INSERT INTO contacts (name, phone, is_external) VALUES ('Ext','2',1)`)
-	externalID, _ := cr2.LastInsertId()
+	var internalID int64
+	if err := d.SQL.QueryRow(`INSERT INTO contacts (name, phone, is_external) VALUES ('Ada','1',false) RETURNING id`).Scan(&internalID); err != nil {
+		t.Fatalf("seed contact: %v", err)
+	}
+	var externalID int64
+	if err := d.SQL.QueryRow(`INSERT INTO contacts (name, phone, is_external) VALUES ('Ext','2',true) RETURNING id`).Scan(&externalID); err != nil {
+		t.Fatalf("seed contact: %v", err)
+	}
 
 	// Sync two responsaveis for host #7: internal is main.
 	in := []models.ResponsavelInput{
@@ -85,7 +90,7 @@ func TestResponsavelRepo_MigratedFromLegacyTables(t *testing.T) {
 	_, d := newResponsavelRepo(t)
 	for _, legacy := range []string{"host_responsaveis", "dns_responsaveis", "service_responsaveis", "project_responsaveis"} {
 		var n int
-		err := d.SQL.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?`, legacy).Scan(&n)
+		err := d.SQL.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?`, legacy).Scan(&n)
 		if err != nil {
 			t.Fatalf("query sqlite_master: %v", err)
 		}
@@ -94,7 +99,7 @@ func TestResponsavelRepo_MigratedFromLegacyTables(t *testing.T) {
 		}
 	}
 	var n int
-	if err := d.SQL.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='responsaveis'`).Scan(&n); err != nil || n != 1 {
+	if err := d.SQL.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'responsaveis'`).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("responsaveis table missing after v70 (n=%d, err=%v)", n, err)
 	}
 }

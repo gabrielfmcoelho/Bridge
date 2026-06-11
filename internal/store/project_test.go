@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 func newProjectRepo(t *testing.T) (*store.ProjectRepo, *database.DB) {
 	t.Helper()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -85,8 +86,10 @@ func TestProjectRepo_HostLinks(t *testing.T) {
 	repo, d := newProjectRepo(t)
 
 	// project_host_links.host_id FKs hosts; seed one host.
-	hr, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1','h1')`)
-	hostID, _ := hr.LastInsertId()
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1','h1') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed hosts: %v", err)
+	}
 
 	p := &models.Project{Name: "Linked", Description: "has a host"}
 	if err := repo.Create(ctx, p); err != nil {

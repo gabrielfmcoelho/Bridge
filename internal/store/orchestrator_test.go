@@ -4,25 +4,24 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 func TestOrchestratorRepo_CRUDRoundTrip(t *testing.T) {
 	ctx := context.Background()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
 
 	// orchestrators.host_id is a FK to hosts; seed a minimal host.
-	res, err := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1', 'h1')`)
-	if err != nil {
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1', 'h1') RETURNING id`).Scan(&hostID); err != nil {
 		t.Fatalf("seed host: %v", err)
 	}
-	hostID, _ := res.LastInsertId()
 
 	repo := store.NewOrchestratorRepo(d.SQL)
 

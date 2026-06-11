@@ -10,11 +10,10 @@ import (
 func TestHostScanRepo_WriteAndReadAggregates(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	res, err := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('web-1', 'web-1')`)
-	if err != nil {
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('web-1', 'web-1') RETURNING id`).Scan(&hostID); err != nil {
 		t.Fatalf("seed host: %v", err)
 	}
-	hostID, _ := res.LastInsertId()
 
 	repo := store.NewHostScanRepo(d.SQL)
 

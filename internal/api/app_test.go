@@ -4,14 +4,14 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 )
 
 // TestNewApp_WiresEveryField guards the DI container: every field of App must be
 // populated by newApp. A forgotten handler (nil field) would panic at first
 // request instead of failing here.
 func TestNewApp_WiresEveryField(t *testing.T) {
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

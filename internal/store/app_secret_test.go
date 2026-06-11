@@ -4,13 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 func TestAppSecretRepo_StoreRevealConfiguredClear(t *testing.T) {
 	ctx := context.Background()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -64,14 +64,14 @@ func TestAppSecretRepo_StoreRevealConfiguredClear(t *testing.T) {
 // TestAppSecretRepo_TableMigrated proves the v71 migration created app_secrets
 // and removed the legacy _cipher/_nonce rows from app_settings.
 func TestAppSecretRepo_TableMigrated(t *testing.T) {
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
 
 	var n int
-	if err := d.SQL.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='app_secrets'`).Scan(&n); err != nil || n != 1 {
+	if err := d.SQL.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'app_secrets'`).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("app_secrets table missing (n=%d, err=%v)", n, err)
 	}
 	// No cipher/nonce rows should remain in app_settings on a fresh DB.

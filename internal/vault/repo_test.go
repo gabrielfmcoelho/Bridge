@@ -6,8 +6,9 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 // secretTestEnv bundles a fresh DB and seeded user IDs for repo tests.
@@ -17,25 +18,23 @@ type secretTestEnv struct {
 	alice       vault.ActorContext // admin
 	bob         vault.ActorContext // editor
 	carol       vault.ActorContext // viewer
-	systemOwner int64        // for legacy-shared placeholder
+	systemOwner int64              // for legacy-shared placeholder
 }
 
 func newSecretTestEnv(t *testing.T) *secretTestEnv {
 	t.Helper()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
 
 	seedUser := func(name, role string) int64 {
-		res, err := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`,
-			name, "x", role)
-		if err != nil {
+		var id int64
+		if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`,
+			name, "x", role).Scan(&id); err != nil {
 			t.Fatalf("seed user %s: %v", name, err)
 		}
-		id, _ := res.LastInsertId()
 		return id
 	}
 	aliceID := seedUser("alice", "admin")

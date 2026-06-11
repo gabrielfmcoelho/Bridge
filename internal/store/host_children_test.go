@@ -11,8 +11,10 @@ import (
 func TestHostRemoteUserRepo_UpsertGetDelete(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	res, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h')`)
-	hostID, _ := res.LastInsertId()
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
 	repo := store.NewHostRemoteUserRepo(d.SQL)
 
 	// Upsert with nil key.
@@ -26,11 +28,10 @@ func TestHostRemoteUserRepo_UpsertGetDelete(t *testing.T) {
 
 	// Upsert again with a key id -> single row, updated. ssh_key_id FKs
 	// ssh_keys, so seed a key first.
-	kres, err := d.SQL.Exec(`INSERT INTO ssh_keys (name) VALUES ('k1')`)
-	if err != nil {
+	var keyID int64
+	if err := d.SQL.QueryRow(`INSERT INTO ssh_keys (name) VALUES ('k1') RETURNING id`).Scan(&keyID); err != nil {
 		t.Fatalf("seed ssh_key: %v", err)
 	}
-	keyID, _ := kres.LastInsertId()
 	if err := repo.CreateOrUpdate(ctx, hostID, "coolify", &keyID); err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -50,8 +51,10 @@ func TestHostRemoteUserRepo_UpsertGetDelete(t *testing.T) {
 func TestHostEntidadeRepo_SyncEnforcesOneMain(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	res, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h')`)
-	hostID, _ := res.LastInsertId()
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
 	repo := store.NewHostEntidadeRepo(d.SQL)
 
 	// No main flagged -> alphabetically-first promoted.

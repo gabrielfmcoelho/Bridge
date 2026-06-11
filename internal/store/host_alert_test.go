@@ -11,8 +11,10 @@ import (
 func TestHostAlertRepo_CRUDResolveAndExternalUpsert(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	hres, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h')`)
-	hostID, _ := hres.LastInsertId()
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
 	repo := store.NewHostAlertRepo(d.SQL)
 
 	a := &models.HostAlert{HostID: hostID, Type: "resource_cpu", Level: "warning", Message: "high"}

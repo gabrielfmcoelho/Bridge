@@ -4,30 +4,28 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 func TestOperationLogRepo_CreateAndListByHost(t *testing.T) {
 	ctx := context.Background()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
 
 	// host_operation_logs has FKs to hosts and users; ListByHost JOINs users.
-	hres, err := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h')`)
-	if err != nil {
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h') RETURNING id`).Scan(&hostID); err != nil {
 		t.Fatalf("seed host: %v", err)
 	}
-	hostID, _ := hres.LastInsertId()
-	ures, err := d.SQL.Exec(`INSERT INTO users (username, password_hash, role, display_name) VALUES ('u','x','admin','User U')`)
-	if err != nil {
+	var userID int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role, display_name) VALUES ('u','x','admin','User U') RETURNING id`).Scan(&userID); err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
-	userID, _ := ures.LastInsertId()
 
 	repo := store.NewOperationLogRepo(d.SQL)
 	method := "key"

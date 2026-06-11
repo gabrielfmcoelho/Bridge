@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 )
 
 func newDNSService(t *testing.T) (*service.DNSService, *database.DB) {
 	t.Helper()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -26,10 +27,14 @@ func TestDNSService_CreateEnrichesListAndGet(t *testing.T) {
 	svc, d := newDNSService(t)
 
 	// dns_host_links.host_id FKs hosts; seed two hosts.
-	h1, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1','h1')`)
-	host1, _ := h1.LastInsertId()
-	h2, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h2','h2')`)
-	host2, _ := h2.LastInsertId()
+	var host1 int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1','h1') RETURNING id`).Scan(&host1); err != nil {
+		t.Fatalf("seed host1: %v", err)
+	}
+	var host2 int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h2','h2') RETURNING id`).Scan(&host2); err != nil {
+		t.Fatalf("seed host2: %v", err)
+	}
 
 	tags := []string{"prod", "edge"}
 	hostIDs := []int64{host1, host2}

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -14,8 +14,7 @@ import (
 // past grace gets removed.
 func TestShareLinkJanitor_DeletesPastGrace(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -24,20 +23,21 @@ func TestShareLinkJanitor_DeletesPastGrace(t *testing.T) {
 	// Seed: one user (FK target for created_by) and three share_bundles rows at
 	// different expiry offsets. (Per-secret share_links were retired in R3; a
 	// share is now a bundle, which the janitor sweeps.)
-	res, _ := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`, "alice", "x", "admin")
-	uid, _ := res.LastInsertId()
+	var uid int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`, "alice", "x", "admin").Scan(&uid); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
 
 	mkLink := func(expires time.Time) int64 {
-		r, err := d.SQL.Exec(
-			`INSERT INTO share_bundles (token_hash, expires_at, created_by) VALUES (?, ?, ?)`,
+		var id int64
+		if err := d.SQL.QueryRow(
+			`INSERT INTO share_bundles (token_hash, expires_at, created_by) VALUES (?, ?, ?) RETURNING id`,
 			[]byte{0xaa}, expires.UTC().Format(time.RFC3339Nano), uid,
-		)
-		if err != nil {
+		).Scan(&id); err != nil {
 			t.Fatalf("seed bundle: %v", err)
 		}
 		// Vary token_hash so the unique idx_share_bundles_token constraint
 		// doesn't collide across same-millisecond inserts.
-		id, _ := r.LastInsertId()
 		_, _ = d.SQL.Exec(`UPDATE share_bundles SET token_hash = ? WHERE id = ?`,
 			[]byte{byte(id), byte(id + 1)}, id)
 		return id
@@ -84,8 +84,7 @@ func TestShareLinkJanitor_DeletesPastGrace(t *testing.T) {
 // when there's nothing to clean up — common pattern on fresh deploys.
 func TestShareLinkJanitor_EmptyIsNoOp(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -14,7 +15,7 @@ import (
 
 func newHostService(t *testing.T) (*service.HostService, *database.DB) {
 	t.Helper()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -34,11 +35,15 @@ func TestHostService_GetComposesRelations(t *testing.T) {
 	store.NewTagRepo(d.SQL).Set(ctx, "host", h.ID, []string{"prod"})
 
 	// Link a service and a dns record to the host.
-	sr, _ := d.SQL.Exec(`INSERT INTO services (nickname) VALUES ('svc')`)
-	svcID, _ := sr.LastInsertId()
+	var svcID int64
+	if err := d.SQL.QueryRow(`INSERT INTO services (nickname) VALUES ('svc') RETURNING id`).Scan(&svcID); err != nil {
+		t.Fatalf("seed service: %v", err)
+	}
 	d.SQL.Exec(`INSERT INTO service_host_links (service_id, host_id) VALUES (?, ?)`, svcID, h.ID)
-	dr, _ := d.SQL.Exec(`INSERT INTO dns_records (domain) VALUES ('web.example.com')`)
-	dnsID, _ := dr.LastInsertId()
+	var dnsID int64
+	if err := d.SQL.QueryRow(`INSERT INTO dns_records (domain) VALUES ('web.example.com') RETURNING id`).Scan(&dnsID); err != nil {
+		t.Fatalf("seed dns: %v", err)
+	}
 	d.SQL.Exec(`INSERT INTO dns_host_links (dns_id, host_id) VALUES (?, ?)`, dnsID, h.ID)
 
 	// A scan so last_scan is populated.
@@ -79,8 +84,10 @@ func TestHostService_ListEnrichesAndComputesAlerts(t *testing.T) {
 	store.NewTagRepo(d.SQL).Set(ctx, "host", h.ID, []string{"edge"})
 
 	// Link a service so ServicesCount is enriched.
-	sr, _ := d.SQL.Exec(`INSERT INTO services (nickname) VALUES ('s1')`)
-	svcID, _ := sr.LastInsertId()
+	var svcID int64
+	if err := d.SQL.QueryRow(`INSERT INTO services (nickname) VALUES ('s1') RETURNING id`).Scan(&svcID); err != nil {
+		t.Fatalf("seed service: %v", err)
+	}
 	d.SQL.Exec(`INSERT INTO service_host_links (service_id, host_id) VALUES (?, ?)`, svcID, h.ID)
 
 	// Scan data with critical CPU usage (90% ≥ default critical 80%).

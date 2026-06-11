@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 )
 
 // TestSelfRegisteredRoutes_Wired verifies the migrated handler groups' routes
@@ -14,7 +14,7 @@ import (
 // public routes must not 401. A 404 would mean the route was dropped during the
 // self-registration migration.
 func TestSelfRegisteredRoutes_Wired(t *testing.T) {
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

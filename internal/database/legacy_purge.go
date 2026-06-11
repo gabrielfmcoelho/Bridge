@@ -82,14 +82,11 @@ func DropLegacyHostSecretColumns(db *sql.DB) error {
 // both queries take a column name parameter and return at least one row
 // when the column exists.
 func hostColumnExists(db *sql.DB, col string) (bool, error) {
-	var query string
-	if active == DialectPostgres {
-		query = `SELECT 1 FROM information_schema.columns WHERE table_name = 'hosts' AND column_name = $1`
-	} else {
-		query = `SELECT 1 FROM pragma_table_info('hosts') WHERE name = ?`
-	}
 	var dummy int
-	err := db.QueryRow(query, col).Scan(&dummy)
+	err := db.QueryRow(
+		`SELECT 1 FROM information_schema.columns WHERE table_name = 'hosts' AND table_schema = current_schema() AND column_name = $1`,
+		col,
+	).Scan(&dummy)
 	if err == sql.ErrNoRows {
 		return false, nil
 	}

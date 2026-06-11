@@ -13,14 +13,13 @@ import (
 // store tests must not depend on). Returns the new id.
 func seedSecret(t *testing.T, d *database.DB, scope models.SecretScope, parentID, owner int64, name string) int64 {
 	t.Helper()
-	res, err := d.SQL.Exec(
+	var id int64
+	if err := d.SQL.QueryRow(
 		`INSERT INTO secrets (type, scope, visibility, parent_id, owner_user_id, name, payload_ciphertext, payload_nonce, key_version, created_by)
-		 VALUES ('password', ?, 'shared', ?, ?, ?, X'00', X'00', 1, ?)`,
-		string(scope), parentID, owner, name, owner)
-	if err != nil {
+		 VALUES ('password', ?, 'shared', ?, ?, ?, ?, ?, 1, ?) RETURNING id`,
+		string(scope), parentID, owner, name, []byte{0}, []byte{0}, owner).Scan(&id); err != nil {
 		t.Fatalf("seed secret: %v", err)
 	}
-	id, _ := res.LastInsertId()
 	return id
 }
 
@@ -45,10 +44,14 @@ func auditCount(t *testing.T, d *database.DB, secretID int64, action string) int
 func TestDeleteParent_SoftDeleteCascadesChildSecrets(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	ures, _ := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin')`)
-	owner, _ := ures.LastInsertId()
-	hres, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h','h')`)
-	hostID, _ := hres.LastInsertId()
+	var owner int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin') RETURNING id`).Scan(&owner); err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h','h') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed hosts: %v", err)
+	}
 
 	s1 := seedSecret(t, d, models.SecretScopeHost, hostID, owner, "pw1")
 	s2 := seedSecret(t, d, models.SecretScopeHost, hostID, owner, "pw2")
@@ -77,10 +80,14 @@ func TestDeleteParent_SoftDeleteCascadesChildSecrets(t *testing.T) {
 func TestDeleteRestoreParent_SoftDeleteRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	ures, _ := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin')`)
-	owner, _ := ures.LastInsertId()
-	tres, _ := d.SQL.Exec(`INSERT INTO external_tools (name, url) VALUES ('t','http://t')`)
-	toolID, _ := tres.LastInsertId()
+	var owner int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin') RETURNING id`).Scan(&owner); err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
+	var toolID int64
+	if err := d.SQL.QueryRow(`INSERT INTO external_tools (name, url) VALUES ('t','http://t') RETURNING id`).Scan(&toolID); err != nil {
+		t.Fatalf("seed external_tools: %v", err)
+	}
 
 	s1 := seedSecret(t, d, models.SecretScopeTool, toolID, owner, "tk")
 	actor := models.ActorContext{UserID: owner, Role: "admin"}

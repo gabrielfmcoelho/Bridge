@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 )
 
 func newProjectService(t *testing.T) (*service.ProjectService, *database.DB) {
 	t.Helper()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -24,8 +25,10 @@ func TestProjectService_CreateEnrichesListAndGet(t *testing.T) {
 	svc, d := newProjectService(t)
 
 	// Seed a contact to use as the project's main responsável.
-	cr, _ := d.SQL.Exec(`INSERT INTO contacts (name, phone, role) VALUES ('Ada','555-1','lead')`)
-	contactID, _ := cr.LastInsertId()
+	var contactID int64
+	if err := d.SQL.QueryRow(`INSERT INTO contacts (name, phone, role) VALUES ('Ada','555-1','lead') RETURNING id`).Scan(&contactID); err != nil {
+		t.Fatalf("seed contact: %v", err)
+	}
 
 	tags := []string{"infra", "core"}
 	resp := []models.ResponsavelInput{{ContactID: contactID, IsMain: true}}
@@ -60,12 +63,18 @@ func TestProjectService_CreateEnrichesListAndGet(t *testing.T) {
 
 	// Seed a service under the project, linked to a host and a dns record, so
 	// Get aggregates host_ids/dns_ids from the project's services.
-	sr, _ := d.SQL.Exec(`INSERT INTO services (nickname, project_id) VALUES ('svc', ?)`, projID)
-	svcID, _ := sr.LastInsertId()
-	hr, _ := d.SQL.Exec(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1','h1')`)
-	hostID, _ := hr.LastInsertId()
-	dr, _ := d.SQL.Exec(`INSERT INTO dns_records (domain) VALUES ('x.com')`)
-	dnsID, _ := dr.LastInsertId()
+	var svcID int64
+	if err := d.SQL.QueryRow(`INSERT INTO services (nickname, project_id) VALUES ('svc', ?) RETURNING id`, projID).Scan(&svcID); err != nil {
+		t.Fatalf("seed service: %v", err)
+	}
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1','h1') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
+	var dnsID int64
+	if err := d.SQL.QueryRow(`INSERT INTO dns_records (domain) VALUES ('x.com') RETURNING id`).Scan(&dnsID); err != nil {
+		t.Fatalf("seed dns: %v", err)
+	}
 	d.SQL.Exec(`INSERT INTO service_host_links (service_id, host_id) VALUES (?, ?)`, svcID, hostID)
 	d.SQL.Exec(`INSERT INTO service_dns_links (service_id, dns_id) VALUES (?, ?)`, svcID, dnsID)
 

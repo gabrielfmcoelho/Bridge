@@ -14,6 +14,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
@@ -44,22 +45,20 @@ type secretAPIEnv struct {
 
 func newSecretAPIEnv(t *testing.T) *secretAPIEnv {
 	t.Helper()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
 
 	mkUser := func(name, role string) *models.User {
-		res, err := d.SQL.Exec(
-			`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`,
+		var id int64
+		if err := d.SQL.QueryRow(
+			`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`,
 			name, "x", role,
-		)
-		if err != nil {
+		).Scan(&id); err != nil {
 			t.Fatalf("seed %s: %v", name, err)
 		}
-		id, _ := res.LastInsertId()
 		return &models.User{ID: id, Username: name, Role: role}
 	}
 	alice := mkUser("alice", "admin")
@@ -68,11 +67,10 @@ func newSecretAPIEnv(t *testing.T) *secretAPIEnv {
 	dave := mkUser("dave", "viewer")
 
 	// Parent service for the shared secret.
-	svcRes, err := d.SQL.Exec(`INSERT INTO services (nickname) VALUES (?)`, "billing-api")
-	if err != nil {
+	var serviceID int64
+	if err := d.SQL.QueryRow(`INSERT INTO services (nickname) VALUES (?) RETURNING id`, "billing-api").Scan(&serviceID); err != nil {
 		t.Fatalf("seed service: %v", err)
 	}
-	serviceID, _ := svcRes.LastInsertId()
 
 	repo := vault.NewSecretRepo(d)
 	ctx := context.Background()

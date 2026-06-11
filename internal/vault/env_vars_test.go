@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
@@ -21,29 +22,26 @@ type envFixture struct {
 
 func newEnvFixture(t *testing.T) *envFixture {
 	t.Helper()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
 
 	mk := func(name, role string) int64 {
-		r, err := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`, name, "x", role)
-		if err != nil {
+		var id int64
+		if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`, name, "x", role).Scan(&id); err != nil {
 			t.Fatalf("seed user %s: %v", name, err)
 		}
-		id, _ := r.LastInsertId()
 		return id
 	}
 	bobID := mk("bob", "editor")
 	carolID := mk("carol", "viewer")
 
-	svcRes, err := d.SQL.Exec(`INSERT INTO services (nickname) VALUES (?)`, "billing-api")
-	if err != nil {
+	var svcID int64
+	if err := d.SQL.QueryRow(`INSERT INTO services (nickname) VALUES (?) RETURNING id`, "billing-api").Scan(&svcID); err != nil {
 		t.Fatalf("seed svc: %v", err)
 	}
-	svcID, _ := svcRes.LastInsertId()
 
 	return &envFixture{
 		t: t, d: d, repo: vault.NewSecretRepo(d),
@@ -224,8 +222,10 @@ func TestBulkUpsertEnvVars_PersonalIsolatedPerOwner(t *testing.T) {
 
 	// alice (additional user, viewer for visibility=personal write is fine
 	// since personal ownership grants write to the owner regardless of role).
-	r, _ := f.d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`, "alice", "x", "viewer")
-	aliceID, _ := r.LastInsertId()
+	var aliceID int64
+	if err := f.d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`, "alice", "x", "viewer").Scan(&aliceID); err != nil {
+		t.Fatalf("seed alice: %v", err)
+	}
 	alice := vault.ActorContext{UserID: aliceID, Role: "viewer"}
 
 	if _, err := f.repo.BulkUpsertEnvVars(ctx, f.carol,

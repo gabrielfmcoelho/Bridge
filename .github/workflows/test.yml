@@ -7,32 +7,11 @@ on:
 
 jobs:
   go-test:
-    name: Go tests (${{ matrix.backend }})
+    name: Go tests
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        backend: [sqlite, postgres]
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: sshcm
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      # Only the postgres matrix leg talks to the service container; the
-      # sqlite leg skips the cross-dialect test via the empty env var.
-      SSHCM_TEST_PG_DSN: ${{ matrix.backend == 'postgres' && 'postgres://postgres:test@localhost:5432/sshcm?sslmode=disable' || '' }}
+    # Postgres-only. Tests spin ephemeral Postgres containers via
+    # testcontainers-go (internal/dbtest + internal/pgtest), using the Docker
+    # daemon present on GitHub-hosted runners — no service container needed.
 
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +25,7 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test -race -buildvcs=false ./internal/database/... ./internal/models/... ./cmd/...
+        run: go test -race -buildvcs=false ./...
 
   frontend-check:
     name: Frontend type-check

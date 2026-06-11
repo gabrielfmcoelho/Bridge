@@ -11,8 +11,10 @@ import (
 func TestUserGitLabTokenRepo_UpsertGetDelete(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	ures, _ := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin')`)
-	userID, _ := ures.LastInsertId()
+	var userID int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin') RETURNING id`).Scan(&userID); err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
 	repo := store.NewUserGitLabTokenRepo(d.SQL)
 
 	tok := &models.UserGitLabToken{UserID: userID, GitLabBaseURL: "https://gl", AccessTokenCipher: []byte{1}, AccessTokenNonce: []byte{2}, GitLabUsername: "ada"}
@@ -43,10 +45,14 @@ func TestUserGitLabTokenRepo_UpsertGetDelete(t *testing.T) {
 func TestProjectGitLabLinkRepo_CRUDAndOwnershipDelete(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	p1, _ := d.SQL.Exec(`INSERT INTO projects (name) VALUES ('p1')`)
-	pid1, _ := p1.LastInsertId()
-	p2, _ := d.SQL.Exec(`INSERT INTO projects (name) VALUES ('p2')`)
-	pid2, _ := p2.LastInsertId()
+	var pid1 int64
+	if err := d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('p1') RETURNING id`).Scan(&pid1); err != nil {
+		t.Fatalf("seed projects: %v", err)
+	}
+	var pid2 int64
+	if err := d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('p2') RETURNING id`).Scan(&pid2); err != nil {
+		t.Fatalf("seed projects: %v", err)
+	}
 	repo := store.NewProjectGitLabLinkRepo(d.SQL)
 
 	l := &models.ProjectGitLabLink{ProjectID: pid1, GitLabProjectID: 10, GitLabBaseURL: "https://gl", GitLabPath: "a/b"}
@@ -81,8 +87,10 @@ func TestProjectGitLabLinkRepo_CRUDAndOwnershipDelete(t *testing.T) {
 func TestUserIdentityRepo_CreateGetList(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
-	ures, _ := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin')`)
-	userID, _ := ures.LastInsertId()
+	var userID int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin') RETURNING id`).Scan(&userID); err != nil {
+		t.Fatalf("seed users: %v", err)
+	}
 	repo := store.NewUserIdentityRepo(d.SQL)
 
 	id := &models.UserExternalIdentity{UserID: userID, ProviderName: "keycloak", ExternalID: "kc-1"}

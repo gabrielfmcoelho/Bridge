@@ -3,14 +3,15 @@ package database
 import (
 	"os"
 	"testing"
+
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/pgtest"
 )
 
 // TestDropLegacyServiceCredentialsTable asserts the purge is idempotent and
 // removes the table. Always-runs sqlite test — postgres parity is implicit
 // because both dialects accept `DROP TABLE IF EXISTS`.
 func TestDropLegacyServiceCredentialsTable(t *testing.T) {
-	dir := t.TempDir()
-	d, err := Open(dir)
+	d, err := OpenDSN(pgtest.SchemaDSN(t), t.TempDir())
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -19,7 +20,7 @@ func TestDropLegacyServiceCredentialsTable(t *testing.T) {
 	// Table should exist after migrations applied.
 	var n int
 	if err := d.SQL.QueryRow(
-		`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='service_credentials'`,
+		`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name='service_credentials'`,
 	).Scan(&n); err != nil {
 		t.Fatalf("count pre: %v", err)
 	}
@@ -32,7 +33,7 @@ func TestDropLegacyServiceCredentialsTable(t *testing.T) {
 	}
 
 	if err := d.SQL.QueryRow(
-		`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='service_credentials'`,
+		`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name='service_credentials'`,
 	).Scan(&n); err != nil {
 		t.Fatalf("count post: %v", err)
 	}
@@ -52,15 +53,14 @@ func TestMaybeDropLegacySecrets_EnvGated(t *testing.T) {
 	// Branch 1: env unset → table stays.
 	t.Run("env unset is no-op", func(t *testing.T) {
 		t.Setenv(MigrateDropLegacySecretsEnv, "")
-		dir := t.TempDir()
-		d, err := Open(dir)
+		d, err := OpenDSN(pgtest.SchemaDSN(t), t.TempDir())
 		if err != nil {
 			t.Fatalf("open: %v", err)
 		}
 		defer d.Close()
 		var n int
 		if err := d.SQL.QueryRow(
-			`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='service_credentials'`,
+			`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name='service_credentials'`,
 		).Scan(&n); err != nil {
 			t.Fatalf("count: %v", err)
 		}
@@ -72,15 +72,14 @@ func TestMaybeDropLegacySecrets_EnvGated(t *testing.T) {
 	// Branch 2: env =1 → table gets dropped during Open's migration tail.
 	t.Run("env set drops table on Open", func(t *testing.T) {
 		t.Setenv(MigrateDropLegacySecretsEnv, "1")
-		dir := t.TempDir()
-		d, err := Open(dir)
+		d, err := OpenDSN(pgtest.SchemaDSN(t), t.TempDir())
 		if err != nil {
 			t.Fatalf("open: %v", err)
 		}
 		defer d.Close()
 		var n int
 		if err := d.SQL.QueryRow(
-			`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='service_credentials'`,
+			`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name='service_credentials'`,
 		).Scan(&n); err != nil {
 			t.Fatalf("count: %v", err)
 		}
@@ -94,15 +93,14 @@ func TestMaybeDropLegacySecrets_EnvGated(t *testing.T) {
 	// foot-gun before it hits production.
 	t.Run("env =true (not 1) is no-op", func(t *testing.T) {
 		t.Setenv(MigrateDropLegacySecretsEnv, "true")
-		dir := t.TempDir()
-		d, err := Open(dir)
+		d, err := OpenDSN(pgtest.SchemaDSN(t), t.TempDir())
 		if err != nil {
 			t.Fatalf("open: %v", err)
 		}
 		defer d.Close()
 		var n int
 		_ = d.SQL.QueryRow(
-			`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='service_credentials'`,
+			`SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name='service_credentials'`,
 		).Scan(&n)
 		if n != 1 {
 			t.Errorf("expected service_credentials still present when env != '1', got %d", n)
@@ -117,8 +115,7 @@ func TestMaybeDropLegacySecrets_EnvGated(t *testing.T) {
 // columns on `hosts` is gone after the purge, while the cached boolean
 // flags (has_password, has_key) survive.
 func TestDropLegacyHostSecretColumns(t *testing.T) {
-	dir := t.TempDir()
-	d, err := Open(dir)
+	d, err := OpenDSN(pgtest.SchemaDSN(t), t.TempDir())
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -153,16 +150,16 @@ func TestDropLegacyHostSecretColumns(t *testing.T) {
 	}
 }
 
-// columnExists is a sqlite-specific helper that uses PRAGMA table_info to
-// check for column presence. Postgres parity isn't needed for this test
-// because the host_secret_columns drop uses portable `DROP COLUMN IF
-// EXISTS` and TestDropLegacyHostSecretColumns asserts the behavioral
-// outcome (column gone) — not the dialect.
+// columnExists checks column presence via information_schema, scoped to the
+// test's schema (current_schema()).
 func columnExists(t *testing.T, d *DB, table, col string) bool {
 	t.Helper()
-	rows, err := d.SQL.Query(`SELECT name FROM pragma_table_info(?) WHERE name = ?`, table, col)
+	rows, err := d.SQL.Query(
+		`SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`,
+		table, col,
+	)
 	if err != nil {
-		t.Fatalf("pragma table_info(%s): %v", table, err)
+		t.Fatalf("information_schema.columns(%s): %v", table, err)
 	}
 	defer rows.Close()
 	return rows.Next()
