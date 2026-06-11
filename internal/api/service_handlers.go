@@ -28,7 +28,7 @@ func (h *serviceHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to list services", err)
 		return
 	}
-	jsonOK(w, services)
+	jsonPaged(w, r, services)
 }
 
 func (h *serviceHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
@@ -214,10 +214,7 @@ func (h *serviceHandlers) handleListTrash(w http.ResponseWriter, r *http.Request
 		jsonServerError(w, r, "failed to list service trash", err)
 		return
 	}
-	if items == nil {
-		items = []models.Service{}
-	}
-	jsonOK(w, items)
+	jsonPaged(w, r, items)
 }
 
 func (h *serviceHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {

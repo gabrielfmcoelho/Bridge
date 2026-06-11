@@ -83,7 +83,7 @@ func (h *secretHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	if views == nil {
 		views = []vault.SecretView{}
 	}
-	jsonOK(w, views)
+	jsonPaged(w, r, views)
 }
 
 type createSecretRequest struct {
@@ -287,7 +287,7 @@ func (h *secretHandlers) handleHistory(w http.ResponseWriter, r *http.Request) {
 	if rows == nil {
 		rows = []models.SecretAuditLog{}
 	}
-	jsonOK(w, rows)
+	jsonPaged(w, r, rows)
 }
 
 func (h *secretHandlers) handleTrash(w http.ResponseWriter, r *http.Request) {
@@ -304,7 +304,7 @@ func (h *secretHandlers) handleTrash(w http.ResponseWriter, r *http.Request) {
 	if views == nil {
 		views = []vault.SecretView{}
 	}
-	jsonOK(w, views)
+	jsonPaged(w, r, views)
 }
 
 func (h *secretHandlers) handleMine(w http.ResponseWriter, r *http.Request) {
@@ -324,5 +324,5 @@ func (h *secretHandlers) handleMine(w http.ResponseWriter, r *http.Request) {
 	if views == nil {
 		views = []vault.SecretView{}
 	}
-	jsonOK(w, views)
+	jsonPaged(w, r, views)
 }

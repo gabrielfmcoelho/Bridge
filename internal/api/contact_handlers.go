@@ -21,7 +21,7 @@ func (h *contactHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to list contacts", err)
 		return
 	}
-	jsonOK(w, contacts)
+	jsonPaged(w, r, contacts)
 }
 
 func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {

@@ -20,7 +20,7 @@ func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to list DNS records", err)
 		return
 	}
-	jsonOK(w, records)
+	jsonPaged(w, r, records)
 }
 
 func (h *dnsHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
@@ -45,8 +45,8 @@ func (h *dnsHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 // "present but empty" (clear) on update.
 type dnsWriteRequest struct {
 	models.DNSRecord
-	Tags         *[]string                     `json:"tags"`
-	HostIDs      *[]int64                      `json:"host_ids"`
+	Tags         *[]string                  `json:"tags"`
+	HostIDs      *[]int64                   `json:"host_ids"`
 	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 }
 

@@ -34,7 +34,7 @@ func (h *sshKeyHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 			HasPassword:   len(k.PasswordCiphertext) > 0,
 		}
 	}
-	jsonOK(w, result)
+	jsonPaged(w, r, result)
 }
 
 func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {

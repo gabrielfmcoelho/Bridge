@@ -23,11 +23,11 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshconfig"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshkeys"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshsetup"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -83,7 +83,6 @@ func (h *sshHandlers) requireUser(w http.ResponseWriter, host *models.Host) stri
 	}
 	return host.User
 }
-
 
 // resolveAuth builds an Auth for the given method. If method is empty, it picks
 // the best available method. Returns the resolved method name and Auth, or

@@ -83,7 +83,7 @@ func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) 
 	if list == nil {
 		list = []models.APICatalog{}
 	}
-	jsonOK(w, list)
+	jsonPaged(w, r, list)
 }
 
 func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +101,7 @@ func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *ht
 	if hits == nil {
 		hits = []models.OperationSearchResult{}
 	}
-	jsonOK(w, hits)
+	jsonPaged(w, r, hits)
 }
 
 // --- get --------------------------------------------------------------------

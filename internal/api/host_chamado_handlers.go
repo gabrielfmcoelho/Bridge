@@ -34,7 +34,7 @@ func (h *hostChamadoHandlers) handleList(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	jsonOK(w, chamados)
+	jsonPaged(w, r, chamados)
 }
 
 func (h *hostChamadoHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {

@@ -55,7 +55,7 @@ func (h *globalIssueHandlers) handleList(w http.ResponseWriter, r *http.Request)
 		result[i] = issueWithLinks{Issue: issue, AssigneeIDs: assigneeMap[issue.ID], AlertIDs: alertMap[issue.ID]}
 	}
 
-	jsonOK(w, result)
+	jsonPaged(w, r, result)
 }
 
 func (h *globalIssueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {

@@ -52,7 +52,7 @@ func (h *hostAlertHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	jsonOK(w, result)
+	jsonPaged(w, r, result)
 }
 
 func (h *hostAlertHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {

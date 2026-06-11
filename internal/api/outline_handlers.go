@@ -19,25 +19,25 @@ type outlineHandlers struct {
 // wikiEnvelope is the shape every "list documents" response carries.
 // The UI differentiates its empty states from the boolean + nil fields.
 type wikiEnvelope struct {
-	Enabled     bool                    `json:"enabled"`
-	Configured  bool                    `json:"configured"`
-	Collection  *outlineclient.Collection `json:"collection"`
-	CollectionBrowseURL string          `json:"collection_browse_url,omitempty"`
-	Documents   []docSummary            `json:"documents"`
-	Warning     string                  `json:"warning,omitempty"`
+	Enabled             bool                      `json:"enabled"`
+	Configured          bool                      `json:"configured"`
+	Collection          *outlineclient.Collection `json:"collection"`
+	CollectionBrowseURL string                    `json:"collection_browse_url,omitempty"`
+	Documents           []docSummary              `json:"documents"`
+	Warning             string                    `json:"warning,omitempty"`
 }
 
 // docSummary flattens the Outline document into what the UI actually needs —
 // enough to render a row without forcing the frontend to mirror Outline's full type.
 type docSummary struct {
-	ID          string    `json:"id"`
-	URLID       string    `json:"url_id"`
-	Title       string    `json:"title"`
-	Emoji       string    `json:"emoji,omitempty"`
-	Excerpt     string    `json:"excerpt"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	UpdatedBy   string    `json:"updated_by,omitempty"`
-	BrowseURL   string    `json:"browse_url"`
+	ID        string    `json:"id"`
+	URLID     string    `json:"url_id"`
+	Title     string    `json:"title"`
+	Emoji     string    `json:"emoji,omitempty"`
+	Excerpt   string    `json:"excerpt"`
+	UpdatedAt time.Time `json:"updated_at"`
+	UpdatedBy string    `json:"updated_by,omitempty"`
+	BrowseURL string    `json:"browse_url"`
 }
 
 // handleListProjectWiki returns recent docs in the project's linked Outline collection.

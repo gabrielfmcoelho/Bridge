@@ -25,7 +25,7 @@ func (h *orchestratorHandlers) handleList(w http.ResponseWriter, r *http.Request
 		jsonServerError(w, r, "failed to list orchestrators", err)
 		return
 	}
-	jsonOK(w, orchs)
+	jsonPaged(w, r, orchs)
 }
 
 func (h *orchestratorHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {

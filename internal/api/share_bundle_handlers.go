@@ -105,10 +105,7 @@ func (h *bundleHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 			bundles = filtered
 		}
 	}
-	if bundles == nil {
-		bundles = []vault.BundleView{}
-	}
-	jsonOK(w, bundles)
+	jsonPaged(w, r, bundles)
 }
 
 func (h *bundleHandlers) handleRevoke(w http.ResponseWriter, r *http.Request) {

@@ -93,25 +93,19 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		result = filtered
 	}
 
-	// If paginated, wrap in an envelope with the total count.
+	// Uniform list envelope (R4). Hosts is the one list that paginates in SQL
+	// (HostFilter.Page/PerPage → repo LIMIT/OFFSET); when per_page is set we
+	// report the real Count, otherwise the full result length.
 	if f.PerPage > 0 {
 		total, _ := h.host.Count(r.Context(), f)
-		totalPages := (total + f.PerPage - 1) / f.PerPage
 		page := f.Page
 		if page < 1 {
 			page = 1
 		}
-		jsonOK(w, map[string]any{
-			"data":        result,
-			"total":       total,
-			"page":        page,
-			"per_page":    f.PerPage,
-			"total_pages": totalPages,
-		})
+		jsonList(w, result, Meta{Page: page, PerPage: f.PerPage, Total: total})
 		return
 	}
-
-	jsonOK(w, result)
+	jsonList(w, result, metaFor(PageParams{Page: 1, PerPage: 0}, len(result)))
 }
 
 func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {

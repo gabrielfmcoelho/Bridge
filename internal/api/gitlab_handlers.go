@@ -103,12 +103,12 @@ func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	t := &models.UserGitLabToken{
-		UserID:             user.ID,
-		GitLabBaseURL:      req.BaseURL,
-		AccessTokenCipher:  cipher,
-		AccessTokenNonce:   nonce,
-		GitLabUserID:       string(rune(glUser.ID)),
-		GitLabUsername:     glUser.Username,
+		UserID:            user.ID,
+		GitLabBaseURL:     req.BaseURL,
+		AccessTokenCipher: cipher,
+		AccessTokenNonce:  nonce,
+		GitLabUserID:      string(rune(glUser.ID)),
+		GitLabUsername:    glUser.Username,
 	}
 	if err := store.NewUserGitLabTokenRepo(h.db.SQL).Upsert(r.Context(), t); err != nil {
 		jsonServerError(w, r, "failed to save token", err)

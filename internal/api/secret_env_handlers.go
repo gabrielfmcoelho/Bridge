@@ -13,11 +13,11 @@ import (
 // All vars in a single request share the same scope/parent/group/visibility;
 // per-var fields are name + value + optional description.
 type envBulkRequest struct {
-	Scope       string            `json:"scope"`
-	ParentID    *int64            `json:"parent_id,omitempty"`
-	Visibility  string            `json:"visibility,omitempty"` // defaults to "shared"
-	GroupLabel  string            `json:"group_label"`
-	Vars        []envBulkVarEntry `json:"vars"`
+	Scope      string            `json:"scope"`
+	ParentID   *int64            `json:"parent_id,omitempty"`
+	Visibility string            `json:"visibility,omitempty"` // defaults to "shared"
+	GroupLabel string            `json:"group_label"`
+	Vars       []envBulkVarEntry `json:"vars"`
 }
 
 type envBulkVarEntry struct {

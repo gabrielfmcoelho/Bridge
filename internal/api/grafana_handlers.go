@@ -130,16 +130,16 @@ func parseIntFromString(s string) (int64, error) {
 // Every metric is a pointer so the JSON `null` distinguishes "series missing"
 // from "value is zero" — the UI uses that to render dimmed tiles.
 type hostLiveMetrics struct {
-	Enabled        bool     `json:"enabled"`
-	Configured     bool     `json:"configured"`
-	HostUp         *bool    `json:"host_up"`
-	CPUPct         *float64 `json:"cpu_pct"`
-	RAMPct         *float64 `json:"ram_pct"`
-	DiskPct        *float64 `json:"disk_pct"`
-	Load1m         *float64 `json:"load_1m"`
-	UptimeSeconds  *float64 `json:"uptime_seconds"`
-	FetchedAt      string   `json:"fetched_at"`
-	Warnings       []string `json:"warnings,omitempty"`
+	Enabled       bool     `json:"enabled"`
+	Configured    bool     `json:"configured"`
+	HostUp        *bool    `json:"host_up"`
+	CPUPct        *float64 `json:"cpu_pct"`
+	RAMPct        *float64 `json:"ram_pct"`
+	DiskPct       *float64 `json:"disk_pct"`
+	Load1m        *float64 `json:"load_1m"`
+	UptimeSeconds *float64 `json:"uptime_seconds"`
+	FetchedAt     string   `json:"fetched_at"`
+	Warnings      []string `json:"warnings,omitempty"`
 }
 
 // handleHostLiveMetrics fans out a small pack of PromQL queries against the
@@ -184,9 +184,9 @@ func (h *grafanaHandlers) handleHostLiveMetrics(w http.ResponseWriter, r *http.R
 	// selector so it matches exactly one series (except node_cpu_seconds_total,
 	// which aggregates across all CPUs via avg()).
 	type task struct {
-		key    string  // field on out to populate
-		expr   string
-		out    **float64
+		key  string // field on out to populate
+		expr string
+		out  **float64
 	}
 	slugQuoted := host.OficialSlug
 	tasks := []task{

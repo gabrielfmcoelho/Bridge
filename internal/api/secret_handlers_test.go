@@ -25,9 +25,9 @@ import (
 // Fixture summary:
 //   - users: alice(admin), bob(editor), carol(viewer), dave(viewer)
 //   - secrets:
-//       shared1   visibility=shared,   type=cred,     scope=service, parent=1, owner=bob
-//       personalC visibility=personal, type=password, scope=avulso,  owner=carol
-//       personalD visibility=personal, type=password, scope=avulso,  owner=dave
+//     shared1   visibility=shared,   type=cred,     scope=service, parent=1, owner=bob
+//     personalC visibility=personal, type=password, scope=avulso,  owner=carol
+//     personalD visibility=personal, type=password, scope=avulso,  owner=dave
 //
 // This shape is enough to assert every cell of the two ACL tables in spec §5.
 type secretAPIEnv struct {
@@ -211,13 +211,17 @@ func decodeMap(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
 	return out
 }
 
+// decodeSlice unwraps the R4 list envelope {data:[...], meta:{...}} and returns
+// the data rows. (List endpoints no longer return a bare array.)
 func decodeSlice(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
 	t.Helper()
-	var out []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+	var env struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
 		t.Fatalf("decode slice: %v (body=%q)", err, rec.Body.String())
 	}
-	return out
+	return env.Data
 }
 
 // ---------------------------------------------------------------------------

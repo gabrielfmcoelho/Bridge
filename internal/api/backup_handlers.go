@@ -62,13 +62,13 @@ func (h *backupHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]any{
-		"status":          "restored",
-		"source_dialect":  backup.SourceDialect,
-		"target_dialect":  dialectString(h.db.Dialect),
-		"schema_version":  backup.SchemaVersion,
-		"row_count":       rowCount,
-		"cross_dialect":   backup.SourceDialect != dialectString(h.db.Dialect),
-		"message":         "Database restored. Sessions may need to log in again.",
+		"status":         "restored",
+		"source_dialect": backup.SourceDialect,
+		"target_dialect": dialectString(h.db.Dialect),
+		"schema_version": backup.SchemaVersion,
+		"row_count":      rowCount,
+		"cross_dialect":  backup.SourceDialect != dialectString(h.db.Dialect),
+		"message":        "Database restored. Sessions may need to log in again.",
 	})
 }
 

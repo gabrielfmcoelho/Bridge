@@ -20,7 +20,7 @@ func (h *projectHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to list projects", err)
 		return
 	}
-	jsonOK(w, projects)
+	jsonPaged(w, r, projects)
 }
 
 func (h *projectHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
@@ -123,10 +123,7 @@ func (h *projectHandlers) handleListTrash(w http.ResponseWriter, r *http.Request
 		jsonServerError(w, r, "failed to list project trash", err)
 		return
 	}
-	if items == nil {
-		items = []models.Project{}
-	}
-	jsonOK(w, items)
+	jsonPaged(w, r, items)
 }
 
 func (h *projectHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {

@@ -343,7 +343,7 @@ func (h *authHandlers) handleListUsers(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to list users", err)
 		return
 	}
-	jsonOK(w, users)
+	jsonPaged(w, r, users)
 }
 
 func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) {

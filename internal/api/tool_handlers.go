@@ -23,7 +23,7 @@ func (h *toolHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	if tools == nil {
 		tools = []models.ExternalTool{}
 	}
-	jsonOK(w, tools)
+	jsonPaged(w, r, tools)
 }
 
 func (h *toolHandlers) handleGet(w http.ResponseWriter, r *http.Request) {

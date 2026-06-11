@@ -70,10 +70,7 @@ func (h *glpiHandlers) handleListTokenProfiles(w http.ResponseWriter, r *http.Re
 		jsonServerError(w, r, "failed to list profiles", err)
 		return
 	}
-	if tokens == nil {
-		tokens = []models.GlpiToken{}
-	}
-	jsonOK(w, tokens)
+	jsonPaged(w, r, tokens)
 }
 
 func (h *glpiHandlers) handleCreateTokenProfile(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +229,7 @@ func (h *glpiHandlers) handleListDropdownCatalogues(w http.ResponseWriter, r *ht
 		list = []models.GlpiDropdownCatalogueSummary{}
 	}
 	jsonOK(w, map[string]any{
-		"catalogues":     list,
+		"catalogues":        list,
 		"allowed_itemtypes": allowedCatalogueItemtypes(),
 	})
 }
@@ -350,26 +347,27 @@ func allowedCatalogueItemtypes() []string {
 // host, or alert-scoped. The handler fills in sensible defaults from the context
 // before POSTing to GLPI.
 type createTicketRequest struct {
-	ProfileID     int64  `json:"profile_id"`
-	Title         string `json:"title"`
-	Description   string `json:"description"`
-	EntityID      int    `json:"entity_id"`
-	CategoryID    int    `json:"category_id"`
-	HostSlug      string `json:"host_slug,omitempty"`       // optional — persists as host_chamado
-	AlertID       int64  `json:"alert_id,omitempty"`        // optional — links via alert_chamado_links
-	LinkComputer  bool   `json:"link_computer,omitempty"`   // if true + host_slug, find & link GLPI Computer
+	ProfileID    int64  `json:"profile_id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	EntityID     int    `json:"entity_id"`
+	CategoryID   int    `json:"category_id"`
+	HostSlug     string `json:"host_slug,omitempty"`     // optional — persists as host_chamado
+	AlertID      int64  `json:"alert_id,omitempty"`      // optional — links via alert_chamado_links
+	LinkComputer bool   `json:"link_computer,omitempty"` // if true + host_slug, find & link GLPI Computer
 }
 
 type createTicketResponse struct {
-	TicketID        int    `json:"ticket_id"`
-	TicketURL       string `json:"ticket_url"`
-	ChamadoID       int64  `json:"chamado_id,omitempty"`
-	ComputerLinked  bool   `json:"computer_linked,omitempty"`
-	Warning         string `json:"warning,omitempty"`
+	TicketID       int    `json:"ticket_id"`
+	TicketURL      string `json:"ticket_url"`
+	ChamadoID      int64  `json:"chamado_id,omitempty"`
+	ComputerLinked bool   `json:"computer_linked,omitempty"`
+	Warning        string `json:"warning,omitempty"`
 }
 
 // handleCreateTicket is the single creation entry point. Route:
-//   POST /api/glpi/tickets
+//
+//	POST /api/glpi/tickets
 func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request) {
 	var req createTicketRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -481,7 +479,8 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 // handleRefreshChamadoCache re-fetches a chamado's ticket from GLPI and updates
 // cached_title + cached_status. Called by the host detail page to keep the
 // existing ChamadoSection showing live GLPI data.
-//   POST /api/hosts/{slug}/chamados/{chamadoId}/glpi/refresh?profile_id=<N>
+//
+//	POST /api/hosts/{slug}/chamados/{chamadoId}/glpi/refresh?profile_id=<N>
 func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	chamadoID, err := pathInt64(r, "chamadoId")
@@ -540,7 +539,8 @@ func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.
 
 // handleGetTicket returns a single ticket from GLPI. Used by the chamado live-sync
 // refresh path. Route:
-//   GET /api/glpi/tickets/{id}?profile_id=<N>
+//
+//	GET /api/glpi/tickets/{id}?profile_id=<N>
 func (h *glpiHandlers) handleGetTicket(w http.ResponseWriter, r *http.Request) {
 	ticketIDStr := r.PathValue("id")
 	ticketID, err := strconv.Atoi(ticketIDStr)
@@ -584,8 +584,8 @@ type ticketEvent struct {
 	UserID    int    `json:"user_id"`
 	UserName  string `json:"user_name,omitempty"`
 	IsPrivate bool   `json:"is_private,omitempty"`
-	State     int    `json:"state,omitempty"`       // tasks only (0=info 1=todo 2=done)
-	Status    int    `json:"status,omitempty"`      // solutions only (1=proposed 2=accepted 3=refused)
+	State     int    `json:"state,omitempty"`  // tasks only (0=info 1=todo 2=done)
+	Status    int    `json:"status,omitempty"` // solutions only (1=proposed 2=accepted 3=refused)
 }
 
 // handleGetTicketDetails returns the ticket plus its followups, tasks and
@@ -1616,4 +1616,3 @@ func mapGlpiError(err error) string {
 	}
 	return msg
 }
-

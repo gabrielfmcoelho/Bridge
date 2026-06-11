@@ -29,7 +29,7 @@ func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		issueIDs, _ := store.NewReleaseRepo(h.db.SQL).IssueIDs(r.Context(), rel.ID)
 		result[i] = releaseWithIssues{Release: rel, IssueIDs: issueIDs}
 	}
-	jsonOK(w, result)
+	jsonPaged(w, r, result)
 }
 
 func (h *releaseHandlers) handleGet(w http.ResponseWriter, r *http.Request) {

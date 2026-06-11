@@ -27,18 +27,18 @@ func (h *dashboardHandlers) handleDashboard(w http.ResponseWriter, r *http.Reque
 
 	jsonOK(w, map[string]any{
 		"hosts": map[string]any{
-			"total":          hostCount,
-			"by_situacao":    hostBySituacao,
-			"by_hospedagem":  hostByHospedagem,
-			"with_scans":     hostsWithScans,
-			"maintenance":    hostsMaintenance,
+			"total":         hostCount,
+			"by_situacao":   hostBySituacao,
+			"by_hospedagem": hostByHospedagem,
+			"with_scans":    hostsWithScans,
+			"maintenance":   hostsMaintenance,
 		},
-		"recent_scans":   recentScans,
-		"dns_records":    dnsCount,
-		"projects":       projectCount,
-		"services":       serviceCount,
-		"orchestrators":  orchestratorCount,
-		"open_issues":    openIssues,
+		"recent_scans":  recentScans,
+		"dns_records":   dnsCount,
+		"projects":      projectCount,
+		"services":      serviceCount,
+		"orchestrators": orchestratorCount,
+		"open_issues":   openIssues,
 	})
 }
 
