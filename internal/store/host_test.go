@@ -166,3 +166,43 @@ func TestHostRepo_ListFilterAndCounts(t *testing.T) {
 		t.Fatalf("ListForSSHConfig = %d, want 2 active", len(cfg))
 	}
 }
+
+// TestHostRepo_SortByScanMetric verifies server-side ORDER BY on the latest
+// scan's numeric resource metrics (P2/P3), with NULLS-LAST for hosts that have
+// no scan.
+func TestHostRepo_SortByScanMetric(t *testing.T) {
+	ctx := context.Background()
+	repo, d := newHostRepo(t)
+	scans := store.NewHostScanRepo(d.SQL)
+
+	mk := func(slug string, cpu string) int64 {
+		var id int64
+		if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES (?, ?) RETURNING id`, slug, slug).Scan(&id); err != nil {
+			t.Fatalf("seed %s: %v", slug, err)
+		}
+		if cpu != "" {
+			if err := scans.Create(ctx, id, `{"cpu_usage":"`+cpu+`"}`); err != nil {
+				t.Fatalf("scan %s: %v", slug, err)
+			}
+		}
+		return id
+	}
+	mk("low", "10%")
+	mk("high", "90%")
+	mk("mid", "50%")
+	mk("noscan", "") // no scan → NULL cpu_pct → sorts last
+
+	got, err := repo.List(ctx, models.HostFilter{SortBy: "resource_cpu", SortDir: "desc"})
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	order := make([]string, len(got))
+	for i, h := range got {
+		order[i] = h.OficialSlug
+	}
+	// desc by CPU: high, mid, low, then the scan-less host last (NULLS LAST).
+	want := []string{"high", "mid", "low", "noscan"}
+	if len(order) != 4 || order[0] != want[0] || order[1] != want[1] || order[2] != want[2] || order[3] != want[3] {
+		t.Fatalf("order = %v, want %v", order, want)
+	}
+}

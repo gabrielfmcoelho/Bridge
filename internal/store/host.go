@@ -100,9 +100,36 @@ func (r *HostRepo) GetByID(ctx context.Context, id int64) (*models.Host, error) 
 	return h, err
 }
 
+// scanSortColumn maps a sort key to the latest-scan numeric column it sorts by
+// (qualified for the `ls` join), or "" when the key isn't a scan metric.
+func scanSortColumn(sortBy string) string {
+	switch sortBy {
+	case "resource_cpu":
+		return "ls.cpu_pct"
+	case "resource_ram":
+		return "ls.ram_pct"
+	case "resource_disk":
+		return "ls.disk_pct"
+	case "containers_count":
+		return "ls.containers_count"
+	}
+	return ""
+}
+
 // List returns hosts matching the filter, with sort + pagination applied.
 func (r *HostRepo) List(ctx context.Context, f models.HostFilter) ([]models.Host, error) {
-	query := `SELECT ` + hostColumns() + ` FROM hosts`
+	// Sorting by a scan metric (cpu/ram/disk %, container count — P2/P3) joins
+	// each host's LATEST scan. DISTINCT ON keeps it one row per host. Only joined
+	// when actually sorting by a metric, so the common case stays a single-table
+	// scan. ls.* never collides with hosts columns, so the unqualified WHERE/
+	// SELECT names stay unambiguous.
+	scanSort := scanSortColumn(f.SortBy)
+	from := ` FROM hosts`
+	if scanSort != "" {
+		from += ` LEFT JOIN (SELECT DISTINCT ON (host_id) host_id, cpu_pct, ram_pct, disk_pct, containers_count
+		                     FROM host_scans ORDER BY host_id, scanned_at DESC) ls ON ls.host_id = hosts.id`
+	}
+	query := `SELECT ` + hostColumns() + from
 	var args []any
 	where := []string{"deleted_at IS NULL"}
 
@@ -176,14 +203,18 @@ func (r *HostRepo) List(ctx context.Context, f models.HostFilter) ([]models.Host
 		"situacao": "situacao", "user": "ssh_user", "tipo_maquina": "tipo_maquina",
 	}
 	sortCol := "nickname"
-	if col, ok := allowedSorts[f.SortBy]; ok {
+	nullsLast := ""
+	if scanSort != "" {
+		sortCol = scanSort
+		nullsLast = " NULLS LAST" // hosts without a scan sort to the end either direction
+	} else if col, ok := allowedSorts[f.SortBy]; ok {
 		sortCol = col
 	}
 	sortDir := "ASC"
 	if f.SortDir == "desc" {
 		sortDir = "DESC"
 	}
-	query += " ORDER BY " + sortCol + " " + sortDir
+	query += " ORDER BY " + sortCol + " " + sortDir + nullsLast
 
 	if f.PerPage > 0 {
 		offset := 0

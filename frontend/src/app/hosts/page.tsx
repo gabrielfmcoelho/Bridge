@@ -126,7 +126,7 @@ export default function HostsPage() {
 
   const [sort, setSort] = useLocalStorage<HostSortConfig>("hosts_sort", { field: "nickname", direction: "asc" });
 
-  useEffect(() => { setVisibleCount(24); setTablePage(1); }, [search, filters]);
+  useEffect(() => { setVisibleCount(24); setTablePage(1); }, [search, filters, sort]);
   useEffect(() => {
     const el = loadMoreRef.current;
     if (!el) return;
@@ -138,32 +138,22 @@ export default function HostsPage() {
   }, []);
 
   const { data: hosts = [], isLoading } = useQuery({
-    queryKey: ["hosts", search, filters],
+    queryKey: ["hosts", search, filters, sort],
     queryFn: () => {
       const params: Record<string, string> = {};
       if (search) params.search = search;
       Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
+      // Server-authoritative sort (incl. scan metrics resolved against the
+      // latest scan's numeric columns — P3). sort.field maps 1:1 to the backend
+      // sort_by keys (nickname/situacao/resource_cpu/ram/disk/containers_count).
+      params.sort_by = sort.field;
+      params.sort_dir = sort.direction;
       return hostsAPI.list(params);
     },
   });
 
-  const sortedHosts = useMemo(() => {
-    const arr = [...hosts];
-    const parsePct = (s?: string) => parseInt((s || "0").replace("%", "")) || 0;
-    arr.sort((a, b) => {
-      let cmp = 0;
-      switch (sort.field) {
-        case "containers_count": cmp = (a.containers_count || 0) - (b.containers_count || 0); break;
-        case "resource_cpu": cmp = parsePct(a.scan_resources?.cpu_usage) - parsePct(b.scan_resources?.cpu_usage); break;
-        case "resource_ram": cmp = parsePct(a.scan_resources?.ram_percent) - parsePct(b.scan_resources?.ram_percent); break;
-        case "resource_disk": cmp = parsePct(a.scan_resources?.disk_percent) - parsePct(b.scan_resources?.disk_percent); break;
-        case "situacao": cmp = a.situacao.localeCompare(b.situacao); break;
-        default: cmp = a.nickname.localeCompare(b.nickname);
-      }
-      return sort.direction === "desc" ? -cmp : cmp;
-    });
-    return arr;
-  }, [hosts, sort]);
+  // Server returns the list already sorted; render in that order.
+  const sortedHosts = hosts;
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
