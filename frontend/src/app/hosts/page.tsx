@@ -152,8 +152,31 @@ export default function HostsPage() {
     },
   });
 
-  // Server returns the list already sorted; render in that order.
+  // Server returns the list already sorted; render in that order. The full list
+  // also feeds the batch-scan worker pool + scannable/failed/success counts
+  // below, so hosts always loads it (card view + scan need the whole set).
   const sortedHosts = hosts;
+
+  // Table view drives REAL server-side pagination: a separate query fetches one
+  // page (filtered+sorted+limited) so column-sort + paging are server-authoritative.
+  // Only enabled in table mode; card/scan keep using the full list above.
+  const TABLE_PER_PAGE = 20;
+  const tableQuery = useQuery({
+    queryKey: ["hosts-table", search, filters, sort, tablePage],
+    enabled: viewMode === "table",
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (search) params.search = search;
+      Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
+      params.sort_by = sort.field;
+      params.sort_dir = sort.direction;
+      params.page = String(tablePage);
+      params.per_page = String(TABLE_PER_PAGE);
+      return hostsAPI.listPaginated(params);
+    },
+  });
+  const tableHosts = tableQuery.data?.data ?? [];
+  const tableTotal = tableQuery.data?.meta.total ?? 0;
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
@@ -394,15 +417,15 @@ export default function HostsPage() {
       />
 
       <InventoryContent
-        isLoading={isLoading}
-        items={sortedHosts}
+        isLoading={viewMode === "table" ? tableQuery.isLoading : isLoading}
+        items={viewMode === "table" ? tableHosts : sortedHosts}
         viewMode={viewMode}
         emptyIcon="server"
         emptyTitle={t("common.noResults")}
         emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") : t("host.emptyStateAdd")}
         emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={() => setShowForm(true)}>+ {t("host.addHost")}</Button> : undefined}
         renderCard={(host) => <HostCard host={host} />}
-        renderTable={(items) => <HostsTableView hosts={items} tablePage={tablePage} onPageChange={setTablePage} canEdit={canEdit} t={t} />}
+        renderTable={(items) => <HostsTableView hosts={items} total={tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} canEdit={canEdit} t={t} />}
         visibleCount={visibleCount}
         loadMoreRef={loadMoreRef}
         onLoadMore={() => setVisibleCount((c) => c + 24)}

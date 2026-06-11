@@ -6,30 +6,52 @@ export interface SortableColumn<K extends string> {
   key: K;
   label: string;
   align?: "left" | "right" | "center";
+  // sortable defaults to true. Set false for columns that can't be sorted
+  // (e.g. computed/non-server-sortable columns under server-side pagination).
+  sortable?: boolean;
 }
 
 interface SortableTableProps<K extends string> {
   columns: SortableColumn<K>[];
   defaultSort?: K;
   defaultDir?: "asc" | "desc";
+  // Controlled mode: when onSortChange is provided, the parent owns the sort
+  // state (sortKey/sortDir) and SortableTable does NOT sort internally — header
+  // clicks just call onSortChange. Used for server-driven sort+pagination. When
+  // omitted, the table is uncontrolled (internal state + the children callback
+  // receives the live sort for client-side sortRows).
+  sortKey?: K;
+  sortDir?: "asc" | "desc";
+  onSortChange?: (key: K, dir: "asc" | "desc") => void;
   children: (sortKey: K, sortDir: "asc" | "desc") => ReactNode;
 }
+
+const ascByDefault = (k: string) => k === "name" || k === "nickname" || k === "title" || k === "user";
 
 export default function SortableTable<K extends string>({
   columns,
   defaultSort,
   defaultDir = "asc",
+  sortKey: controlledKey,
+  sortDir: controlledDir,
+  onSortChange,
   children,
 }: SortableTableProps<K>) {
-  const [sortKey, setSortKey] = useState<K>(defaultSort ?? columns[0].key);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">(defaultDir);
+  const controlled = onSortChange != null;
+  const [internalKey, setInternalKey] = useState<K>(defaultSort ?? columns[0].key);
+  const [internalDir, setInternalDir] = useState<"asc" | "desc">(defaultDir);
+
+  const sortKey = controlled ? (controlledKey ?? columns[0].key) : internalKey;
+  const sortDir = controlled ? (controlledDir ?? defaultDir) : internalDir;
 
   const toggleSort = (key: K) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    const nextDir: "asc" | "desc" =
+      sortKey === key ? (sortDir === "asc" ? "desc" : "asc") : ascByDefault(key) ? "asc" : "desc";
+    if (controlled) {
+      onSortChange(key, nextDir);
     } else {
-      setSortKey(key);
-      setSortDir(key === ("name" as K) || key === ("nickname" as K) || key === ("title" as K) || key === ("user" as K) ? "asc" : "desc");
+      setInternalKey(key);
+      setInternalDir(nextDir);
     }
   };
 
@@ -38,22 +60,25 @@ export default function SortableTable<K extends string>({
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                onClick={() => toggleSort(col.key)}
-                className={`${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} px-4 py-3 font-semibold cursor-pointer select-none hover:text-[var(--text-secondary)] transition-colors`}
-              >
-                <span className="inline-flex items-center gap-1">
-                  {col.label}
-                  {sortKey === col.key && (
-                    <svg className={`w-3 h-3 text-[var(--accent)] transition-transform ${sortDir === "desc" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-                    </svg>
-                  )}
-                </span>
-              </th>
-            ))}
+            {columns.map((col) => {
+              const sortable = col.sortable !== false;
+              return (
+                <th
+                  key={col.key}
+                  onClick={sortable ? () => toggleSort(col.key) : undefined}
+                  className={`${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} px-4 py-3 font-semibold select-none transition-colors ${sortable ? "cursor-pointer hover:text-[var(--text-secondary)]" : ""}`}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    {col.label}
+                    {sortable && sortKey === col.key && (
+                      <svg className={`w-3 h-3 text-[var(--accent)] transition-transform ${sortDir === "desc" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                      </svg>
+                    )}
+                  </span>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>{children(sortKey, sortDir)}</tbody>
