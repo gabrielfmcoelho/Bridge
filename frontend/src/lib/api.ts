@@ -362,6 +362,14 @@ async function request<T>(
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  // getList unwraps the R4 list envelope {data,meta} and returns the bare
+  // array. The backend treats a missing per_page as "unbounded" (returns all),
+  // so a plain getList gives the full set — exactly what dropdowns/selects and
+  // every existing array consumer expect. No call-site changes needed.
+  getList: <T>(path: string) => request<ListEnvelope<T>>(path).then((r) => r.data),
+  // getListPaginated keeps the envelope (data + meta) for table pages that
+  // drive server-side pagination; pass ?page=&per_page= in the path.
+  getListPaginated: <T>(path: string) => request<ListEnvelope<T>>(path),
   post: <T>(path: string, data?: unknown) =>
     request<T>(path, { method: "POST", body: data ? JSON.stringify(data) : undefined }),
   put: <T>(path: string, data: unknown) =>
@@ -382,24 +390,25 @@ export const authAPI = {
   me: () => api.get<import("./types").User>("/api/auth/me"),
 };
 
-// Pagination envelope
-export interface PaginatedResponse<T> {
+// R4 list envelope: { data: [...], meta: { page, per_page, total } }.
+export interface ListEnvelope<T> {
   data: T[];
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
+  meta: { page: number; per_page: number; total: number };
 }
+
+// Back-compat alias — the flat shape was replaced by the nested envelope.
+// Read pagination via `.meta.total` / `.meta.page` now.
+export type PaginatedResponse<T> = ListEnvelope<T>;
 
 // Hosts
 export const hostsAPI = {
   list: (params?: Record<string, string>) => {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-    return api.get<import("./types").Host[]>(`/api/hosts${qs}`);
+    return api.getList<import("./types").Host>(`/api/hosts${qs}`);
   },
   listPaginated: (params?: Record<string, string>) => {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-    return api.get<PaginatedResponse<import("./types").Host>>(`/api/hosts${qs}`);
+    return api.getListPaginated<import("./types").Host>(`/api/hosts${qs}`);
   },
   get: (slug: string) =>
     api.get<{
@@ -422,14 +431,14 @@ export const hostsAPI = {
   getPassword: (slug: string) => api.get<{ password: string }>(`/api/hosts/${slug}/password`),
   // Soft-delete trash (R3). delete() now soft-deletes; trash() lists the
   // soft-deleted rows and restore() un-deletes one (cascade-restoring secrets).
-  trash: () => api.get<import("./types").Host[]>("/api/hosts/trash"),
+  trash: () => api.getList<import("./types").Host>("/api/hosts/trash"),
   restore: (id: number) => api.post(`/api/hosts/${id}/restore`),
 };
 
 // Host Alerts (manual)
 export const hostAlertsAPI = {
   list: (slug: string) =>
-    api.get<import("./types").HostAlert[]>(`/api/hosts/${slug}/alerts`),
+    api.getList<import("./types").HostAlert>(`/api/hosts/${slug}/alerts`),
   create: (slug: string, data: { type: string; level: string; message: string; description?: string; source?: string }) =>
     api.post<import("./types").HostAlert>(`/api/hosts/${slug}/alerts`, data),
   update: (slug: string, id: number, data: { type: string; level: string; message: string; description?: string }) =>
@@ -443,7 +452,7 @@ export const hostAlertsAPI = {
 // Host Chamados
 export const hostChamadosAPI = {
   list: (slug: string) =>
-    api.get<import("./types").HostChamado[]>(`/api/hosts/${slug}/chamados`),
+    api.getList<import("./types").HostChamado>(`/api/hosts/${slug}/chamados`),
   create: (slug: string, data: { chamado_id: string; title: string; status: string; user_id: number; date: string }) =>
     api.post<import("./types").HostChamado>(`/api/hosts/${slug}/chamados`, data),
   update: (slug: string, id: number, data: { chamado_id: string; title: string; status: string; user_id: number; date: string }) =>
@@ -454,7 +463,7 @@ export const hostChamadosAPI = {
 
 // DNS
 export const dnsAPI = {
-  list: () => api.get<import("./types").DNSRecord[]>("/api/dns"),
+  list: () => api.getList<import("./types").DNSRecord>("/api/dns"),
   get: (id: number) => api.get<{ dns_record: import("./types").DNSRecord; tags: string[]; host_ids: number[]; responsaveis: import("./types").EntityResponsavel[] }>(`/api/dns/${id}`),
   create: (data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.post<import("./types").DNSRecord>("/api/dns", data),
@@ -528,7 +537,7 @@ export const alertSettingsAPI = {
 
 // Projects
 export const projectsAPI = {
-  list: () => api.get<import("./types").Project[]>("/api/projects"),
+  list: () => api.getList<import("./types").Project>("/api/projects"),
   get: (id: number) =>
     api.get<{
       project: import("./types").Project;
@@ -543,13 +552,13 @@ export const projectsAPI = {
   update: (id: number, data: Partial<import("./types").Project> & { tags?: string[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.put<import("./types").Project>(`/api/projects/${id}`, data),
   delete: (id: number) => api.delete(`/api/projects/${id}`),
-  trash: () => api.get<import("./types").Project[]>("/api/projects/trash"),
+  trash: () => api.getList<import("./types").Project>("/api/projects/trash"),
   restore: (id: number) => api.post(`/api/projects/${id}/restore`),
 };
 
 // Services
 export const servicesAPI = {
-  list: () => api.get<import("./types").Service[]>("/api/services"),
+  list: () => api.getList<import("./types").Service>("/api/services"),
   get: (id: number) =>
     api.get<{
       service: import("./types").Service;
@@ -569,13 +578,13 @@ export const servicesAPI = {
     api.post<import("./types").Service>(`/api/services/${id}/fixate`),
   updateContainer: (id: number, data: { container_name: string; container_id: string }) =>
     api.put<import("./types").Service>(`/api/services/${id}/container`, data),
-  trash: () => api.get<import("./types").Service[]>("/api/services/trash"),
+  trash: () => api.getList<import("./types").Service>("/api/services/trash"),
   restore: (id: number) => api.post(`/api/services/${id}/restore`),
 };
 
 // Orchestrators
 export const orchestratorsAPI = {
-  list: () => api.get<import("./types").Orchestrator[]>("/api/orchestrators"),
+  list: () => api.getList<import("./types").Orchestrator>("/api/orchestrators"),
   create: (data: Partial<import("./types").Orchestrator>) =>
     api.post<import("./types").Orchestrator>("/api/orchestrators", data),
   update: (id: number, data: Partial<import("./types").Orchestrator>) =>
@@ -644,10 +653,7 @@ export const sshAPI = {
 
 // SSH Keys
 export const sshKeysAPI = {
-  list: async () => {
-    const data = await api.get<unknown>("/api/ssh-keys");
-    return Array.isArray(data) ? (data as import("./types").SSHKeyRecord[]) : [];
-  },
+  list: () => api.getList<import("./types").SSHKeyRecord>("/api/ssh-keys"),
   get: (id: number) => api.get<{
     id: number;
     name: string;
@@ -684,7 +690,7 @@ export const dashboardAPI = {
 
 // Enums
 export const enumsAPI = {
-  list: (category: string) => api.get<import("./types").EnumOption[]>(`/api/enums/${category}`),
+  list: (category: string) => api.getList<import("./types").EnumOption>(`/api/enums/${category}`),
   listAll: () => api.get<Record<string, import("./types").EnumOption[]>>("/api/enums"),
   create: (category: string, value: string, color?: string) => api.post(`/api/enums/${category}`, { value, color: color || "" }),
   update: (category: string, oldValue: string, newValue: string, color?: string) =>
@@ -711,10 +717,7 @@ type ContactPayload = {
   is_external?: boolean;
 };
 export const contactsAPI = {
-  list: async () => {
-    const data = await api.get<unknown>("/api/contacts");
-    return Array.isArray(data) ? (data as import("./types").Contact[]) : [];
-  },
+  list: () => api.getList<import("./types").Contact>("/api/contacts"),
   create: (data: ContactPayload) =>
     api.post<import("./types").Contact>("/api/contacts", data),
   update: (id: number, data: ContactPayload) =>
@@ -724,15 +727,12 @@ export const contactsAPI = {
 
 // Issues
 export const issuesAPI = {
-  listByProject: async (projectId: number, serviceId?: number) => {
+  listByProject: (projectId: number, serviceId?: number) => {
     const qs = serviceId ? `?service_id=${serviceId}` : "";
-    const data = await api.get<unknown>(`/api/projects/${projectId}/issues${qs}`);
-    return Array.isArray(data) ? (data as import("./types").Issue[]) : [];
+    return api.getList<import("./types").Issue>(`/api/projects/${projectId}/issues${qs}`);
   },
-  listByService: async (serviceId: number) => {
-    const data = await api.get<unknown>(`/api/services/${serviceId}/issues`);
-    return Array.isArray(data) ? (data as import("./types").Issue[]) : [];
-  },
+  listByService: (serviceId: number) =>
+    api.getList<import("./types").Issue>(`/api/services/${serviceId}/issues`),
   create: (projectId: number, data: Partial<import("./types").Issue>) =>
     api.post<import("./types").Issue>(`/api/projects/${projectId}/issues`, data),
   update: (projectId: number, issueId: number, data: Partial<import("./types").Issue>) =>
@@ -745,10 +745,9 @@ export const issuesAPI = {
 
 // Global Issues
 export const globalIssuesAPI = {
-  list: async (params?: Record<string, string>) => {
+  list: (params?: Record<string, string>) => {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-    const data = await api.get<unknown>(`/api/issues${qs}`);
-    return Array.isArray(data) ? (data as import("./types").Issue[]) : [];
+    return api.getList<import("./types").Issue>(`/api/issues${qs}`);
   },
   create: (data: Partial<import("./types").Issue> & { assignee_ids?: number[]; alert_ids?: number[] }) =>
     api.post<import("./types").Issue>("/api/issues", data),
@@ -763,7 +762,7 @@ export const globalIssuesAPI = {
 
 // Releases
 export const releasesAPI = {
-  list: () => api.get<(import("./types").Release & { issue_ids: number[] })[]>("/api/releases"),
+  list: () => api.getList<import("./types").Release & { issue_ids: number[] }>("/api/releases"),
   get: (id: number) => api.get<{ release: import("./types").Release; issue_ids: number[] }>(`/api/releases/${id}`),
   create: (data: Partial<import("./types").Release> & { issue_ids?: number[] }) =>
     api.post<import("./types").Release>("/api/releases", data),
@@ -774,10 +773,7 @@ export const releasesAPI = {
 
 // External tools
 export const toolsAPI = {
-  list: async () => {
-    const data = await api.get<unknown>("/api/tools");
-    return Array.isArray(data) ? (data as import("./types").ExternalTool[]) : [];
-  },
+  list: () => api.getList<import("./types").ExternalTool>("/api/tools"),
   get: (id: number) => api.get<import("./types").ExternalTool>(`/api/tools/${id}`),
   create: (data: Partial<import("./types").ExternalTool>) =>
     api.post<import("./types").ExternalTool>("/api/tools", data),
@@ -803,10 +799,10 @@ export const secretsAPI = {
     if (params.group_label) q.set("group_label", params.group_label);
     if (params.include_deleted) q.set("include_deleted", "1");
     const qs = q.toString();
-    return api.get<import("./types").Secret[]>(`/api/secrets${qs ? `?${qs}` : ""}`);
+    return api.getList<import("./types").Secret>(`/api/secrets${qs ? `?${qs}` : ""}`);
   },
-  mine: () => api.get<import("./types").Secret[]>("/api/secrets/mine"),
-  trash: () => api.get<import("./types").Secret[]>("/api/secrets/trash"),
+  mine: () => api.getList<import("./types").Secret>("/api/secrets/mine"),
+  trash: () => api.getList<import("./types").Secret>("/api/secrets/trash"),
   get: (id: number) => api.get<import("./types").Secret>(`/api/secrets/${id}`),
   reveal: (id: number) => api.get<import("./types").SecretReveal>(`/api/secrets/${id}/reveal`),
   create: (data: {
@@ -880,7 +876,7 @@ export const apiCatalogAPI = {
     if (params.parent_id != null) q.set("parent_id", String(params.parent_id));
     if (params.q) q.set("q", params.q);
     const qs = q.toString();
-    return api.get<import("./types").ApiCatalog[]>(`/api/api-catalog${qs ? `?${qs}` : ""}`);
+    return api.getList<import("./types").ApiCatalog>(`/api/api-catalog${qs ? `?${qs}` : ""}`);
   },
   searchOperations: (params: { q?: string; scope?: string; parent_id?: number } = {}) => {
     const q = new URLSearchParams();
@@ -888,7 +884,7 @@ export const apiCatalogAPI = {
     if (params.scope) q.set("scope", params.scope);
     if (params.parent_id != null) q.set("parent_id", String(params.parent_id));
     const qs = q.toString();
-    return api.get<import("./types").OperationSearchResult[]>(`/api/api-catalog/search${qs ? `?${qs}` : ""}`);
+    return api.getList<import("./types").OperationSearchResult>(`/api/api-catalog/search${qs ? `?${qs}` : ""}`);
   },
   get: (id: number) => api.get<import("./types").ApiCatalog>(`/api/api-catalog/${id}`),
   getSpec: (id: number) => api.get<Record<string, unknown>>(`/api/api-catalog/${id}/spec`),
@@ -956,7 +952,7 @@ export const shareBundlesAPI = {
       has_passphrase: boolean;
       items: import("./types").ShareBundleItemView[];
     }>("/api/share-bundles", body),
-  list: () => api.get<import("./types").ShareBundleView[]>("/api/share-bundles"),
+  list: () => api.getList<import("./types").ShareBundleView>("/api/share-bundles"),
   revoke: (id: number) => api.delete(`/api/share-bundles/${id}`),
 };
 
@@ -1288,7 +1284,7 @@ export type GlpiDropdownCatalogue = {
 
 export const glpiAPI = {
   // Admin profile CRUD
-  listProfiles: () => api.get<GlpiTokenProfile[]>("/api/settings/integrations/glpi/tokens"),
+  listProfiles: () => api.getList<GlpiTokenProfile>("/api/settings/integrations/glpi/tokens"),
   createProfile: (data: { name: string; description?: string; user_token: string; default_entity_id?: number }) =>
     api.post<GlpiTokenProfile>("/api/settings/integrations/glpi/tokens", data),
   updateProfile: (id: number, data: { name: string; description?: string; user_token?: string; default_entity_id?: number }) =>
@@ -1603,7 +1599,7 @@ export const coolifyAPI = {
 
 // Users (admin)
 export const usersAPI = {
-  list: () => api.get<import("./types").User[]>("/api/users"),
+  list: () => api.getList<import("./types").User>("/api/users"),
   create: (data: { username: string; password: string; display_name: string; role: string }) =>
     api.post<import("./types").User>("/api/users", data),
   update: (id: number, data: Partial<import("./types").User> & { password?: string }) =>

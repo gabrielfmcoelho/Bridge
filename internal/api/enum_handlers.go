@@ -21,7 +21,7 @@ func (h *enumHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to list options", err)
 		return
 	}
-	jsonOK(w, options)
+	jsonPaged(w, r, options)
 }
 
 func (h *enumHandlers) handleListAll(w http.ResponseWriter, r *http.Request) {
