@@ -7,6 +7,7 @@
 // the page) puts it in the route's CSS bundle, guaranteeing it loads.
 import "@scalar/api-reference-react/style.css";
 import dynamic from "next/dynamic";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const ApiReferenceReact = dynamic(
   () => import("@scalar/api-reference-react").then((m) => ({ default: m.ApiReferenceReact })),
@@ -20,7 +21,7 @@ const ApiReferenceReact = dynamic(
 // the app surface. We zero out the layout containers AND the --scalar-background-1
 // CSS variable (Scalar's main canvas/sidebar background); backgrounds 2–4 are
 // left intact so code samples, cards, and the test-request panel keep enough
-// contrast to stay readable. Dark mode is forced to match the dark app shell.
+// contrast to stay readable. Theme is forced to match the active app theme.
 const SCALAR_CSS = `
 .scalar-app,
 .scalar-api-reference,
@@ -33,15 +34,24 @@ const SCALAR_CSS = `
 }
 /* The Test Request / API-client modal inherits the transparent canvas above,
    which leaves it see-through over the endpoint list. Restore Scalar's solid
-   dark background (its default --scalar-background-1) for the modal subtree. */
-.scalar-client--open,
-.scalar-modal,
-.scalar-modal-layout,
-.scalar-modal-layout-full,
-.scalar-modal-body {
+   background for the modal subtree based on the active theme. */
+[data-theme="dark"] .scalar-client--open,
+[data-theme="dark"] .scalar-modal,
+[data-theme="dark"] .scalar-modal-layout,
+[data-theme="dark"] .scalar-modal-layout-full,
+[data-theme="dark"] .scalar-modal-body {
   --scalar-background-1: #0f0f0f !important;
   --scalar-sidebar-background-1: #0f0f0f !important;
   background-color: #0f0f0f !important;
+}
+[data-theme="light"] .scalar-client--open,
+[data-theme="light"] .scalar-modal,
+[data-theme="light"] .scalar-modal-layout,
+[data-theme="light"] .scalar-modal-layout-full,
+[data-theme="light"] .scalar-modal-body {
+  --scalar-background-1: #ffffff !important;
+  --scalar-sidebar-background-1: #ffffff !important;
+  background-color: #ffffff !important;
 }
 `;
 
@@ -49,7 +59,7 @@ const SCALAR_CSS = `
 // already-fetched spec object (fetched through our authenticated client).
 // The API-client launcher and Ask-AI assistant are always disabled. The
 // sidebar and per-endpoint "Test Request" affordance are configurable: the
-// detail page keeps both; the public share page turns both off for a leaner,
+// per-endpoint page keeps both; the public share page turns both off for a leaner,
 // read-only reference.
 export default function ApiReference({
   content,
@@ -64,9 +74,11 @@ export default function ApiReference({
   // the real API host instead of falling back to this app's origin.
   serverUrl?: string;
 }) {
+  const { theme } = useTheme();
   const doc = serverUrl ? { ...content, servers: [{ url: serverUrl }] } : content;
   return (
     <ApiReferenceReact
+      key={theme}
       configuration={{
         content: doc,
         showSidebar,
@@ -74,7 +86,7 @@ export default function ApiReference({
         hideTestRequestButton: hideTestRequest,
         hideDownloadButton: true,
         hideDarkModeToggle: true,
-        forceDarkModeState: "dark",
+        forceDarkModeState: theme,
         agent: { disabled: true },
         mcp: { disabled: true },
         customCss: SCALAR_CSS,
