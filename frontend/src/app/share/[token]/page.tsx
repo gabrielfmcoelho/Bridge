@@ -8,6 +8,7 @@ import ApiReference from "@/components/atlas/apis/ApiReference";
 import type { BundlePayload } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
+import { useLocale } from "@/contexts/LocaleContext";
 
 // Public reveal page. Reached for BOTH kinds of share link:
 //   - a single secret  (ShareLinkModal → GET /api/share/{token})
@@ -45,7 +46,7 @@ async function redeem(token: string, passphrase?: string): Promise<ViewState> {
   try {
     bundleRes = await fetch(withPass(`/api/share-bundle/${enc}`, passphrase));
   } catch {
-    return { kind: "error", message: "Could not reach the server. Check your connection and try again." };
+    return { kind: "error", message: "share.connectionError" };
   }
   if (bundleRes.ok) {
     const data = (await bundleRes.json().catch(() => null)) as BundlePayload | null;
@@ -54,7 +55,7 @@ async function redeem(token: string, passphrase?: string): Promise<ViewState> {
     return { kind: "needsPassphrase", incorrect: Boolean(passphrase) };
   } else if (bundleRes.status !== 404) {
     const body = await bundleRes.json().catch(() => ({}));
-    return { kind: "error", message: body.error || `Request failed (${bundleRes.status}).` };
+    return { kind: "error", message: body.error || `share.requestFailed:${bundleRes.status}` };
   }
 
   // 2) Not a bundle (404) — fall back to a single-secret link.
@@ -62,7 +63,7 @@ async function redeem(token: string, passphrase?: string): Promise<ViewState> {
   try {
     res = await fetch(withPass(`/api/share/${enc}`, passphrase));
   } catch {
-    return { kind: "error", message: "Could not reach the server. Check your connection and try again." };
+    return { kind: "error", message: "share.connectionError" };
   }
   if (res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -71,7 +72,7 @@ async function redeem(token: string, passphrase?: string): Promise<ViewState> {
   if (res.status === 401) return { kind: "needsPassphrase", incorrect: Boolean(passphrase) };
   if (res.status === 404) return { kind: "gone" };
   const body = await res.json().catch(() => ({}));
-  return { kind: "error", message: body.error || `Request failed (${res.status}).` };
+  return { kind: "error", message: body.error || `share.requestFailed:${res.status}` };
 }
 
 // Some payloads are JSON (env-var bundles, app logins). Pretty-print those so
@@ -107,14 +108,14 @@ function parseSecretPayload(payload: string, type?: string): ParsedPayload {
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
     return {
       detectedType: "raw",
-      fields: [{ label: "Secret Value", value: payload }]
+      fields: [{ label: "share.fields.secretValue", value: payload }]
     };
   }
 
   try {
     const data = JSON.parse(trimmed);
     if (typeof data !== "object" || data === null) {
-      return { detectedType: "raw", fields: [{ label: "Secret Value", value: payload }] };
+      return { detectedType: "raw", fields: [{ label: "share.fields.secretValue", value: payload }] };
     }
 
     // Determine the type
@@ -138,20 +139,20 @@ function parseSecretPayload(payload: string, type?: string): ParsedPayload {
     const fields: ParsedPayloadField[] = [];
 
     if (resolvedType === "password") {
-      fields.push({ label: "Password", value: data.value || "", isSensitive: true });
+      fields.push({ label: "share.fields.password", value: data.value || "", isSensitive: true });
     } else if (resolvedType === "cred") {
-      fields.push({ label: "Username", value: data.username || "" });
-      fields.push({ label: "Password", value: data.password || "", isSensitive: true });
+      fields.push({ label: "share.fields.username", value: data.username || "" });
+      fields.push({ label: "share.fields.password", value: data.password || "", isSensitive: true });
     } else if (resolvedType === "sshkey") {
-      if (data.username) fields.push({ label: "Username", value: data.username });
-      if (data.private_key_pem) fields.push({ label: "Private Key", value: data.private_key_pem, isCode: true });
-      if (data.public_key) fields.push({ label: "Public Key", value: data.public_key, isCode: true });
+      if (data.username) fields.push({ label: "share.fields.username", value: data.username });
+      if (data.private_key_pem) fields.push({ label: "share.fields.privateKey", value: data.private_key_pem, isCode: true });
+      if (data.public_key) fields.push({ label: "share.fields.publicKey", value: data.public_key, isCode: true });
     } else if (resolvedType === "app_login") {
-      if (data.app_name) fields.push({ label: "App Name", value: data.app_name });
-      if (data.url) fields.push({ label: "URL", value: data.url });
-      if (data.username) fields.push({ label: "Username", value: data.username });
-      if (data.password) fields.push({ label: "Password", value: data.password || "", isSensitive: true });
-      if (data.notes) fields.push({ label: "Notes", value: data.notes });
+      if (data.app_name) fields.push({ label: "share.fields.appName", value: data.app_name });
+      if (data.url) fields.push({ label: "share.fields.url", value: data.url });
+      if (data.username) fields.push({ label: "share.fields.username", value: data.username });
+      if (data.password) fields.push({ label: "share.fields.password", value: data.password || "", isSensitive: true });
+      if (data.notes) fields.push({ label: "share.fields.notes", value: data.notes });
     } else {
       // Generic JSON: list key-values nicely
       for (const [k, v] of Object.entries(data)) {
@@ -173,7 +174,7 @@ function parseSecretPayload(payload: string, type?: string): ParsedPayload {
   } catch {
     return {
       detectedType: "raw",
-      fields: [{ label: "Secret Value", value: payload }]
+      fields: [{ label: "share.fields.secretValue", value: payload }]
     };
   }
 }
@@ -191,6 +192,7 @@ function SecretPayloadViewer({
   copiedKeyPrefix: string;
   copiedKey: string | null;
 }) {
+  const { t } = useLocale();
   const { fields, detectedType } = parseSecretPayload(payload, type);
   const [revealedSensitives, setRevealedSensitives] = useState<Record<number, boolean>>({});
 
@@ -213,7 +215,7 @@ function SecretPayloadViewer({
           onClick={() => toggleReveal(0)}
           className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] px-2 py-1 cursor-pointer font-medium"
         >
-          {isRevealed ? "Hide" : "Show"}
+          {isRevealed ? t("common.hide") : t("common.show")}
         </button>
         <Button
           variant="secondary"
@@ -221,7 +223,7 @@ function SecretPayloadViewer({
           onClick={() => onCopy(val, currentKey)}
           className="shrink-0"
         >
-          {copiedKey === currentKey ? "Copied!" : "Copy"}
+          {copiedKey === currentKey ? t("common.copied") : t("common.copy")}
         </Button>
       </div>
     );
@@ -239,7 +241,7 @@ function SecretPayloadViewer({
           <div key={idx} className="space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
-                {f.label}
+                {f.label.startsWith("share.fields.") ? t(f.label) : f.label}
               </span>
               <div className="flex items-center gap-2">
                 {isSensitive && (
@@ -248,7 +250,7 @@ function SecretPayloadViewer({
                     onClick={() => toggleReveal(idx)}
                     className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
                   >
-                    {isRevealed ? "Hide" : "Show"}
+                    {isRevealed ? t("common.hide") : t("common.show")}
                   </button>
                 )}
                 <button
@@ -256,7 +258,7 @@ function SecretPayloadViewer({
                   onClick={() => onCopy(f.value, fieldKey)}
                   className="text-xs text-[var(--accent)] hover:underline cursor-pointer font-medium"
                 >
-                  {isCopied ? "Copied!" : "Copy"}
+                  {isCopied ? t("common.copied") : t("common.copy")}
                 </button>
               </div>
             </div>
@@ -282,7 +284,7 @@ function SecretPayloadViewer({
             onClick={() => onCopy(payload, `${copiedKeyPrefix}-raw-json`)}
             className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:underline cursor-pointer"
           >
-            {copiedKey === `${copiedKeyPrefix}-raw-json` ? "Copied raw JSON!" : "Copy raw JSON"}
+            {copiedKey === `${copiedKeyPrefix}-raw-json` ? t("share.copiedRawJson") : t("share.copyRawJson")}
           </button>
         </div>
       )}
@@ -293,7 +295,7 @@ function SecretPayloadViewer({
 const SECTOR_BRANDING = {
   enabled: true,
   name: "SEAD",
-  subName: "Secretaria de Estado da Administração",
+  subName: "Secretaria de Administração do Piauí",
   logoUrl: "", // Path to your logo (e.g. "/sead-logo.svg")
 };
 
@@ -302,6 +304,34 @@ function DepartmentIcon() {
     <svg className="w-3.5 h-3.5 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
     </svg>
+  );
+}
+
+function LocaleToggle() {
+  const { locale, setLocale } = useLocale();
+  return (
+    <div className="flex h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] overflow-hidden">
+      <button
+        onClick={() => setLocale("en")}
+        className={`px-3 text-[11px] font-medium transition-all duration-150 cursor-pointer ${
+          locale === "en"
+            ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+            : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+        }`}
+      >
+        EN
+      </button>
+      <button
+        onClick={() => setLocale("pt-BR")}
+        className={`px-3 text-[11px] font-medium border-l border-[var(--border-default)] transition-all duration-150 cursor-pointer ${
+          locale === "pt-BR"
+            ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+            : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+        }`}
+      >
+        PT
+      </button>
+    </div>
   );
 }
 
@@ -333,6 +363,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
   const { token } = use(props.params);
 
   const { theme } = useTheme();
+  const { t } = useLocale();
   const { appName, appColor, appLogo } = useAppearance();
   const [state, setState] = useState<ViewState>({ kind: "loading" });
   const [passphrase, setPassphrase] = useState("");
@@ -380,12 +411,12 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-30"
             style={{ background: `radial-gradient(circle, ${appColor || 'var(--accent)'}14 0%, transparent 70%)` }}
           />
-          <div 
+          <div
             className="absolute -right-36 -bottom-36 select-none pointer-events-none transition-opacity duration-300"
-            style={{ 
-              width: "700px", 
-              height: "1000px", 
-              opacity: theme === "light" ? 0.05 : 0.02 
+            style={{
+              width: "700px",
+              height: "1000px",
+              opacity: theme === "light" ? 0.15 : 0.10
             }}
           >
             <img src="/LOGO%20PIAU%C3%8D.svg" alt="" className="w-full h-full object-contain" />
@@ -439,22 +470,25 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                 </>
               )}
             </div>
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <LocaleToggle />
+              <ThemeToggle />
+            </div>
           </div>
 
           <div>
-            <h1 className="text-lg font-semibold text-[var(--text-primary)]">{b.title || "Shared bundle"}</h1>
-            <p className="text-xs text-[var(--text-muted)]">Someone shared this with you through a short-lived link.</p>
+            <h1 className="text-lg font-semibold text-[var(--text-primary)]">{b.title || t("share.bundleTitle")}</h1>
+            <p className="text-xs text-[var(--text-muted)]">{t("share.bundleDesc")}</p>
           </div>
 
           {b.secrets.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-[var(--text-secondary)]">Secrets</h2>
+              <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{t("share.secrets")}</h2>
               {b.secrets.map((s, i) => (
                 <Card key={i}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-[var(--text-primary)]">
-                      {s.name} <span className="text-xs text-[var(--text-muted)]">({s.type})</span>
+                      {s.name} <span className="text-xs text-[var(--text-muted)]">({t("share.types." + s.type)})</span>
                     </span>
                   </div>
                   <SecretPayloadViewer
@@ -473,11 +507,6 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
             <div key={i} className="space-y-2">
               <div className="flex items-center gap-3">
                 <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{doc.name}</h2>
-                {doc.external_url && (
-                  <a href={doc.external_url} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--accent)] hover:underline">
-                    Open externally ↗
-                  </a>
-                )}
               </div>
               <Card className="p-0 overflow-hidden">
                 <ApiReference content={doc.spec} showSidebar={false} hideTestRequest />
@@ -491,7 +520,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                 ? "bg-amber-50 border border-amber-200 text-amber-700"
                 : "bg-amber-500/10 border border-amber-500/25 text-amber-400"
             }`}>
-              This link no longer has any available content.
+              {t("share.noContent")}
             </div>
           )}
 
@@ -506,9 +535,9 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
             </svg>
             <div>
               <strong className={`font-semibold block mb-0.5 ${theme === "light" ? "text-sky-900" : "text-[var(--text-secondary)]"}`}>
-                Aviso de Segurança
+                {t("share.securityNotice")}
               </strong>
-              Este é um link de compartilhamento temporário. Copie as credenciais necessárias e feche esta aba quando terminar.
+              {t("share.securityNoticeDesc")}
             </div>
           </div>
         </div>
@@ -523,12 +552,12 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-30"
           style={{ background: `radial-gradient(circle, ${appColor || 'var(--accent)'}14 0%, transparent 70%)` }}
         />
-        <div 
+        <div
           className="absolute -right-36 -bottom-36 select-none pointer-events-none transition-opacity duration-300"
-          style={{ 
-            width: "700px", 
-            height: "1000px", 
-            opacity: theme === "light" ? 0.05 : 0.02 
+          style={{
+            width: "700px",
+            height: "1000px",
+            opacity: theme === "light" ? 0.15 : 0.10
           }}
         >
           <img src="/LOGO%20PIAU%C3%8D.svg" alt="" className="w-full h-full object-contain" />
@@ -582,33 +611,36 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
               </>
             )}
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <LocaleToggle />
+            <ThemeToggle />
+          </div>
         </div>
 
         <Card>
-          <h1 className="text-base font-semibold text-[var(--text-primary)] mb-1">Shared secret</h1>
+          <h1 className="text-base font-semibold text-[var(--text-primary)] mb-1">{t("share.secretTitle")}</h1>
           <p className="text-xs text-[var(--text-muted)] mb-5">
-            Someone shared a secret with you through a short-lived link.
+            {t("share.secretDesc")}
           </p>
 
-          {state.kind === "loading" && <p className="text-sm text-[var(--text-muted)]">Loading…</p>}
+          {state.kind === "loading" && <p className="text-sm text-[var(--text-muted)]">{t("common.loading")}</p>}
 
           {state.kind === "needsPassphrase" && (
             <form onSubmit={handleSubmit} className="space-y-3">
               <p className="text-sm text-[var(--text-secondary)]">
-                This link is protected. Enter the passphrase to reveal it.
+                {t("share.protected")}
               </p>
               <Input
                 type="password"
                 autoFocus
                 value={passphrase}
                 onChange={(e) => setPassphrase(e.target.value)}
-                placeholder="Passphrase"
+                placeholder={t("share.passphrase")}
                 autoComplete="off"
-                error={state.incorrect ? "Incorrect passphrase. Please try again." : undefined}
+                error={state.incorrect ? t("share.incorrectPassphrase") : undefined}
               />
               <Button type="submit" loading={submitting} disabled={!passphrase} className="w-full">
-                Unlock
+                {t("share.unlock")}
               </Button>
             </form>
           )}
@@ -631,9 +663,9 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                 </svg>
                 <div>
                   <strong className={`font-semibold block mb-0.5 ${theme === "light" ? "text-sky-900" : "text-[var(--text-secondary)]"}`}>
-                    Aviso de Segurança
+                    {t("share.securityNotice")}
                   </strong>
-                  Este link é temporário. Certifique-se de copiar as credenciais e fechar esta aba.
+                  {t("share.securityNoticeDescSingle")}
                 </div>
               </div>
             </div>
@@ -645,7 +677,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                 ? "bg-amber-50 border border-amber-200 text-amber-700"
                 : "bg-amber-500/10 border border-amber-500/25 text-amber-400"
             }`}>
-              This link has expired or is no longer valid. Ask the sender for a new one.
+              {t("share.expired")}
             </div>
           )}
 
@@ -655,7 +687,11 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                 ? "bg-red-50 border border-red-200 text-red-700"
                 : "bg-red-500/10 border border-red-500/25 text-red-400"
             }`}>
-              {state.message}
+              {state.message.startsWith("share.requestFailed:")
+                ? t("share.requestFailed", { status: state.message.split(":")[1] })
+                : state.message.startsWith("share.")
+                ? t(state.message)
+                : state.message}
             </div>
           )}
         </Card>

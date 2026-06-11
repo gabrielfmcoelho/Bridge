@@ -1128,5 +1128,42 @@
     "select": "Adicionar uma entidade\u2026",
     "noOptions": "Nenhuma entidade configurada. Adicione em enum_options.",
     "allLinked": "Todas as entidades vinculadas"
+  },
+  "share": {
+    "bundleTitle": "Pacote compartilhado",
+    "bundleDesc": "Alguém compartilhou isso com você através de um link temporário.",
+    "noContent": "Este link não possui mais nenhum conteúdo disponível.",
+    "securityNotice": "Aviso de Segurança",
+    "securityNoticeDesc": "Este é um link de compartilhamento temporário. Copie as credenciais necessárias e feche esta aba quando terminar.",
+    "securityNoticeDescSingle": "Este link é temporário. Certifique-se de copiar as credenciais e fechar esta aba.",
+    "secretTitle": "Segredo compartilhado",
+    "secretDesc": "Alguém compartilhou um segredo com você através de um link temporário.",
+    "protected": "Este link está protegido. Insira a senha para revelá-lo.",
+    "passphrase": "Senha",
+    "incorrectPassphrase": "Senha incorreta. Por favor, tente novamente.",
+    "unlock": "Desbloquear",
+    "expired": "Este link expirou ou não é mais válido. Peça ao remetente por um novo.",
+    "connectionError": "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.",
+    "requestFailed": "Falha na requisição ({status}).",
+    "secrets": "Segredos",
+    "copiedRawJson": "JSON bruto copiado!",
+    "copyRawJson": "Copiar JSON bruto",
+    "fields": {
+      "secretValue": "Valor do Segredo",
+      "password": "Senha",
+      "username": "Usuário",
+      "privateKey": "Chave Privada",
+      "publicKey": "Chave Pública",
+      "appName": "Nome do App",
+      "url": "URL",
+      "notes": "Notas"
+    },
+    "types": {
+      "password": "senha",
+      "cred": "credenciais",
+      "sshkey": "chave ssh",
+      "app_login": "login de app",
+      "raw": "bruto"
+    }
   }
 }

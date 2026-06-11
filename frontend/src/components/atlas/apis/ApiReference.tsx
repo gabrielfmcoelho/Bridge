@@ -8,6 +8,7 @@
 import "@scalar/api-reference-react/style.css";
 import dynamic from "next/dynamic";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLocale } from "@/contexts/LocaleContext";
 
 const ApiReferenceReact = dynamic(
   () => import("@scalar/api-reference-react").then((m) => ({ default: m.ApiReferenceReact })),
@@ -75,10 +76,35 @@ export default function ApiReference({
   serverUrl?: string;
 }) {
   const { theme } = useTheme();
+  const { locale } = useLocale();
+  const isPt = locale === "pt-BR";
+
+  const customCss = `
+${SCALAR_CSS}
+.show-more,
+.group\\/summary button {
+  font-size: 0 !important;
+}
+.show-more::after {
+  content: "${isPt ? "Mostrar mais" : "Show More"}" !important;
+  font-size: var(--scalar-font-size-3, 13px) !important;
+}
+.group\\/summary button::after,
+.group-summary button::after {
+  content: "${isPt ? "Mais" : "More"}" !important;
+  font-size: var(--scalar-font-size-3, 13px) !important;
+}
+.group\\/summary button[aria-expanded="true"]::after,
+.group-summary button[aria-expanded="true"]::after {
+  content: "${isPt ? "Mostrar menos" : "Show Less"}" !important;
+  font-size: var(--scalar-font-size-3, 13px) !important;
+}
+`;
+
   const doc = serverUrl ? { ...content, servers: [{ url: serverUrl }] } : content;
   return (
     <ApiReferenceReact
-      key={theme}
+      key={`${theme}-${locale}`}
       configuration={{
         content: doc,
         showSidebar,
@@ -87,9 +113,10 @@ export default function ApiReference({
         hideDownloadButton: true,
         hideDarkModeToggle: true,
         forceDarkModeState: theme,
+        showDeveloperTools: "never",
         agent: { disabled: true },
         mcp: { disabled: true },
-        customCss: SCALAR_CSS,
+        customCss,
       }}
     />
   );

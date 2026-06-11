@@ -1128,5 +1128,42 @@
     "select": "Add an entity…",
     "noOptions": "No entities configured. Add them under enum_options.",
     "allLinked": "All entities linked"
+  },
+  "share": {
+    "bundleTitle": "Shared bundle",
+    "bundleDesc": "Someone shared this with you through a short-lived link.",
+    "noContent": "This link no longer has any available content.",
+    "securityNotice": "Security Notice",
+    "securityNoticeDesc": "This is a temporary sharing link. Copy the necessary credentials and close this tab when finished.",
+    "securityNoticeDescSingle": "This link is temporary. Make sure to copy the credentials and close this tab.",
+    "secretTitle": "Shared secret",
+    "secretDesc": "Someone shared a secret with you through a short-lived link.",
+    "protected": "This link is protected. Enter the passphrase to reveal it.",
+    "passphrase": "Passphrase",
+    "incorrectPassphrase": "Incorrect passphrase. Please try again.",
+    "unlock": "Unlock",
+    "expired": "This link has expired or is no longer valid. Ask the sender for a new one.",
+    "connectionError": "Could not reach the server. Check your connection and try again.",
+    "requestFailed": "Request failed ({status}).",
+    "secrets": "Secrets",
+    "copiedRawJson": "Copied raw JSON!",
+    "copyRawJson": "Copy raw JSON",
+    "fields": {
+      "secretValue": "Secret Value",
+      "password": "Password",
+      "username": "Username",
+      "privateKey": "Private Key",
+      "publicKey": "Public Key",
+      "appName": "App Name",
+      "url": "URL",
+      "notes": "Notes"
+    },
+    "types": {
+      "password": "password",
+      "cred": "credentials",
+      "sshkey": "ssh key",
+      "app_login": "app login",
+      "raw": "raw"
+    }
   }
 }
