@@ -56,3 +56,48 @@ func TestHostScanRepo_WriteAndReadAggregates(t *testing.T) {
 		t.Fatalf("recent = %+v, %v", recent, err)
 	}
 }
+
+// TestHostScanRepo_PopulatesNumericMetrics asserts that Create derives the
+// sortable numeric columns (P2) from the scan JSON's display strings, and that
+// missing/non-numeric values store as NULL (not 0).
+func TestHostScanRepo_PopulatesNumericMetrics(t *testing.T) {
+	ctx := context.Background()
+	d := openDB(t)
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('m1','m1') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
+	repo := store.NewHostScanRepo(d.SQL)
+	if err := repo.Create(ctx, hostID,
+		`{"cpu_usage":"45%","ram_percent":"50%","disk_percent":"40%","containers":["c1","c2","c3"]}`); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	var cpu, ram, disk *float64
+	var containers int
+	if err := d.SQL.QueryRow(
+		`SELECT cpu_pct, ram_pct, disk_pct, containers_count FROM host_scans WHERE host_id = ?`, hostID,
+	).Scan(&cpu, &ram, &disk, &containers); err != nil {
+		t.Fatalf("read metrics: %v", err)
+	}
+	if cpu == nil || *cpu != 45 || ram == nil || *ram != 50 || disk == nil || *disk != 40 {
+		t.Fatalf("metrics = cpu:%v ram:%v disk:%v, want 45/50/40", cpu, ram, disk)
+	}
+	if containers != 3 {
+		t.Fatalf("containers_count = %d, want 3", containers)
+	}
+
+	// Missing percentages → NULL (not 0).
+	if err := repo.Create(ctx, hostID, `{"cpu":"4 cores"}`); err != nil {
+		t.Fatalf("create 2: %v", err)
+	}
+	var cpu2 *float64
+	if err := d.SQL.QueryRow(
+		`SELECT cpu_pct FROM host_scans WHERE host_id = ? ORDER BY id DESC LIMIT 1`, hostID,
+	).Scan(&cpu2); err != nil {
+		t.Fatalf("read cpu2: %v", err)
+	}
+	if cpu2 != nil {
+		t.Fatalf("absent cpu_usage should be NULL, got %v", *cpu2)
+	}
+}

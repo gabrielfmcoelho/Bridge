@@ -1176,4 +1176,22 @@ var migrationsPostgres = []string{
 	`ALTER TABLE hosts    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	ALTER TABLE services ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`,
+
+	// Version 74 (P2): promote host-scan resource metrics from display-string
+	// JSON ("45%", "1.2 GB") to typed numeric columns so the host list can sort
+	// /filter on them in SQL (impossible against the opaque data blob). New scans
+	// populate these at ingest (HostScanRepo.Create); this backfills existing
+	// rows by parsing the stored JSON. data is always json.Marshal output, so the
+	// ::jsonb cast is safe; non-numeric/empty values become NULL.
+	`ALTER TABLE host_scans ADD COLUMN IF NOT EXISTS cpu_pct          DOUBLE PRECISION;
+	ALTER TABLE host_scans ADD COLUMN IF NOT EXISTS ram_pct          DOUBLE PRECISION;
+	ALTER TABLE host_scans ADD COLUMN IF NOT EXISTS disk_pct         DOUBLE PRECISION;
+	ALTER TABLE host_scans ADD COLUMN IF NOT EXISTS containers_count INTEGER;
+	UPDATE host_scans SET
+		cpu_pct  = NULLIF(regexp_replace(COALESCE(data::jsonb->>'cpu_usage',''),    '[^0-9.]', '', 'g'), '')::double precision,
+		ram_pct  = NULLIF(regexp_replace(COALESCE(data::jsonb->>'ram_percent',''),  '[^0-9.]', '', 'g'), '')::double precision,
+		disk_pct = NULLIF(regexp_replace(COALESCE(data::jsonb->>'disk_percent',''), '[^0-9.]', '', 'g'), '')::double precision,
+		containers_count = CASE WHEN jsonb_typeof(data::jsonb->'containers') = 'array'
+			THEN jsonb_array_length(data::jsonb->'containers') ELSE 0 END
+	WHERE data IS NOT NULL AND data <> '';`,
 }

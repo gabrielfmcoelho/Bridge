@@ -3,6 +3,9 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -18,9 +21,16 @@ type HostScanRepo struct {
 // NewHostScanRepo constructs a HostScanRepo over the given DB handle.
 func NewHostScanRepo(db *sql.DB) *HostScanRepo { return &HostScanRepo{db: db} }
 
-// Create records a new scan snapshot (raw JSON data) for a host.
+// Create records a new scan snapshot for a host. The raw JSON `data` is stored
+// verbatim, and the sortable resource metrics (cpu/ram/disk %, container count)
+// are derived from it into typed columns (P2) so the host list can ORDER BY
+// them. Unparseable/empty percentages are stored NULL.
 func (r *HostScanRepo) Create(ctx context.Context, hostID int64, data string) error {
-	_, err := r.db.ExecContext(ctx, `INSERT INTO host_scans (host_id, data) VALUES (?, ?)`, hostID, data)
+	cpu, ram, disk, containers := parseScanMetrics(data)
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO host_scans (host_id, data, cpu_pct, ram_pct, disk_pct, containers_count)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		hostID, data, cpu, ram, disk, containers)
 	return err
 }
 
@@ -116,4 +126,35 @@ func (r *HostScanRepo) LatestDataBulk(ctx context.Context) (map[int64]string, er
 		m[id] = data
 	}
 	return m, rows.Err()
+}
+
+// parseScanMetrics extracts the sortable resource numerics from a scan's JSON
+// blob. cpu/ram/disk are display strings like "45%" → *float64 (nil when
+// absent/unparseable, so they store as NULL — distinct from a real 0%).
+// containers_count is the length of the containers array (0 when absent).
+func parseScanMetrics(data string) (cpu, ram, disk *float64, containers int) {
+	var s struct {
+		CPUUsage    string   `json:"cpu_usage"`
+		RAMPercent  string   `json:"ram_percent"`
+		DiskPercent string   `json:"disk_percent"`
+		Containers  []string `json:"containers"`
+	}
+	if err := json.Unmarshal([]byte(data), &s); err != nil {
+		return nil, nil, nil, 0
+	}
+	return pctPtr(s.CPUUsage), pctPtr(s.RAMPercent), pctPtr(s.DiskPercent), len(s.Containers)
+}
+
+// pctPtr parses a "45%"-style string to a *float64, returning nil when empty or
+// non-numeric (→ SQL NULL).
+func pctPtr(s string) *float64 {
+	s = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(s), "%"))
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return nil
+	}
+	return &v
 }
