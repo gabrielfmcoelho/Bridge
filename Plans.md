@@ -120,4 +120,20 @@ frontend grouping concept derived from `GROUP BY group_label`.
 
 ## 📦 アーカイブ
 
-_(none yet)_
+### 2026-06-12 — Backend architecture refactor (R0–R5) delivered to `main`
+
+`refactor/phase-0-transport-helpers` を `main` へマージ＝**c70ed1e**（コンフリクト無し；
+i18n message 2ファイルは auto-merge）。R0–R5 全行 `cc:完了`。マージ後ツリーを検証 green
+（`go build`/`vet`、backend は refactor 分と `.go` 差分 0＝`go test -race ./...`(testcontainers)
+は同一性で green、`tsc`、`next build`）。origin/main と同期。
+
+**Delivered**: R0 共有トランスポートヘルパー · R1 リポジトリ層（models→store, 純DTO化）·
+R2 サービス層 + DI container + 全 route 自己登録 · R3 スキーマ正規化（polymorphic
+responsaveis / app_secrets / share_bundles）+ hosts/services/projects soft-delete ·
+R4 `{data,meta}` envelope + 全インベントリの server-side filter/sort/pagination +
+god-handler 分割（glpi/coolify/outline protocol→client）· R5 graceful shutdown +
+request logging + auth-failure audit · 加えて Postgres-only + testcontainers ·
+numeric scan metrics · server-side sorting。
+
+**Outstanding（process / Impl 作業外）**: 36 件の `cc:完了` は PM の `pm:確認済` 待ち；
+Phase 1–5 の secret-UI 行は既存の "BROWSER SMOKE TEST PENDING"（手動 UI 検証）注記を保持。
