@@ -8,6 +8,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type globalIssueHandlers struct {
@@ -54,7 +55,7 @@ func (h *globalIssueHandlers) handleList(w http.ResponseWriter, r *http.Request)
 		result[i] = issueWithLinks{Issue: issue, AssigneeIDs: assigneeMap[issue.ID], AlertIDs: alertMap[issue.ID]}
 	}
 
-	jsonOK(w, result)
+	jsonPaged(w, r, result)
 }
 
 func (h *globalIssueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -184,7 +185,7 @@ func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 
 	// Auto-resolve linked alerts when issue is done
 	if req.Status == "done" {
-		if err := models.ResolveAlertsByIssueID(h.db.SQL, issueID); err != nil {
+		if err := store.NewHostAlertRepo(h.db.SQL).ResolveByIssue(r.Context(), issueID); err != nil {
 			log.Printf("[issues] ResolveAlertsByIssueID error: %v", err)
 		}
 	}
@@ -219,7 +220,7 @@ func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request)
 
 	// Auto-resolve linked alerts when issue is moved to done
 	if req.Status == "done" {
-		if err := models.ResolveAlertsByIssueID(h.db.SQL, issueID); err != nil {
+		if err := store.NewHostAlertRepo(h.db.SQL).ResolveByIssue(r.Context(), issueID); err != nil {
 			log.Printf("[issues] ResolveAlertsByIssueID error: %v", err)
 		}
 	}
@@ -262,4 +263,14 @@ func (h *globalIssueHandlers) handleDelete(w http.ResponseWriter, r *http.Reques
 	}
 
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *globalIssueHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/issues", h.handleList)
+	rr.role("editor", "POST /api/issues", h.handleCreate)
+	rr.role("editor", "PUT /api/issues/{id}", h.handleUpdate)
+	rr.role("editor", "PATCH /api/issues/{id}/move", h.handleMove)
+	rr.role("editor", "PATCH /api/issues/{id}/archive", h.handleArchive)
+	rr.role("admin", "DELETE /api/issues/{id}", h.handleDelete)
 }

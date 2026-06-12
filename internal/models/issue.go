@@ -86,14 +86,14 @@ func GetIssue(db *sql.DB, id int64) (*Issue, error) {
 }
 
 type IssueFilter struct {
-	EntityType    string
-	EntityID      int64
-	ProjectID     int64
-	ServiceID     int64
-	Status        string
-	Priority      string
-	AssigneeID    int64
-	Search        string
+	EntityType      string
+	EntityID        int64
+	ProjectID       int64
+	ServiceID       int64
+	Status          string
+	Priority        string
+	AssigneeID      int64
+	Search          string
 	ExcludeArchived bool
 }
 

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
@@ -43,12 +42,9 @@ func (h *secretHandlers) register(mux *http.ServeMux, wrap func(http.Handler) ht
 	// Env-var bundle endpoints (Phase 2 — Tasks 2.2 + 2.3).
 	mux.Handle("POST /api/secrets/env/bulk", wrap(http.HandlerFunc(h.handleEnvBulk)))
 	mux.Handle("GET /api/secrets/env", wrap(http.HandlerFunc(h.handleEnvList)))
-	// Share-link endpoints — owner-only mgmt (Phase 3 Task 3.3). The
-	// public redemption GET /api/share/{token} is wired in router.go
-	// outside the auth wrapper.
-	mux.Handle("POST /api/secrets/{id}/share-links", wrap(http.HandlerFunc(h.handleCreateShareLink)))
-	mux.Handle("GET /api/secrets/{id}/share-links", wrap(http.HandlerFunc(h.handleListShareLinks)))
-	mux.Handle("DELETE /api/secrets/{id}/share-links/{linkId}", wrap(http.HandlerFunc(h.handleRevokeShareLink)))
+	// Per-secret public sharing was retired in R3: a single-secret share is now
+	// a one-item share bundle (POST /api/share-bundles). The owner-only
+	// management UI lists/revokes via /api/share-bundles?secret_id=.
 	mux.Handle("GET /api/secrets/{id}", wrap(http.HandlerFunc(h.handleGetMetadata)))
 	mux.Handle("GET /api/secrets/{id}/reveal", wrap(http.HandlerFunc(h.handleReveal)))
 	mux.Handle("GET /api/secrets/{id}/history", wrap(http.HandlerFunc(h.handleHistory)))
@@ -57,35 +53,10 @@ func (h *secretHandlers) register(mux *http.ServeMux, wrap func(http.Handler) ht
 	mux.Handle("POST /api/secrets/{id}/restore", wrap(http.HandlerFunc(h.handleRestore)))
 }
 
-// actor reads the authenticated user from the request context and converts
-// to the ACL-aware vault.ActorContext. Returns nil if no user is present —
-// that condition is a programmer error (auth middleware should have rejected
-// the request) so handlers below treat it as 401.
-func (h *secretHandlers) actor(r *http.Request) (vault.ActorContext, bool) {
-	u := auth.UserFromContext(r.Context())
-	if u == nil {
-		return vault.ActorContext{}, false
-	}
-	return vault.ActorContext{UserID: u.ID, Role: u.Role}, true
-}
-
-// writeRepoErr maps vault repo sentinels to HTTP status codes. Anything else
-// is a 500 (logged via jsonServerError).
-func writeRepoErr(w http.ResponseWriter, r *http.Request, err error) {
-	switch {
-	case errors.Is(err, vault.ErrSecretNotFound):
-		jsonError(w, http.StatusNotFound, "secret not found")
-	case errors.Is(err, vault.ErrSecretForbidden):
-		jsonError(w, http.StatusForbidden, "forbidden")
-	default:
-		jsonServerError(w, r, "secret repo error", err)
-	}
-}
-
 // --- handlers ---------------------------------------------------------------
 
 func (h *secretHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -106,13 +77,13 @@ func (h *secretHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	views, err := h.repo.List(r.Context(), actor, filter)
 	if err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	if views == nil {
 		views = []vault.SecretView{}
 	}
-	jsonOK(w, views)
+	jsonPaged(w, r, views)
 }
 
 type createSecretRequest struct {
@@ -128,7 +99,7 @@ type createSecretRequest struct {
 }
 
 func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -178,7 +149,7 @@ func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *secretHandlers) handleGetMetadata(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -190,14 +161,14 @@ func (h *secretHandlers) handleGetMetadata(w http.ResponseWriter, r *http.Reques
 	}
 	v, err := h.repo.GetMetadata(r.Context(), actor, id)
 	if err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	jsonOK(w, v)
 }
 
 func (h *secretHandlers) handleReveal(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -209,7 +180,7 @@ func (h *secretHandlers) handleReveal(w http.ResponseWriter, r *http.Request) {
 	}
 	plain, err := h.repo.Reveal(r.Context(), actor, id)
 	if err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	jsonOK(w, map[string]any{"payload": plain})
@@ -228,7 +199,7 @@ type updateSecretRequest struct {
 }
 
 func (h *secretHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -254,7 +225,7 @@ func (h *secretHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		Payload:     req.Payload,
 	}
 	if err := h.repo.Update(r.Context(), actor, id, patch); err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -262,7 +233,7 @@ func (h *secretHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *secretHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -273,14 +244,14 @@ func (h *secretHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.SoftDelete(r.Context(), actor, id); err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *secretHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -291,14 +262,14 @@ func (h *secretHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.Restore(r.Context(), actor, id); err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *secretHandlers) handleHistory(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -310,34 +281,34 @@ func (h *secretHandlers) handleHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.repo.History(r.Context(), actor, id)
 	if err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	if rows == nil {
 		rows = []models.SecretAuditLog{}
 	}
-	jsonOK(w, rows)
+	jsonPaged(w, r, rows)
 }
 
 func (h *secretHandlers) handleTrash(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
 	views, err := h.repo.ListTrash(r.Context(), actor)
 	if err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	if views == nil {
 		views = []vault.SecretView{}
 	}
-	jsonOK(w, views)
+	jsonPaged(w, r, views)
 }
 
 func (h *secretHandlers) handleMine(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -347,12 +318,11 @@ func (h *secretHandlers) handleMine(w http.ResponseWriter, r *http.Request) {
 		OwnerUserID: &actor.UserID,
 	})
 	if err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	if views == nil {
 		views = []vault.SecretView{}
 	}
-	jsonOK(w, views)
+	jsonPaged(w, r, views)
 }
-

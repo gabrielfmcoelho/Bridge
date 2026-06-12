@@ -186,6 +186,26 @@ func (c *Client) CollectionsList(ctx context.Context, limit, offset int) ([]Coll
 	return out, nil
 }
 
+// CollectionsListAll pages through collections.list until a short page signals
+// end-of-list, capping iterations so a misbehaving server can't hang the caller.
+// Extracted from the api handler (R4b — the pagination loop is protocol logic).
+func (c *Client) CollectionsListAll(ctx context.Context) ([]Collection, error) {
+	const pageSize = 100
+	const maxPages = 20
+	var out []Collection
+	for page := 0; page < maxPages; page++ {
+		chunk, err := c.CollectionsList(ctx, pageSize, page*pageSize)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, chunk...)
+		if len(chunk) < pageSize {
+			break
+		}
+	}
+	return out, nil
+}
+
 // CollectionInfo fetches one collection by id.
 func (c *Client) CollectionInfo(ctx context.Context, id string) (*Collection, error) {
 	var out Collection

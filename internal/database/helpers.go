@@ -24,16 +24,9 @@ func InsertReturningID(db Execer, query string, args ...any) (int64, error) {
 // InsertReturningCol is like InsertReturningID but lets the caller specify
 // the column whose value should be returned on Postgres.
 func InsertReturningCol(db Execer, query, col string, args ...any) (int64, error) {
-	if active == DialectPostgres {
-		var id int64
-		if err := db.QueryRow(query+" RETURNING "+col, args...).Scan(&id); err != nil {
-			return 0, err
-		}
-		return id, nil
-	}
-	res, err := db.Exec(query, args...)
-	if err != nil {
+	var id int64
+	if err := db.QueryRow(query+" RETURNING "+col, args...).Scan(&id); err != nil {
 		return 0, err
 	}
-	return res.LastInsertId()
+	return id, nil
 }

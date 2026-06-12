@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +15,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	glpiclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/glpi"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type glpiHandlers struct {
@@ -47,7 +47,7 @@ func (h *glpiHandlers) resolveClient() (*glpiclient.Client, glpiclient.Settings,
 // stored user token on demand.
 func (h *glpiHandlers) sessionFor(ctx context.Context, client *glpiclient.Client, profileID int64) (string, error) {
 	return h.cache.Get(ctx, client, profileID, func(id int64) (string, error) {
-		tok, err := models.GetGlpiToken(h.db.SQL, id)
+		tok, err := store.NewGlpiTokenRepo(h.db.SQL).Get(ctx, id)
 		if err != nil {
 			return "", err
 		}
@@ -64,15 +64,12 @@ func (h *glpiHandlers) sessionFor(ctx context.Context, client *glpiclient.Client
 // ─── Admin CRUD for token profiles ───────────────────────────────────────────
 
 func (h *glpiHandlers) handleListTokenProfiles(w http.ResponseWriter, r *http.Request) {
-	tokens, err := models.ListGlpiTokens(h.db.SQL)
+	tokens, err := store.NewGlpiTokenRepo(h.db.SQL).List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list profiles", err)
 		return
 	}
-	if tokens == nil {
-		tokens = []models.GlpiToken{}
-	}
-	jsonOK(w, tokens)
+	jsonPaged(w, r, tokens)
 }
 
 func (h *glpiHandlers) handleCreateTokenProfile(w http.ResponseWriter, r *http.Request) {
@@ -104,8 +101,8 @@ func (h *glpiHandlers) handleCreateTokenProfile(w http.ResponseWriter, r *http.R
 		UserTokenNonce:  nonce,
 		DefaultEntityID: req.DefaultEntityID,
 	}
-	if err := models.CreateGlpiToken(h.db.SQL, tok); err != nil {
-		jsonError(w, http.StatusConflict, "create failed (name conflict?): "+err.Error())
+	if err := store.NewGlpiTokenRepo(h.db.SQL).Create(r.Context(), tok); err != nil {
+		jsonErrorLogged(w, r, http.StatusConflict, "could not create GLPI token (name already in use?)", err)
 		return
 	}
 	tok.HasToken = true
@@ -118,7 +115,7 @@ func (h *glpiHandlers) handleUpdateTokenProfile(w http.ResponseWriter, r *http.R
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	existing, err := models.GetGlpiToken(h.db.SQL, id)
+	existing, err := store.NewGlpiTokenRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "lookup failed", err)
 		return
@@ -154,7 +151,7 @@ func (h *glpiHandlers) handleUpdateTokenProfile(w http.ResponseWriter, r *http.R
 		update.UserTokenCipher = cipher
 		update.UserTokenNonce = nonce
 	}
-	if err := models.UpdateGlpiToken(h.db.SQL, update); err != nil {
+	if err := store.NewGlpiTokenRepo(h.db.SQL).Update(r.Context(), update); err != nil {
 		jsonServerError(w, r, "update failed", err)
 		return
 	}
@@ -169,7 +166,7 @@ func (h *glpiHandlers) handleDeleteTokenProfile(w http.ResponseWriter, r *http.R
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	if err := models.DeleteGlpiToken(h.db.SQL, id); err != nil {
+	if err := store.NewGlpiTokenRepo(h.db.SQL).Delete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "delete failed", err)
 		return
 	}
@@ -198,12 +195,12 @@ func (h *glpiHandlers) handleTestTokenProfile(w http.ResponseWriter, r *http.Req
 	h.cache.Invalidate(id)
 	session, err := h.sessionFor(ctx, client, id)
 	if err != nil {
-		jsonOK(w, map[string]any{"success": false, "error": mapGlpiError(err)})
+		jsonOK(w, map[string]any{"success": false, "error": glpiclient.FriendlyError(err)})
 		return
 	}
 	profiles, err := client.GetMyProfiles(ctx, session)
 	if err != nil {
-		jsonOK(w, map[string]any{"success": false, "error": mapGlpiError(err)})
+		jsonOK(w, map[string]any{"success": false, "error": glpiclient.FriendlyError(err)})
 		return
 	}
 	names := []string{}
@@ -222,7 +219,7 @@ func (h *glpiHandlers) handleTestTokenProfile(w http.ResponseWriter, r *http.Req
 // updated). The full options payload isn't in this response — it's only
 // fetched when the admin opens the editor for one row.
 func (h *glpiHandlers) handleListDropdownCatalogues(w http.ResponseWriter, r *http.Request) {
-	list, err := models.ListGlpiDropdownCatalogues(h.db.SQL)
+	list, err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list catalogues", err)
 		return
@@ -231,7 +228,7 @@ func (h *glpiHandlers) handleListDropdownCatalogues(w http.ResponseWriter, r *ht
 		list = []models.GlpiDropdownCatalogueSummary{}
 	}
 	jsonOK(w, map[string]any{
-		"catalogues":     list,
+		"catalogues":        list,
 		"allowed_itemtypes": allowedCatalogueItemtypes(),
 	})
 }
@@ -244,7 +241,7 @@ func (h *glpiHandlers) handleGetDropdownCatalogue(w http.ResponseWriter, r *http
 		jsonError(w, http.StatusBadRequest, "itemtype not allowed")
 		return
 	}
-	cat, err := models.GetGlpiDropdownCatalogue(h.db.SQL, itemtype)
+	cat, err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Get(r.Context(), itemtype)
 	if err != nil {
 		jsonServerError(w, r, "catalogue lookup failed", err)
 		return
@@ -307,7 +304,7 @@ func (h *glpiHandlers) handleUpsertDropdownCatalogue(w http.ResponseWriter, r *h
 		id := u.ID
 		userID = &id
 	}
-	if err := models.UpsertGlpiDropdownCatalogue(h.db.SQL, itemtype, payload, len(clean), userID); err != nil {
+	if err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Upsert(r.Context(), itemtype, payload, len(clean), userID); err != nil {
 		jsonServerError(w, r, "catalogue save failed", err)
 		return
 	}
@@ -325,7 +322,7 @@ func (h *glpiHandlers) handleDeleteDropdownCatalogue(w http.ResponseWriter, r *h
 		jsonError(w, http.StatusBadRequest, "itemtype not allowed")
 		return
 	}
-	if err := models.DeleteGlpiDropdownCatalogue(h.db.SQL, itemtype); err != nil {
+	if err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Delete(r.Context(), itemtype); err != nil {
 		jsonServerError(w, r, "catalogue delete failed", err)
 		return
 	}
@@ -349,26 +346,27 @@ func allowedCatalogueItemtypes() []string {
 // host, or alert-scoped. The handler fills in sensible defaults from the context
 // before POSTing to GLPI.
 type createTicketRequest struct {
-	ProfileID     int64  `json:"profile_id"`
-	Title         string `json:"title"`
-	Description   string `json:"description"`
-	EntityID      int    `json:"entity_id"`
-	CategoryID    int    `json:"category_id"`
-	HostSlug      string `json:"host_slug,omitempty"`       // optional — persists as host_chamado
-	AlertID       int64  `json:"alert_id,omitempty"`        // optional — links via alert_chamado_links
-	LinkComputer  bool   `json:"link_computer,omitempty"`   // if true + host_slug, find & link GLPI Computer
+	ProfileID    int64  `json:"profile_id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	EntityID     int    `json:"entity_id"`
+	CategoryID   int    `json:"category_id"`
+	HostSlug     string `json:"host_slug,omitempty"`     // optional — persists as host_chamado
+	AlertID      int64  `json:"alert_id,omitempty"`      // optional — links via alert_chamado_links
+	LinkComputer bool   `json:"link_computer,omitempty"` // if true + host_slug, find & link GLPI Computer
 }
 
 type createTicketResponse struct {
-	TicketID        int    `json:"ticket_id"`
-	TicketURL       string `json:"ticket_url"`
-	ChamadoID       int64  `json:"chamado_id,omitempty"`
-	ComputerLinked  bool   `json:"computer_linked,omitempty"`
-	Warning         string `json:"warning,omitempty"`
+	TicketID       int    `json:"ticket_id"`
+	TicketURL      string `json:"ticket_url"`
+	ChamadoID      int64  `json:"chamado_id,omitempty"`
+	ComputerLinked bool   `json:"computer_linked,omitempty"`
+	Warning        string `json:"warning,omitempty"`
 }
 
 // handleCreateTicket is the single creation entry point. Route:
-//   POST /api/glpi/tickets
+//
+//	POST /api/glpi/tickets
 func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request) {
 	var req createTicketRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -393,7 +391,7 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 	entityID := req.EntityID
 	if entityID == 0 {
 		// Fall back to profile default → instance default.
-		tok, _ := models.GetGlpiToken(h.db.SQL, req.ProfileID)
+		tok, _ := store.NewGlpiTokenRepo(h.db.SQL).Get(r.Context(), req.ProfileID)
 		if tok != nil && tok.DefaultEntityID > 0 {
 			entityID = tok.DefaultEntityID
 		} else {
@@ -406,7 +404,7 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 
 	session, err := h.sessionFor(ctx, client, req.ProfileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
@@ -417,7 +415,7 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 		ITILCategoriesID: req.CategoryID,
 	})
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "create failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "create failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	ticketURL := fmt.Sprintf("%s/front/ticket.form.php?id=%d", client.WebBaseURL(), ticketID)
@@ -426,7 +424,7 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 
 	// Optional link to a GLPI Computer asset (matched by slug or hostname).
 	if req.HostSlug != "" && req.LinkComputer {
-		host, _ := models.GetHostBySlug(h.db.SQL, req.HostSlug)
+		host, _ := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), req.HostSlug)
 		if host != nil {
 			if comp, cerr := client.FindComputerByName(ctx, session, host.OficialSlug); cerr == nil && comp != nil {
 				if lerr := client.LinkComputerToTicket(ctx, session, ticketID, comp.ID); lerr == nil {
@@ -440,14 +438,14 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 
 	// Persist as host_chamado when we have a host context.
 	if req.HostSlug != "" {
-		host, _ := models.GetHostBySlug(h.db.SQL, req.HostSlug)
+		host, _ := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), req.HostSlug)
 		if host != nil {
 			userID := int64(0)
 			if u := auth.UserFromContext(r.Context()); u != nil {
 				userID = u.ID
 			}
-			cid, cerr := models.CreateExternalHostChamado(
-				h.db.SQL,
+			cid, cerr := store.NewHostChamadoRepo(h.db.SQL).CreateExternal(
+				r.Context(),
 				host.ID,
 				userID,
 				strconv.Itoa(ticketID),
@@ -480,7 +478,8 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 // handleRefreshChamadoCache re-fetches a chamado's ticket from GLPI and updates
 // cached_title + cached_status. Called by the host detail page to keep the
 // existing ChamadoSection showing live GLPI data.
-//   POST /api/hosts/{slug}/chamados/{chamadoId}/glpi/refresh?profile_id=<N>
+//
+//	POST /api/hosts/{slug}/chamados/{chamadoId}/glpi/refresh?profile_id=<N>
 func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	chamadoID, err := pathInt64(r, "chamadoId")
@@ -488,12 +487,12 @@ func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.
 		jsonBadRequest(w, r, "invalid chamado id", err)
 		return
 	}
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
 	}
-	chamado, err := models.GetHostChamado(h.db.SQL, chamadoID)
+	chamado, err := store.NewHostChamadoRepo(h.db.SQL).Get(r.Context(), chamadoID)
 	if err != nil || chamado == nil || chamado.HostID != host.ID {
 		jsonError(w, http.StatusNotFound, "chamado not found for this host")
 		return
@@ -519,27 +518,28 @@ func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.
 	defer cancel()
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	t, err := client.GetTicket(ctx, session, ticketID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "fetch failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "fetch failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
 	ticketURL := fmt.Sprintf("%s/front/ticket.form.php?id=%d", client.WebBaseURL(), t.ID)
-	if err := models.UpdateChamadoCache(h.db.SQL, chamadoID, "glpi", ticketURL, t.Name, glpiclient.StatusSlug(t.Status)); err != nil {
+	if err := store.NewHostChamadoRepo(h.db.SQL).UpdateCache(r.Context(), chamadoID, "glpi", ticketURL, t.Name, glpiclient.StatusSlug(t.Status)); err != nil {
 		jsonServerError(w, r, "cache update failed", err)
 		return
 	}
 
-	jsonOK(w, enrichTicket(client, t))
+	jsonOK(w, client.TicketView(t))
 }
 
 // handleGetTicket returns a single ticket from GLPI. Used by the chamado live-sync
 // refresh path. Route:
-//   GET /api/glpi/tickets/{id}?profile_id=<N>
+//
+//	GET /api/glpi/tickets/{id}?profile_id=<N>
 func (h *glpiHandlers) handleGetTicket(w http.ResponseWriter, r *http.Request) {
 	ticketIDStr := r.PathValue("id")
 	ticketID, err := strconv.Atoi(ticketIDStr)
@@ -562,29 +562,15 @@ func (h *glpiHandlers) handleGetTicket(w http.ResponseWriter, r *http.Request) {
 
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	t, err := client.GetTicket(ctx, session, ticketID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "fetch failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "fetch failed: "+glpiclient.FriendlyError(err))
 		return
 	}
-	jsonOK(w, enrichTicket(client, t))
-}
-
-// ticketEvent is one entry in the ticket timeline — followup, task, or solution.
-// Normalized so the UI can render them in a single chronological list.
-type ticketEvent struct {
-	Type      string `json:"type"` // "followup" | "task" | "solution"
-	ID        int    `json:"id"`
-	Content   string `json:"content"`
-	Date      string `json:"date"`
-	UserID    int    `json:"user_id"`
-	UserName  string `json:"user_name,omitempty"`
-	IsPrivate bool   `json:"is_private,omitempty"`
-	State     int    `json:"state,omitempty"`       // tasks only (0=info 1=todo 2=done)
-	Status    int    `json:"status,omitempty"`      // solutions only (1=proposed 2=accepted 3=refused)
+	jsonOK(w, client.TicketView(t))
 }
 
 // handleGetTicketDetails returns the ticket plus its followups, tasks and
@@ -613,161 +599,16 @@ func (h *glpiHandlers) handleGetTicketDetails(w http.ResponseWriter, r *http.Req
 
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
-	t, err := client.GetTicket(ctx, session, ticketID)
+	detail, err := client.TicketDetails(ctx, session, ticketID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "fetch failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "fetch failed: "+glpiclient.FriendlyError(err))
 		return
 	}
-
-	// Fan out the three related collections in parallel. Each failure degrades
-	// gracefully to an empty slice + warning so the ticket body still renders.
-	var (
-		followups []glpiclient.Followup
-		tasks     []glpiclient.Task
-		solutions []glpiclient.Solution
-		warnings  []string
-		wg        sync.WaitGroup
-		mu        sync.Mutex
-	)
-	addWarn := func(s string) { mu.Lock(); warnings = append(warnings, s); mu.Unlock() }
-
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
-		f, err := client.GetTicketFollowups(ctx, session, ticketID)
-		if err != nil {
-			addWarn("followups: " + mapGlpiError(err))
-			return
-		}
-		followups = f
-	}()
-	go func() {
-		defer wg.Done()
-		ts, err := client.GetTicketTasks(ctx, session, ticketID)
-		if err != nil {
-			addWarn("tasks: " + mapGlpiError(err))
-			return
-		}
-		tasks = ts
-	}()
-	go func() {
-		defer wg.Done()
-		sols, err := client.GetTicketSolutions(ctx, session, ticketID)
-		if err != nil {
-			addWarn("solutions: " + mapGlpiError(err))
-			return
-		}
-		solutions = sols
-	}()
-	wg.Wait()
-
-	// Resolve every referenced user id once. Cache to avoid re-fetching the
-	// same user across many followups written by the same technician.
-	userIDs := map[int]struct{}{}
-	if t.UsersIDRequester > 0 {
-		userIDs[t.UsersIDRequester] = struct{}{}
-	}
-	for _, f := range followups {
-		if f.UsersID > 0 {
-			userIDs[f.UsersID] = struct{}{}
-		}
-	}
-	for _, tk := range tasks {
-		if tk.UsersID > 0 {
-			userIDs[tk.UsersID] = struct{}{}
-		}
-		if tk.UsersIDTech > 0 {
-			userIDs[tk.UsersIDTech] = struct{}{}
-		}
-	}
-	for _, s := range solutions {
-		if s.UsersID > 0 {
-			userIDs[s.UsersID] = struct{}{}
-		}
-	}
-	users := map[int]string{}
-	for id := range userIDs {
-		u, err := client.GetUser(ctx, session, id)
-		if err != nil || u == nil {
-			continue
-		}
-		users[id] = u.DisplayName()
-	}
-
-	// Build the timeline in chronological order (oldest first, like a chat log).
-	events := make([]ticketEvent, 0, len(followups)+len(tasks)+len(solutions))
-	for _, f := range followups {
-		events = append(events, ticketEvent{
-			Type:      "followup",
-			ID:        f.ID,
-			Content:   f.Content,
-			Date:      f.Date,
-			UserID:    f.UsersID,
-			UserName:  users[f.UsersID],
-			IsPrivate: f.IsPrivate == 1,
-		})
-	}
-	for _, tk := range tasks {
-		events = append(events, ticketEvent{
-			Type:     "task",
-			ID:       tk.ID,
-			Content:  tk.Content,
-			Date:     tk.Date,
-			UserID:   firstNonZero(tk.UsersIDTech, tk.UsersID),
-			UserName: users[firstNonZero(tk.UsersIDTech, tk.UsersID)],
-			State:    tk.State,
-		})
-	}
-	for _, s := range solutions {
-		events = append(events, ticketEvent{
-			Type:     "solution",
-			ID:       s.ID,
-			Content:  s.Content,
-			Date:     s.BestDate(),
-			UserID:   s.UsersID,
-			UserName: users[s.UsersID],
-			Status:   s.Status,
-		})
-	}
-	// Oldest → newest. Entries with no date are pushed to the end rather than
-	// the front so a GLPI Solution missing a timestamp doesn't jump above real
-	// follow-ups in the timeline.
-	sort.SliceStable(events, func(i, j int) bool {
-		a, b := events[i].Date, events[j].Date
-		if a == "" && b == "" {
-			return false
-		}
-		if a == "" {
-			return false
-		}
-		if b == "" {
-			return true
-		}
-		return a < b
-	})
-
-	out := map[string]any{
-		"ticket":        enrichTicket(client, t),
-		"glpi_base_url": client.WebBaseURL(),
-		"requester":     map[string]any{"id": t.UsersIDRequester, "name": users[t.UsersIDRequester]},
-		"events":        events,
-		"event_counts":  map[string]int{"followup": len(followups), "task": len(tasks), "solution": len(solutions)},
-	}
-	if len(warnings) > 0 {
-		out["warnings"] = warnings
-	}
-	jsonOK(w, out)
-}
-
-func firstNonZero(a, b int) int {
-	if a != 0 {
-		return a
-	}
-	return b
+	jsonOK(w, detail)
 }
 
 // ─── Formcreator ────────────────────────────────────────────────────────────
@@ -790,7 +631,7 @@ func (h *glpiHandlers) handleListForms(w http.ResponseWriter, r *http.Request) {
 
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
@@ -801,7 +642,7 @@ func (h *glpiHandlers) handleListForms(w http.ResponseWriter, r *http.Request) {
 	// filter active-ness client-side below, which is version-proof.
 	forms, err := client.ListFormcreatorForms(ctx, session, false, 0, 199)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "list failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "list failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	includeInactive := r.URL.Query().Get("include_inactive") == "true"
@@ -853,14 +694,14 @@ func (h *glpiHandlers) handleGetFormBundle(w http.ResponseWriter, r *http.Reques
 
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
 	// Form metadata is required — fail hard if it doesn't load.
 	form, err := client.GetFormcreatorForm(ctx, session, formID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "form lookup failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "form lookup failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
@@ -881,7 +722,7 @@ func (h *glpiHandlers) handleGetFormBundle(w http.ResponseWriter, r *http.Reques
 		defer wg.Done()
 		out, err := client.ListFormcreatorSectionsByForm(ctx, session, formID)
 		if err != nil {
-			addWarn("sections: " + mapGlpiError(err))
+			addWarn("sections: " + glpiclient.FriendlyError(err))
 			return
 		}
 		sections = out
@@ -890,7 +731,7 @@ func (h *glpiHandlers) handleGetFormBundle(w http.ResponseWriter, r *http.Reques
 		defer wg.Done()
 		out, err := client.ListFormcreatorQuestionsByForm(ctx, session, formID)
 		if err != nil {
-			addWarn("questions: " + mapGlpiError(err))
+			addWarn("questions: " + glpiclient.FriendlyError(err))
 			return
 		}
 		questions = out
@@ -899,7 +740,7 @@ func (h *glpiHandlers) handleGetFormBundle(w http.ResponseWriter, r *http.Reques
 		defer wg.Done()
 		out, err := client.ListFormcreatorConditionsByForm(ctx, session, formID)
 		if err != nil {
-			addWarn("conditions: " + mapGlpiError(err))
+			addWarn("conditions: " + glpiclient.FriendlyError(err))
 			return
 		}
 		conditions = out
@@ -955,13 +796,13 @@ func (h *glpiHandlers) handleSubmitForm(w http.ResponseWriter, r *http.Request) 
 
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
 	res, err := client.SubmitFormcreatorFormAnswer(ctx, session, formID, req.Answers)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "submit failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "submit failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
@@ -1009,12 +850,12 @@ func (h *glpiHandlers) handleSearchDropdown(w http.ResponseWriter, r *http.Reque
 	defer cancel()
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	raw, err := client.SearchDropdownItems(ctx, session, itemtype, query, 0, 49)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "search failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "search failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	out := make([]map[string]any, 0, len(raw))
@@ -1044,7 +885,7 @@ type catalogueOption struct {
 // if present and non-empty, writes the filtered response and returns ok=true.
 // A nil/empty catalogue returns ok=false so the caller falls through to REST.
 func (h *glpiHandlers) serveDropdownFromCatalogue(w http.ResponseWriter, r *http.Request, itemtype, query string) ([]map[string]any, bool) {
-	cat, err := models.GetGlpiDropdownCatalogue(h.db.SQL, itemtype)
+	cat, err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Get(r.Context(), itemtype)
 	if err != nil || cat == nil || len(cat.Options) == 0 {
 		return nil, false
 	}
@@ -1142,12 +983,12 @@ func (h *glpiHandlers) handleSearchUsers(w http.ResponseWriter, r *http.Request)
 	defer cancel()
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	raw, err := client.SearchUsers(ctx, session, query, 0, 49)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "search failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "search failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	out := make([]map[string]any, 0, len(raw))
@@ -1176,7 +1017,7 @@ func (h *glpiHandlers) handleSearchUsers(w http.ResponseWriter, r *http.Request)
 // writes the response and returns true. The shape maps {name → display,
 // completename → login} so callers can swap seamlessly between sources.
 func (h *glpiHandlers) serveUsersFromCatalogue(w http.ResponseWriter, query string) bool {
-	cat, err := models.GetGlpiDropdownCatalogue(h.db.SQL, "User")
+	cat, err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).Get(context.Background(), "User")
 	if err != nil || cat == nil || len(cat.Options) == 0 {
 		return false
 	}
@@ -1230,13 +1071,13 @@ func (h *glpiHandlers) handleSearchFormcreatorTags(w http.ResponseWriter, r *htt
 	defer cancel()
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	raw, err := client.ListFormcreatorTags(ctx, session, query, 0, 99)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "search failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "search failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	out := make([]map[string]any, 0, len(raw))
@@ -1290,14 +1131,14 @@ func (h *glpiHandlers) handleUploadFormDocument(w http.ResponseWriter, r *http.R
 	defer cancel()
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
 	mimeType := header.Header.Get("Content-Type")
 	docID, err := client.UploadDocumentMultipart(ctx, session, header.Filename, mimeType, file)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "upload failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "upload failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	jsonCreated(w, map[string]any{
@@ -1338,13 +1179,13 @@ func (h *glpiHandlers) handleGetGlpiDocument(w http.ResponseWriter, r *http.Requ
 
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
 	upstream, err := client.GetDocumentBinary(ctx, session, docID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "fetch failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "fetch failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	defer upstream.Body.Close()
@@ -1374,7 +1215,7 @@ func (h *glpiHandlers) handleListProjectTickets(w http.ResponseWriter, r *http.R
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil || project == nil {
 		jsonError(w, http.StatusNotFound, "project not found")
 		return
@@ -1396,37 +1237,24 @@ func (h *glpiHandlers) handleListProjectTickets(w http.ResponseWriter, r *http.R
 	defer cancel()
 	session, err := h.sessionFor(ctx, client, *project.GlpiTokenID)
 	if err != nil {
-		env.Warning = mapGlpiError(err)
+		env.Warning = glpiclient.FriendlyError(err)
 		jsonOK(w, env)
 		return
 	}
 
-	// Build search criteria. Scope by entity (GLPI field 80) if the project set one.
-	// Always exclude closed tickets (status field id 12 != 6).
-	criteria := []map[string]string{
-		{"field": "12", "searchtype": "notequals", "value": "6", "link": "AND"},
-	}
-	if project.GlpiEntityID > 0 {
-		criteria = append(criteria, map[string]string{
-			"field": "80", "searchtype": "equals", "value": strconv.Itoa(project.GlpiEntityID), "link": "AND",
-		})
-	}
-	if project.GlpiCategoryID > 0 {
-		criteria = append(criteria, map[string]string{
-			"field": "7", "searchtype": "equals", "value": strconv.Itoa(project.GlpiCategoryID), "link": "AND",
-		})
-	}
-
-	tickets, err := client.SearchTickets(ctx, session, criteria, 0, 49)
+	// Scope by entity/category (excluding closed) — see glpi.TicketScope.
+	tickets, err := client.ListScopedTickets(ctx, session, glpiclient.TicketScope{
+		EntityID: project.GlpiEntityID, CategoryID: project.GlpiCategoryID, RangeStart: 0, RangeEnd: 49,
+	})
 	if err != nil {
-		env.Warning = mapGlpiError(err)
+		env.Warning = glpiclient.FriendlyError(err)
 		jsonOK(w, env)
 		return
 	}
 
 	out := make([]map[string]any, 0, len(tickets))
 	for _, t := range tickets {
-		out = append(out, enrichTicket(client, &t))
+		out = append(out, client.TicketView(&t))
 	}
 	env.Tickets = out
 	jsonOK(w, env)
@@ -1459,7 +1287,7 @@ func (h *glpiHandlers) handleListProfileTickets(w http.ResponseWriter, r *http.R
 
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
@@ -1472,21 +1300,16 @@ func (h *glpiHandlers) handleListProfileTickets(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	criteria := []map[string]string{}
-	if !includeClosed {
-		criteria = append(criteria, map[string]string{
-			"field": "12", "searchtype": "notequals", "value": "6", "link": "AND",
-		})
-	}
-
-	tickets, err := client.SearchTickets(ctx, session, criteria, start, end)
+	tickets, err := client.ListScopedTickets(ctx, session, glpiclient.TicketScope{
+		IncludeClosed: includeClosed, RangeStart: start, RangeEnd: end,
+	})
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "search failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "search failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 	out := make([]map[string]any, 0, len(tickets))
 	for _, t := range tickets {
-		out = append(out, enrichTicket(client, &t))
+		out = append(out, client.TicketView(&t))
 	}
 	jsonOK(w, map[string]any{
 		"tickets": out,
@@ -1520,7 +1343,7 @@ func parseRange(s string) (int, int, bool) {
 // chamado block on the host detail page.
 func (h *glpiHandlers) handleListHostTickets(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -1547,13 +1370,13 @@ func (h *glpiHandlers) handleListHostTickets(w http.ResponseWriter, r *http.Requ
 	defer cancel()
 	session, err := h.sessionFor(ctx, client, profileID)
 	if err != nil {
-		jsonError(w, http.StatusBadGateway, "auth failed: "+mapGlpiError(err))
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
 		return
 	}
 
 	computer, err := client.FindComputerByName(ctx, session, host.OficialSlug)
 	if err != nil {
-		jsonOK(w, map[string]any{"tickets": []any{}, "warning": mapGlpiError(err)})
+		jsonOK(w, map[string]any{"tickets": []any{}, "warning": glpiclient.FriendlyError(err)})
 		return
 	}
 	if computer == nil {
@@ -1565,7 +1388,7 @@ func (h *glpiHandlers) handleListHostTickets(w http.ResponseWriter, r *http.Requ
 	var tickets []glpiclient.Ticket
 	rel := fmt.Sprintf("/Computer/%d/Ticket", computer.ID)
 	if err := client.Get(ctx, session, rel, &tickets); err != nil {
-		jsonOK(w, map[string]any{"tickets": []any{}, "computer": computer, "warning": mapGlpiError(err)})
+		jsonOK(w, map[string]any{"tickets": []any{}, "computer": computer, "warning": glpiclient.FriendlyError(err)})
 		return
 	}
 
@@ -1574,45 +1397,40 @@ func (h *glpiHandlers) handleListHostTickets(w http.ResponseWriter, r *http.Requ
 		if t.Status >= 6 {
 			continue
 		}
-		out = append(out, enrichTicket(client, &t))
+		out = append(out, client.TicketView(&t))
 	}
 	jsonOK(w, map[string]any{"tickets": out, "computer": computer})
 }
 
-// ─── Misc helpers ───────────────────────────────────────────────────────────
+// Ticket presentation (TicketView), the GLPI error mapper (FriendlyError), and
+// the scoped-search criteria (ListScopedTickets) moved to
+// internal/integrations/glpi (R4b — protocol logic lives with the client).
 
-func enrichTicket(client *glpiclient.Client, t *glpiclient.Ticket) map[string]any {
-	return map[string]any{
-		"id":           t.ID,
-		"name":         t.Name,
-		"content":      t.Content,
-		"status":       t.Status,
-		"status_label": glpiclient.StatusLabel(t.Status),
-		"status_slug":  glpiclient.StatusSlug(t.Status),
-		"priority":     t.Priority,
-		"entities_id":  t.EntitiesID,
-		"date":         t.Date,
-		"date_mod":     t.DateMod,
-		"url":          fmt.Sprintf("%s/front/ticket.form.php?id=%d", client.WebBaseURL(), t.ID),
-	}
+// registerRoutes binds the GLPI integration: admin token/dropdown management,
+// ticket + form operations, and the project/host-scoped ticket listings.
+func (h *glpiHandlers) registerRoutes(rr routeRegistrar) {
+	rr.role("admin", "GET /api/settings/integrations/glpi/tokens", h.handleListTokenProfiles)
+	rr.role("admin", "POST /api/settings/integrations/glpi/tokens", h.handleCreateTokenProfile)
+	rr.role("admin", "PUT /api/settings/integrations/glpi/tokens/{id}", h.handleUpdateTokenProfile)
+	rr.role("admin", "DELETE /api/settings/integrations/glpi/tokens/{id}", h.handleDeleteTokenProfile)
+	rr.role("admin", "POST /api/settings/integrations/glpi/tokens/{id}/test", h.handleTestTokenProfile)
+	rr.role("admin", "GET /api/settings/integrations/glpi/dropdowns", h.handleListDropdownCatalogues)
+	rr.role("admin", "GET /api/settings/integrations/glpi/dropdowns/{itemtype}", h.handleGetDropdownCatalogue)
+	rr.role("admin", "PUT /api/settings/integrations/glpi/dropdowns/{itemtype}", h.handleUpsertDropdownCatalogue)
+	rr.role("admin", "DELETE /api/settings/integrations/glpi/dropdowns/{itemtype}", h.handleDeleteDropdownCatalogue)
+	rr.role("editor", "POST /api/glpi/tickets", h.handleCreateTicket)
+	rr.auth("GET /api/glpi/tickets/{id}", h.handleGetTicket)
+	rr.auth("GET /api/glpi/tickets/{id}/details", h.handleGetTicketDetails)
+	rr.auth("GET /api/glpi/documents/{id}", h.handleGetGlpiDocument)
+	rr.auth("GET /api/glpi/forms", h.handleListForms)
+	rr.auth("GET /api/glpi/forms/{id}", h.handleGetFormBundle)
+	rr.role("editor", "POST /api/glpi/forms/{id}/submit", h.handleSubmitForm)
+	rr.role("editor", "POST /api/glpi/forms/uploads", h.handleUploadFormDocument)
+	rr.auth("GET /api/glpi/dropdowns/{itemtype}/search", h.handleSearchDropdown)
+	rr.auth("GET /api/glpi/users/search", h.handleSearchUsers)
+	rr.auth("GET /api/glpi/formcreator/tags/search", h.handleSearchFormcreatorTags)
+	rr.auth("GET /api/projects/{id}/glpi/tickets", h.handleListProjectTickets)
+	rr.auth("GET /api/glpi/profiles/{id}/tickets", h.handleListProfileTickets)
+	rr.auth("GET /api/hosts/{slug}/glpi/tickets", h.handleListHostTickets)
+	rr.role("editor", "POST /api/hosts/{slug}/chamados/{chamadoId}/glpi/refresh", h.handleRefreshChamadoCache)
 }
-
-func mapGlpiError(err error) string {
-	msg := err.Error()
-	switch {
-	case strings.Contains(msg, "401"):
-		return "Authentication failed — check App-Token and user token"
-	case strings.Contains(msg, "403"):
-		// 403 means the session is valid but the active profile lacks read
-		// rights on this GLPI itemtype. Point users at the real cause.
-		return "Permission denied — this GLPI profile can't read this resource"
-	case strings.Contains(msg, "404"):
-		return "Endpoint not found — check Base URL (should end in /apirest.php)"
-	case strings.Contains(msg, "no such host"), strings.Contains(msg, "connection refused"):
-		return "Host unreachable — check Base URL"
-	case strings.Contains(msg, "context deadline exceeded"):
-		return "Timed out — GLPI took too long"
-	}
-	return msg
-}
-

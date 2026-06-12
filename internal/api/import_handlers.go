@@ -10,6 +10,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -69,7 +70,7 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 		}
 
 		// Check slug uniqueness
-		exists, _ := models.HostSlugExists(h.db.SQL, item.OficialSlug, 0)
+		exists, _ := store.NewHostRepo(h.db.SQL).SlugExists(r.Context(), item.OficialSlug, 0)
 		if exists {
 			result.Skipped++
 			result.Errors = append(result.Errors, importItemResult{Index: i, Name: name, Error: "slug already exists (skipped)"})
@@ -91,7 +92,7 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 		item.Host.PreferredAuth = preferredAuth
 
 		// Create host
-		if err := models.CreateHost(h.db.SQL, &item.Host); err != nil {
+		if err := store.NewHostRepo(h.db.SQL).Create(r.Context(), &item.Host); err != nil {
 			result.Failed++
 			result.Errors = append(result.Errors, importItemResult{Index: i, Name: name, Error: fmt.Sprintf("create failed: %v", err)})
 			continue
@@ -109,7 +110,7 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 
 		// Set tags
 		if len(item.Tags) > 0 {
-			models.SetTags(h.db.SQL, "host", item.Host.ID, item.Tags)
+			store.NewTagRepo(h.db.SQL).Set(r.Context(), "host", item.Host.ID, item.Tags)
 		}
 
 		result.Created++
@@ -149,17 +150,17 @@ func (h *importHandlers) handleImportDNS(w http.ResponseWriter, r *http.Request)
 		}
 
 		// Try to create — unique constraint on domain will reject duplicates
-		if err := models.CreateDNSRecord(h.db.SQL, &item.DNSRecord); err != nil {
+		if err := store.NewDNSRepo(h.db.SQL).Create(r.Context(), &item.DNSRecord); err != nil {
 			result.Skipped++
 			result.Errors = append(result.Errors, importItemResult{Index: i, Name: name, Error: "domain already exists (skipped)"})
 			continue
 		}
 
 		if len(item.Tags) > 0 {
-			models.SetTags(h.db.SQL, "dns", item.DNSRecord.ID, item.Tags)
+			store.NewTagRepo(h.db.SQL).Set(r.Context(), "dns", item.DNSRecord.ID, item.Tags)
 		}
 		if len(item.HostIDs) > 0 {
-			models.SetDNSHostLinks(h.db.SQL, item.DNSRecord.ID, item.HostIDs)
+			store.NewDNSRepo(h.db.SQL).SetHostLinks(r.Context(), item.DNSRecord.ID, item.HostIDs)
 		}
 
 		result.Created++
@@ -198,4 +199,11 @@ func (h *importHandlers) handleImport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonError(w, http.StatusBadRequest, "expected JSON object with 'type' ('hosts' or 'dns') and 'data' (array) fields")
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *importHandlers) registerRoutes(rr routeRegistrar) {
+	rr.role("admin", "POST /api/import", h.handleImport)
+	rr.role("admin", "POST /api/import/hosts", h.handleImportHosts)
+	rr.role("admin", "POST /api/import/dns", h.handleImportDNS)
 }

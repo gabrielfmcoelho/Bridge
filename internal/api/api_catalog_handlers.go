@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/apicatalog"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // apiCatalogHandlers serves the Atlas REST API catalog surface
@@ -62,14 +63,6 @@ func (h *apiCatalogHandlers) register(mux *http.ServeMux, wrap func(role string,
 	mux.Handle("DELETE /api/api-catalog/{id}", wrap("admin", http.HandlerFunc(h.handleDelete)))
 }
 
-func (h *apiCatalogHandlers) ownerID(r *http.Request) (int64, bool) {
-	u := auth.UserFromContext(r.Context())
-	if u == nil {
-		return 0, false
-	}
-	return u.ID, true
-}
-
 // --- list / search ----------------------------------------------------------
 
 func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +75,7 @@ func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) 
 			f.ParentID = &pid
 		}
 	}
-	list, err := models.ListAPICatalog(h.db.SQL, f)
+	list, err := store.NewAPICatalogRepo(h.db.SQL).List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "list api catalog", err)
 		return
@@ -90,7 +83,7 @@ func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) 
 	if list == nil {
 		list = []models.APICatalog{}
 	}
-	jsonOK(w, list)
+	jsonPaged(w, r, list)
 }
 
 func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +93,7 @@ func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *ht
 			parentID = &pid
 		}
 	}
-	hits, err := models.SearchOperations(h.db.SQL, r.URL.Query().Get("q"), r.URL.Query().Get("scope"), parentID)
+	hits, err := store.NewAPICatalogRepo(h.db.SQL).SearchOperations(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("scope"), parentID)
 	if err != nil {
 		jsonServerError(w, r, "search operations", err)
 		return
@@ -108,7 +101,7 @@ func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *ht
 	if hits == nil {
 		hits = []models.OperationSearchResult{}
 	}
-	jsonOK(w, hits)
+	jsonPaged(w, r, hits)
 }
 
 // --- get --------------------------------------------------------------------
@@ -119,7 +112,7 @@ func (h *apiCatalogHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	a, err := models.GetAPICatalog(h.db.SQL, id)
+	a, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "get api catalog", err)
 		return
@@ -138,7 +131,7 @@ func (h *apiCatalogHandlers) handleGetSpec(w http.ResponseWriter, r *http.Reques
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	spec, err := models.GetAPICatalogSpec(h.db.SQL, id)
+	spec, err := store.NewAPICatalogRepo(h.db.SQL).GetSpec(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "get api spec", err)
 		return
@@ -171,7 +164,7 @@ func (h *apiCatalogHandlers) handleFilterSpec(w http.ResponseWriter, r *http.Req
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
-	spec, err := models.GetAPICatalogSpec(h.db.SQL, id)
+	spec, err := store.NewAPICatalogRepo(h.db.SQL).GetSpec(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "get api spec", err)
 		return
@@ -193,11 +186,12 @@ func (h *apiCatalogHandlers) handleFilterSpec(w http.ResponseWriter, r *http.Req
 // --- import -----------------------------------------------------------------
 
 func (h *apiCatalogHandlers) handleImportUpload(w http.ResponseWriter, r *http.Request) {
-	owner, ok := h.ownerID(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
+	owner := actor.UserID
 	r.Body = http.MaxBytesReader(w, r.Body, apicatalog.MaxSpecBytes+1<<20)
 	if err := r.ParseMultipartForm(apicatalog.MaxSpecBytes + 1<<20); err != nil {
 		jsonBadRequest(w, r, "spec file too large or malformed form", err)
@@ -234,18 +228,17 @@ type importURLRequest struct {
 }
 
 func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Request) {
-	owner, ok := h.ownerID(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
+	owner := actor.UserID
 	var req importURLRequest
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
+	if !decodeBody(w, r, &req) {
 		return
 	}
-	if strings.TrimSpace(req.SourceURL) == "" {
-		jsonError(w, http.StatusBadRequest, "source_url is required")
+	if !requireFields(w, map[string]string{"source_url": req.SourceURL}) {
 		return
 	}
 	raw, err := apicatalog.FetchSpec(r.Context(), req.SourceURL, h.allowPrivateFetch)
@@ -287,11 +280,11 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
-	if err := models.UpdateAPICatalogMeta(h.db.SQL, id, req.Name, req.Description, strings.TrimSpace(req.BaseURL), strings.TrimSpace(req.DocsURL)); err != nil {
+	if err := store.NewAPICatalogRepo(h.db.SQL).UpdateMeta(r.Context(), id, req.Name, req.Description, strings.TrimSpace(req.BaseURL), strings.TrimSpace(req.DocsURL)); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
-	a, err := models.GetAPICatalog(h.db.SQL, id)
+	a, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "reload api catalog", err)
 		return
@@ -311,7 +304,7 @@ func (h *apiCatalogHandlers) handleRefetch(w http.ResponseWriter, r *http.Reques
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	a, err := models.GetAPICatalog(h.db.SQL, id)
+	a, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "get api catalog", err)
 		return
@@ -334,12 +327,12 @@ func (h *apiCatalogHandlers) handleRefetch(w http.ResponseWriter, r *http.Reques
 		jsonBadRequest(w, r, "could not parse spec: "+err.Error(), err)
 		return
 	}
-	if err := models.UpdateAPICatalogSpec(h.db.SQL, id, string(ps.SpecJSON), ps.SpecHash, ps.SpecVersion,
+	if err := store.NewAPICatalogRepo(h.db.SQL).UpdateSpec(r.Context(), id, string(ps.SpecJSON), ps.SpecHash, ps.SpecVersion,
 		ps.Title, ps.VersionLabel, ps.ExternalURL, toModelOps(ps.Operations)); err != nil {
 		jsonServerError(w, r, "update api spec", err)
 		return
 	}
-	reloaded, err := models.GetAPICatalog(h.db.SQL, id)
+	reloaded, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "reload api catalog", err)
 		return
@@ -353,7 +346,7 @@ func (h *apiCatalogHandlers) handleDelete(w http.ResponseWriter, r *http.Request
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	if err := models.SoftDeleteAPICatalog(h.db.SQL, id); err != nil {
+	if err := store.NewAPICatalogRepo(h.db.SQL).SoftDelete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "delete api catalog", err)
 		return
 	}
@@ -397,7 +390,7 @@ func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL str
 // createFromSpec parses raw, validates the parent (for projeto scope), and
 // persists the catalog + operation index.
 func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Request, raw []byte, meta catalogMeta, owner int64) {
-	if err := h.validateParent(meta.Scope, meta.ParentID); err != nil {
+	if err := h.validateParent(r.Context(), meta.Scope, meta.ParentID); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
@@ -432,11 +425,11 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 		OwnerUserID:  owner,
 		CreatedBy:    owner,
 	}
-	if err := models.CreateAPICatalog(h.db.SQL, a, toModelOps(ps.Operations)); err != nil {
+	if err := store.NewAPICatalogRepo(h.db.SQL).Create(r.Context(), a, toModelOps(ps.Operations)); err != nil {
 		jsonBadRequest(w, r, "could not save api: "+err.Error(), err)
 		return
 	}
-	reloaded, err := models.GetAPICatalog(h.db.SQL, a.ID)
+	reloaded, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), a.ID)
 	if err != nil {
 		jsonServerError(w, r, "reload api catalog", err)
 		return
@@ -444,14 +437,14 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 	jsonCreated(w, reloaded)
 }
 
-func (h *apiCatalogHandlers) validateParent(scope string, parentID *int64) error {
+func (h *apiCatalogHandlers) validateParent(ctx context.Context, scope string, parentID *int64) error {
 	if scope != models.APICatalogScopeProjeto {
 		return nil
 	}
 	if parentID == nil {
 		return fmt.Errorf("parent_id is required for projeto scope")
 	}
-	p, err := models.GetProject(h.db.SQL, *parentID)
+	p, err := store.NewProjectRepo(h.db.SQL).Get(ctx, *parentID)
 	if err != nil {
 		return err
 	}

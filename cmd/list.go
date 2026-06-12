@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +25,7 @@ var listCmd = &cobra.Command{
 		}
 		defer db.Close()
 
-		hosts, err := models.ListHosts(db.SQL, models.HostFilter{})
+		hosts, err := store.NewHostRepo(db.SQL).List(context.Background(), models.HostFilter{})
 		if err != nil {
 			return fmt.Errorf("listing hosts: %w", err)
 		}
@@ -32,7 +34,7 @@ var listCmd = &cobra.Command{
 			return nil
 		}
 
-		tagMap, _ := models.GetAllTags(db.SQL, "host")
+		tagMap, _ := store.NewTagRepo(db.SQL).GetAll(context.Background(), "host")
 
 		printTable(hosts, tagMap)
 		return nil

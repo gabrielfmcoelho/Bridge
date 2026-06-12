@@ -4,14 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/go-ldap/ldap/v3"
 )
 
@@ -28,11 +27,11 @@ func NewLDAPProvider(db *sql.DB, enc *database.Encryptor) *LDAPProvider {
 	return &LDAPProvider{db: db, enc: enc}
 }
 
-func (p *LDAPProvider) Name() string             { return "ldap" }
+func (p *LDAPProvider) Name() string              { return "ldap" }
 func (p *LDAPProvider) SupportsDirectLogin() bool { return true }
 
 func (p *LDAPProvider) Enabled() bool {
-	return models.GetAppSettingValue(p.db, "auth_active_provider") == "ldap"
+	return store.NewAppSettingsRepo(p.db).Value(context.Background(), "auth_active_provider") == "ldap"
 }
 
 func (p *LDAPProvider) DisplayInfo() auth.ProviderDisplayInfo {
@@ -53,21 +52,21 @@ func (p *LDAPProvider) ExchangeCode(_ context.Context, _, _ string) (*auth.Exter
 
 // ldapConfig holds the resolved LDAP configuration values.
 type ldapConfig struct {
-	Host             string
-	Port             string
-	UseTLS           bool
-	SkipVerify       bool
-	BaseDN           string
-	BindDN           string
-	BindPassword     string
-	UserFilter       string
-	UsernameAttr     string
-	DisplayNameAttr  string
-	EmailAttr        string
+	Host            string
+	Port            string
+	UseTLS          bool
+	SkipVerify      bool
+	BaseDN          string
+	BindDN          string
+	BindPassword    string
+	UserFilter      string
+	UsernameAttr    string
+	DisplayNameAttr string
+	EmailAttr       string
 }
 
 func (p *LDAPProvider) loadConfig() (*ldapConfig, error) {
-	get := func(key string) string { return models.GetAppSettingValue(p.db, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(p.db).Value(context.Background(), key) }
 
 	bindPassword, err := p.decryptSetting("auth_ldap_bind_password")
 	if err != nil {
@@ -110,22 +109,10 @@ func (p *LDAPProvider) loadConfig() (*ldapConfig, error) {
 	return cfg, nil
 }
 
-// decryptSetting decrypts a setting stored as hex-encoded _cipher/_nonce pair in app_settings.
+// decryptSetting decrypts an integration secret stored in app_secrets.
 func (p *LDAPProvider) decryptSetting(prefix string) (string, error) {
-	cipherHex := models.GetAppSettingValue(p.db, prefix+"_cipher")
-	nonceHex := models.GetAppSettingValue(p.db, prefix+"_nonce")
-	if cipherHex == "" || nonceHex == "" {
-		return "", nil // not configured
-	}
-	cipher, err := hex.DecodeString(cipherHex)
-	if err != nil {
-		return "", fmt.Errorf("decode cipher hex: %w", err)
-	}
-	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil {
-		return "", fmt.Errorf("decode nonce hex: %w", err)
-	}
-	return p.enc.Decrypt(cipher, nonce)
+	v, _, err := store.NewAppSecretRepo(p.db).Reveal(context.Background(), p.enc, prefix)
+	return v, err
 }
 
 func (p *LDAPProvider) Authenticate(_ context.Context, username, password string) (*auth.ExternalIdentity, error) {

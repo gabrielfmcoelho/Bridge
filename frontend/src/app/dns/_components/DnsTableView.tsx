@@ -1,46 +1,50 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
-import SortableTable, { sortRows } from "@/components/ui/SortableTable";
+import SortableTable from "@/components/ui/SortableTable";
 import Pagination from "@/components/ui/Pagination";
 import type { DNSRecord } from "@/lib/types";
 
-const ROWS_PER_PAGE = 20;
+// Server-driven table (inventory pagination). `records` is ONE server page
+// (filtered+sorted+limited by the parent's paginated query), `total` is the full
+// match count for the pager, and column-header clicks drive the page-level sort
+// via onSortChange (→ server refetch). https/tags aren't server-sortable.
+const PER_PAGE = 20;
+type Sort = { field: string; direction: "asc" | "desc" };
+type ColKey = "domain" | "https" | "situacao" | "responsavel" | "tags";
 
 interface DnsTableViewProps {
   records: DNSRecord[];
+  total: number;
+  tablePage: number;
+  onPageChange: (page: number) => void;
+  sort: Sort;
+  onSortChange: (s: Sort) => void;
   t: (key: string) => string;
 }
 
-export default function DnsTableView({ records, t }: DnsTableViewProps) {
+export default function DnsTableView({ records, total, tablePage, onPageChange, sort, onSortChange, t }: DnsTableViewProps) {
   const router = useRouter();
-  const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(records.length / ROWS_PER_PAGE));
-
   return (
     <div className="space-y-3 animate-fade-in">
       <SortableTable
         columns={[
-          { key: "domain" as const, label: t("dns.domain") },
-          { key: "https" as const, label: "HTTPS" },
-          { key: "situacao" as const, label: t("common.status") },
-          { key: "responsavel" as const, label: t("dns.responsavel") },
-          { key: "tags" as const, label: t("common.tags") },
+          { key: "domain" as ColKey, label: t("dns.domain") },
+          { key: "https" as ColKey, label: "HTTPS", sortable: false },
+          { key: "situacao" as ColKey, label: t("common.status") },
+          { key: "responsavel" as ColKey, label: t("dns.responsavel") },
+          { key: "tags" as ColKey, label: t("common.tags"), sortable: false },
         ]}
-        defaultSort="domain"
+        sortKey={sort.field as ColKey}
+        sortDir={sort.direction}
+        onSortChange={(key, dir) => {
+          if (key === "https" || key === "tags") return; // not server-sortable
+          onSortChange({ field: key, direction: dir });
+        }}
       >
-        {(sk, sd) => {
-          const sorted = sortRows(records, sk, sd, {
-            domain: (a, b) => a.domain.localeCompare(b.domain),
-            https: (a, b) => Number(b.has_https) - Number(a.has_https),
-            situacao: (a, b) => a.situacao.localeCompare(b.situacao),
-            responsavel: (a, b) => (a.main_responsavel_name || a.responsavel || "").localeCompare(b.main_responsavel_name || b.responsavel || ""),
-            tags: (a, b) => (a.tags?.length || 0) - (b.tags?.length || 0),
-          });
-          const paged = sorted.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
-          return paged.map((dns, i) => (
+        {() =>
+          records.map((dns, i) => (
             <tr
               key={dns.id}
               className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
@@ -65,13 +69,10 @@ export default function DnsTableView({ records, t }: DnsTableViewProps) {
                 </div>
               </td>
             </tr>
-          ));
-        }}
+          ))
+        }
       </SortableTable>
-
-      {totalPages > 1 && (
-        <Pagination page={page} totalPages={totalPages} total={records.length} perPage={ROWS_PER_PAGE} onChange={setPage} />
-      )}
+      <Pagination page={tablePage} totalPages={Math.max(1, Math.ceil(total / PER_PAGE))} total={total} perPage={PER_PAGE} onChange={onPageChange} />
     </div>
   );
 }

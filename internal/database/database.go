@@ -13,7 +13,6 @@ import (
 	"time"
 
 	gossh "golang.org/x/crypto/ssh"
-	_ "modernc.org/sqlite"
 )
 
 // DB wraps a SQL database connection and an Encryptor for sensitive data.
@@ -24,9 +23,9 @@ type DB struct {
 	configDir string
 }
 
-// Open initialises the database and runs migrations. Backend selection is
-// controlled by SSHCM_DB_DRIVER ("sqlite" default, or "postgres"). For the
-// postgres driver, SSHCM_DB_DSN must be set to a pgx-compatible DSN.
+// Open initialises the database and runs migrations. The app is Postgres-only:
+// SSHCM_DB_DSN must be set to a pgx-compatible DSN (SSHCM_DB_DRIVER is accepted
+// for back-compat but only postgres is valid). configDir holds secret.key.
 func Open(configDir string) (*DB, error) {
 	if err := os.MkdirAll(configDir, 0700); err != nil {
 		return nil, fmt.Errorf("database: create dir: %w", err)
@@ -37,44 +36,23 @@ func Open(configDir string) (*DB, error) {
 		return nil, fmt.Errorf("database: encryptor: %w", err)
 	}
 
-	cfg := resolveDriverConfig(configDir)
-	active = cfg.kind
-
-	var db *sql.DB
-	switch cfg.kind {
-	case DialectPostgres:
-		if cfg.dsn == "" {
-			return nil, fmt.Errorf("database: SSHCM_DB_DSN is required when SSHCM_DB_DRIVER=postgres")
-		}
-		registerPgxRebindDriver()
-		db, err = sql.Open(pgxRebindDriverName, cfg.dsn)
-		if err != nil {
-			return nil, fmt.Errorf("database: open postgres: %w", err)
-		}
-		// Pool tuning. Postgres benefits from a bounded pool; sqlite is
-		// effectively serial so we leave it at Go's defaults. Values are
-		// env-overridable for deployments with unusual workloads.
-		db.SetMaxOpenConns(envInt("SSHCM_DB_MAX_OPEN", 20))
-		db.SetMaxIdleConns(envInt("SSHCM_DB_MAX_IDLE", 5))
-		db.SetConnMaxLifetime(time.Duration(envInt("SSHCM_DB_MAX_LIFETIME_SEC", 1800)) * time.Second)
-		db.SetConnMaxIdleTime(time.Duration(envInt("SSHCM_DB_MAX_IDLE_SEC", 300)) * time.Second)
-	default:
-		db, err = sql.Open(cfg.driver, cfg.dsn)
-		if err != nil {
-			return nil, fmt.Errorf("database: open sqlite: %w", err)
-		}
-		// SQLite-only PRAGMAs for WAL concurrency and FK enforcement.
-		if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("database: wal mode: %w", err)
-		}
-		if _, err := db.Exec(`PRAGMA foreign_keys=ON`); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("database: foreign keys: %w", err)
-		}
+	cfg := resolveDriverConfig()
+	if cfg.dsn == "" {
+		return nil, fmt.Errorf("database: SSHCM_DB_DSN is required (Postgres-only — set a pgx-compatible DSN; SQLite is no longer supported)")
 	}
 
-	d := &DB{SQL: db, Encryptor: enc, Dialect: cfg.kind, configDir: configDir}
+	registerPgxRebindDriver()
+	db, err := sql.Open(pgxRebindDriverName, cfg.dsn)
+	if err != nil {
+		return nil, fmt.Errorf("database: open postgres: %w", err)
+	}
+	// Bounded pool; values are env-overridable for unusual workloads.
+	db.SetMaxOpenConns(envInt("SSHCM_DB_MAX_OPEN", 20))
+	db.SetMaxIdleConns(envInt("SSHCM_DB_MAX_IDLE", 5))
+	db.SetConnMaxLifetime(time.Duration(envInt("SSHCM_DB_MAX_LIFETIME_SEC", 1800)) * time.Second)
+	db.SetConnMaxIdleTime(time.Duration(envInt("SSHCM_DB_MAX_IDLE_SEC", 300)) * time.Second)
+
+	d := &DB{SQL: db, Encryptor: enc, Dialect: DialectPostgres, configDir: configDir}
 	if err := d.runMigrations(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("database: migrations: %w", err)
@@ -95,6 +73,47 @@ func Open(configDir string) (*DB, error) {
 	// Recompute SSH key fingerprints that used the old hex format.
 	d.fixSSHKeyFingerprints()
 
+	return d, nil
+}
+
+// OpenDSN opens a Postgres database at an explicit pgx DSN, bypassing the
+// SSHCM_DB_DRIVER/SSHCM_DB_DSN env vars. The test harness (internal/dbtest) uses
+// it to target an isolated per-test schema without mutating process-global env
+// (which isn't parallel-safe). configDir holds secret.key. Runs migrations +
+// the same startup guards as Open.
+func OpenDSN(dsn, configDir string) (*DB, error) {
+	if dsn == "" {
+		return nil, fmt.Errorf("database: OpenDSN requires a non-empty DSN")
+	}
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return nil, fmt.Errorf("database: create dir: %w", err)
+	}
+	enc, err := NewEncryptor(filepath.Join(configDir, "secret.key"))
+	if err != nil {
+		return nil, fmt.Errorf("database: encryptor: %w", err)
+	}
+	registerPgxRebindDriver()
+	db, err := sql.Open(pgxRebindDriverName, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("database: open postgres: %w", err)
+	}
+	db.SetMaxOpenConns(envInt("SSHCM_DB_MAX_OPEN", 20))
+	db.SetMaxIdleConns(envInt("SSHCM_DB_MAX_IDLE", 5))
+
+	d := &DB{SQL: db, Encryptor: enc, Dialect: DialectPostgres, configDir: configDir}
+	if err := d.runMigrations(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("database: migrations: %w", err)
+	}
+	if err := d.maybeDropLegacySecrets(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("database: legacy purge: %w", err)
+	}
+	if err := d.guardAgainstLostKey(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	d.fixSSHKeyFingerprints()
 	return d, nil
 }
 
@@ -153,8 +172,7 @@ func (d *DB) guardAgainstLostKey() error {
 
 	var count int
 	err := d.SQL.QueryRow(`
-		SELECT COUNT(*) FROM app_settings
-		WHERE key LIKE '%_cipher' AND value IS NOT NULL AND value <> ''
+		SELECT COUNT(*) FROM app_secrets WHERE cipher IS NOT NULL AND cipher <> ''
 	`).Scan(&count)
 	if err != nil {
 		// If the check itself fails we'd rather start than refuse — the worst
@@ -174,53 +192,42 @@ func (d *DB) guardAgainstLostKey() error {
 	)
 }
 
-// purgeUndecryptableSettings tries to decrypt every encrypted row in
-// app_settings with the active key. Rows that fail (wrong key, corrupt data)
-// are deleted together with their paired _nonce row. The action is logged so
-// operators can audit what was wiped.
+// purgeUndecryptableSettings tries to decrypt every secret in app_secrets with
+// the active key. Rows that fail (wrong key, corrupt data) are deleted. The
+// action is logged so operators can audit what was wiped.
 func (d *DB) purgeUndecryptableSettings() error {
-	rows, err := d.SQL.Query(`
-		SELECT key, value FROM app_settings
-		WHERE key LIKE '%_cipher' AND value IS NOT NULL AND value <> ''
-	`)
+	rows, err := d.SQL.Query(`SELECT key, cipher, nonce FROM app_secrets WHERE cipher <> ''`)
 	if err != nil {
 		return fmt.Errorf("purge encrypted settings: query: %w", err)
 	}
 
-	type entry struct{ key, value string }
-	var ciphers []entry
+	type entry struct{ key, cipher, nonce string }
+	var secrets []entry
 	for rows.Next() {
 		var e entry
-		if err := rows.Scan(&e.key, &e.value); err != nil {
+		if err := rows.Scan(&e.key, &e.cipher, &e.nonce); err != nil {
 			rows.Close()
 			return fmt.Errorf("purge encrypted settings: scan: %w", err)
 		}
-		ciphers = append(ciphers, e)
+		secrets = append(secrets, e)
 	}
 	rows.Close()
 
 	var doomed []string
-	for _, c := range ciphers {
-		nonceKey := strings.TrimSuffix(c.key, "_cipher") + "_nonce"
-		var nonceHex string
-		if err := d.SQL.QueryRow(`SELECT value FROM app_settings WHERE key = ?`, nonceKey).Scan(&nonceHex); err != nil {
-			// Cipher without a nonce is already broken — purge it.
-			doomed = append(doomed, c.key, nonceKey)
-			continue
-		}
-		cipherBytes, errC := hex.DecodeString(c.value)
-		nonceBytes, errN := hex.DecodeString(nonceHex)
+	for _, s := range secrets {
+		cipherBytes, errC := hex.DecodeString(s.cipher)
+		nonceBytes, errN := hex.DecodeString(s.nonce)
 		if errC != nil || errN != nil {
-			doomed = append(doomed, c.key, nonceKey)
+			doomed = append(doomed, s.key)
 			continue
 		}
 		if _, err := d.Encryptor.Decrypt(cipherBytes, nonceBytes); err != nil {
-			doomed = append(doomed, c.key, nonceKey)
+			doomed = append(doomed, s.key)
 		}
 	}
 
 	if len(doomed) == 0 {
-		log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: every encrypted setting decrypted cleanly, nothing to purge")
+		log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: every encrypted secret decrypted cleanly, nothing to purge")
 		return nil
 	}
 
@@ -229,7 +236,7 @@ func (d *DB) purgeUndecryptableSettings() error {
 		return fmt.Errorf("purge encrypted settings: begin: %w", err)
 	}
 	for _, k := range doomed {
-		if _, err := tx.Exec(`DELETE FROM app_settings WHERE key = ?`, k); err != nil {
+		if _, err := tx.Exec(`DELETE FROM app_secrets WHERE key = ?`, k); err != nil {
 			tx.Rollback()
 			return fmt.Errorf("purge encrypted settings: delete %q: %w", k, err)
 		}
@@ -238,7 +245,7 @@ func (d *DB) purgeUndecryptableSettings() error {
 		return fmt.Errorf("purge encrypted settings: commit: %w", err)
 	}
 
-	log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: deleted %d undecryptable app_settings row(s): %v",
+	log.Printf("SSHCM_RESET_ENCRYPTED_SETTINGS=true: deleted %d undecryptable app_secrets row(s): %v",
 		len(doomed), doomed)
 	return nil
 }
@@ -312,21 +319,14 @@ func (d *DB) fixSSHKeyFingerprints() {
 func (d *DB) runMigrations() error {
 	ctx := context.Background()
 
-	migrations := migrationsSQLite
-	if d.Dialect == DialectPostgres {
-		migrations = migrationsPostgres
-	}
+	migrations := migrationsPostgres
 
-	// Use a single connection so PRAGMA settings persist across transactions.
 	conn, err := d.SQL.Conn(ctx)
 	if err != nil {
 		return fmt.Errorf("acquire connection: %w", err)
 	}
 	defer conn.Close()
 
-	// Create the migrations tracking table. Postgres and SQLite share the
-	// same DDL here; DATETIME is accepted by Postgres as an alias for
-	// TIMESTAMP, and INTEGER PRIMARY KEY is valid in both dialects.
 	trackingDDL := `CREATE TABLE IF NOT EXISTS schema_migrations (
 		version    INTEGER PRIMARY KEY,
 		applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -335,24 +335,10 @@ func (d *DB) runMigrations() error {
 		return fmt.Errorf("create migrations table: %w", err)
 	}
 
-	// Determine the current version.
 	var current int
 	err = conn.QueryRowContext(ctx, `SELECT COALESCE(MAX(version), -1) FROM schema_migrations`).Scan(&current)
 	if err != nil {
 		return fmt.Errorf("read migration version: %w", err)
-	}
-
-	// SQLite disables FK checks during schema changes (needed for the v38
-	// table-rebuild migration). Postgres doesn't need this.
-	if d.Dialect == DialectSQLite {
-		if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys=OFF`); err != nil {
-			return fmt.Errorf("disable fk: %w", err)
-		}
-	}
-
-	insertVersionSQL := `INSERT INTO schema_migrations (version) VALUES (?)`
-	if d.Dialect == DialectPostgres {
-		insertVersionSQL = `INSERT INTO schema_migrations (version) VALUES ($1)`
 	}
 
 	for i := current + 1; i < len(migrations); i++ {
@@ -360,35 +346,16 @@ func (d *DB) runMigrations() error {
 		if err != nil {
 			return fmt.Errorf("begin migration %d: %w", i, err)
 		}
-
 		if _, err := tx.Exec(migrations[i]); err != nil {
 			tx.Rollback()
-			if d.Dialect == DialectSQLite {
-				conn.ExecContext(ctx, `PRAGMA foreign_keys=ON`)
-			}
 			return fmt.Errorf("migration %d: %w", i, err)
 		}
-
-		if _, err := tx.Exec(insertVersionSQL, i); err != nil {
+		if _, err := tx.Exec(`INSERT INTO schema_migrations (version) VALUES ($1)`, i); err != nil {
 			tx.Rollback()
-			if d.Dialect == DialectSQLite {
-				conn.ExecContext(ctx, `PRAGMA foreign_keys=ON`)
-			}
 			return fmt.Errorf("record migration %d: %w", i, err)
 		}
-
 		if err := tx.Commit(); err != nil {
-			if d.Dialect == DialectSQLite {
-				conn.ExecContext(ctx, `PRAGMA foreign_keys=ON`)
-			}
 			return fmt.Errorf("commit migration %d: %w", i, err)
-		}
-	}
-
-	// Re-enable FK checks (SQLite only).
-	if d.Dialect == DialectSQLite {
-		if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys=ON`); err != nil {
-			return fmt.Errorf("enable fk: %w", err)
 		}
 	}
 

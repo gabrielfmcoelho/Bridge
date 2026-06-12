@@ -7,6 +7,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type gitlabHandlers struct {
@@ -20,12 +21,12 @@ func (h *gitlabHandlers) getClientForUser(r *http.Request) (*gitlabclient.Client
 		return nil, "", http.ErrNoCookie
 	}
 
-	baseURL := models.GetAppSettingValue(h.db.SQL, "auth_gitlab_base_url")
+	baseURL := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "auth_gitlab_base_url")
 	if baseURL == "" {
 		baseURL = "https://gitlab.com"
 	}
 
-	token, err := models.GetUserGitLabToken(h.db.SQL, user.ID, baseURL)
+	token, err := store.NewUserGitLabTokenRepo(h.db.SQL).Get(r.Context(), user.ID, baseURL)
 	if err != nil || token == nil {
 		return nil, baseURL, http.ErrNoCookie
 	}
@@ -80,7 +81,7 @@ func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if req.BaseURL == "" {
-		req.BaseURL = models.GetAppSettingValue(h.db.SQL, "auth_gitlab_base_url")
+		req.BaseURL = store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "auth_gitlab_base_url")
 		if req.BaseURL == "" {
 			req.BaseURL = "https://gitlab.com"
 		}
@@ -102,14 +103,14 @@ func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	t := &models.UserGitLabToken{
-		UserID:             user.ID,
-		GitLabBaseURL:      req.BaseURL,
-		AccessTokenCipher:  cipher,
-		AccessTokenNonce:   nonce,
-		GitLabUserID:       string(rune(glUser.ID)),
-		GitLabUsername:     glUser.Username,
+		UserID:            user.ID,
+		GitLabBaseURL:     req.BaseURL,
+		AccessTokenCipher: cipher,
+		AccessTokenNonce:  nonce,
+		GitLabUserID:      string(rune(glUser.ID)),
+		GitLabUsername:    glUser.Username,
 	}
-	if err := models.UpsertUserGitLabToken(h.db.SQL, t); err != nil {
+	if err := store.NewUserGitLabTokenRepo(h.db.SQL).Upsert(r.Context(), t); err != nil {
 		jsonServerError(w, r, "failed to save token", err)
 		return
 	}
@@ -125,12 +126,12 @@ func (h *gitlabHandlers) handleDeleteToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	baseURL := models.GetAppSettingValue(h.db.SQL, "auth_gitlab_base_url")
+	baseURL := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "auth_gitlab_base_url")
 	if baseURL == "" {
 		baseURL = "https://gitlab.com"
 	}
 
-	models.DeleteUserGitLabToken(h.db.SQL, user.ID, baseURL)
+	store.NewUserGitLabTokenRepo(h.db.SQL).Delete(r.Context(), user.ID, baseURL)
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
@@ -142,7 +143,7 @@ func (h *gitlabHandlers) handleListCommits(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	link, err := models.GetProjectGitLabLink(h.db.SQL, projectID)
+	link, err := store.NewProjectGitLabLinkRepo(h.db.SQL).GetFirst(r.Context(), projectID)
 	if err != nil || link == nil {
 		jsonError(w, http.StatusNotFound, "no GitLab link for this project")
 		return
@@ -171,7 +172,7 @@ func (h *gitlabHandlers) handleListIssues(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	link, err := models.GetProjectGitLabLink(h.db.SQL, projectID)
+	link, err := store.NewProjectGitLabLinkRepo(h.db.SQL).GetFirst(r.Context(), projectID)
 	if err != nil || link == nil {
 		jsonError(w, http.StatusNotFound, "no GitLab link for this project")
 		return
@@ -232,10 +233,20 @@ func (h *gitlabHandlers) handleLinkProject(w http.ResponseWriter, r *http.Reques
 		GitLabBaseURL:   baseURL,
 		GitLabPath:      glProject.PathWithNamespace,
 	}
-	if err := models.CreateProjectGitLabLink(h.db.SQL, link); err != nil {
+	if err := store.NewProjectGitLabLinkRepo(h.db.SQL).Create(r.Context(), link); err != nil {
 		jsonError(w, http.StatusConflict, "link already exists or failed to create")
 		return
 	}
 
 	jsonCreated(w, link)
+}
+
+// registerRoutes binds the per-user GitLab token routes (profile-level).
+func (h *gitlabHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/gitlab/status", h.handleStatus)
+	rr.auth("POST /api/gitlab/token", h.handleSaveToken)
+	rr.auth("DELETE /api/gitlab/token", h.handleDeleteToken)
+	rr.auth("GET /api/gitlab/projects/{id}/commits", h.handleListCommits)
+	rr.auth("GET /api/gitlab/projects/{id}/issues", h.handleListIssues)
+	rr.role("editor", "POST /api/gitlab/projects/{id}/link", h.handleLinkProject)
 }

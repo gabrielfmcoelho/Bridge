@@ -13,11 +13,11 @@ import (
 // All vars in a single request share the same scope/parent/group/visibility;
 // per-var fields are name + value + optional description.
 type envBulkRequest struct {
-	Scope       string            `json:"scope"`
-	ParentID    *int64            `json:"parent_id,omitempty"`
-	Visibility  string            `json:"visibility,omitempty"` // defaults to "shared"
-	GroupLabel  string            `json:"group_label"`
-	Vars        []envBulkVarEntry `json:"vars"`
+	Scope      string            `json:"scope"`
+	ParentID   *int64            `json:"parent_id,omitempty"`
+	Visibility string            `json:"visibility,omitempty"` // defaults to "shared"
+	GroupLabel string            `json:"group_label"`
+	Vars       []envBulkVarEntry `json:"vars"`
 }
 
 type envBulkVarEntry struct {
@@ -27,7 +27,7 @@ type envBulkVarEntry struct {
 }
 
 func (h *secretHandlers) handleEnvBulk(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -87,7 +87,7 @@ func (h *secretHandlers) handleEnvBulk(w http.ResponseWriter, r *http.Request) {
 // vars in the same group appear under the same key (the UI is responsible
 // for visually disambiguating if needed, e.g. by checking visibility).
 func (h *secretHandlers) handleEnvList(w http.ResponseWriter, r *http.Request) {
-	actor, ok := h.actor(r)
+	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
@@ -105,7 +105,7 @@ func (h *secretHandlers) handleEnvList(w http.ResponseWriter, r *http.Request) {
 	}
 	views, err := h.repo.List(r.Context(), actor, filter)
 	if err != nil {
-		writeRepoErr(w, r, err)
+		writeErr(w, r, err)
 		return
 	}
 	grouped := make(map[string][]vault.SecretView)

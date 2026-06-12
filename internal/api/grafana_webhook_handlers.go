@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,6 +15,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type grafanaWebhookHandlers struct {
@@ -99,7 +101,7 @@ func (h *grafanaWebhookHandlers) handleAlertWebhook(w http.ResponseWriter, r *ht
 			skipped++
 			continue
 		}
-		host, err := findHostByLabel(h.db, slug)
+		host, err := findHostByLabel(r.Context(), h.db, slug)
 		if err != nil {
 			log.Printf("[grafana-webhook] host lookup for %q: %v", slug, err)
 			skipped++
@@ -121,7 +123,7 @@ func (h *grafanaWebhookHandlers) handleAlertWebhook(w http.ResponseWriter, r *ht
 			ExternalID:     alert.Fingerprint,
 			ExternalSource: "grafana",
 		}
-		if _, err := models.UpsertExternalHostAlert(h.db.SQL, record); err != nil {
+		if _, err := store.NewHostAlertRepo(h.db.SQL).UpsertExternal(r.Context(), record); err != nil {
 			log.Printf("[grafana-webhook] upsert for host %s fp=%s: %v", host.OficialSlug, alert.Fingerprint, err)
 			skipped++
 			continue
@@ -177,8 +179,8 @@ func extractHostLabel(labels map[string]string) string {
 //  1. exact match on the full label value
 //  2. prefix before the first ":" or "." (covers Prometheus instance="myhost:9100"
 //     and FQDN-style instance="myhost.example.com")
-func findHostByLabel(db *database.DB, raw string) (*models.Host, error) {
-	host, err := models.GetHostBySlug(db.SQL, raw)
+func findHostByLabel(ctx context.Context, db *database.DB, raw string) (*models.Host, error) {
+	host, err := store.NewHostRepo(db.SQL).GetBySlug(ctx, raw)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +197,7 @@ func findHostByLabel(db *database.DB, raw string) (*models.Host, error) {
 	if trimmed == raw {
 		return nil, nil
 	}
-	return models.GetHostBySlug(db.SQL, trimmed)
+	return store.NewHostRepo(db.SQL).GetBySlug(ctx, trimmed)
 }
 
 // alertType returns a short category label. Prefer the Grafana alertname label,
@@ -245,4 +247,10 @@ func mapAlertStatus(status string) string {
 		return "resolved"
 	}
 	return "active"
+}
+
+// registerRoutes binds the public Grafana alert webhook — no auth middleware;
+// HMAC-signed by Grafana and verified in the handler.
+func (h *grafanaWebhookHandlers) registerRoutes(rr routeRegistrar) {
+	rr.public("POST /api/webhooks/grafana/alerts", h.handleAlertWebhook)
 }

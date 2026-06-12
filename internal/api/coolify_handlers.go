@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,8 +12,8 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/coolify"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
-	gossh "golang.org/x/crypto/ssh"
 )
 
 type coolifyHandlers struct {
@@ -22,23 +21,19 @@ type coolifyHandlers struct {
 }
 
 func (h *coolifyHandlers) getClient() (*coolify.Client, error) {
-	get := func(key string) string { return models.GetAppSettingValue(h.db.SQL, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), key) }
 
 	if get("coolify_enabled") != "true" {
 		return nil, fmt.Errorf("coolify integration is not enabled")
 	}
 
 	baseURL := get("coolify_base_url")
-	cipherHex := get("coolify_api_token_cipher")
-	nonceHex := get("coolify_api_token_nonce")
-	if cipherHex == "" || nonceHex == "" || baseURL == "" {
-		return nil, fmt.Errorf("coolify integration is not configured")
-	}
-	cipher, _ := hex.DecodeString(cipherHex)
-	nonce, _ := hex.DecodeString(nonceHex)
-	apiToken, err := h.db.Encryptor.Decrypt(cipher, nonce)
+	apiToken, ok, err := store.NewAppSecretRepo(h.db.SQL).Reveal(context.Background(), h.db.Encryptor, "coolify_api_token")
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt coolify token: %w", err)
+	}
+	if !ok || baseURL == "" {
+		return nil, fmt.Errorf("coolify integration is not configured")
 	}
 
 	return coolify.NewClient(baseURL, apiToken), nil
@@ -56,15 +51,15 @@ func (h *coolifyHandlers) logOp(r *http.Request, hostID int64, opType, status, o
 		Status:        status,
 		Output:        output,
 	}
-	if err := models.CreateOperationLog(h.db.SQL, ol); err != nil {
+	if err := store.NewOperationLogRepo(h.db.SQL).Create(r.Context(), ol); err != nil {
 		log.Printf("[coolify] failed to log operation: %v", err)
 	}
 }
 
 // handleStatus returns whether the Coolify integration is enabled and configured.
 func (h *coolifyHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
-	enabled := models.GetAppSettingValue(h.db.SQL, "coolify_enabled") == "true"
-	configured := models.GetAppSettingValue(h.db.SQL, "coolify_api_token_cipher") != ""
+	enabled := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_enabled") == "true"
+	configured := store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), "coolify_api_token")
 	jsonOK(w, map[string]any{
 		"enabled":    enabled,
 		"configured": configured,
@@ -88,7 +83,7 @@ func (h *coolifyHandlers) handleTestConnection(w http.ResponseWriter, r *http.Re
 // handleGetServerStatus fetches the current status of a host's linked Coolify server.
 func (h *coolifyHandlers) handleGetServerStatus(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -118,7 +113,7 @@ func (h *coolifyHandlers) handleGetServerStatus(w http.ResponseWriter, r *http.R
 // handleCheckHost searches Coolify for a server matching this host's IP.
 func (h *coolifyHandlers) handleCheckHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -139,7 +134,7 @@ func (h *coolifyHandlers) handleCheckHost(w http.ResponseWriter, r *http.Request
 
 	if server != nil {
 		// Store the UUID on the host for future operations
-		models.SetHostCoolifyUUID(h.db.SQL, host.ID, &server.UUID)
+		store.NewHostRepo(h.db.SQL).SetCoolifyUUID(r.Context(), host.ID, &server.UUID)
 		h.logOp(r, host.ID, "coolify-check", "success", fmt.Sprintf("found server %s (%s)", server.UUID, server.Name))
 		jsonOK(w, map[string]any{"found": true, "server": server})
 		return
@@ -149,67 +144,7 @@ func (h *coolifyHandlers) handleCheckHost(w http.ResponseWriter, r *http.Request
 	jsonOK(w, map[string]any{"found": false})
 }
 
-// resolvePrivateKeyUUID finds or uploads a private key in Coolify and returns
-// its UUID. Matching order: exact name, then fingerprint (both against the
-// current key list), then create-and-handle-422 (re-list and fingerprint-match
-// when Coolify reports the key already exists).
-func (h *coolifyHandlers) resolvePrivateKeyUUID(client *coolify.Client, privKey, keyName, description string) (string, error) {
-	existingKeys, listErr := client.ListPrivateKeys()
-	if listErr != nil {
-		log.Printf("[coolify] failed to list keys: %v", listErr)
-	}
-	log.Printf("[coolify] found %d existing keys in Coolify", len(existingKeys))
-
-	for _, k := range existingKeys {
-		log.Printf("[coolify] key: uuid=%s name=%q fingerprint=%q", k.UUID, k.Name, k.Fingerprint)
-		if k.Name == keyName {
-			log.Printf("[coolify] matched by name: %s", k.UUID)
-			return k.UUID, nil
-		}
-	}
-
-	ourFingerprint := ""
-	if signer, err := gossh.ParsePrivateKey([]byte(privKey)); err == nil {
-		ourFingerprint = strings.TrimPrefix(gossh.FingerprintSHA256(signer.PublicKey()), "SHA256:")
-		log.Printf("[coolify] our key fingerprint: %s", ourFingerprint)
-	} else {
-		log.Printf("[coolify] failed to parse private key for fingerprint: %v", err)
-	}
-
-	if ourFingerprint != "" {
-		for _, k := range existingKeys {
-			if k.Fingerprint != "" && k.Fingerprint == ourFingerprint {
-				log.Printf("[coolify] matched by fingerprint: %s (name=%q)", k.UUID, k.Name)
-				return k.UUID, nil
-			}
-		}
-	}
-
-	uuid, createErr := client.CreatePrivateKey(coolify.CreateKeyRequest{
-		Name:        keyName,
-		Description: description,
-		PrivateKey:  privKey,
-	})
-	if createErr == nil {
-		log.Printf("[coolify] key created: %s", uuid)
-		return uuid, nil
-	}
-
-	log.Printf("[coolify] key create failed: %v", createErr)
-	if !strings.Contains(createErr.Error(), "422") && !strings.Contains(createErr.Error(), "already exists") {
-		return "", createErr
-	}
-	log.Printf("[coolify] 422 duplicate — re-listing for fingerprint match, our fp=%q", ourFingerprint)
-	freshKeys, _ := client.ListPrivateKeys()
-	for _, k := range freshKeys {
-		log.Printf("[coolify] re-list key: uuid=%s name=%q fingerprint=%q", k.UUID, k.Name, k.Fingerprint)
-		if ourFingerprint != "" && k.Fingerprint == ourFingerprint {
-			log.Printf("[coolify] matched on re-list by fingerprint: %s", k.UUID)
-			return k.UUID, nil
-		}
-	}
-	return "", createErr
-}
+// (resolvePrivateKeyUUID moved to coolify.Client.EnsurePrivateKey — R4b.)
 
 // selectRegistrationKey resolves which sshcm SSH key should be uploaded to
 // Coolify for a given host. Priority: explicit sshKeyID from the caller,
@@ -218,7 +153,7 @@ func (h *coolifyHandlers) resolvePrivateKeyUUID(client *coolify.Client, privKey,
 // text, the Coolify key name to use, and a description.
 func (h *coolifyHandlers) selectRegistrationKey(host *models.Host, sshKeyID int64, targetUser string) (privKey, keyName, description string, err error) {
 	load := func(id int64) (*models.SSHKey, string, error) {
-		k, gerr := models.GetSSHKey(h.db.SQL, id)
+		k, gerr := store.NewSSHKeyRepo(h.db.SQL).Get(context.Background(), id)
 		if gerr != nil {
 			return nil, "", gerr
 		}
@@ -244,7 +179,7 @@ func (h *coolifyHandlers) selectRegistrationKey(host *models.Host, sshKeyID int6
 	}
 
 	if targetUser != "" {
-		if link, lerr := models.GetHostRemoteUserByUsername(h.db.SQL, host.ID, targetUser); lerr == nil && link != nil && link.SSHKeyID != nil {
+		if link, lerr := store.NewHostRemoteUserRepo(h.db.SQL).GetByUsername(context.Background(), host.ID, targetUser); lerr == nil && link != nil && link.SSHKeyID != nil {
 			k, plain, lderr := load(*link.SSHKeyID)
 			if lderr == nil {
 				return plain, coolifyManagedKeyName(k), fmt.Sprintf("Managed by SSHCM key %q (remote user %s)", k.Name, targetUser), nil
@@ -279,7 +214,7 @@ func coolifyManagedKeyName(k *models.SSHKey) string {
 // handleRegisterHost uploads the chosen SSH key and creates a server in Coolify.
 func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -298,7 +233,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Coolify rejects usernames with dots. Use configured default user or "root".
-	coolifyUser := models.GetAppSettingValue(h.db.SQL, "coolify_default_user")
+	coolifyUser := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_default_user")
 	if coolifyUser == "" {
 		coolifyUser = "root"
 	}
@@ -309,7 +244,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	privateKeyUUID, err := h.resolvePrivateKeyUUID(client, privKey, keyName, description)
+	privateKeyUUID, err := client.EnsurePrivateKey(privKey, keyName, description)
 	if err != nil {
 		h.logOp(r, host.ID, "coolify-register", "failed", "key upload: "+err.Error())
 		jsonError(w, http.StatusBadGateway, "failed to upload key to coolify: "+err.Error())
@@ -340,7 +275,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	models.SetHostCoolifyUUID(h.db.SQL, host.ID, &serverUUID)
+	store.NewHostRepo(h.db.SQL).SetCoolifyUUID(r.Context(), host.ID, &serverUUID)
 	h.logOp(r, host.ID, "coolify-register", "success", fmt.Sprintf("created server %s with key %s", serverUUID, privateKeyUUID))
 	jsonOK(w, map[string]any{"uuid": serverUUID})
 }
@@ -348,7 +283,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 // handleValidateHost triggers Coolify server validation.
 func (h *coolifyHandlers) handleValidateHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -379,7 +314,7 @@ func (h *coolifyHandlers) handleValidateHost(w http.ResponseWriter, r *http.Requ
 // match), then PATCHes the server with the new key's UUID.
 func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -411,7 +346,7 @@ func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	privateKeyUUID, err := h.resolvePrivateKeyUUID(client, privKey, keyName, description)
+	privateKeyUUID, err := client.EnsurePrivateKey(privKey, keyName, description)
 	if err != nil {
 		h.logOp(r, host.ID, "coolify-update-key", "failed", "key upload: "+err.Error())
 		jsonError(w, http.StatusBadGateway, "failed to upload key to coolify: "+err.Error())
@@ -433,7 +368,7 @@ func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.R
 // handleSyncHost updates the Coolify server with current host info.
 func (h *coolifyHandlers) handleSyncHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -454,7 +389,7 @@ func (h *coolifyHandlers) handleSyncHost(w http.ResponseWriter, r *http.Request)
 		port = p
 	}
 
-	coolifyUser := models.GetAppSettingValue(h.db.SQL, "coolify_default_user")
+	coolifyUser := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_default_user")
 	if coolifyUser == "" {
 		coolifyUser = "root"
 	}
@@ -478,7 +413,7 @@ func (h *coolifyHandlers) handleSyncHost(w http.ResponseWriter, r *http.Request)
 // handleDeleteHost removes the server from Coolify and clears the UUID.
 func (h *coolifyHandlers) handleDeleteHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -501,7 +436,7 @@ func (h *coolifyHandlers) handleDeleteHost(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	models.SetHostCoolifyUUID(h.db.SQL, host.ID, nil)
+	store.NewHostRepo(h.db.SQL).SetCoolifyUUID(r.Context(), host.ID, nil)
 	h.logOp(r, host.ID, "coolify-delete", "success", "deleted server "+uuid)
 	jsonOK(w, map[string]any{"success": true})
 }
@@ -515,7 +450,7 @@ func (h *coolifyHandlers) handleCheckKey(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	key, err := models.GetSSHKey(h.db.SQL, id)
+	key, err := store.NewSSHKeyRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || key == nil {
 		jsonError(w, http.StatusNotFound, "key not found")
 		return
@@ -555,7 +490,7 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	key, err := models.GetSSHKey(h.db.SQL, id)
+	key, err := store.NewSSHKeyRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || key == nil {
 		jsonError(w, http.StatusNotFound, "key not found")
 		return
@@ -602,3 +537,18 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, map[string]any{"uuid": uuid, "name": keyName, "already_existed": false})
 }
 
+// registerRoutes binds the Coolify integration: status/test plus the per-host
+// and per-key check/register/sync operations.
+func (h *coolifyHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/coolify/status", h.handleStatus)
+	rr.role("admin", "POST /api/coolify/test", h.handleTestConnection)
+	rr.role("editor", "GET /api/coolify/server-status/{slug}", h.handleGetServerStatus)
+	rr.role("editor", "POST /api/coolify/check/{slug}", h.handleCheckHost)
+	rr.role("admin", "POST /api/coolify/register/{slug}", h.handleRegisterHost)
+	rr.role("admin", "POST /api/coolify/validate/{slug}", h.handleValidateHost)
+	rr.role("admin", "POST /api/coolify/sync/{slug}", h.handleSyncHost)
+	rr.role("admin", "POST /api/coolify/server/{slug}/key", h.handleUpdateServerKey)
+	rr.role("admin", "DELETE /api/coolify/server/{slug}", h.handleDeleteHost)
+	rr.role("editor", "GET /api/coolify/keys/{id}/check", h.handleCheckKey)
+	rr.role("admin", "POST /api/coolify/keys/{id}/sync", h.handleSyncKey)
+}

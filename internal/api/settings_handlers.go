@@ -9,6 +9,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type settingsHandlers struct {
@@ -16,7 +17,7 @@ type settingsHandlers struct {
 }
 
 func (h *settingsHandlers) handleGetAppearance(w http.ResponseWriter, r *http.Request) {
-	s, err := models.GetAppSettings(h.db.SQL)
+	s, err := store.NewAppSettingsRepo(h.db.SQL).Get(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load settings", err)
 		return
@@ -37,7 +38,7 @@ func (h *settingsHandlers) handleUpdateAppearance(w http.ResponseWriter, r *http
 	if req.AppColor == "" {
 		req.AppColor = "#06b6d4"
 	}
-	if err := models.UpdateAppSettings(h.db.SQL, &req); err != nil {
+	if err := store.NewAppSettingsRepo(h.db.SQL).Update(r.Context(), &req); err != nil {
 		jsonServerError(w, r, "failed to save settings", err)
 		return
 	}
@@ -74,13 +75,13 @@ func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Reque
 
 	dataURI := fmt.Sprintf("data:%s;base64,%s", ct, base64.StdEncoding.EncodeToString(data))
 
-	s, err := models.GetAppSettings(h.db.SQL)
+	s, err := store.NewAppSettingsRepo(h.db.SQL).Get(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load settings", err)
 		return
 	}
 	s.AppLogo = dataURI
-	if err := models.UpdateAppSettings(h.db.SQL, s); err != nil {
+	if err := store.NewAppSettingsRepo(h.db.SQL).Update(r.Context(), s); err != nil {
 		jsonServerError(w, r, "failed to save logo", err)
 		return
 	}
@@ -89,7 +90,7 @@ func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *settingsHandlers) handleGetAlertThresholds(w http.ResponseWriter, r *http.Request) {
-	t, err := models.GetAlertThresholds(h.db.SQL)
+	t, err := store.NewAlertSettingsRepo(h.db.SQL).GetThresholds(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load alert thresholds", err)
 		return
@@ -109,7 +110,7 @@ func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r 
 		jsonError(w, http.StatusBadRequest, "threshold values must be between 0 and 100")
 		return
 	}
-	if err := models.UpdateAlertThresholds(h.db.SQL, &req); err != nil {
+	if err := store.NewAlertSettingsRepo(h.db.SQL).UpdateThresholds(r.Context(), &req); err != nil {
 		jsonServerError(w, r, "failed to save alert thresholds", err)
 		return
 	}
@@ -117,15 +118,26 @@ func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r 
 }
 
 func (h *settingsHandlers) handleDeleteLogo(w http.ResponseWriter, r *http.Request) {
-	s, err := models.GetAppSettings(h.db.SQL)
+	s, err := store.NewAppSettingsRepo(h.db.SQL).Get(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load settings", err)
 		return
 	}
 	s.AppLogo = ""
-	if err := models.UpdateAppSettings(h.db.SQL, s); err != nil {
+	if err := store.NewAppSettingsRepo(h.db.SQL).Update(r.Context(), s); err != nil {
 		jsonServerError(w, r, "failed to remove logo", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "ok"})
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *settingsHandlers) registerRoutes(rr routeRegistrar) {
+	// GET appearance is public so login/setup pages can load branding.
+	rr.public("GET /api/settings/appearance", h.handleGetAppearance)
+	rr.role("admin", "PUT /api/settings/appearance", h.handleUpdateAppearance)
+	rr.role("admin", "POST /api/settings/appearance/logo", h.handleUploadLogo)
+	rr.role("admin", "DELETE /api/settings/appearance/logo", h.handleDeleteLogo)
+	rr.auth("GET /api/settings/alerts", h.handleGetAlertThresholds)
+	rr.role("admin", "PUT /api/settings/alerts", h.handleUpdateAlertThresholds)
 }

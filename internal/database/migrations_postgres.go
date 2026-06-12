@@ -1123,4 +1123,75 @@ var migrationsPostgres = []string{
 	// Version 69: base_url + docs_url on api_catalog — see migrations_sqlite.go.
 	`ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS base_url TEXT NOT NULL DEFAULT '';
 	ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS docs_url TEXT NOT NULL DEFAULT '';`,
+
+	// Version 70 (R3): unify *_responsaveis into one polymorphic table — see
+	// migrations_sqlite.go. is_main is BOOLEAN here (Go reads it into bool).
+	`CREATE TABLE IF NOT EXISTS responsaveis (
+		id          BIGSERIAL PRIMARY KEY,
+		entity_type TEXT NOT NULL CHECK (entity_type IN ('host','dns','service','project')),
+		entity_id   BIGINT NOT NULL,
+		contact_id  BIGINT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+		is_main     BOOLEAN NOT NULL DEFAULT FALSE,
+		UNIQUE(entity_type, entity_id, contact_id)
+	);
+	INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'host', host_id, contact_id, is_main FROM host_responsaveis WHERE contact_id > 0
+		ON CONFLICT (entity_type, entity_id, contact_id) DO NOTHING;
+	INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'dns', dns_id, contact_id, is_main FROM dns_responsaveis WHERE contact_id > 0
+		ON CONFLICT (entity_type, entity_id, contact_id) DO NOTHING;
+	INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'service', service_id, contact_id, is_main FROM service_responsaveis WHERE contact_id > 0
+		ON CONFLICT (entity_type, entity_id, contact_id) DO NOTHING;
+	INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'project', project_id, contact_id, is_main FROM project_responsaveis WHERE contact_id > 0
+		ON CONFLICT (entity_type, entity_id, contact_id) DO NOTHING;
+	DROP TABLE host_responsaveis;
+	DROP TABLE dns_responsaveis;
+	DROP TABLE service_responsaveis;
+	DROP TABLE project_responsaveis;
+	CREATE INDEX IF NOT EXISTS idx_responsaveis_entity ON responsaveis (entity_type, entity_id);`,
+
+	// Version 71 (R3): app_settings cipher sprawl → app_secrets — see
+	// migrations_sqlite.go.
+	`CREATE TABLE IF NOT EXISTS app_secrets (
+		key    TEXT PRIMARY KEY,
+		cipher TEXT NOT NULL DEFAULT '',
+		nonce  TEXT NOT NULL DEFAULT ''
+	);
+	INSERT INTO app_secrets (key, cipher, nonce)
+		SELECT substr(c.key, 1, length(c.key) - 7), c.value, n.value
+		FROM app_settings c
+		JOIN app_settings n ON n.key = substr(c.key, 1, length(c.key) - 7) || '_nonce'
+		WHERE c.key LIKE '%\_cipher' ESCAPE '\' AND c.value <> ''
+		ON CONFLICT (key) DO NOTHING;
+	DELETE FROM app_settings WHERE key LIKE '%\_cipher' ESCAPE '\' OR key LIKE '%\_nonce' ESCAPE '\';`,
+
+	// Version 72 (R3): retire secret_share_links — see migrations_sqlite.go.
+	`DROP TABLE IF EXISTS secret_share_links;`,
+
+	// Version 73 (R3 optional): extend soft-delete to hosts/services/projects —
+	// see migrations_sqlite.go. Symmetric with sqlite: just add the column; the
+	// slug stays reserved while soft-deleted (restore, don't recreate).
+	`ALTER TABLE hosts    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`,
+
+	// Version 74 (P2): promote host-scan resource metrics from display-string
+	// JSON ("45%", "1.2 GB") to typed numeric columns so the host list can sort
+	// /filter on them in SQL (impossible against the opaque data blob). New scans
+	// populate these at ingest (HostScanRepo.Create); this backfills existing
+	// rows by parsing the stored JSON. data is always json.Marshal output, so the
+	// ::jsonb cast is safe; non-numeric/empty values become NULL.
+	`ALTER TABLE host_scans ADD COLUMN IF NOT EXISTS cpu_pct          DOUBLE PRECISION;
+	ALTER TABLE host_scans ADD COLUMN IF NOT EXISTS ram_pct          DOUBLE PRECISION;
+	ALTER TABLE host_scans ADD COLUMN IF NOT EXISTS disk_pct         DOUBLE PRECISION;
+	ALTER TABLE host_scans ADD COLUMN IF NOT EXISTS containers_count INTEGER;
+	UPDATE host_scans SET
+		cpu_pct  = NULLIF(regexp_replace(COALESCE(data::jsonb->>'cpu_usage',''),    '[^0-9.]', '', 'g'), '')::double precision,
+		ram_pct  = NULLIF(regexp_replace(COALESCE(data::jsonb->>'ram_percent',''),  '[^0-9.]', '', 'g'), '')::double precision,
+		disk_pct = NULLIF(regexp_replace(COALESCE(data::jsonb->>'disk_percent',''), '[^0-9.]', '', 'g'), '')::double precision,
+		containers_count = CASE WHEN jsonb_typeof(data::jsonb->'containers') = 'array'
+			THEN jsonb_array_length(data::jsonb->'containers') ELSE 0 END
+	WHERE data IS NOT NULL AND data <> '';`,
 }

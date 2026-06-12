@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { dnsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -37,6 +37,7 @@ export default function DNSPage() {
   const [editing, setEditing] = useState<DNSRecord | null>(null);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [tablePage, setTablePage] = useState(1);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
@@ -44,6 +45,30 @@ export default function DNSPage() {
     queryKey: ["dns"],
     queryFn: dnsAPI.list,
   });
+
+  // Table view drives REAL server-side filtering+sort+pagination (one page at a
+  // time). Enabled only in table mode; KPIs/export/cards keep using allRecords.
+  const tableQuery = useQuery({
+    queryKey: ["dns-table", search, filters, sort, tablePage],
+    enabled: viewMode === "table",
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (search) params.search = search;
+      if (filters.situacao) params.situacao = filters.situacao;
+      if (filters.tag) params.tag = filters.tag;
+      if (filters.responsavel) params.responsavel = filters.responsavel;
+      if (filters.has_https) params.has_https = filters.has_https;
+      params.sort_by = sort.field;
+      params.sort_dir = sort.direction;
+      params.page = String(tablePage);
+      params.per_page = "20";
+      return dnsAPI.listPaginated(params);
+    },
+  });
+  const tableRecords = tableQuery.data?.data ?? [];
+  const tableTotal = tableQuery.data?.meta.total ?? 0;
+
+  useEffect(() => { setTablePage(1); }, [search, filters, sort]);
 
   const filteredAndSorted = useMemo(() => {
     let result = [...allRecords];
@@ -118,15 +143,15 @@ export default function DNSPage() {
       />
 
       <InventoryContent
-        isLoading={isLoading}
-        items={filteredAndSorted}
+        isLoading={viewMode === "table" ? tableQuery.isLoading : isLoading}
+        items={viewMode === "table" ? tableRecords : filteredAndSorted}
         viewMode={viewMode}
         emptyIcon="globe"
         emptyTitle={t("common.noResults")}
         emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") || "Try adjusting your filters" : t("dns.emptyStateAdd") || "Add your first DNS record"}
         emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={openCreate}>+ {t("dns.addDns")}</Button> : undefined}
         renderCard={(dns) => <DnsCard dns={dns} />}
-        renderTable={(items) => <DnsTableView records={items} t={t} />}
+        renderTable={(items) => <DnsTableView records={items} total={tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}
       />
 
       <Drawer open={showForm} onClose={() => setShowForm(false)} title={editing ? t("common.edit") : t("dns.addDns")} subHeader={formSubHeader}>

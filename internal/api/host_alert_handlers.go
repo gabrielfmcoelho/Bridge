@@ -6,6 +6,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type hostAlertHandlers struct {
@@ -14,7 +15,7 @@ type hostAlertHandlers struct {
 
 func (h *hostAlertHandlers) resolveHost(w http.ResponseWriter, r *http.Request) *models.Host {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return nil
@@ -28,14 +29,14 @@ func (h *hostAlertHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	alerts, err := models.ListHostAlerts(h.db.SQL, host.ID)
+	alerts, err := store.NewHostAlertRepo(h.db.SQL).ListByHost(r.Context(), host.ID)
 	if err != nil {
 		jsonServerError(w, r, "failed to list alerts", err)
 		return
 	}
 
 	// Enrich with linked issue IDs
-	linkedIssues, _ := models.GetAlertLinkedIssueIDs(h.db.SQL, host.ID)
+	linkedIssues, _ := store.NewHostAlertRepo(h.db.SQL).LinkedIssueIDsByHost(r.Context(), host.ID)
 
 	type alertWithLink struct {
 		models.HostAlert
@@ -51,7 +52,7 @@ func (h *hostAlertHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	jsonOK(w, result)
+	jsonPaged(w, r, result)
 }
 
 func (h *hostAlertHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +79,7 @@ func (h *hostAlertHandlers) handleCreate(w http.ResponseWriter, r *http.Request)
 	log.Printf("[alerts] Creating alert: host_id=%d type=%s level=%s source=%s message=%q",
 		req.HostID, req.Type, req.Level, req.Source, req.Message)
 
-	if err := models.CreateHostAlert(h.db.SQL, &req); err != nil {
+	if err := store.NewHostAlertRepo(h.db.SQL).Create(r.Context(), &req); err != nil {
 		log.Printf("[alerts] CreateHostAlert error: %v", err)
 		jsonServerError(w, r, "failed to create alert", err)
 		return
@@ -100,7 +101,7 @@ func (h *hostAlertHandlers) handleUpdate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	existing, err := models.GetHostAlert(h.db.SQL, alertID)
+	existing, err := store.NewHostAlertRepo(h.db.SQL).Get(r.Context(), alertID)
 	if err != nil || existing == nil || existing.HostID != host.ID {
 		jsonError(w, http.StatusNotFound, "alert not found")
 		return
@@ -121,7 +122,7 @@ func (h *hostAlertHandlers) handleUpdate(w http.ResponseWriter, r *http.Request)
 	existing.Message = req.Message
 	existing.Description = req.Description
 
-	if err := models.UpdateHostAlert(h.db.SQL, existing); err != nil {
+	if err := store.NewHostAlertRepo(h.db.SQL).Update(r.Context(), existing); err != nil {
 		jsonServerError(w, r, "failed to update alert", err)
 		return
 	}
@@ -141,20 +142,20 @@ func (h *hostAlertHandlers) handleConclude(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	existing, err := models.GetHostAlert(h.db.SQL, alertID)
+	existing, err := store.NewHostAlertRepo(h.db.SQL).Get(r.Context(), alertID)
 	if err != nil || existing == nil || existing.HostID != host.ID {
 		jsonError(w, http.StatusNotFound, "alert not found")
 		return
 	}
 
 	// Check if alert has linked issues — if so, it can only be resolved via issue completion
-	linkedIssues, _ := models.GetAlertLinkedIssueIDs(h.db.SQL, host.ID)
+	linkedIssues, _ := store.NewHostAlertRepo(h.db.SQL).LinkedIssueIDsByHost(r.Context(), host.ID)
 	if _, hasIssue := linkedIssues[alertID]; hasIssue {
 		jsonError(w, http.StatusConflict, "alert has linked issue — resolve the issue to conclude this alert")
 		return
 	}
 
-	if err := models.ResolveHostAlert(h.db.SQL, alertID); err != nil {
+	if err := store.NewHostAlertRepo(h.db.SQL).Resolve(r.Context(), alertID); err != nil {
 		log.Printf("[alerts] ResolveHostAlert error: %v", err)
 		jsonServerError(w, r, "failed to conclude alert", err)
 		return
@@ -175,7 +176,7 @@ func (h *hostAlertHandlers) handleDelete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	existing, err := models.GetHostAlert(h.db.SQL, alertID)
+	existing, err := store.NewHostAlertRepo(h.db.SQL).Get(r.Context(), alertID)
 	if err != nil || existing == nil || existing.HostID != host.ID {
 		jsonError(w, http.StatusNotFound, "alert not found")
 		return
@@ -185,10 +186,19 @@ func (h *hostAlertHandlers) handleDelete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := models.DeleteHostAlert(h.db.SQL, alertID); err != nil {
+	if err := store.NewHostAlertRepo(h.db.SQL).Delete(r.Context(), alertID); err != nil {
 		jsonServerError(w, r, "failed to delete alert", err)
 		return
 	}
 
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *hostAlertHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/hosts/{slug}/alerts", h.handleList)
+	rr.role("editor", "POST /api/hosts/{slug}/alerts", h.handleCreate)
+	rr.role("editor", "PUT /api/hosts/{slug}/alerts/{alertId}", h.handleUpdate)
+	rr.role("editor", "POST /api/hosts/{slug}/alerts/{alertId}/conclude", h.handleConclude)
+	rr.role("admin", "DELETE /api/hosts/{slug}/alerts/{alertId}", h.handleDelete)
 }

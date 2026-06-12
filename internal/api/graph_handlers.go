@@ -6,6 +6,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type graphHandlers struct {
@@ -31,7 +32,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	edges := []graphEdge{}
 
 	// Hosts
-	hosts, _ := models.ListHosts(h.db.SQL, models.HostFilter{})
+	hosts, _ := store.NewHostRepo(h.db.SQL).List(r.Context(), models.HostFilter{})
 	hostIDMap := make(map[int64]string)
 	for _, host := range hosts {
 		nid := fmt.Sprintf("host-%d", host.ID)
@@ -50,7 +51,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// DNS records
-	dnsRecords, _ := models.ListDNSRecords(h.db.SQL)
+	dnsRecords, _ := store.NewDNSRepo(h.db.SQL).List(r.Context())
 	dnsIDMap := make(map[int64]string)
 	for _, dns := range dnsRecords {
 		nid := fmt.Sprintf("dns-%d", dns.ID)
@@ -66,7 +67,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		})
 
 		// DNS -> Host edges
-		hostIDs, _ := models.GetDNSHostIDs(h.db.SQL, dns.ID)
+		hostIDs, _ := store.NewDNSRepo(h.db.SQL).HostIDs(r.Context(), dns.ID)
 		for _, hid := range hostIDs {
 			if target, ok := hostIDMap[hid]; ok {
 				edges = append(edges, graphEdge{Source: nid, Target: target, Label: "points to"})
@@ -75,7 +76,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Projects
-	projects, _ := models.ListProjects(h.db.SQL)
+	projects, _ := store.NewProjectRepo(h.db.SQL).List(r.Context())
 	projectIDMap := make(map[int64]string)
 	for _, p := range projects {
 		nid := fmt.Sprintf("project-%d", p.ID)
@@ -89,7 +90,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Services
-	services, _ := models.ListServices(h.db.SQL)
+	services, _ := store.NewServiceRepo(h.db.SQL).List(r.Context())
 	serviceIDMap := make(map[int64]string)
 	for _, svc := range services {
 		nid := fmt.Sprintf("service-%d", svc.ID)
@@ -113,7 +114,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Service -> Host edges
-		hostIDs, _ := models.GetServiceHostIDs(h.db.SQL, svc.ID)
+		hostIDs, _ := store.NewServiceRepo(h.db.SQL).HostIDs(r.Context(), svc.ID)
 		for _, hid := range hostIDs {
 			if target, ok := hostIDMap[hid]; ok {
 				edges = append(edges, graphEdge{Source: nid, Target: target, Label: "runs on"})
@@ -121,7 +122,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Service -> DNS edges
-		dnsIDs, _ := models.GetServiceDNSIDs(h.db.SQL, svc.ID)
+		dnsIDs, _ := store.NewServiceRepo(h.db.SQL).DNSIDs(r.Context(), svc.ID)
 		for _, did := range dnsIDs {
 			if target, ok := dnsIDMap[did]; ok {
 				edges = append(edges, graphEdge{Source: nid, Target: target, Label: "served at"})
@@ -131,7 +132,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 
 	// Direct Host -> Project edges
 	for _, p := range projects {
-		hostIDs, _ := models.GetProjectHostIDs(h.db.SQL, p.ID)
+		hostIDs, _ := store.NewProjectRepo(h.db.SQL).HostIDs(r.Context(), p.ID)
 		for _, hid := range hostIDs {
 			if target, ok := hostIDMap[hid]; ok {
 				edges = append(edges, graphEdge{Source: target, Target: projectIDMap[p.ID], Label: "part of"})
@@ -141,7 +142,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 
 	// Service dependency edges
 	for _, svc := range services {
-		depIDs, _ := models.GetServiceDependencyIDs(h.db.SQL, svc.ID)
+		depIDs, _ := store.NewServiceRepo(h.db.SQL).DependencyIDs(r.Context(), svc.ID)
 		for _, depID := range depIDs {
 			src := serviceIDMap[svc.ID]
 			if target, ok := serviceIDMap[depID]; ok {
@@ -154,4 +155,9 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		"nodes": nodes,
 		"edges": edges,
 	})
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *graphHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/graph", h.handleGraph)
 }

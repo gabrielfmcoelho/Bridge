@@ -5,26 +5,30 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 func newHostSecretFixture(t *testing.T) (*database.DB, int64, int64) {
 	t.Helper()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
 
-	r, _ := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`, "alice", "x", "admin")
-	uid, _ := r.LastInsertId()
+	var uid int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`, "alice", "x", "admin").Scan(&uid); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
 
-	r2, _ := d.SQL.Exec(
-		`INSERT INTO hosts (nickname, oficial_slug, hostname, ssh_user) VALUES (?,?,?,?)`,
+	var hid int64
+	if err := d.SQL.QueryRow(
+		`INSERT INTO hosts (nickname, oficial_slug, hostname, ssh_user) VALUES (?,?,?,?) RETURNING id`,
 		"h1", "h1", "10.0.0.1", "deploy",
-	)
-	hid, _ := r2.LastInsertId()
+	).Scan(&hid); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
 
 	return d, hid, uid
 }

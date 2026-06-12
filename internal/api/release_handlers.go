@@ -6,6 +6,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type releaseHandlers struct {
@@ -13,7 +14,7 @@ type releaseHandlers struct {
 }
 
 func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	releases, err := models.ListReleases(h.db.SQL)
+	releases, err := store.NewReleaseRepo(h.db.SQL).List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list releases", err)
 		return
@@ -25,10 +26,10 @@ func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	result := make([]releaseWithIssues, len(releases))
 	for i, rel := range releases {
-		issueIDs, _ := models.GetReleaseIssueIDs(h.db.SQL, rel.ID)
+		issueIDs, _ := store.NewReleaseRepo(h.db.SQL).IssueIDs(r.Context(), rel.ID)
 		result[i] = releaseWithIssues{Release: rel, IssueIDs: issueIDs}
 	}
-	jsonOK(w, result)
+	jsonPaged(w, r, result)
 }
 
 func (h *releaseHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
@@ -38,13 +39,13 @@ func (h *releaseHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rel, err := models.GetRelease(h.db.SQL, id)
+	rel, err := store.NewReleaseRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || rel == nil {
 		jsonError(w, http.StatusNotFound, "release not found")
 		return
 	}
 
-	issueIDs, _ := models.GetReleaseIssueIDs(h.db.SQL, id)
+	issueIDs, _ := store.NewReleaseRepo(h.db.SQL).IssueIDs(r.Context(), id)
 	jsonOK(w, map[string]any{
 		"release":   rel,
 		"issue_ids": issueIDs,
@@ -68,13 +69,13 @@ func (h *releaseHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		req.Status = "pending"
 	}
 
-	if err := models.CreateRelease(h.db.SQL, &req.Release); err != nil {
+	if err := store.NewReleaseRepo(h.db.SQL).Create(r.Context(), &req.Release); err != nil {
 		jsonServerError(w, r, "failed to create release", err)
 		return
 	}
 
 	if len(req.IssueIDs) > 0 {
-		models.SetReleaseIssues(h.db.SQL, req.Release.ID, req.IssueIDs)
+		store.NewReleaseRepo(h.db.SQL).SetIssues(r.Context(), req.Release.ID, req.IssueIDs)
 	}
 
 	jsonCreated(w, req.Release)
@@ -87,7 +88,7 @@ func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, err := models.GetRelease(h.db.SQL, id)
+	existing, err := store.NewReleaseRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil || existing == nil {
 		jsonError(w, http.StatusNotFound, "release not found")
 		return
@@ -109,13 +110,13 @@ func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		req.LiveDate = time.Now().Format("2006-01-02")
 	}
 
-	if err := models.UpdateRelease(h.db.SQL, &req.Release); err != nil {
+	if err := store.NewReleaseRepo(h.db.SQL).Update(r.Context(), &req.Release); err != nil {
 		jsonServerError(w, r, "failed to update release", err)
 		return
 	}
 
 	if req.IssueIDs != nil {
-		models.SetReleaseIssues(h.db.SQL, id, req.IssueIDs)
+		store.NewReleaseRepo(h.db.SQL).SetIssues(r.Context(), id, req.IssueIDs)
 	}
 
 	jsonOK(w, req.Release)
@@ -128,9 +129,18 @@ func (h *releaseHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := models.DeleteRelease(h.db.SQL, id); err != nil {
+	if err := store.NewReleaseRepo(h.db.SQL).Delete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "failed to delete release", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *releaseHandlers) registerRoutes(rr routeRegistrar) {
+	rr.public("GET /api/releases", h.handleList)
+	rr.role("editor", "POST /api/releases", h.handleCreate)
+	rr.public("GET /api/releases/{id}", h.handleGet)
+	rr.role("editor", "PUT /api/releases/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/releases/{id}", h.handleDelete)
 }

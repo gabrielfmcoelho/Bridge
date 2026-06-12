@@ -130,7 +130,7 @@ export interface AlertThresholds {
   resource_info_low: number;
 }
 
-export type SortField = "nickname" | "containers_count" | "resource_cpu" | "resource_ram" | "resource_disk" | "situacao";
+export type SortField = "nickname" | "hostname" | "hospedagem" | "containers_count" | "resource_cpu" | "resource_ram" | "resource_disk" | "situacao";
 
 export interface HostSortConfig {
   field: SortField;

@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,121 +12,17 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
+// hostHandlers retains db for the write paths (create/update with vault
+// dual-writes, SSH-key resealing, Grafana provisioning) which are not yet
+// lifted into the service. Read paths (list/get) delegate to host.
 type hostHandlers struct {
-	db *database.DB
-}
-
-type scanResources struct {
-	CPU        string `json:"cpu,omitempty"`
-	CPUUsage   string `json:"cpu_usage,omitempty"`
-	RAM        string `json:"ram,omitempty"`
-	RAMPercent string `json:"ram_percent,omitempty"`
-	Storage    string `json:"storage,omitempty"`
-	DiskPct    string `json:"disk_percent,omitempty"`
-}
-
-type scanFull struct {
-	scanResources
-	Services   []string            `json:"services"`
-	Containers []string            `json:"containers"`
-	Profile    *hostProfileSummary `json:"profile,omitempty"`
-}
-
-// hostProfileSummary mirrors the relevant subset of sshtest.HostProfile —
-// only the fields needed to surface the idle verdict (and the operator's
-// "why" trail) on the host list. Defining a local twin keeps the api
-// package free of an internal/sshtest import.
-type hostProfileSummary struct {
-	Idle         bool     `json:"idle"`
-	Reasons      []string `json:"reasons,omitempty"`
-	Counterfacts []string `json:"counterfacts,omitempty"`
-}
-
-type hostAlert struct {
-	ID            int64  `json:"id"`
-	Type          string `json:"type"`
-	Level         string `json:"level"`
-	Message       string `json:"message"`
-	Description   string `json:"description,omitempty"`
-	Source        string `json:"source"`
-	Status        string `json:"status"`
-	LinkedIssueID *int64 `json:"linked_issue_id,omitempty"`
-}
-
-func computeAlerts(_ *scanResources, sf *scanFull, host models.Host, t *models.AlertThresholds) []hostAlert {
-	var alerts []hostAlert
-
-	parseUsagePct := func(s string) (int, bool) {
-		s = strings.TrimSuffix(strings.TrimSpace(s), "%")
-		v, err := strconv.Atoi(s)
-		return v, err == nil
-	}
-
-	if sf != nil {
-		// Resource alerts
-		for _, r := range []struct {
-			typ, label, usage string
-		}{
-			{"resource_cpu", "CPU", sf.CPUUsage},
-			{"resource_ram", "RAM", sf.RAMPercent},
-			{"resource_disk", "Disk", sf.DiskPct},
-		} {
-			if r.usage == "" {
-				continue
-			}
-			pct, ok := parseUsagePct(r.usage)
-			if !ok {
-				continue
-			}
-			var level, msg string
-			switch {
-			case pct >= t.ResourceCritical:
-				level = "critical"
-				msg = fmt.Sprintf("%s at %d%% (critical: %d%%)", r.label, pct, t.ResourceCritical)
-			case pct >= t.ResourceWarning:
-				level = "warning"
-				msg = fmt.Sprintf("%s at %d%% (warning: %d%%)", r.label, pct, t.ResourceWarning)
-			case pct <= t.ResourceInfoLow:
-				level = "info"
-				msg = fmt.Sprintf("%s at %d%% (sub-utilized)", r.label, pct)
-			}
-			if level != "" {
-				alerts = append(alerts, hostAlert{Type: r.typ, Level: level, Message: msg, Source: "auto", Status: "active"})
-			}
-		}
-
-		// /dev/null alert
-		allFields := sf.CPU + sf.CPUUsage + sf.RAM + sf.RAMPercent + sf.Storage + sf.DiskPct
-		lower := strings.ToLower(allFields)
-		if strings.Contains(lower, "/dev/null") || strings.Contains(lower, "permission denied") {
-			alerts = append(alerts, hostAlert{
-				Type:    "dev_null",
-				Level:   "warning",
-				Message: "Scan returned /dev/null permission warning",
-				Source:  "auto",
-			})
-		}
-	}
-
-	// Auth failed alert — only fires when all *tested* credentials failed
-	pwdTestedFailed := host.HasPassword && host.PasswordTestStatus != nil && *host.PasswordTestStatus == "failed"
-	keyTestedFailed := host.HasKey && host.KeyTestStatus != nil && *host.KeyTestStatus == "failed"
-	pwdTestedOK := host.HasPassword && host.PasswordTestStatus != nil && *host.PasswordTestStatus == "success"
-	keyTestedOK := host.HasKey && host.KeyTestStatus != nil && *host.KeyTestStatus == "success"
-
-	if (pwdTestedFailed || keyTestedFailed) && !pwdTestedOK && !keyTestedOK {
-		alerts = append(alerts, hostAlert{
-			Type:    "auth_failed",
-			Level:   "warning",
-			Message: "No authentication method is working",
-			Source:  "auto",
-		})
-	}
-
-	return alerts
+	host *service.HostService
+	db   *database.DB
 }
 
 func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
@@ -144,8 +40,6 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		SortBy:              r.URL.Query().Get("sort_by"),
 		SortDir:             r.URL.Query().Get("sort_dir"),
 	}
-
-	// Parse pagination
 	if p := r.URL.Query().Get("page"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil && v > 0 {
 			f.Page = v
@@ -157,142 +51,14 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	hosts, err := models.ListHosts(h.db.SQL, f)
+	result, err := h.host.List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "failed to list hosts", err)
 		return
 	}
 
-	// Attach tags, scan status, and scan resource summary for each host.
-	tagMap, _ := models.GetAllTags(h.db.SQL, "host")
-	scanStatuses, scanErr := models.GetHostScanStatuses(h.db.SQL)
-	if scanErr != nil {
-		log.Printf("[hosts] GetHostScanStatuses error: %v", scanErr)
-	}
-	scanDataBulk, bulkErr := models.GetLatestScanDataBulk(h.db.SQL)
-	if bulkErr != nil {
-		log.Printf("[hosts] GetLatestScanDataBulk error: %v", bulkErr)
-	}
-	log.Printf("[hosts] Found %d hosts, %d scan statuses, %d scan data entries", len(hosts), len(scanStatuses), len(scanDataBulk))
-
-	thresholds, thErr := models.GetAlertThresholds(h.db.SQL)
-	if thErr != nil {
-		log.Printf("[hosts] GetAlertThresholds error: %v", thErr)
-		thresholds = &models.AlertThresholds{ResourceCritical: 80, ResourceWarning: 60, ResourceInfoLow: 5}
-	}
-
-	type hostWithExtra struct {
-		models.Host
-		Tags                 []string       `json:"tags"`
-		HasScan              bool           `json:"has_scan"`
-		LastScanAt           *time.Time     `json:"last_scan_at,omitempty"`
-		ScanRes              *scanResources `json:"scan_resources,omitempty"`
-		ContainersCount      int            `json:"containers_count"`
-		ProcessesCount       int            `json:"processes_count"`
-		ServicesCount        int            `json:"services_count"`
-		DNSCount             int            `json:"dns_count"`
-		IssuesCount          int            `json:"issues_count"`
-		CanCompile           bool           `json:"can_compile"`
-		Idle                 bool           `json:"idle,omitempty"`
-		IdleReasons          []string       `json:"idle_reasons,omitempty"`
-		IdleCounterfacts     []string       `json:"idle_counterfacts,omitempty"`
-		Alerts               []hostAlert    `json:"alerts"`
-		MainResponsavelName  string         `json:"main_responsavel_name"`
-		MainEntidade         string         `json:"main_entidade"`
-		ChamadosCount        int            `json:"chamados_count"`
-		ProjectsCount        int            `json:"projects_count"`
-	}
-
-	projCounts, _ := models.GetProjectCountsByHost(h.db.SQL)
-	svcCounts, _ := models.GetServiceCountsByHost(h.db.SQL)
-	dnsCounts, _ := models.GetDNSCountsByHost(h.db.SQL)
-	issueCounts, _ := models.GetIssueCountsByEntity(h.db.SQL, "host")
-	mainRespNames, _ := models.GetMainResponsavelNamesBulk(h.db.SQL)
-	mainEntidades, _ := models.GetMainEntidadeBulk(h.db.SQL)
-	chamadosCounts, _ := models.GetChamadosCountsBulk(h.db.SQL)
-	manualAlertsBulk, _ := models.ListHostAlertsBulk(h.db.SQL)
-	alertLinkedIssues, _ := models.GetAlertLinkedIssueIDsBulk(h.db.SQL)
-
-	result := make([]hostWithExtra, len(hosts))
-	for i, host := range hosts {
-		hwt := hostWithExtra{Host: host, Tags: tagMap[host.ID]}
-		hwt.ServicesCount = svcCounts[host.ID]
-		hwt.DNSCount = dnsCounts[host.ID]
-		hwt.IssuesCount = issueCounts[host.ID]
-		hwt.MainResponsavelName = mainRespNames[host.ID]
-		hwt.MainEntidade = mainEntidades[host.ID]
-		hwt.ChamadosCount = chamadosCounts[host.ID]
-		hwt.ProjectsCount = projCounts[host.ID]
-		hwt.CanCompile = host.Hostname != "" && host.User != ""
-		if scanTime, ok := scanStatuses[host.ID]; ok {
-			hwt.HasScan = true
-			t := scanTime
-			hwt.LastScanAt = &t
-		}
-		var sfPtr *scanFull
-		if data, ok := scanDataBulk[host.ID]; ok {
-			var sf scanFull
-			if err := json.Unmarshal([]byte(data), &sf); err != nil {
-				log.Printf("[hosts] Host %d: JSON unmarshal error: %v", host.ID, err)
-			} else {
-				if sf.CPU != "" || sf.RAM != "" || sf.Storage != "" {
-					sr := sf.scanResources
-					hwt.ScanRes = &sr
-				}
-				hwt.ContainersCount = len(sf.Containers)
-				hwt.ProcessesCount = len(sf.Services)
-				if sf.Profile != nil {
-					hwt.Idle = sf.Profile.Idle
-					hwt.IdleReasons = sf.Profile.Reasons
-					hwt.IdleCounterfacts = sf.Profile.Counterfacts
-				}
-				sfPtr = &sf
-			}
-		}
-		hwt.Alerts = computeAlerts(hwt.ScanRes, sfPtr, host, thresholds)
-		// Build set of auto-computed alert types for dedup
-		autoTypes := make(map[string]bool, len(hwt.Alerts))
-		for _, a := range hwt.Alerts {
-			autoTypes[a.Type] = true
-		}
-		// Merge DB alerts, enriched with linked issue IDs.
-		// For source="auto" DB alerts that duplicate a computed alert of the
-		// same type, replace the computed one (so the DB ID + issue link show up)
-		// instead of appending a second copy.
-		if manualAlerts, ok := manualAlertsBulk[host.ID]; ok {
-			for _, ma := range manualAlerts {
-				ha := hostAlert{
-					ID:          ma.ID,
-					Type:        ma.Type,
-					Level:       ma.Level,
-					Message:     ma.Message,
-					Description: ma.Description,
-					Source:      ma.Source,
-					Status:      ma.Status,
-				}
-				if issueID, ok := alertLinkedIssues[ma.ID]; ok {
-					id := issueID
-					ha.LinkedIssueID = &id
-				}
-				if ma.Source == "auto" && autoTypes[ma.Type] {
-					// Replace the computed alert with the persisted one
-					for j, ca := range hwt.Alerts {
-						if ca.Source == "auto" && ca.Type == ma.Type && ca.ID == 0 {
-							hwt.Alerts[j] = ha
-							break
-						}
-					}
-				} else {
-					hwt.Alerts = append(hwt.Alerts, ha)
-				}
-			}
-		}
-		result[i] = hwt
-	}
-
-	// Post-enrichment filter: alert_level
-	alertLevelFilter := r.URL.Query().Get("alert_level")
-	if alertLevelFilter != "" {
+	// Post-enrichment filter: alert_level (operates on the computed alerts).
+	if alertLevelFilter := r.URL.Query().Get("alert_level"); alertLevelFilter != "" {
 		filtered := result[:0]
 		for _, hwt := range result {
 			if alertLevelFilter == "none" {
@@ -311,13 +77,11 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		result = filtered
 	}
 
-	// Post-enrichment filter: idle. The idle flag comes from the
-	// HostProfile heuristic embedded in scan_data, so this filter has to
-	// run after we've unmarshalled the scan JSON for each host. "active"
-	// keeps only hosts that have scan data AND were classified as not
-	// idle — hosts with no scan are excluded (we can't tell either way).
-	idleFilter := r.URL.Query().Get("idle")
-	if idleFilter == "idle" || idleFilter == "active" {
+	// Post-enrichment filter: idle. The idle flag comes from the HostProfile
+	// heuristic embedded in scan_data, so it runs after enrichment. "active"
+	// keeps only hosts that have scan data AND were classified not-idle; hosts
+	// with no scan are excluded (we can't tell either way).
+	if idleFilter := r.URL.Query().Get("idle"); idleFilter == "idle" || idleFilter == "active" {
 		filtered := result[:0]
 		for _, hwt := range result {
 			if idleFilter == "idle" && hwt.Idle {
@@ -329,75 +93,47 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		result = filtered
 	}
 
-	// If paginated, wrap in envelope with total count
+	// Uniform list envelope (R4). Hosts is the one list that paginates in SQL
+	// (HostFilter.Page/PerPage → repo LIMIT/OFFSET); when per_page is set we
+	// report the real Count, otherwise the full result length.
 	if f.PerPage > 0 {
-		total, _ := models.CountHosts(h.db.SQL, f)
-		totalPages := (total + f.PerPage - 1) / f.PerPage
+		total, _ := h.host.Count(r.Context(), f)
 		page := f.Page
 		if page < 1 {
 			page = 1
 		}
-		jsonOK(w, map[string]any{
-			"data":        result,
-			"total":       total,
-			"page":        page,
-			"per_page":    f.PerPage,
-			"total_pages": totalPages,
-		})
+		jsonList(w, result, Meta{Page: page, PerPage: f.PerPage, Total: total})
 		return
 	}
-
-	jsonOK(w, result)
+	jsonList(w, result, metaFor(PageParams{Page: 1, PerPage: 0}, len(result)))
 }
 
 func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	detail, err := h.host.Get(r.Context(), slug)
 	if err != nil {
 		jsonServerError(w, r, "database error", err)
 		return
 	}
-	if host == nil {
+	if detail == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
 	}
-
-	tags, _ := models.GetTags(h.db.SQL, "host", host.ID)
-	orch, _ := models.GetOrchestratorByHost(h.db.SQL, host.ID)
-	dns, _ := models.GetHostDNSRecords(h.db.SQL, host.ID)
-	services, _ := models.ListServicesByHost(h.db.SQL, host.ID)
-	projects, _ := models.ListProjectsByHost(h.db.SQL, host.ID)
-	lastScan, _ := models.GetLatestHostScan(h.db.SQL, host.ID)
-	responsaveis, _ := models.ListHostResponsaveis(h.db.SQL, host.ID)
-	chamados, _ := models.ListHostChamados(h.db.SQL, host.ID)
-	entidades, _ := models.ListHostEntidades(h.db.SQL, host.ID)
-
-	jsonOK(w, map[string]any{
-		"host":         host,
-		"tags":         tags,
-		"orchestrator": orch,
-		"dns_records":  dns,
-		"services":     services,
-		"projects":     projects,
-		"last_scan":    lastScan,
-		"responsaveis": responsaveis,
-		"chamados":     chamados,
-		"entidades":    entidades,
-	})
+	jsonOK(w, detail)
 }
 
 func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		models.Host
-		Tags         []string                      `json:"tags"`
-		Password     string                        `json:"password"`
-		SSHKeyID     int64                         `json:"ssh_key_id"`
-		Responsaveis []models.HostResponsavelInput `json:"responsaveis"`
-		Chamados     []models.HostChamadoInput     `json:"chamados"`
-		Entidades    []models.HostEntidadeInput    `json:"entidades"`
-		DNSIDs       []int64                       `json:"dns_ids"`
-		ServiceIDs   []int64                       `json:"service_ids"`
-		ProjectIDs   []int64                       `json:"project_ids"`
+		Tags         []string                   `json:"tags"`
+		Password     string                     `json:"password"`
+		SSHKeyID     int64                      `json:"ssh_key_id"`
+		Responsaveis []models.ResponsavelInput  `json:"responsaveis"`
+		Chamados     []models.HostChamadoInput  `json:"chamados"`
+		Entidades    []models.HostEntidadeInput `json:"entidades"`
+		DNSIDs       []int64                    `json:"dns_ids"`
+		ServiceIDs   []int64                    `json:"service_ids"`
+		ProjectIDs   []int64                    `json:"project_ids"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -408,23 +144,18 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, _ := models.HostSlugExists(h.db.SQL, req.OficialSlug, 0)
+	exists, _ := store.NewHostRepo(h.db.SQL).SlugExists(r.Context(), req.OficialSlug, 0)
 	if exists {
 		jsonError(w, http.StatusConflict, "slug already exists")
 		return
 	}
 
-	// Key material is attached via linkSSHKey (post-create) which writes
-	// to the unified vault. Callers cannot set a filesystem path on the
-	// host row — the vault is the source of truth so backups restore
-	// cleanly onto any machine.
+	// Flag derivation (transport-input shaping). Key material is attached via
+	// the vault by the service's SSH-key link — callers can't set a filesystem
+	// path; has_password is a cached flag for the vault payload.
 	req.Host.KeyPath = ""
 	req.Host.HasKey = false
-
-	// has_password is a cached flag; the actual password payload is
-	// stored in the vault by the post-CreateHost dual-write below.
 	req.Host.HasPassword = req.Password != ""
-
 	preferredAuth, prefErr := normalizePreferredAuth(req.Host.HasPassword, req.Host.HasKey || req.SSHKeyID > 0, req.Host.PreferredAuth)
 	if prefErr != nil {
 		jsonError(w, http.StatusBadRequest, prefErr.Error())
@@ -432,84 +163,39 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Host.PreferredAuth = preferredAuth
 
-	if err := models.CreateHost(h.db.SQL, &req.Host); err != nil {
+	w2 := &service.HostWrite{
+		Host:         req.Host,
+		Password:     req.Password,
+		SSHKeyID:     req.SSHKeyID,
+		Tags:         &req.Tags,
+		Responsaveis: &req.Responsaveis,
+		Chamados:     &req.Chamados,
+		Entidades:    &req.Entidades,
+		DNSIDs:       &req.DNSIDs,
+		ServiceIDs:   &req.ServiceIDs,
+		ProjectIDs:   &req.ProjectIDs,
+	}
+	host, err := h.host.Create(r.Context(), actorID(r), w2)
+	if errors.Is(err, service.ErrHostKeyLink) {
+		jsonServerError(w, r, "host created but "+err.Error(), err)
+		return
+	}
+	if err != nil {
 		jsonServerError(w, r, "failed to create host", err)
 		return
 	}
 
-	// Stage 1 dual-write: mirror the password to the unified vault so
-	// SSH/Coolify/import handlers reading via vault.HostGetPassword see
-	// it. Stage 2 will drop the column-side write and the host row will
-	// only carry the has_password boolean.
-	if req.Password != "" {
-		actorID := actorUserID(r)
-		if err := vault.HostSetPassword(r.Context(), h.db, req.Host.ID, actorID, req.Password); err != nil {
-			log.Printf("[hosts] vault dual-write on create slug=%s: %v", req.OficialSlug, err)
-		}
-	}
+	// Fire-and-forget: auto-provision a default Grafana dashboard if enabled.
+	h.maybeProvisionGrafanaDashboard(*host)
 
-	if len(req.Tags) > 0 {
-		models.SetTags(h.db.SQL, "host", req.Host.ID, req.Tags)
-	}
-
-	// Sync responsaveis and chamados
-	if len(req.Responsaveis) > 0 {
-		if err := models.SyncHostResponsaveis(h.db.SQL, req.Host.ID, req.Responsaveis); err != nil {
-			log.Printf("[hosts] SyncHostResponsaveis error on create: %v", err)
-		}
-	}
-	if len(req.Chamados) > 0 {
-		if err := models.SyncHostChamados(h.db.SQL, req.Host.ID, req.Chamados); err != nil {
-			log.Printf("[hosts] SyncHostChamados error on create: %v", err)
-		}
-	}
-	if len(req.Entidades) > 0 {
-		if err := models.SyncHostEntidades(h.db.SQL, req.Host.ID, req.Entidades); err != nil {
-			log.Printf("[hosts] SyncHostEntidades error on create: %v", err)
-		}
-	}
-
-	// Link SSH key from DB if provided. A failure here doesn't abort host
-	// creation (the host row already exists at this point) but it MUST be
-	// surfaced to the client so the user isn't misled into thinking the key
-	// was attached. See linkSSHKey for the silent-failure modes this guards.
-	if req.SSHKeyID > 0 {
-		if linkErr := h.linkSSHKey(req.Host.ID, req.SSHKeyID, req.OficialSlug); linkErr != nil {
-			jsonServerError(w, r, "host created but ssh key link failed: "+linkErr.Error(), linkErr)
-			return
-		}
-	}
-
-	// Link DNS records and services if provided.
-	if len(req.DNSIDs) > 0 {
-		if err := models.SetHostDNSLinks(h.db.SQL, req.Host.ID, req.DNSIDs); err != nil {
-			log.Printf("[hosts] SetHostDNSLinks error on create: %v", err)
-		}
-	}
-	if len(req.ServiceIDs) > 0 {
-		if err := models.SetHostServiceLinks(h.db.SQL, req.Host.ID, req.ServiceIDs); err != nil {
-			log.Printf("[hosts] SetHostServiceLinks error on create: %v", err)
-		}
-	}
-	if len(req.ProjectIDs) > 0 {
-		if err := models.SetHostProjectLinks(h.db.SQL, req.Host.ID, req.ProjectIDs); err != nil {
-			log.Printf("[hosts] SetHostProjectLinks error on create: %v", err)
-		}
-	}
-
-	// Fire-and-forget: if Grafana integration is fully configured, auto-provision
-	// a default dashboard for this new host in the background. Failures just log —
-	// we never block host creation on Grafana being reachable.
-	h.maybeProvisionGrafanaDashboard(req.Host)
-
-	jsonCreated(w, req.Host)
+	jsonCreated(w, *host)
 }
 
 // maybeProvisionGrafanaDashboard runs ProvisionHostDashboard in a goroutine if
 // the integration is enabled. Keep the call site cheap — a couple of DB reads
 // worst case when it's disabled.
 func (h *hostHandlers) maybeProvisionGrafanaDashboard(host models.Host) {
-	if models.GetAppSettingValue(h.db.SQL, "grafana_enabled") != "true" {
+	if store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), "grafana_enabled") != "true" {
 		return
 	}
 	go func(host models.Host) {
@@ -528,7 +214,7 @@ func (h *hostHandlers) maybeProvisionGrafanaDashboard(host models.Host) {
 
 func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	existing, err := models.GetHostBySlug(h.db.SQL, slug)
+	existing, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || existing == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -536,16 +222,16 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		models.Host
-		Tags         []string                       `json:"tags"`
-		Password     string                         `json:"password"`
-		SSHKeyID     int64                          `json:"ssh_key_id"`
-		ClearKey     bool                           `json:"clear_key"`
-		Responsaveis *[]models.HostResponsavelInput `json:"responsaveis"`
-		Chamados     *[]models.HostChamadoInput     `json:"chamados"`
-		Entidades    *[]models.HostEntidadeInput    `json:"entidades"`
-		DNSIDs       *[]int64                       `json:"dns_ids"`
-		ServiceIDs   *[]int64                       `json:"service_ids"`
-		ProjectIDs   *[]int64                       `json:"project_ids"`
+		Tags         []string                    `json:"tags"`
+		Password     string                      `json:"password"`
+		SSHKeyID     int64                       `json:"ssh_key_id"`
+		ClearKey     bool                        `json:"clear_key"`
+		Responsaveis *[]models.ResponsavelInput  `json:"responsaveis"`
+		Chamados     *[]models.HostChamadoInput  `json:"chamados"`
+		Entidades    *[]models.HostEntidadeInput `json:"entidades"`
+		DNSIDs       *[]int64                    `json:"dns_ids"`
+		ServiceIDs   *[]int64                    `json:"service_ids"`
+		ProjectIDs   *[]int64                    `json:"project_ids"`
 	}
 	req.Host = *existing
 	if err := decodeJSON(r, &req); err != nil {
@@ -555,16 +241,16 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	// If only ssh_key_id is provided (no host data), just link the key and return.
 	if req.SSHKeyID > 0 && req.Nickname == "" {
-		if linkErr := h.linkSSHKey(existing.ID, req.SSHKeyID, existing.OficialSlug); linkErr != nil {
+		if linkErr := h.host.LinkSSHKey(r.Context(), existing.ID, req.SSHKeyID, existing.OficialSlug); linkErr != nil {
 			jsonServerError(w, r, "failed to link ssh key: "+linkErr.Error(), linkErr)
 			return
 		}
-		updatedHost, getErr := models.GetHostByID(h.db.SQL, existing.ID)
+		updatedHost, getErr := store.NewHostRepo(h.db.SQL).GetByID(r.Context(), existing.ID)
 		if getErr == nil && updatedHost != nil {
 			preferredAuth, normErr := normalizePreferredAuth(updatedHost.HasPassword, updatedHost.HasKey, updatedHost.PreferredAuth)
 			if normErr == nil && preferredAuth != updatedHost.PreferredAuth {
 				updatedHost.PreferredAuth = preferredAuth
-				_ = models.UpdateHost(h.db.SQL, updatedHost)
+				_ = store.NewHostRepo(h.db.SQL).Update(r.Context(), updatedHost)
 			}
 		}
 		jsonOK(w, existing)
@@ -581,7 +267,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Host.OficialSlug != existing.OficialSlug {
-		exists, slugErr := models.HostSlugExists(h.db.SQL, req.Host.OficialSlug, existing.ID)
+		exists, slugErr := store.NewHostRepo(h.db.SQL).SlugExists(r.Context(), req.Host.OficialSlug, existing.ID)
 		if slugErr != nil {
 			jsonServerError(w, r, "failed to validate slug", slugErr)
 			return
@@ -622,76 +308,33 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Host.PreferredAuth = preferredAuth
 
-	if err := models.UpdateHost(h.db.SQL, &req.Host); err != nil {
+	w2 := &service.HostWrite{
+		Host:         req.Host,
+		Password:     req.Password,
+		SSHKeyID:     req.SSHKeyID,
+		ClearKey:     req.ClearKey,
+		Responsaveis: req.Responsaveis,
+		Chamados:     req.Chamados,
+		Entidades:    req.Entidades,
+		DNSIDs:       req.DNSIDs,
+		ServiceIDs:   req.ServiceIDs,
+		ProjectIDs:   req.ProjectIDs,
+	}
+	// Tags is a non-pointer slice here; apply only when present in the request.
+	if req.Tags != nil {
+		w2.Tags = &req.Tags
+	}
+	host, err := h.host.Update(r.Context(), actorID(r), w2)
+	if errors.Is(err, service.ErrHostKeyLink) {
+		jsonServerError(w, r, "host updated but "+err.Error(), err)
+		return
+	}
+	if err != nil {
 		jsonServerError(w, r, "failed to update host", err)
 		return
 	}
 
-	// Stage 1 dual-write: keep the vault row in sync. Password rotation
-	// upserts; clearing the key removes the vault row. SSH key linking
-	// (req.SSHKeyID > 0) flows through linkSSHKey which writes to vault
-	// inside that helper.
-	actorID := actorUserID(r)
-	if req.Password != "" {
-		if err := vault.HostSetPassword(r.Context(), h.db, existing.ID, actorID, req.Password); err != nil {
-			log.Printf("[hosts] vault dual-write on update slug=%s: %v", existing.OficialSlug, err)
-		}
-	}
-	if req.ClearKey {
-		if err := vault.HostSetSSHKey(r.Context(), h.db, existing.ID, actorID, vault.HostSSHKey{}); err != nil {
-			log.Printf("[hosts] vault clear-key on update slug=%s: %v", existing.OficialSlug, err)
-		}
-	}
-
-	if req.Tags != nil {
-		models.SetTags(h.db.SQL, "host", existing.ID, req.Tags)
-	}
-
-	// Sync responsaveis and chamados if provided
-	if req.Responsaveis != nil {
-		if err := models.SyncHostResponsaveis(h.db.SQL, existing.ID, *req.Responsaveis); err != nil {
-			log.Printf("[hosts] SyncHostResponsaveis error on update: %v", err)
-		}
-	}
-	if req.Chamados != nil {
-		if err := models.SyncHostChamados(h.db.SQL, existing.ID, *req.Chamados); err != nil {
-			log.Printf("[hosts] SyncHostChamados error on update: %v", err)
-		}
-	}
-	if req.Entidades != nil {
-		if err := models.SyncHostEntidades(h.db.SQL, existing.ID, *req.Entidades); err != nil {
-			log.Printf("[hosts] SyncHostEntidades error on update: %v", err)
-		}
-	}
-
-	// Link SSH key from DB if provided. Host was already updated above with
-	// the preserved key data, so this will overwrite with the selected key.
-	// Failure must be surfaced so the client knows the link didn't stick.
-	if req.SSHKeyID > 0 {
-		if linkErr := h.linkSSHKey(existing.ID, req.SSHKeyID, existing.OficialSlug); linkErr != nil {
-			jsonServerError(w, r, "host updated but ssh key link failed: "+linkErr.Error(), linkErr)
-			return
-		}
-	}
-
-	// Sync DNS and service links if provided.
-	if req.DNSIDs != nil {
-		if err := models.SetHostDNSLinks(h.db.SQL, existing.ID, *req.DNSIDs); err != nil {
-			log.Printf("[hosts] SetHostDNSLinks error on update: %v", err)
-		}
-	}
-	if req.ServiceIDs != nil {
-		if err := models.SetHostServiceLinks(h.db.SQL, existing.ID, *req.ServiceIDs); err != nil {
-			log.Printf("[hosts] SetHostServiceLinks error on update: %v", err)
-		}
-	}
-	if req.ProjectIDs != nil {
-		if err := models.SetHostProjectLinks(h.db.SQL, existing.ID, *req.ProjectIDs); err != nil {
-			log.Printf("[hosts] SetHostProjectLinks error on update: %v", err)
-		}
-	}
-
-	jsonOK(w, req.Host)
+	jsonOK(w, *host)
 }
 
 func normalizePreferredAuth(hasPassword, hasKey bool, preferredAuth string) (string, error) {
@@ -712,15 +355,14 @@ func normalizePreferredAuth(hasPassword, hasKey bool, preferredAuth string) (str
 
 func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
 	}
 
-	models.DeleteTags(h.db.SQL, "host", host.ID)
-	if err := cascadeParentDelete(r, h.db, models.SecretScopeHost, host.ID,
-		`DELETE FROM hosts WHERE id = ?`); err != nil {
+	actor, _ := actorFrom(r)
+	if err := h.host.Delete(r.Context(), actor, host.ID); err != nil {
 		jsonServerError(w, r, "failed to delete host", err)
 		return
 	}
@@ -729,7 +371,7 @@ func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 func (h *hostHandlers) handleGetPassword(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -764,57 +406,39 @@ func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
 	return []byte(key.PrivateKeyPEM), nil
 }
 
-// linkSSHKey copies the encrypted key blob from the ssh_keys table onto the
-// host row. It does NOT materialize the key to the filesystem — key-auth SSH
-// decrypts the blob in-memory at connection time via resolveHostKeyPEM.
-//
-// Returns an error so callers can surface linking failures instead of the
-// previous silent-return behavior that made "I selected a key but it didn't
-// save" bugs impossible to diagnose in production.
-func (h *hostHandlers) linkSSHKey(hostID, sshKeyID int64, slug string) error {
-	k, err := models.GetSSHKey(h.db.SQL, sshKeyID)
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *hostHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/hosts", h.handleList)
+	rr.auth("GET /api/hosts/trash", h.handleListTrash)
+	rr.role("admin", "POST /api/hosts/{id}/restore", h.handleRestore)
+	rr.role("editor", "POST /api/hosts", h.handleCreate)
+	rr.auth("GET /api/hosts/{slug}", h.handleGet)
+	rr.role("editor", "PUT /api/hosts/{slug}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/hosts/{slug}", h.handleDelete)
+	rr.role("admin", "GET /api/hosts/{slug}/password", h.handleGetPassword)
+}
+
+func (h *hostHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
+	items, err := h.host.ListTrash(r.Context())
 	if err != nil {
-		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: GetSSHKey error: %v", slug, sshKeyID, err)
-		return fmt.Errorf("load ssh key %d: %w", sshKeyID, err)
+		jsonServerError(w, r, "failed to list host trash", err)
+		return
 	}
-	if k == nil {
-		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: ssh key not found", slug, sshKeyID)
-		return fmt.Errorf("ssh key %d not found", sshKeyID)
+	if items == nil {
+		items = []models.Host{}
 	}
-	if len(k.PrivKeyCiphertext) == 0 {
-		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: ssh key has no private key stored (name=%q, credential_type=%q)",
-			slug, sshKeyID, k.Name, k.CredentialType)
-		return fmt.Errorf("ssh key %q has no stored private key — add a private key to the entry or pick a different key", k.Name)
-	}
-	// Update the host flag + path metadata (the encrypted payload lives
-	// in the vault). identities_only="yes" forces SSH to use only the
-	// host's linked key rather than agent or other identities.
-	if err := models.UpdateHostKeyMeta(h.db.SQL, hostID, true, "", "yes"); err != nil {
-		log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: UpdateHostKeyMeta error: %v", slug, sshKeyID, err)
-		return fmt.Errorf("update host key flags: %w", err)
-	}
+	jsonOK(w, items)
+}
 
-	// Decrypt the ssh_keys row and re-seal into the host's vault entry.
-	priv, perr := h.db.Encryptor.Decrypt(k.PrivKeyCiphertext, k.PrivKeyNonce)
-	if perr != nil {
-		log.Printf("[hosts] linkSSHKey decrypt priv slug=%s: %v", slug, perr)
-		return fmt.Errorf("decrypt ssh key %d private payload: %w", sshKeyID, perr)
+func (h *hostHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
 	}
-	pub := ""
-	if len(k.PubKeyCiphertext) > 0 {
-		if p, derr := h.db.Encryptor.Decrypt(k.PubKeyCiphertext, k.PubKeyNonce); derr == nil {
-			pub = p
-		}
+	actor, _ := actorFrom(r)
+	if err := h.host.Restore(r.Context(), actor, id); err != nil {
+		jsonServerError(w, r, "failed to restore host", err)
+		return
 	}
-	// actor_user_id=0 falls through to the vault's resolveSystemActor —
-	// linkSSHKey is called from several paths (create + update + sync
-	// from coolify) where the caller's user isn't easily threaded down.
-	if vErr := vault.HostSetSSHKey(context.Background(), h.db, hostID, 0,
-		vault.HostSSHKey{PrivateKeyPEM: priv, PublicKey: pub}); vErr != nil {
-		log.Printf("[hosts] linkSSHKey vault write slug=%s: %v", slug, vErr)
-		return fmt.Errorf("store host ssh key in vault: %w", vErr)
-	}
-
-	log.Printf("[hosts] linkSSHKey slug=%s key_id=%d: linked key %q (fingerprint=%s)", slug, sshKeyID, k.Name, k.Fingerprint)
-	return nil
+	jsonOK(w, map[string]string{"status": "restored"})
 }

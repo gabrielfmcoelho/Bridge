@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -19,8 +19,7 @@ import (
 // TestCrossDialectRestore in internal/database.
 func TestMigrateLegacySecrets(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -29,39 +28,36 @@ func TestMigrateLegacySecrets(t *testing.T) {
 	// Seed the maintenance user (production wires this up via the
 	// seed-maintenance-user binary). The migration looks up by id, not
 	// username, so the test resolves it once here.
-	res, err := d.SQL.Exec(
-		`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`,
+	var maintID int64
+	if err := d.SQL.QueryRow(
+		`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`,
 		"sead-manutencao", "x", "admin",
-	)
-	if err != nil {
+	).Scan(&maintID); err != nil {
 		t.Fatalf("seed maintenance user: %v", err)
 	}
-	maintID, _ := res.LastInsertId()
 
 	// Seed parent service and host so legacy rows have FK targets.
-	svcRes, err := d.SQL.Exec(`INSERT INTO services (nickname) VALUES (?)`, "billing-api")
-	if err != nil {
+	var serviceID int64
+	if err := d.SQL.QueryRow(`INSERT INTO services (nickname) VALUES (?) RETURNING id`, "billing-api").Scan(&serviceID); err != nil {
 		t.Fatalf("seed service: %v", err)
 	}
-	serviceID, _ := svcRes.LastInsertId()
 
-	hostRes, err := d.SQL.Exec(
-		`INSERT INTO hosts (nickname, oficial_slug, hostname, ssh_user) VALUES (?,?,?,?)`,
+	var hostID int64
+	if err := d.SQL.QueryRow(
+		`INSERT INTO hosts (nickname, oficial_slug, hostname, ssh_user) VALUES (?,?,?,?) RETURNING id`,
 		"db-01", "db-01", "10.0.0.1", "deploy",
-	)
-	if err != nil {
+	).Scan(&hostID); err != nil {
 		t.Fatalf("seed host: %v", err)
 	}
-	hostID, _ := hostRes.LastInsertId()
 
 	// Pre-encrypt the legacy payloads with the active encryptor; the
 	// migration is expected to reuse the ciphertext for cred + password
 	// and re-encrypt for sshkey.
 	const (
-		credPlain    = "postgres://billing:s3cr3t@db-01/billing"
+		credPlain     = "postgres://billing:s3cr3t@db-01/billing"
 		passwordPlain = "deploy-r00t-pw"
-		privPlain    = "-----BEGIN OPENSSH PRIVATE KEY-----\nfakepriv\n-----END OPENSSH PRIVATE KEY-----"
-		pubPlain     = "ssh-ed25519 AAAA... deploy@db-01"
+		privPlain     = "-----BEGIN OPENSSH PRIVATE KEY-----\nfakepriv\n-----END OPENSSH PRIVATE KEY-----"
+		pubPlain      = "ssh-ed25519 AAAA... deploy@db-01"
 	)
 
 	credCT, credNonce, err := d.Encryptor.Encrypt(credPlain)
@@ -89,8 +85,8 @@ func TestMigrateLegacySecrets(t *testing.T) {
 	}
 	if _, err := d.SQL.Exec(
 		`UPDATE hosts SET
-			has_password = 1, password_ciphertext = ?, password_nonce = ?,
-			has_key = 1,
+			has_password = TRUE, password_ciphertext = ?, password_nonce = ?,
+			has_key = TRUE,
 			pub_key_ciphertext = ?, pub_key_nonce = ?,
 			priv_key_ciphertext = ?, priv_key_nonce = ?
 		 WHERE id = ?`,
@@ -240,21 +236,19 @@ func TestMigrateLegacySecrets(t *testing.T) {
 // the migration would write empty-string ciphertext rows.
 func TestMigrateLegacySecretsSkipsEmptyHostColumns(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	defer d.Close()
 
-	res, err := d.SQL.Exec(
-		`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`,
+	var maintID int64
+	if err := d.SQL.QueryRow(
+		`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`,
 		"sead-manutencao", "x", "admin",
-	)
-	if err != nil {
+	).Scan(&maintID); err != nil {
 		t.Fatalf("seed maint: %v", err)
 	}
-	maintID, _ := res.LastInsertId()
 
 	// Host with NO secrets populated.
 	if _, err := d.SQL.Exec(

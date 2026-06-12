@@ -12,6 +12,7 @@ var TableCopyOrder = []string{
 	"users",
 	"enum_options",
 	"app_settings",
+	"app_secrets",
 	"permissions",
 	"contacts",
 	"hosts",
@@ -31,12 +32,11 @@ var TableCopyOrder = []string{
 	"user_gitlab_tokens",
 	"project_gitlab_links",
 	"host_scans",
-	"host_responsaveis",
 	"host_chamados",
 	"host_alerts",
-	"dns_responsaveis",
-	"service_responsaveis",
-	"project_responsaveis",
+	// polymorphic responsáveis (FKs contacts only) — R3 unification of the
+	// former host/dns/service/project_responsaveis junctions.
+	"responsaveis",
 	// link/dependent
 	"dns_host_links",
 	"project_host_links",
@@ -68,10 +68,7 @@ var BoolColumns = map[string]map[string]bool{
 	"external_tools":       {"embed_enabled": true},
 	"issues":               {"archived": true},
 	"contacts":             {"is_external": true},
-	"host_responsaveis":    {"is_main": true},
-	"dns_responsaveis":     {"is_main": true},
-	"service_responsaveis": {"is_main": true},
-	"project_responsaveis": {"is_main": true},
+	"responsaveis":         {"is_main": true},
 	"host_entidades":       {"is_main": true},
 	"project_gitlab_links": {"sync_issues": true},
 }
@@ -127,10 +124,9 @@ var IntColumns = map[string]map[string]bool{
 // inserts from the app don't collide with imported rows.
 var SerialTables = []string{
 	"users", "hosts", "orchestrators", "dns_records", "projects",
-	"project_responsaveis", "services", "service_credentials",
+	"responsaveis", "services", "service_credentials",
 	"external_tools", "contacts", "ssh_keys", "host_scans",
-	"host_responsaveis", "host_chamados", "dns_responsaveis",
-	"service_responsaveis", "host_alerts", "issues", "releases",
+	"host_chamados", "host_alerts", "issues", "releases",
 	"host_operation_logs", "user_external_identities",
 	"user_gitlab_tokens", "project_gitlab_links", "auth_role_mappings",
 }

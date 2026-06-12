@@ -3,7 +3,6 @@ package providers
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +10,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"golang.org/x/oauth2"
 )
 
@@ -26,16 +25,16 @@ func NewGitLabProvider(db *sql.DB, enc *database.Encryptor) *GitLabProvider {
 	return &GitLabProvider{db: db, enc: enc}
 }
 
-func (p *GitLabProvider) Name() string             { return "gitlab" }
+func (p *GitLabProvider) Name() string              { return "gitlab" }
 func (p *GitLabProvider) SupportsDirectLogin() bool { return false }
 
 func (p *GitLabProvider) Enabled() bool {
 	// SSO is only live when the admin has explicitly flipped the SSO switch on
 	// AND GitLab is the chosen auth provider. Either switch being off blocks login.
-	if models.GetAppSettingValue(p.db, "auth_gitlab_enabled") != "true" {
+	if store.NewAppSettingsRepo(p.db).Value(context.Background(), "auth_gitlab_enabled") != "true" {
 		return false
 	}
-	return models.GetAppSettingValue(p.db, "auth_active_provider") == "gitlab"
+	return store.NewAppSettingsRepo(p.db).Value(context.Background(), "auth_active_provider") == "gitlab"
 }
 
 func (p *GitLabProvider) DisplayInfo() auth.ProviderDisplayInfo {
@@ -57,7 +56,7 @@ type gitlabConfig struct {
 }
 
 func (p *GitLabProvider) loadConfig() (*gitlabConfig, error) {
-	get := func(key string) string { return models.GetAppSettingValue(p.db, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(p.db).Value(context.Background(), key) }
 
 	clientSecret, err := p.decryptSetting("auth_gitlab_client_secret")
 	if err != nil {
@@ -79,20 +78,8 @@ func (p *GitLabProvider) loadConfig() (*gitlabConfig, error) {
 }
 
 func (p *GitLabProvider) decryptSetting(prefix string) (string, error) {
-	cipherHex := models.GetAppSettingValue(p.db, prefix+"_cipher")
-	nonceHex := models.GetAppSettingValue(p.db, prefix+"_nonce")
-	if cipherHex == "" || nonceHex == "" {
-		return "", nil
-	}
-	cipher, err := hex.DecodeString(cipherHex)
-	if err != nil {
-		return "", err
-	}
-	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil {
-		return "", err
-	}
-	return p.enc.Decrypt(cipher, nonce)
+	v, _, err := store.NewAppSecretRepo(p.db).Reveal(context.Background(), p.enc, prefix)
+	return v, err
 }
 
 func (p *GitLabProvider) oauthConfig(cfg *gitlabConfig, callbackURL string) *oauth2.Config {

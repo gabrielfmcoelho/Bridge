@@ -14,7 +14,9 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -24,9 +26,9 @@ import (
 // Fixture summary:
 //   - users: alice(admin), bob(editor), carol(viewer), dave(viewer)
 //   - secrets:
-//       shared1   visibility=shared,   type=cred,     scope=service, parent=1, owner=bob
-//       personalC visibility=personal, type=password, scope=avulso,  owner=carol
-//       personalD visibility=personal, type=password, scope=avulso,  owner=dave
+//     shared1   visibility=shared,   type=cred,     scope=service, parent=1, owner=bob
+//     personalC visibility=personal, type=password, scope=avulso,  owner=carol
+//     personalD visibility=personal, type=password, scope=avulso,  owner=dave
 //
 // This shape is enough to assert every cell of the two ACL tables in spec §5.
 type secretAPIEnv struct {
@@ -43,22 +45,20 @@ type secretAPIEnv struct {
 
 func newSecretAPIEnv(t *testing.T) *secretAPIEnv {
 	t.Helper()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
 
 	mkUser := func(name, role string) *models.User {
-		res, err := d.SQL.Exec(
-			`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`,
+		var id int64
+		if err := d.SQL.QueryRow(
+			`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`,
 			name, "x", role,
-		)
-		if err != nil {
+		).Scan(&id); err != nil {
 			t.Fatalf("seed %s: %v", name, err)
 		}
-		id, _ := res.LastInsertId()
 		return &models.User{ID: id, Username: name, Role: role}
 	}
 	alice := mkUser("alice", "admin")
@@ -67,11 +67,10 @@ func newSecretAPIEnv(t *testing.T) *secretAPIEnv {
 	dave := mkUser("dave", "viewer")
 
 	// Parent service for the shared secret.
-	svcRes, err := d.SQL.Exec(`INSERT INTO services (nickname) VALUES (?)`, "billing-api")
-	if err != nil {
+	var serviceID int64
+	if err := d.SQL.QueryRow(`INSERT INTO services (nickname) VALUES (?) RETURNING id`, "billing-api").Scan(&serviceID); err != nil {
 		t.Fatalf("seed service: %v", err)
 	}
-	serviceID, _ := svcRes.LastInsertId()
 
 	repo := vault.NewSecretRepo(d)
 	ctx := context.Background()
@@ -153,7 +152,7 @@ func newSecretAPIEnv(t *testing.T) *secretAPIEnv {
 			http.Error(w, `{"error":"bad test user header"}`, http.StatusUnauthorized)
 			return
 		}
-		u, err := models.GetUserByID(d.SQL, uid)
+		u, err := store.NewUserRepo(d.SQL).GetByID(context.Background(), uid)
 		if err != nil || u == nil {
 			http.Error(w, `{"error":"test user not found"}`, http.StatusUnauthorized)
 			return
@@ -210,13 +209,17 @@ func decodeMap(t *testing.T, rec *httptest.ResponseRecorder) map[string]any {
 	return out
 }
 
+// decodeSlice unwraps the R4 list envelope {data:[...], meta:{...}} and returns
+// the data rows. (List endpoints no longer return a bare array.)
 func decodeSlice(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
 	t.Helper()
-	var out []map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+	var env struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
 		t.Fatalf("decode slice: %v (body=%q)", err, rec.Body.String())
 	}
-	return out
+	return env.Data
 }
 
 // ---------------------------------------------------------------------------

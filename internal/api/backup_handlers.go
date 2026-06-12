@@ -62,13 +62,13 @@ func (h *backupHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]any{
-		"status":          "restored",
-		"source_dialect":  backup.SourceDialect,
-		"target_dialect":  dialectString(h.db.Dialect),
-		"schema_version":  backup.SchemaVersion,
-		"row_count":       rowCount,
-		"cross_dialect":   backup.SourceDialect != dialectString(h.db.Dialect),
-		"message":         "Database restored. Sessions may need to log in again.",
+		"status":         "restored",
+		"source_dialect": backup.SourceDialect,
+		"target_dialect": dialectString(h.db.Dialect),
+		"schema_version": backup.SchemaVersion,
+		"row_count":      rowCount,
+		"cross_dialect":  backup.SourceDialect != dialectString(h.db.Dialect),
+		"message":        "Database restored. Sessions may need to log in again.",
 	})
 }
 
@@ -77,4 +77,10 @@ func dialectString(k database.DialectKind) string {
 		return "postgres"
 	}
 	return "sqlite"
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *backupHandlers) registerRoutes(rr routeRegistrar) {
+	rr.role("admin", "GET /api/backup", h.handleBackup)
+	rr.role("admin", "POST /api/restore", h.handleRestore)
 }

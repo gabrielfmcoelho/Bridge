@@ -1,29 +1,50 @@
 "use client";
 
+import SortableTable from "@/components/ui/SortableTable";
+import Pagination from "@/components/ui/Pagination";
 import Badge from "@/components/ui/Badge";
 import type { Service } from "@/lib/types";
 
+// Server-driven table (inventory pagination). `services` is ONE server page
+// (filtered+sorted+limited by the parent's paginated query), `total` is the full
+// match count for the pager, and column-header clicks drive the page-level sort
+// via onSortChange (→ server refetch). Only nickname/technology_stack are
+// server-sortable.
+const PER_PAGE = 20;
+type Sort = { field: string; direction: "asc" | "desc" };
+type ColKey = "nickname" | "description" | "source" | "technology_stack" | "developed_by" | "tags";
+
 interface ServicesTableViewProps {
   services: Service[];
+  total: number;
+  tablePage: number;
+  onPageChange: (page: number) => void;
+  sort: Sort;
+  onSortChange: (s: Sort) => void;
   t: (key: string) => string;
 }
 
-export default function ServicesTableView({ services, t }: ServicesTableViewProps) {
+export default function ServicesTableView({ services, total, tablePage, onPageChange, sort, onSortChange, t }: ServicesTableViewProps) {
   return (
-    <div className="bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] overflow-x-auto animate-fade-in">
-      <table className="w-full text-sm min-w-[600px]">
-        <thead>
-          <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
-            <th className="text-left px-4 py-3 font-semibold">{t("service.nickname")}</th>
-            <th className="text-left px-4 py-3 font-semibold">{t("common.description")}</th>
-            <th className="text-left px-4 py-3 font-semibold">{t("service.source")}</th>
-            <th className="text-left px-4 py-3 font-semibold">{t("service.technologyStack")}</th>
-            <th className="text-left px-4 py-3 font-semibold">{t("service.developedBy")}</th>
-            <th className="text-left px-4 py-3 font-semibold">{t("common.tags")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {services.map((svc, i) => (
+    <div className="animate-fade-in">
+      <SortableTable
+        columns={[
+          { key: "nickname" as ColKey, label: t("service.nickname") },
+          { key: "description" as ColKey, label: t("common.description"), sortable: false },
+          { key: "source" as ColKey, label: t("service.source"), sortable: false },
+          { key: "technology_stack" as ColKey, label: t("service.technologyStack") },
+          { key: "developed_by" as ColKey, label: t("service.developedBy"), sortable: false },
+          { key: "tags" as ColKey, label: t("common.tags"), sortable: false },
+        ]}
+        sortKey={sort.field as ColKey}
+        sortDir={sort.direction}
+        onSortChange={(key, dir) => {
+          if (key !== "nickname" && key !== "technology_stack") return; // not server-sortable
+          onSortChange({ field: key, direction: dir });
+        }}
+      >
+        {() =>
+          services.map((svc, i) => (
             <tr
               key={svc.id}
               className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
@@ -62,9 +83,10 @@ export default function ServicesTableView({ services, t }: ServicesTableViewProp
                 </div>
               </td>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          ))
+        }
+      </SortableTable>
+      <Pagination page={tablePage} totalPages={Math.max(1, Math.ceil(total / PER_PAGE))} total={total} perPage={PER_PAGE} onChange={onPageChange} />
     </div>
   );
 }

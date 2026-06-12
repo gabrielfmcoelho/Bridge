@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
 )
 
 // scrubPath redacts share-link tokens from URL paths before they hit logs.
@@ -24,21 +26,27 @@ func scrubPath(path string) string {
 }
 
 func jsonOK(w http.ResponseWriter, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(data)
+	httpx.WriteJSON(w, http.StatusOK, data)
 }
 
 func jsonCreated(w http.ResponseWriter, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(data)
+	httpx.WriteJSON(w, http.StatusCreated, data)
 }
 
 func jsonError(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	httpx.WriteError(w, status, msg)
+}
+
+// jsonErrorLogged writes `status` with the sanitized client message `msg` and
+// logs the underlying `err` (when non-nil) with request context. Use it for
+// 4xx responses where the real error must NOT reach the client but operators
+// still need it — e.g. a unique-constraint violation surfaced as 409. This is
+// the non-500 sibling of jsonServerError.
+func jsonErrorLogged(w http.ResponseWriter, r *http.Request, status int, msg string, err error) {
+	if err != nil {
+		log.Printf("[api] %s %s: %s: %v", r.Method, scrubPath(r.URL.Path), msg, err)
+	}
+	jsonError(w, status, msg)
 }
 
 // jsonServerError writes a 500 response and logs the underlying error with

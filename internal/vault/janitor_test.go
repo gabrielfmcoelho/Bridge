@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -14,42 +14,31 @@ import (
 // past grace gets removed.
 func TestShareLinkJanitor_DeletesPastGrace(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
 	defer d.Close()
 
-	// Seed: one user (FK target for created_by + the personal-secret owner),
-	// one personal secret (FK target for share_links.secret_id), three
-	// share_links rows at different expiry offsets.
-	res, _ := d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?)`, "alice", "x", "admin")
-	uid, _ := res.LastInsertId()
-
-	res2, _ := d.SQL.Exec(
-		`INSERT INTO secrets
-		    (type, scope, visibility, owner_user_id, name,
-		     payload_ciphertext, payload_nonce, key_version, created_by)
-		 VALUES ('password', 'avulso', 'personal', ?, 'secret-1', ?, ?, 1, ?)`,
-		uid, []byte{0x01}, []byte{0x02}, uid,
-	)
-	secretID, _ := res2.LastInsertId()
+	// Seed: one user (FK target for created_by) and three share_bundles rows at
+	// different expiry offsets. (Per-secret share_links were retired in R3; a
+	// share is now a bundle, which the janitor sweeps.)
+	var uid int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES (?,?,?) RETURNING id`, "alice", "x", "admin").Scan(&uid); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
 
 	mkLink := func(expires time.Time) int64 {
-		r, err := d.SQL.Exec(
-			`INSERT INTO secret_share_links (secret_id, token_hash, expires_at, created_by)
-			 VALUES (?, ?, ?, ?)`,
-			secretID, []byte{0xaa}, expires.UTC().Format(time.RFC3339Nano), uid,
-		)
-		if err != nil {
-			t.Fatalf("seed link: %v", err)
+		var id int64
+		if err := d.SQL.QueryRow(
+			`INSERT INTO share_bundles (token_hash, expires_at, created_by) VALUES (?, ?, ?) RETURNING id`,
+			[]byte{0xaa}, expires.UTC().Format(time.RFC3339Nano), uid,
+		).Scan(&id); err != nil {
+			t.Fatalf("seed bundle: %v", err)
 		}
-		// SQLite has a tiny race where multiple inserts in the same
-		// millisecond can collide on the unique idx_secret_share_links_token
-		// constraint we built on token_hash. Vary the hash so seeds succeed.
-		id, _ := r.LastInsertId()
-		_, _ = d.SQL.Exec(`UPDATE secret_share_links SET token_hash = ? WHERE id = ?`,
+		// Vary token_hash so the unique idx_share_bundles_token constraint
+		// doesn't collide across same-millisecond inserts.
+		_, _ = d.SQL.Exec(`UPDATE share_bundles SET token_hash = ? WHERE id = ?`,
 			[]byte{byte(id), byte(id + 1)}, id)
 		return id
 	}
@@ -83,7 +72,7 @@ func TestShareLinkJanitor_DeletesPastGrace(t *testing.T) {
 		{expiredPastGrace, false, "expired past grace"},
 	} {
 		var n int
-		_ = d.SQL.QueryRow(`SELECT COUNT(*) FROM secret_share_links WHERE id = ?`, c.id).Scan(&n)
+		_ = d.SQL.QueryRow(`SELECT COUNT(*) FROM share_bundles WHERE id = ?`, c.id).Scan(&n)
 		got := n == 1
 		if got != c.want {
 			t.Errorf("%s (id=%d): exists=%v, want %v", c.desc, c.id, got, c.want)
@@ -95,8 +84,7 @@ func TestShareLinkJanitor_DeletesPastGrace(t *testing.T) {
 // when there's nothing to clean up — common pattern on fresh deploys.
 func TestShareLinkJanitor_EmptyIsNoOp(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
-	d, err := database.Open(dir)
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

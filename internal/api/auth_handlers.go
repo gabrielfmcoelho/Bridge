@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type authHandlers struct {
@@ -79,7 +81,7 @@ func (h *authHandlers) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 	user, err := auth.SetupMasterUser(h.db.SQL, req.Username, req.Password, req.DisplayName)
 	if err != nil {
-		jsonError(w, http.StatusConflict, err.Error())
+		jsonErrorLogged(w, r, http.StatusConflict, "could not complete setup (already initialized?)", err)
 		return
 	}
 
@@ -132,7 +134,7 @@ func (h *authHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// Fallback to local auth if configured (e.g., LDAP unreachable).
 			fallbackKey := "auth_" + req.Provider + "_fallback_to_local"
-			if models.GetAppSettingValue(h.db.SQL, fallbackKey) == "true" {
+			if store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), fallbackKey) == "true" {
 				u, localErr := auth.Login(h.db.SQL, req.Username, req.Password)
 				if localErr == nil {
 					user = u
@@ -172,12 +174,12 @@ func (h *authHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
 // resolveOrProvisionUser looks up a local user by external identity, or auto-provisions one.
 func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (*models.User, error) {
 	// Check if this external identity is already linked to a local user.
-	existing, err := models.GetIdentityByProviderAndExternalID(h.db.SQL, identity.ProviderName, identity.ExternalID)
+	existing, err := store.NewUserIdentityRepo(h.db.SQL).GetByProviderAndExternalID(context.Background(), identity.ProviderName, identity.ExternalID)
 	if err != nil {
 		return nil, err
 	}
 	if existing != nil {
-		user, err := models.GetUserByID(h.db.SQL, existing.UserID)
+		user, err := store.NewUserRepo(h.db.SQL).GetByID(context.Background(), existing.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -192,20 +194,20 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 	}
 
 	// Check if auto-provisioning is enabled.
-	autoProvision := models.GetAppSettingValue(h.db.SQL, "auth_auto_provision")
+	autoProvision := store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), "auth_auto_provision")
 	if autoProvision != "true" {
 		return nil, fmt.Errorf("account not linked and auto-provisioning is disabled")
 	}
 
 	// Determine the default role.
-	defaultRole := models.GetAppSettingValue(h.db.SQL, "auth_default_role")
+	defaultRole := store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), "auth_default_role")
 	if defaultRole == "" {
 		defaultRole = "viewer"
 	}
 
 	// Check if external groups map to a specific role.
 	if len(identity.Groups) > 0 {
-		mappedRole := models.ResolveRoleFromExternalGroups(h.db.SQL, identity.ProviderName, identity.Groups)
+		mappedRole := store.NewPermissionRepo(h.db.SQL).ResolveRoleFromExternalGroups(context.Background(), identity.ProviderName, identity.Groups)
 		if mappedRole != "" {
 			defaultRole = mappedRole
 		}
@@ -226,7 +228,7 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 		AuthProvider: identity.ProviderName,
 		Email:        identity.Email,
 	}
-	if err := models.CreateUser(h.db.SQL, user); err != nil {
+	if err := store.NewUserRepo(h.db.SQL).Create(context.Background(), user); err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
@@ -236,7 +238,7 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 		ProviderName: identity.ProviderName,
 		ExternalID:   identity.ExternalID,
 	}
-	if err := models.CreateUserExternalIdentity(h.db.SQL, link); err != nil {
+	if err := store.NewUserIdentityRepo(h.db.SQL).Create(context.Background(), link); err != nil {
 		return nil, fmt.Errorf("link identity: %w", err)
 	}
 
@@ -245,15 +247,15 @@ func (h *authHandlers) resolveOrProvisionUser(identity *auth.ExternalIdentity) (
 
 // syncExternalRole updates the user's role from external groups if role sync is enabled.
 func (h *authHandlers) syncExternalRole(user *models.User, identity *auth.ExternalIdentity) {
-	syncEnabled := models.GetAppSettingValue(h.db.SQL, "auth_role_sync_enabled")
+	syncEnabled := store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), "auth_role_sync_enabled")
 	if syncEnabled != "true" || len(identity.Groups) == 0 {
 		return
 	}
 
-	mappedRole := models.ResolveRoleFromExternalGroups(h.db.SQL, identity.ProviderName, identity.Groups)
+	mappedRole := store.NewPermissionRepo(h.db.SQL).ResolveRoleFromExternalGroups(context.Background(), identity.ProviderName, identity.Groups)
 	if mappedRole != "" && mappedRole != user.Role {
 		user.Role = mappedRole
-		models.UpdateUser(h.db.SQL, user)
+		store.NewUserRepo(h.db.SQL).Update(context.Background(), user)
 	}
 }
 
@@ -262,7 +264,7 @@ func (h *authHandlers) ensureUniqueUsername(username string) string {
 	candidate := username
 	suffix := 2
 	for {
-		existing, _ := models.GetUserByUsername(h.db.SQL, candidate)
+		existing, _ := store.NewUserRepo(h.db.SQL).GetByUsername(context.Background(), candidate)
 		if existing == nil {
 			return candidate
 		}
@@ -288,10 +290,10 @@ func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch permissions for this user's role.
-	permissions, _ := models.ListPermissionsForRole(h.db.SQL, user.Role)
+	permissions, _ := store.NewPermissionRepo(h.db.SQL).ListForRole(r.Context(), user.Role)
 	if user.Role == "admin" {
 		// Admin gets all permissions.
-		allPerms, _ := models.ListPermissions(h.db.SQL)
+		allPerms, _ := store.NewPermissionRepo(h.db.SQL).ListPermissions(r.Context())
 		permissions = make([]string, len(allPerms))
 		for i, p := range allPerms {
 			permissions[i] = p.Code
@@ -302,7 +304,7 @@ func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch external identities.
-	identities, _ := models.ListIdentitiesByUser(h.db.SQL, user.ID)
+	identities, _ := store.NewUserIdentityRepo(h.db.SQL).ListByUser(r.Context(), user.ID)
 
 	type identitySummary struct {
 		Provider   string `json:"provider"`
@@ -336,12 +338,12 @@ func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 // User management (admin only)
 
 func (h *authHandlers) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := models.ListUsers(h.db.SQL)
+	users, err := store.NewUserRepo(h.db.SQL).List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list users", err)
 		return
 	}
-	jsonOK(w, users)
+	jsonPaged(w, r, users)
 }
 
 func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -375,7 +377,7 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		DisplayName:  req.DisplayName,
 		Role:         req.Role,
 	}
-	if err := models.CreateUser(h.db.SQL, u); err != nil {
+	if err := store.NewUserRepo(h.db.SQL).Create(r.Context(), u); err != nil {
 		jsonError(w, http.StatusConflict, "username already exists")
 		return
 	}
@@ -401,7 +403,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	user, err := models.GetUserByID(h.db.SQL, id)
+	user, err := store.NewUserRepo(h.db.SQL).GetByID(r.Context(), id)
 	if err != nil || user == nil {
 		jsonError(w, http.StatusNotFound, "user not found")
 		return
@@ -416,7 +418,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 	if req.Role != "" {
 		user.Role = req.Role
 	}
-	if err := models.UpdateUser(h.db.SQL, user); err != nil {
+	if err := store.NewUserRepo(h.db.SQL).Update(r.Context(), user); err != nil {
 		jsonServerError(w, r, "failed to update user", err)
 		return
 	}
@@ -427,7 +429,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 			jsonServerError(w, r, "failed to hash password", err)
 			return
 		}
-		if err := models.UpdateUserPassword(h.db.SQL, id, hash); err != nil {
+		if err := store.NewUserRepo(h.db.SQL).UpdatePassword(r.Context(), id, hash); err != nil {
 			jsonServerError(w, r, "failed to update password", err)
 			return
 		}
@@ -450,9 +452,22 @@ func (h *authHandlers) handleDeleteUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := models.DeleteUser(h.db.SQL, id); err != nil {
+	if err := store.NewUserRepo(h.db.SQL).Delete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "failed to delete user", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *authHandlers) registerRoutes(rr routeRegistrar) {
+	rr.public("GET /api/auth/status", h.handleStatus)
+	rr.public("POST /api/auth/setup", h.handleSetup)
+	rr.public("POST /api/auth/login", h.handleLogin)
+	rr.auth("POST /api/auth/logout", h.handleLogout)
+	rr.auth("GET /api/auth/me", h.handleMe)
+	rr.role("admin", "GET /api/users", h.handleListUsers)
+	rr.role("admin", "POST /api/users", h.handleCreateUser)
+	rr.role("admin", "PUT /api/users/{id}", h.handleUpdateUser)
+	rr.role("admin", "DELETE /api/users/{id}", h.handleDeleteUser)
 }

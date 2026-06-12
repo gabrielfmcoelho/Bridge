@@ -3,34 +3,36 @@ package api
 import (
 	"net/http"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
+// contactHandlers is the reference for the post-Phase-1 handler shape: it holds
+// a repository (not a raw *database.DB) and stays thin — parse, call repo,
+// render. The repo is injected at construction time (router.go), which the
+// Phase 2 DI container will centralize.
 type contactHandlers struct {
-	db *database.DB
+	contacts *store.ContactRepo
 }
 
 func (h *contactHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	contacts, err := models.ListContacts(h.db.SQL)
+	contacts, err := h.contacts.List(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list contacts", err)
 		return
 	}
-	jsonOK(w, contacts)
+	jsonPaged(w, r, contacts)
 }
 
 func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req models.Contact
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
+	if !decodeBody(w, r, &req) {
 		return
 	}
-	if req.Name == "" {
-		jsonError(w, http.StatusBadRequest, "name is required")
+	if !requireFields(w, map[string]string{"name": req.Name}) {
 		return
 	}
-	if err := models.CreateContact(h.db.SQL, &req); err != nil {
+	if err := h.contacts.Create(r.Context(), &req); err != nil {
 		jsonServerError(w, r, "failed to create contact", err)
 		return
 	}
@@ -38,22 +40,19 @@ func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := pathInt64(r, "id")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid id", err)
+	id, ok := pathID(w, r, "id")
+	if !ok {
 		return
 	}
 	var req models.Contact
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
+	if !decodeBody(w, r, &req) {
 		return
 	}
-	if req.Name == "" {
-		jsonError(w, http.StatusBadRequest, "name is required")
+	if !requireFields(w, map[string]string{"name": req.Name}) {
 		return
 	}
 	req.ID = id
-	if err := models.UpdateContact(h.db.SQL, &req); err != nil {
+	if err := h.contacts.Update(r.Context(), &req); err != nil {
 		jsonServerError(w, r, "failed to update contact", err)
 		return
 	}
@@ -61,14 +60,21 @@ func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *contactHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := pathInt64(r, "id")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid id", err)
+	id, ok := pathID(w, r, "id")
+	if !ok {
 		return
 	}
-	if err := models.DeleteContact(h.db.SQL, id); err != nil {
+	if err := h.contacts.Delete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "failed to delete contact", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *contactHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/contacts", h.handleList)
+	rr.role("editor", "POST /api/contacts", h.handleCreate)
+	rr.role("editor", "PUT /api/contacts/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/contacts/{id}", h.handleDelete)
 }

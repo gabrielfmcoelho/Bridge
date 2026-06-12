@@ -3,156 +3,132 @@ package api
 import (
 	"net/http"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 )
 
+// dnsHandlers is a Phase 2 reference handler: it holds a domain service (not a
+// raw *database.DB), and each method is parse → call service → render. All the
+// enrichment/orchestration lives in service.DNSService.
 type dnsHandlers struct {
-	db *database.DB
+	dns *service.DNSService
 }
 
 func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	records, err := models.ListDNSRecords(h.db.SQL)
+	pp := parsePageParams(r)
+	f := models.DNSFilter{
+		Search:      r.URL.Query().Get("search"),
+		Situacao:    r.URL.Query().Get("situacao"),
+		Tag:         r.URL.Query().Get("tag"),
+		Responsavel: r.URL.Query().Get("responsavel"),
+		HasHTTPS:    r.URL.Query().Get("has_https"),
+		SortBy:      r.URL.Query().Get("sort_by"),
+		SortDir:     r.URL.Query().Get("sort_dir"),
+		Page:        pp.Page,
+		PerPage:     pp.PerPage,
+	}
+	items, err := h.dns.List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "failed to list DNS records", err)
 		return
 	}
-
-	tagMap, _ := models.GetAllTags(h.db.SQL, "dns")
-	mainRespNames, _ := models.GetDNSMainResponsavelNamesBulk(h.db.SQL)
-	type dnsWithTags struct {
-		models.DNSRecord
-		Tags                  []string `json:"tags"`
-		HostIDs               []int64  `json:"host_ids"`
-		MainResponsavelName   string   `json:"main_responsavel_name"`
-	}
-	result := make([]dnsWithTags, len(records))
-	for i, rec := range records {
-		hostIDs, _ := models.GetDNSHostIDs(h.db.SQL, rec.ID)
-		result[i] = dnsWithTags{
-			DNSRecord:           rec,
-			Tags:                tagMap[rec.ID],
-			HostIDs:             hostIDs,
-			MainResponsavelName: mainRespNames[rec.ID],
+	// Real server-side pagination (R4 envelope). When per_page is set we report
+	// the matching Count; an unbounded request reports the returned length.
+	total := len(items)
+	if !pp.Unbounded() {
+		if n, err := h.dns.Count(r.Context(), f); err == nil {
+			total = n
 		}
 	}
-
-	jsonOK(w, result)
+	jsonList(w, items, metaFor(pp, total))
 }
 
 func (h *dnsHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
-	id, err := pathInt64(r, "id")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid id", err)
+	id, ok := pathID(w, r, "id")
+	if !ok {
 		return
 	}
-
-	rec, err := models.GetDNSRecord(h.db.SQL, id)
-	if err != nil || rec == nil {
+	detail, err := h.dns.Get(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to load DNS record", err)
+		return
+	}
+	if detail == nil {
 		jsonError(w, http.StatusNotFound, "DNS record not found")
 		return
 	}
+	jsonOK(w, detail)
+}
 
-	tags, _ := models.GetTags(h.db.SQL, "dns", rec.ID)
-	hostIDs, _ := models.GetDNSHostIDs(h.db.SQL, rec.ID)
-	responsaveis, _ := models.ListDNSResponsaveis(h.db.SQL, rec.ID)
+// dnsWriteRequest is the create/update wire shape: a DNSRecord plus its
+// relations. Pointer slices distinguish "absent" (leave unchanged) from
+// "present but empty" (clear) on update.
+type dnsWriteRequest struct {
+	models.DNSRecord
+	Tags         *[]string                  `json:"tags"`
+	HostIDs      *[]int64                   `json:"host_ids"`
+	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
+}
 
-	jsonOK(w, map[string]any{
-		"dns_record":   rec,
-		"tags":         tags,
-		"host_ids":     hostIDs,
-		"responsaveis": responsaveis,
-	})
+func (req *dnsWriteRequest) toWrite() *service.DNSWrite {
+	return &service.DNSWrite{Record: req.DNSRecord, Tags: req.Tags, HostIDs: req.HostIDs, Responsaveis: req.Responsaveis}
 }
 
 func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		models.DNSRecord
-		Tags         []string                      `json:"tags"`
-		HostIDs      []int64                       `json:"host_ids"`
-		Responsaveis []models.DNSResponsavelInput  `json:"responsaveis"`
-	}
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
+	var req dnsWriteRequest
+	if !decodeBody(w, r, &req) {
 		return
 	}
-	if req.Domain == "" {
-		jsonError(w, http.StatusBadRequest, "domain is required")
+	if !requireFields(w, map[string]string{"domain": req.Domain}) {
 		return
 	}
-
-	if err := models.CreateDNSRecord(h.db.SQL, &req.DNSRecord); err != nil {
+	wr := req.toWrite()
+	if err := h.dns.Create(r.Context(), wr); err != nil {
 		jsonError(w, http.StatusConflict, "domain already exists")
 		return
 	}
-
-	if len(req.Tags) > 0 {
-		models.SetTags(h.db.SQL, "dns", req.DNSRecord.ID, req.Tags)
-	}
-	if len(req.HostIDs) > 0 {
-		models.SetDNSHostLinks(h.db.SQL, req.DNSRecord.ID, req.HostIDs)
-	}
-	if len(req.Responsaveis) > 0 {
-		models.SyncDNSResponsaveis(h.db.SQL, req.DNSRecord.ID, req.Responsaveis)
-	}
-
-	jsonCreated(w, req.DNSRecord)
+	jsonCreated(w, wr.Record)
 }
 
 func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
-	id, err := pathInt64(r, "id")
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req dnsWriteRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	wr := req.toWrite()
+	found, err := h.dns.Update(r.Context(), id, wr)
 	if err != nil {
-		jsonBadRequest(w, r, "invalid id", err)
-		return
-	}
-
-	existing, err := models.GetDNSRecord(h.db.SQL, id)
-	if err != nil || existing == nil {
-		jsonError(w, http.StatusNotFound, "DNS record not found")
-		return
-	}
-
-	var req struct {
-		models.DNSRecord
-		Tags         []string                       `json:"tags"`
-		HostIDs      []int64                        `json:"host_ids"`
-		Responsaveis *[]models.DNSResponsavelInput  `json:"responsaveis"`
-	}
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
-		return
-	}
-
-	req.DNSRecord.ID = id
-	if err := models.UpdateDNSRecord(h.db.SQL, &req.DNSRecord); err != nil {
 		jsonServerError(w, r, "failed to update DNS record", err)
 		return
 	}
-
-	if req.Tags != nil {
-		models.SetTags(h.db.SQL, "dns", id, req.Tags)
+	if !found {
+		jsonError(w, http.StatusNotFound, "DNS record not found")
+		return
 	}
-	if req.HostIDs != nil {
-		models.SetDNSHostLinks(h.db.SQL, id, req.HostIDs)
-	}
-	if req.Responsaveis != nil {
-		models.SyncDNSResponsaveis(h.db.SQL, id, *req.Responsaveis)
-	}
-
-	jsonOK(w, req.DNSRecord)
+	jsonOK(w, wr.Record)
 }
 
 func (h *dnsHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
-	id, err := pathInt64(r, "id")
-	if err != nil {
-		jsonBadRequest(w, r, "invalid id", err)
+	id, ok := pathID(w, r, "id")
+	if !ok {
 		return
 	}
-
-	models.DeleteTags(h.db.SQL, "dns", id)
-	if err := models.DeleteDNSRecord(h.db.SQL, id); err != nil {
+	if err := h.dns.Delete(r.Context(), id); err != nil {
 		jsonServerError(w, r, "failed to delete DNS record", err)
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *dnsHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/dns", h.handleList)
+	rr.role("editor", "POST /api/dns", h.handleCreate)
+	rr.auth("GET /api/dns/{id}", h.handleGet)
+	rr.role("editor", "PUT /api/dns/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/dns/{id}", h.handleDelete)
 }

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/llm"
 	outlineclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/outline"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type integrationSettingsHandlers struct {
@@ -101,17 +101,17 @@ var integrationGroups = map[string][]string{
 
 // secretKeys are settings that need encryption (stored as _cipher/_nonce pairs).
 var secretKeys = map[string]bool{
-	"auth_ldap_bind_password":              true,
-	"auth_keycloak_client_secret":          true,
-	"auth_gitlab_client_secret":            true,
-	"gitlab_code_service_token":            true,
-	"llm_api_key":                          true,
-	"coolify_api_token":                    true,
-	"grafana_api_token":                    true,
-	"grafana_webhook_secret":               true,
-	"grafana_prom_remote_write_password":   true,
-	"outline_api_token":                    true,
-	"glpi_app_token":                       true,
+	"auth_ldap_bind_password":            true,
+	"auth_keycloak_client_secret":        true,
+	"auth_gitlab_client_secret":          true,
+	"gitlab_code_service_token":          true,
+	"llm_api_key":                        true,
+	"coolify_api_token":                  true,
+	"grafana_api_token":                  true,
+	"grafana_webhook_secret":             true,
+	"grafana_prom_remote_write_password": true,
+	"outline_api_token":                  true,
+	"glpi_app_token":                     true,
 }
 
 // handleGetIntegrations returns all integration settings grouped by provider.
@@ -123,14 +123,13 @@ func (h *integrationSettingsHandlers) handleGetIntegrations(w http.ResponseWrite
 		for _, key := range keys {
 			if secretKeys[key] {
 				// For secrets, just indicate whether a value is set (never return the actual value).
-				cipher := models.GetAppSettingValue(h.db.SQL, key+"_cipher")
-				if cipher != "" {
+				if store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), key) {
 					settings[key] = "••••••••"
 				} else {
 					settings[key] = ""
 				}
 			} else {
-				settings[key] = models.GetAppSettingValue(h.db.SQL, key)
+				settings[key] = store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), key)
 			}
 		}
 		result[group] = settings
@@ -173,16 +172,13 @@ func (h *integrationSettingsHandlers) handleUpdateIntegrationGroup(w http.Respon
 			if value == "" || value == "••••••••" {
 				continue
 			}
-			// Encrypt the secret value.
-			cipher, nonce, err := h.db.Encryptor.Encrypt(value)
-			if err != nil {
+			// Encrypt + persist the secret in app_secrets.
+			if err := store.NewAppSecretRepo(h.db.SQL).Store(r.Context(), h.db.Encryptor, key, value); err != nil {
 				jsonServerError(w, r, "failed to encrypt "+key, err)
 				return
 			}
-			models.SetAppSettingValue(h.db.SQL, key+"_cipher", hex.EncodeToString(cipher))
-			models.SetAppSettingValue(h.db.SQL, key+"_nonce", hex.EncodeToString(nonce))
 		} else {
-			models.SetAppSettingValue(h.db.SQL, key, value)
+			store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key, value)
 		}
 	}
 
@@ -243,8 +239,7 @@ func (h *integrationSettingsHandlers) handleClearIntegrationSecret(w http.Respon
 		return
 	}
 
-	models.SetAppSettingValue(h.db.SQL, key+"_cipher", "")
-	models.SetAppSettingValue(h.db.SQL, key+"_nonce", "")
+	store.NewAppSecretRepo(h.db.SQL).Clear(r.Context(), key)
 	jsonOK(w, map[string]string{"status": "cleared"})
 }
 
@@ -298,11 +293,11 @@ func (h *integrationSettingsHandlers) handleTestOutline(w http.ResponseWriter, r
 	}
 
 	jsonOK(w, map[string]any{
-		"success":        true,
-		"user":           info.User.Name,
-		"user_email":     info.User.Email,
-		"workspace":      info.Team.Name,
-		"workspace_url":  info.Team.URL,
+		"success":       true,
+		"user":          info.User.Name,
+		"user_email":    info.User.Email,
+		"workspace":     info.Team.Name,
+		"workspace_url": info.Team.URL,
 	})
 }
 
@@ -431,7 +426,7 @@ func (h *integrationSettingsHandlers) handleTestLLM(w http.ResponseWriter, r *ht
 	apiKey := req.APIKey
 	model := req.Model
 
-	get := func(key string) string { return models.GetAppSettingValue(h.db.SQL, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), key) }
 	if baseURL == "" {
 		baseURL = get("llm_base_url")
 	}
@@ -439,16 +434,8 @@ func (h *integrationSettingsHandlers) handleTestLLM(w http.ResponseWriter, r *ht
 		model = get("llm_model_text")
 	}
 	if apiKey == "" {
-		cipherHex := get("llm_api_key_cipher")
-		nonceHex := get("llm_api_key_nonce")
-		if cipherHex != "" && nonceHex != "" {
-			cipher, err1 := hex.DecodeString(cipherHex)
-			nonce, err2 := hex.DecodeString(nonceHex)
-			if err1 == nil && err2 == nil {
-				if decrypted, err := h.db.Encryptor.Decrypt(cipher, nonce); err == nil {
-					apiKey = decrypted
-				}
-			}
+		if decrypted, ok, err := store.NewAppSecretRepo(h.db.SQL).Reveal(r.Context(), h.db.Encryptor, "llm_api_key"); ok && err == nil {
+			apiKey = decrypted
 		}
 	}
 
@@ -611,13 +598,13 @@ func (h *integrationSettingsHandlers) handleTestGitLabCode(w http.ResponseWriter
 
 // handleGetPermissions returns all permissions and the role-permission matrix.
 func (h *integrationSettingsHandlers) handleGetPermissions(w http.ResponseWriter, r *http.Request) {
-	perms, err := models.ListPermissions(h.db.SQL)
+	perms, err := store.NewPermissionRepo(h.db.SQL).ListPermissions(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list permissions", err)
 		return
 	}
 
-	rolePerms, err := models.ListAllRolePermissions(h.db.SQL)
+	rolePerms, err := store.NewPermissionRepo(h.db.SQL).ListAllRolePermissions(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list role permissions", err)
 		return
@@ -655,7 +642,7 @@ func (h *integrationSettingsHandlers) handleUpdatePermissions(w http.ResponseWri
 		return
 	}
 
-	if err := models.SetRolePermissions(h.db.SQL, req.Role, req.Permissions); err != nil {
+	if err := store.NewPermissionRepo(h.db.SQL).SetForRole(r.Context(), req.Role, req.Permissions); err != nil {
 		jsonServerError(w, r, "failed to update permissions", err)
 		return
 	}
@@ -667,7 +654,7 @@ func (h *integrationSettingsHandlers) handleUpdatePermissions(w http.ResponseWri
 
 // handleGetRoleMappings returns all external group-to-role mappings.
 func (h *integrationSettingsHandlers) handleGetRoleMappings(w http.ResponseWriter, r *http.Request) {
-	mappings, err := models.ListAuthRoleMappings(h.db.SQL)
+	mappings, err := store.NewPermissionRepo(h.db.SQL).ListRoleMappings(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to list role mappings", err)
 		return
@@ -690,7 +677,7 @@ func (h *integrationSettingsHandlers) handleCreateRoleMapping(w http.ResponseWri
 		return
 	}
 
-	if err := models.CreateAuthRoleMapping(h.db.SQL, &req); err != nil {
+	if err := store.NewPermissionRepo(h.db.SQL).CreateRoleMapping(r.Context(), &req); err != nil {
 		jsonError(w, http.StatusConflict, "mapping already exists or failed to create")
 		return
 	}
@@ -706,10 +693,33 @@ func (h *integrationSettingsHandlers) handleDeleteRoleMapping(w http.ResponseWri
 		return
 	}
 
-	if err := models.DeleteAuthRoleMapping(h.db.SQL, id); err != nil {
+	if err := store.NewPermissionRepo(h.db.SQL).DeleteRoleMapping(r.Context(), id); err != nil {
 		jsonServerError(w, r, "failed to delete mapping", err)
 		return
 	}
 
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+// registerRoutes binds the admin-only integration settings, permissions, and
+// role-mapping operations.
+func (h *integrationSettingsHandlers) registerRoutes(rr routeRegistrar) {
+	// Integration settings (admin only)
+	rr.role("admin", "GET /api/settings/integrations", h.handleGetIntegrations)
+	rr.role("admin", "PUT /api/settings/integrations/{group}", h.handleUpdateIntegrationGroup)
+	rr.role("admin", "POST /api/settings/integrations/test/ldap", h.handleTestLDAP)
+	rr.role("admin", "POST /api/settings/integrations/test/gitlab-code", h.handleTestGitLabCode)
+	rr.role("admin", "POST /api/settings/integrations/test/llm", h.handleTestLLM)
+	rr.role("admin", "POST /api/settings/integrations/test/grafana", h.handleTestGrafana)
+	rr.role("admin", "POST /api/settings/integrations/test/outline", h.handleTestOutline)
+	rr.role("admin", "DELETE /api/settings/integrations/{group}/secret/{key}", h.handleClearIntegrationSecret)
+
+	// Permissions management (admin only)
+	rr.role("admin", "GET /api/settings/permissions", h.handleGetPermissions)
+	rr.role("admin", "PUT /api/settings/permissions", h.handleUpdatePermissions)
+
+	// Role mappings (admin only)
+	rr.role("admin", "GET /api/settings/role-mappings", h.handleGetRoleMappings)
+	rr.role("admin", "POST /api/settings/role-mappings", h.handleCreateRoleMapping)
+	rr.role("admin", "DELETE /api/settings/role-mappings/{id}", h.handleDeleteRoleMapping)
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -13,7 +14,9 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 const testOpenAPI30 = `openapi: 3.0.1
@@ -42,14 +45,14 @@ type catalogEnv struct {
 
 func newCatalogEnv(t *testing.T) *catalogEnv {
 	t.Helper()
-	d, err := database.Open(t.TempDir())
+	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
 
 	u := &models.User{Username: "editor", DisplayName: "Editor", Role: "editor", Email: "e@example.com"}
-	if err := models.CreateUser(d.SQL, u); err != nil {
+	if err := store.NewUserRepo(d.SQL).Create(context.Background(), u); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
@@ -201,13 +204,16 @@ func decodeObj(t *testing.T, resp *http.Response) map[string]any {
 	return m
 }
 
+// decodeArr unwraps the R4 list envelope {data:[...], meta:{...}}.
 func decodeArr(t *testing.T, resp *http.Response) []map[string]any {
 	t.Helper()
-	var a []map[string]any
-	if err := json.Unmarshal([]byte(readBody(resp)), &a); err != nil {
+	var env struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(readBody(resp)), &env); err != nil {
 		t.Fatalf("decode arr: %v", err)
 	}
-	return a
+	return env.Data
 }
 
 func itoa(v int64) string { return strings.TrimSpace(strconv.FormatInt(v, 10)) }

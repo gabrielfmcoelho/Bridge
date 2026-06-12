@@ -96,18 +96,31 @@ func migrateServiceCredentials(tx *sql.Tx, ownerUserID int64, stats *LegacyMigra
 	}
 	defer rows.Close()
 
+	// Drain the cursor fully BEFORE issuing the per-row inserts: insertSharedSecret
+	// runs its own queries on the same *sql.Tx, and Postgres can't run a second
+	// query while this result set is still open on the tx's single connection.
+	// (Mirrors migrateHostSSHKeys below; SQLite tolerated the interleaving.)
+	type pendingCred struct {
+		serviceID int64
+		roleName  string
+		ct, nonce []byte
+	}
+	var pending []pendingCred
 	for rows.Next() {
-		var (
-			serviceID int64
-			roleName  string
-			ct, nonce []byte
-		)
-		if err := rows.Scan(&serviceID, &roleName, &ct, &nonce); err != nil {
+		var p pendingCred
+		if err := rows.Scan(&p.serviceID, &p.roleName, &p.ct, &p.nonce); err != nil {
 			return err
 		}
-		inserted, err := insertSharedSecret(tx, "cred", "service", serviceID, roleName, ct, nonce, ownerUserID)
+		pending = append(pending, p)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, p := range pending {
+		inserted, err := insertSharedSecret(tx, "cred", "service", p.serviceID, p.roleName, p.ct, p.nonce, ownerUserID)
 		if err != nil {
-			return fmt.Errorf("service %d role %q: %w", serviceID, roleName, err)
+			return fmt.Errorf("service %d role %q: %w", p.serviceID, p.roleName, err)
 		}
 		if inserted {
 			stats.ServiceCredsMigrated++
@@ -115,7 +128,7 @@ func migrateServiceCredentials(tx *sql.Tx, ownerUserID int64, stats *LegacyMigra
 			stats.Skipped++
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 func migrateHostPasswords(tx *sql.Tx, ownerUserID int64, stats *LegacyMigrationStats) error {
@@ -130,17 +143,28 @@ func migrateHostPasswords(tx *sql.Tx, ownerUserID int64, stats *LegacyMigrationS
 	}
 	defer rows.Close()
 
+	// Drain before inserting — see migrateServiceCredentials (Postgres can't
+	// interleave a nested query while this cursor is open on the same tx).
+	type pendingPw struct {
+		hostID    int64
+		ct, nonce []byte
+	}
+	var pending []pendingPw
 	for rows.Next() {
-		var (
-			hostID    int64
-			ct, nonce []byte
-		)
-		if err := rows.Scan(&hostID, &ct, &nonce); err != nil {
+		var p pendingPw
+		if err := rows.Scan(&p.hostID, &p.ct, &p.nonce); err != nil {
 			return err
 		}
-		inserted, err := insertSharedSecret(tx, "password", "host", hostID, "password", ct, nonce, ownerUserID)
+		pending = append(pending, p)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, p := range pending {
+		inserted, err := insertSharedSecret(tx, "password", "host", p.hostID, "password", p.ct, p.nonce, ownerUserID)
 		if err != nil {
-			return fmt.Errorf("host %d password: %w", hostID, err)
+			return fmt.Errorf("host %d password: %w", p.hostID, err)
 		}
 		if inserted {
 			stats.HostPasswordsMigrated++
@@ -148,7 +172,7 @@ func migrateHostPasswords(tx *sql.Tx, ownerUserID int64, stats *LegacyMigrationS
 			stats.Skipped++
 		}
 	}
-	return rows.Err()
+	return nil
 }
 
 func migrateHostSSHKeys(tx *sql.Tx, enc *database.Encryptor, ownerUserID int64, stats *LegacyMigrationStats) error {
@@ -168,8 +192,8 @@ func migrateHostSSHKeys(tx *sql.Tx, enc *database.Encryptor, ownerUserID int64, 
 	defer rows.Close()
 
 	type pendingKey struct {
-		hostID                  int64
-		sshUser                 string
+		hostID                     int64
+		sshUser                    string
 		pubCT, pubN, privCT, privN []byte
 	}
 	var pending []pendingKey

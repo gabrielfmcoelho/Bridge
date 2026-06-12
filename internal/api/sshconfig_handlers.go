@@ -27,6 +27,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshkeys"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshsetup"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -57,7 +58,7 @@ func (h *sshHandlers) logOperation(r *http.Request, hostID int64, opType string,
 		Status:        status,
 		Output:        output,
 	}
-	if err := models.CreateOperationLog(h.db.SQL, ol); err != nil {
+	if err := store.NewOperationLogRepo(h.db.SQL).Create(r.Context(), ol); err != nil {
 		log.Printf("[ssh] failed to log operation: %v", err)
 	}
 }
@@ -66,7 +67,7 @@ func (h *sshHandlers) logOperation(r *http.Request, hostID int64, opType string,
 // writes an HTTP error if not found.
 func (h *sshHandlers) requireHost(w http.ResponseWriter, r *http.Request) *models.Host {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return nil
@@ -82,7 +83,6 @@ func (h *sshHandlers) requireUser(w http.ResponseWriter, host *models.Host) stri
 	}
 	return host.User
 }
-
 
 // resolveAuth builds an Auth for the given method. If method is empty, it picks
 // the best available method. Returns the resolved method name and Auth, or
@@ -165,7 +165,7 @@ func (h *sshHandlers) dial(w http.ResponseWriter, host *models.Host, user string
 
 // handlePreviewConfig renders the SSH config that would be generated.
 func (h *sshHandlers) handlePreviewConfig(w http.ResponseWriter, r *http.Request) {
-	hosts, err := models.ListHostsForSSHConfig(h.db.SQL)
+	hosts, err := store.NewHostRepo(h.db.SQL).ListForSSHConfig(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load hosts", err)
 		return
@@ -179,7 +179,7 @@ func (h *sshHandlers) handlePreviewConfig(w http.ResponseWriter, r *http.Request
 
 // handleGenerateConfig writes the SSH config file from DB data.
 func (h *sshHandlers) handleGenerateConfig(w http.ResponseWriter, r *http.Request) {
-	hosts, err := models.ListHostsForSSHConfig(h.db.SQL)
+	hosts, err := store.NewHostRepo(h.db.SQL).ListForSSHConfig(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load hosts", err)
 		return
@@ -240,7 +240,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 	if dialErr != nil {
 		host.ConnectionsFailed++
 		setTestStatus("failed")
-		models.UpdateHost(h.db.SQL, host)
+		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 		h.logOperation(r, host.ID, "test", &method, "failed", dialErr.Error())
 		jsonOK(w, map[string]any{"success": false, "error": "SSH connect: " + dialErr.Error()})
 		return
@@ -254,7 +254,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		if testErr != nil {
 			host.ConnectionsFailed++
 			setTestStatus("failed")
-			models.UpdateHost(h.db.SQL, host)
+			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
 			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
 			return
@@ -289,19 +289,19 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 			host.PrecisaManutencao = true
 			updated = true
 			result["resource_alert"] = true
-			models.AddTag(h.db.SQL, "host", host.ID, "alerta-recursos")
-			models.RemoveTag(h.db.SQL, "host", host.ID, "sub-utilizado")
+			store.NewTagRepo(h.db.SQL).Add(r.Context(), "host", host.ID, "alerta-recursos")
+			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "sub-utilizado")
 		} else if cpuPct > 0 && cpuPct < 5 && ramPct > 0 && ramPct < 5 && diskPct > 0 && diskPct < 5 {
 			result["sub_utilized"] = true
-			models.AddTag(h.db.SQL, "host", host.ID, "sub-utilizado")
-			models.RemoveTag(h.db.SQL, "host", host.ID, "alerta-recursos")
+			store.NewTagRepo(h.db.SQL).Add(r.Context(), "host", host.ID, "sub-utilizado")
+			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "alerta-recursos")
 			if host.PrecisaManutencao {
 				host.PrecisaManutencao = false
 				updated = true
 			}
 		} else {
-			models.RemoveTag(h.db.SQL, "host", host.ID, "alerta-recursos")
-			models.RemoveTag(h.db.SQL, "host", host.ID, "sub-utilizado")
+			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "alerta-recursos")
+			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "sub-utilizado")
 			if host.PrecisaManutencao {
 				host.PrecisaManutencao = false
 				updated = true
@@ -309,12 +309,12 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		}
 
 		if updated {
-			models.UpdateHost(h.db.SQL, host)
+			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 		}
 		h.logOperation(r, host.ID, "test", &method, "success", "")
 		// Annotate scanned SSH keys with managed status from DB
 		if len(vmInfo.SSHKeys) > 0 {
-			dbKeys, _ := models.ListSSHKeys(h.db.SQL)
+			dbKeys, _ := store.NewSSHKeyRepo(h.db.SQL).List(r.Context())
 			matched := 0
 			for i, sk := range vmInfo.SSHKeys {
 				for _, dk := range dbKeys {
@@ -335,7 +335,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		}
 		// Store scan snapshot in DB
 		if scanJSON, err := json.Marshal(vmInfo); err == nil {
-			if dbErr := models.CreateHostScan(h.db.SQL, host.ID, string(scanJSON)); dbErr != nil {
+			if dbErr := store.NewHostScanRepo(h.db.SQL).Create(r.Context(), host.ID, string(scanJSON)); dbErr != nil {
 				result["scan_save_error"] = dbErr.Error()
 			} else {
 				result["scan_saved"] = true
@@ -344,7 +344,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 
 		// Reconcile container-based services.
 		if len(vmInfo.ParsedContainers) > 0 {
-			if reconcileErr := models.ReconcileContainerServices(h.db.SQL, host.ID, vmInfo.ParsedContainers); reconcileErr != nil {
+			if reconcileErr := store.NewServiceRepo(h.db.SQL).ReconcileContainers(r.Context(), host.ID, vmInfo.ParsedContainers); reconcileErr != nil {
 				result["reconcile_error"] = reconcileErr.Error()
 			} else {
 				result["services_reconciled"] = true
@@ -355,7 +355,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		if testErr != nil {
 			host.ConnectionsFailed++
 			setTestStatus("failed")
-			models.UpdateHost(h.db.SQL, host)
+			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
 			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
 			return
@@ -365,7 +365,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 			host.ConnectionsFailed = 0
 		}
 		setTestStatus("success")
-		models.UpdateHost(h.db.SQL, host)
+		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 		h.logOperation(r, host.ID, "test", &method, "success", "")
 	}
 
@@ -485,17 +485,17 @@ func syncDockerLogsAlert(db *sql.DB, hostID int64, report *sshtest.DockerLogsRep
 			ExternalSource: dockerLogsAlertExternalSource,
 			ExternalID:     externalID,
 		}
-		if _, err := models.UpsertExternalHostAlert(db, alert); err != nil {
+		if _, err := store.NewHostAlertRepo(db).UpsertExternal(context.Background(), alert); err != nil {
 			log.Printf("[docker-logs] upsert alert host=%d failed: %v", hostID, err)
 		}
 	default: // "ok" or unknown
-		existing, err := models.GetExternalHostAlert(db, dockerLogsAlertExternalSource, externalID)
+		existing, err := store.NewHostAlertRepo(db).GetExternal(context.Background(), dockerLogsAlertExternalSource, externalID)
 		if err != nil {
 			log.Printf("[docker-logs] lookup existing alert host=%d failed: %v", hostID, err)
 			return
 		}
 		if existing != nil && existing.Status == "active" {
-			if rerr := models.ResolveHostAlert(db, existing.ID); rerr != nil {
+			if rerr := store.NewHostAlertRepo(db).Resolve(context.Background(), existing.ID); rerr != nil {
 				log.Printf("[docker-logs] auto-resolve alert id=%d host=%d failed: %v", existing.ID, hostID, rerr)
 			}
 		}
@@ -623,7 +623,7 @@ func (h *sshHandlers) handleDockerLogsApplyRotation(w http.ResponseWriter, r *ht
 // handleSetupKey sets up an SSH key for a host.
 func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -695,8 +695,8 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	// Flag bookkeeping + vault write. identities_only="yes" forces SSH to
 	// use the host's linked key only. key_path is empty — keys live only
 	// in the unified vault, never on the filesystem.
-	_ = models.UpdateHostKeyMeta(h.db.SQL, host.ID, true, "", "yes")
-	if vErr := vault.HostSetSSHKey(r.Context(), h.db, host.ID, actorUserID(r),
+	_ = store.NewHostRepo(h.db.SQL).UpdateKeyMeta(r.Context(), host.ID, true, "", "yes")
+	if vErr := vault.HostSetSSHKey(r.Context(), h.db, host.ID, actorID(r),
 		vault.HostSSHKey{PrivateKeyPEM: string(result.PrivKeyPEM), PublicKey: result.PubKeyLine}); vErr != nil {
 		log.Printf("[ssh] setup-key vault write slug=%s: %v", host.OficialSlug, vErr)
 	}
@@ -719,7 +719,7 @@ func (h *sshHandlers) handleListKeys(w http.ResponseWriter, r *http.Request) {
 
 // handleDownloadConfig returns the SSH config as a downloadable file.
 func (h *sshHandlers) handleDownloadConfig(w http.ResponseWriter, r *http.Request) {
-	hosts, err := models.ListHostsForSSHConfig(h.db.SQL)
+	hosts, err := store.NewHostRepo(h.db.SQL).ListForSSHConfig(r.Context())
 	if err != nil {
 		jsonServerError(w, r, "failed to load hosts", err)
 		return
@@ -868,7 +868,7 @@ func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Requ
 		id := req.SSHKeyID
 		keyIDArg = &id
 	}
-	if linkErr := models.CreateOrUpdateHostRemoteUser(h.db.SQL, host.ID, req.Username, keyIDArg); linkErr != nil {
+	if linkErr := store.NewHostRemoteUserRepo(h.db.SQL).CreateOrUpdate(r.Context(), host.ID, req.Username, keyIDArg); linkErr != nil {
 		log.Printf("[sshcm] create-remote-user host=%d user=%s link-persist error=%v", host.ID, req.Username, linkErr)
 	}
 
@@ -938,7 +938,7 @@ func (h *sshHandlers) handleDeleteRemoteUser(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if linkErr := models.DeleteHostRemoteUser(h.db.SQL, host.ID, req.Username); linkErr != nil {
+	if linkErr := store.NewHostRemoteUserRepo(h.db.SQL).Delete(r.Context(), host.ID, req.Username); linkErr != nil {
 		log.Printf("[sshcm] delete-remote-user host=%d user=%s link-cleanup error=%v", host.ID, req.Username, linkErr)
 	}
 
@@ -976,7 +976,7 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 	if opErr != nil {
 		s := "failed"
 		host.DockerGroupStatus = &s
-		models.UpdateHost(h.db.SQL, host)
+		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 		h.logOperation(r, host.ID, "docker-setup", &method, "failed", opErr.Error())
 		jsonOK(w, map[string]any{"success": false, "error": opErr.Error()})
 		return
@@ -995,7 +995,7 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 		dockerStatus = "needs_sudo"
 	}
 	host.DockerGroupStatus = &dockerStatus
-	models.UpdateHost(h.db.SQL, host)
+	store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
 
 	logStatus := "success"
 	if status.NeedsSudo && !status.GroupFixApplied {
@@ -1197,7 +1197,7 @@ func (h *sshHandlers) resolveIdentityFile(host *models.Host) string {
 	}
 	fp := ssh.FingerprintSHA256(pub)
 
-	keys, err := models.ListSSHKeys(h.db.SQL)
+	keys, err := store.NewSSHKeyRepo(h.db.SQL).List(context.Background())
 	if err != nil {
 		return fallback
 	}
@@ -1212,7 +1212,7 @@ func (h *sshHandlers) resolveIdentityFile(host *models.Host) string {
 // handleHostSSHConfig returns the SSH config snippet for a single host.
 func (h *sshHandlers) handleHostSSHConfig(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -1244,7 +1244,7 @@ func (h *sshHandlers) handleHostSSHConfig(w http.ResponseWriter, r *http.Request
 // handleOperationLogs returns operation logs for a host.
 func (h *sshHandlers) handleOperationLogs(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -1257,7 +1257,7 @@ func (h *sshHandlers) handleOperationLogs(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	logs, err := models.ListOperationLogs(h.db.SQL, host.ID, limit)
+	logs, err := store.NewOperationLogRepo(h.db.SQL).ListByHost(r.Context(), host.ID, limit)
 	if err != nil {
 		jsonServerError(w, r, "failed to load operation logs", err)
 		return
@@ -1444,4 +1444,28 @@ func parsePercent(s string) float64 {
 	s = strings.TrimSuffix(s, "%")
 	v, _ := strconv.ParseFloat(s, 64)
 	return v
+}
+
+// registerRoutes binds the /api/ssh/* operations with their auth policies.
+func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/ssh/preview-config", h.handlePreviewConfig)
+	rr.role("editor", "POST /api/ssh/generate-config", h.handleGenerateConfig)
+	rr.role("editor", "POST /api/ssh/test/{slug}", h.handleTestConnection)
+	rr.role("editor", "POST /api/ssh/network-test/{slug}", h.handleNetworkTest)
+	rr.role("editor", "POST /api/ssh/setup-key/{slug}", h.handleSetupKey)
+	rr.role("editor", "POST /api/ssh/fix-dev-null/{slug}", h.handleFixDevNull)
+	rr.role("admin", "POST /api/ssh/setup-sudo-nopasswd/{slug}", h.handleSetupSudoNopasswd)
+	rr.role("admin", "POST /api/ssh/create-remote-user/{slug}", h.handleCreateRemoteUser)
+	rr.role("admin", "POST /api/ssh/delete-remote-user/{slug}", h.handleDeleteRemoteUser)
+	rr.auth("GET /api/ssh/keys", h.handleListKeys)
+	rr.auth("GET /api/ssh/download-config", h.handleDownloadConfig)
+	rr.auth("GET /api/ssh/server-info", h.handleServerInfo)
+	rr.auth("GET /api/ssh/operation-logs/{slug}", h.handleOperationLogs)
+	rr.role("editor", "POST /api/ssh/list-remote-keys/{slug}", h.handleListRemoteKeys)
+	rr.role("admin", "POST /api/ssh/docker-setup/{slug}", h.handleDockerSetup)
+	rr.role("editor", "POST /api/ssh/docker-logs/{slug}", h.handleDockerLogsInspect)
+	rr.role("admin", "POST /api/ssh/docker-logs-rotation/{slug}", h.handleDockerLogsApplyRotation)
+	rr.role("admin", "POST /api/ssh/nginx-cleanup/{slug}", h.handleNginxCleanup)
+	rr.role("admin", "POST /api/ssh/grafana-agent-setup/{slug}", h.handleGrafanaAgentSetup)
+	rr.auth("GET /api/ssh/host-config/{slug}", h.handleHostSSHConfig)
 }

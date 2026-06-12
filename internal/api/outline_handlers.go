@@ -9,7 +9,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	outlineclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/outline"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type outlineHandlers struct {
@@ -19,25 +19,25 @@ type outlineHandlers struct {
 // wikiEnvelope is the shape every "list documents" response carries.
 // The UI differentiates its empty states from the boolean + nil fields.
 type wikiEnvelope struct {
-	Enabled     bool                    `json:"enabled"`
-	Configured  bool                    `json:"configured"`
-	Collection  *outlineclient.Collection `json:"collection"`
-	CollectionBrowseURL string          `json:"collection_browse_url,omitempty"`
-	Documents   []docSummary            `json:"documents"`
-	Warning     string                  `json:"warning,omitempty"`
+	Enabled             bool                      `json:"enabled"`
+	Configured          bool                      `json:"configured"`
+	Collection          *outlineclient.Collection `json:"collection"`
+	CollectionBrowseURL string                    `json:"collection_browse_url,omitempty"`
+	Documents           []docSummary              `json:"documents"`
+	Warning             string                    `json:"warning,omitempty"`
 }
 
 // docSummary flattens the Outline document into what the UI actually needs —
 // enough to render a row without forcing the frontend to mirror Outline's full type.
 type docSummary struct {
-	ID          string    `json:"id"`
-	URLID       string    `json:"url_id"`
-	Title       string    `json:"title"`
-	Emoji       string    `json:"emoji,omitempty"`
-	Excerpt     string    `json:"excerpt"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	UpdatedBy   string    `json:"updated_by,omitempty"`
-	BrowseURL   string    `json:"browse_url"`
+	ID        string    `json:"id"`
+	URLID     string    `json:"url_id"`
+	Title     string    `json:"title"`
+	Emoji     string    `json:"emoji,omitempty"`
+	Excerpt   string    `json:"excerpt"`
+	UpdatedAt time.Time `json:"updated_at"`
+	UpdatedBy string    `json:"updated_by,omitempty"`
+	BrowseURL string    `json:"browse_url"`
 }
 
 // handleListProjectWiki returns recent docs in the project's linked Outline collection.
@@ -49,7 +49,7 @@ func (h *outlineHandlers) handleListProjectWiki(w http.ResponseWriter, r *http.R
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "project lookup failed", err)
 		return
@@ -187,9 +187,9 @@ func (h *outlineHandlers) buildCommonSection(
 			URLID:     d.URLID,
 			Title:     d.Title,
 			Emoji:     d.Emoji,
-			Excerpt:   buildExcerpt(d.Text, 160),
+			Excerpt:   outlineclient.Excerpt(d.Text, 160),
 			UpdatedAt: d.UpdatedAt,
-			UpdatedBy: userName(d.UpdatedBy),
+			UpdatedBy: d.UpdatedBy.DisplayName(),
 			BrowseURL: d.BrowseURL(baseURL),
 		})
 	}
@@ -229,9 +229,9 @@ func (h *outlineHandlers) populateWikiEnvelope(
 			URLID:     d.URLID,
 			Title:     d.Title,
 			Emoji:     d.Emoji,
-			Excerpt:   buildExcerpt(d.Text, 160),
+			Excerpt:   outlineclient.Excerpt(d.Text, 160),
 			UpdatedAt: d.UpdatedAt,
-			UpdatedBy: userName(d.UpdatedBy),
+			UpdatedBy: d.UpdatedBy.DisplayName(),
 			BrowseURL: d.BrowseURL(baseURL),
 		})
 	}
@@ -245,7 +245,7 @@ func (h *outlineHandlers) handleCreateProjectDocument(w http.ResponseWriter, r *
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "project lookup failed", err)
 		return
@@ -394,7 +394,7 @@ func (h *outlineHandlers) handleSearchProjectWiki(w http.ResponseWriter, r *http
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "project lookup failed", err)
 		return
@@ -466,30 +466,6 @@ func (h *outlineHandlers) runSearch(w http.ResponseWriter, r *http.Request, coll
 // buildExcerpt strips minimal markdown (leading #s for headings, trailing whitespace)
 // and truncates to `n` runes with an ellipsis. Keeps list rows compact without pulling
 // in a full markdown parser.
-func buildExcerpt(text string, n int) string {
-	t := strings.TrimSpace(text)
-	// Drop leading markdown heading markers.
-	for strings.HasPrefix(t, "#") || strings.HasPrefix(t, " ") {
-		t = strings.TrimLeft(t, "# ")
-	}
-	t = strings.ReplaceAll(t, "\n", " ")
-	if len(t) <= n {
-		return t
-	}
-	runes := []rune(t)
-	if len(runes) <= n {
-		return t
-	}
-	return string(runes[:n]) + "…"
-}
-
-func userName(u *outlineclient.User) string {
-	if u == nil {
-		return ""
-	}
-	return u.Name
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // Outline-like navigation surface (tree + single-doc viewer + collection picker)
 // ────────────────────────────────────────────────────────────────────────────
@@ -525,30 +501,21 @@ func (h *outlineHandlers) handleListWorkspaceCollections(w http.ResponseWriter, 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
-	// Page through collections.list until a short page signals end-of-list. Cap
-	// iterations so a misbehaving server can't hang the handler.
-	const pageSize = 100
-	const maxPages = 20
-	out := make([]workspaceCollectionSummary, 0, pageSize)
-	for page := 0; page < maxPages; page++ {
-		chunk, err := client.CollectionsList(ctx, pageSize, page*pageSize)
-		if err != nil {
-			jsonError(w, http.StatusBadGateway, "outline api error: "+err.Error())
-			return
-		}
-		for _, c := range chunk {
-			out = append(out, workspaceCollectionSummary{
-				ID:          c.ID,
-				URLID:       c.URLID,
-				Name:        c.Name,
-				Description: c.Description,
-				Color:       c.Color,
-				Icon:        c.Icon,
-			})
-		}
-		if len(chunk) < pageSize {
-			break
-		}
+	collections, err := client.CollectionsListAll(ctx)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "outline api error: "+err.Error())
+		return
+	}
+	out := make([]workspaceCollectionSummary, 0, len(collections))
+	for _, c := range collections {
+		out = append(out, workspaceCollectionSummary{
+			ID:          c.ID,
+			URLID:       c.URLID,
+			Name:        c.Name,
+			Description: c.Description,
+			Color:       c.Color,
+			Icon:        c.Icon,
+		})
 	}
 	jsonOK(w, map[string]any{"collections": out})
 }
@@ -704,7 +671,21 @@ func (h *outlineHandlers) handleGetWikiDocument(w http.ResponseWriter, r *http.R
 		Text:         doc.Text,
 		CollectionID: doc.CollectionID,
 		UpdatedAt:    doc.UpdatedAt,
-		UpdatedBy:    userName(doc.UpdatedBy),
+		UpdatedBy:    doc.UpdatedBy.DisplayName(),
 		BrowseURL:    doc.BrowseURL(settings.BaseURL),
 	})
+}
+
+// registerRoutes binds the Outline (wiki) integration: per-project wiki +
+// common workspace documents, search, collections, and tree.
+func (h *outlineHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/projects/{id}/wiki", h.handleListProjectWiki)
+	rr.role("editor", "POST /api/projects/{id}/wiki/documents", h.handleCreateProjectDocument)
+	rr.auth("GET /api/projects/{id}/wiki/search", h.handleSearchProjectWiki)
+	rr.auth("GET /api/wiki/documents", h.handleListCommonWiki)
+	rr.role("editor", "POST /api/wiki/documents", h.handleCreateCommonDocument)
+	rr.auth("GET /api/wiki/search", h.handleSearchCommonWiki)
+	rr.role("admin", "GET /api/wiki/collections", h.handleListWorkspaceCollections)
+	rr.auth("GET /api/wiki/tree", h.handleCommonWikiTree)
+	rr.auth("GET /api/wiki/documents/{id}", h.handleGetWikiDocument)
 }

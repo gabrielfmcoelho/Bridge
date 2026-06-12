@@ -13,6 +13,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type grafanaHandlers struct {
@@ -44,7 +45,7 @@ func (h *grafanaHandlers) handleEmbedURL(w http.ResponseWriter, r *http.Request)
 
 	switch entity {
 	case "host":
-		host, err := models.GetHostBySlug(h.db.SQL, id)
+		host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), id)
 		if err != nil {
 			jsonServerError(w, r, "host lookup failed", err)
 			return
@@ -66,7 +67,7 @@ func (h *grafanaHandlers) handleEmbedURL(w http.ResponseWriter, r *http.Request)
 			jsonError(w, http.StatusBadRequest, "service id must be numeric")
 			return
 		}
-		svc, err := models.GetService(h.db.SQL, sid)
+		svc, err := store.NewServiceRepo(h.db.SQL).Get(r.Context(), sid)
 		if err != nil {
 			jsonServerError(w, r, "service lookup failed", err)
 			return
@@ -129,16 +130,16 @@ func parseIntFromString(s string) (int64, error) {
 // Every metric is a pointer so the JSON `null` distinguishes "series missing"
 // from "value is zero" — the UI uses that to render dimmed tiles.
 type hostLiveMetrics struct {
-	Enabled        bool     `json:"enabled"`
-	Configured     bool     `json:"configured"`
-	HostUp         *bool    `json:"host_up"`
-	CPUPct         *float64 `json:"cpu_pct"`
-	RAMPct         *float64 `json:"ram_pct"`
-	DiskPct        *float64 `json:"disk_pct"`
-	Load1m         *float64 `json:"load_1m"`
-	UptimeSeconds  *float64 `json:"uptime_seconds"`
-	FetchedAt      string   `json:"fetched_at"`
-	Warnings       []string `json:"warnings,omitempty"`
+	Enabled       bool     `json:"enabled"`
+	Configured    bool     `json:"configured"`
+	HostUp        *bool    `json:"host_up"`
+	CPUPct        *float64 `json:"cpu_pct"`
+	RAMPct        *float64 `json:"ram_pct"`
+	DiskPct       *float64 `json:"disk_pct"`
+	Load1m        *float64 `json:"load_1m"`
+	UptimeSeconds *float64 `json:"uptime_seconds"`
+	FetchedAt     string   `json:"fetched_at"`
+	Warnings      []string `json:"warnings,omitempty"`
 }
 
 // handleHostLiveMetrics fans out a small pack of PromQL queries against the
@@ -147,7 +148,7 @@ type hostLiveMetrics struct {
 // as an external label, so all selectors use {host=<slug>}.
 func (h *grafanaHandlers) handleHostLiveMetrics(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil {
 		jsonServerError(w, r, "host lookup failed", err)
 		return
@@ -183,9 +184,9 @@ func (h *grafanaHandlers) handleHostLiveMetrics(w http.ResponseWriter, r *http.R
 	// selector so it matches exactly one series (except node_cpu_seconds_total,
 	// which aggregates across all CPUs via avg()).
 	type task struct {
-		key    string  // field on out to populate
-		expr   string
-		out    **float64
+		key  string // field on out to populate
+		expr string
+		out  **float64
 	}
 	slugQuoted := host.OficialSlug
 	tasks := []task{
@@ -317,7 +318,7 @@ func ProvisionHostDashboard(ctx context.Context, db *database.DB, host *models.H
 
 	// Persist the UID so the Metrics tab picks it up immediately.
 	host.GrafanaDashboardUID = returnedUID
-	if err := models.UpdateHost(db.SQL, host); err != nil {
+	if err := store.NewHostRepo(db.SQL).Update(ctx, host); err != nil {
 		log.Printf("[grafana-provision] host %d: uploaded dashboard %s but failed to persist UID: %v", host.ID, returnedUID, err)
 	}
 	return returnedUID, nil
@@ -366,7 +367,7 @@ func ProvisionServiceDashboard(ctx context.Context, db *database.DB, svc *models
 	}
 
 	svc.GrafanaDashboardUID = returnedUID
-	if err := models.UpdateService(db.SQL, svc); err != nil {
+	if err := store.NewServiceRepo(db.SQL).Update(ctx, svc); err != nil {
 		log.Printf("[grafana-provision] service %d: uploaded dashboard %s but failed to persist UID: %v", svc.ID, returnedUID, err)
 	}
 	return returnedUID, nil
@@ -376,7 +377,7 @@ func ProvisionServiceDashboard(ctx context.Context, db *database.DB, svc *models
 // default dashboard" button in the host form. Synchronous; returns the new UID.
 func (h *grafanaHandlers) handleProvisionHostDashboard(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	host, err := models.GetHostBySlug(h.db.SQL, slug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
 	if err != nil {
 		jsonServerError(w, r, "host lookup failed", err)
 		return
@@ -409,7 +410,7 @@ func (h *grafanaHandlers) handleProvisionServiceDashboard(w http.ResponseWriter,
 		jsonBadRequest(w, r, "invalid service id", err)
 		return
 	}
-	svc, err := models.GetService(h.db.SQL, id)
+	svc, err := store.NewServiceRepo(h.db.SQL).Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "service lookup failed", err)
 		return
@@ -433,4 +434,13 @@ func (h *grafanaHandlers) handleProvisionServiceDashboard(w http.ResponseWriter,
 		"uid":     uid,
 		"message": fmt.Sprintf("Dashboard %q provisioned. The Metrics tab will use it on next load.", uid),
 	})
+}
+
+// registerRoutes binds the Grafana embed/live-metrics + dashboard provisioning
+// routes.
+func (h *grafanaHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/grafana/embed-url", h.handleEmbedURL)
+	rr.auth("GET /api/hosts/{slug}/metrics/live", h.handleHostLiveMetrics)
+	rr.role("admin", "POST /api/hosts/{slug}/grafana/provision", h.handleProvisionHostDashboard)
+	rr.role("admin", "POST /api/services/{id}/grafana/provision", h.handleProvisionServiceDashboard)
 }

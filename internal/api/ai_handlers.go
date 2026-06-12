@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/llm"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type aiHandlers struct {
@@ -23,7 +23,7 @@ type aiHandlers struct {
 }
 
 func (h *aiHandlers) getClient() (*llm.Client, error) {
-	get := func(key string) string { return models.GetAppSettingValue(h.db.SQL, key) }
+	get := func(key string) string { return store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), key) }
 
 	if get("llm_enabled") != "true" {
 		return nil, http.ErrAbortHandler
@@ -37,17 +37,13 @@ func (h *aiHandlers) getClient() (*llm.Client, error) {
 		maxTokens = n
 	}
 
-	// Decrypt API key.
-	cipherHex := get("llm_api_key_cipher")
-	nonceHex := get("llm_api_key_nonce")
-	if cipherHex == "" || nonceHex == "" || baseURL == "" {
-		return nil, http.ErrAbortHandler
-	}
-	cipher, _ := hex.DecodeString(cipherHex)
-	nonce, _ := hex.DecodeString(nonceHex)
-	apiKey, err := h.db.Encryptor.Decrypt(cipher, nonce)
+	// Decrypt API key (now stored in app_secrets).
+	apiKey, ok, err := store.NewAppSecretRepo(h.db.SQL).Reveal(context.Background(), h.db.Encryptor, "llm_api_key")
 	if err != nil {
 		return nil, err
+	}
+	if !ok || baseURL == "" {
+		return nil, http.ErrAbortHandler
 	}
 
 	return llm.NewClient(baseURL, apiKey, model, maxTokens), nil
@@ -55,12 +51,12 @@ func (h *aiHandlers) getClient() (*llm.Client, error) {
 
 // handleStatus checks if the LLM integration is configured.
 func (h *aiHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
-	enabled := models.GetAppSettingValue(h.db.SQL, "llm_enabled") == "true"
-	configured := models.GetAppSettingValue(h.db.SQL, "llm_api_key_cipher") != ""
+	enabled := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_enabled") == "true"
+	configured := store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), "llm_api_key")
 	jsonOK(w, map[string]any{
 		"enabled":    enabled,
 		"configured": configured,
-		"model":      models.GetAppSettingValue(h.db.SQL, "llm_model_text"),
+		"model":      store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_model_text"),
 	})
 }
 
@@ -117,7 +113,7 @@ func (h *aiHandlers) handleAssistHostDoc(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Fetch host data.
-	host, err := models.GetHostBySlug(h.db.SQL, req.HostSlug)
+	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), req.HostSlug)
 	if err != nil || host == nil {
 		jsonError(w, http.StatusNotFound, "host not found")
 		return
@@ -189,7 +185,7 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	links, err := models.ListProjectGitLabLinks(h.db.SQL, projectID)
+	links, err := store.NewProjectGitLabLinkRepo(h.db.SQL).List(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "failed to list project links", err)
 		return
@@ -297,7 +293,7 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 	}
 
 	// Build the user prompt with the locale instruction up front so the model can't miss it.
-	project, err := models.GetProject(h.db.SQL, projectID)
+	project, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), projectID)
 	projectName := ""
 	if err == nil && project != nil {
 		projectName = project.Name
@@ -325,30 +321,30 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 
 	analysis := strings.TrimSpace(reply)
 	record := &models.ProjectAIAnalysis{
-		ProjectID:    projectID,
-		Content:      analysis,
-		Locale:       locale,
-		CommitsUsed:  len(all),
-		ReposUsed:    len(targets),
+		ProjectID:   projectID,
+		Content:     analysis,
+		Locale:      locale,
+		CommitsUsed: len(all),
+		ReposUsed:   len(targets),
 	}
-	if err := models.UpsertProjectAIAnalysis(h.db.SQL, record); err != nil {
+	if err := store.NewProjectAIAnalysisRepo(h.db.SQL).Upsert(r.Context(), record); err != nil {
 		// Persistence failure shouldn't hide the freshly-generated result from the user,
 		// so log and still return the analysis. Next visit will see no cached version.
 		log.Printf("[ai] failed to cache project analysis project=%d: %v", projectID, err)
 	}
 
 	// Re-read to get the DB-generated generated_at timestamp.
-	if saved, err := models.GetProjectAIAnalysis(h.db.SQL, projectID); err == nil && saved != nil {
+	if saved, err := store.NewProjectAIAnalysisRepo(h.db.SQL).Get(r.Context(), projectID); err == nil && saved != nil {
 		jsonOK(w, saved)
 		return
 	}
 	jsonOK(w, map[string]any{
-		"project_id":    projectID,
-		"content":       analysis,
-		"locale":        locale,
-		"commits_used":  len(all),
-		"repos_used":    len(targets),
-		"generated_at":  time.Now().UTC().Format(time.RFC3339),
+		"project_id":   projectID,
+		"content":      analysis,
+		"locale":       locale,
+		"commits_used": len(all),
+		"repos_used":   len(targets),
+		"generated_at": time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
@@ -361,7 +357,7 @@ func (h *aiHandlers) handleGetProjectAnalysis(w http.ResponseWriter, r *http.Req
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
-	cached, err := models.GetProjectAIAnalysis(h.db.SQL, projectID)
+	cached, err := store.NewProjectAIAnalysisRepo(h.db.SQL).Get(r.Context(), projectID)
 	if err != nil {
 		jsonServerError(w, r, "failed to read cached analysis", err)
 		return
@@ -416,4 +412,14 @@ func (h *aiHandlers) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]string{"response": result})
+}
+
+// registerRoutes wires this group's routes (self-registration, R2).
+func (h *aiHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/ai/status", h.handleStatus)
+	rr.perm("ai.use", "POST /api/ai/assist/issue", h.handleAssistIssue)
+	rr.perm("ai.use", "POST /api/ai/assist/host-doc", h.handleAssistHostDoc)
+	rr.perm("ai.use", "POST /api/ai/chat", h.handleChat)
+	rr.auth("GET /api/projects/{id}/ai/analyze", h.handleGetProjectAnalysis)
+	rr.perm("ai.use", "POST /api/projects/{id}/ai/analyze", h.handleAnalyzeProject)
 }

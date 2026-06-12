@@ -1,28 +1,30 @@
 package glpi
 
 import (
+	"context"
 	"database/sql"
-	"encoding/hex"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // Settings captures the instance-level GLPI configuration. User tokens (one per
 // profile) live in the glpi_tokens table — not here — because we support multiple.
 type Settings struct {
-	Enabled          bool
-	BaseURL          string
-	AppToken         string
-	DefaultEntityID  int
+	Enabled         bool
+	BaseURL         string
+	AppToken        string
+	DefaultEntityID int
 }
 
 // LoadSettings reads the glpi_* keys from app_settings, decrypting the App-Token.
 func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
-	get := func(k string) string { return strings.TrimSpace(models.GetAppSettingValue(db, k)) }
+	get := func(k string) string {
+		return strings.TrimSpace(store.NewAppSettingsRepo(db).Value(context.Background(), k))
+	}
 	s := Settings{
-		Enabled: models.GetAppSettingValue(db, "glpi_enabled") == "true",
+		Enabled: store.NewAppSettingsRepo(db).Value(context.Background(), "glpi_enabled") == "true",
 		BaseURL: strings.TrimRight(get("glpi_base_url"), "/"),
 	}
 	appTok, err := decryptSecret(db, enc, "glpi_app_token")
@@ -47,20 +49,8 @@ func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 }
 
 func decryptSecret(db *sql.DB, enc *database.Encryptor, prefix string) (string, error) {
-	cipherHex := models.GetAppSettingValue(db, prefix+"_cipher")
-	nonceHex := models.GetAppSettingValue(db, prefix+"_nonce")
-	if cipherHex == "" || nonceHex == "" {
-		return "", nil
-	}
-	cipher, err := hex.DecodeString(cipherHex)
-	if err != nil {
-		return "", err
-	}
-	nonce, err := hex.DecodeString(nonceHex)
-	if err != nil {
-		return "", err
-	}
-	return enc.Decrypt(cipher, nonce)
+	v, _, err := store.NewAppSecretRepo(db).Reveal(context.Background(), enc, prefix)
+	return v, err
 }
 
 // NewServiceClient returns a ready-to-use client if the minimum config is present.

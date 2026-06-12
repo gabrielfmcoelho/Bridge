@@ -22,12 +22,11 @@ var ErrSecretNotFound = errors.New("secret not found")
 // (e.g. admin trying to Reveal another user's personal secret per D1).
 var ErrSecretForbidden = errors.New("forbidden")
 
-// ActorContext identifies the user making a repo call. Required for ACL
-// decisions; the handler layer constructs this from the auth middleware.
-type ActorContext struct {
-	UserID int64
-	Role   string // "viewer" | "editor" | "admin"
-}
+// ActorContext is the acting principal for a repo call. The canonical type now
+// lives in models (so store + vault can share it without an import cycle); this
+// alias keeps the historical vault.ActorContext spelling working for existing
+// callers.
+type ActorContext = models.ActorContext
 
 // SecretFilter narrows List / ListTrash results. Empty fields are wildcards.
 type SecretFilter struct {

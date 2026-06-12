@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -37,13 +37,38 @@ export default function ProjectsPage() {
   const [editing, setEditing] = useState<Project | null>(null);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [tablePage, setTablePage] = useState(1);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
+  // Full list — feeds KPIs, CSV export, and the card view (which client-filters).
   const { data: allProjects = [], isLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: projectsAPI.list,
   });
+
+  // Table view drives REAL server-side filtering+sort+pagination (one page at a
+  // time). Enabled only in table mode; KPIs/export/cards keep using allProjects.
+  const TABLE_PER_PAGE = 20;
+  const tableQuery = useQuery({
+    queryKey: ["projects-table", search, filters, sort, tablePage],
+    enabled: viewMode === "table",
+    queryFn: () => {
+      const params: Record<string, string> = {};
+      if (search) params.search = search;
+      if (filters.situacao) params.situacao = filters.situacao;
+      if (filters.tag) params.tag = filters.tag;
+      params.sort_by = sort.field;
+      params.sort_dir = sort.direction;
+      params.page = String(tablePage);
+      params.per_page = String(TABLE_PER_PAGE);
+      return projectsAPI.listPaginated(params);
+    },
+  });
+  const tableProjects = tableQuery.data?.data ?? [];
+  const tableTotal = tableQuery.data?.meta.total ?? 0;
+
+  useEffect(() => { setTablePage(1); }, [search, filters, sort]);
 
   const filteredAndSorted = useMemo(() => {
     let result = [...allProjects];
@@ -119,8 +144,8 @@ export default function ProjectsPage() {
       />
 
       <InventoryContent
-        isLoading={isLoading}
-        items={filteredAndSorted}
+        isLoading={viewMode === "table" ? tableQuery.isLoading : isLoading}
+        items={viewMode === "table" ? tableProjects : filteredAndSorted}
         viewMode={viewMode}
         emptyIcon="folder"
         emptyTitle={t("common.noResults")}
@@ -129,7 +154,7 @@ export default function ProjectsPage() {
           <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("project.addProject")}</Button>
         ) : undefined}
         renderCard={(project) => <ProjectCard project={project} />}
-        renderTable={(items) => <ProjectsTableView projects={items} t={t} />}
+        renderTable={(items) => <ProjectsTableView projects={items} total={tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}
       />
 
       <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={editing ? t("common.edit") : t("project.addProject")} subHeader={formSubHeader}>
