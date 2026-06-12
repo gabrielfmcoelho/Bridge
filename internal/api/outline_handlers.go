@@ -187,9 +187,9 @@ func (h *outlineHandlers) buildCommonSection(
 			URLID:     d.URLID,
 			Title:     d.Title,
 			Emoji:     d.Emoji,
-			Excerpt:   buildExcerpt(d.Text, 160),
+			Excerpt:   outlineclient.Excerpt(d.Text, 160),
 			UpdatedAt: d.UpdatedAt,
-			UpdatedBy: userName(d.UpdatedBy),
+			UpdatedBy: d.UpdatedBy.DisplayName(),
 			BrowseURL: d.BrowseURL(baseURL),
 		})
 	}
@@ -229,9 +229,9 @@ func (h *outlineHandlers) populateWikiEnvelope(
 			URLID:     d.URLID,
 			Title:     d.Title,
 			Emoji:     d.Emoji,
-			Excerpt:   buildExcerpt(d.Text, 160),
+			Excerpt:   outlineclient.Excerpt(d.Text, 160),
 			UpdatedAt: d.UpdatedAt,
-			UpdatedBy: userName(d.UpdatedBy),
+			UpdatedBy: d.UpdatedBy.DisplayName(),
 			BrowseURL: d.BrowseURL(baseURL),
 		})
 	}
@@ -466,30 +466,6 @@ func (h *outlineHandlers) runSearch(w http.ResponseWriter, r *http.Request, coll
 // buildExcerpt strips minimal markdown (leading #s for headings, trailing whitespace)
 // and truncates to `n` runes with an ellipsis. Keeps list rows compact without pulling
 // in a full markdown parser.
-func buildExcerpt(text string, n int) string {
-	t := strings.TrimSpace(text)
-	// Drop leading markdown heading markers.
-	for strings.HasPrefix(t, "#") || strings.HasPrefix(t, " ") {
-		t = strings.TrimLeft(t, "# ")
-	}
-	t = strings.ReplaceAll(t, "\n", " ")
-	if len(t) <= n {
-		return t
-	}
-	runes := []rune(t)
-	if len(runes) <= n {
-		return t
-	}
-	return string(runes[:n]) + "…"
-}
-
-func userName(u *outlineclient.User) string {
-	if u == nil {
-		return ""
-	}
-	return u.Name
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // Outline-like navigation surface (tree + single-doc viewer + collection picker)
 // ────────────────────────────────────────────────────────────────────────────
@@ -695,7 +671,7 @@ func (h *outlineHandlers) handleGetWikiDocument(w http.ResponseWriter, r *http.R
 		Text:         doc.Text,
 		CollectionID: doc.CollectionID,
 		UpdatedAt:    doc.UpdatedAt,
-		UpdatedBy:    userName(doc.UpdatedBy),
+		UpdatedBy:    doc.UpdatedBy.DisplayName(),
 		BrowseURL:    doc.BrowseURL(settings.BaseURL),
 	})
 }
