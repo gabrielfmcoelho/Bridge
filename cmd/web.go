@@ -4,14 +4,19 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/api"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -31,9 +36,14 @@ var webCmd = &cobra.Command{
 		}
 		defer db.Close()
 
+		// Root context cancelled on SIGINT/SIGTERM — drives graceful shutdown of
+		// the HTTP server and the janitor below.
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+
 		// Background: clean up expired share links every hour (Phase 3 Task 3.4).
-		// Cancelled when web's parent context is cancelled — process exit.
-		vault.NewShareLinkJanitor(db.SQL).Start(context.Background())
+		// Stops when ctx is cancelled (shutdown signal).
+		vault.NewShareLinkJanitor(db.SQL).Start(ctx)
 
 		apiRouter := api.NewRouter(db, configPath)
 
@@ -81,7 +91,16 @@ var webCmd = &cobra.Command{
 			ReadHeaderTimeout: 10 * time.Second,
 			IdleTimeout:       60 * time.Second,
 		}
-		return srv.ListenAndServe()
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("listen on %s: %w", addr, err)
+		}
+		// Serve until SIGINT/SIGTERM, then drain in-flight requests (15s budget).
+		if err := httpx.GracefulServe(ctx, srv, ln, 15*time.Second); err != nil {
+			return err
+		}
+		fmt.Println("\nShut down cleanly")
+		return nil
 	},
 }
 
