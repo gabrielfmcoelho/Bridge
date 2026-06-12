@@ -33,22 +33,28 @@ func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := GetSessionToken(r)
 		if token == "" {
+			auditAuthFailure(r, "no session token")
 			httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
 
 		userID, err := ValidateSession(db, token)
 		if err != nil {
+			auditAuthFailure(r, "invalid or expired session")
 			httpx.WriteError(w, http.StatusUnauthorized, "invalid or expired session")
 			return
 		}
 
 		user, err := store.NewUserRepo(db).GetByID(r.Context(), userID)
 		if err != nil || user == nil {
+			auditAuthFailure(r, "user not found")
 			httpx.WriteError(w, http.StatusUnauthorized, "user not found")
 			return
 		}
 
+		// Record who authenticated so the request-logging middleware can report
+		// the actor (it installed the sink on r's context before us).
+		recordActor(r.Context(), user.Username)
 		ctx := context.WithValue(r.Context(), userContextKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -60,11 +66,13 @@ func RequireRole(minRole string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
+			auditAuthFailure(r, "role check: no authenticated user")
 			httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
 
 		if !hasMinRole(user.Role, minRole) {
+			auditAuthFailure(r, "insufficient role: have "+user.Role+" need "+minRole)
 			httpx.WriteError(w, http.StatusForbidden, "insufficient permissions")
 			return
 		}
@@ -88,11 +96,13 @@ func RequirePermission(db *sql.DB, permission string, next http.Handler) http.Ha
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := UserFromContext(r.Context())
 		if user == nil {
+			auditAuthFailure(r, "permission check: no authenticated user")
 			httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
 
 		if !store.NewPermissionRepo(db).Has(r.Context(), user.Role, permission) {
+			auditAuthFailure(r, "missing permission: "+permission)
 			httpx.WriteError(w, http.StatusForbidden, "insufficient permissions")
 			return
 		}

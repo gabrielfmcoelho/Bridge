@@ -267,7 +267,9 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 		jsonOK(w, tags)
 	})))
 
-	return corsMiddleware(mux)
+	// loggingMiddleware is outermost: it installs the actor sink before auth runs
+	// and times the full request (incl. CORS handling) through to its final status.
+	return loggingMiddleware(corsMiddleware(mux))
 }
 
 // authenticated wraps a handler with RequireAuth middleware.
