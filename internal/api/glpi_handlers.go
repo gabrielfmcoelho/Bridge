@@ -1405,3 +1405,32 @@ func (h *glpiHandlers) handleListHostTickets(w http.ResponseWriter, r *http.Requ
 // Ticket presentation (TicketView), the GLPI error mapper (FriendlyError), and
 // the scoped-search criteria (ListScopedTickets) moved to
 // internal/integrations/glpi (R4b — protocol logic lives with the client).
+
+// registerRoutes binds the GLPI integration: admin token/dropdown management,
+// ticket + form operations, and the project/host-scoped ticket listings.
+func (h *glpiHandlers) registerRoutes(rr routeRegistrar) {
+	rr.role("admin", "GET /api/settings/integrations/glpi/tokens", h.handleListTokenProfiles)
+	rr.role("admin", "POST /api/settings/integrations/glpi/tokens", h.handleCreateTokenProfile)
+	rr.role("admin", "PUT /api/settings/integrations/glpi/tokens/{id}", h.handleUpdateTokenProfile)
+	rr.role("admin", "DELETE /api/settings/integrations/glpi/tokens/{id}", h.handleDeleteTokenProfile)
+	rr.role("admin", "POST /api/settings/integrations/glpi/tokens/{id}/test", h.handleTestTokenProfile)
+	rr.role("admin", "GET /api/settings/integrations/glpi/dropdowns", h.handleListDropdownCatalogues)
+	rr.role("admin", "GET /api/settings/integrations/glpi/dropdowns/{itemtype}", h.handleGetDropdownCatalogue)
+	rr.role("admin", "PUT /api/settings/integrations/glpi/dropdowns/{itemtype}", h.handleUpsertDropdownCatalogue)
+	rr.role("admin", "DELETE /api/settings/integrations/glpi/dropdowns/{itemtype}", h.handleDeleteDropdownCatalogue)
+	rr.role("editor", "POST /api/glpi/tickets", h.handleCreateTicket)
+	rr.auth("GET /api/glpi/tickets/{id}", h.handleGetTicket)
+	rr.auth("GET /api/glpi/tickets/{id}/details", h.handleGetTicketDetails)
+	rr.auth("GET /api/glpi/documents/{id}", h.handleGetGlpiDocument)
+	rr.auth("GET /api/glpi/forms", h.handleListForms)
+	rr.auth("GET /api/glpi/forms/{id}", h.handleGetFormBundle)
+	rr.role("editor", "POST /api/glpi/forms/{id}/submit", h.handleSubmitForm)
+	rr.role("editor", "POST /api/glpi/forms/uploads", h.handleUploadFormDocument)
+	rr.auth("GET /api/glpi/dropdowns/{itemtype}/search", h.handleSearchDropdown)
+	rr.auth("GET /api/glpi/users/search", h.handleSearchUsers)
+	rr.auth("GET /api/glpi/formcreator/tags/search", h.handleSearchFormcreatorTags)
+	rr.auth("GET /api/projects/{id}/glpi/tickets", h.handleListProjectTickets)
+	rr.auth("GET /api/glpi/profiles/{id}/tickets", h.handleListProfileTickets)
+	rr.auth("GET /api/hosts/{slug}/glpi/tickets", h.handleListHostTickets)
+	rr.role("editor", "POST /api/hosts/{slug}/chamados/{chamadoId}/glpi/refresh", h.handleRefreshChamadoCache)
+}

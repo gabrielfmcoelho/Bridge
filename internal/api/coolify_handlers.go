@@ -536,3 +536,19 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 
 	jsonOK(w, map[string]any{"uuid": uuid, "name": keyName, "already_existed": false})
 }
+
+// registerRoutes binds the Coolify integration: status/test plus the per-host
+// and per-key check/register/sync operations.
+func (h *coolifyHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/coolify/status", h.handleStatus)
+	rr.role("admin", "POST /api/coolify/test", h.handleTestConnection)
+	rr.role("editor", "GET /api/coolify/server-status/{slug}", h.handleGetServerStatus)
+	rr.role("editor", "POST /api/coolify/check/{slug}", h.handleCheckHost)
+	rr.role("admin", "POST /api/coolify/register/{slug}", h.handleRegisterHost)
+	rr.role("admin", "POST /api/coolify/validate/{slug}", h.handleValidateHost)
+	rr.role("admin", "POST /api/coolify/sync/{slug}", h.handleSyncHost)
+	rr.role("admin", "POST /api/coolify/server/{slug}/key", h.handleUpdateServerKey)
+	rr.role("admin", "DELETE /api/coolify/server/{slug}", h.handleDeleteHost)
+	rr.role("editor", "GET /api/coolify/keys/{id}/check", h.handleCheckKey)
+	rr.role("admin", "POST /api/coolify/keys/{id}/sync", h.handleSyncKey)
+}

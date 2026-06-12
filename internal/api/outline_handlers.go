@@ -675,3 +675,17 @@ func (h *outlineHandlers) handleGetWikiDocument(w http.ResponseWriter, r *http.R
 		BrowseURL:    doc.BrowseURL(settings.BaseURL),
 	})
 }
+
+// registerRoutes binds the Outline (wiki) integration: per-project wiki +
+// common workspace documents, search, collections, and tree.
+func (h *outlineHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/projects/{id}/wiki", h.handleListProjectWiki)
+	rr.role("editor", "POST /api/projects/{id}/wiki/documents", h.handleCreateProjectDocument)
+	rr.auth("GET /api/projects/{id}/wiki/search", h.handleSearchProjectWiki)
+	rr.auth("GET /api/wiki/documents", h.handleListCommonWiki)
+	rr.role("editor", "POST /api/wiki/documents", h.handleCreateCommonDocument)
+	rr.auth("GET /api/wiki/search", h.handleSearchCommonWiki)
+	rr.role("admin", "GET /api/wiki/collections", h.handleListWorkspaceCollections)
+	rr.auth("GET /api/wiki/tree", h.handleCommonWikiTree)
+	rr.auth("GET /api/wiki/documents/{id}", h.handleGetWikiDocument)
+}

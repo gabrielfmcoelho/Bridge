@@ -415,3 +415,12 @@ func pickName(display, path string) string {
 	}
 	return path
 }
+
+// registerRoutes binds per-project GitLab link management + aggregated commits
+// (uses the shared service PAT).
+func (h *projectGitLabHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/projects/{id}/gitlab/links", h.handleListLinks)
+	rr.role("editor", "POST /api/projects/{id}/gitlab/links", h.handleCreateLink)
+	rr.role("editor", "DELETE /api/projects/{id}/gitlab/links/{linkId}", h.handleDeleteLink)
+	rr.auth("GET /api/projects/{id}/gitlab/commits", h.handleListCommits)
+}

@@ -1445,3 +1445,27 @@ func parsePercent(s string) float64 {
 	v, _ := strconv.ParseFloat(s, 64)
 	return v
 }
+
+// registerRoutes binds the /api/ssh/* operations with their auth policies.
+func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/ssh/preview-config", h.handlePreviewConfig)
+	rr.role("editor", "POST /api/ssh/generate-config", h.handleGenerateConfig)
+	rr.role("editor", "POST /api/ssh/test/{slug}", h.handleTestConnection)
+	rr.role("editor", "POST /api/ssh/network-test/{slug}", h.handleNetworkTest)
+	rr.role("editor", "POST /api/ssh/setup-key/{slug}", h.handleSetupKey)
+	rr.role("editor", "POST /api/ssh/fix-dev-null/{slug}", h.handleFixDevNull)
+	rr.role("admin", "POST /api/ssh/setup-sudo-nopasswd/{slug}", h.handleSetupSudoNopasswd)
+	rr.role("admin", "POST /api/ssh/create-remote-user/{slug}", h.handleCreateRemoteUser)
+	rr.role("admin", "POST /api/ssh/delete-remote-user/{slug}", h.handleDeleteRemoteUser)
+	rr.auth("GET /api/ssh/keys", h.handleListKeys)
+	rr.auth("GET /api/ssh/download-config", h.handleDownloadConfig)
+	rr.auth("GET /api/ssh/server-info", h.handleServerInfo)
+	rr.auth("GET /api/ssh/operation-logs/{slug}", h.handleOperationLogs)
+	rr.role("editor", "POST /api/ssh/list-remote-keys/{slug}", h.handleListRemoteKeys)
+	rr.role("admin", "POST /api/ssh/docker-setup/{slug}", h.handleDockerSetup)
+	rr.role("editor", "POST /api/ssh/docker-logs/{slug}", h.handleDockerLogsInspect)
+	rr.role("admin", "POST /api/ssh/docker-logs-rotation/{slug}", h.handleDockerLogsApplyRotation)
+	rr.role("admin", "POST /api/ssh/nginx-cleanup/{slug}", h.handleNginxCleanup)
+	rr.role("admin", "POST /api/ssh/grafana-agent-setup/{slug}", h.handleGrafanaAgentSetup)
+	rr.auth("GET /api/ssh/host-config/{slug}", h.handleHostSSHConfig)
+}

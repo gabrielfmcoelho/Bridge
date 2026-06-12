@@ -248,3 +248,9 @@ func mapAlertStatus(status string) string {
 	}
 	return "active"
 }
+
+// registerRoutes binds the public Grafana alert webhook — no auth middleware;
+// HMAC-signed by Grafana and verified in the handler.
+func (h *grafanaWebhookHandlers) registerRoutes(rr routeRegistrar) {
+	rr.public("POST /api/webhooks/grafana/alerts", h.handleAlertWebhook)
+}

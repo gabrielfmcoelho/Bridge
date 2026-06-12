@@ -435,3 +435,12 @@ func (h *grafanaHandlers) handleProvisionServiceDashboard(w http.ResponseWriter,
 		"message": fmt.Sprintf("Dashboard %q provisioned. The Metrics tab will use it on next load.", uid),
 	})
 }
+
+// registerRoutes binds the Grafana embed/live-metrics + dashboard provisioning
+// routes.
+func (h *grafanaHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/grafana/embed-url", h.handleEmbedURL)
+	rr.auth("GET /api/hosts/{slug}/metrics/live", h.handleHostLiveMetrics)
+	rr.role("admin", "POST /api/hosts/{slug}/grafana/provision", h.handleProvisionHostDashboard)
+	rr.role("admin", "POST /api/services/{id}/grafana/provision", h.handleProvisionServiceDashboard)
+}

@@ -700,3 +700,26 @@ func (h *integrationSettingsHandlers) handleDeleteRoleMapping(w http.ResponseWri
 
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
+
+// registerRoutes binds the admin-only integration settings, permissions, and
+// role-mapping operations.
+func (h *integrationSettingsHandlers) registerRoutes(rr routeRegistrar) {
+	// Integration settings (admin only)
+	rr.role("admin", "GET /api/settings/integrations", h.handleGetIntegrations)
+	rr.role("admin", "PUT /api/settings/integrations/{group}", h.handleUpdateIntegrationGroup)
+	rr.role("admin", "POST /api/settings/integrations/test/ldap", h.handleTestLDAP)
+	rr.role("admin", "POST /api/settings/integrations/test/gitlab-code", h.handleTestGitLabCode)
+	rr.role("admin", "POST /api/settings/integrations/test/llm", h.handleTestLLM)
+	rr.role("admin", "POST /api/settings/integrations/test/grafana", h.handleTestGrafana)
+	rr.role("admin", "POST /api/settings/integrations/test/outline", h.handleTestOutline)
+	rr.role("admin", "DELETE /api/settings/integrations/{group}/secret/{key}", h.handleClearIntegrationSecret)
+
+	// Permissions management (admin only)
+	rr.role("admin", "GET /api/settings/permissions", h.handleGetPermissions)
+	rr.role("admin", "PUT /api/settings/permissions", h.handleUpdatePermissions)
+
+	// Role mappings (admin only)
+	rr.role("admin", "GET /api/settings/role-mappings", h.handleGetRoleMappings)
+	rr.role("admin", "POST /api/settings/role-mappings", h.handleCreateRoleMapping)
+	rr.role("admin", "DELETE /api/settings/role-mappings/{id}", h.handleDeleteRoleMapping)
+}

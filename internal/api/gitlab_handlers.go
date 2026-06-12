@@ -240,3 +240,13 @@ func (h *gitlabHandlers) handleLinkProject(w http.ResponseWriter, r *http.Reques
 
 	jsonCreated(w, link)
 }
+
+// registerRoutes binds the per-user GitLab token routes (profile-level).
+func (h *gitlabHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/gitlab/status", h.handleStatus)
+	rr.auth("POST /api/gitlab/token", h.handleSaveToken)
+	rr.auth("DELETE /api/gitlab/token", h.handleDeleteToken)
+	rr.auth("GET /api/gitlab/projects/{id}/commits", h.handleListCommits)
+	rr.auth("GET /api/gitlab/projects/{id}/issues", h.handleListIssues)
+	rr.role("editor", "POST /api/gitlab/projects/{id}/link", h.handleLinkProject)
+}
