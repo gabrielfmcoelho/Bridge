@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -574,20 +573,6 @@ func (h *glpiHandlers) handleGetTicket(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, client.TicketView(t))
 }
 
-// ticketEvent is one entry in the ticket timeline — followup, task, or solution.
-// Normalized so the UI can render them in a single chronological list.
-type ticketEvent struct {
-	Type      string `json:"type"` // "followup" | "task" | "solution"
-	ID        int    `json:"id"`
-	Content   string `json:"content"`
-	Date      string `json:"date"`
-	UserID    int    `json:"user_id"`
-	UserName  string `json:"user_name,omitempty"`
-	IsPrivate bool   `json:"is_private,omitempty"`
-	State     int    `json:"state,omitempty"`  // tasks only (0=info 1=todo 2=done)
-	Status    int    `json:"status,omitempty"` // solutions only (1=proposed 2=accepted 3=refused)
-}
-
 // handleGetTicketDetails returns the ticket plus its followups, tasks and
 // solutions merged into a chronological timeline. Route:
 //
@@ -618,157 +603,12 @@ func (h *glpiHandlers) handleGetTicketDetails(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	t, err := client.GetTicket(ctx, session, ticketID)
+	detail, err := client.TicketDetails(ctx, session, ticketID)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "fetch failed: "+glpiclient.FriendlyError(err))
 		return
 	}
-
-	// Fan out the three related collections in parallel. Each failure degrades
-	// gracefully to an empty slice + warning so the ticket body still renders.
-	var (
-		followups []glpiclient.Followup
-		tasks     []glpiclient.Task
-		solutions []glpiclient.Solution
-		warnings  []string
-		wg        sync.WaitGroup
-		mu        sync.Mutex
-	)
-	addWarn := func(s string) { mu.Lock(); warnings = append(warnings, s); mu.Unlock() }
-
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
-		f, err := client.GetTicketFollowups(ctx, session, ticketID)
-		if err != nil {
-			addWarn("followups: " + glpiclient.FriendlyError(err))
-			return
-		}
-		followups = f
-	}()
-	go func() {
-		defer wg.Done()
-		ts, err := client.GetTicketTasks(ctx, session, ticketID)
-		if err != nil {
-			addWarn("tasks: " + glpiclient.FriendlyError(err))
-			return
-		}
-		tasks = ts
-	}()
-	go func() {
-		defer wg.Done()
-		sols, err := client.GetTicketSolutions(ctx, session, ticketID)
-		if err != nil {
-			addWarn("solutions: " + glpiclient.FriendlyError(err))
-			return
-		}
-		solutions = sols
-	}()
-	wg.Wait()
-
-	// Resolve every referenced user id once. Cache to avoid re-fetching the
-	// same user across many followups written by the same technician.
-	userIDs := map[int]struct{}{}
-	if t.UsersIDRequester > 0 {
-		userIDs[t.UsersIDRequester] = struct{}{}
-	}
-	for _, f := range followups {
-		if f.UsersID > 0 {
-			userIDs[f.UsersID] = struct{}{}
-		}
-	}
-	for _, tk := range tasks {
-		if tk.UsersID > 0 {
-			userIDs[tk.UsersID] = struct{}{}
-		}
-		if tk.UsersIDTech > 0 {
-			userIDs[tk.UsersIDTech] = struct{}{}
-		}
-	}
-	for _, s := range solutions {
-		if s.UsersID > 0 {
-			userIDs[s.UsersID] = struct{}{}
-		}
-	}
-	users := map[int]string{}
-	for id := range userIDs {
-		u, err := client.GetUser(ctx, session, id)
-		if err != nil || u == nil {
-			continue
-		}
-		users[id] = u.DisplayName()
-	}
-
-	// Build the timeline in chronological order (oldest first, like a chat log).
-	events := make([]ticketEvent, 0, len(followups)+len(tasks)+len(solutions))
-	for _, f := range followups {
-		events = append(events, ticketEvent{
-			Type:      "followup",
-			ID:        f.ID,
-			Content:   f.Content,
-			Date:      f.Date,
-			UserID:    f.UsersID,
-			UserName:  users[f.UsersID],
-			IsPrivate: f.IsPrivate == 1,
-		})
-	}
-	for _, tk := range tasks {
-		events = append(events, ticketEvent{
-			Type:     "task",
-			ID:       tk.ID,
-			Content:  tk.Content,
-			Date:     tk.Date,
-			UserID:   firstNonZero(tk.UsersIDTech, tk.UsersID),
-			UserName: users[firstNonZero(tk.UsersIDTech, tk.UsersID)],
-			State:    tk.State,
-		})
-	}
-	for _, s := range solutions {
-		events = append(events, ticketEvent{
-			Type:     "solution",
-			ID:       s.ID,
-			Content:  s.Content,
-			Date:     s.BestDate(),
-			UserID:   s.UsersID,
-			UserName: users[s.UsersID],
-			Status:   s.Status,
-		})
-	}
-	// Oldest → newest. Entries with no date are pushed to the end rather than
-	// the front so a GLPI Solution missing a timestamp doesn't jump above real
-	// follow-ups in the timeline.
-	sort.SliceStable(events, func(i, j int) bool {
-		a, b := events[i].Date, events[j].Date
-		if a == "" && b == "" {
-			return false
-		}
-		if a == "" {
-			return false
-		}
-		if b == "" {
-			return true
-		}
-		return a < b
-	})
-
-	out := map[string]any{
-		"ticket":        client.TicketView(t),
-		"glpi_base_url": client.WebBaseURL(),
-		"requester":     map[string]any{"id": t.UsersIDRequester, "name": users[t.UsersIDRequester]},
-		"events":        events,
-		"event_counts":  map[string]int{"followup": len(followups), "task": len(tasks), "solution": len(solutions)},
-	}
-	if len(warnings) > 0 {
-		out["warnings"] = warnings
-	}
-	jsonOK(w, out)
-}
-
-func firstNonZero(a, b int) int {
-	if a != 0 {
-		return a
-	}
-	return b
+	jsonOK(w, detail)
 }
 
 // ─── Formcreator ────────────────────────────────────────────────────────────
