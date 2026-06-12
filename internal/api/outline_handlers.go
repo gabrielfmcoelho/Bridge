@@ -525,30 +525,21 @@ func (h *outlineHandlers) handleListWorkspaceCollections(w http.ResponseWriter, 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
-	// Page through collections.list until a short page signals end-of-list. Cap
-	// iterations so a misbehaving server can't hang the handler.
-	const pageSize = 100
-	const maxPages = 20
-	out := make([]workspaceCollectionSummary, 0, pageSize)
-	for page := 0; page < maxPages; page++ {
-		chunk, err := client.CollectionsList(ctx, pageSize, page*pageSize)
-		if err != nil {
-			jsonError(w, http.StatusBadGateway, "outline api error: "+err.Error())
-			return
-		}
-		for _, c := range chunk {
-			out = append(out, workspaceCollectionSummary{
-				ID:          c.ID,
-				URLID:       c.URLID,
-				Name:        c.Name,
-				Description: c.Description,
-				Color:       c.Color,
-				Icon:        c.Icon,
-			})
-		}
-		if len(chunk) < pageSize {
-			break
-		}
+	collections, err := client.CollectionsListAll(ctx)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "outline api error: "+err.Error())
+		return
+	}
+	out := make([]workspaceCollectionSummary, 0, len(collections))
+	for _, c := range collections {
+		out = append(out, workspaceCollectionSummary{
+			ID:          c.ID,
+			URLID:       c.URLID,
+			Name:        c.Name,
+			Description: c.Description,
+			Color:       c.Color,
+			Icon:        c.Icon,
+		})
 	}
 	jsonOK(w, map[string]any{"collections": out})
 }

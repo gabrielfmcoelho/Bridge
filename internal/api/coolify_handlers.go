@@ -14,7 +14,6 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
-	gossh "golang.org/x/crypto/ssh"
 )
 
 type coolifyHandlers struct {
@@ -145,67 +144,7 @@ func (h *coolifyHandlers) handleCheckHost(w http.ResponseWriter, r *http.Request
 	jsonOK(w, map[string]any{"found": false})
 }
 
-// resolvePrivateKeyUUID finds or uploads a private key in Coolify and returns
-// its UUID. Matching order: exact name, then fingerprint (both against the
-// current key list), then create-and-handle-422 (re-list and fingerprint-match
-// when Coolify reports the key already exists).
-func (h *coolifyHandlers) resolvePrivateKeyUUID(client *coolify.Client, privKey, keyName, description string) (string, error) {
-	existingKeys, listErr := client.ListPrivateKeys()
-	if listErr != nil {
-		log.Printf("[coolify] failed to list keys: %v", listErr)
-	}
-	log.Printf("[coolify] found %d existing keys in Coolify", len(existingKeys))
-
-	for _, k := range existingKeys {
-		log.Printf("[coolify] key: uuid=%s name=%q fingerprint=%q", k.UUID, k.Name, k.Fingerprint)
-		if k.Name == keyName {
-			log.Printf("[coolify] matched by name: %s", k.UUID)
-			return k.UUID, nil
-		}
-	}
-
-	ourFingerprint := ""
-	if signer, err := gossh.ParsePrivateKey([]byte(privKey)); err == nil {
-		ourFingerprint = strings.TrimPrefix(gossh.FingerprintSHA256(signer.PublicKey()), "SHA256:")
-		log.Printf("[coolify] our key fingerprint: %s", ourFingerprint)
-	} else {
-		log.Printf("[coolify] failed to parse private key for fingerprint: %v", err)
-	}
-
-	if ourFingerprint != "" {
-		for _, k := range existingKeys {
-			if k.Fingerprint != "" && k.Fingerprint == ourFingerprint {
-				log.Printf("[coolify] matched by fingerprint: %s (name=%q)", k.UUID, k.Name)
-				return k.UUID, nil
-			}
-		}
-	}
-
-	uuid, createErr := client.CreatePrivateKey(coolify.CreateKeyRequest{
-		Name:        keyName,
-		Description: description,
-		PrivateKey:  privKey,
-	})
-	if createErr == nil {
-		log.Printf("[coolify] key created: %s", uuid)
-		return uuid, nil
-	}
-
-	log.Printf("[coolify] key create failed: %v", createErr)
-	if !strings.Contains(createErr.Error(), "422") && !strings.Contains(createErr.Error(), "already exists") {
-		return "", createErr
-	}
-	log.Printf("[coolify] 422 duplicate — re-listing for fingerprint match, our fp=%q", ourFingerprint)
-	freshKeys, _ := client.ListPrivateKeys()
-	for _, k := range freshKeys {
-		log.Printf("[coolify] re-list key: uuid=%s name=%q fingerprint=%q", k.UUID, k.Name, k.Fingerprint)
-		if ourFingerprint != "" && k.Fingerprint == ourFingerprint {
-			log.Printf("[coolify] matched on re-list by fingerprint: %s", k.UUID)
-			return k.UUID, nil
-		}
-	}
-	return "", createErr
-}
+// (resolvePrivateKeyUUID moved to coolify.Client.EnsurePrivateKey — R4b.)
 
 // selectRegistrationKey resolves which sshcm SSH key should be uploaded to
 // Coolify for a given host. Priority: explicit sshKeyID from the caller,
@@ -305,7 +244,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	privateKeyUUID, err := h.resolvePrivateKeyUUID(client, privKey, keyName, description)
+	privateKeyUUID, err := client.EnsurePrivateKey(privKey, keyName, description)
 	if err != nil {
 		h.logOp(r, host.ID, "coolify-register", "failed", "key upload: "+err.Error())
 		jsonError(w, http.StatusBadGateway, "failed to upload key to coolify: "+err.Error())
@@ -407,7 +346,7 @@ func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	privateKeyUUID, err := h.resolvePrivateKeyUUID(client, privKey, keyName, description)
+	privateKeyUUID, err := client.EnsurePrivateKey(privKey, keyName, description)
 	if err != nil {
 		h.logOp(r, host.ID, "coolify-update-key", "failed", "key upload: "+err.Error())
 		jsonError(w, http.StatusBadGateway, "failed to upload key to coolify: "+err.Error())
