@@ -858,6 +858,9 @@ export const secretsAPI = {
       max_views?: number | null;
       has_passphrase: boolean;
     }>(`/api/share-bundles`, { ...body, items: [{ type: "secret", ref_id: id }] }),
+  // Secret single-shares always carry an expiry (the secret modal only sends
+  // finite TTLs), so expires_at stays non-null here. Never-expiry is a
+  // bundle/API-share feature (see shareBundlesAPI / ShareBundleView).
   listShareLinks: (id: number) =>
     api.get<{
       id: number;
@@ -955,11 +958,35 @@ export const shareBundlesAPI = {
       title: string;
       token: string;
       url: string;
-      expires_at: string;
+      expires_at: string | null;
       has_passphrase: boolean;
       items: import("./types").ShareBundleItemView[];
     }>("/api/share-bundles", body),
   list: () => api.getList<import("./types").ShareBundleView>("/api/share-bundles"),
+  // Bundles already emitted that EXPOSE a given item (e.g. all live links for an
+  // API doc). Server-side filter — matches multi-item bundles too.
+  listForItem: (itemType: "secret" | "api_doc", refID: number) =>
+    api.getList<import("./types").ShareBundleView>(
+      `/api/share-bundles?item_type=${itemType}&ref_id=${refID}`,
+    ),
+  // Renew/extend WITHOUT changing the token: same URL keeps working. Reactivates
+  // a revoked/archived link; max_views null clears the cap, >0 sets it, omit to keep.
+  renew: (id: number, body: { ttl_seconds?: number; max_views?: number | null }) =>
+    api.patch<import("./types").ShareBundleView>(`/api/share-bundles/${id}`, body),
+  // Rebuild a link under a token you already hold (revives a URL whose row was
+  // hard-deleted). 409 if a live bundle still owns the token (renew it instead).
+  reissue: (body: {
+    token: string;
+    title?: string;
+    ttl_seconds?: number;
+    max_views?: number;
+    passphrase?: string;
+    items: {
+      type: "secret" | "api_doc";
+      ref_id: number;
+      selector?: { mode: string; op_keys?: string[]; tags?: string[] };
+    }[];
+  }) => api.post<import("./types").ShareBundleView>("/api/share-bundles/reissue", body),
   revoke: (id: number) => api.delete(`/api/share-bundles/${id}`),
 };
 

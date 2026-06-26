@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -22,12 +22,18 @@ export default function ShareBundleModal({
   api: ApiCatalog;
 }) {
   const { t } = useLocale();
+  const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>("all");
+  // Per-link renew duration (seconds) keyed by bundle id; default 24h.
+  const [renewChoice, setRenewChoice] = useState<Record<number, number>>({});
   const [selTags, setSelTags] = useState<Set<string>>(new Set());
   const [selOps, setSelOps] = useState<Set<string>>(new Set());
   const [selSecrets, setSelSecrets] = useState<Set<number>>(new Set());
   const [ttlHours, setTtlHours] = useState("24");
   const [passphrase, setPassphrase] = useState("");
+  // Optional: paste a token from a lost /share URL to rebuild that exact link.
+  const [reuseToken, setReuseToken] = useState("");
+  const [neverExpiry, setNeverExpiry] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -53,6 +59,24 @@ export default function ShareBundleModal({
     enabled: open,
   });
 
+  // Links already emitted for THIS API (server-side filtered; matches
+  // multi-item bundles that include this api_doc too).
+  const linksKey = ["share-bundles", "api", api.id] as const;
+  const { data: existingLinks = [] } = useQuery({
+    queryKey: linksKey,
+    queryFn: () => shareBundlesAPI.listForItem("api_doc", api.id),
+    enabled: open,
+  });
+  const renew = useMutation({
+    mutationFn: ({ id, ttl }: { id: number; ttl: number }) =>
+      shareBundlesAPI.renew(id, { ttl_seconds: ttl }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: linksKey }),
+  });
+  const revoke = useMutation({
+    mutationFn: (id: number) => shareBundlesAPI.revoke(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: linksKey }),
+  });
+
   function toggle<T>(set: Set<T>, val: T): Set<T> {
     const next = new Set(set);
     if (next.has(val)) next.delete(val);
@@ -67,6 +91,8 @@ export default function ShareBundleModal({
     setSelSecrets(new Set());
     setTtlHours("24");
     setPassphrase("");
+    setReuseToken("");
+    setNeverExpiry(false);
     setError(null);
     setSubmitting(false);
     setResult(null);
@@ -95,16 +121,34 @@ export default function ShareBundleModal({
       ...Array.from(selSecrets).map((id) => ({ type: "secret" as const, ref_id: id })),
     ];
 
+    // ttl_seconds: -1 signals "never expires"; otherwise hours→seconds (blank
+    // falls back to the backend's 24h default).
     const ttl = Number(ttlHours);
+    const ttlSeconds = neverExpiry ? -1 : ttl > 0 ? ttl * 3600 : undefined;
     setSubmitting(true);
     try {
-      const res = await shareBundlesAPI.create({
-        title: api.name,
-        ttl_seconds: ttl > 0 ? ttl * 3600 : undefined,
-        passphrase: passphrase.trim() || undefined,
-        items,
-      });
-      setResult(`${window.location.origin}${res.url}`);
+      const token = reuseToken.trim();
+      if (token) {
+        // Restore a lost link: rebuild under the token the holder still has, so
+        // the exact /share/<token> URL works again.
+        await shareBundlesAPI.reissue({
+          token,
+          title: api.name,
+          ttl_seconds: ttlSeconds,
+          passphrase: passphrase.trim() || undefined,
+          items,
+        });
+        setResult(`${window.location.origin}/share/${token}`);
+      } else {
+        const res = await shareBundlesAPI.create({
+          title: api.name,
+          ttl_seconds: ttlSeconds,
+          passphrase: passphrase.trim() || undefined,
+          items,
+        });
+        setResult(`${window.location.origin}${res.url}`);
+      }
+      qc.invalidateQueries({ queryKey: linksKey });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -203,9 +247,35 @@ export default function ShareBundleModal({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Input label={t("atlas.apis.ttlHours")} type="number" value={ttlHours} onChange={(e) => setTtlHours(e.target.value)} />
+            <Input
+              label={t("atlas.apis.ttlHours")}
+              type="number"
+              value={ttlHours}
+              onChange={(e) => setTtlHours(e.target.value)}
+              disabled={neverExpiry}
+            />
             <Input label={t("atlas.apis.passphraseOptional")} type="password" value={passphrase} onChange={(e) => setPassphrase(e.target.value)} />
           </div>
+
+          <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <input
+              type="checkbox"
+              checked={neverExpiry}
+              onChange={(e) => setNeverExpiry(e.target.checked)}
+            />
+            {t("atlas.apis.neverExpires")}
+          </label>
+          {neverExpiry && (
+            <p className="-mt-2 text-[10px] text-amber-400">{t("atlas.apis.neverExpiresHint")}</p>
+          )}
+
+          <Input
+            label={t("atlas.apis.reuseTokenLabel")}
+            value={reuseToken}
+            onChange={(e) => setReuseToken(e.target.value)}
+            placeholder={t("atlas.apis.reuseTokenPlaceholder")}
+            className="font-mono text-xs"
+          />
 
           {error && <FormError message={error} />}
 
@@ -214,8 +284,121 @@ export default function ShareBundleModal({
               {t("common.cancel") || "Cancel"}
             </Button>
             <Button type="button" onClick={submit} loading={submitting}>
-              {submitting ? t("atlas.apis.creating") : t("atlas.apis.createLink")}
+              {submitting
+                ? t("atlas.apis.creating")
+                : reuseToken.trim()
+                  ? t("atlas.apis.restoreLink")
+                  : t("atlas.apis.createLink")}
             </Button>
+          </div>
+
+          {/* Links already emitted for this API — renew (same URL) or revoke. */}
+          <div className="border-t border-[var(--border-subtle)] pt-3">
+            <label className="block text-sm mb-1.5 text-[var(--text-secondary)]">
+              {t("atlas.apis.existingLinks")}
+            </label>
+            {existingLinks.length === 0 ? (
+              <p className="text-xs text-[var(--text-muted)]">{t("atlas.apis.noLinks")}</p>
+            ) : (
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {existingLinks.map((link) => {
+                  const archived = link.deleted_at != null;
+                  const expired =
+                    link.expires_at != null &&
+                    new Date(link.expires_at).getTime() < Date.now();
+                  const revoked = link.revoked_at != null;
+                  const exhausted =
+                    link.max_views != null && link.view_count >= link.max_views;
+                  const dead = archived || expired || revoked || exhausted;
+                  const ttl = renewChoice[link.id] ?? 86400;
+                  return (
+                    <div
+                      key={link.id}
+                      className="flex items-center justify-between gap-2 text-xs p-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)]"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[var(--text-secondary)]">
+                            {link.view_count}
+                            {link.max_views != null ? `/${link.max_views}` : ""}{" "}
+                            {t("atlas.apis.views")}
+                          </span>
+                          {link.has_passphrase && (
+                            <span className="text-[10px] text-amber-400">
+                              {t("atlas.apis.withPassphrase")}
+                            </span>
+                          )}
+                          {archived && (
+                            <span className="text-[10px] text-[var(--text-muted)]">
+                              {t("atlas.apis.statusArchived")}
+                            </span>
+                          )}
+                          {revoked && (
+                            <span className="text-[10px] text-red-400">
+                              {t("atlas.apis.statusRevoked")}
+                            </span>
+                          )}
+                          {!archived && !revoked && expired && (
+                            <span className="text-[10px] text-red-400">
+                              {t("atlas.apis.statusExpired")}
+                            </span>
+                          )}
+                          {!archived && !revoked && !expired && exhausted && (
+                            <span className="text-[10px] text-red-400">
+                              {t("atlas.apis.statusExhausted")}
+                            </span>
+                          )}
+                          {!dead && (
+                            <span className="text-[10px] text-emerald-400">
+                              {t("atlas.apis.statusLive")}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-[var(--text-faint)] mt-0.5">
+                          {link.expires_at
+                            ? `${t("atlas.apis.expiresLabel")} ${new Date(link.expires_at).toLocaleString()}`
+                            : t("atlas.apis.expiryNever")}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <select
+                          aria-label={t("atlas.apis.renewExtend")}
+                          value={ttl}
+                          onChange={(e) =>
+                            setRenewChoice((m) => ({ ...m, [link.id]: Number(e.target.value) }))
+                          }
+                          className="text-[10px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-1 py-0.5 text-[var(--text-secondary)]"
+                        >
+                          <option value={3600}>1h</option>
+                          <option value={86400}>24h</option>
+                          <option value={604800}>7d</option>
+                        </select>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          type="button"
+                          onClick={() => renew.mutate({ id: link.id, ttl })}
+                          disabled={renew.isPending}
+                        >
+                          {renew.isPending ? t("atlas.apis.renewing") : t("atlas.apis.renew")}
+                        </Button>
+                        {!dead && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            type="button"
+                            onClick={() => revoke.mutate(link.id)}
+                            disabled={revoke.isPending}
+                          >
+                            {t("atlas.apis.revoke")}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

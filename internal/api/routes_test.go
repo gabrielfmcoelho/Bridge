@@ -58,6 +58,13 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/ai/status"},
 		{"POST", "/api/ai/chat"},
 
+		// Share bundles (owner routes)
+		{"POST", "/api/share-bundles"},
+		{"POST", "/api/share-bundles/reissue"},
+		{"GET", "/api/share-bundles"},
+		{"PATCH", "/api/share-bundles/1"},
+		{"DELETE", "/api/share-bundles/1"},
+
 		// SSH operations
 		{"GET", "/api/ssh/preview-config"},
 		{"POST", "/api/ssh/generate-config"},

@@ -520,12 +520,13 @@ export interface ShareBundleItemView {
 export interface ShareBundleView {
   id: number;
   title: string;
-  expires_at: string;
+  expires_at: string | null; // null = never expires
   max_views?: number | null;
   view_count: number;
   created_by: number;
   created_at: string;
   revoked_at?: string | null;
+  deleted_at?: string | null;
   has_passphrase: boolean;
   items: ShareBundleItemView[];
 }

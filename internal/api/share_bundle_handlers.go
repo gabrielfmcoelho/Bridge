@@ -52,6 +52,7 @@ func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		TTL:        time.Duration(req.TTLSeconds) * time.Second,
 		MaxViews:   req.MaxViews,
 		Passphrase: req.Passphrase,
+		NoExpiry:   req.TTLSeconds < 0,
 	})
 	switch {
 	case err == nil:
@@ -86,6 +87,27 @@ func (h *bundleHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
+	// Generalized ?item_type=&ref_id= filter: return every bundle that CONTAINS
+	// that item — the per-API / per-secret "already emitted links" list. Unlike
+	// the legacy ?secret_id= filter below, this matches multi-item bundles (a
+	// link carrying an API doc plus attached secrets still counts) and is
+	// resolved server-side rather than over the full bundle set.
+	itemType := r.URL.Query().Get("item_type")
+	if rid := r.URL.Query().Get("ref_id"); rid != "" && itemType != "" {
+		refID, perr := strconv.ParseInt(rid, 10, 64)
+		if perr != nil {
+			jsonBadRequest(w, r, "invalid ref_id", perr)
+			return
+		}
+		bundles, err := h.repo.ListBundlesForItem(r.Context(), actor, itemType, refID)
+		if err != nil {
+			jsonServerError(w, r, "list share bundles", err)
+			return
+		}
+		jsonPaged(w, r, bundles)
+		return
+	}
+
 	bundles, err := h.repo.ListBundles(r.Context(), actor)
 	if err != nil {
 		jsonServerError(w, r, "list share bundles", err)
@@ -106,6 +128,97 @@ func (h *bundleHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	jsonPaged(w, r, bundles)
+}
+
+type reissueBundleRequest struct {
+	Token      string                  `json:"token"`
+	Title      string                  `json:"title"`
+	TTLSeconds int                     `json:"ttl_seconds"`
+	MaxViews   int                     `json:"max_views"`
+	Passphrase string                  `json:"passphrase"`
+	Items      []vault.BundleItemInput `json:"items"`
+}
+
+// handleReissue rebuilds a bundle under a caller-supplied raw token, reviving a
+// link whose row was already hard-deleted so the exact URL works again. Mirrors
+// handleCreate's validation; 409 if a live link already owns the token.
+func (h *bundleHandlers) handleReissue(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFrom(r)
+	if !ok {
+		jsonError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	var req reissueBundleRequest
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+	view, err := h.repo.ReissueBundle(r.Context(), actor, req.Token, req.Items, vault.CreateBundleOpts{
+		Title:      req.Title,
+		TTL:        time.Duration(req.TTLSeconds) * time.Second,
+		MaxViews:   req.MaxViews,
+		Passphrase: req.Passphrase,
+		NoExpiry:   req.TTLSeconds < 0,
+	})
+	switch {
+	case err == nil:
+		jsonCreated(w, view)
+	case errors.Is(err, vault.ErrBundleTokenInUse):
+		jsonError(w, http.StatusConflict, "a live link already uses this token; renew it instead")
+	case errors.Is(err, vault.ErrBundleTokenInvalid):
+		jsonError(w, http.StatusBadRequest, "token is required")
+	case errors.Is(err, vault.ErrBundleEmpty):
+		jsonError(w, http.StatusBadRequest, "a share bundle must contain at least one item")
+	case errors.Is(err, vault.ErrShareTargetNotPersonal):
+		jsonError(w, http.StatusBadRequest, "only personal secrets may be shared")
+	case errors.Is(err, vault.ErrBundleInvalidItem):
+		jsonError(w, http.StatusBadRequest, "invalid bundle item type")
+	case errors.Is(err, vault.ErrSecretNotFound), errors.Is(err, vault.ErrBundleItemNotFound):
+		jsonError(w, http.StatusNotFound, "bundle item not found")
+	case errors.Is(err, vault.ErrSecretForbidden):
+		jsonError(w, http.StatusForbidden, "forbidden")
+	default:
+		jsonServerError(w, r, "reissue share bundle", err)
+	}
+}
+
+type renewBundleRequest struct {
+	TTLSeconds int  `json:"ttl_seconds"`
+	MaxViews   *int `json:"max_views"`
+}
+
+// handleRenew extends a bundle's expiry (and reactivates it if revoked) without
+// changing the token, so a previously-issued URL keeps working. Owner-only;
+// optionally adjusts max_views.
+func (h *bundleHandlers) handleRenew(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFrom(r)
+	if !ok {
+		jsonError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	id, err := pathInt64(r, "id")
+	if err != nil {
+		jsonBadRequest(w, r, "invalid bundle id", err)
+		return
+	}
+	var req renewBundleRequest
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+	view, err := h.repo.RenewBundle(r.Context(), actor, id, vault.RenewBundleOpts{
+		TTL:      time.Duration(req.TTLSeconds) * time.Second,
+		MaxViews: req.MaxViews,
+		NoExpiry: req.TTLSeconds < 0,
+	})
+	switch {
+	case err == nil:
+		jsonOK(w, view)
+	case errors.Is(err, vault.ErrBundleNotFound):
+		jsonError(w, http.StatusNotFound, "share bundle not found")
+	default:
+		jsonServerError(w, r, "renew share bundle", err)
+	}
 }
 
 func (h *bundleHandlers) handleRevoke(w http.ResponseWriter, r *http.Request) {

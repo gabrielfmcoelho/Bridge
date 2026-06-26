@@ -7,15 +7,15 @@ import (
 	"time"
 )
 
-// ShareLinkJanitor periodically deletes share-link rows past their grace
-// period. Lives outside the request path so its only failure mode is a
-// logged warning — never affects user-facing latency or correctness.
+// ShareLinkJanitor periodically ARCHIVES share-bundle rows past their grace
+// period (soft-delete: sets deleted_at). Lives outside the request path so its
+// only failure mode is a logged warning — never affects user-facing latency or
+// correctness.
 //
-// Spec §6 / Plans.md Task 3.4: rows where (expires_at + 7d) < now are
-// removed. The 7-day grace lets an operator who shared a link, lost the
-// URL, and waited a few days still recover by inspecting the audit log
-// — once the row is gone, the audit log row remains (secret_audit_log
-// has no FK to share_links, by design).
+// Rows where (expires_at + grace) < now get deleted_at stamped. Soft-delete
+// (rather than the original hard DELETE) keeps the token identity and bundle
+// items intact, so an owner who lost the URL can revive the exact same link via
+// RenewBundle long after it lapsed — the link is archived, never destroyed.
 type ShareLinkJanitor struct {
 	db       *sql.DB
 	interval time.Duration
@@ -57,7 +57,7 @@ func (j *ShareLinkJanitor) Start(ctx context.Context) {
 		if n, err := j.RunOnce(ctx); err != nil {
 			log.Printf("[share-janitor] startup sweep: %v", err)
 		} else if n > 0 {
-			log.Printf("[share-janitor] startup: deleted %d expired share links", n)
+			log.Printf("[share-janitor] startup: archived %d expired share links", n)
 		}
 
 		t := time.NewTicker(j.interval)
@@ -73,21 +73,24 @@ func (j *ShareLinkJanitor) Start(ctx context.Context) {
 					continue
 				}
 				if n > 0 {
-					log.Printf("[share-janitor] deleted %d expired share links", n)
+					log.Printf("[share-janitor] archived %d expired share links", n)
 				}
 			}
 		}
 	}()
 }
 
-// RunOnce executes one sweep. Returns the number of rows deleted.
-// Threshold is computed in Go (not the DB) so the same comparison works
-// across sqlite and postgres without dialect-specific date arithmetic.
+// RunOnce executes one sweep. Returns the number of rows archived.
+// Threshold is computed in Go (not the DB) so the comparison needs no
+// dialect-specific date arithmetic. The sweep SOFT-deletes (sets deleted_at)
+// rather than dropping the row, so the token identity and items survive and an
+// owner can revive the exact link via RenewBundle. Already-archived rows are
+// skipped (deleted_at IS NULL guard) so deleted_at reflects first-archival time.
 func (j *ShareLinkJanitor) RunOnce(ctx context.Context) (int64, error) {
 	threshold := time.Now().Add(-j.grace).UTC().Format(time.RFC3339Nano)
 	res, err := j.db.ExecContext(ctx,
-		`DELETE FROM share_bundles WHERE expires_at < ?`,
-		threshold,
+		`UPDATE share_bundles SET deleted_at = ? WHERE expires_at < ? AND deleted_at IS NULL`,
+		time.Now().UTC().Format(time.RFC3339Nano), threshold,
 	)
 	if err != nil {
 		return 0, err

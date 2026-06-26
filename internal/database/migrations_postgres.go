@@ -1194,4 +1194,18 @@ var migrationsPostgres = []string{
 		containers_count = CASE WHEN jsonb_typeof(data::jsonb->'containers') = 'array'
 			THEN jsonb_array_length(data::jsonb->'containers') ELSE 0 END
 	WHERE data IS NOT NULL AND data <> '';`,
+
+	// Version 75: soft-delete for share bundles. Previously the janitor
+	// hard-deleted expired bundles (cascading away their items and the token
+	// identity), so a link past expiry+grace was unrecoverable. With a
+	// deleted_at column the janitor archives instead of destroying, the owner
+	// list can surface archived links, and RenewBundle revives them under the
+	// SAME token. The partial index keeps the janitor sweep cheap.
+	`ALTER TABLE share_bundles ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	CREATE INDEX IF NOT EXISTS idx_share_bundles_active ON share_bundles (expires_at) WHERE deleted_at IS NULL;`,
+
+	// Version 76: allow never-expiring share bundles. expires_at becomes
+	// nullable — NULL means "no expiry" (redeemable until revoked; the janitor
+	// never archives it since NULL never matches expires_at < threshold).
+	`ALTER TABLE share_bundles ALTER COLUMN expires_at DROP NOT NULL;`,
 }

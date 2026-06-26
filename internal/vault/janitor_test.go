@@ -2,6 +2,7 @@ package vault_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -52,30 +53,39 @@ func TestShareLinkJanitor_DeletesPastGrace(t *testing.T) {
 	expiredPastGrace := mkLink(now.Add(-30 * 24 * time.Hour))
 
 	j := vault.NewShareLinkJanitor(d.SQL) // 7d grace default
-	deleted, err := j.RunOnce(ctx)
+	swept, err := j.RunOnce(ctx)
 	if err != nil {
 		t.Fatalf("RunOnce: %v", err)
 	}
-	if deleted != 1 {
-		t.Errorf("deleted: got %d, want 1", deleted)
+	if swept != 1 {
+		t.Errorf("swept: got %d, want 1", swept)
 	}
 
-	// The live + within-grace rows should still exist; only the past-grace
-	// row should be gone.
+	// Soft-delete, NOT hard-delete: every row still exists. Only the
+	// past-grace row carries a deleted_at; live + within-grace rows stay
+	// active (deleted_at IS NULL) so the public link keeps working until
+	// its own expiry. Retaining the row keeps the token revivable via Renew.
 	for _, c := range []struct {
-		id   int64
-		want bool // true = should exist
-		desc string
+		id      int64
+		wantDel bool // true = deleted_at should be set
+		desc    string
 	}{
-		{live, true, "live link"},
-		{expiringWithinGrace, true, "expired within grace"},
-		{expiredPastGrace, false, "expired past grace"},
+		{live, false, "live link"},
+		{expiringWithinGrace, false, "expired within grace"},
+		{expiredPastGrace, true, "expired past grace"},
 	} {
-		var n int
-		_ = d.SQL.QueryRow(`SELECT COUNT(*) FROM share_bundles WHERE id = ?`, c.id).Scan(&n)
-		got := n == 1
-		if got != c.want {
-			t.Errorf("%s (id=%d): exists=%v, want %v", c.desc, c.id, got, c.want)
+		var exists int
+		_ = d.SQL.QueryRow(`SELECT COUNT(*) FROM share_bundles WHERE id = ?`, c.id).Scan(&exists)
+		if exists != 1 {
+			t.Errorf("%s (id=%d): row was hard-deleted; want soft-delete (row retained)", c.desc, c.id)
+			continue
+		}
+		var deletedAt sql.NullTime
+		if err := d.SQL.QueryRow(`SELECT deleted_at FROM share_bundles WHERE id = ?`, c.id).Scan(&deletedAt); err != nil {
+			t.Fatalf("%s: read deleted_at: %v", c.desc, err)
+		}
+		if deletedAt.Valid != c.wantDel {
+			t.Errorf("%s (id=%d): deleted_at set=%v, want %v", c.desc, c.id, deletedAt.Valid, c.wantDel)
 		}
 	}
 }
