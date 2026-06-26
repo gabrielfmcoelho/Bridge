@@ -40,12 +40,14 @@ interface LocaleState {
 const LocaleContext = createContext<LocaleState | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState("en");
+  const [locale, setLocaleState] = useState("pt-BR");
 
-  // Hydrate from localStorage after mount to avoid SSR/client mismatch.
+  // Hydrate from localStorage after mount to avoid SSR/client mismatch. Apply
+  // any persisted choice (including "en") so a user who picked English keeps it
+  // even though pt-BR is now the default.
   useEffect(() => {
     const stored = localStorage.getItem("sshcm_locale");
-    if (stored && stored !== "en") {
+    if (stored === "en" || stored === "pt-BR") {
       setLocaleState(stored);
     }
   }, []);

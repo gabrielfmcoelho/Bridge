@@ -15,21 +15,17 @@ interface ThemeState {
 const ThemeContext = createContext<ThemeState | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>("light");
 
   // Hydrate from localStorage after mount to avoid SSR/client mismatch.
   // The pre-hydration inline script in layout.tsx has already applied the
   // data-theme attribute on <html>, so we only need to sync React state.
-  // On first visit (no stored value), follow the browser's color-scheme
-  // preference — matches what the inline script picked.
+  // On first visit (no stored value) we keep the "light" default — matching
+  // the inline script.
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") {
       setThemeState(stored);
-      return;
-    }
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: light)").matches) {
-      setThemeState("light");
     }
   }, []);
 
