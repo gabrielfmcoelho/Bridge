@@ -29,11 +29,12 @@ func (h *bundleHandlers) actor(r *http.Request) (vault.ActorContext, bool) {
 }
 
 type createBundleRequest struct {
-	Title      string                  `json:"title"`
-	TTLSeconds int                     `json:"ttl_seconds"`
-	MaxViews   int                     `json:"max_views"`
-	Passphrase string                  `json:"passphrase"`
-	Items      []vault.BundleItemInput `json:"items"`
+	Title       string                  `json:"title"`
+	Description string                  `json:"description"`
+	TTLSeconds  int                     `json:"ttl_seconds"`
+	MaxViews    int                     `json:"max_views"`
+	Passphrase  string                  `json:"passphrase"`
+	Items       []vault.BundleItemInput `json:"items"`
 }
 
 func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -48,17 +49,19 @@ func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tok, view, err := h.repo.CreateBundle(r.Context(), actor, req.Items, vault.CreateBundleOpts{
-		Title:      req.Title,
-		TTL:        time.Duration(req.TTLSeconds) * time.Second,
-		MaxViews:   req.MaxViews,
-		Passphrase: req.Passphrase,
-		NoExpiry:   req.TTLSeconds < 0,
+		Title:       req.Title,
+		Description: req.Description,
+		TTL:         time.Duration(req.TTLSeconds) * time.Second,
+		MaxViews:    req.MaxViews,
+		Passphrase:  req.Passphrase,
+		NoExpiry:    req.TTLSeconds < 0,
 	})
 	switch {
 	case err == nil:
 		jsonCreated(w, map[string]any{
 			"id":             view.ID,
 			"title":          view.Title,
+			"description":    view.Description,
 			"expires_at":     view.ExpiresAt,
 			"max_views":      view.MaxViews,
 			"has_passphrase": view.HasPassphrase,
@@ -131,12 +134,13 @@ func (h *bundleHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 }
 
 type reissueBundleRequest struct {
-	Token      string                  `json:"token"`
-	Title      string                  `json:"title"`
-	TTLSeconds int                     `json:"ttl_seconds"`
-	MaxViews   int                     `json:"max_views"`
-	Passphrase string                  `json:"passphrase"`
-	Items      []vault.BundleItemInput `json:"items"`
+	Token       string                  `json:"token"`
+	Title       string                  `json:"title"`
+	Description string                  `json:"description"`
+	TTLSeconds  int                     `json:"ttl_seconds"`
+	MaxViews    int                     `json:"max_views"`
+	Passphrase  string                  `json:"passphrase"`
+	Items       []vault.BundleItemInput `json:"items"`
 }
 
 // handleReissue rebuilds a bundle under a caller-supplied raw token, reviving a
@@ -154,11 +158,12 @@ func (h *bundleHandlers) handleReissue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	view, err := h.repo.ReissueBundle(r.Context(), actor, req.Token, req.Items, vault.CreateBundleOpts{
-		Title:      req.Title,
-		TTL:        time.Duration(req.TTLSeconds) * time.Second,
-		MaxViews:   req.MaxViews,
-		Passphrase: req.Passphrase,
-		NoExpiry:   req.TTLSeconds < 0,
+		Title:       req.Title,
+		Description: req.Description,
+		TTL:         time.Duration(req.TTLSeconds) * time.Second,
+		MaxViews:    req.MaxViews,
+		Passphrase:  req.Passphrase,
+		NoExpiry:    req.TTLSeconds < 0,
 	})
 	switch {
 	case err == nil:
@@ -242,6 +247,31 @@ func (h *bundleHandlers) handleRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleAccessLog returns a bundle's anonymous access log (network metadata
+// only), newest-first. Owner-only: a missing or foreign bundle collapses to 404
+// so a caller can't probe another owner's link state.
+func (h *bundleHandlers) handleAccessLog(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFrom(r)
+	if !ok {
+		jsonError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	id, err := pathInt64(r, "id")
+	if err != nil {
+		jsonBadRequest(w, r, "invalid bundle id", err)
+		return
+	}
+	entries, err := h.repo.BundleAccessLog(r.Context(), actor, id)
+	switch {
+	case err == nil:
+		jsonPaged(w, r, entries)
+	case errors.Is(err, vault.ErrBundleNotFound):
+		jsonError(w, http.StatusNotFound, "share bundle not found")
+	default:
+		jsonServerError(w, r, "share bundle access log", err)
+	}
+}
+
 // publicBundleHandlers serves GET /api/share-bundle/{token} — the public
 // redemption path. Mirrors publicShareHandlers: no auth, hardened response
 // headers, and all "not redeemable" reasons collapse to 404 so a guesser
@@ -260,7 +290,10 @@ func (h *publicBundleHandlers) handleRedeem(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	passphrase := r.URL.Query().Get("passphrase")
-	payload, err := h.repo.RedeemBundle(r.Context(), token, passphrase)
+	payload, err := h.repo.RedeemBundle(r.Context(), token, passphrase, vault.RedeemMeta{
+		RemoteIP:  auth.ClientIP(r),
+		UserAgent: r.UserAgent(),
+	})
 	switch {
 	case err == nil:
 		jsonOK(w, payload)

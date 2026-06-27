@@ -520,6 +520,7 @@ export interface ShareBundleItemView {
 export interface ShareBundleView {
   id: number;
   title: string;
+  description?: string;
   expires_at: string | null; // null = never expires
   max_views?: number | null;
   view_count: number;
@@ -549,6 +550,16 @@ export interface BundleApiDocItem {
 
 export interface BundlePayload {
   title: string;
+  description?: string;
   secrets: BundleSecretItem[];
   api_docs: BundleApiDocItem[];
+}
+
+// ShareBundleAccessEntry is one anonymous access-log row (network metadata only)
+// returned by GET /api/share-bundles/{id}/access-log.
+export interface ShareBundleAccessEntry {
+  accessed_at: string;
+  remote_ip: string;
+  user_agent: string;
+  used_passphrase: boolean;
 }

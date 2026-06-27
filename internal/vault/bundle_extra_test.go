@@ -88,7 +88,7 @@ func TestBundle_Renew(t *testing.T) {
 	time.Sleep(15 * time.Millisecond)
 
 	// It is expired now.
-	if _, err := env.repo.RedeemBundle(ctx, tok, ""); err != vault.ErrShareLinkExpired {
+	if _, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{}); err != vault.ErrShareLinkExpired {
 		t.Fatalf("expected expired, got %v", err)
 	}
 
@@ -100,7 +100,7 @@ func TestBundle_Renew(t *testing.T) {
 	if updated.ExpiresAt == nil || !updated.ExpiresAt.After(time.Now()) {
 		t.Errorf("expected future expiry after renew, got %v", updated.ExpiresAt)
 	}
-	if _, err := env.repo.RedeemBundle(ctx, tok, ""); err != nil {
+	if _, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{}); err != nil {
 		t.Errorf("renewed link should redeem with the SAME token, got %v", err)
 	}
 
@@ -108,13 +108,13 @@ func TestBundle_Renew(t *testing.T) {
 	if err := env.repo.RevokeBundle(ctx, env.bob, view.ID); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
-	if _, err := env.repo.RedeemBundle(ctx, tok, ""); err != vault.ErrShareLinkRevoked {
+	if _, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{}); err != vault.ErrShareLinkRevoked {
 		t.Fatalf("expected revoked, got %v", err)
 	}
 	if _, err := env.repo.RenewBundle(ctx, env.bob, view.ID, vault.RenewBundleOpts{TTL: time.Hour}); err != nil {
 		t.Fatalf("renew after revoke: %v", err)
 	}
-	if _, err := env.repo.RedeemBundle(ctx, tok, ""); err != nil {
+	if _, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{}); err != nil {
 		t.Errorf("renewed (reactivated) link should redeem, got %v", err)
 	}
 
@@ -156,7 +156,7 @@ func TestBundle_ArchiveRedeemRenew(t *testing.T) {
 	}
 
 	// An archived link must not redeem (collapses to not-found publicly).
-	if _, err := env.repo.RedeemBundle(ctx, tok, ""); err != vault.ErrShareLinkNotFound {
+	if _, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{}); err != vault.ErrShareLinkNotFound {
 		t.Fatalf("archived link should not redeem, got %v", err)
 	}
 
@@ -173,7 +173,7 @@ func TestBundle_ArchiveRedeemRenew(t *testing.T) {
 	if _, err := env.repo.RenewBundle(ctx, env.bob, view.ID, vault.RenewBundleOpts{TTL: time.Hour}); err != nil {
 		t.Fatalf("renew: %v", err)
 	}
-	if _, err := env.repo.RedeemBundle(ctx, tok, ""); err != nil {
+	if _, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{}); err != nil {
 		t.Errorf("revived link should redeem with the same token, got %v", err)
 	}
 	got2, _ := env.repo.ListBundlesForItem(ctx, env.bob, vault.BundleItemAPIDoc, apiID)
@@ -202,7 +202,7 @@ func TestBundle_Reissue(t *testing.T) {
 	}
 
 	// The SAME raw token now redeems.
-	payload, err := env.repo.RedeemBundle(ctx, rawToken, "")
+	payload, err := env.repo.RedeemBundle(ctx, rawToken, "", vault.RedeemMeta{})
 	if err != nil {
 		t.Fatalf("redeem reissued: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestBundle_NeverExpires(t *testing.T) {
 	if view.ExpiresAt != nil {
 		t.Errorf("never-expiring bundle should have nil ExpiresAt, got %v", *view.ExpiresAt)
 	}
-	if _, err := env.repo.RedeemBundle(ctx, tok, ""); err != nil {
+	if _, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{}); err != nil {
 		t.Errorf("never-expiring link should redeem, got %v", err)
 	}
 	got, err := env.repo.ListBundlesForItem(ctx, env.bob, vault.BundleItemAPIDoc, apiID)

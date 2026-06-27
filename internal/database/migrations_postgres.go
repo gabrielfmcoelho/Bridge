@@ -1208,4 +1208,26 @@ var migrationsPostgres = []string{
 	// nullable — NULL means "no expiry" (redeemable until revoked; the janitor
 	// never archives it since NULL never matches expires_at < threshold).
 	`ALTER TABLE share_bundles ALTER COLUMN expires_at DROP NOT NULL;`,
+
+	// Version 77: editable description (free-text note) on share bundles. title
+	// already exists; this adds the companion long-form field shown on the guest
+	// reveal page. NOT NULL DEFAULT '' so every existing row reads back cleanly.
+	`ALTER TABLE share_bundles ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT '';`,
+
+	// Version 78: per-access network-metadata log for share bundles. Redemption
+	// is anonymous, so this records only network metadata (timestamp, caller IP,
+	// user-agent, whether a passphrase gated the reveal) — never an identity. The
+	// FK cascades on a true hard-delete; soft-delete keeps the parent row so the
+	// log survives. The (bundle_id, accessed_at DESC) index serves the owner's
+	// newest-first read.
+	`CREATE TABLE IF NOT EXISTS share_bundle_access_log (
+		id              BIGSERIAL PRIMARY KEY,
+		bundle_id       BIGINT NOT NULL REFERENCES share_bundles(id) ON DELETE CASCADE,
+		accessed_at     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		remote_ip       TEXT NOT NULL DEFAULT '',
+		user_agent      TEXT NOT NULL DEFAULT '',
+		used_passphrase BOOLEAN NOT NULL DEFAULT FALSE
+	);
+	CREATE INDEX IF NOT EXISTS idx_share_bundle_access_log_bundle
+		ON share_bundle_access_log (bundle_id, accessed_at DESC);`,
 }

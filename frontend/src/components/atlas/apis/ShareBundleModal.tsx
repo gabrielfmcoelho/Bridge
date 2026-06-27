@@ -12,6 +12,44 @@ import type { ApiCatalog } from "@/lib/types";
 
 type Mode = "all" | "tags" | "operations";
 
+// AccessLogPanel lazily loads (only when expanded) and renders a bundle's
+// anonymous access log: time / IP / browser, with a lock when a passphrase
+// gated the reveal. Network metadata only — the links are anonymous.
+function AccessLogPanel({ bundleId }: { bundleId: number }) {
+  const { t } = useLocale();
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ["share-bundle-access-log", bundleId],
+    queryFn: () => shareBundlesAPI.accessLog(bundleId),
+  });
+
+  return (
+    <div className="mt-1.5 border-t border-[var(--border-subtle)] pt-1.5">
+      {isLoading ? (
+        <p className="text-[10px] text-[var(--text-muted)]">{t("common.loading")}</p>
+      ) : entries.length === 0 ? (
+        <p className="text-[10px] text-[var(--text-muted)]">{t("atlas.apis.accessLogEmpty")}</p>
+      ) : (
+        <ul className="space-y-1 max-h-32 overflow-y-auto">
+          {entries.map((e, i) => (
+            <li key={i} className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+              <span className="text-[var(--text-faint)] shrink-0">
+                {new Date(e.accessed_at).toLocaleString()}
+              </span>
+              <span className="font-mono shrink-0">{e.remote_ip || "—"}</span>
+              <span className="truncate text-[var(--text-muted)]" title={e.user_agent}>
+                {e.user_agent || "—"}
+              </span>
+              {e.used_passphrase && (
+                <span title={t("atlas.apis.accessLogPassphrase")} className="shrink-0">🔒</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function ShareBundleModal({
   open,
   onClose,
@@ -26,9 +64,14 @@ export default function ShareBundleModal({
   const [mode, setMode] = useState<Mode>("all");
   // Per-link renew duration (seconds) keyed by bundle id; default 24h.
   const [renewChoice, setRenewChoice] = useState<Record<number, number>>({});
+  // Which existing link's access-log panel is expanded (bundle id, or null).
+  const [openLog, setOpenLog] = useState<number | null>(null);
   const [selTags, setSelTags] = useState<Set<string>>(new Set());
   const [selOps, setSelOps] = useState<Set<string>>(new Set());
   const [selSecrets, setSelSecrets] = useState<Set<number>>(new Set());
+  // Editable nickname + free-text note (nickname defaults to the API name).
+  const [title, setTitle] = useState(api.name);
+  const [description, setDescription] = useState("");
   const [ttlHours, setTtlHours] = useState("24");
   const [passphrase, setPassphrase] = useState("");
   // Optional: paste a token from a lost /share URL to rebuild that exact link.
@@ -89,6 +132,8 @@ export default function ShareBundleModal({
     setSelTags(new Set());
     setSelOps(new Set());
     setSelSecrets(new Set());
+    setTitle(api.name);
+    setDescription("");
     setTtlHours("24");
     setPassphrase("");
     setReuseToken("");
@@ -97,6 +142,7 @@ export default function ShareBundleModal({
     setSubmitting(false);
     setResult(null);
     setCopied(false);
+    setOpenLog(null);
   }
 
   function close() {
@@ -127,13 +173,16 @@ export default function ShareBundleModal({
     const ttlSeconds = neverExpiry ? -1 : ttl > 0 ? ttl * 3600 : undefined;
     setSubmitting(true);
     try {
+      const bundleTitle = title.trim() || api.name;
+      const bundleDescription = description.trim() || undefined;
       const token = reuseToken.trim();
       if (token) {
         // Restore a lost link: rebuild under the token the holder still has, so
         // the exact /share/<token> URL works again.
         await shareBundlesAPI.reissue({
           token,
-          title: api.name,
+          title: bundleTitle,
+          description: bundleDescription,
           ttl_seconds: ttlSeconds,
           passphrase: passphrase.trim() || undefined,
           items,
@@ -141,7 +190,8 @@ export default function ShareBundleModal({
         setResult(`${window.location.origin}/share/${token}`);
       } else {
         const res = await shareBundlesAPI.create({
-          title: api.name,
+          title: bundleTitle,
+          description: bundleDescription,
           ttl_seconds: ttlSeconds,
           passphrase: passphrase.trim() || undefined,
           items,
@@ -246,6 +296,26 @@ export default function ShareBundleModal({
             )}
           </div>
 
+          <Input
+            label={t("atlas.apis.shareTitleLabel")}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={api.name}
+          />
+
+          <div>
+            <label className="block text-sm mb-1.5 text-[var(--text-secondary)]">
+              {t("atlas.apis.shareDescriptionLabel")}
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t("atlas.apis.shareDescriptionPlaceholder")}
+              rows={2}
+              className="w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:border-[var(--accent)] focus:outline-none resize-y"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Input
               label={t("atlas.apis.ttlHours")}
@@ -314,9 +384,15 @@ export default function ShareBundleModal({
                   return (
                     <div
                       key={link.id}
-                      className="flex items-center justify-between gap-2 text-xs p-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)]"
+                      className="text-xs p-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)]"
                     >
+                    <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
+                        {link.title && (
+                          <div className="font-medium text-[var(--text-secondary)] truncate">
+                            {link.title}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[var(--text-secondary)]">
                             {link.view_count}
@@ -361,6 +437,18 @@ export default function ShareBundleModal({
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          aria-expanded={openLog === link.id}
+                          onClick={() =>
+                            setOpenLog((cur) => (cur === link.id ? null : link.id))
+                          }
+                          className="text-[10px] px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] cursor-pointer"
+                        >
+                          {openLog === link.id
+                            ? t("atlas.apis.accessLogHide")
+                            : t("atlas.apis.accessLog")}
+                        </button>
                         <select
                           aria-label={t("atlas.apis.renewExtend")}
                           value={ttl}
@@ -394,6 +482,8 @@ export default function ShareBundleModal({
                           </Button>
                         )}
                       </div>
+                    </div>
+                    {openLog === link.id && <AccessLogPanel bundleId={link.id} />}
                     </div>
                   );
                 })}

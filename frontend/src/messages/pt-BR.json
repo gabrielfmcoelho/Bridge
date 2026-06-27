@@ -123,7 +123,14 @@
       "renew": "Renovar",
       "renewing": "Renovando…",
       "renewExtend": "Estender por",
-      "withPassphrase": "senha"
+      "withPassphrase": "senha",
+      "shareTitleLabel": "Apelido",
+      "shareDescriptionLabel": "Descrição",
+      "shareDescriptionPlaceholder": "Nota opcional exibida a quem abrir o link.",
+      "accessLog": "Registro de acessos",
+      "accessLogHide": "Ocultar registro",
+      "accessLogEmpty": "Nenhum acesso registrado ainda.",
+      "accessLogPassphrase": "Senha foi utilizada"
     },
     "lineage": {
       "title": "Linhagem de Dados",
@@ -1153,6 +1160,7 @@
   "share": {
     "bundleTitle": "Pacote compartilhado",
     "bundleDesc": "Alguém compartilhou isso com você através de um link temporário.",
+    "indexTitle": "Nesta página",
     "noContent": "Este link não possui mais nenhum conteúdo disponível.",
     "securityNotice": "Aviso de Segurança",
     "securityNoticeDesc": "Este é um link de compartilhamento temporário. Copie as credenciais necessárias e feche esta aba quando terminar.",

@@ -51,6 +51,10 @@ func auditAuthFailure(r *http.Request, reason string) {
 		r.Method, r.URL.Path, reason, clientIP(r))
 }
 
+// ClientIP is the exported form of clientIP, reused by handlers that record a
+// best-effort caller IP (e.g. the anonymous share-bundle access log).
+func ClientIP(r *http.Request) string { return clientIP(r) }
+
 // clientIP returns the best-effort caller IP: the first X-Forwarded-For hop when
 // present (proxy/ingress), else the RemoteAddr host.
 func clientIP(r *http.Request) string {

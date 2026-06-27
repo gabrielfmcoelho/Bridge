@@ -849,7 +849,7 @@ export const secretsAPI = {
   // delegate to /api/share-bundles (the redeem page already handles bundle
   // tokens). The shapes stay link-compatible for ShareLinkModal. create()
   // returns the raw token ONLY here — surface it immediately or it's lost.
-  createShareLink: (id: number, body: { ttl_seconds?: number; max_views?: number; passphrase?: string }) =>
+  createShareLink: (id: number, body: { ttl_seconds?: number; max_views?: number; passphrase?: string; title?: string; description?: string }) =>
     api.post<{
       id: number;
       token: string;
@@ -944,6 +944,7 @@ export const apiCatalogAPI = {
 export const shareBundlesAPI = {
   create: (body: {
     title?: string;
+    description?: string;
     ttl_seconds?: number;
     max_views?: number;
     passphrase?: string;
@@ -956,6 +957,7 @@ export const shareBundlesAPI = {
     api.post<{
       id: number;
       title: string;
+      description: string;
       token: string;
       url: string;
       expires_at: string | null;
@@ -978,6 +980,7 @@ export const shareBundlesAPI = {
   reissue: (body: {
     token: string;
     title?: string;
+    description?: string;
     ttl_seconds?: number;
     max_views?: number;
     passphrase?: string;
@@ -988,6 +991,9 @@ export const shareBundlesAPI = {
     }[];
   }) => api.post<import("./types").ShareBundleView>("/api/share-bundles/reissue", body),
   revoke: (id: number) => api.delete(`/api/share-bundles/${id}`),
+  // Anonymous access log (network metadata only) for a bundle the caller owns.
+  accessLog: (id: number) =>
+    api.getList<import("./types").ShareBundleAccessEntry>(`/api/share-bundles/${id}/access-log`),
 };
 
 // Appearance settings

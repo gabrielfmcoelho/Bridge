@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
 import ApiReference from "@/components/atlas/apis/ApiReference";
+import ShareIndexSidebar from "@/components/share/ShareIndexSidebar";
 import type { BundlePayload } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
@@ -478,41 +479,51 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
 
           <div>
             <h1 className="text-lg font-semibold text-[var(--text-primary)]">{b.title || t("share.bundleTitle")}</h1>
-            <p className="text-xs text-[var(--text-muted)]">{t("share.bundleDesc")}</p>
+            <p className="text-xs text-[var(--text-muted)]">{b.description || t("share.bundleDesc")}</p>
           </div>
 
-          {b.secrets.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{t("share.secrets")}</h2>
-              {b.secrets.map((s, i) => (
-                <Card key={i}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-[var(--text-primary)]">
-                      {s.name} <span className="text-xs text-[var(--text-muted)]">({t("share.types." + s.type)})</span>
-                    </span>
+          {(b.secrets.length > 0 || b.api_docs.length > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-5 items-start">
+              {/* Index rail — collapses to the top on mobile. */}
+              <ShareIndexSidebar secrets={b.secrets} apiDocs={b.api_docs} />
+
+              {/* Content column */}
+              <div className="min-w-0 space-y-5">
+                {b.secrets.length > 0 && (
+                  <div className="space-y-3">
+                    <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{t("share.secrets")}</h2>
+                    {b.secrets.map((s, i) => (
+                      <Card key={i} id={`secret-${i}`} className="scroll-mt-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-[var(--text-primary)]">
+                            {s.name} <span className="text-xs text-[var(--text-muted)]">({t("share.types." + s.type)})</span>
+                          </span>
+                        </div>
+                        <SecretPayloadViewer
+                          payload={s.payload}
+                          type={s.type}
+                          onCopy={handleCopy}
+                          copiedKeyPrefix={`s-${i}`}
+                          copiedKey={copied}
+                        />
+                      </Card>
+                    ))}
                   </div>
-                  <SecretPayloadViewer
-                    payload={s.payload}
-                    type={s.type}
-                    onCopy={handleCopy}
-                    copiedKeyPrefix={`s-${i}`}
-                    copiedKey={copied}
-                  />
-                </Card>
-              ))}
+                )}
+
+                {b.api_docs.map((doc, i) => (
+                  <div key={i} id={`api-${i}`} className="space-y-2 scroll-mt-6">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{doc.name}</h2>
+                    </div>
+                    <Card className="p-0 overflow-hidden">
+                      <ApiReference content={doc.spec} showSidebar={false} hideTestRequest />
+                    </Card>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-
-          {b.api_docs.map((doc, i) => (
-            <div key={i} className="space-y-2">
-              <div className="flex items-center gap-3">
-                <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{doc.name}</h2>
-              </div>
-              <Card className="p-0 overflow-hidden">
-                <ApiReference content={doc.spec} showSidebar={false} hideTestRequest />
-              </Card>
-            </div>
-          ))}
 
           {b.secrets.length === 0 && b.api_docs.length === 0 && (
             <div className={`text-sm rounded-[var(--radius-md)] p-3 ${

@@ -67,7 +67,7 @@ func TestBundle_CreateRedeem_LiveResolveAndPartialFilter(t *testing.T) {
 		t.Fatalf("unexpected view: %+v", view)
 	}
 
-	payload, err := env.repo.RedeemBundle(ctx, tok, "")
+	payload, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{})
 	if err != nil {
 		t.Fatalf("redeem: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestBundle_CreateRedeem_LiveResolveAndPartialFilter(t *testing.T) {
 	if err := env.repo.Update(ctx, env.bob, secretID, vault.SecretPatch{Payload: &newVal}); err != nil {
 		t.Fatalf("update secret: %v", err)
 	}
-	payload2, err := env.repo.RedeemBundle(ctx, tok, "")
+	payload2, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{})
 	if err != nil {
 		t.Fatalf("redeem 2: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestBundle_CreateRedeem_LiveResolveAndPartialFilter(t *testing.T) {
 	if err := env.repo.SoftDelete(ctx, env.bob, secretID); err != nil {
 		t.Fatalf("delete secret: %v", err)
 	}
-	payload3, err := env.repo.RedeemBundle(ctx, tok, "")
+	payload3, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{})
 	if err != nil {
 		t.Fatalf("redeem 3: %v", err)
 	}
@@ -126,15 +126,15 @@ func TestBundle_Gates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if _, err := env.repo.RedeemBundle(ctx, tok, ""); err != vault.ErrShareLinkPassphraseBad {
+	if _, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{}); err != vault.ErrShareLinkPassphraseBad {
 		t.Errorf("expected passphrase error, got %v", err)
 	}
-	if _, err := env.repo.RedeemBundle(ctx, tok, "open-sesame"); err != nil {
+	if _, err := env.repo.RedeemBundle(ctx, tok, "open-sesame", vault.RedeemMeta{}); err != nil {
 		t.Errorf("correct passphrase should redeem, got %v", err)
 	}
 
 	// Wrong token.
-	if _, err := env.repo.RedeemBundle(ctx, "not-a-real-token", ""); err != vault.ErrShareLinkNotFound {
+	if _, err := env.repo.RedeemBundle(ctx, "not-a-real-token", "", vault.RedeemMeta{}); err != vault.ErrShareLinkNotFound {
 		t.Errorf("expected not-found, got %v", err)
 	}
 
@@ -148,7 +148,7 @@ func TestBundle_Gates(t *testing.T) {
 	if err := env.repo.RevokeBundle(ctx, env.bob, view.ID); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
-	if _, err := env.repo.RedeemBundle(ctx, tok2, ""); err != vault.ErrShareLinkRevoked {
+	if _, err := env.repo.RedeemBundle(ctx, tok2, "", vault.RedeemMeta{}); err != vault.ErrShareLinkRevoked {
 		t.Errorf("expected revoked, got %v", err)
 	}
 }
@@ -168,7 +168,7 @@ func TestBundle_AllowsSharedSecret(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected shared secret to be bundleable, got %v", err)
 	}
-	payload, err := env.repo.RedeemBundle(ctx, tok, "")
+	payload, err := env.repo.RedeemBundle(ctx, tok, "", vault.RedeemMeta{})
 	if err != nil {
 		t.Fatalf("redeem: %v", err)
 	}

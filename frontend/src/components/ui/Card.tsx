@@ -1,6 +1,7 @@
 interface CardProps {
   children: React.ReactNode;
   className?: string;
+  id?: string;
   style?: React.CSSProperties;
   onClick?: () => void;
   accent?: "cyan" | "emerald" | "purple" | "amber" | "red" | "none";
@@ -25,6 +26,7 @@ const indicatorIcons: Record<string, string> = {
 export default function Card({
   children,
   className = "",
+  id,
   style,
   onClick,
   accent = "none",
@@ -35,6 +37,7 @@ export default function Card({
 
   return (
     <div
+      id={id}
       className={`
         relative
         bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-3.5 md:p-5

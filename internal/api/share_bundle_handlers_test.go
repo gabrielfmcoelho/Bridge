@@ -177,6 +177,53 @@ func TestBundleHandlers_Reissue(t *testing.T) {
 	}
 }
 
+// TestBundleHandlers_AccessLog verifies GET /api/share-bundles/{id}/access-log
+// returns the owner's recorded accesses (200) and 404s a non-owner.
+func TestBundleHandlers_AccessLog(t *testing.T) {
+	f := newBundleHandlerFixture(t)
+	h := &bundleHandlers{repo: f.repo}
+
+	tok, view, err := f.repo.CreateBundle(context.Background(), f.actor,
+		[]vault.BundleItemInput{{Type: vault.BundleItemSecret, RefID: f.secretID}},
+		vault.CreateBundleOpts{Title: "logged", TTL: time.Hour})
+	if err != nil {
+		t.Fatalf("create bundle: %v", err)
+	}
+	// Anonymous redeem records one access-log row.
+	if _, err := f.repo.RedeemBundle(context.Background(), tok, "",
+		vault.RedeemMeta{RemoteIP: "198.51.100.4", UserAgent: "probe/1.0"}); err != nil {
+		t.Fatalf("redeem: %v", err)
+	}
+	idStr := strconv.FormatInt(view.ID, 10)
+
+	// Owner sees exactly one row.
+	req := f.as(f.owner, httptest.NewRequest(http.MethodGet,
+		"/api/share-bundles/"+idStr+"/access-log", nil))
+	req.SetPathValue("id", idStr)
+	rec := httptest.NewRecorder()
+	h.handleAccessLog(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("access-log status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	rows := decodeEnvelopeData(t, rec)
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 access-log row, got %d", len(rows))
+	}
+	if rows[0]["remote_ip"] != "198.51.100.4" {
+		t.Errorf("remote_ip not surfaced: %+v", rows[0])
+	}
+
+	// Non-owner gets 404.
+	req2 := f.as(f.other, httptest.NewRequest(http.MethodGet,
+		"/api/share-bundles/"+idStr+"/access-log", nil))
+	req2.SetPathValue("id", idStr)
+	rec2 := httptest.NewRecorder()
+	h.handleAccessLog(rec2, req2)
+	if rec2.Code != http.StatusNotFound {
+		t.Errorf("non-owner access-log status = %d, want 404", rec2.Code)
+	}
+}
+
 func decodeEnvelopeData(t *testing.T, rec *httptest.ResponseRecorder) []map[string]any {
 	t.Helper()
 	var env struct {

@@ -123,7 +123,14 @@
       "renew": "Renew",
       "renewing": "Renewing…",
       "renewExtend": "Extend by",
-      "withPassphrase": "passphrase"
+      "withPassphrase": "passphrase",
+      "shareTitleLabel": "Nickname",
+      "shareDescriptionLabel": "Description",
+      "shareDescriptionPlaceholder": "Optional note shown to whoever opens the link.",
+      "accessLog": "Access log",
+      "accessLogHide": "Hide log",
+      "accessLogEmpty": "No accesses recorded yet.",
+      "accessLogPassphrase": "Passphrase was used"
     },
     "lineage": {
       "title": "Data Lineage",
@@ -1153,6 +1160,7 @@
   "share": {
     "bundleTitle": "Shared bundle",
     "bundleDesc": "Someone shared this with you through a short-lived link.",
+    "indexTitle": "On this page",
     "noContent": "This link no longer has any available content.",
     "securityNotice": "Security Notice",
     "securityNoticeDesc": "This is a temporary sharing link. Copy the necessary credentials and close this tab when finished.",

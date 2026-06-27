@@ -62,10 +62,12 @@ type BundleItemInput struct {
 
 // CreateBundleOpts mirrors CreateShareLinkOpts.
 type CreateBundleOpts struct {
-	Title      string
-	TTL        time.Duration
-	MaxViews   int
-	Passphrase string
+	Title string
+	// Description is an optional free-text note shown on the guest reveal page.
+	Description string
+	TTL         time.Duration
+	MaxViews    int
+	Passphrase  string
 	// NoExpiry, when true, stores a NULL expires_at — the link never expires
 	// (redeemable until revoked; never archived by the janitor). Overrides TTL.
 	NoExpiry bool
@@ -95,6 +97,7 @@ type BundleItemView struct {
 type BundleView struct {
 	ID            int64            `json:"id"`
 	Title         string           `json:"title"`
+	Description   string           `json:"description"`
 	ExpiresAt     *time.Time       `json:"expires_at"` // nil = never expires
 	MaxViews      *int             `json:"max_views,omitempty"`
 	ViewCount     int              `json:"view_count"`
@@ -123,9 +126,29 @@ type BundleAPIDocItem struct {
 }
 
 type BundlePayload struct {
-	Title   string             `json:"title"`
-	Secrets []BundleSecretItem `json:"secrets"`
-	APIDocs []BundleAPIDocItem `json:"api_docs"`
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Secrets     []BundleSecretItem `json:"secrets"`
+	APIDocs     []BundleAPIDocItem `json:"api_docs"`
+}
+
+// RedeemMeta carries the anonymous network metadata captured when a bundle is
+// redeemed. It identifies the request, never the requester (bundles are public
+// links). Recorded best-effort into share_bundle_access_log on a successful
+// reveal.
+type RedeemMeta struct {
+	RemoteIP  string
+	UserAgent string
+}
+
+// BundleAccessEntry is one owner-facing access-log row: when a guest redeemed
+// the link, from where (best-effort IP), with what user-agent, and whether a
+// passphrase gated the reveal. No identity is recorded.
+type BundleAccessEntry struct {
+	AccessedAt     time.Time `json:"accessed_at"`
+	RemoteIP       string    `json:"remote_ip"`
+	UserAgent      string    `json:"user_agent"`
+	UsedPassphrase bool      `json:"used_passphrase"`
 }
 
 // CreateBundle generates a fresh token and persists a new bundle. Item access
@@ -254,9 +277,9 @@ func (r *SecretRepo) buildBundle(ctx context.Context, actor ActorContext, hash [
 
 	id, err := database.InsertReturningID(tx,
 		`INSERT INTO share_bundles
-			(token_hash, title, expires_at, passphrase_hash, max_views, view_count, created_by)
-		 VALUES (?, ?, ?, ?, ?, 0, ?)`,
-		hash, opts.Title, expiresArg, passphraseHash, maxViews, actor.UserID,
+			(token_hash, title, description, expires_at, passphrase_hash, max_views, view_count, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+		hash, opts.Title, opts.Description, expiresArg, passphraseHash, maxViews, actor.UserID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("insert share bundle: %w", err)
@@ -285,6 +308,7 @@ func (r *SecretRepo) buildBundle(ctx context.Context, actor ActorContext, hash [
 	view := &BundleView{
 		ID:            id,
 		Title:         opts.Title,
+		Description:   opts.Description,
 		ExpiresAt:     expiresView,
 		ViewCount:     0,
 		CreatedBy:     actor.UserID,
@@ -303,23 +327,24 @@ func (r *SecretRepo) buildBundle(ctx context.Context, actor ActorContext, hash [
 // ladder as RedeemShareLink, then LIVE-RESOLVES each item against current
 // data. Items whose source has since been deleted are skipped (graceful), not
 // fatal. Increments view_count on success.
-func (r *SecretRepo) RedeemBundle(ctx context.Context, token, passphrase string) (*BundlePayload, error) {
+func (r *SecretRepo) RedeemBundle(ctx context.Context, token, passphrase string, meta RedeemMeta) (*BundlePayload, error) {
 	hash := secretshare.HashToken(token)
 
 	var (
-		id         int64
-		title      string
-		passHash   []byte
-		maxViews   sql.NullInt64
-		viewCount  int
-		expiresStr sql.NullString
-		revoked    sql.NullTime
-		deleted    sql.NullTime
+		id          int64
+		title       string
+		description string
+		passHash    []byte
+		maxViews    sql.NullInt64
+		viewCount   int
+		expiresStr  sql.NullString
+		revoked     sql.NullTime
+		deleted     sql.NullTime
 	)
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, title, passphrase_hash, max_views, view_count, expires_at, revoked_at, deleted_at
+		`SELECT id, title, description, passphrase_hash, max_views, view_count, expires_at, revoked_at, deleted_at
 		   FROM share_bundles WHERE token_hash = ?`, hash,
-	).Scan(&id, &title, &passHash, &maxViews, &viewCount, &expiresStr, &revoked, &deleted)
+	).Scan(&id, &title, &description, &passHash, &maxViews, &viewCount, &expiresStr, &revoked, &deleted)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrShareLinkNotFound
 	}
@@ -356,7 +381,7 @@ func (r *SecretRepo) RedeemBundle(ctx context.Context, token, passphrase string)
 		return nil, err
 	}
 
-	payload := &BundlePayload{Title: title, Secrets: []BundleSecretItem{}, APIDocs: []BundleAPIDocItem{}}
+	payload := &BundlePayload{Title: title, Description: description, Secrets: []BundleSecretItem{}, APIDocs: []BundleAPIDocItem{}}
 	for _, it := range items {
 		switch it.itemType {
 		case BundleItemSecret:
@@ -408,6 +433,14 @@ func (r *SecretRepo) RedeemBundle(ctx context.Context, token, passphrase string)
 		`UPDATE share_bundles SET view_count = view_count + 1 WHERE id = ?`, id); err != nil {
 		return nil, err
 	}
+
+	// Record the anonymous access (network metadata only). Best-effort: a log
+	// failure must never block the reveal, so the error is swallowed.
+	_, _ = r.db.ExecContext(ctx,
+		`INSERT INTO share_bundle_access_log (bundle_id, remote_ip, user_agent, used_passphrase)
+		 VALUES (?, ?, ?, ?)`,
+		id, meta.RemoteIP, meta.UserAgent, len(passHash) > 0)
+
 	return payload, nil
 }
 
@@ -443,12 +476,12 @@ func (r *SecretRepo) loadBundleItems(ctx context.Context, bundleID int64) ([]bun
 // bundleViewColumns is the shared owner-facing projection used by every
 // metadata read (list / list-for-item / single get). Kept in one place so the
 // scan order in scanBundleViews stays in lock-step with the SELECT.
-const bundleViewColumns = `id, title, expires_at, passphrase_hash, max_views, view_count, created_by, created_at, revoked_at, deleted_at`
+const bundleViewColumns = `id, title, description, expires_at, passphrase_hash, max_views, view_count, created_by, created_at, revoked_at, deleted_at`
 
 // bundleViewColumnsPrefixed qualifies bundleViewColumns with a table alias for
 // joined queries (where bare `id` would be ambiguous against share_bundle_items).
 func bundleViewColumnsPrefixed(alias string) string {
-	return alias + ".id, " + alias + ".title, " + alias + ".expires_at, " +
+	return alias + ".id, " + alias + ".title, " + alias + ".description, " + alias + ".expires_at, " +
 		alias + ".passphrase_hash, " + alias + ".max_views, " + alias + ".view_count, " +
 		alias + ".created_by, " + alias + ".created_at, " + alias + ".revoked_at, " + alias + ".deleted_at"
 }
@@ -468,7 +501,7 @@ func (r *SecretRepo) scanBundleViews(ctx context.Context, rows *sql.Rows) ([]Bun
 			created  string
 			expires  sql.NullString
 		)
-		if err := rows.Scan(&v.ID, &v.Title, &expires, &passHash, &maxViews,
+		if err := rows.Scan(&v.ID, &v.Title, &v.Description, &expires, &passHash, &maxViews,
 			&v.ViewCount, &v.CreatedBy, &created, &revoked, &deleted); err != nil {
 			return nil, err
 		}
@@ -634,4 +667,42 @@ func (r *SecretRepo) RevokeBundle(ctx context.Context, actor ActorContext, bundl
 		return ErrBundleNotFound
 	}
 	return nil
+}
+
+// BundleAccessLog returns the anonymous access-log rows for an owner's bundle,
+// newest-first, hard-capped at the 500 most-recent. Owner-scoped: a missing or
+// foreign bundle yields ErrBundleNotFound (never another owner's history). The
+// rows carry only network metadata — no identity is recorded.
+func (r *SecretRepo) BundleAccessLog(ctx context.Context, actor ActorContext, bundleID int64) ([]BundleAccessEntry, error) {
+	var owner int64
+	switch err := r.db.QueryRowContext(ctx,
+		`SELECT created_by FROM share_bundles WHERE id = ?`, bundleID).Scan(&owner); {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, ErrBundleNotFound
+	case err != nil:
+		return nil, err
+	}
+	if owner != actor.UserID {
+		return nil, ErrBundleNotFound
+	}
+
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT accessed_at, remote_ip, user_agent, used_passphrase
+		   FROM share_bundle_access_log
+		  WHERE bundle_id = ?
+		  ORDER BY accessed_at DESC, id DESC
+		  LIMIT 500`, bundleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []BundleAccessEntry{}
+	for rows.Next() {
+		var e BundleAccessEntry
+		if err := rows.Scan(&e.AccessedAt, &e.RemoteIP, &e.UserAgent, &e.UsedPassphrase); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }

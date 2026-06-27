@@ -50,6 +50,8 @@ export default function ShareLinkModal({ secretID, onClose }: ShareLinkModalProp
   const [customTTLSeconds, setCustomTTLSeconds] = useState<string>("");
   const [passphrase, setPassphrase] = useState("");
   const [maxViews, setMaxViews] = useState<string>("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   // Last successful create — holds the raw token + url for the
   // copy-to-clipboard affordance. Cleared when the user creates another or
   // closes the modal.
@@ -75,6 +77,8 @@ export default function ShareLinkModal({ secretID, onClose }: ShareLinkModalProp
         ttl_seconds: ttlSeconds,
         max_views: Number(maxViews) || 0,
         passphrase: passphrase || undefined,
+        title: title.trim() || undefined,
+        description: description.trim() || undefined,
       });
       return res;
     },
@@ -85,6 +89,8 @@ export default function ShareLinkModal({ secretID, onClose }: ShareLinkModalProp
       // Reset the form for the next link.
       setPassphrase("");
       setMaxViews("");
+      setTitle("");
+      setDescription("");
     },
   });
 
@@ -148,6 +154,30 @@ export default function ShareLinkModal({ secretID, onClose }: ShareLinkModalProp
         <Card>
           <h3 className="text-sm font-semibold mb-3">New share link</h3>
           <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-[var(--text-muted)] mb-1.5 block">
+                Nickname (optional)
+              </label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="A label for this link"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-[var(--text-muted)] mb-1.5 block">
+                Description (optional)
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Shown to whoever opens the link"
+                rows={2}
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:border-[var(--accent)] focus:outline-none resize-y"
+              />
+            </div>
+
             <div>
               <label className="text-xs font-medium text-[var(--text-muted)] mb-1.5 block">Expires after</label>
               <div className="flex flex-wrap gap-2">
