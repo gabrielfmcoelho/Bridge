@@ -1161,6 +1161,7 @@
     "bundleTitle": "Shared bundle",
     "bundleDesc": "Someone shared this with you through a short-lived link.",
     "indexTitle": "On this page",
+    "indexOther": "Other",
     "noContent": "This link no longer has any available content.",
     "securityNotice": "Security Notice",
     "securityNoticeDesc": "This is a temporary sharing link. Copy the necessary credentials and close this tab when finished.",

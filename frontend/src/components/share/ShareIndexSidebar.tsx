@@ -1,6 +1,6 @@
 "use client";
 
-import { operationsFromSpec } from "@/lib/atlas/openapi";
+import { operationsFromSpec, groupOperationsByTag } from "@/lib/atlas/openapi";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { BundleApiDocItem, BundleSecretItem } from "@/lib/types";
 
@@ -66,7 +66,10 @@ export default function ShareIndexSidebar({
       )}
 
       {apiDocs.map((doc, i) => {
-        const ops = operationsFromSpec(doc.spec);
+        const groups = groupOperationsByTag(operationsFromSpec(doc.spec));
+        // Only show tag headings when at least one real tag exists; an all-
+        // untagged API renders flat (no lone "Other" label).
+        const showTags = groups.some((g) => g.tag !== null);
         return (
           <div key={`api-${i}`} className="mb-3 last:mb-0">
             <button
@@ -76,32 +79,36 @@ export default function ShareIndexSidebar({
             >
               {doc.name}
             </button>
-            {ops.length > 0 && (
-              <ul className="space-y-0.5">
-                {ops.map((op, j) => (
-                  <li key={`api-${i}-op-${j}`}>
-                    <button
-                      type="button"
-                      onClick={() => scrollToAnchor(`api-${i}`)}
-                      title={op.summary || `${op.method} ${op.path}`}
-                      className="w-full flex items-center gap-1.5 text-left px-2 py-0.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)] cursor-pointer"
-                    >
-                      <span
-                        className={`shrink-0 font-bold text-[9px] w-10 ${METHOD_COLORS[op.method] || "text-[var(--text-muted)]"}`}
+            {groups.map((group, g) => (
+              <div key={`api-${i}-tag-${g}`} className="mb-1.5 last:mb-0">
+                {showTags && (
+                  <p className="px-2 pt-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">
+                    {group.tag ?? t("share.indexOther")}
+                  </p>
+                )}
+                <ul className="space-y-0.5">
+                  {group.operations.map((op, j) => (
+                    <li key={`api-${i}-tag-${g}-op-${j}`}>
+                      <button
+                        type="button"
+                        onClick={() => scrollToAnchor(`api-${i}`)}
+                        title={`${op.method} ${op.path}`}
+                        className="w-full flex items-start gap-1.5 text-left px-2 py-0.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)] cursor-pointer"
                       >
-                        {op.method}
-                      </span>
-                      <span
-                        className="truncate"
-                        style={{ fontFamily: "var(--font-mono)" }}
-                      >
-                        {op.path}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                        <span
+                          className={`shrink-0 font-bold text-[9px] w-10 mt-0.5 ${METHOD_COLORS[op.method] || "text-[var(--text-muted)]"}`}
+                        >
+                          {op.method}
+                        </span>
+                        <span className="whitespace-normal break-words leading-snug">
+                          {op.summary || op.path}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         );
       })}

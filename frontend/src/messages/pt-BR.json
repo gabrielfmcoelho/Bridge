@@ -1161,6 +1161,7 @@
     "bundleTitle": "Pacote compartilhado",
     "bundleDesc": "Alguém compartilhou isso com você através de um link temporário.",
     "indexTitle": "Nesta página",
+    "indexOther": "Outros",
     "noContent": "Este link não possui mais nenhum conteúdo disponível.",
     "securityNotice": "Aviso de Segurança",
     "securityNoticeDesc": "Este é um link de compartilhamento temporário. Copie as credenciais necessárias e feche esta aba quando terminar.",

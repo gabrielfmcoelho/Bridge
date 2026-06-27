@@ -5,6 +5,7 @@ export interface SpecOperation {
   method: string; // upper-case HTTP verb, e.g. "GET"
   path: string; // template path, e.g. "/things/{id}"
   summary: string; // human label; falls back to operationId, else ""
+  tags: string[]; // OpenAPI tags; [] if untagged
 }
 
 // The HTTP methods OpenAPI defines on a Path Item Object. Anything else under a
@@ -34,8 +35,40 @@ export function operationsFromSpec(spec: unknown): SpecOperation[] {
         (typeof op.summary === "string" && op.summary) ||
         (typeof op.operationId === "string" && op.operationId) ||
         "";
-      out.push({ method: method.toUpperCase(), path, summary });
+      const tags = Array.isArray(op.tags)
+        ? op.tags.filter((x): x is string => typeof x === "string")
+        : [];
+      out.push({ method: method.toUpperCase(), path, summary, tags });
     }
   }
   return out;
+}
+
+export interface SpecTagGroup {
+  tag: string | null; // null = untagged ("Other")
+  operations: SpecOperation[];
+}
+
+// groupOperationsByTag buckets operations by their primary (first) tag,
+// preserving first-appearance order; untagged operations collect under a single
+// null group, which is sorted last for readability.
+export function groupOperationsByTag(ops: SpecOperation[]): SpecTagGroup[] {
+  const order: string[] = [];
+  const byTag = new Map<string, SpecOperation[]>();
+  for (const op of ops) {
+    const key = op.tags[0] ?? "";
+    if (!byTag.has(key)) {
+      byTag.set(key, []);
+      order.push(key);
+    }
+    byTag.get(key)!.push(op);
+  }
+  const groups: SpecTagGroup[] = order.map((key) => ({
+    tag: key === "" ? null : key,
+    operations: byTag.get(key)!,
+  }));
+  // Stable sort (ES2019+) keeps tagged groups in first-appearance order and
+  // pushes the single untagged group to the end.
+  groups.sort((a, b) => (a.tag === null ? 1 : 0) - (b.tag === null ? 1 : 0));
+  return groups;
 }
