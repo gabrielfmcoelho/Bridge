@@ -12,6 +12,7 @@ import PageShell from "@/components/layout/PageShell";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import CreateDocumentModal from "@/components/wiki/CreateDocumentModal";
+import WikiShareModal, { type WikiShareTarget } from "@/components/wiki/WikiShareModal";
 import WikiSearchBar from "@/components/wiki/WikiSearchBar";
 import WikiTree from "@/components/wiki/WikiTree";
 import WikiDocumentViewer from "@/components/wiki/WikiDocumentViewer";
@@ -65,7 +66,7 @@ function WikiPageInner() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
   const selectedDocId = searchParams.get("doc");
@@ -74,6 +75,7 @@ function WikiPageInner() {
   const [viewMode, setViewMode] = useState<ViewMode>(selectedDocId ? "docs" : "search");
   const [searchQuery, setSearchQuery] = useState("");
   const [createForCollection, setCreateForCollection] = useState<string | null>(null);
+  const [shareTarget, setShareTarget] = useState<WikiShareTarget | null>(null);
   const [collapsedCollections, setCollapsedCollections] = useState<Set<string>>(new Set());
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -219,6 +221,24 @@ function WikiPageInner() {
                     {section.collection?.name ?? section.collection_id}
                   </span>
                 </button>
+                {section.collection && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShareTarget({
+                        kind: "wiki_collection",
+                        refKey: section.collection_id,
+                        title: section.collection?.name ?? section.collection_id,
+                      })
+                    }
+                    className="text-[var(--text-faint)] hover:text-[var(--accent)] text-xs px-1"
+                    title={t("atlas.apis.shareWikiCollection")}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                  </button>
+                )}
                 {canEdit && section.collection && (
                   <button
                     type="button"
@@ -366,13 +386,28 @@ function WikiPageInner() {
         <div className="max-w-[780px] mx-auto w-full">
           {doc && (
             <div className="mb-3">
-              <h2
-                className="text-3xl font-bold text-[var(--text-primary)] leading-tight flex items-start gap-2"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                {doc.emoji && <span className="shrink-0">{doc.emoji}</span>}
-                <span>{doc.title || "Untitled"}</span>
-              </h2>
+              <div className="flex items-start justify-between gap-3">
+                <h2
+                  className="text-3xl font-bold text-[var(--text-primary)] leading-tight flex items-start gap-2"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  {doc.emoji && <span className="shrink-0">{doc.emoji}</span>}
+                  <span>{doc.title || "Untitled"}</span>
+                </h2>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShareTarget({ kind: "wiki_doc", refKey: doc.id, title: doc.title || "Untitled" })
+                  }
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
+                  title={t("atlas.apis.shareWikiPage")}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  {t("atlas.apis.shareWikiPage")}
+                </button>
+              </div>
               <p className="mt-1.5 text-xs text-[var(--text-muted)]">
                 Updated {getTimeAgo(doc.updated_at, locale)}
                 {doc.updated_by ? ` by ${doc.updated_by}` : ""}
@@ -528,6 +563,12 @@ function WikiPageInner() {
             .then(() => setCreateForCollection(null))
         }
         submitting={createMutation.isPending}
+      />
+
+      <WikiShareModal
+        open={shareTarget !== null}
+        onClose={() => setShareTarget(null)}
+        target={shareTarget}
       />
     </PageShell>
   );

@@ -1230,4 +1230,17 @@ var migrationsPostgres = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_share_bundle_access_log_bundle
 		ON share_bundle_access_log (bundle_id, accessed_at DESC);`,
+
+	// Version 79: share Outline wiki content. Two new item_types (wiki_doc,
+	// wiki_collection) reference Outline objects, whose IDs are string UUIDs and
+	// so cannot use the BIGINT ref_id. ref_key TEXT carries the UUID (ref_id
+	// stays 0 for wiki rows); secret/api_doc rows keep using ref_id untouched.
+	// The item_type CHECK from v68 is auto-named share_bundle_items_item_type_check
+	// (Postgres default for a single-column table CHECK); DROP IF EXISTS keeps this
+	// migration safe if the name ever differs. ADD COLUMN ... DEFAULT '' keeps
+	// every existing row valid.
+	`ALTER TABLE share_bundle_items ADD COLUMN IF NOT EXISTS ref_key TEXT NOT NULL DEFAULT '';
+	ALTER TABLE share_bundle_items DROP CONSTRAINT IF EXISTS share_bundle_items_item_type_check;
+	ALTER TABLE share_bundle_items ADD CONSTRAINT share_bundle_items_item_type_check
+		CHECK (item_type IN ('secret','api_doc','wiki_doc','wiki_collection'));`,
 }

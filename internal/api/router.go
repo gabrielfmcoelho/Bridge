@@ -93,6 +93,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("POST /api/share-bundles/reissue", authenticated(db, http.HandlerFunc(bundleH.handleReissue)))
 	mux.Handle("GET /api/share-bundles", authenticated(db, http.HandlerFunc(bundleH.handleList)))
 	mux.Handle("PATCH /api/share-bundles/{id}", authenticated(db, http.HandlerFunc(bundleH.handleRenew)))
+	mux.Handle("PUT /api/share-bundles/{id}/items", authenticated(db, http.HandlerFunc(bundleH.handleUpdateItems)))
 	mux.Handle("DELETE /api/share-bundles/{id}", authenticated(db, http.HandlerFunc(bundleH.handleRevoke)))
 	mux.Handle("GET /api/share-bundles/{id}/access-log", authenticated(db, http.HandlerFunc(bundleH.handleAccessLog)))
 	publicBundleH := &publicBundleHandlers{repo: secretRepo}

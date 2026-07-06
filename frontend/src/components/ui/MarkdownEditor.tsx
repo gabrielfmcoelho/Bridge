@@ -2,8 +2,17 @@
 
 import { useState } from "react";
 import { marked } from "marked";
+import DOMPurify from "isomorphic-dompurify";
 
 marked.setOptions({ breaks: true, gfm: true });
+
+// renderMarkdown is the single sanitized markdown → HTML pipeline. marked.parse
+// output is passed through DOMPurify before it ever reaches
+// dangerouslySetInnerHTML — mandatory because share/wiki content is rendered on
+// the public, unauthenticated redeem page.
+export function renderMarkdown(content: string): string {
+  return DOMPurify.sanitize(marked.parse(content) as string);
+}
 
 interface MarkdownEditorProps {
   value: string;
@@ -60,7 +69,7 @@ export default function MarkdownEditor({ value, onChange, label, rows = 5, place
         ) : (
           <div
             className="markdown-preview px-3 py-2 text-sm text-[var(--text-primary)] min-h-[80px]"
-            dangerouslySetInnerHTML={{ __html: value ? marked.parse(value) as string : '<span class="text-[var(--text-faint)]">Nothing to preview</span>' }}
+            dangerouslySetInnerHTML={{ __html: value ? renderMarkdown(value) : '<span class="text-[var(--text-faint)]">Nothing to preview</span>' }}
           />
         )}
       </div>
@@ -73,7 +82,21 @@ export function MarkdownContent({ content }: { content: string }) {
   return (
     <div
       className="markdown-preview text-sm text-[var(--text-secondary)]"
-      dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }}
+      dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
     />
   );
+}
+
+// SafeMarkdownContent is the same sanitized renderer, named explicitly for use on
+// the public redeem page. className overridable so share styling can differ from
+// the in-app wiki viewer.
+export function SafeMarkdownContent({
+  content,
+  className = "markdown-preview text-sm text-[var(--text-primary)]",
+}: {
+  content: string;
+  className?: string;
+}) {
+  if (!content) return null;
+  return <div className={className} dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />;
 }

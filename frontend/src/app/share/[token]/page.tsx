@@ -6,6 +6,7 @@ import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
 import ApiReference from "@/components/atlas/apis/ApiReference";
 import ShareIndexSidebar from "@/components/share/ShareIndexSidebar";
+import ShareWikiSection from "@/components/share/ShareWikiSection";
 import type { BundlePayload } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
@@ -482,10 +483,10 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
             <p className="text-xs text-[var(--text-muted)]">{b.description || t("share.bundleDesc")}</p>
           </div>
 
-          {(b.secrets.length > 0 || b.api_docs.length > 0) && (
+          {(b.secrets.length > 0 || b.api_docs.length > 0 || b.wiki.length > 0) && (
             <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-5 items-start">
               {/* Index rail — collapses to the top on mobile. */}
-              <ShareIndexSidebar secrets={b.secrets} apiDocs={b.api_docs} />
+              <ShareIndexSidebar secrets={b.secrets} apiDocs={b.api_docs} wiki={b.wiki} />
 
               {/* Content column */}
               <div className="min-w-0 space-y-5">
@@ -521,11 +522,20 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                     </Card>
                   </div>
                 ))}
+
+                {b.wiki.length > 0 && (
+                  <div className="space-y-5">
+                    <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{t("share.wiki")}</h2>
+                    {b.wiki.map((item, i) => (
+                      <ShareWikiSection key={i} item={item} index={i} />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {b.secrets.length === 0 && b.api_docs.length === 0 && (
+          {b.secrets.length === 0 && b.api_docs.length === 0 && b.wiki.length === 0 && (
             <div className={`text-sm rounded-[var(--radius-md)] p-3 ${
               theme === "light"
                 ? "bg-amber-50 border border-amber-200 text-amber-700"

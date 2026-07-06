@@ -6,11 +6,42 @@ import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FormError from "@/components/ui/FormError";
-import { shareBundlesAPI, secretsAPI } from "@/lib/api";
+import { shareBundlesAPI, secretsAPI, outlineAPI, type OutlineDocumentNode } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { ApiCatalog } from "@/lib/types";
 
 type Mode = "all" | "tags" | "operations";
+
+// WikiPickerNodes recursively renders an Outline collection's document tree with
+// a checkbox per document, so individual pages can be attached to the bundle.
+function WikiPickerNodes({
+  nodes,
+  selected,
+  onToggle,
+}: {
+  nodes: OutlineDocumentNode[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <ul className="space-y-0.5">
+      {nodes.map((n) => (
+        <li key={n.id}>
+          <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <input type="checkbox" checked={selected.has(n.id)} onChange={() => onToggle(n.id)} />
+            {n.emoji ? `${n.emoji} ` : ""}
+            <span className="truncate">{n.title}</span>
+          </label>
+          {n.children && n.children.length > 0 && (
+            <div className="pl-4 border-l border-[var(--border-subtle)] ml-1.5">
+              <WikiPickerNodes nodes={n.children} selected={selected} onToggle={onToggle} />
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 // AccessLogPanel lazily loads (only when expanded) and renders a bundle's
 // anonymous access log: time / IP / browser, with a lock when a passphrase
@@ -69,6 +100,10 @@ export default function ShareBundleModal({
   const [selTags, setSelTags] = useState<Set<string>>(new Set());
   const [selOps, setSelOps] = useState<Set<string>>(new Set());
   const [selSecrets, setSelSecrets] = useState<Set<number>>(new Set());
+  // Attachable Outline content (keyed by string UUID): whole collections and/or
+  // individual documents.
+  const [selWikiCols, setSelWikiCols] = useState<Set<string>>(new Set());
+  const [selWikiDocs, setSelWikiDocs] = useState<Set<string>>(new Set());
   // Editable nickname + free-text note (nickname defaults to the API name).
   const [title, setTitle] = useState(api.name);
   const [description, setDescription] = useState("");
@@ -81,6 +116,10 @@ export default function ShareBundleModal({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // When set, the top form is editing an existing link's items in place (same
+  // URL) rather than creating a new one; `notice` shows a transient confirmation.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const ops = useMemo(() => api.operations || [], [api.operations]);
   const tags = useMemo(() => {
@@ -101,6 +140,16 @@ export default function ShareBundleModal({
       }),
     enabled: open,
   });
+
+  // Outline collections (+ their document trees) available to attach. Soft-fails
+  // when the integration is off/unconfigured — the section just stays empty.
+  const { data: wikiTree } = useQuery({
+    queryKey: ["wiki-tree", "share-picker"],
+    queryFn: outlineAPI.commonWikiTree,
+    enabled: open,
+    retry: false,
+  });
+  const wikiSections = wikiTree?.sections ?? [];
 
   // Links already emitted for THIS API (server-side filtered; matches
   // multi-item bundles that include this api_doc too).
@@ -132,6 +181,8 @@ export default function ShareBundleModal({
     setSelTags(new Set());
     setSelOps(new Set());
     setSelSecrets(new Set());
+    setSelWikiCols(new Set());
+    setSelWikiDocs(new Set());
     setTitle(api.name);
     setDescription("");
     setTtlHours("24");
@@ -143,11 +194,66 @@ export default function ShareBundleModal({
     setResult(null);
     setCopied(false);
     setOpenLog(null);
+    setEditingId(null);
+    setNotice(null);
   }
 
   function close() {
     reset();
     onClose();
+  }
+
+  // Load an existing link's items into the top picker and switch to edit mode,
+  // so saving replaces that link's items in place (same URL).
+  function beginEdit(link: (typeof existingLinks)[number]) {
+    setResult(null);
+    setError(null);
+    setNotice(null);
+    const cols = new Set<string>();
+    const docs = new Set<string>();
+    const secretIds = new Set<number>();
+    let nextMode: Mode = "all";
+    const nextTags = new Set<string>();
+    const nextOps = new Set<string>();
+    for (const it of link.items) {
+      if (it.type === "secret") secretIds.add(it.ref_id);
+      else if (it.type === "wiki_collection" && it.ref_key) cols.add(it.ref_key);
+      else if (it.type === "wiki_doc" && it.ref_key) docs.add(it.ref_key);
+      else if (it.type === "api_doc" && it.selector) {
+        try {
+          const sel = JSON.parse(it.selector) as { mode?: Mode; tags?: string[]; op_keys?: string[] };
+          if (sel.mode === "tags") {
+            nextMode = "tags";
+            (sel.tags ?? []).forEach((tg) => nextTags.add(tg));
+          } else if (sel.mode === "operations") {
+            nextMode = "operations";
+            (sel.op_keys ?? []).forEach((k) => nextOps.add(k));
+          }
+        } catch {
+          /* malformed selector — fall back to whole API */
+        }
+      }
+    }
+    setMode(nextMode);
+    setSelTags(nextTags);
+    setSelOps(nextOps);
+    setSelSecrets(secretIds);
+    setSelWikiCols(cols);
+    setSelWikiDocs(docs);
+    setTitle(link.title || api.name);
+    setEditingId(link.id);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setNotice(null);
+    setMode("all");
+    setSelTags(new Set());
+    setSelOps(new Set());
+    setSelSecrets(new Set());
+    setSelWikiCols(new Set());
+    setSelWikiDocs(new Set());
+    setTitle(api.name);
   }
 
   async function submit() {
@@ -165,6 +271,8 @@ export default function ShareBundleModal({
     const items = [
       { type: "api_doc" as const, ref_id: api.id, selector },
       ...Array.from(selSecrets).map((id) => ({ type: "secret" as const, ref_id: id })),
+      ...Array.from(selWikiCols).map((id) => ({ type: "wiki_collection" as const, ref_key: id })),
+      ...Array.from(selWikiDocs).map((id) => ({ type: "wiki_doc" as const, ref_key: id })),
     ];
 
     // ttl_seconds: -1 signals "never expires"; otherwise hours→seconds (blank
@@ -175,6 +283,15 @@ export default function ShareBundleModal({
     try {
       const bundleTitle = title.trim() || api.name;
       const bundleDescription = description.trim() || undefined;
+      // Edit mode: replace the existing link's items in place (same URL). ttl/
+      // passphrase/reuse don't apply — only the item set changes.
+      if (editingId != null) {
+        await shareBundlesAPI.updateItems(editingId, items);
+        qc.invalidateQueries({ queryKey: linksKey });
+        setNotice(t("atlas.apis.itemsUpdated"));
+        setEditingId(null);
+        return;
+      }
       const token = reuseToken.trim();
       if (token) {
         // Restore a lost link: rebuild under the token the holder still has, so
@@ -296,6 +413,40 @@ export default function ShareBundleModal({
             )}
           </div>
 
+          {wikiSections.length > 0 && (
+            <div>
+              <label className="block text-sm mb-1.5 text-[var(--text-secondary)]">
+                {t("atlas.apis.attachWiki")}
+              </label>
+              <div className="max-h-48 overflow-y-auto space-y-2 border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-2">
+                {wikiSections.map((section) => (
+                  <div key={section.collection_id}>
+                    <label className="flex items-center gap-2 text-xs font-semibold text-[var(--text-secondary)]">
+                      <input
+                        type="checkbox"
+                        checked={selWikiCols.has(section.collection_id)}
+                        onChange={() => setSelWikiCols((s) => toggle(s, section.collection_id))}
+                      />
+                      <span className="truncate">{section.collection?.name ?? section.collection_id}</span>
+                      <span className="text-[9px] font-normal text-[var(--text-faint)]">
+                        {t("share.wikiCollection")}
+                      </span>
+                    </label>
+                    {!selWikiCols.has(section.collection_id) && (section.nodes?.length ?? 0) > 0 && (
+                      <div className="pl-4 mt-0.5">
+                        <WikiPickerNodes
+                          nodes={section.nodes ?? []}
+                          selected={selWikiDocs}
+                          onToggle={(id) => setSelWikiDocs((s) => toggle(s, id))}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Input
             label={t("atlas.apis.shareTitleLabel")}
             value={title}
@@ -347,18 +498,31 @@ export default function ShareBundleModal({
             className="font-mono text-xs"
           />
 
+          {notice && <p className="text-xs text-emerald-400">{notice}</p>}
+          {editingId != null && (
+            <p className="text-[11px] text-[var(--text-muted)]">{t("atlas.apis.editingNotice")}</p>
+          )}
+
           {error && <FormError message={error} />}
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" type="button" onClick={close}>
-              {t("common.cancel") || "Cancel"}
-            </Button>
+            {editingId != null ? (
+              <Button variant="ghost" type="button" onClick={cancelEdit}>
+                {t("atlas.apis.cancelEdit")}
+              </Button>
+            ) : (
+              <Button variant="ghost" type="button" onClick={close}>
+                {t("common.cancel") || "Cancel"}
+              </Button>
+            )}
             <Button type="button" onClick={submit} loading={submitting}>
               {submitting
                 ? t("atlas.apis.creating")
-                : reuseToken.trim()
-                  ? t("atlas.apis.restoreLink")
-                  : t("atlas.apis.createLink")}
+                : editingId != null
+                  ? t("atlas.apis.saveChanges")
+                  : reuseToken.trim()
+                    ? t("atlas.apis.restoreLink")
+                    : t("atlas.apis.createLink")}
             </Button>
           </div>
 
@@ -437,6 +601,19 @@ export default function ShareBundleModal({
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        {!dead && (
+                          <button
+                            type="button"
+                            onClick={() => beginEdit(link)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded-[var(--radius-sm)] border cursor-pointer ${
+                              editingId === link.id
+                                ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10"
+                                : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)]"
+                            }`}
+                          >
+                            {t("atlas.apis.edit")}
+                          </button>
+                        )}
                         <button
                           type="button"
                           aria-expanded={openLog === link.id}

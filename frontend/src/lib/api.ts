@@ -949,8 +949,9 @@ export const shareBundlesAPI = {
     max_views?: number;
     passphrase?: string;
     items: {
-      type: "secret" | "api_doc";
-      ref_id: number;
+      type: "secret" | "api_doc" | "wiki_doc" | "wiki_collection";
+      ref_id?: number; // wiki items omit this (server defaults to 0)
+      ref_key?: string; // string UUID for wiki items
       selector?: { mode: string; op_keys?: string[]; tags?: string[] };
     }[];
   }) =>
@@ -971,10 +972,26 @@ export const shareBundlesAPI = {
     api.getList<import("./types").ShareBundleView>(
       `/api/share-bundles?item_type=${itemType}&ref_id=${refID}`,
     ),
+  // String-keyed sibling for wiki items (Outline UUID lives in ref_key).
+  listForItemKey: (itemType: "wiki_doc" | "wiki_collection", refKey: string) =>
+    api.getList<import("./types").ShareBundleView>(
+      `/api/share-bundles?item_type=${itemType}&ref_key=${encodeURIComponent(refKey)}`,
+    ),
   // Renew/extend WITHOUT changing the token: same URL keeps working. Reactivates
   // a revoked/archived link; max_views null clears the cap, >0 sets it, omit to keep.
   renew: (id: number, body: { ttl_seconds?: number; max_views?: number | null }) =>
     api.patch<import("./types").ShareBundleView>(`/api/share-bundles/${id}`, body),
+  // Replace a live bundle's items IN PLACE, keeping the same token/URL — used to
+  // add/remove secrets, API docs, or wiki content on an already-shared link.
+  updateItems: (
+    id: number,
+    items: {
+      type: "secret" | "api_doc" | "wiki_doc" | "wiki_collection";
+      ref_id?: number;
+      ref_key?: string;
+      selector?: { mode: string; op_keys?: string[]; tags?: string[] };
+    }[],
+  ) => api.put<import("./types").ShareBundleView>(`/api/share-bundles/${id}/items`, { items }),
   // Rebuild a link under a token you already hold (revives a URL whose row was
   // hard-deleted). 409 if a live bundle still owns the token (renew it instead).
   reissue: (body: {
@@ -985,8 +1002,9 @@ export const shareBundlesAPI = {
     max_views?: number;
     passphrase?: string;
     items: {
-      type: "secret" | "api_doc";
-      ref_id: number;
+      type: "secret" | "api_doc" | "wiki_doc" | "wiki_collection";
+      ref_id?: number; // wiki items omit this (server defaults to 0)
+      ref_key?: string; // string UUID for wiki items
       selector?: { mode: string; op_keys?: string[]; tags?: string[] };
     }[];
   }) => api.post<import("./types").ShareBundleView>("/api/share-bundles/reissue", body),

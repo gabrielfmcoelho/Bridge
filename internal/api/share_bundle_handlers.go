@@ -77,8 +77,10 @@ func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "invalid bundle item type")
 	case errors.Is(err, vault.ErrSecretNotFound), errors.Is(err, vault.ErrBundleItemNotFound):
 		jsonError(w, http.StatusNotFound, "bundle item not found")
-	case errors.Is(err, vault.ErrSecretForbidden):
+	case errors.Is(err, vault.ErrSecretForbidden), errors.Is(err, vault.ErrBundleItemForbidden):
 		jsonError(w, http.StatusForbidden, "forbidden")
+	case errors.Is(err, vault.ErrBundleWikiUnavailable):
+		jsonError(w, http.StatusBadGateway, "wiki integration is not available")
 	default:
 		jsonServerError(w, r, "create share bundle", err)
 	}
@@ -103,6 +105,17 @@ func (h *bundleHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		bundles, err := h.repo.ListBundlesForItem(r.Context(), actor, itemType, refID)
+		if err != nil {
+			jsonServerError(w, r, "list share bundles", err)
+			return
+		}
+		jsonPaged(w, r, bundles)
+		return
+	}
+	// String-keyed sibling for wiki items, whose ref lives in ref_key (ref_id is
+	// 0). Same "links exposing this item" semantics as the ref_id branch above.
+	if rkey := r.URL.Query().Get("ref_key"); rkey != "" && itemType != "" {
+		bundles, err := h.repo.ListBundlesForItemKey(r.Context(), actor, itemType, rkey)
 		if err != nil {
 			jsonServerError(w, r, "list share bundles", err)
 			return
@@ -180,8 +193,10 @@ func (h *bundleHandlers) handleReissue(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "invalid bundle item type")
 	case errors.Is(err, vault.ErrSecretNotFound), errors.Is(err, vault.ErrBundleItemNotFound):
 		jsonError(w, http.StatusNotFound, "bundle item not found")
-	case errors.Is(err, vault.ErrSecretForbidden):
+	case errors.Is(err, vault.ErrSecretForbidden), errors.Is(err, vault.ErrBundleItemForbidden):
 		jsonError(w, http.StatusForbidden, "forbidden")
+	case errors.Is(err, vault.ErrBundleWikiUnavailable):
+		jsonError(w, http.StatusBadGateway, "wiki integration is not available")
 	default:
 		jsonServerError(w, r, "reissue share bundle", err)
 	}
@@ -223,6 +238,51 @@ func (h *bundleHandlers) handleRenew(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, "share bundle not found")
 	default:
 		jsonServerError(w, r, "renew share bundle", err)
+	}
+}
+
+type updateBundleItemsRequest struct {
+	Items []vault.BundleItemInput `json:"items"`
+}
+
+// handleUpdateItems replaces a bundle's item set in place (owner-only), keeping
+// the same token/URL. Lets an owner add/remove secrets, API docs, or wiki
+// content on an already-shared link without re-issuing it. Every new item is
+// re-validated for access; expiry/passphrase/view_count are preserved.
+func (h *bundleHandlers) handleUpdateItems(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFrom(r)
+	if !ok {
+		jsonError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	id, err := pathInt64(r, "id")
+	if err != nil {
+		jsonBadRequest(w, r, "invalid bundle id", err)
+		return
+	}
+	var req updateBundleItemsRequest
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+	view, err := h.repo.UpdateBundleItems(r.Context(), actor, id, req.Items)
+	switch {
+	case err == nil:
+		jsonOK(w, view)
+	case errors.Is(err, vault.ErrBundleNotFound):
+		jsonError(w, http.StatusNotFound, "share bundle not found")
+	case errors.Is(err, vault.ErrBundleEmpty):
+		jsonError(w, http.StatusBadRequest, "a share bundle must contain at least one item")
+	case errors.Is(err, vault.ErrBundleInvalidItem):
+		jsonError(w, http.StatusBadRequest, "invalid bundle item type")
+	case errors.Is(err, vault.ErrSecretNotFound), errors.Is(err, vault.ErrBundleItemNotFound):
+		jsonError(w, http.StatusNotFound, "bundle item not found")
+	case errors.Is(err, vault.ErrSecretForbidden), errors.Is(err, vault.ErrBundleItemForbidden):
+		jsonError(w, http.StatusForbidden, "forbidden")
+	case errors.Is(err, vault.ErrBundleWikiUnavailable):
+		jsonError(w, http.StatusBadGateway, "wiki integration is not available")
+	default:
+		jsonServerError(w, r, "update share bundle items", err)
 	}
 }
 

@@ -511,8 +511,9 @@ export interface ApiDocSelector {
 // --- Share bundles (Phase D–E) ---
 
 export interface ShareBundleItemView {
-  type: "secret" | "api_doc";
+  type: "secret" | "api_doc" | "wiki_doc" | "wiki_collection";
   ref_id: number;
+  ref_key?: string; // string UUID for wiki items (ref_id is 0)
   label: string;
   selector?: string; // raw JSON selector for api_doc items
 }
@@ -548,11 +549,40 @@ export interface BundleApiDocItem {
   spec: Record<string, unknown>;
 }
 
+// BundleWikiDoc is one resolved Outline document (raw markdown + nested child
+// tree for collections). Markdown is rendered through a sanitizing pipeline on
+// the public redeem page.
+export interface BundleWikiDoc {
+  id: string;
+  title: string;
+  emoji?: string;
+  markdown: string;
+  browse_url?: string;
+  updated_at?: string;
+  updated_by?: string;
+  children?: BundleWikiDoc[];
+}
+
+// BundleWikiItem is one resolved wiki bundle item: a single document
+// (kind "doc", one root in documents) or a whole collection (kind "collection",
+// the collection's document tree in documents). truncated is set when a large
+// collection's fan-out was capped.
+export interface BundleWikiItem {
+  kind: "doc" | "collection";
+  title: string;
+  collection_name?: string;
+  description?: string;
+  browse_url?: string;
+  documents: BundleWikiDoc[];
+  truncated?: boolean;
+}
+
 export interface BundlePayload {
   title: string;
   description?: string;
   secrets: BundleSecretItem[];
   api_docs: BundleApiDocItem[];
+  wiki: BundleWikiItem[];
 }
 
 // ShareBundleAccessEntry is one anonymous access-log row (network metadata only)

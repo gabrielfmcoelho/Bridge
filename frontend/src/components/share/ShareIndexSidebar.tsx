@@ -2,7 +2,7 @@
 
 import { operationsFromSpec, groupOperationsByTag } from "@/lib/atlas/openapi";
 import { useLocale } from "@/contexts/LocaleContext";
-import type { BundleApiDocItem, BundleSecretItem } from "@/lib/types";
+import type { BundleApiDocItem, BundleSecretItem, BundleWikiDoc, BundleWikiItem } from "@/lib/types";
 
 // ShareIndexSidebar is the unified endpoint index for the public reveal page: a
 // single sticky rail listing the bundle's secrets and, per API, its operations.
@@ -24,16 +24,44 @@ function scrollToAnchor(id: string) {
   if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+// WikiIndexNodes recursively lists a collection's document tree as scroll links
+// into the content column (each doc is anchored wiki-{section}-doc-{id}).
+function WikiIndexNodes({ docs, section }: { docs: BundleWikiDoc[]; section: number }) {
+  return (
+    <ul className="space-y-0.5">
+      {docs.map((doc) => (
+        <li key={doc.id}>
+          <button
+            type="button"
+            onClick={() => scrollToAnchor(`wiki-${section}-doc-${doc.id}`)}
+            className="w-full truncate text-left px-2 py-0.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)] cursor-pointer"
+          >
+            {doc.emoji ? `${doc.emoji} ` : ""}
+            {doc.title}
+          </button>
+          {doc.children && doc.children.length > 0 && (
+            <div className="pl-2 border-l border-[var(--border-subtle)] ml-2">
+              <WikiIndexNodes docs={doc.children} section={section} />
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function ShareIndexSidebar({
   secrets,
   apiDocs,
+  wiki = [],
 }: {
   secrets: BundleSecretItem[];
   apiDocs: BundleApiDocItem[];
+  wiki?: BundleWikiItem[];
 }) {
   const { t } = useLocale();
 
-  if (secrets.length === 0 && apiDocs.length === 0) return null;
+  if (secrets.length === 0 && apiDocs.length === 0 && wiki.length === 0) return null;
 
   return (
     <nav
@@ -112,6 +140,28 @@ export default function ShareIndexSidebar({
           </div>
         );
       })}
+
+      {wiki.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[11px] font-semibold text-[var(--text-secondary)] px-1 mb-1">
+            {t("share.wiki")}
+          </p>
+          {wiki.map((item, i) => (
+            <div key={`wiki-${i}`} className="mb-2 last:mb-0">
+              <button
+                type="button"
+                onClick={() => scrollToAnchor(`wiki-${i}`)}
+                className="w-full truncate text-left px-1 mb-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                {item.title}
+              </button>
+              {item.kind === "collection" && item.documents.length > 0 && (
+                <WikiIndexNodes docs={item.documents} section={i} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </nav>
   );
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/apicatalog"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	outlineclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/outline"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/secretshare"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
@@ -32,6 +33,11 @@ import (
 const (
 	BundleItemSecret = "secret"
 	BundleItemAPIDoc = "api_doc"
+	// BundleItemWikiDoc / BundleItemWikiCollection reference an Outline document
+	// or collection by its string UUID (carried in ref_key, not the BIGINT
+	// ref_id). Both resolve LIVE at redeem via the shared Outline client.
+	BundleItemWikiDoc        = "wiki_doc"
+	BundleItemWikiCollection = "wiki_collection"
 )
 
 var (
@@ -50,13 +56,22 @@ var (
 	ErrBundleTokenInUse = errors.New("share token already in use")
 	// ErrBundleTokenInvalid is returned by ReissueBundle for an empty token.
 	ErrBundleTokenInvalid = errors.New("share token is empty")
+	// ErrBundleItemForbidden is returned when the actor tries to bundle a wiki
+	// doc/collection outside the collections they may share (common + project).
+	ErrBundleItemForbidden = errors.New("share bundle item forbidden")
+	// ErrBundleWikiUnavailable is returned when a wiki item is requested but the
+	// Outline integration is disabled or unconfigured.
+	ErrBundleWikiUnavailable = errors.New("wiki integration unavailable")
 )
 
 // BundleItemInput is one requested item. Selector applies to api_doc only;
-// nil/empty means the whole spec.
+// nil/empty means the whole spec. RefKey carries the string UUID for wiki
+// items (wiki_doc / wiki_collection), whose Outline IDs don't fit the numeric
+// RefID; secret / api_doc items leave it empty and use RefID.
 type BundleItemInput struct {
 	Type     string               `json:"type"`
 	RefID    int64                `json:"ref_id"`
+	RefKey   string               `json:"ref_key,omitempty"`
 	Selector *apicatalog.Selector `json:"selector,omitempty"`
 }
 
@@ -89,6 +104,7 @@ type RenewBundleOpts struct {
 type BundleItemView struct {
 	Type     string  `json:"type"`
 	RefID    int64   `json:"ref_id"`
+	RefKey   string  `json:"ref_key,omitempty"` // string UUID for wiki items
 	Label    string  `json:"label"`
 	Selector *string `json:"selector,omitempty"` // raw JSON for api_doc
 }
@@ -125,11 +141,41 @@ type BundleAPIDocItem struct {
 	Spec        json.RawMessage `json:"spec"`
 }
 
+// BundleWikiDoc is one resolved Outline document — raw markdown plus a nested
+// child tree (populated only when it belongs to a shared collection). The
+// markdown is delivered raw; the frontend renders it through a sanitizing
+// pipeline (the redeem page is public/anonymous).
+type BundleWikiDoc struct {
+	ID        string          `json:"id"`
+	Title     string          `json:"title"`
+	Emoji     string          `json:"emoji,omitempty"`
+	Markdown  string          `json:"markdown"`
+	BrowseURL string          `json:"browse_url,omitempty"`
+	UpdatedAt time.Time       `json:"updated_at"`
+	UpdatedBy string          `json:"updated_by,omitempty"`
+	Children  []BundleWikiDoc `json:"children,omitempty"`
+}
+
+// BundleWikiItem is one resolved wiki bundle item: a single document (Kind
+// "doc", one root in Documents) or a whole collection (Kind "collection", the
+// collection's document tree in Documents). Truncated is set when a large
+// collection's fan-out was capped.
+type BundleWikiItem struct {
+	Kind           string          `json:"kind"` // "doc" | "collection"
+	Title          string          `json:"title"`
+	CollectionName string          `json:"collection_name,omitempty"`
+	Description    string          `json:"description,omitempty"` // collection description
+	BrowseURL      string          `json:"browse_url,omitempty"`
+	Documents      []BundleWikiDoc `json:"documents"`
+	Truncated      bool            `json:"truncated,omitempty"`
+}
+
 type BundlePayload struct {
 	Title       string             `json:"title"`
 	Description string             `json:"description"`
 	Secrets     []BundleSecretItem `json:"secrets"`
 	APIDocs     []BundleAPIDocItem `json:"api_docs"`
+	Wiki        []BundleWikiItem   `json:"wiki"`
 }
 
 // RedeemMeta carries the anonymous network metadata captured when a bundle is
@@ -194,50 +240,12 @@ func (r *SecretRepo) ReissueBundle(ctx context.Context, actor ActorContext, rawT
 // items it only checks existence (catalog browse is open to any authenticated
 // user). Shared by CreateBundle (random token) and ReissueBundle (supplied one).
 func (r *SecretRepo) buildBundle(ctx context.Context, actor ActorContext, hash []byte, items []BundleItemInput, opts CreateBundleOpts) (*BundleView, error) {
-	if len(items) == 0 {
-		return nil, ErrBundleEmpty
-	}
-	// Validate access for every item and capture owner-facing labels in one
-	// pass (the returned view echoes them back so the create UI can confirm
-	// what's in the link).
-	itemViews := make([]BundleItemView, 0, len(items))
-	for _, it := range items {
-		switch it.Type {
-		case BundleItemSecret:
-			// Any secret the actor can reveal may be bundled — personal
-			// (owner-only) and shared (viewer+) alike. decideAccess enforces
-			// the per-visibility rule.
-			v, err := r.loadView(ctx, it.RefID, false)
-			if err != nil {
-				return nil, err
-			}
-			dec := decideAccess(actor, v.Visibility, v.OwnerUserID)
-			if !dec.canSeeMetadata {
-				return nil, ErrSecretNotFound
-			}
-			if !dec.canReveal {
-				return nil, ErrSecretForbidden
-			}
-			itemViews = append(itemViews, BundleItemView{Type: it.Type, RefID: it.RefID, Label: v.Name})
-		case BundleItemAPIDoc:
-			a, err := store.NewAPICatalogRepo(r.db).Get(ctx, it.RefID)
-			if err != nil {
-				return nil, err
-			}
-			if a == nil {
-				return nil, ErrBundleItemNotFound
-			}
-			iv := BundleItemView{Type: it.Type, RefID: it.RefID, Label: a.Name}
-			if it.Selector != nil {
-				if b, err := json.Marshal(it.Selector); err == nil {
-					s := string(b)
-					iv.Selector = &s
-				}
-			}
-			itemViews = append(itemViews, iv)
-		default:
-			return nil, ErrBundleInvalidItem
-		}
+	// Validate access for every item and capture owner-facing labels (the view
+	// echoes them back so the create UI can confirm what's in the link). Shared
+	// with UpdateBundleItems; also enforces the non-empty rule.
+	itemViews, err := r.validateBundleItems(ctx, actor, items)
+	if err != nil {
+		return nil, err
 	}
 
 	// expiresArg is what we store (NULL when NoExpiry); expiresView is echoed
@@ -284,22 +292,8 @@ func (r *SecretRepo) buildBundle(ctx context.Context, actor ActorContext, hash [
 	if err != nil {
 		return nil, fmt.Errorf("insert share bundle: %w", err)
 	}
-	for i, it := range items {
-		var selector any
-		if it.Type == BundleItemAPIDoc && it.Selector != nil {
-			b, err := json.Marshal(it.Selector)
-			if err != nil {
-				return nil, err
-			}
-			selector = string(b)
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO share_bundle_items (bundle_id, item_type, ref_id, selector, sort_order)
-			 VALUES (?, ?, ?, ?, ?)`,
-			id, it.Type, it.RefID, selector, i,
-		); err != nil {
-			return nil, fmt.Errorf("insert bundle item: %w", err)
-		}
+	if err := insertBundleItems(ctx, tx, id, items); err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -321,6 +315,131 @@ func (r *SecretRepo) buildBundle(ctx context.Context, actor ActorContext, hash [
 		view.MaxViews = &mv
 	}
 	return view, nil
+}
+
+// validateBundleItems checks every requested item's access and returns the
+// owner-facing labels. Enforces the non-empty rule and per-type ACL (secrets:
+// revealable; api_doc: exists; wiki: inside a shareable collection). Shared by
+// buildBundle (create/reissue) and UpdateBundleItems (edit).
+func (r *SecretRepo) validateBundleItems(ctx context.Context, actor ActorContext, items []BundleItemInput) ([]BundleItemView, error) {
+	if len(items) == 0 {
+		return nil, ErrBundleEmpty
+	}
+	itemViews := make([]BundleItemView, 0, len(items))
+	for _, it := range items {
+		switch it.Type {
+		case BundleItemSecret:
+			// Any secret the actor can reveal may be bundled — personal
+			// (owner-only) and shared (viewer+) alike. decideAccess enforces
+			// the per-visibility rule.
+			v, err := r.loadView(ctx, it.RefID, false)
+			if err != nil {
+				return nil, err
+			}
+			dec := decideAccess(actor, v.Visibility, v.OwnerUserID)
+			if !dec.canSeeMetadata {
+				return nil, ErrSecretNotFound
+			}
+			if !dec.canReveal {
+				return nil, ErrSecretForbidden
+			}
+			itemViews = append(itemViews, BundleItemView{Type: it.Type, RefID: it.RefID, Label: v.Name})
+		case BundleItemAPIDoc:
+			a, err := store.NewAPICatalogRepo(r.db).Get(ctx, it.RefID)
+			if err != nil {
+				return nil, err
+			}
+			if a == nil {
+				return nil, ErrBundleItemNotFound
+			}
+			iv := BundleItemView{Type: it.Type, RefID: it.RefID, Label: a.Name}
+			if it.Selector != nil {
+				if b, err := json.Marshal(it.Selector); err == nil {
+					s := string(b)
+					iv.Selector = &s
+				}
+			}
+			itemViews = append(itemViews, iv)
+		case BundleItemWikiDoc, BundleItemWikiCollection:
+			// The actor may only bundle wiki content inside collections they can
+			// legitimately share (common + project-linked). authorizeWikiRef
+			// enforces that and returns the owner-facing label.
+			label, err := r.authorizeWikiRef(ctx, actor, it.Type, it.RefKey)
+			if err != nil {
+				return nil, err
+			}
+			itemViews = append(itemViews, BundleItemView{Type: it.Type, RefKey: it.RefKey, Label: label})
+		default:
+			return nil, ErrBundleInvalidItem
+		}
+	}
+	return itemViews, nil
+}
+
+// insertBundleItems writes the item rows for a bundle within an open tx (sort
+// order follows slice order). Shared by create and edit.
+func insertBundleItems(ctx context.Context, tx *sql.Tx, bundleID int64, items []BundleItemInput) error {
+	for i, it := range items {
+		var selector any
+		if it.Type == BundleItemAPIDoc && it.Selector != nil {
+			b, err := json.Marshal(it.Selector)
+			if err != nil {
+				return err
+			}
+			selector = string(b)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO share_bundle_items (bundle_id, item_type, ref_id, ref_key, selector, sort_order)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			bundleID, it.Type, it.RefID, it.RefKey, selector, i,
+		); err != nil {
+			return fmt.Errorf("insert bundle item: %w", err)
+		}
+	}
+	return nil
+}
+
+// UpdateBundleItems replaces the item set of an existing bundle WITHOUT changing
+// the token, so a previously-issued /share/{token} URL keeps working and now
+// exposes the new items (bundles resolve content live at redeem). Owner-only.
+// Every new item is re-validated for access exactly as at creation; the bundle's
+// expiry/passphrase/view_count/token are all preserved.
+func (r *SecretRepo) UpdateBundleItems(ctx context.Context, actor ActorContext, bundleID int64, items []BundleItemInput) (*BundleView, error) {
+	// Ownership check first — also yields ErrBundleNotFound for a foreign/missing
+	// bundle, so we never surface item errors for a bundle the actor doesn't own.
+	var owner int64
+	switch err := r.db.QueryRowContext(ctx,
+		`SELECT created_by FROM share_bundles WHERE id = ?`, bundleID).Scan(&owner); {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, ErrBundleNotFound
+	case err != nil:
+		return nil, err
+	}
+	if owner != actor.UserID {
+		return nil, ErrBundleNotFound
+	}
+
+	if _, err := r.validateBundleItems(ctx, actor, items); err != nil {
+		return nil, err
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM share_bundle_items WHERE bundle_id = ?`, bundleID); err != nil {
+		return nil, fmt.Errorf("clear bundle items: %w", err)
+	}
+	if err := insertBundleItems(ctx, tx, bundleID, items); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.getBundleView(ctx, actor, bundleID)
 }
 
 // RedeemBundle is the public path: token-gated, no actor. Walks the same gate
@@ -381,7 +500,15 @@ func (r *SecretRepo) RedeemBundle(ctx context.Context, token, passphrase string,
 		return nil, err
 	}
 
-	payload := &BundlePayload{Title: title, Description: description, Secrets: []BundleSecretItem{}, APIDocs: []BundleAPIDocItem{}}
+	payload := &BundlePayload{Title: title, Description: description, Secrets: []BundleSecretItem{}, APIDocs: []BundleAPIDocItem{}, Wiki: []BundleWikiItem{}}
+	// Wiki items resolve live against Outline. Build one client on the first
+	// wiki item (nil if the integration is down — those items then skip
+	// gracefully, like a deleted secret/api_doc).
+	var (
+		wikiClient   *outlineclient.Client
+		wikiSettings outlineclient.Settings
+		wikiInit     bool
+	)
 	for _, it := range items {
 		switch it.itemType {
 		case BundleItemSecret:
@@ -426,6 +553,21 @@ func (r *SecretRepo) RedeemBundle(ctx context.Context, token, passphrase string,
 				Name: a.Name, Title: a.Title, Version: a.VersionLabel,
 				ExternalURL: ext, Spec: json.RawMessage(filtered),
 			})
+		case BundleItemWikiDoc, BundleItemWikiCollection:
+			if !wikiInit {
+				wikiInit = true
+				if c, s, err := r.wikiClient(ctx); err == nil {
+					wikiClient, wikiSettings = c, s
+				}
+			}
+			if wikiClient == nil {
+				continue // outline unavailable — skip gracefully
+			}
+			wi, err := r.resolveWikiItem(ctx, it.itemType, it.refKey, wikiClient, wikiSettings)
+			if err != nil || wi == nil {
+				continue // deleted/missing/timeout — skip gracefully
+			}
+			payload.Wiki = append(payload.Wiki, *wi)
 		}
 	}
 
@@ -447,12 +589,13 @@ func (r *SecretRepo) RedeemBundle(ctx context.Context, token, passphrase string,
 type bundleItemRow struct {
 	itemType string
 	refID    int64
+	refKey   string
 	selector string
 }
 
 func (r *SecretRepo) loadBundleItems(ctx context.Context, bundleID int64) ([]bundleItemRow, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT item_type, ref_id, selector FROM share_bundle_items
+		`SELECT item_type, ref_id, ref_key, selector FROM share_bundle_items
 		  WHERE bundle_id = ? ORDER BY sort_order, id`, bundleID)
 	if err != nil {
 		return nil, err
@@ -461,9 +604,12 @@ func (r *SecretRepo) loadBundleItems(ctx context.Context, bundleID int64) ([]bun
 	var out []bundleItemRow
 	for rows.Next() {
 		var it bundleItemRow
-		var sel sql.NullString
-		if err := rows.Scan(&it.itemType, &it.refID, &sel); err != nil {
+		var refKey, sel sql.NullString
+		if err := rows.Scan(&it.itemType, &it.refID, &refKey, &sel); err != nil {
 			return nil, err
+		}
+		if refKey.Valid {
+			it.refKey = refKey.String
 		}
 		if sel.Valid {
 			it.selector = sel.String
@@ -569,6 +715,22 @@ func (r *SecretRepo) ListBundlesForItem(ctx context.Context, actor ActorContext,
 	return r.scanBundleViews(ctx, rows)
 }
 
+// ListBundlesForItemKey is the string-keyed sibling of ListBundlesForItem, for
+// wiki items whose Outline UUID lives in ref_key (ref_id is 0). Returns the
+// actor's own bundles that contain an item matching (itemType, refKey).
+func (r *SecretRepo) ListBundlesForItemKey(ctx context.Context, actor ActorContext, itemType, refKey string) ([]BundleView, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT DISTINCT `+bundleViewColumnsPrefixed(`b`)+`
+		   FROM share_bundles b
+		   JOIN share_bundle_items i ON i.bundle_id = b.id
+		  WHERE b.created_by = ? AND i.item_type = ? AND i.ref_key = ?
+		  ORDER BY b.created_at DESC`, actor.UserID, itemType, refKey)
+	if err != nil {
+		return nil, err
+	}
+	return r.scanBundleViews(ctx, rows)
+}
+
 // getBundleView reads a single owner-owned bundle as a BundleView, or
 // ErrBundleNotFound if it does not exist / belongs to someone else.
 func (r *SecretRepo) getBundleView(ctx context.Context, actor ActorContext, bundleID int64) (*BundleView, error) {
@@ -633,8 +795,15 @@ func (r *SecretRepo) RenewBundle(ctx context.Context, actor ActorContext, bundle
 
 func (r *SecretRepo) labelItems(ctx context.Context, items []bundleItemRow) []BundleItemView {
 	views := make([]BundleItemView, 0, len(items))
+	// Outline client is built lazily on the first wiki item and reused for the
+	// rest of this bundle's labels (nil if the integration is down — those items
+	// then fall back to their "(deleted)" label).
+	var (
+		wikiClient *outlineclient.Client
+		wikiInit   bool
+	)
 	for _, it := range items {
-		bv := BundleItemView{Type: it.itemType, RefID: it.refID, Label: "(deleted)"}
+		bv := BundleItemView{Type: it.itemType, RefID: it.refID, RefKey: it.refKey, Label: "(deleted)"}
 		switch it.itemType {
 		case BundleItemSecret:
 			if v, err := r.loadView(ctx, it.refID, false); err == nil {
@@ -647,6 +816,26 @@ func (r *SecretRepo) labelItems(ctx context.Context, items []bundleItemRow) []Bu
 			if it.selector != "" {
 				s := it.selector
 				bv.Selector = &s
+			}
+		case BundleItemWikiDoc, BundleItemWikiCollection:
+			if !wikiInit {
+				wikiInit = true
+				if c, _, err := r.wikiClient(ctx); err == nil {
+					wikiClient = c
+				}
+			}
+			if wikiClient != nil && it.refKey != "" {
+				lctx, cancel := context.WithTimeout(ctx, wikiAuthTimeout)
+				if it.itemType == BundleItemWikiDoc {
+					if d, err := wikiClient.DocumentInfo(lctx, it.refKey); err == nil {
+						bv.Label = d.Title
+					}
+				} else {
+					if c, err := wikiClient.CollectionInfo(lctx, it.refKey); err == nil {
+						bv.Label = c.Name
+					}
+				}
+				cancel()
 			}
 		}
 		views = append(views, bv)

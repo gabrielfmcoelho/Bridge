@@ -132,6 +132,6 @@ To run via Docker:
 # Build the Docker image (from the root of the workspace)
 docker build -f Dockerfile.frontend -t bridge-frontend .
 
-# Run the container
-docker run -p 3000:3000 -e API_URL=http://your-backend-api:8080 bridge-frontend
+# Run the container (container now listens on port 80)
+docker run -p 80:80 -e API_URL=http://your-backend-api:8080 bridge-frontend
 ```
