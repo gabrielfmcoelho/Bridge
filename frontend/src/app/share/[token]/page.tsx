@@ -35,6 +35,10 @@ type ViewState =
   | { kind: "gone" }
   | { kind: "error"; message: string };
 
+// The bundle content is organized into category tabs (Secrets / API / Wiki);
+// only categories with content get a tab.
+type BundleTab = "secrets" | "api" | "wiki";
+
 function withPass(path: string, passphrase?: string): string {
   const qs = passphrase ? `?passphrase=${encodeURIComponent(passphrase)}` : "";
   return `${API_BASE}${path}${qs}`;
@@ -371,6 +375,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
   const [passphrase, setPassphrase] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<BundleTab | null>(null);
 
   const attempt = useCallback(
     async (pass?: string) => {
@@ -406,6 +411,14 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
   // stays in the narrow centered card.
   if (state.kind === "bundle") {
     const b = state.payload;
+    // One tab per non-empty category; effectiveTab falls back to the first
+    // available so the view is never blank before the user clicks.
+    const tabs: { key: BundleTab; label: string; count: number }[] = [];
+    if (b.secrets.length) tabs.push({ key: "secrets", label: t("share.secrets"), count: b.secrets.length });
+    if (b.api_docs.length) tabs.push({ key: "api", label: t("share.apis"), count: b.api_docs.length });
+    if (b.wiki.length) tabs.push({ key: "wiki", label: t("share.wiki"), count: b.wiki.length });
+    const effectiveTab: BundleTab | null =
+      activeTab && tabs.some((x) => x.key === activeTab) ? activeTab : tabs[0]?.key ?? null;
     return (
       <main className="min-h-screen p-6 relative overflow-hidden bg-grid" style={{ background: "var(--bg-base)" }}>
         {/* Background decoration */}
@@ -483,54 +496,80 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
             <p className="text-xs text-[var(--text-muted)]">{b.description || t("share.bundleDesc")}</p>
           </div>
 
-          {(b.secrets.length > 0 || b.api_docs.length > 0 || b.wiki.length > 0) && (
-            <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-5 items-start">
-              {/* Index rail — collapses to the top on mobile. */}
-              <ShareIndexSidebar secrets={b.secrets} apiDocs={b.api_docs} wiki={b.wiki} />
+          {tabs.length > 0 && (
+            <div className="space-y-4">
+              {/* Category tabs — only shown when there's more than one to switch. */}
+              {tabs.length > 1 && (
+                <div className="flex gap-1 border-b border-[var(--border-subtle)]">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${
+                        effectiveTab === tab.key
+                          ? "border-[var(--accent)] text-[var(--accent)]"
+                          : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                      }`}
+                    >
+                      {tab.label}
+                      <span className="ml-1.5 text-[10px] opacity-60">{tab.count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
-              {/* Content column */}
-              <div className="min-w-0 space-y-5">
-                {b.secrets.length > 0 && (
-                  <div className="space-y-3">
-                    <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{t("share.secrets")}</h2>
-                    {b.secrets.map((s, i) => (
-                      <Card key={i} id={`secret-${i}`} className="scroll-mt-6">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-[var(--text-primary)]">
-                            {s.name} <span className="text-xs text-[var(--text-muted)]">({t("share.types." + s.type)})</span>
-                          </span>
-                        </div>
-                        <SecretPayloadViewer
-                          payload={s.payload}
-                          type={s.type}
-                          onCopy={handleCopy}
-                          copiedKeyPrefix={`s-${i}`}
-                          copiedKey={copied}
-                        />
-                      </Card>
-                    ))}
-                  </div>
-                )}
+              <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-5 items-start">
+                {/* Index rail — scoped to the active tab (with its own search). */}
+                <ShareIndexSidebar
+                  secrets={effectiveTab === "secrets" ? b.secrets : []}
+                  apiDocs={effectiveTab === "api" ? b.api_docs : []}
+                  wiki={effectiveTab === "wiki" ? b.wiki : []}
+                />
 
-                {b.api_docs.map((doc, i) => (
-                  <div key={i} id={`api-${i}`} className="space-y-2 scroll-mt-6">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{doc.name}</h2>
+                {/* Content column — only the active tab. */}
+                <div className="min-w-0 space-y-5">
+                  {effectiveTab === "secrets" && (
+                    <div className="space-y-3">
+                      {b.secrets.map((s, i) => (
+                        <Card key={i} id={`secret-${i}`} className="scroll-mt-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-[var(--text-primary)]">
+                              {s.name} <span className="text-xs text-[var(--text-muted)]">({t("share.types." + s.type)})</span>
+                            </span>
+                          </div>
+                          <SecretPayloadViewer
+                            payload={s.payload}
+                            type={s.type}
+                            onCopy={handleCopy}
+                            copiedKeyPrefix={`s-${i}`}
+                            copiedKey={copied}
+                          />
+                        </Card>
+                      ))}
                     </div>
-                    <Card className="p-0 overflow-hidden">
-                      <ApiReference content={doc.spec} showSidebar={false} hideTestRequest />
-                    </Card>
-                  </div>
-                ))}
+                  )}
 
-                {b.wiki.length > 0 && (
-                  <div className="space-y-5">
-                    <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{t("share.wiki")}</h2>
-                    {b.wiki.map((item, i) => (
-                      <ShareWikiSection key={i} item={item} index={i} />
+                  {effectiveTab === "api" &&
+                    b.api_docs.map((doc, i) => (
+                      <div key={i} id={`api-${i}`} className="space-y-2 scroll-mt-6">
+                        <div className="flex items-center gap-3">
+                          <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{doc.name}</h2>
+                        </div>
+                        <Card className="p-0 overflow-hidden">
+                          <ApiReference content={doc.spec} showSidebar={false} hideTestRequest />
+                        </Card>
+                      </div>
                     ))}
-                  </div>
-                )}
+
+                  {effectiveTab === "wiki" && (
+                    <div className="space-y-5">
+                      {b.wiki.map((item, i) => (
+                        <ShareWikiSection key={i} item={item} index={i} />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
