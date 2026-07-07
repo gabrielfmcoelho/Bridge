@@ -17,6 +17,9 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
 ENV PORT=80
+# Descaracterização eleitoral (runtime): run with -e DESCARACTERIZACAO_ELEITORAL=true
+# to strip the Piauí state logo from the public share page during election
+# blackout periods. Read per-request by app/share/layout.tsx — no rebuild needed.
 EXPOSE 80
 
 CMD ["node", "server.js"]

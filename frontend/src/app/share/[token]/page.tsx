@@ -364,6 +364,33 @@ function ThemeToggle() {
   );
 }
 
+// Shared background: accent glow (always) + Piauí state logo. The logo wrapper
+// carries `piaui-backdrop` so it can be stripped during an electoral blackout
+// (descaracterização eleitoral) via a CSS rule the server layout toggles —
+// see app/share/layout.tsx and the [data-descaracterizacao] rule in globals.css.
+// Rendered identically by both the bundle and single-secret views.
+function BackgroundDecoration() {
+  const { theme } = useTheme();
+  const { appColor } = useAppearance();
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-30"
+        style={{ background: `radial-gradient(circle, ${appColor || 'var(--accent)'}14 0%, transparent 70%)` }}
+      />
+      <div
+        className="piaui-backdrop absolute -right-36 -bottom-36 select-none pointer-events-none transition-opacity duration-300"
+        style={{
+          width: "700px",
+          height: "1000px",
+          opacity: theme === "light" ? 0.15 : 0.10
+        }}
+      >
+        <img src="/LOGO%20PIAU%C3%8D.svg" alt="" className="w-full h-full object-contain" />
+      </div>
+    </div>
+  );
+}
+
 export default function SharedSecretPage(props: { params: Promise<{ token: string }> }) {
   // Next 16: route params arrive as a Promise, unwrapped with React's use().
   const { token } = use(props.params);
@@ -422,21 +449,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
     return (
       <main className="min-h-screen p-6 relative overflow-hidden bg-grid" style={{ background: "var(--bg-base)" }}>
         {/* Background decoration */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-30"
-            style={{ background: `radial-gradient(circle, ${appColor || 'var(--accent)'}14 0%, transparent 70%)` }}
-          />
-          <div
-            className="absolute -right-36 -bottom-36 select-none pointer-events-none transition-opacity duration-300"
-            style={{
-              width: "700px",
-              height: "1000px",
-              opacity: theme === "light" ? 0.15 : 0.10
-            }}
-          >
-            <img src="/LOGO%20PIAU%C3%8D.svg" alt="" className="w-full h-full object-contain" />
-          </div>
-        </div>
+        <BackgroundDecoration />
 
         <div className="max-w-5xl mx-auto space-y-5 relative z-10">
           {/* Top branding bar */}
@@ -608,21 +621,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
   return (
     <main className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-grid" style={{ background: "var(--bg-base)" }}>
       {/* Background decoration */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-30"
-          style={{ background: `radial-gradient(circle, ${appColor || 'var(--accent)'}14 0%, transparent 70%)` }}
-        />
-        <div
-          className="absolute -right-36 -bottom-36 select-none pointer-events-none transition-opacity duration-300"
-          style={{
-            width: "700px",
-            height: "1000px",
-            opacity: theme === "light" ? 0.15 : 0.10
-          }}
-        >
-          <img src="/LOGO%20PIAU%C3%8D.svg" alt="" className="w-full h-full object-contain" />
-        </div>
-      </div>
+      <BackgroundDecoration />
 
       <div className="w-full max-w-md relative z-10">
         {/* Branding & Theme Toggle */}

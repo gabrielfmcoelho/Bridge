@@ -303,6 +303,13 @@ input[type="checkbox"]:hover {
   background-size: 40px 40px;
 }
 
+/* ─── Descaracterização eleitoral ───
+   Hide the Piauí state logo on the public share page when the server layout
+   flags the blackout (app/share/layout.tsx reads DESCARACTERIZACAO_ELEITORAL). */
+[data-descaracterizacao="true"] .piaui-backdrop {
+  display: none;
+}
+
 /* ─── Markdown preview ─── */
 .markdown-preview h1 { font-size: 1.25rem; font-weight: 700; margin: 0.75em 0 0.5em; color: var(--text-primary); }
 .markdown-preview h2 { font-size: 1.1rem; font-weight: 600; margin: 0.75em 0 0.5em; color: var(--text-primary); }
