@@ -1243,4 +1243,14 @@ var migrationsPostgres = []string{
 	ALTER TABLE share_bundle_items DROP CONSTRAINT IF EXISTS share_bundle_items_item_type_check;
 	ALTER TABLE share_bundle_items ADD CONSTRAINT share_bundle_items_item_type_check
 		CHECK (item_type IN ('secret','api_doc','wiki_doc','wiki_collection'));`,
+
+	// Version 80: reusable host credentials. host_remote_users gains a nullable
+	// secret_id FK so one shared 'avulso' password credential can be referenced
+	// by many (host, username) rows — the password analogue of ssh_key_id.
+	// ON DELETE SET NULL unlinks hosts when the library credential is removed
+	// rather than cascading. Existing rows default to NULL (per-host resolution).
+	`ALTER TABLE host_remote_users
+		ADD COLUMN IF NOT EXISTS secret_id BIGINT REFERENCES secrets(id) ON DELETE SET NULL;
+	CREATE INDEX IF NOT EXISTS idx_host_remote_users_secret
+		ON host_remote_users (secret_id) WHERE secret_id IS NOT NULL;`,
 }

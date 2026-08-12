@@ -159,3 +159,64 @@ func TestEnvList_FilterByGroupLabel(t *testing.T) {
 		t.Errorf("prod group: %v", out["prod"])
 	}
 }
+
+// ---------------------------------------------------------------------------
+// POST /api/secrets/env/bulk — multi-target (targets[] array)
+// ---------------------------------------------------------------------------
+
+func TestEnvBulk_TargetsArray_DualSync(t *testing.T) {
+	env := newSecretEnvEnv(t)
+
+	var projectID, svcInProject int64
+	if err := env.d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('dual-proj') RETURNING id`).Scan(&projectID); err != nil {
+		t.Fatalf("seed project: %v", err)
+	}
+	if err := env.d.SQL.QueryRow(`INSERT INTO services (nickname, project_id) VALUES ('dual-svc', ?) RETURNING id`, projectID).Scan(&svcInProject); err != nil {
+		t.Fatalf("seed service-in-project: %v", err)
+	}
+
+	body := fmt.Sprintf(`{
+		"targets":[
+			{"scope":"projeto","parent_id":%d},
+			{"scope":"service","parent_id":%d}
+		],
+		"group_label":"prod","visibility":"shared",
+		"vars":[
+			{"name":"DB_URL","value":"postgres://x"},
+			{"name":"API_KEY","value":"k-1"}
+		]
+	}`, projectID, svcInProject)
+	rec := env.do(env.bob, "POST", "/api/secrets/env/bulk", body)
+	if rec.Code != 200 {
+		t.Fatalf("got %d, want 200; body=%s", rec.Code, rec.Body)
+	}
+	out := decodeMap(t, rec)
+	// 2 vars x 2 targets.
+	if out["created"].(float64) != 4 {
+		t.Errorf("expected created=4, got %v", out)
+	}
+}
+
+func TestEnvBulk_TargetsArray_ServiceNotInProject_Rejected(t *testing.T) {
+	env := newSecretEnvEnv(t)
+
+	var projectID, otherProject, svcOther int64
+	_ = env.d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('p1') RETURNING id`).Scan(&projectID)
+	_ = env.d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('p2') RETURNING id`).Scan(&otherProject)
+	if err := env.d.SQL.QueryRow(`INSERT INTO services (nickname, project_id) VALUES ('svc-p2', ?) RETURNING id`, otherProject).Scan(&svcOther); err != nil {
+		t.Fatalf("seed svc: %v", err)
+	}
+
+	body := fmt.Sprintf(`{
+		"targets":[
+			{"scope":"projeto","parent_id":%d},
+			{"scope":"service","parent_id":%d}
+		],
+		"group_label":"prod","visibility":"shared",
+		"vars":[{"name":"DB_URL","value":"v"}]
+	}`, projectID, svcOther)
+	rec := env.do(env.bob, "POST", "/api/secrets/env/bulk", body)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("service outside project should be 400, got %d body=%s", rec.Code, rec.Body)
+	}
+}

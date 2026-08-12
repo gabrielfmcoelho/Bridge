@@ -10,14 +10,23 @@ import (
 )
 
 // envBulkRequest is the body of POST /api/secrets/env/bulk (Task 2.2).
-// All vars in a single request share the same scope/parent/group/visibility;
-// per-var fields are name + value + optional description.
+// All vars in a single request share the same group/visibility. A request may
+// fan out to several targets via `targets` (project AND service, etc.); the
+// legacy single `scope`/`parent_id` pair is still accepted and synthesised
+// into one target so older callers keep working.
 type envBulkRequest struct {
-	Scope      string            `json:"scope"`
+	Targets    []envTarget       `json:"targets,omitempty"` // preferred: multi-target
+	Scope      string            `json:"scope,omitempty"`   // legacy single-target
 	ParentID   *int64            `json:"parent_id,omitempty"`
 	Visibility string            `json:"visibility,omitempty"` // defaults to "shared"
 	GroupLabel string            `json:"group_label"`
 	Vars       []envBulkVarEntry `json:"vars"`
+}
+
+// envTarget is one (scope, parent) destination inside a bulk request.
+type envTarget struct {
+	Scope    string `json:"scope"`
+	ParentID *int64 `json:"parent_id,omitempty"`
 }
 
 type envBulkVarEntry struct {
@@ -50,10 +59,26 @@ func (h *secretHandlers) handleEnvBulk(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	res, err := h.repo.BulkUpsertEnvVars(
+	// Resolve targets: prefer the `targets` array; fall back to the legacy
+	// single scope/parent pair. The repo validates emptiness + invariants.
+	targets := make([]vault.EnvVarTarget, 0, len(req.Targets)+1)
+	if len(req.Targets) > 0 {
+		for _, tg := range req.Targets {
+			targets = append(targets, vault.EnvVarTarget{
+				Scope:    models.SecretScope(tg.Scope),
+				ParentID: tg.ParentID,
+			})
+		}
+	} else {
+		targets = append(targets, vault.EnvVarTarget{
+			Scope:    models.SecretScope(req.Scope),
+			ParentID: req.ParentID,
+		})
+	}
+
+	res, err := h.repo.BulkUpsertEnvVarsMulti(
 		r.Context(), actor,
-		models.SecretScope(req.Scope),
-		req.ParentID,
+		targets,
 		models.SecretVisibility(req.Visibility),
 		req.GroupLabel,
 		upserts,

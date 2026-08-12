@@ -18,6 +18,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import ShareLinkModal from "@/app/secrets/_components/ShareLinkModal";
 import HistoryDrawer from "@/app/secrets/_components/HistoryDrawer";
 import NewSecretModal from "@/app/secrets/_components/NewSecretModal";
+import LinkedHostsModal from "@/app/secrets/_components/LinkedHostsModal";
 import VaultEntryEditor from "@/components/vault/VaultEntryEditor";
 
 // The Vault page lives here (outside app/secrets/, which is write-protected)
@@ -50,6 +51,7 @@ function VaultPageInner() {
   const [shareTarget, setShareTarget] = useState<number | null>(null);
   const [historyTarget, setHistoryTarget] = useState<number | null>(null);
   const [editTarget, setEditTarget] = useState<Secret | null>(null);
+  const [manageHostsTarget, setManageHostsTarget] = useState<number | null>(null);
   const [newOpen, setNewOpen] = useState(false);
 
   const { data: rawSecrets = [], isLoading, refetch } = useQuery({
@@ -158,6 +160,7 @@ function VaultPageInner() {
                     onShare={() => setShareTarget(s.id)}
                     onHistory={() => setHistoryTarget(s.id)}
                     onEdit={() => setEditTarget(s)}
+                    onManageHosts={() => setManageHostsTarget(s.id)}
                     onDeleted={refetch}
                   />
                 ))}
@@ -170,6 +173,7 @@ function VaultPageInner() {
       <ShareLinkModal secretID={shareTarget} onClose={() => setShareTarget(null)} />
       <HistoryDrawer secretID={historyTarget} onClose={() => setHistoryTarget(null)} />
       <NewSecretModal open={newOpen} onClose={() => setNewOpen(false)} />
+      <LinkedHostsModal secretID={manageHostsTarget} onClose={() => setManageHostsTarget(null)} />
       <VaultEntryEditor secret={editTarget} onClose={() => setEditTarget(null)} />
     </PageShell>
   );
@@ -205,6 +209,7 @@ function SecretRow({
   onShare,
   onHistory,
   onEdit,
+  onManageHosts,
   onDeleted,
 }: {
   secret: Secret;
@@ -212,6 +217,7 @@ function SecretRow({
   onShare: () => void;
   onHistory: () => void;
   onEdit: () => void;
+  onManageHosts: () => void;
   onDeleted: () => void;
 }) {
   const { user } = useAuth();
@@ -272,6 +278,11 @@ function SecretRow({
           <Button size="sm" variant="secondary" onClick={onEdit}>
             Edit
           </Button>
+          {secret.type === "password" && secret.scope === "avulso" && (
+            <Button size="sm" variant="secondary" onClick={onManageHosts}>
+              Hosts
+            </Button>
+          )}
           {canShare && (
             <Button size="sm" variant="secondary" onClick={onShare}>
               Share

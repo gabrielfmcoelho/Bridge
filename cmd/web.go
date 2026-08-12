@@ -41,6 +41,18 @@ var webCmd = &cobra.Command{
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
+		// Env-gated one-shot: consolidate duplicate host passwords into shared
+		// credentials when MIGRATE_SHARED_HOST_PASSWORDS=1 (idempotent, safe to
+		// leave on). Runs after migrations so host_remote_users.secret_id exists.
+		if err := vault.RunSharedHostPasswordMigrationIfEnabled(ctx, db); err != nil {
+			return err
+		}
+		// Phase 2 (env-gated): soft-delete per-host password rows made redundant
+		// by consolidation. Safe only because resolution above is link-first.
+		if err := vault.RunSharedHostPasswordCleanupIfEnabled(ctx, db); err != nil {
+			return err
+		}
+
 		// Background: clean up expired share links every hour (Phase 3 Task 3.4).
 		// Stops when ctx is cancelled (shutdown signal).
 		vault.NewShareLinkJanitor(db.SQL).Start(ctx)

@@ -249,3 +249,100 @@ func TestBulkUpsertEnvVars_PersonalIsolatedPerOwner(t *testing.T) {
 		t.Errorf("expected 2 personal DB_URL rows (one per owner), got %d", n)
 	}
 }
+
+// --- Multi-target (Part B of the env_var UX spec) ---
+
+// seedProjectAndServices returns a project id, a service that belongs to it,
+// and a service that belongs to a DIFFERENT project — enough to exercise the
+// project<->service guard.
+func (f *envFixture) seedProjectAndServices(t *testing.T) (projectID, svcInProject, svcOtherProject int64) {
+	t.Helper()
+	if err := f.d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('proj-a') RETURNING id`).Scan(&projectID); err != nil {
+		t.Fatalf("seed project: %v", err)
+	}
+	var otherProject int64
+	if err := f.d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('proj-b') RETURNING id`).Scan(&otherProject); err != nil {
+		t.Fatalf("seed other project: %v", err)
+	}
+	if err := f.d.SQL.QueryRow(`INSERT INTO services (nickname, project_id) VALUES ('svc-a', ?) RETURNING id`, projectID).Scan(&svcInProject); err != nil {
+		t.Fatalf("seed svc-a: %v", err)
+	}
+	if err := f.d.SQL.QueryRow(`INSERT INTO services (nickname, project_id) VALUES ('svc-b', ?) RETURNING id`, otherProject).Scan(&svcOtherProject); err != nil {
+		t.Fatalf("seed svc-b: %v", err)
+	}
+	return projectID, svcInProject, svcOtherProject
+}
+
+func TestBulkUpsertEnvVarsMulti_TwoTargets_OneTx(t *testing.T) {
+	f := newEnvFixture(t)
+	ctx := context.Background()
+	projectID, svcInProject, _ := f.seedProjectAndServices(t)
+
+	res, err := f.repo.BulkUpsertEnvVarsMulti(ctx, f.bob,
+		[]vault.EnvVarTarget{
+			{Scope: models.SecretScopeProjeto, ParentID: &projectID},
+			{Scope: models.SecretScopeService, ParentID: &svcInProject},
+		},
+		models.SecretVisibilityShared, "prod",
+		[]vault.EnvVarUpsert{
+			{Name: "DB_URL", Value: "postgres://x"},
+			{Name: "API_KEY", Value: "k-1"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("multi bulk: %v", err)
+	}
+	// 2 vars written to each of 2 targets = 4 creates.
+	if res.Created != 4 || res.Updated != 0 {
+		t.Errorf("got %+v, want {Created:4 Updated:0}", res)
+	}
+
+	var projRows, svcRows int
+	_ = f.d.SQL.QueryRow(`SELECT COUNT(*) FROM secrets WHERE scope='projeto' AND parent_id=? AND group_label='prod'`, projectID).Scan(&projRows)
+	_ = f.d.SQL.QueryRow(`SELECT COUNT(*) FROM secrets WHERE scope='service' AND parent_id=? AND group_label='prod'`, svcInProject).Scan(&svcRows)
+	if projRows != 2 || svcRows != 2 {
+		t.Errorf("expected 2 rows per target, got proj=%d svc=%d", projRows, svcRows)
+	}
+}
+
+func TestBulkUpsertEnvVarsMulti_ServiceNotInProject_Rejected(t *testing.T) {
+	f := newEnvFixture(t)
+	ctx := context.Background()
+	projectID, _, svcOtherProject := f.seedProjectAndServices(t)
+
+	_, err := f.repo.BulkUpsertEnvVarsMulti(ctx, f.bob,
+		[]vault.EnvVarTarget{
+			{Scope: models.SecretScopeProjeto, ParentID: &projectID},
+			{Scope: models.SecretScopeService, ParentID: &svcOtherProject}, // wrong project
+		},
+		models.SecretVisibilityShared, "prod",
+		[]vault.EnvVarUpsert{{Name: "DB_URL", Value: "v"}},
+	)
+	if err == nil {
+		t.Fatal("expected rejection when service does not belong to the project")
+	}
+
+	// Atomic: nothing landed for either target.
+	var n int
+	_ = f.d.SQL.QueryRow(`SELECT COUNT(*) FROM secrets WHERE group_label='prod'`).Scan(&n)
+	if n != 0 {
+		t.Errorf("expected 0 rows after guard rejection, got %d", n)
+	}
+}
+
+func TestBulkUpsertEnvVarsMulti_DuplicateTarget_Rejected(t *testing.T) {
+	f := newEnvFixture(t)
+	ctx := context.Background()
+
+	_, err := f.repo.BulkUpsertEnvVarsMulti(ctx, f.bob,
+		[]vault.EnvVarTarget{
+			{Scope: models.SecretScopeService, ParentID: &f.serviceID},
+			{Scope: models.SecretScopeService, ParentID: &f.serviceID}, // same target twice
+		},
+		models.SecretVisibilityShared, "prod",
+		[]vault.EnvVarUpsert{{Name: "DB_URL", Value: "v"}},
+	)
+	if err == nil {
+		t.Fatal("expected rejection for duplicate (scope,parent) target")
+	}
+}

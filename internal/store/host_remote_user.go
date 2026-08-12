@@ -67,3 +67,44 @@ func (r *HostRemoteUserRepo) Delete(ctx context.Context, hostID int64, username 
 	_, err := r.db.ExecContext(ctx, `DELETE FROM host_remote_users WHERE host_id = ? AND username = ?`, hostID, username)
 	return err
 }
+
+// SetSecret links the (host, username) row to a shared password credential
+// (secretID non-nil) or unlinks it (secretID nil → per-host resolution).
+// Upserts so a host with no prior remote-user row still gets the link. The
+// row's ssh_key_id is preserved on update — a host can carry both a shared key
+// and a shared password.
+func (r *HostRemoteUserRepo) SetSecret(ctx context.Context, hostID int64, username string, secretID *int64) error {
+	var secretArg any
+	if secretID != nil {
+		secretArg = *secretID
+	}
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO host_remote_users (host_id, username, secret_id, created_at, updated_at)
+			VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			ON CONFLICT(host_id, username) DO UPDATE SET
+				secret_id = excluded.secret_id,
+				updated_at = CURRENT_TIMESTAMP`,
+		hostID, username, secretArg,
+	)
+	return err
+}
+
+// ListHostsBySecret returns the host ids currently linked to the given shared
+// credential (secret_id), for the credentials-library "used by" view.
+func (r *HostRemoteUserRepo) ListHostsBySecret(ctx context.Context, secretID int64) ([]int64, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT host_id FROM host_remote_users WHERE secret_id = ? ORDER BY host_id`, secretID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}

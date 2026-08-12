@@ -830,7 +830,10 @@ export const secretsAPI = {
   history: (id: number) => api.get<{ id: number; secret_id: number; action: string; actor_user_id?: number; at: string; metadata?: unknown }[]>(`/api/secrets/${id}/history`),
   // Env-var bundle endpoints (Phase 2 — Tasks 2.2/2.3).
   envBulk: (data: {
-    scope: string;
+    // Preferred: fan out one var-set to several targets (project AND service,
+    // etc.) in a single transaction. Legacy single scope/parent_id still works.
+    targets?: { scope: string; parent_id?: number }[];
+    scope?: string;
     parent_id?: number;
     visibility?: string;
     group_label: string;
@@ -844,6 +847,14 @@ export const secretsAPI = {
     const qs = q.toString();
     return api.get<Record<string, import("./types").Secret[]>>(`/api/secrets/env${qs ? `?${qs}` : ""}`);
   },
+  // Shared-credential host links: reuse one avulso password credential across
+  // N hosts (host_remote_users.secret_id). Only valid for avulso password secrets.
+  listLinkedHosts: (secretID: number) =>
+    api.get<{ host_ids: number[] }>(`/api/secrets/${secretID}/hosts`),
+  linkHosts: (secretID: number, hostIDs: number[]) =>
+    api.post<{ linked: number }>(`/api/secrets/${secretID}/hosts`, { host_ids: hostIDs }),
+  unlinkHost: (secretID: number, hostID: number) =>
+    api.delete(`/api/secrets/${secretID}/hosts/${hostID}`),
   // Single-secret public sharing. R3 retired the dedicated secret_share_links
   // table — a single-secret share is now a one-item share bundle, so these
   // delegate to /api/share-bundles (the redeem page already handles bundle

@@ -70,6 +70,11 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	secretRepo := deps.Secrets
 	secretH := &secretHandlers{db: db, repo: secretRepo}
 	secretH.register(mux, func(next http.Handler) http.Handler { return authenticated(db, next) })
+	// Shared-credential host links: reuse one avulso password credential across
+	// N hosts via host_remote_users.secret_id (secret_host_link_handlers.go).
+	mux.Handle("GET /api/secrets/{id}/hosts", authenticated(db, http.HandlerFunc(secretH.handleListLinkedHosts)))
+	mux.Handle("POST /api/secrets/{id}/hosts", authenticated(db, http.HandlerFunc(secretH.handleLinkHosts)))
+	mux.Handle("DELETE /api/secrets/{id}/hosts/{host_id}", authenticated(db, http.HandlerFunc(secretH.handleUnlinkHost)))
 
 	// (Per-secret /api/share/{token} retired in R3 — single-secret shares are
 	// now bundles; redemption is GET /api/share-bundle/{token} below.)

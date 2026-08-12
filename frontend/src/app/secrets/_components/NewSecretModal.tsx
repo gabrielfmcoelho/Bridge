@@ -8,6 +8,9 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
+import TabBar from "@/components/ui/TabBar";
+import { parseDotenv } from "@/lib/parseDotenv";
+import { buildEnvTargets } from "@/lib/envTargets";
 
 interface NewSecretModalProps {
   open: boolean;
@@ -88,6 +91,19 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
   // env_var: bulk rows + the shared group_label.
   const [groupLabel, setGroupLabel] = useState("");
   const [envVars, setEnvVars] = useState<EnvVarRow[]>([{ name: "", value: "", description: "" }]);
+  // env_var input mode: "rows" = per-var table; "paste" = a .env blob parsed
+  // into rows before saving. Both feed the same envVars array.
+  const [envInputMode, setEnvInputMode] = useState<"rows" | "paste">("rows");
+  const [pasteText, setPasteText] = useState("");
+  const [pasteHint, setPasteHint] = useState("");
+  // env_var multi-target: when scope=projeto, optionally also sync the same
+  // bundle to one or more of that project's services (one atomic write).
+  const [alsoSyncServices, setAlsoSyncServices] = useState(false);
+  const [syncServiceIDs, setSyncServiceIDs] = useState<number[]>([]);
+  // password + scope=avulso: optionally link this new shared credential to
+  // hosts in one step (create the credential, then reuse it across N hosts).
+  const [linkHostIDs, setLinkHostIDs] = useState<number[]>([]);
+  const [hostSearch, setHostSearch] = useState("");
 
   // Parent list: fetch only when scope needs one. Each useQuery has
   // enabled: scope === ... so we don't hit /api/hosts when the user is
@@ -95,12 +111,17 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
   const services = useQuery({
     queryKey: ["services-list"],
     queryFn: servicesAPI.list,
-    enabled: open && scope === "service",
+    enabled:
+      open &&
+      (scope === "service" ||
+        (type === "env_var" && scope === "projeto" && alsoSyncServices)),
   });
   const hosts = useQuery({
     queryKey: ["hosts-list"],
     queryFn: () => hostsAPI.list(),
-    enabled: open && scope === "host",
+    enabled:
+      open &&
+      (scope === "host" || (type === "password" && scope === "avulso")),
   });
   const tools = useQuery({
     queryKey: ["tools-list"],
@@ -135,6 +156,14 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
     }
   }, [scope, services.data, hosts.data, tools.data, projects.data]);
 
+  // Services belonging to the selected project (parentID when scope=projeto).
+  // The checklist below only offers these, so an out-of-project service is
+  // unrepresentable — the backend guardServiceInProject stays the safety net.
+  const projectServices = useMemo(
+    () => (services.data ?? []).filter((s) => s.project_id === Number(parentID)),
+    [services.data, parentID],
+  );
+
   const reset = () => {
     setType("password");
     setScope("avulso");
@@ -155,6 +184,13 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
     setAppNotes("");
     setGroupLabel("");
     setEnvVars([{ name: "", value: "", description: "" }]);
+    setEnvInputMode("rows");
+    setPasteText("");
+    setPasteHint("");
+    setAlsoSyncServices(false);
+    setSyncServiceIDs([]);
+    setLinkHostIDs([]);
+    setHostSearch("");
   };
 
   const buildPayload = (): string => {
@@ -201,6 +237,9 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
       if (!groupLabel || !/^[a-z][a-z0-9-]*$/.test(groupLabel)) {
         return "Group label must match ^[a-z][a-z0-9-]*$ (lowercase only).";
       }
+      if (scope === "projeto" && alsoSyncServices && syncServiceIDs.length === 0) {
+        return "Select at least one service, or uncheck 'also sync to services'.";
+      }
       const filled = envVars.filter((v) => v.name.trim() || v.value);
       if (filled.length === 0) return "Add at least one env var.";
       const seen = new Set<string>();
@@ -246,13 +285,25 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
         const vars = envVars
           .filter((v) => v.name.trim() && v.value)
           .map((v) => ({ name: v.name, value: v.value, description: v.description || undefined }));
-        return secretsAPI.envBulk({
-          scope,
-          parent_id: parsedParent,
+        const payload: Parameters<typeof secretsAPI.envBulk>[0] = {
           visibility,
           group_label: groupLabel.trim(),
           vars,
-        });
+        };
+        // Project + services → multi-target (one atomic write to all). Any
+        // other case keeps the legacy single scope/parent path.
+        if (
+          scope === "projeto" &&
+          alsoSyncServices &&
+          syncServiceIDs.length > 0 &&
+          parsedParent != null
+        ) {
+          payload.targets = buildEnvTargets(parsedParent, syncServiceIDs);
+        } else {
+          payload.scope = scope;
+          payload.parent_id = parsedParent;
+        }
+        return secretsAPI.envBulk(payload);
       }
 
       const body: Parameters<typeof secretsAPI.create>[0] = {
@@ -266,7 +317,12 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
       if (parsedParent != null) {
         body.parent_id = parsedParent;
       }
-      return secretsAPI.create(body);
+      const created = await secretsAPI.create(body);
+      // One-step: link the newly-created shared credential to the chosen hosts.
+      if (type === "password" && scope === "avulso" && linkHostIDs.length > 0) {
+        await secretsAPI.linkHosts(created.id, linkHostIDs);
+      }
+      return created;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["secrets-all"] });
@@ -293,6 +349,23 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
       return;
     }
     setEnvVars(envVars.filter((_, i) => i !== idx));
+  };
+
+  // Parse the pasted .env blob into rows. Appends to any real rows already
+  // typed (dropping a single blank starter row), then switches to the Rows
+  // tab so the user reviews before saving. Parsed rows inherit the same
+  // name/value/dup validation as hand-typed ones — no second code path.
+  const parsePasteIntoRows = () => {
+    const parsed = parseDotenv(pasteText);
+    if (parsed.length === 0) {
+      setPasteHint("No KEY=value lines found.");
+      return;
+    }
+    const existing = envVars.filter((v) => v.name.trim() || v.value);
+    setEnvVars([...existing, ...parsed]);
+    setPasteText("");
+    setPasteHint("");
+    setEnvInputMode("rows");
   };
 
   return (
@@ -352,7 +425,11 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
               <FormRow label={`Parent ${scope}`} required hint="Pick from the list of existing rows.">
                 <Select
                   value={parentID}
-                  onChange={(e) => setParentID(e.target.value)}
+                  onChange={(e) => {
+                    setParentID(e.target.value);
+                    // Different project → its service list changes; drop stale picks.
+                    setSyncServiceIDs([]);
+                  }}
                   options={parentOptions}
                 />
               </FormRow>
@@ -362,6 +439,54 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
               (scope === "projeto" && projects.isLoading) ? (
                 <p className="text-[10px] text-[var(--text-faint)] mt-1">Loading {scope}s…</p>
               ) : null}
+
+              {/* env_var only: sync the same bundle to services of this project. */}
+              {type === "env_var" && scope === "projeto" && parentID && (
+                <div className="mt-3">
+                  <label className="flex items-center gap-2 text-xs text-[var(--text-muted)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={alsoSyncServices}
+                      onChange={(e) => {
+                        setAlsoSyncServices(e.target.checked);
+                        if (!e.target.checked) setSyncServiceIDs([]);
+                      }}
+                    />
+                    Also sync to services of this project
+                  </label>
+                  {alsoSyncServices && (
+                    <div className="mt-2 space-y-1 pl-6">
+                      {services.isLoading ? (
+                        <p className="text-[10px] text-[var(--text-faint)]">Loading services…</p>
+                      ) : projectServices.length === 0 ? (
+                        <p className="text-[10px] text-[var(--text-faint)]">
+                          This project has no services.
+                        </p>
+                      ) : (
+                        projectServices.map((s) => (
+                          <label
+                            key={s.id}
+                            className="flex items-center gap-2 text-xs text-[var(--text-primary)] cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={syncServiceIDs.includes(s.id)}
+                              onChange={(e) =>
+                                setSyncServiceIDs((prev) =>
+                                  e.target.checked
+                                    ? [...prev, s.id]
+                                    : prev.filter((id) => id !== s.id),
+                                )
+                              }
+                            />
+                            {s.nickname}
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -385,14 +510,69 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
           </h3>
 
           {type === "password" && (
-            <FormRow label="Value" required>
-              <Input
-                type="password"
-                value={valueField}
-                onChange={(e) => setValueField(e.target.value)}
-                autoComplete="new-password"
-              />
-            </FormRow>
+            <div className="space-y-3">
+              <FormRow label="Value" required>
+                <Input
+                  type="password"
+                  value={valueField}
+                  onChange={(e) => setValueField(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </FormRow>
+              {scope === "avulso" && (
+                <div>
+                  <label className="text-xs font-medium text-[var(--text-muted)] block mb-1">
+                    Link to hosts{" "}
+                    <span className="text-[var(--text-faint)]">
+                      (optional — reuse this one credential across hosts)
+                    </span>
+                  </label>
+                  <Input
+                    value={hostSearch}
+                    onChange={(e) => setHostSearch(e.target.value)}
+                    placeholder="Search hosts…"
+                  />
+                  <div className="mt-2 max-h-40 overflow-y-auto space-y-1 pr-1">
+                    {hosts.isLoading ? (
+                      <p className="text-[10px] text-[var(--text-faint)]">Loading hosts…</p>
+                    ) : (
+                      (hosts.data ?? [])
+                        .filter(
+                          (h) =>
+                            hostSearch === "" ||
+                            h.nickname.toLowerCase().includes(hostSearch.toLowerCase()),
+                        )
+                        .map((h) => (
+                          <label
+                            key={h.id}
+                            className="flex items-center gap-2 text-xs text-[var(--text-primary)] cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={linkHostIDs.includes(h.id)}
+                              onChange={(e) =>
+                                setLinkHostIDs((prev) =>
+                                  e.target.checked
+                                    ? [...prev, h.id]
+                                    : prev.filter((id) => id !== h.id),
+                                )
+                              }
+                            />
+                            {h.nickname}{" "}
+                            <span className="text-[var(--text-faint)]">({h.user})</span>
+                          </label>
+                        ))
+                    )}
+                  </div>
+                  {linkHostIDs.length > 0 && (
+                    <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                      {linkHostIDs.length} host{linkHostIDs.length === 1 ? "" : "s"} will use
+                      this credential.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {type === "cred" && (
@@ -479,6 +659,41 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
                 />
               </FormRow>
 
+              <TabBar
+                tabs={[
+                  { key: "rows", label: "Rows" },
+                  { key: "paste", label: "Paste .env" },
+                ]}
+                activeTab={envInputMode}
+                onChange={(k) => {
+                  setEnvInputMode(k as "rows" | "paste");
+                  setPasteHint("");
+                }}
+              />
+
+              {envInputMode === "paste" && (
+                <div className="space-y-2">
+                  <textarea
+                    value={pasteText}
+                    onChange={(e) => setPasteText(e.target.value)}
+                    rows={8}
+                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2 text-xs font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
+                    placeholder={'KEY=xxxxx #comment\nKEY2=yyyyy #comment2\nDB_URL="postgres://…"'}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button type="button" size="sm" variant="secondary" onClick={parsePasteIntoRows}>
+                      Parse → rows
+                    </Button>
+                    <p className="text-[10px] text-[var(--text-faint)]">
+                      One KEY=value per line; added to the Rows tab to review before saving.
+                    </p>
+                  </div>
+                  {pasteHint && <p className="text-[10px] text-red-400">{pasteHint}</p>}
+                </div>
+              )}
+
+              {envInputMode === "rows" && (
+                <>
               <div className="space-y-2">
                 <div className="grid grid-cols-12 gap-2 text-[10px] font-medium text-[var(--text-faint)] uppercase tracking-wider">
                   <span className="col-span-4">Name</span>
@@ -532,6 +747,8 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
                   All vars commit in one transaction — partial failure rolls back the whole batch.
                 </p>
               </div>
+                </>
+              )}
             </div>
           )}
         </Card>

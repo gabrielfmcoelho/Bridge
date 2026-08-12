@@ -48,12 +48,49 @@ type HostSSHKey struct {
 // SSH automation (not a user-facing reveal). Use SecretRepo.Reveal for
 // audit-logged reveals via the HTTP surface.
 func HostGetPassword(ctx context.Context, db *database.DB, hostID int64) (string, bool, error) {
+	// Link-first: a host whose login user (hosts.ssh_user) references a shared
+	// credential via host_remote_users.secret_id resolves the password from that
+	// one row. Falls through to the per-host secret when there's no live link.
+	if val, ok, err := resolveLinkedHostPassword(ctx, db, hostID); err != nil || ok {
+		return val, ok, err
+	}
 	return decryptHostSecret(ctx, db, hostID, models.SecretTypePassword, hostPasswordName, func(plain string) (string, error) {
 		// Password payload format is the raw plaintext (legacy migrated
 		// rows from migrate_legacy don't JSON-wrap). New rows written by
 		// HostSetPassword follow the same shape so this stays a one-liner.
 		return plain, nil
 	})
+}
+
+// resolveLinkedHostPassword returns the password from a shared credential that
+// the host's login user references via host_remote_users.secret_id. Returns
+// ok=false (caller falls through to the per-host secret) when there is no link,
+// the link carries no secret_id, or the referenced credential is soft-deleted.
+// The join on hosts.ssh_user = host_remote_users.username scopes resolution to
+// the login user's row, not other remote users (e.g. 'coolify') on the host.
+func resolveLinkedHostPassword(ctx context.Context, db *database.DB, hostID int64) (string, bool, error) {
+	var ct, nonce []byte
+	err := db.SQL.QueryRowContext(ctx,
+		`SELECT s.payload_ciphertext, s.payload_nonce
+		   FROM host_remote_users hru
+		   JOIN hosts h ON h.id = hru.host_id AND h.ssh_user = hru.username
+		   JOIN secrets s ON s.id = hru.secret_id
+		  WHERE hru.host_id = ? AND hru.secret_id IS NOT NULL
+		    AND s.type = ? AND s.deleted_at IS NULL
+		  LIMIT 1`,
+		hostID, string(models.SecretTypePassword),
+	).Scan(&ct, &nonce)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("host %d linked password lookup: %w", hostID, err)
+	}
+	plain, err := db.Encryptor.Decrypt(ct, nonce)
+	if err != nil {
+		return "", false, fmt.Errorf("host %d linked password decrypt: %w", hostID, err)
+	}
+	return plain, true, nil
 }
 
 // HostGetSSHKey returns the host's stored SSH key triple. ok=false when
@@ -77,8 +114,23 @@ func HostGetSSHKey(ctx context.Context, db *database.DB, hostID int64) (key Host
 // "remove the password" without dropping the host. actorUserID is the
 // user performing the write — used for the audit row.
 func HostSetPassword(ctx context.Context, db *database.DB, hostID, actorUserID int64, plaintext string) error {
-	return upsertHostSecret(ctx, db, hostID, actorUserID,
-		models.SecretTypePassword, hostPasswordName, plaintext)
+	if err := upsertHostSecret(ctx, db, hostID, actorUserID,
+		models.SecretTypePassword, hostPasswordName, plaintext); err != nil {
+		return err
+	}
+	// Break sharing: a per-host write (or clear) is authoritative for this host,
+	// so drop any shared-credential link on the login user — otherwise
+	// resolveLinkedHostPassword would keep returning the shared value instead of
+	// what was just set. ponytail: not in the same tx as the secret write — a
+	// failed clear leaves a stale link the next set retries; the per-host row is
+	// already correct, so the blast radius is "reads the old shared value once".
+	_, err := db.SQL.ExecContext(ctx,
+		`UPDATE host_remote_users
+		    SET secret_id = NULL, updated_at = CURRENT_TIMESTAMP
+		  WHERE host_id = ? AND secret_id IS NOT NULL
+		    AND username = (SELECT ssh_user FROM hosts WHERE id = ?)`,
+		hostID, hostID)
+	return err
 }
 
 // HostSetSSHKey upserts the JSON {username, private_key_pem, public_key}
