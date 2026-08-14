@@ -98,6 +98,13 @@ type VMInfo struct {
 	SwapTotal      string   `json:"swap_total"`
 	SwapUsed       string   `json:"swap_used"`
 	ParsedContainers  []ContainerInfo    `json:"parsed_containers,omitempty"`
+	// ContainersKnown reports that `docker ps` actually answered — false when
+	// docker was unreadable (no passwordless sudo, dead daemon, timeout), where
+	// an empty ParsedContainers means "we couldn't look", not "nothing runs
+	// here". Service reconciliation needs the distinction before it marks
+	// container services offline. Docker simply not being installed counts as
+	// known-empty.
+	ContainersKnown   bool               `json:"containers_known"`
 	Warnings          []string           `json:"warnings,omitempty"`
 	ProcessDetails    []ProcessDetail    `json:"process_details,omitempty"`
 	SSHKeys           []SSHKeyInfo       `json:"ssh_keys,omitempty"`
@@ -280,6 +287,15 @@ type DiscoveredService struct {
 	ContainerID    string   `json:"container_id,omitempty"`
 	ContainerImage string   `json:"container_image,omitempty"`
 	Sources        []string `json:"sources,omitempty"` // ["systemd","process","package","port","container"]
+	// HostRunning reports a live instance running on the host itself — an
+	// active systemd unit, a process outside every container cgroup, or a
+	// listener no container published. A host with both a native postgres and
+	// a postgres container reports HostRunning plus a ContainerID; a
+	// container-only host reports the ContainerID alone.
+	HostRunning bool `json:"host_running,omitempty"`
+	// HostPorts is the subset of Ports owned by the host instance (Ports also
+	// carries the ports a container published, which the UI still shows).
+	HostPorts []int `json:"host_ports,omitempty"`
 }
 
 // Agent represents a detected management/monitoring/security agent on the
@@ -1254,11 +1270,15 @@ func captureDocker(client *ssh.Client, cmd, sudoCmd string, warnings map[string]
 			return strings.TrimSpace(cleanCommandOutput(sudoOut, nil))
 		}
 		warnings["docker_permission_denied"] = true
+		warnings["docker_unreadable"] = true
 		return ""
 	}
 
-	// Command failed for other reasons (daemon stopped, etc.) — skip silently
+	// Command failed for other reasons (daemon stopped, timeout, …) — skip
+	// silently, but flag the container list as unknown rather than empty:
+	// service reconciliation must not take "" as "every container is gone".
 	if execErr != nil {
+		warnings["docker_unreadable"] = true
 		return ""
 	}
 
@@ -1936,15 +1956,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	}
 
 	// Build a map of docker host port → container for fast lookup.
-	dockerHostPorts := map[int]*ContainerInfo{}
-	for i := range info.ParsedContainers {
-		c := &info.ParsedContainers[i]
-		for _, pair := range parseDockerPortBindings(c.Ports) {
-			for p := pair.hostStart; p <= pair.hostEnd; p++ {
-				dockerHostPorts[p] = c
-			}
-		}
-	}
+	dockerHostPorts := dockerHostPortMap(info.ParsedContainers)
 
 	// Annotate each listening port with its owner — the richer data the UI
 	// renders when available. The existing info.Ports []string stays as-is
@@ -2068,6 +2080,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	} else if warnFlags["docker_requires_sudo"] {
 		info.Warnings = append(info.Warnings, "Docker requires sudo to run. Container data was collected via sudo -n. Consider adding the user to the docker group.")
 	}
+	info.ContainersKnown = !warnFlags["docker_unreadable"]
 	return info, nil
 }
 
@@ -2125,6 +2138,22 @@ func parseDockerPortBindings(raw string) []dockerPortRange {
 			contStart: cs, contEnd: ce,
 			proto: proto,
 		})
+	}
+	return out
+}
+
+// dockerHostPortMap indexes every host port a container publishes back to that
+// container. Shared by port-owner annotation and by service detection, which
+// uses it to tell a container's published listener from a host daemon's.
+func dockerHostPortMap(containers []ContainerInfo) map[int]*ContainerInfo {
+	out := map[int]*ContainerInfo{}
+	for i := range containers {
+		c := &containers[i]
+		for _, pair := range parseDockerPortBindings(c.Ports) {
+			for p := pair.hostStart; p <= pair.hostEnd; p++ {
+				out[p] = c
+			}
+		}
 	}
 	return out
 }

@@ -60,9 +60,16 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
               </td>
               <td className="px-4 py-2.5 text-[var(--text-secondary)] max-w-[200px] truncate">{svc.description || "-"}</td>
               <td className="px-4 py-2.5">
-                <Badge color={svc.source === "auto" ? "blue" : svc.source === "fixed" ? "emerald" : "default"}>
-                  {svc.source === "auto" ? t("service.sourceAuto") : svc.source === "fixed" ? t("service.sourceFixed") : t("service.sourceManual")}
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  <Badge color={svc.source === "auto" ? "blue" : svc.source === "fixed" ? "emerald" : "default"}>
+                    {svc.source === "auto" ? t("service.sourceAuto") : svc.source === "fixed" ? t("service.sourceFixed") : t("service.sourceManual")}
+                  </Badge>
+                  {svc.discovery_kind && (
+                    <Badge color={svc.discovery_kind === "container" ? "cyan" : "purple"}>
+                      {svc.discovery_kind === "container" ? t("service.kindContainer") : t("service.kindHost")}
+                    </Badge>
+                  )}
+                </div>
               </td>
               <td className="px-4 py-2.5">{svc.technology_stack ? <Badge>{svc.technology_stack}</Badge> : <span className="text-[var(--text-faint)]">-</span>}</td>
               <td className="px-4 py-2.5">

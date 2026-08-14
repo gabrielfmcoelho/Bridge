@@ -29,6 +29,11 @@ export default function ServiceCard({ svc }: { svc: Service }) {
                   {svc.source === "auto" ? t("service.sourceAuto") : t("service.sourceFixed")}
                 </Badge>
               )}
+              {svc.discovery_kind && (
+                <Badge color={svc.discovery_kind === "container" ? "cyan" : "purple"} compact>
+                  {svc.discovery_kind === "container" ? t("service.kindContainer") : t("service.kindHost")}
+                </Badge>
+              )}
               {svc.container_status && (
                 <span className={`inline-block w-2 h-2 rounded-full ${svc.container_status === "online" ? "bg-emerald-400" : "bg-gray-400"}`} title={svc.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")} />
               )}

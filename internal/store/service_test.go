@@ -278,43 +278,163 @@ func TestServiceRepo_FixateAndContainerBinding(t *testing.T) {
 	}
 }
 
-func TestServiceRepo_ReconcileContainers(t *testing.T) {
+func TestServiceRepo_ReconcileDiscovered(t *testing.T) {
 	ctx := context.Background()
 	repo, d := newServiceRepo(t)
 	var hostID int64
 	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h1','h1') RETURNING id`).Scan(&hostID); err != nil {
 		t.Fatalf("seed host: %v", err)
 	}
+	byKey := func(t *testing.T) map[string]models.Service {
+		t.Helper()
+		svcs, err := repo.ListDiscoveredByHost(ctx, hostID)
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		m := map[string]models.Service{}
+		for _, s := range svcs {
+			m[s.DiscoveryKind+"/"+s.DiscoveryKey] = s
+		}
+		return m
+	}
 
-	// First sweep: one container → creates an online auto service linked to host.
+	// First sweep: one container + one host service → two online auto services.
 	c := sshtest.ContainerInfo{ID: "c1", Name: "web", Image: "nginx:latest", Ports: "0.0.0.0:8080->80/tcp"}
-	if err := repo.ReconcileContainers(ctx, hostID, []sshtest.ContainerInfo{c}); err != nil {
+	pg := sshtest.DiscoveredService{
+		Name: "postgresql", Label: "PostgreSQL", Kind: "database",
+		Unit: "postgresql", State: "active", Version: "15.4",
+		Ports: []int{5432}, HostPorts: []int{5432}, HostRunning: true,
+		Sources: []string{"systemd", "package", "port"},
+	}
+	inv := store.DiscoveredInventory{
+		Containers: []sshtest.ContainerInfo{c}, ContainersKnown: true,
+		Services: []sshtest.DiscoveredService{pg},
+	}
+	if err := repo.ReconcileDiscovered(ctx, hostID, inv); err != nil {
 		t.Fatalf("reconcile 1: %v", err)
 	}
-	svcs, _ := repo.ListContainerServicesByHost(ctx, hostID)
-	if len(svcs) != 1 || svcs[0].ContainerName != "web" || svcs[0].ContainerStatus != "online" {
-		t.Fatalf("after reconcile 1 = %+v", svcs)
+	got := byKey(t)
+	if len(got) != 2 {
+		t.Fatalf("after reconcile 1 = %+v, want 2 rows", got)
 	}
-	if svcs[0].Source != "auto" || svcs[0].Port != "8080" {
-		t.Fatalf("auto service shape = %+v (want source=auto port=8080)", svcs[0])
+	if s := got["container/web"]; s.Source != "auto" || s.ContainerStatus != "online" || s.Port != "8080" {
+		t.Fatalf("container row = %+v (want auto/online/8080)", s)
+	}
+	if s := got["host/postgresql"]; s.Source != "auto" || s.ContainerStatus != "online" ||
+		s.Port != "5432" || s.ServiceType != "database" || s.Version != "15.4" || s.ContainerName != "" {
+		t.Fatalf("host row = %+v (want auto/online/5432/database/15.4, no container)", s)
 	}
 
-	// Second sweep: same container, new image → updates in place (no new row).
+	// Second sweep: container renamed (same engine ID) → row moves, no duplicate.
+	c.Name = "web-1"
 	c.Image = "nginx:1.27"
-	if err := repo.ReconcileContainers(ctx, hostID, []sshtest.ContainerInfo{c}); err != nil {
+	inv.Containers = []sshtest.ContainerInfo{c}
+	if err := repo.ReconcileDiscovered(ctx, hostID, inv); err != nil {
 		t.Fatalf("reconcile 2: %v", err)
 	}
-	svcs, _ = repo.ListContainerServicesByHost(ctx, hostID)
-	if len(svcs) != 1 || svcs[0].ContainerImage != "nginx:1.27" {
-		t.Fatalf("after reconcile 2 = %+v", svcs)
+	got = byKey(t)
+	if len(got) != 2 {
+		t.Fatalf("after rename = %+v, want 2 rows (no orphan)", got)
+	}
+	if s := got["container/web-1"]; s.ContainerName != "web-1" || s.ContainerImage != "nginx:1.27" || s.ContainerStatus != "online" {
+		t.Fatalf("renamed row = %+v", s)
 	}
 
-	// Third sweep: empty → the unseen service is marked offline.
-	if err := repo.ReconcileContainers(ctx, hostID, nil); err != nil {
+	// Third sweep: docker unreadable → container row must NOT go offline, but
+	// the host service (still reported) stays online.
+	if err := repo.ReconcileDiscovered(ctx, hostID, store.DiscoveredInventory{
+		ContainersKnown: false,
+		Services:        []sshtest.DiscoveredService{pg},
+	}); err != nil {
 		t.Fatalf("reconcile 3: %v", err)
 	}
-	svcs, _ = repo.ListContainerServicesByHost(ctx, hostID)
-	if len(svcs) != 1 || svcs[0].ContainerStatus != "offline" {
-		t.Fatalf("after reconcile 3 = %+v, want offline", svcs)
+	got = byKey(t)
+	if s := got["container/web-1"]; s.ContainerStatus != "online" {
+		t.Fatalf("docker-unreadable sweep offlined the container row: %+v", s)
+	}
+
+	// Fourth sweep: docker answered with nothing and postgres stopped → both
+	// go offline. This is the sweep the old container-count guard could never
+	// reach.
+	if err := repo.ReconcileDiscovered(ctx, hostID, store.DiscoveredInventory{ContainersKnown: true}); err != nil {
+		t.Fatalf("reconcile 4: %v", err)
+	}
+	got = byKey(t)
+	for k, s := range got {
+		if s.ContainerStatus != "offline" {
+			t.Fatalf("row %s = %+v, want offline", k, s)
+		}
+	}
+}
+
+// Only catalog hits with a live host-side instance become host rows: the scan
+// sets HostRunning after attributing every process by cgroup, so a container's
+// postgres seen through the shared PID namespace never lands here.
+func TestServiceRepo_ReconcileDiscovered_SkipsNonLiveHostServices(t *testing.T) {
+	ctx := context.Background()
+	repo, d := newServiceRepo(t)
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h2','h2') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
+	if err := repo.ReconcileDiscovered(ctx, hostID, store.DiscoveredInventory{
+		ContainersKnown: true,
+		Services: []sshtest.DiscoveredService{
+			// installed but never started
+			{Name: "redis", Label: "Redis", State: "stopped", Sources: []string{"package"}},
+			// unit file present, not loaded
+			{Name: "nginx", Label: "Nginx", Sources: []string{"systemd"}},
+			// running, but every process and port belongs to a container
+			{Name: "mongodb", Label: "MongoDB", State: "running", Ports: []int{27017},
+				ContainerID: "abc", Sources: []string{"container"}},
+		},
+	}); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	svcs, _ := repo.ListDiscoveredByHost(ctx, hostID)
+	if len(svcs) != 0 {
+		t.Fatalf("created %d rows, want 0: %+v", len(svcs), svcs)
+	}
+}
+
+// The case per-PID attribution exists for: a native database and a
+// containerized one on the same host produce two independent rows.
+func TestServiceRepo_ReconcileDiscovered_NativeAndContainerCoexist(t *testing.T) {
+	ctx := context.Background()
+	repo, d := newServiceRepo(t)
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h3','h3') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
+	if err := repo.ReconcileDiscovered(ctx, hostID, store.DiscoveredInventory{
+		ContainersKnown: true,
+		Containers: []sshtest.ContainerInfo{
+			{ID: "c1", Name: "db", Image: "postgres:16", Ports: "0.0.0.0:15432->5432/tcp"},
+		},
+		Services: []sshtest.DiscoveredService{{
+			Name: "postgresql", Label: "PostgreSQL", Unit: "postgresql", State: "active",
+			Ports: []int{5432, 15432}, HostPorts: []int{5432}, HostRunning: true,
+			ContainerID: "c1", Sources: []string{"systemd", "process", "port", "container"},
+		}},
+	}); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	svcs, _ := repo.ListDiscoveredByHost(ctx, hostID)
+	if len(svcs) != 2 {
+		t.Fatalf("got %d rows, want 2 (native + container): %+v", len(svcs), svcs)
+	}
+	for _, s := range svcs {
+		switch s.DiscoveryKind {
+		case "host":
+			if s.Port != "5432" || s.ContainerName != "" {
+				t.Errorf("host row = %+v, want port 5432 and no container", s)
+			}
+		case "container":
+			if s.Port != "15432" || s.ContainerName != "db" {
+				t.Errorf("container row = %+v, want port 15432 on container db", s)
+			}
+		default:
+			t.Errorf("unexpected discovery_kind %q", s.DiscoveryKind)
+		}
 	}
 }

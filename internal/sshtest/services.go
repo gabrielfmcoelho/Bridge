@@ -18,6 +18,10 @@ type serviceSpec struct {
 	Binaries    []string
 	Packages    []string
 	ImageHints  []string // case-insensitive substrings to match against container image names
+	// ServiceType overrides the Kind→service_type mapping (see
+	// kindToServiceType) for entries whose Kind is too coarse for the
+	// services page. Empty means "derive from Kind".
+	ServiceType string
 	// SignaturePorts are well-known TCP ports for this service. Used as a
 	// fallback for the listening-ports panel when `ss -tlnp` can't read
 	// the owning process (e.g., postgres listening as the postgres user
@@ -33,7 +37,7 @@ type serviceSpec struct {
 // queues), not the agents that *manage* the host (monitoring, security).
 var serviceCatalog = []serviceSpec{
 	// ── Web servers / reverse proxies ──
-	{Name: "nginx", Label: "Nginx", Vendor: "F5/NGINX", Kind: "web",
+	{Name: "nginx", Label: "Nginx", Vendor: "F5/NGINX", Kind: "web", ServiceType: "nginx",
 		Units: []string{"nginx"}, Binaries: []string{"nginx"},
 		Packages:   []string{"nginx", "nginx-core", "nginx-full", "nginx-extras", "nginx-light"},
 		ImageHints: []string{"nginx"}},
@@ -265,14 +269,14 @@ var serviceCatalog = []serviceSpec{
 		Units: []string{"graylog-server"}, Binaries: []string{"graylog"},
 		Packages:   []string{"graylog-server"},
 		ImageHints: []string{"graylog"}},
-	{Name: "sonarqube", Label: "SonarQube", Vendor: "SonarSource", Kind: "analytics",
+	{Name: "sonarqube", Label: "SonarQube", Vendor: "SonarSource", Kind: "analytics", ServiceType: "infrastructure",
 		Units: []string{"sonar"}, Binaries: []string{"sonar"},
 		ImageHints: []string{"sonarqube"}},
-	{Name: "gitlab", Label: "GitLab", Vendor: "GitLab Inc.", Kind: "analytics",
+	{Name: "gitlab", Label: "GitLab", Vendor: "GitLab Inc.", Kind: "analytics", ServiceType: "infrastructure",
 		Units: []string{"gitlab-runsvdir"}, Binaries: []string{"gitlab-mon"},
 		Packages:   []string{"gitlab-ce", "gitlab-ee"},
 		ImageHints: []string{"gitlab/gitlab"}},
-	{Name: "jenkins", Label: "Jenkins", Vendor: "Jenkins", Kind: "analytics",
+	{Name: "jenkins", Label: "Jenkins", Vendor: "Jenkins", Kind: "analytics", ServiceType: "infrastructure",
 		Units: []string{"jenkins"}, Binaries: []string{"jenkins"},
 		Packages:   []string{"jenkins"},
 		ImageHints: []string{"jenkins"}},
@@ -289,12 +293,13 @@ func captureServices(inv *hostInventory, containers []ContainerInfo, agentNames 
 	// with the same well-known port (e.g. mysql + mariadb both on 3306)
 	// don't both flag a host that has neither installed.
 	servicePortClaims := map[int]bool{}
+	publishedPorts := dockerHostPortMap(containers)
 	var services []DiscoveredService
 	for _, spec := range serviceCatalog {
 		if agentNames[spec.Name] {
 			continue
 		}
-		svc, ok := detectService(spec, inv, containers, agentPortClaims, servicePortClaims)
+		svc, ok := detectService(spec, inv, containers, publishedPorts, agentPortClaims, servicePortClaims)
 		if !ok {
 			continue
 		}
@@ -318,11 +323,20 @@ func captureServices(inv *hostInventory, containers []ContainerInfo, agentNames 
 // but additionally inspects container images so a postgres-in-docker host
 // shows up as "postgresql" alongside a host-installed postgres.
 //
+// Evidence is attributed per instance, because containers share the host PID
+// namespace: a process only counts as host evidence ("process" / "port") when
+// its cgroup says it is not containerized, otherwise it counts as container
+// evidence. That is what lets a host running both a native postgres and a
+// postgres container report both, instead of collapsing into one ambiguous row.
+//
+// publishedPorts maps a host port to the container publishing it, so a
+// signature port answered by `-p 5432:5432` isn't mistaken for a host daemon.
+//
 // agentPortClaims and servicePortClaims are sets of ports already claimed
 // by earlier catalog entries (agents first, then in-progress services).
 // Signature-port detection skips any port already in either set so two
 // catalog rows can't both flag the same listener.
-func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerInfo, agentPortClaims, servicePortClaims map[int]bool) (DiscoveredService, bool) {
+func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerInfo, publishedPorts map[int]*ContainerInfo, agentPortClaims, servicePortClaims map[int]bool) (DiscoveredService, bool) {
 	svc := DiscoveredService{Name: spec.Name, Label: spec.Label, Vendor: spec.Vendor, Kind: spec.Kind}
 	sources := map[string]bool{}
 
@@ -342,7 +356,14 @@ func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerI
 			break
 		}
 	}
-	// systemd loaded units (active state).
+	// hostRunning tracks whether a *non-containerized* instance is live right
+	// now — an active systemd unit, a process outside any container cgroup, or
+	// a listener no container published. Callers persisting host services key
+	// off this rather than off State, which can describe either instance.
+	hostRunning := false
+
+	// systemd loaded units (active state). Host systemd never lists a
+	// container's units, so this is host evidence by construction.
 	for _, want := range spec.Units {
 		matched := false
 		for unit, active := range inv.LoadedUnits {
@@ -351,6 +372,9 @@ func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerI
 					svc.Unit = stripUnitSuffix(unit)
 				}
 				svc.State = active
+				if active == "active" || active == "activating" || active == "reloading" {
+					hostRunning = true
+				}
 				sources["systemd"] = true
 				matched = true
 				break
@@ -361,24 +385,50 @@ func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerI
 		}
 	}
 
-	// Running processes.
+	// Running processes, split by cgroup. `ps` on the host shows a container's
+	// processes too, so every match is attributed to whichever side its cgroup
+	// says it belongs to. Both loops run to completion: a host can have a
+	// native daemon *and* a containerized one, and we want to see both.
+	hostProc, containerProc := false, false
 	for _, p := range inv.Procs {
 		matched := false
 		for _, b := range spec.Binaries {
 			if binaryMatches(b, p.comm, p.args) {
-				if svc.PID == 0 {
-					svc.PID = p.pid
-				}
-				if svc.State == "" {
-					svc.State = "running"
-				}
-				sources["process"] = true
 				matched = true
 				break
 			}
 		}
-		if matched {
-			break
+		if !matched {
+			continue
+		}
+		cgroupID, inContainer := inv.ContainerPIDs[p.pid]
+		if !inContainer {
+			hostProc = true
+			hostRunning = true
+			if svc.PID == 0 {
+				svc.PID = p.pid
+			}
+			if svc.State == "" {
+				svc.State = "running"
+			}
+			sources["process"] = true
+			continue
+		}
+		containerProc = true
+		sources["container"] = true
+		if svc.ContainerID == "" && cgroupID != "" {
+			// Resolve to the `docker ps` row when we can — that gives the
+			// image too, and works even when the image name matches no
+			// ImageHint (a private registry build of postgres, say).
+			if c := containerByCgroupID(containers, cgroupID); c != nil {
+				svc.ContainerID = c.ID
+				svc.ContainerImage = c.Image
+			} else {
+				svc.ContainerID = shortContainerID(cgroupID)
+			}
+		}
+		if svc.State == "" {
+			svc.State = "running"
 		}
 	}
 
@@ -397,11 +447,34 @@ func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerI
 	// (e.g. postgres listening as the postgres user). Ports already
 	// claimed by an agent or a previous service are skipped to prevent
 	// double-attribution (e.g., mysql + mariadb both target :3306).
+	//
+	// Every port is kept for display, but only host-owned ones count as host
+	// evidence: a port docker published belongs to its container, and when the
+	// only matching process is containerized the listener is the container's
+	// too (a `network: host` container owns the host port directly).
 	portSet := map[int]bool{}
+	hostPortSet := map[int]bool{}
+	addPort := func(port int) {
+		portSet[port] = true
+		if c := publishedPorts[port]; c != nil {
+			sources["container"] = true
+			if svc.ContainerID == "" {
+				svc.ContainerID = c.ID
+				svc.ContainerImage = c.Image
+			}
+			return
+		}
+		if containerProc && !hostProc {
+			sources["container"] = true
+			return
+		}
+		hostPortSet[port] = true
+		sources["port"] = true
+		hostRunning = true
+	}
 	for _, b := range spec.Binaries {
 		for _, port := range inv.PortsByProc[b] {
-			portSet[port] = true
-			sources["port"] = true
+			addPort(port)
 		}
 	}
 	for _, p := range spec.SignaturePorts {
@@ -411,14 +484,19 @@ func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerI
 		if agentPortClaims[p] || servicePortClaims[p] {
 			continue
 		}
-		portSet[p] = true
-		sources["port"] = true
+		addPort(p)
 	}
 	if len(portSet) > 0 {
 		for p := range portSet {
 			svc.Ports = append(svc.Ports, p)
 		}
 		sort.Ints(svc.Ports)
+	}
+	if len(hostPortSet) > 0 {
+		for p := range hostPortSet {
+			svc.HostPorts = append(svc.HostPorts, p)
+		}
+		sort.Ints(svc.HostPorts)
 	}
 
 	// Containers — match image name. A container counts as a separate
@@ -448,9 +526,30 @@ func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerI
 	if svc.State == "" && sources["package"] {
 		svc.State = "stopped"
 	}
+	svc.HostRunning = hostRunning
 	for src := range sources {
 		svc.Sources = append(svc.Sources, src)
 	}
 	sort.Strings(svc.Sources)
 	return svc, true
+}
+
+// containerByCgroupID resolves the full container ID from a cgroup path to its
+// `docker ps` row — the listing carries 12-char short IDs, the cgroup the full
+// 64-char one, so the match is by prefix.
+func containerByCgroupID(containers []ContainerInfo, cgroupID string) *ContainerInfo {
+	for i := range containers {
+		if containers[i].ID != "" && strings.HasPrefix(cgroupID, containers[i].ID) {
+			return &containers[i]
+		}
+	}
+	return nil
+}
+
+// shortContainerID truncates a full container ID to docker's 12-char form.
+func shortContainerID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
 }

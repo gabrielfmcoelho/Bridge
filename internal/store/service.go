@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,7 +29,8 @@ const serviceCols = `id, nickname, project_id, description, service_type, servic
 	orchestrator_managed, is_directly_managed, is_responsible, developed_by,
 	is_external_dependency, external_provider, external_url, external_contact,
 	repository_url, gitlab_url, documentation_url,
-	source, container_status, container_id, container_name, container_image, container_ports,
+	source, discovery_kind, discovery_key,
+	container_status, container_id, container_name, container_image, container_ports,
 	discovered_at, last_seen_at, grafana_dashboard_uid, created_at, updated_at`
 
 // serviceColsS is serviceCols qualified with the `s.` table alias, for joins.
@@ -37,7 +39,8 @@ const serviceColsS = `s.id, s.nickname, s.project_id, s.description, s.service_t
 	s.orchestrator_managed, s.is_directly_managed, s.is_responsible, s.developed_by,
 	s.is_external_dependency, s.external_provider, s.external_url, s.external_contact,
 	s.repository_url, s.gitlab_url, s.documentation_url,
-	s.source, s.container_status, s.container_id, s.container_name, s.container_image, s.container_ports,
+	s.source, s.discovery_kind, s.discovery_key,
+	s.container_status, s.container_id, s.container_name, s.container_image, s.container_ports,
 	s.discovered_at, s.last_seen_at, s.grafana_dashboard_uid, s.created_at, s.updated_at`
 
 func scanService(scanner interface{ Scan(...any) error }, s *models.Service) error {
@@ -46,7 +49,8 @@ func scanService(scanner interface{ Scan(...any) error }, s *models.Service) err
 		&s.OrchestratorManaged, &s.IsDirectlyManaged, &s.IsResponsible, &s.DevelopedBy,
 		&s.IsExternalDependency, &s.ExternalProvider, &s.ExternalURL, &s.ExternalContact,
 		&s.RepositoryURL, &s.GitlabURL, &s.DocumentationURL,
-		&s.Source, &s.ContainerStatus, &s.ContainerID, &s.ContainerName, &s.ContainerImage, &s.ContainerPorts,
+		&s.Source, &s.DiscoveryKind, &s.DiscoveryKey,
+		&s.ContainerStatus, &s.ContainerID, &s.ContainerName, &s.ContainerImage, &s.ContainerPorts,
 		&s.DiscoveredAt, &s.LastSeenAt, &s.GrafanaDashboardUID, &s.CreatedAt, &s.UpdatedAt,
 	)
 }
@@ -65,6 +69,11 @@ func scanServices(rows *sql.Rows) ([]models.Service, error) {
 }
 
 // Create inserts a service (defaulting Source to "manual") and sets s.ID.
+//
+// discovery_kind/discovery_key are intentionally absent from both Create and
+// Update: they are the scan's identity for a row and are written only by
+// ReconcileDiscovered, so an API payload can't graft itself onto (or steal)
+// another host's discovered service.
 func (r *ServiceRepo) Create(ctx context.Context, s *models.Service) error {
 	if s.Source == "" {
 		s.Source = "manual"
@@ -224,13 +233,14 @@ func (r *ServiceRepo) ListByHost(ctx context.Context, hostID int64) ([]models.Se
 	return scanServices(rows)
 }
 
-// ListContainerServicesByHost returns all auto/fixed services linked to a host
-// that have a container_name set.
-func (r *ServiceRepo) ListContainerServicesByHost(ctx context.Context, hostID int64) ([]models.Service, error) {
+// ListDiscoveredByHost returns every scan-owned service linked to a host —
+// auto or fixed, container or host kind. Manual services (no discovery_key)
+// are excluded so reconciliation can never touch a hand-made row.
+func (r *ServiceRepo) ListDiscoveredByHost(ctx context.Context, hostID int64) ([]models.Service, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+serviceColsS+`
 		 FROM services s JOIN service_host_links l ON s.id = l.service_id
-		 WHERE l.host_id = ? AND s.deleted_at IS NULL AND s.source IN ('auto', 'fixed') AND s.container_name != ''
+		 WHERE l.host_id = ? AND s.deleted_at IS NULL AND s.source IN ('auto', 'fixed') AND s.discovery_key != ''
 		 ORDER BY s.nickname`, hostID)
 	if err != nil {
 		return nil, err
@@ -392,18 +402,136 @@ func (r *ServiceRepo) replaceLinks(ctx context.Context, table, keyCol, valCol st
 	return tx.Commit()
 }
 
-// ReconcileContainers matches discovered containers against existing auto/fixed
-// services for a host: new containers create auto services (linked to the host),
-// matching containers refresh status/metadata, and unseen services go offline —
-// all in one tx.
-func (r *ServiceRepo) ReconcileContainers(ctx context.Context, hostID int64, containers []sshtest.ContainerInfo) error {
-	existing, err := r.ListContainerServicesByHost(ctx, hostID)
+// DiscoveredInventory is one scan's view of what runs on a host, as far as
+// service reconciliation cares.
+//
+// ContainersKnown carries the distinction the container list alone can't make:
+// an empty Containers slice means "this host runs no containers" only when
+// docker actually answered. When docker was unreadable (no passwordless sudo,
+// dead daemon, timeout) the container half of the sweep must be skipped
+// entirely, or every container service on the host would be marked offline by
+// a permissions blip.
+type DiscoveredInventory struct {
+	Containers      []sshtest.ContainerInfo
+	ContainersKnown bool
+	Services        []sshtest.DiscoveredService
+}
+
+// discoveredRow is a container or host service normalised to what the services
+// table stores, so one reconcile loop handles both kinds.
+type discoveredRow struct {
+	kind           string // "container" | "host"
+	key            string // per-host identity: container name | catalog service name
+	nickname       string
+	description    string
+	serviceType    string
+	serviceSubtype string
+	version        string
+	port           string
+	containerID    string
+	containerName  string
+	containerImage string
+	containerPorts string
+	orchestrated   bool
+}
+
+// identity is the (kind, key) pair a row reconciles on.
+func (d discoveredRow) identity() string { return d.kind + "\x00" + d.key }
+
+func serviceIdentity(s models.Service) string { return s.DiscoveryKind + "\x00" + s.DiscoveryKey }
+
+// containerRows normalises `docker ps` output.
+func containerRows(containers []sshtest.ContainerInfo) []discoveredRow {
+	rows := make([]discoveredRow, 0, len(containers))
+	for _, c := range containers {
+		if c.Name == "" {
+			continue
+		}
+		inf := sshtest.InferFromImage(c.Image, c.Name)
+		rows = append(rows, discoveredRow{
+			kind: "container", key: c.Name,
+			nickname:    inf.Nickname,
+			description: "Auto-discovered from container " + c.Name,
+			serviceType: inf.ServiceType, serviceSubtype: inf.ServiceSubtype,
+			port:           extractFirstHostPort(c.Ports),
+			containerID:    c.ID,
+			containerName:  c.Name,
+			containerImage: c.Image,
+			containerPorts: c.Ports,
+			orchestrated:   true,
+		})
+	}
+	return rows
+}
+
+// hostServiceRows normalises the catalog hits that deserve a service row.
+//
+// A hit qualifies on HostRunning alone: the scan attributes every process by
+// cgroup and every listener by publisher, so HostRunning means a live instance
+// outside any container — never the container's own postgres seen through the
+// shared PID namespace. A host running both gets a row here *and* a container
+// row from the docker sweep, which is the point.
+//
+// Package-only hits ("installed, never started") are excluded by the same flag,
+// so the services page lists what runs rather than what is merely present; when
+// a live service stops, HostRunning goes false and the offline sweep picks it up.
+func hostServiceRows(services []sshtest.DiscoveredService) []discoveredRow {
+	rows := make([]discoveredRow, 0, len(services))
+	for _, s := range services {
+		if s.Name == "" || !s.HostRunning {
+			continue
+		}
+		// HostPorts, not Ports: the latter also carries whatever a container
+		// of the same software published, which is not this row's listener.
+		port := ""
+		if len(s.HostPorts) > 0 {
+			port = strconv.Itoa(s.HostPorts[0])
+		}
+		desc := "Auto-discovered host service " + s.Name
+		if s.Unit != "" {
+			desc = "Auto-discovered from systemd unit " + s.Unit
+		}
+		rows = append(rows, discoveredRow{
+			kind: "host", key: s.Name,
+			nickname:    s.Label,
+			description: desc,
+			serviceType: sshtest.ServiceTypeForCatalog(s.Name), serviceSubtype: s.Label,
+			version: s.Version,
+			port:    port,
+		})
+	}
+	return rows
+}
+
+// ReconcileDiscovered matches a scan against the existing auto/fixed services
+// for a host: unknown workloads create auto services (linked to the host),
+// known ones refresh their runtime metadata, and anything the scan could see
+// but didn't find goes offline — all in one tx.
+//
+// Containers match on container ID first and name second, so renaming a
+// container updates its row in place instead of orphaning it and creating a
+// duplicate. Host services match on the catalog name.
+//
+// Only scan-owned fields are refreshed on an existing row. Nickname, port and
+// version stay as first discovered, because a fixated service is expected to
+// carry the operator's edits.
+func (r *ServiceRepo) ReconcileDiscovered(ctx context.Context, hostID int64, inv DiscoveredInventory) error {
+	existing, err := r.ListDiscoveredByHost(ctx, hostID)
 	if err != nil {
 		return err
 	}
-	byName := make(map[string]*models.Service, len(existing))
+	byIdentity := make(map[string]*models.Service, len(existing))
+	byContainerID := make(map[string]*models.Service)
 	for i := range existing {
-		byName[existing[i].ContainerName] = &existing[i]
+		byIdentity[serviceIdentity(existing[i])] = &existing[i]
+		if existing[i].DiscoveryKind == "container" && existing[i].ContainerID != "" {
+			byContainerID[existing[i].ContainerID] = &existing[i]
+		}
+	}
+
+	rows := hostServiceRows(inv.Services)
+	if inv.ContainersKnown {
+		rows = append(rows, containerRows(inv.Containers)...)
 	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -413,38 +541,42 @@ func (r *ServiceRepo) ReconcileContainers(ctx context.Context, hostID int64, con
 	defer tx.Rollback()
 
 	now := time.Now()
-	seen := make(map[string]bool)
+	seen := make(map[string]bool, len(rows))
 
-	for _, c := range containers {
-		if c.Name == "" {
-			continue
+	for _, row := range rows {
+		match := byIdentity[row.identity()]
+		if match == nil && row.containerID != "" {
+			// Renamed container: same engine ID, new name.
+			match = byContainerID[row.containerID]
 		}
-		if svc, ok := byName[c.Name]; ok {
-			seen[c.Name] = true
+		if match != nil {
+			seen[serviceIdentity(*match)] = true
+			seen[row.identity()] = true
 			if _, err := tx.ExecContext(ctx,
-				`UPDATE services SET container_id = ?, container_image = ?, container_ports = ?,
-					container_status = 'online', last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
+				`UPDATE services SET discovery_key = ?, container_id = ?, container_name = ?,
+					container_image = ?, container_ports = ?, container_status = 'online',
+					last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
 				WHERE id = ?`,
-				c.ID, c.Image, c.Ports, now, svc.ID,
+				row.key, row.containerID, row.containerName, row.containerImage, row.containerPorts,
+				now, match.ID,
 			); err != nil {
 				return err
 			}
 			continue
 		}
 
-		inf := sshtest.InferFromImage(c.Image, c.Name)
-		port := extractFirstHostPort(c.Ports)
 		var id int64
 		if err := tx.QueryRowContext(ctx,
-			`INSERT INTO services (nickname, description, service_type, service_subtype,
-				source, container_status, container_id, container_name, container_image, container_ports,
+			`INSERT INTO services (nickname, description, service_type, service_subtype, version,
+				source, discovery_kind, discovery_key,
+				container_status, container_id, container_name, container_image, container_ports,
 				port, orchestrator_managed, discovered_at, last_seen_at)
-			VALUES (?, ?, ?, ?, 'auto', 'online', ?, ?, ?, ?, ?, true, ?, ?)
+			VALUES (?, ?, ?, ?, ?, 'auto', ?, ?, 'online', ?, ?, ?, ?, ?, ?, ?, ?)
 			RETURNING id`,
-			inf.Nickname, "Auto-discovered from container "+c.Name,
-			inf.ServiceType, inf.ServiceSubtype,
-			c.ID, c.Name, c.Image, c.Ports,
-			port, now, now,
+			row.nickname, row.description, row.serviceType, row.serviceSubtype, row.version,
+			row.kind, row.key,
+			row.containerID, row.containerName, row.containerImage, row.containerPorts,
+			row.port, row.orchestrated, now, now,
 		).Scan(&id); err != nil {
 			return err
 		}
@@ -453,11 +585,15 @@ func (r *ServiceRepo) ReconcileContainers(ctx context.Context, hostID int64, con
 		); err != nil {
 			return err
 		}
-		seen[c.Name] = true
+		seen[row.identity()] = true
 	}
 
 	for _, svc := range existing {
-		if seen[svc.ContainerName] || svc.ContainerStatus == "offline" {
+		if seen[serviceIdentity(svc)] || svc.ContainerStatus == "offline" {
+			continue
+		}
+		// Docker refused to answer — its containers are unknown, not gone.
+		if svc.DiscoveryKind == "container" && !inv.ContainersKnown {
 			continue
 		}
 		if _, err := tx.ExecContext(ctx,

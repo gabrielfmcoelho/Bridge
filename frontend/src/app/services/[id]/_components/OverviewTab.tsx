@@ -62,20 +62,30 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
         </div>
       </Card>
 
-      {/* Container info section */}
-      {service.container_name && (
+      {/* Discovery section — container fields only apply to container services;
+          a host service shows its catalog identity and the same lifecycle. */}
+      {service.discovery_kind && (
         <Card accent="cyan" hover={false}>
           <h2
             className="text-sm font-semibold text-[var(--text-secondary)] mb-4"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            {t("service.containerInfo")}
+            {service.discovery_kind === "container" ? t("service.containerInfo") : t("service.kindHost")}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Field label={t("service.containerName")} value={service.container_name} mono />
-            <Field label={t("service.containerImage")} value={service.container_image} mono />
-            <Field label={t("service.containerId")} value={service.container_id} mono />
-            <Field label={t("service.containerPorts")} value={service.container_ports} mono />
+            {service.discovery_kind === "container" ? (
+              <>
+                <Field label={t("service.containerName")} value={service.container_name} mono />
+                <Field label={t("service.containerImage")} value={service.container_image} mono />
+                <Field label={t("service.containerId")} value={service.container_id} mono />
+                <Field label={t("service.containerPorts")} value={service.container_ports} mono />
+              </>
+            ) : (
+              <>
+                <Field label={t("service.kindHost")} value={service.discovery_key} mono />
+                <Field label={t("service.kindHostDesc")} value={service.description || "-"} />
+              </>
+            )}
             <Field label={t("service.containerStatus")} value={service.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")} />
             <Field label={t("service.lastSeen")} value={service.last_seen_at || "-"} />
           </div>

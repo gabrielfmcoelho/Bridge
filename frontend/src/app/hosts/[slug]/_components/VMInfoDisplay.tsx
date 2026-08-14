@@ -1365,6 +1365,14 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
           {t("scan.services.enabledAtBoot")}
         </span>
       )}
+      {service.host_running && (
+        <span
+          className="shrink-0 text-[10px] text-purple-300 light:text-purple-800 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30"
+          title={t("scan.services.hostInstanceTooltip")}
+        >
+          {t("scan.services.hostInstance")}
+        </span>
+      )}
       {service.container_image && (
         <span
           className="shrink-0 text-[10px] text-cyan-300 light:text-cyan-800 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30"

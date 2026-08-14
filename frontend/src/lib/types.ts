@@ -228,6 +228,10 @@ export interface Service {
   documentation_url: string;
   grafana_dashboard_uid?: string;
   source: "manual" | "auto" | "fixed";
+  /** How the scan found this service; "" for manual services. */
+  discovery_kind: "container" | "host" | "";
+  /** Per-host identity the scan reconciles on: container name or catalog name. */
+  discovery_key: string;
   container_status: "online" | "offline" | "";
   container_id: string;
   container_name: string;

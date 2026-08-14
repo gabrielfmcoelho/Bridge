@@ -200,7 +200,7 @@ func (h *serviceHandlers) handleUpdateContainer(w http.ResponseWriter, r *http.R
 		return
 	}
 	svc, err := h.service.UpdateContainer(r.Context(), id, req.ContainerName, req.ContainerID)
-	if errors.Is(err, service.ErrServiceCannotRebindAuto) {
+	if errors.Is(err, service.ErrServiceCannotRebindAuto) || errors.Is(err, service.ErrServiceNotContainer) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}

@@ -143,6 +143,11 @@ export default function ServiceDetail({ id }: { id: number }) {
                     {data.service.source === "auto" ? t("service.sourceAuto") : t("service.sourceFixed")}
                   </Badge>
                 )}
+                {data.service.discovery_kind && (
+                  <Badge color={data.service.discovery_kind === "container" ? "cyan" : "purple"} compact>
+                    {data.service.discovery_kind === "container" ? t("service.kindContainer") : t("service.kindHost")}
+                  </Badge>
+                )}
                 {data.service.container_status && (
                   <Badge color={data.service.container_status === "online" ? "emerald" : "default"} compact>
                     {data.service.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")}

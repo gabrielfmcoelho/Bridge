@@ -1253,4 +1253,27 @@ var migrationsPostgres = []string{
 		ADD COLUMN IF NOT EXISTS secret_id BIGINT REFERENCES secrets(id) ON DELETE SET NULL;
 	CREATE INDEX IF NOT EXISTS idx_host_remote_users_secret
 		ON host_remote_users (secret_id) WHERE secret_id IS NOT NULL;`,
+
+	// Version 81: generalise auto-discovery beyond containers. A scan now
+	// reconciles two kinds of workload per host, so identity moves off
+	// container_name onto an explicit (discovery_kind, discovery_key) pair:
+	//
+	//	container | <container name>       — from `docker ps`
+	//	host      | <catalog service name> — systemd/process/port evidence
+	//
+	// container_status keeps its name but is now the shared online/offline
+	// lifecycle field for both kinds. Existing container rows backfill from
+	// container_name. The 'workers' service_type predates the enum rename in
+	// v50 and was never a valid enum_options value — fold it into 'worker'
+	// so the service form's select can resolve those rows.
+	`ALTER TABLE services ADD COLUMN IF NOT EXISTS discovery_kind TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS discovery_key TEXT NOT NULL DEFAULT '';
+
+	UPDATE services SET discovery_kind = 'container', discovery_key = container_name
+		WHERE container_name <> '' AND source IN ('auto', 'fixed') AND discovery_key = '';
+
+	UPDATE services SET service_type = 'worker' WHERE service_type = 'workers';
+
+	CREATE INDEX IF NOT EXISTS idx_services_discovery
+		ON services (discovery_kind, discovery_key) WHERE discovery_key <> '';`,
 }

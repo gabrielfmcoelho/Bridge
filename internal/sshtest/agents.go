@@ -2,6 +2,7 @@ package sshtest
 
 import (
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -233,6 +234,15 @@ type hostInventory struct {
 	Procs       []procEntry       // running processes
 	PortsByProc map[string][]int  // process basename → listen ports
 	ListenPorts map[int]bool      // every TCP port with a listener (for signature-port detection)
+	// ContainerPIDs maps a PID to the container it runs in, for every process
+	// whose cgroup says it is containerized. The value is the engine's
+	// container ID (empty for runtimes that don't put one in the path, e.g.
+	// LXC) — presence in the map is what marks a PID as containerized.
+	//
+	// Containers share the host PID namespace as far as `ps` is concerned, so
+	// without this a postgres inside a container is indistinguishable from one
+	// installed on the host.
+	ContainerPIDs map[int]string
 }
 
 // catalogPackageNames returns every package name referenced across the
@@ -307,18 +317,28 @@ func collectHostInventory(client *ssh.Client, portOwners []PortOwner) *hostInven
 		//    (truncated to 15 chars on Linux), so we also keep argv[0] for
 		//    binaries whose name exceeds 15 chars (e.g. amazon-ssm-agent).
 		`ps -eo pid=,user=,comm=,args= 2>/dev/null | head -n 5000`,
+		`echo '` + delim + `'`,
+		// 4: cgroup path of every process that looks containerized, one line
+		//    per PID (-m1). The grep is deliberately loose — it also matches
+		//    the engines' own units (docker.service, containerd.service) —
+		//    because parseContainerCgroups does the precise filtering; being
+		//    loose here keeps the pattern portable across cgroup v1 (which
+		//    writes /docker/<id>) and v2 (/system.slice/docker-<id>.scope).
+		//    /proc/<pid>/cgroup is world-readable, so this needs no sudo.
+		`grep -m1 -H -E 'docker|containerd|libpod|kubepods|lxc|crio' /proc/[0-9]*/cgroup 2>/dev/null | head -n 5000`,
 	}, "; ")
 
 	raw := runCmd(client, cmd)
-	sections := splitSections(raw, delim, 4)
+	sections := splitSections(raw, delim, 5)
 
 	inv := &hostInventory{
-		UnitFiles:   parseUnitFiles(sections[0]),
-		LoadedUnits: parseLoadedUnits(sections[1]),
-		Packages:    parsePackageList(sections[2]),
-		Procs:       parsePsOutput(sections[3]),
-		PortsByProc: map[string][]int{},
-		ListenPorts: map[int]bool{},
+		UnitFiles:     parseUnitFiles(sections[0]),
+		LoadedUnits:   parseLoadedUnits(sections[1]),
+		Packages:      parsePackageList(sections[2]),
+		Procs:         parsePsOutput(sections[3]),
+		ContainerPIDs: parseContainerCgroups(sections[4]),
+		PortsByProc:   map[string][]int{},
+		ListenPorts:   map[int]bool{},
 	}
 
 	// Pre-index port owners by process basename for O(1) lookup per spec
@@ -587,6 +607,52 @@ func parsePsOutput(s string) []procEntry {
 			args = strings.Join(fields[3:], " ")
 		}
 		out = append(out, procEntry{pid: pid, user: fields[1], comm: fields[2], args: args})
+	}
+	return out
+}
+
+// containerCgroupRe pulls the engine's container ID out of a cgroup path.
+// Covers docker on cgroup v1 (`/docker/<id>`) and v2
+// (`/system.slice/docker-<id>.scope`), podman (`libpod-<id>.scope`), CRI-O and
+// containerd (`cri-containerd-<id>.scope`, `crio-<id>.scope`). Requiring a
+// hex run after the separator is what keeps the engines' own units out: a
+// daemon sits in `/system.slice/docker.service`, which has no ID to match.
+var containerCgroupRe = regexp.MustCompile(`(?:docker|libpod|crio|cri-containerd|containerd)[-/]([0-9a-f]{12,64})`)
+
+// containerCgroupMarkers mark a process as containerized on runtimes that put
+// no engine ID in the path. LXC uses the container's name; Kubernetes pod
+// slices nest the real scope deeper than -m1 reaches on some kernels.
+var containerCgroupMarkers = []string{"/lxc/", "lxc.payload", "/kubepods"}
+
+// parseContainerCgroups parses `grep -H '' /proc/<pid>/cgroup` output into a
+// pid → container-ID map. A PID present with an empty value is containerized
+// under a runtime whose cgroup path carries no ID.
+func parseContainerCgroups(s string) map[int]string {
+	out := map[int]string{}
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "/proc/") {
+			continue
+		}
+		// "/proc/1234/cgroup:0::/system.slice/docker-<id>.scope"
+		path, cgroup, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		pid, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(path, "/proc/"), "/cgroup"))
+		if err != nil || pid <= 0 {
+			continue
+		}
+		if m := containerCgroupRe.FindStringSubmatch(cgroup); m != nil {
+			out[pid] = m[1]
+			continue
+		}
+		for _, marker := range containerCgroupMarkers {
+			if strings.Contains(cgroup, marker) {
+				out[pid] = ""
+				break
+			}
+		}
 	}
 	return out
 }

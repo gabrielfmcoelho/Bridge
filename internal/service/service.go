@@ -16,6 +16,9 @@ var (
 	ErrServiceNotAuto = errors.New("only auto-discovered services can be fixated")
 	// ErrServiceCannotRebindAuto is returned by UpdateContainer for an auto service.
 	ErrServiceCannotRebindAuto = errors.New("cannot rebind auto services; fixate first")
+	// ErrServiceNotContainer is returned by UpdateContainer for a host-discovered
+	// service, which has no container to rebind.
+	ErrServiceNotContainer = errors.New("only container services can be rebound")
 )
 
 // ServiceService owns service read enrichment and write orchestration (service
@@ -273,6 +276,9 @@ func (s *ServiceService) UpdateContainer(ctx context.Context, id int64, containe
 	}
 	if svc.Source == "auto" {
 		return nil, ErrServiceCannotRebindAuto
+	}
+	if svc.DiscoveryKind == "host" {
+		return nil, ErrServiceNotContainer
 	}
 	if err := s.services.UpdateContainerBinding(ctx, id, containerName, containerID); err != nil {
 		return nil, err

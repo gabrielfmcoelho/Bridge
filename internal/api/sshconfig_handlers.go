@@ -342,13 +342,20 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 			}
 		}
 
-		// Reconcile container-based services.
-		if len(vmInfo.ParsedContainers) > 0 {
-			if reconcileErr := store.NewServiceRepo(h.db.SQL).ReconcileContainers(r.Context(), host.ID, vmInfo.ParsedContainers); reconcileErr != nil {
-				result["reconcile_error"] = reconcileErr.Error()
-			} else {
-				result["services_reconciled"] = true
-			}
+		// Reconcile discovered services — containers plus host-level catalog
+		// hits. Runs on every scan, including one that found nothing: that is
+		// how a stopped workload gets marked offline. ContainersKnown tells
+		// the reconciler whether an empty container list means "none run here"
+		// or "docker wouldn't answer".
+		inv := store.DiscoveredInventory{
+			Containers:      vmInfo.ParsedContainers,
+			ContainersKnown: vmInfo.ContainersKnown,
+			Services:        vmInfo.ServiceInventory,
+		}
+		if reconcileErr := store.NewServiceRepo(h.db.SQL).ReconcileDiscovered(r.Context(), host.ID, inv); reconcileErr != nil {
+			result["reconcile_error"] = reconcileErr.Error()
+		} else {
+			result["services_reconciled"] = true
 		}
 	} else {
 		testErr := sshtest.Test(client)
