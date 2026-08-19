@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -30,6 +31,7 @@ type ServiceService struct {
 	services     *store.ServiceRepo
 	tags         *store.TagRepo
 	responsaveis *store.ResponsavelRepo
+	grants       *store.AssetEntidadeRepo
 }
 
 // NewServiceService constructs a ServiceService over the given DB handle.
@@ -39,6 +41,7 @@ func NewServiceService(db *sql.DB) *ServiceService {
 		services:     store.NewServiceRepo(db),
 		tags:         store.NewTagRepo(db),
 		responsaveis: store.NewResponsavelRepo(db),
+		grants:       store.NewAssetEntidadeRepo(db),
 	}
 }
 
@@ -61,6 +64,7 @@ type ServiceDetail struct {
 	DependsOnIDs []int64              `json:"depends_on_ids"`
 	DependentIDs []int64              `json:"dependent_ids"`
 	Responsaveis []models.Responsavel `json:"responsaveis"`
+	Entidades    models.AssetGrants   `json:"entidades"`
 }
 
 // ServiceWrite carries the create/update payload (service + relations). For
@@ -73,6 +77,9 @@ type ServiceWrite struct {
 	DNSIDs       *[]int64
 	DependsOnIDs *[]int64
 	Responsaveis *[]models.ResponsavelInput
+	// Grants, when non-nil, replaces the service's entidade grants (already
+	// resolved by the handler via store.ResolveGrants).
+	Grants *models.AssetGrants
 }
 
 // List returns the services matching the filter (server-side filter/sort/
@@ -154,6 +161,7 @@ func (s *ServiceService) Get(ctx context.Context, id int64) (*ServiceDetail, err
 	if err != nil {
 		return nil, err
 	}
+	grants, _ := s.grants.Get(ctx, store.AssetService, id) // best effort
 	return &ServiceDetail{
 		Service:      svc,
 		Tags:         tags,
@@ -162,7 +170,13 @@ func (s *ServiceService) Get(ctx context.Context, id int64) (*ServiceDetail, err
 		DependsOnIDs: dependsOn,
 		DependentIDs: dependents,
 		Responsaveis: resp,
+		Entidades:    grants,
 	}, nil
+}
+
+// Grants returns the service's current entidade grants.
+func (s *ServiceService) Grants(ctx context.Context, id int64) (models.AssetGrants, error) {
+	return s.grants.Get(ctx, store.AssetService, id)
 }
 
 // Create inserts the service and applies its relations (only the non-empty ones).
@@ -172,6 +186,11 @@ func (s *ServiceService) Create(ctx context.Context, w *ServiceWrite) error {
 		return err
 	}
 	id := w.Service.ID
+	if w.Grants != nil {
+		if err := s.grants.Replace(ctx, s.db, store.AssetService, id, *w.Grants); err != nil {
+			return fmt.Errorf("failed to set entidades: %w", err)
+		}
+	}
 	if w.Tags != nil && len(*w.Tags) > 0 {
 		if err := s.tags.Set(ctx, "service", id, *w.Tags); err != nil {
 			return err
@@ -210,6 +229,11 @@ func (s *ServiceService) Update(ctx context.Context, id int64, w *ServiceWrite) 
 	w.Service.ID = id
 	if err := s.services.Update(ctx, &w.Service); err != nil {
 		return true, err
+	}
+	if w.Grants != nil {
+		if err := s.grants.Replace(ctx, s.db, store.AssetService, id, *w.Grants); err != nil {
+			return true, fmt.Errorf("failed to set entidades: %w", err)
+		}
 	}
 	if w.Tags != nil {
 		if err := s.tags.Set(ctx, "service", id, *w.Tags); err != nil {

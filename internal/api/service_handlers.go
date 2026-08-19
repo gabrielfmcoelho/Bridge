@@ -73,6 +73,7 @@ func (h *serviceHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 // "present" (set) on update.
 type serviceWriteRequest struct {
 	models.Service
+	models.AssetGrantsInput
 	Tags         *[]string                  `json:"tags"`
 	HostIDs      *[]int64                   `json:"host_ids"`
 	DNSIDs       *[]int64                   `json:"dns_ids"`
@@ -99,7 +100,17 @@ func (h *serviceHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if !requireFields(w, map[string]string{"nickname": req.Nickname}) {
 		return
 	}
+	g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, nil)
+	if errors.Is(err, store.ErrEntidadeForbidden) {
+		jsonError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	wr := req.toWrite()
+	wr.Grants = &g
 	if err := h.service.Create(r.Context(), wr); err != nil {
 		jsonServerError(w, r, "failed to create service", err)
 		return
@@ -139,6 +150,19 @@ func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wr := req.toWrite()
+	if req.AssetGrantsInput.Present() {
+		existing, _ := h.service.Grants(r.Context(), id)
+		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existing)
+		if errors.Is(err, store.ErrEntidadeForbidden) {
+			jsonError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		wr.Grants = &g
+	}
 	found, err := h.service.Update(r.Context(), id, wr)
 	if err != nil {
 		jsonServerError(w, r, "failed to update service", err)

@@ -106,7 +106,8 @@ func (r *ServiceRepo) Create(ctx context.Context, s *models.Service) error {
 // Get returns a service by id, or (nil, nil) if absent.
 func (r *ServiceRepo) Get(ctx context.Context, id int64) (*models.Service, error) {
 	s := &models.Service{}
-	err := scanService(r.db.QueryRowContext(ctx, `SELECT `+serviceCols+` FROM services WHERE id = ? AND deleted_at IS NULL`, id), s)
+	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
+	err := scanService(r.db.QueryRowContext(ctx, `SELECT `+serviceCols+` FROM services WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...), s)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -115,7 +116,8 @@ func (r *ServiceRepo) Get(ctx context.Context, id int64) (*models.Service, error
 
 // List returns all services ordered by nickname.
 func (r *ServiceRepo) List(ctx context.Context) ([]models.Service, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE deleted_at IS NULL ORDER BY nickname`)
+	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE deleted_at IS NULL AND `+vis+` ORDER BY nickname`, vargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -127,9 +129,10 @@ func (r *ServiceRepo) List(ctx context.Context) ([]models.Service, error) {
 // clauses with `?` placeholders (the driver rebinds `?`→$N), ILIKE search via
 // database.LikeOp(), a tag subquery against the unified tags table, and
 // tri-state boolean filters inlined as literal true/false (no bound arg).
-func serviceWhere(f models.ServiceFilter) ([]string, []any) {
-	var args []any
-	where := []string{"deleted_at IS NULL"}
+func serviceWhere(ctx context.Context, f models.ServiceFilter) ([]string, []any) {
+	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
+	where := []string{"deleted_at IS NULL", vis}
+	args := append([]any{}, vargs...)
 
 	if f.Search != "" {
 		op := database.LikeOp()
@@ -165,7 +168,7 @@ func serviceWhere(f models.ServiceFilter) ([]string, []any) {
 // unbounded (no LIMIT) — the path the frontend's full-list query uses.
 func (r *ServiceRepo) ListFiltered(ctx context.Context, f models.ServiceFilter) ([]models.Service, error) {
 	query := `SELECT ` + serviceCols + ` FROM services`
-	where, args := serviceWhere(f)
+	where, args := serviceWhere(ctx, f)
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -203,7 +206,7 @@ func (r *ServiceRepo) ListFiltered(ctx context.Context, f models.ServiceFilter) 
 // ListFiltered paginates over (no order/limit).
 func (r *ServiceRepo) CountFiltered(ctx context.Context, f models.ServiceFilter) (int, error) {
 	query := `SELECT COUNT(*) FROM services`
-	where, args := serviceWhere(f)
+	where, args := serviceWhere(ctx, f)
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -214,7 +217,8 @@ func (r *ServiceRepo) CountFiltered(ctx context.Context, f models.ServiceFilter)
 
 // ListByProject returns services belonging to a project, ordered by nickname.
 func (r *ServiceRepo) ListByProject(ctx context.Context, projectID int64) ([]models.Service, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE project_id = ? AND deleted_at IS NULL ORDER BY nickname`, projectID)
+	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE project_id = ? AND deleted_at IS NULL AND `+vis+` ORDER BY nickname`, append([]any{projectID}, vargs...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -223,10 +227,11 @@ func (r *ServiceRepo) ListByProject(ctx context.Context, projectID int64) ([]mod
 
 // ListByHost returns services linked to a host, ordered by nickname.
 func (r *ServiceRepo) ListByHost(ctx context.Context, hostID int64) ([]models.Service, error) {
+	vis, vargs := VisibleExpr(ctx, AssetService, "s.id")
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+serviceColsS+`
 		 FROM services s JOIN service_host_links l ON s.id = l.service_id
-		 WHERE l.host_id = ? AND s.deleted_at IS NULL ORDER BY s.nickname`, hostID)
+		 WHERE l.host_id = ? AND s.deleted_at IS NULL AND `+vis+` ORDER BY s.nickname`, append([]any{hostID}, vargs...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -250,6 +255,7 @@ func (r *ServiceRepo) ListDiscoveredByHost(ctx context.Context, hostID int64) ([
 
 // Update writes the mutable fields of a service by id.
 func (r *ServiceRepo) Update(ctx context.Context, s *models.Service) error {
+	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE services SET nickname = ?, project_id = ?, description = ?, service_type = ?, service_subtype = ?,
 			technology_stack = ?, deploy_approach = ?, orchestrator_tool = ?, environment = ?, port = ?, version = ?,
@@ -258,14 +264,14 @@ func (r *ServiceRepo) Update(ctx context.Context, s *models.Service) error {
 			repository_url = ?, gitlab_url = ?, documentation_url = ?,
 			source = ?, container_status = ?, container_id = ?, container_name = ?, container_image = ?, container_ports = ?,
 			discovered_at = ?, last_seen_at = ?, grafana_dashboard_uid = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`,
-		s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype,
-		s.TechnologyStack, s.DeployApproach, s.OrchestratorTool, s.Environment, s.Port, s.Version,
-		s.OrchestratorManaged, s.IsDirectlyManaged, s.IsResponsible, s.DevelopedBy,
-		s.IsExternalDependency, s.ExternalProvider, s.ExternalURL, s.ExternalContact,
-		s.RepositoryURL, s.GitlabURL, s.DocumentationURL,
-		s.Source, s.ContainerStatus, s.ContainerID, s.ContainerName, s.ContainerImage, s.ContainerPorts,
-		s.DiscoveredAt, s.LastSeenAt, s.GrafanaDashboardUID, s.ID,
+		WHERE id = ? AND `+vis,
+		append([]any{s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype,
+			s.TechnologyStack, s.DeployApproach, s.OrchestratorTool, s.Environment, s.Port, s.Version,
+			s.OrchestratorManaged, s.IsDirectlyManaged, s.IsResponsible, s.DevelopedBy,
+			s.IsExternalDependency, s.ExternalProvider, s.ExternalURL, s.ExternalContact,
+			s.RepositoryURL, s.GitlabURL, s.DocumentationURL,
+			s.Source, s.ContainerStatus, s.ContainerID, s.ContainerName, s.ContainerImage, s.ContainerPorts,
+			s.DiscoveredAt, s.LastSeenAt, s.GrafanaDashboardUID, s.ID}, vargs...)...,
 	)
 	return err
 }
@@ -288,14 +294,16 @@ func (r *ServiceRepo) UpdateContainerBinding(ctx context.Context, id int64, cont
 // Delete removes a service row by id. (Vault cascade is handled separately via
 // the cascade registry in the delete path.)
 func (r *ServiceRepo) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM services WHERE id = ?`, id)
+	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
+	_, err := r.db.ExecContext(ctx, `DELETE FROM services WHERE id = ? AND `+vis, append([]any{id}, vargs...)...)
 	return err
 }
 
 // Count returns the total number of services.
 func (r *ServiceRepo) Count(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM services WHERE deleted_at IS NULL`).Scan(&n)
+	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM services WHERE deleted_at IS NULL AND `+vis, vargs...).Scan(&n)
 	return n, err
 }
 
@@ -585,6 +593,10 @@ func (r *ServiceRepo) ReconcileDiscovered(ctx context.Context, hostID int64, inv
 		); err != nil {
 			return err
 		}
+		// A scan-born service is visible to whoever sees its host.
+		if err := NewAssetEntidadeRepo(r.db).CopyFrom(ctx, tx, AssetHost, hostID, AssetService, id); err != nil {
+			return err
+		}
 		seen[row.identity()] = true
 	}
 
@@ -640,7 +652,8 @@ func extractFirstHostPort(ports string) string {
 
 // ListTrash returns soft-deleted services (deleted_at set).
 func (r *ServiceRepo) ListTrash(ctx context.Context) ([]models.Service, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE deleted_at IS NOT NULL ORDER BY nickname`)
+	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT `+serviceCols+` FROM services WHERE deleted_at IS NOT NULL AND `+vis+` ORDER BY nickname`, vargs...)
 	if err != nil {
 		return nil, err
 	}
