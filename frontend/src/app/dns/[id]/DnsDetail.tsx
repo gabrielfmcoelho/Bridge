@@ -178,6 +178,7 @@ export default function DnsDetail({ id }: { id: number }) {
               initialTags={data.tags}
               initialHostIds={data.host_ids}
               initialResponsaveis={responsaveis}
+              initialGrants={data.entidades}
               onSuccess={() => {
                 queryClient.invalidateQueries({ queryKey: ["dns", id] });
                 queryClient.invalidateQueries({ queryKey: ["dns"] });

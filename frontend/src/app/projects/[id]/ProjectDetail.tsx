@@ -176,6 +176,7 @@ export default function ProjectDetail({ id }: { id: number }) {
           >
             <ProjectForm
               initial={data.project}
+              initialGrants={data.entidades}
               onSubHeaderChange={setFormSubHeader}
               onSuccess={() => {
                 setShowEditDrawer(false);

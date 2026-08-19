@@ -249,6 +249,7 @@ export default function ServiceDetail({ id }: { id: number }) {
           >
             <ServiceForm
               initial={data.service}
+              initialGrants={data.entidades}
               onSubHeaderChange={setFormSubHeader}
               onSuccess={() => {
                 setShowEditDrawer(false);
