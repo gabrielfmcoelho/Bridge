@@ -41,6 +41,9 @@ type APICatalog struct {
 	UpdatedAt      time.Time      `json:"updated_at"`
 	OperationCount int            `json:"operation_count"`
 	Operations     []APIOperation `json:"operations,omitempty"`
+	// Entidades carries the entidade grants on detail responses (edit-form
+	// prefill); nil on list rows.
+	Entidades *AssetGrants `json:"entidades,omitempty"`
 
 	// SpecJSON is the canonical normalized spec. Carried on the struct so the
 	// repo's Create can persist it, but excluded from JSON output — the raw
