@@ -23,7 +23,8 @@ func (h *dashboardHandlers) handleDashboard(w http.ResponseWriter, r *http.Reque
 	projectCount, _ := store.NewProjectRepo(h.db.SQL).Count(r.Context())
 	serviceCount, _ := store.NewServiceRepo(h.db.SQL).Count(r.Context())
 	orchestratorCount, _ := store.NewOrchestratorRepo(h.db.SQL).Count(r.Context())
-	openIssues, _ := models.OpenIssueCount(h.db.SQL)
+	visSQL, visArgs := store.VisibleExprDyn(r.Context(), "entity_type", "entity_id")
+	openIssues, _ := models.OpenIssueCountVisible(h.db.SQL, visSQL, visArgs)
 
 	jsonOK(w, map[string]any{
 		"hosts": map[string]any{
