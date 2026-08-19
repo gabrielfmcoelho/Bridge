@@ -8,6 +8,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -96,6 +97,24 @@ type createSecretRequest struct {
 	GroupLabel  *string `json:"group_label,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Payload     string  `json:"payload"`
+	// Entidade grants — honoured only for shared avulso secrets (root assets);
+	// every other scope/visibility inherits from its parent or is owner-only.
+	models.AssetGrantsInput
+}
+
+// ownsGrants reports whether a secret carries its own entidade grants
+// (asset_type 'secret'): only shared avulso ones do.
+func ownsGrants(scope models.SecretScope, vis models.SecretVisibility) bool {
+	return scope == models.SecretScopeAvulso && vis == models.SecretVisibilityShared
+}
+
+// grantsErr maps ResolveGrants failures: forbidden entidade → 403, else 400.
+func grantsErr(w http.ResponseWriter, err error) {
+	if errors.Is(err, store.ErrEntidadeForbidden) {
+		jsonError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	jsonError(w, http.StatusBadRequest, err.Error())
 }
 
 func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -129,6 +148,18 @@ func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		KeyVersion:  1,
 		CreatedBy:   actor.UserID,
 	}
+	var (
+		grants    models.AssetGrants
+		hasGrants = ownsGrants(s.Scope, s.Visibility)
+	)
+	if hasGrants {
+		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, nil)
+		if err != nil {
+			grantsErr(w, err)
+			return
+		}
+		grants = g
+	}
 	id, err := h.repo.Create(r.Context(), actor, s, req.Payload)
 	if err != nil {
 		// Validation errors (invalid type/scope/visibility, missing fields,
@@ -144,6 +175,13 @@ func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		jsonBadRequest(w, r, err.Error(), err)
 		return
+	}
+	if hasGrants {
+		if err := store.NewAssetEntidadeRepo(h.db.SQL).Replace(r.Context(), h.db.SQL, store.AssetSecret, id, grants); err != nil {
+			// Row exists but is admin-only until grants are set.
+			jsonServerError(w, r, "failed to set entidades", err)
+			return
+		}
 	}
 	jsonCreated(w, map[string]any{"id": id})
 }
@@ -163,6 +201,11 @@ func (h *secretHandlers) handleGetMetadata(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		writeErr(w, r, err)
 		return
+	}
+	if ownsGrants(v.Scope, v.Visibility) {
+		if g, err := store.NewAssetEntidadeRepo(h.db.SQL).Get(r.Context(), store.AssetSecret, id); err == nil {
+			v.Entidades = &g
+		}
 	}
 	jsonOK(w, v)
 }
@@ -196,6 +239,9 @@ type updateSecretRequest struct {
 	GroupLabel  *string         `json:"group_label,omitempty"`
 	Payload     *string         `json:"payload,omitempty"`
 	Visibility  json.RawMessage `json:"visibility,omitempty"` // sentinel — must not be present
+
+	// Entidade grants — shared avulso only; ignored otherwise.
+	models.AssetGrantsInput
 }
 
 func (h *secretHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
@@ -224,9 +270,39 @@ func (h *secretHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		GroupLabel:  req.GroupLabel,
 		Payload:     req.Payload,
 	}
+	// Resolve grants before mutating so a bad entidade fails the whole PUT;
+	// Replace only after Update passed the repo's ACL (editor+ on shared).
+	var newGrants *models.AssetGrants
+	if req.AssetGrantsInput.Present() {
+		v, err := h.repo.GetMetadata(r.Context(), actor, id)
+		if err != nil {
+			writeErr(w, r, err)
+			return
+		}
+		if ownsGrants(v.Scope, v.Visibility) {
+			grantsRepo := store.NewAssetEntidadeRepo(h.db.SQL)
+			existing, err := grantsRepo.Get(r.Context(), store.AssetSecret, id)
+			if err != nil {
+				jsonServerError(w, r, "failed to load entidades", err)
+				return
+			}
+			g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existing)
+			if err != nil {
+				grantsErr(w, err)
+				return
+			}
+			newGrants = &g
+		}
+	}
 	if err := h.repo.Update(r.Context(), actor, id, patch); err != nil {
 		writeErr(w, r, err)
 		return
+	}
+	if newGrants != nil {
+		if err := store.NewAssetEntidadeRepo(h.db.SQL).Replace(r.Context(), h.db.SQL, store.AssetSecret, id, *newGrants); err != nil {
+			jsonServerError(w, r, "failed to set entidades", err)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]any{"id": id})

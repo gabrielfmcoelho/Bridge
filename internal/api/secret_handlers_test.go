@@ -573,3 +573,57 @@ func TestSecretHandlers_History(t *testing.T) {
 		}
 	})
 }
+
+// ---------------------------------------------------------------------------
+// Entidade grants on shared avulso secrets (phase 3g)
+// ---------------------------------------------------------------------------
+
+func TestSecretHandlers_AvulsoGrants(t *testing.T) {
+	env := newSecretAPIEnv(t)
+	var sga int64
+	if err := env.d.SQL.QueryRow(`SELECT id FROM entidades WHERE slug = 'sga'`).Scan(&sga); err != nil {
+		t.Fatalf("entidade sga: %v", err)
+	}
+	grants := store.NewAssetEntidadeRepo(env.d.SQL)
+
+	body := fmt.Sprintf(`{"type":"password","scope":"avulso","visibility":"shared","name":"team-wifi","payload":"v","creator_entidade_id":%d}`, sga)
+	rec := env.do(env.bob, "POST", "/api/secrets", body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create: got %d, want 201 (body=%s)", rec.Code, rec.Body.String())
+	}
+	id := int64(decodeMap(t, rec)["id"].(float64))
+	g, err := grants.Get(context.Background(), store.AssetSecret, id)
+	if err != nil || g.CreatorEntidadeID == nil || *g.CreatorEntidadeID != sga {
+		t.Fatalf("grants after create = %+v, err=%v; want creator=%d", g, err, sga)
+	}
+
+	// GET metadata exposes the grants for the edit form.
+	rec = env.do(env.bob, "GET", fmt.Sprintf("/api/secrets/%d", id), "")
+	if rec.Code != 200 {
+		t.Fatalf("get: got %d", rec.Code)
+	}
+	if _, ok := decodeMap(t, rec)["entidades"]; !ok {
+		t.Error("GET metadata missing entidades for shared avulso secret")
+	}
+
+	// PUT with is_global flips the grants; non-grant fields untouched.
+	rec = env.do(env.bob, "PUT", fmt.Sprintf("/api/secrets/%d", id), `{"is_global":true}`)
+	if rec.Code != 200 {
+		t.Fatalf("update: got %d (body=%s)", rec.Code, rec.Body.String())
+	}
+	g, _ = grants.Get(context.Background(), store.AssetSecret, id)
+	if !g.IsGlobal || g.CreatorEntidadeID == nil {
+		t.Errorf("grants after update = %+v; want global + creator kept", g)
+	}
+
+	// Personal secrets never get grant rows even if the client sends them.
+	body = fmt.Sprintf(`{"type":"password","scope":"avulso","visibility":"personal","name":"mine","payload":"v","creator_entidade_id":%d}`, sga)
+	rec = env.do(env.carol, "POST", "/api/secrets", body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create personal: got %d", rec.Code)
+	}
+	pid := int64(decodeMap(t, rec)["id"].(float64))
+	if g, _ := grants.Get(context.Background(), store.AssetSecret, pid); g.CreatorEntidadeID != nil {
+		t.Errorf("personal secret got grants: %+v", g)
+	}
+}
