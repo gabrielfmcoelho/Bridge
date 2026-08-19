@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -36,13 +35,8 @@ func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if !requireFields(w, map[string]string{"name": req.Name}) {
 		return
 	}
-	g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, nil)
-	if errors.Is(err, store.ErrEntidadeForbidden) {
-		jsonError(w, http.StatusForbidden, err.Error())
-		return
-	}
-	if err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+	g, ok := resolveGrants(w, r, req.AssetGrantsInput, nil)
+	if !ok {
 		return
 	}
 	if err := h.contacts.Create(r.Context(), &req.Contact); err != nil {
@@ -83,13 +77,8 @@ func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.AssetGrantsInput.Present() {
 		grants := store.NewAssetEntidadeRepo(h.contacts.DB())
 		existing, _ := grants.Get(r.Context(), store.AssetContact, id)
-		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existing)
-		if errors.Is(err, store.ErrEntidadeForbidden) {
-			jsonError(w, http.StatusForbidden, err.Error())
-			return
-		}
-		if err != nil {
-			jsonError(w, http.StatusBadRequest, err.Error())
+		g, ok := resolveGrants(w, r, req.AssetGrantsInput, &existing)
+		if !ok {
 			return
 		}
 		if err := grants.Replace(r.Context(), h.contacts.DB(), store.AssetContact, id, g); err != nil {

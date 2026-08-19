@@ -100,13 +100,8 @@ func (h *serviceHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if !requireFields(w, map[string]string{"nickname": req.Nickname}) {
 		return
 	}
-	g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, nil)
-	if errors.Is(err, store.ErrEntidadeForbidden) {
-		jsonError(w, http.StatusForbidden, err.Error())
-		return
-	}
-	if err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+	g, ok := resolveGrants(w, r, req.AssetGrantsInput, nil)
+	if !ok {
 		return
 	}
 	wr := req.toWrite()
@@ -152,13 +147,8 @@ func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	wr := req.toWrite()
 	if req.AssetGrantsInput.Present() {
 		existing, _ := h.service.Grants(r.Context(), id)
-		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existing)
-		if errors.Is(err, store.ErrEntidadeForbidden) {
-			jsonError(w, http.StatusForbidden, err.Error())
-			return
-		}
-		if err != nil {
-			jsonError(w, http.StatusBadRequest, err.Error())
+		g, ok := resolveGrants(w, r, req.AssetGrantsInput, &existing)
+		if !ok {
 			return
 		}
 		wr.Grants = &g

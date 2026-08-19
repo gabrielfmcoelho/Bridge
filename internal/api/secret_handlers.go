@@ -108,15 +108,6 @@ func ownsGrants(scope models.SecretScope, vis models.SecretVisibility) bool {
 	return scope == models.SecretScopeAvulso && vis == models.SecretVisibilityShared
 }
 
-// grantsErr maps ResolveGrants failures: forbidden entidade → 403, else 400.
-func grantsErr(w http.ResponseWriter, err error) {
-	if errors.Is(err, store.ErrEntidadeForbidden) {
-		jsonError(w, http.StatusForbidden, err.Error())
-		return
-	}
-	jsonError(w, http.StatusBadRequest, err.Error())
-}
-
 func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -153,9 +144,8 @@ func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		hasGrants = ownsGrants(s.Scope, s.Visibility)
 	)
 	if hasGrants {
-		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, nil)
-		if err != nil {
-			grantsErr(w, err)
+		g, ok := resolveGrants(w, r, req.AssetGrantsInput, nil)
+		if !ok {
 			return
 		}
 		grants = g
@@ -286,9 +276,8 @@ func (h *secretHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 				jsonServerError(w, r, "failed to load entidades", err)
 				return
 			}
-			g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existing)
-			if err != nil {
-				grantsErr(w, err)
+			g, ok := resolveGrants(w, r, req.AssetGrantsInput, &existing)
+			if !ok {
 				return
 			}
 			newGrants = &g

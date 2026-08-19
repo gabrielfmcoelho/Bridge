@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -55,13 +54,8 @@ func (h *toolHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "name is required")
 		return
 	}
-	g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, nil)
-	if errors.Is(err, store.ErrEntidadeForbidden) {
-		jsonError(w, http.StatusForbidden, err.Error())
-		return
-	}
-	if err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
+	g, ok := resolveGrants(w, r, req.AssetGrantsInput, nil)
+	if !ok {
 		return
 	}
 
@@ -116,13 +110,8 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.AssetGrantsInput.Present() {
 		grants := store.NewAssetEntidadeRepo(h.db.SQL)
 		existingGrants, _ := grants.Get(r.Context(), store.AssetTool, id)
-		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existingGrants)
-		if errors.Is(err, store.ErrEntidadeForbidden) {
-			jsonError(w, http.StatusForbidden, err.Error())
-			return
-		}
-		if err != nil {
-			jsonError(w, http.StatusBadRequest, err.Error())
+		g, ok := resolveGrants(w, r, req.AssetGrantsInput, &existingGrants)
+		if !ok {
 			return
 		}
 		if err := grants.Replace(r.Context(), h.db.SQL, store.AssetTool, id, g); err != nil {
