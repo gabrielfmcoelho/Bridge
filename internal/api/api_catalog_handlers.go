@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -121,7 +122,16 @@ func (h *apiCatalogHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, "api not found")
 		return
 	}
+	h.attachGrants(r.Context(), a)
 	jsonOK(w, a)
+}
+
+// attachGrants loads the row's entidade grants onto a.Entidades (best effort:
+// a failure leaves it nil).
+func (h *apiCatalogHandlers) attachGrants(ctx context.Context, a *models.APICatalog) {
+	if g, err := store.NewAssetEntidadeRepo(h.db.SQL).Get(ctx, store.AssetAPICatalog, a.ID); err == nil {
+		a.Entidades = &g
+	}
 }
 
 // handleGetSpec returns the canonical spec JSON verbatim for the renderer.
@@ -225,6 +235,7 @@ type importURLRequest struct {
 	SourceURL   string `json:"source_url"`
 	BaseURL     string `json:"base_url"`
 	DocsURL     string `json:"docs_url"`
+	models.AssetGrantsInput
 }
 
 func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Request) {
@@ -256,6 +267,7 @@ func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Requ
 		SourceURL:   req.SourceURL,
 		BaseURL:     strings.TrimSpace(req.BaseURL),
 		DocsURL:     strings.TrimSpace(req.DocsURL),
+		Grants:      req.AssetGrantsInput,
 	}
 	h.createFromSpec(w, r, raw, meta, owner)
 }
@@ -267,6 +279,7 @@ type updateCatalogRequest struct {
 	Description string `json:"description"`
 	BaseURL     string `json:"base_url"`
 	DocsURL     string `json:"docs_url"`
+	models.AssetGrantsInput
 }
 
 func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
@@ -293,7 +306,34 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 		jsonError(w, http.StatusNotFound, "api not found")
 		return
 	}
+	if req.AssetGrantsInput.Present() {
+		grants := store.NewAssetEntidadeRepo(h.db.SQL)
+		existing, _ := grants.Get(r.Context(), store.AssetAPICatalog, id)
+		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existing)
+		if !h.grantsOK(w, r, err) {
+			return
+		}
+		if err := grants.Replace(r.Context(), h.db.SQL, store.AssetAPICatalog, id, g); err != nil {
+			jsonServerError(w, r, "failed to set entidades", err)
+			return
+		}
+	}
+	h.attachGrants(r.Context(), a)
 	jsonOK(w, a)
+}
+
+// grantsOK maps a ResolveGrants error onto the response (403 for an
+// out-of-scope creator, 400 otherwise) and reports whether to proceed.
+func (h *apiCatalogHandlers) grantsOK(w http.ResponseWriter, r *http.Request, err error) bool {
+	if err == nil {
+		return true
+	}
+	if errors.Is(err, store.ErrEntidadeForbidden) {
+		jsonError(w, http.StatusForbidden, err.Error())
+	} else {
+		jsonError(w, http.StatusBadRequest, err.Error())
+	}
+	return false
 }
 
 // handleRefetch re-downloads a URL-sourced spec and replaces the stored spec
@@ -364,9 +404,12 @@ type catalogMeta struct {
 	SourceURL   string
 	BaseURL     string
 	DocsURL     string
+	Grants      models.AssetGrantsInput
 }
 
 // formMeta extracts catalog metadata from a multipart form (upload path).
+// Grant fields: creator_entidade_id (int), responsible_entidade_ids
+// (comma-separated ints), is_global ("true"/"1") — each only set when present.
 func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL string) (catalogMeta, error) {
 	m := catalogMeta{
 		Name:        r.FormValue("name"),
@@ -383,6 +426,28 @@ func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL str
 			return m, fmt.Errorf("invalid parent_id")
 		}
 		m.ParentID = &pid
+	}
+	if v := strings.TrimSpace(r.FormValue("creator_entidade_id")); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return m, fmt.Errorf("invalid creator_entidade_id")
+		}
+		m.Grants.CreatorEntidadeID = &id
+	}
+	if v := strings.TrimSpace(r.FormValue("responsible_entidade_ids")); v != "" {
+		ids := []int64{}
+		for _, s := range strings.Split(v, ",") {
+			id, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+			if err != nil {
+				return m, fmt.Errorf("invalid responsible_entidade_ids")
+			}
+			ids = append(ids, id)
+		}
+		m.Grants.ResponsibleEntidadeIDs = &ids
+	}
+	if v := strings.TrimSpace(r.FormValue("is_global")); v != "" {
+		g := v == "true" || v == "1"
+		m.Grants.IsGlobal = &g
 	}
 	return m, nil
 }
@@ -407,6 +472,10 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 		jsonError(w, http.StatusBadRequest, "name is required (spec has no title to fall back to)")
 		return
 	}
+	g, err := store.ResolveGrants(r.Context(), meta.Grants, nil)
+	if !h.grantsOK(w, r, err) {
+		return
+	}
 	a := &models.APICatalog{
 		Scope:        meta.Scope,
 		ParentID:     meta.ParentID,
@@ -429,10 +498,19 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 		jsonBadRequest(w, r, "could not save api: "+err.Error(), err)
 		return
 	}
+	// Grants must land before the reload: without them a scoped caller can't
+	// see the row it just created.
+	if err := store.NewAssetEntidadeRepo(h.db.SQL).Replace(r.Context(), h.db.SQL, store.AssetAPICatalog, a.ID, g); err != nil {
+		jsonServerError(w, r, "failed to set entidades", err)
+		return
+	}
 	reloaded, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), a.ID)
 	if err != nil {
 		jsonServerError(w, r, "reload api catalog", err)
 		return
+	}
+	if reloaded != nil {
+		h.attachGrants(r.Context(), reloaded)
 	}
 	jsonCreated(w, reloaded)
 }

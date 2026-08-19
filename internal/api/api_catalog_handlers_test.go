@@ -43,15 +43,23 @@ type catalogEnv struct {
 	user   *models.User
 }
 
-func newCatalogEnv(t *testing.T) *catalogEnv {
-	t.Helper()
-	d, err := dbtest.Open(t)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { d.Close() })
+func newCatalogEnv(t *testing.T) *catalogEnv { return newCatalogEnvOn(t, nil, "editor", 0) }
 
-	u := &models.User{Username: "editor", DisplayName: "Editor", Role: "editor", Email: "e@example.com"}
+// newCatalogEnvOn builds an env over d (opened fresh when nil) whose requests
+// carry editor user `name` and, when entidade != 0, a scope limited to that
+// entidade (primary = that entidade). entidade == 0 ⇒ unscoped.
+func newCatalogEnvOn(t *testing.T, d *database.DB, name string, entidade int64) *catalogEnv {
+	t.Helper()
+	if d == nil {
+		var err error
+		d, err = dbtest.Open(t)
+		if err != nil {
+			t.Fatalf("open db: %v", err)
+		}
+		t.Cleanup(func() { d.Close() })
+	}
+
+	u := &models.User{Username: name, DisplayName: name, Role: "editor", Email: name + "@example.com"}
 	if err := store.NewUserRepo(d.SQL).Create(context.Background(), u); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -62,11 +70,24 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	// fixed editor user); production wires authenticated()/authedRole().
 	h.register(mux, func(role string, next http.Handler) http.Handler { return next })
 	wrapped := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mux.ServeHTTP(w, r.WithContext(auth.WithUser(r.Context(), u)))
+		ctx := auth.WithUser(r.Context(), u)
+		if entidade != 0 {
+			ctx = store.WithScope(ctx, store.Scope{EntidadeIDs: []int64{entidade}, PrimaryEntidadeID: entidade})
+		}
+		mux.ServeHTTP(w, r.WithContext(ctx))
 	})
 	srv := httptest.NewServer(wrapped)
 	t.Cleanup(srv.Close)
 	return &catalogEnv{t: t, d: d, server: srv, user: u}
+}
+
+func entidadeID(t *testing.T, d *database.DB, slug string) int64 {
+	t.Helper()
+	var id int64
+	if err := d.SQL.QueryRow(`SELECT id FROM entidades WHERE slug = ?`, slug).Scan(&id); err != nil {
+		t.Fatalf("entidade %s: %v", slug, err)
+	}
+	return id
 }
 
 func (e *catalogEnv) do(method, path, body string) *http.Response {
@@ -184,6 +205,43 @@ func TestCatalog_ImportURL_SSRFBlocked(t *testing.T) {
 		`{"name":"x","scope":"avulso","source_url":"http://127.0.0.1:9/openapi.json"}`)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("ssrf status = %d, want 400 (body=%s)", resp.StatusCode, readBody(resp))
+	}
+}
+
+// TestCatalog_EntidadeScope: a scoped sga user imports with no explicit grants
+// ⇒ creator defaults to sga, the row is visible to sga and invisible to sgp.
+func TestCatalog_EntidadeScope(t *testing.T) {
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { d.Close() })
+	sgaID, sgpID := entidadeID(t, d, "sga"), entidadeID(t, d, "sgp")
+	sga := newCatalogEnvOn(t, d, "sga-user", sgaID)
+	sgp := newCatalogEnvOn(t, d, "sgp-user", sgpID)
+
+	resp := sga.uploadSpec(testOpenAPI30)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("upload status = %d, body=%s", resp.StatusCode, readBody(resp))
+	}
+	created := decodeObj(t, resp)
+	id := int64(created["id"].(float64))
+	ents, _ := created["entidades"].(map[string]any)
+	if ents == nil || ents["creator_entidade_id"] != float64(sgaID) {
+		t.Errorf("entidades = %v, want creator %d", created["entidades"], sgaID)
+	}
+
+	if arr := decodeArr(t, sga.do(http.MethodGet, "/api/api-catalog", "")); len(arr) != 1 {
+		t.Errorf("sga list = %d, want 1", len(arr))
+	}
+	if arr := decodeArr(t, sgp.do(http.MethodGet, "/api/api-catalog", "")); len(arr) != 0 {
+		t.Errorf("sgp list = %d, want 0", len(arr))
+	}
+	if resp := sgp.do(http.MethodGet, "/api/api-catalog/"+itoa(id), ""); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("sgp get = %d, want 404", resp.StatusCode)
+	}
+	if resp := sga.do(http.MethodGet, "/api/api-catalog/"+itoa(id), ""); resp.StatusCode != http.StatusOK {
+		t.Errorf("sga get = %d, want 200", resp.StatusCode)
 	}
 }
 

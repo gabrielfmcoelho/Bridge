@@ -77,10 +77,11 @@ func insertAPIOperations(ctx context.Context, tx *sql.Tx, apiID int64, ops []mod
 // (nil, nil) when not found / soft-deleted.
 func (r *APICatalogRepo) Get(ctx context.Context, id int64) (*models.APICatalog, error) {
 	a := &models.APICatalog{}
+	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
 	err := r.db.QueryRowContext(ctx,
 		`SELECT id, scope, parent_id, name, description, source_type, source_url, external_url, base_url, docs_url,
 			spec_version, spec_hash, title, version_label, owner_user_id, created_by, created_at, updated_at
-		FROM api_catalog WHERE id = ? AND deleted_at IS NULL`, id,
+		FROM api_catalog WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...,
 	).Scan(&a.ID, &a.Scope, &a.ParentID, &a.Name, &a.Description, &a.SourceType, &a.SourceURL, &a.ExternalURL, &a.BaseURL, &a.DocsURL,
 		&a.SpecVersion, &a.SpecHash, &a.Title, &a.VersionLabel, &a.OwnerUserID, &a.CreatedBy, &a.CreatedAt, &a.UpdatedAt)
 	if err == sql.ErrNoRows {
@@ -101,7 +102,8 @@ func (r *APICatalogRepo) Get(ctx context.Context, id int64) (*models.APICatalog,
 // GetSpec returns the canonical spec JSON for a live catalog row, or ("", nil).
 func (r *APICatalogRepo) GetSpec(ctx context.Context, id int64) (string, error) {
 	var spec string
-	err := r.db.QueryRowContext(ctx, `SELECT spec_json FROM api_catalog WHERE id = ? AND deleted_at IS NULL`, id).Scan(&spec)
+	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
+	err := r.db.QueryRowContext(ctx, `SELECT spec_json FROM api_catalog WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...).Scan(&spec)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -142,7 +144,8 @@ func (r *APICatalogRepo) List(ctx context.Context, f models.APICatalogFilter) ([
 			c.spec_version, c.spec_hash, c.title, c.version_label, c.owner_user_id, c.created_by, c.created_at, c.updated_at,
 			(SELECT COUNT(*) FROM api_operations o WHERE o.api_id = c.id) AS op_count
 		FROM api_catalog c WHERE c.deleted_at IS NULL`
-	var args []any
+	vis, args := VisibleExpr(ctx, AssetAPICatalog, "c.id")
+	q += " AND " + vis
 	if f.Scope != "" {
 		q += " AND c.scope = ?"
 		args = append(args, f.Scope)
@@ -182,7 +185,8 @@ func (r *APICatalogRepo) SearchOperations(ctx context.Context, query, scope stri
 	q := `SELECT c.id, c.name, c.scope, o.method, o.path, o.op_key, o.summary, o.description, o.tags
 		FROM api_operations o JOIN api_catalog c ON c.id = o.api_id
 		WHERE c.deleted_at IS NULL`
-	var args []any
+	vis, args := VisibleExpr(ctx, AssetAPICatalog, "c.id")
+	q += " AND " + vis
 	if scope != "" {
 		q += " AND c.scope = ?"
 		args = append(args, scope)
@@ -228,9 +232,10 @@ func (r *APICatalogRepo) UpdateMeta(ctx context.Context, id int64, name, descrip
 	if strings.TrimSpace(name) == "" {
 		return fmt.Errorf("name is required")
 	}
+	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE api_catalog SET name = ?, description = ?, base_url = ?, docs_url = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND deleted_at IS NULL`, name, description, baseURL, docsURL, id)
+		WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{name, description, baseURL, docsURL, id}, vargs...)...)
 	return err
 }
 
@@ -243,12 +248,17 @@ func (r *APICatalogRepo) UpdateSpec(ctx context.Context, id int64, specJSON, spe
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx,
+	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
+	res, err := tx.ExecContext(ctx,
 		`UPDATE api_catalog SET spec_json = ?, spec_hash = ?, spec_version = ?, title = ?,
 			version_label = ?, external_url = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND deleted_at IS NULL`,
-		specJSON, specHash, specVersion, title, versionLabel, externalURL, id); err != nil {
+		WHERE id = ? AND deleted_at IS NULL AND `+vis,
+		append([]any{specJSON, specHash, specVersion, title, versionLabel, externalURL, id}, vargs...)...)
+	if err != nil {
 		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows // invisible or gone: don't touch its operations
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM api_operations WHERE api_id = ?`, id); err != nil {
 		return err
@@ -262,6 +272,7 @@ func (r *APICatalogRepo) UpdateSpec(ctx context.Context, id int64, specJSON, spe
 // SoftDelete marks a catalog row deleted. Its operations remain (FK CASCADE only
 // fires on hard delete) but are unreachable via the live queries above.
 func (r *APICatalogRepo) SoftDelete(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `UPDATE api_catalog SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL`, id)
+	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
+	_, err := r.db.ExecContext(ctx, `UPDATE api_catalog SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...)
 	return err
 }
