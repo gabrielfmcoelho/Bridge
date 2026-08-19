@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -42,7 +43,10 @@ func (h *toolHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *toolHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var req models.ExternalTool
+	var req struct {
+		models.ExternalTool
+		models.AssetGrantsInput
+	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -51,12 +55,25 @@ func (h *toolHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "name is required")
 		return
 	}
+	g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, nil)
+	if errors.Is(err, store.ErrEntidadeForbidden) {
+		jsonError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
-	if err := store.NewExternalToolRepo(h.db.SQL).Create(r.Context(), &req); err != nil {
+	if err := store.NewExternalToolRepo(h.db.SQL).Create(r.Context(), &req.ExternalTool); err != nil {
 		jsonServerError(w, r, "failed to create tool", err)
 		return
 	}
-	jsonCreated(w, req)
+	if err := store.NewAssetEntidadeRepo(h.db.SQL).Replace(r.Context(), h.db.SQL, store.AssetTool, req.ExternalTool.ID, g); err != nil {
+		jsonServerError(w, r, "failed to set entidades", err)
+		return
+	}
+	jsonCreated(w, req.ExternalTool)
 }
 
 func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +89,10 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req models.ExternalTool
+	var req struct {
+		models.ExternalTool
+		models.AssetGrantsInput
+	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -89,11 +109,28 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		req.Source = existing.Source
 	}
 
-	if err := store.NewExternalToolRepo(h.db.SQL).Update(r.Context(), &req); err != nil {
+	if err := store.NewExternalToolRepo(h.db.SQL).Update(r.Context(), &req.ExternalTool); err != nil {
 		jsonServerError(w, r, "failed to update tool", err)
 		return
 	}
-	jsonOK(w, req)
+	if req.AssetGrantsInput.Present() {
+		grants := store.NewAssetEntidadeRepo(h.db.SQL)
+		existingGrants, _ := grants.Get(r.Context(), store.AssetTool, id)
+		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existingGrants)
+		if errors.Is(err, store.ErrEntidadeForbidden) {
+			jsonError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := grants.Replace(r.Context(), h.db.SQL, store.AssetTool, id, g); err != nil {
+			jsonServerError(w, r, "failed to set entidades", err)
+			return
+		}
+	}
+	jsonOK(w, req.ExternalTool)
 }
 
 func (h *toolHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
@@ -222,6 +259,11 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 	}
 	if err := store.NewExternalToolRepo(h.db.SQL).Create(r.Context(), tool); err != nil {
 		jsonServerError(w, r, "failed to create synced tool", err)
+		return
+	}
+	// A synced tool inherits its service's entidade grants.
+	if err := store.NewAssetEntidadeRepo(h.db.SQL).CopyFrom(r.Context(), h.db.SQL, store.AssetService, req.ServiceID, store.AssetTool, tool.ID); err != nil {
+		jsonServerError(w, r, "failed to set entidades", err)
 		return
 	}
 	jsonCreated(w, tool)

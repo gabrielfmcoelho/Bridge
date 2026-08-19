@@ -45,25 +45,27 @@ func (r *ExternalToolRepo) Create(ctx context.Context, t *models.ExternalTool) e
 	return nil
 }
 
-// Get returns a live (non-deleted) tool by id, or (nil, nil) if absent.
+// Get returns a live (non-deleted) visible tool by id, or (nil, nil) if absent.
 func (r *ExternalToolRepo) Get(ctx context.Context, id int64) (*models.ExternalTool, error) {
+	vis, vargs := VisibleExpr(ctx, AssetTool, "t.id")
 	t := &models.ExternalTool{}
 	err := scanExternalTool(r.db.QueryRowContext(ctx,
 		`SELECT t.id, t.name, t.description, t.url, t.icon, t.embed_enabled, t.sort_order,
 			t.service_id, t.dns_id, t.source, `+hasCredsExpr+`, t.created_at, t.updated_at
-		 FROM external_tools t WHERE t.id = ? AND t.deleted_at IS NULL`, id), t)
+		 FROM external_tools t WHERE t.id = ? AND t.deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...), t)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return t, err
 }
 
-// List returns all live tools ordered by sort_order, name.
+// List returns all live visible tools ordered by sort_order, name.
 func (r *ExternalToolRepo) List(ctx context.Context) ([]models.ExternalTool, error) {
+	vis, vargs := VisibleExpr(ctx, AssetTool, "t.id")
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT t.id, t.name, t.description, t.url, t.icon, t.embed_enabled, t.sort_order,
 			t.service_id, t.dns_id, t.source, `+hasCredsExpr+`, t.created_at, t.updated_at
-		 FROM external_tools t WHERE t.deleted_at IS NULL ORDER BY t.sort_order, t.name`)
+		 FROM external_tools t WHERE t.deleted_at IS NULL AND `+vis+` ORDER BY t.sort_order, t.name`, vargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,33 +81,37 @@ func (r *ExternalToolRepo) List(ctx context.Context) ([]models.ExternalTool, err
 	return tools, rows.Err()
 }
 
-// Update writes the mutable fields of an existing tool by id.
+// Update writes the mutable fields of an existing visible tool by id.
 func (r *ExternalToolRepo) Update(ctx context.Context, t *models.ExternalTool) error {
+	vis, vargs := VisibleExpr(ctx, AssetTool, "external_tools.id")
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE external_tools SET name = ?, description = ?, url = ?, icon = ?, embed_enabled = ?, sort_order = ?,
 			service_id = ?, dns_id = ?, source = ?, updated_at = CURRENT_TIMESTAMP
-		 WHERE id = ?`,
-		t.Name, t.Description, t.URL, t.Icon, t.EmbedEnabled, t.SortOrder,
-		t.ServiceID, t.DNSID, t.Source, t.ID,
+		 WHERE id = ? AND `+vis,
+		append([]any{t.Name, t.Description, t.URL, t.Icon, t.EmbedEnabled, t.SortOrder,
+			t.ServiceID, t.DNSID, t.Source, t.ID}, vargs...)...,
 	)
 	return err
 }
 
-// Delete hard-deletes a tool row by id (distinct from the soft-delete path that
-// flows through the cascade registry).
+// Delete hard-deletes a visible tool row by id (distinct from the soft-delete
+// path that flows through the cascade registry).
 func (r *ExternalToolRepo) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM external_tools WHERE id = ?`, id)
+	vis, vargs := VisibleExpr(ctx, AssetTool, "external_tools.id")
+	_, err := r.db.ExecContext(ctx, `DELETE FROM external_tools WHERE id = ? AND `+vis, append([]any{id}, vargs...)...)
 	return err
 }
 
 // GetByServiceAndDNS looks up an existing live synced tool for a service+DNS
 // pair (excludes soft-deleted so a sync re-creates rather than resurrects).
 func (r *ExternalToolRepo) GetByServiceAndDNS(ctx context.Context, serviceID, dnsID int64) (*models.ExternalTool, error) {
+	vis, vargs := VisibleExpr(ctx, AssetTool, "t.id")
 	t := &models.ExternalTool{}
 	err := scanExternalTool(r.db.QueryRowContext(ctx,
 		`SELECT t.id, t.name, t.description, t.url, t.icon, t.embed_enabled, t.sort_order,
 			t.service_id, t.dns_id, t.source, 0, t.created_at, t.updated_at
-		 FROM external_tools t WHERE t.service_id = ? AND t.dns_id = ? AND t.deleted_at IS NULL`, serviceID, dnsID), t)
+		 FROM external_tools t WHERE t.service_id = ? AND t.dns_id = ? AND t.deleted_at IS NULL AND `+vis,
+		append([]any{serviceID, dnsID}, vargs...)...), t)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

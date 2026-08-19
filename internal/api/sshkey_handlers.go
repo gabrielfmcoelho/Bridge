@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -46,6 +47,7 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		PublicKey      string `json:"public_key"`
 		PrivateKey     string `json:"private_key"`
 		Password       string `json:"password"`
+		models.AssetGrantsInput
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -53,6 +55,15 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Name == "" {
 		jsonError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, nil)
+	if errors.Is(err, store.ErrEntidadeForbidden) {
+		jsonError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if req.CredentialType == "" {
@@ -119,6 +130,10 @@ func (h *sshKeyHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to create credential", err)
 		return
 	}
+	if err := store.NewAssetEntidadeRepo(h.db.SQL).Replace(r.Context(), h.db.SQL, store.AssetSSHKey, k.ID, g); err != nil {
+		jsonServerError(w, r, "failed to set entidades", err)
+		return
+	}
 	jsonCreated(w, k)
 }
 
@@ -145,6 +160,7 @@ func (h *sshKeyHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		password, _ = h.db.Encryptor.Decrypt(k.PasswordCiphertext, k.PasswordNonce)
 	}
 
+	entidades, _ := store.NewAssetEntidadeRepo(h.db.SQL).Get(r.Context(), store.AssetSSHKey, k.ID)
 	jsonOK(w, map[string]any{
 		"id":              k.ID,
 		"name":            k.Name,
@@ -156,6 +172,7 @@ func (h *sshKeyHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		"password":        password,
 		"fingerprint":     k.Fingerprint,
 		"created_at":      k.CreatedAt,
+		"entidades":       entidades,
 	})
 }
 
@@ -179,6 +196,7 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		PublicKey      string `json:"public_key"`
 		PrivateKey     string `json:"private_key"`
 		Password       string `json:"password"`
+		models.AssetGrantsInput
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -244,6 +262,23 @@ func (h *sshKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if err := store.NewSSHKeyRepo(h.db.SQL).Update(r.Context(), k); err != nil {
 		jsonServerError(w, r, "failed to update credential", err)
 		return
+	}
+	if req.AssetGrantsInput.Present() {
+		grants := store.NewAssetEntidadeRepo(h.db.SQL)
+		existingGrants, _ := grants.Get(r.Context(), store.AssetSSHKey, id)
+		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existingGrants)
+		if errors.Is(err, store.ErrEntidadeForbidden) {
+			jsonError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := grants.Replace(r.Context(), h.db.SQL, store.AssetSSHKey, id, g); err != nil {
+			jsonServerError(w, r, "failed to set entidades", err)
+			return
+		}
 	}
 	jsonOK(w, k)
 }
