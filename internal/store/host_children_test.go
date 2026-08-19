@@ -46,4 +46,3 @@ func TestHostRemoteUserRepo_UpsertGetDelete(t *testing.T) {
 		t.Fatalf("after delete = %+v, want nil", got)
 	}
 }
-

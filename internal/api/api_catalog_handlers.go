@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -309,8 +308,8 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 	if req.AssetGrantsInput.Present() {
 		grants := store.NewAssetEntidadeRepo(h.db.SQL)
 		existing, _ := grants.Get(r.Context(), store.AssetAPICatalog, id)
-		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existing)
-		if !h.grantsOK(w, r, err) {
+		g, ok := resolveGrants(w, r, req.AssetGrantsInput, &existing)
+		if !ok {
 			return
 		}
 		if err := grants.Replace(r.Context(), h.db.SQL, store.AssetAPICatalog, id, g); err != nil {
@@ -320,20 +319,6 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 	}
 	h.attachGrants(r.Context(), a)
 	jsonOK(w, a)
-}
-
-// grantsOK maps a ResolveGrants error onto the response (403 for an
-// out-of-scope creator, 400 otherwise) and reports whether to proceed.
-func (h *apiCatalogHandlers) grantsOK(w http.ResponseWriter, r *http.Request, err error) bool {
-	if err == nil {
-		return true
-	}
-	if errors.Is(err, store.ErrEntidadeForbidden) {
-		jsonError(w, http.StatusForbidden, err.Error())
-	} else {
-		jsonError(w, http.StatusBadRequest, err.Error())
-	}
-	return false
 }
 
 // handleRefetch re-downloads a URL-sourced spec and replaces the stored spec
@@ -472,8 +457,8 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 		jsonError(w, http.StatusBadRequest, "name is required (spec has no title to fall back to)")
 		return
 	}
-	g, err := store.ResolveGrants(r.Context(), meta.Grants, nil)
-	if !h.grantsOK(w, r, err) {
+	g, ok := resolveGrants(w, r, meta.Grants, nil)
+	if !ok {
 		return
 	}
 	a := &models.APICatalog{
