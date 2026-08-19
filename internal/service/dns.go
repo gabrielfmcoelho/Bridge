@@ -12,20 +12,28 @@ package service
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // DNSService owns DNS read enrichment and write orchestration (record + tags +
-// host links + responsáveis). It composes the DNS repo, the tag repo, and the
-// responsável model helpers (the latter migrate to store in Phase 3).
+// host links + responsáveis + entidade grants). It composes the DNS repo, the
+// tag repo, and the responsável model helpers (the latter migrate to store in
+// Phase 3).
 type DNSService struct {
 	db           *sql.DB
 	dns          *store.DNSRepo
 	tags         *store.TagRepo
 	responsaveis *store.ResponsavelRepo
+	grants       *store.AssetEntidadeRepo
 }
+
+// ErrSetEntidades marks a grants write that failed after the record itself
+// was saved: the row exists but is admin-only until grants are set.
+var ErrSetEntidades = errors.New("set entidades")
 
 // NewDNSService constructs a DNSService over the given DB handle. (Until the DI
 // container is fully populated, it builds the repos it needs.)
@@ -35,6 +43,7 @@ func NewDNSService(db *sql.DB) *DNSService {
 		dns:          store.NewDNSRepo(db),
 		tags:         store.NewTagRepo(db),
 		responsaveis: store.NewResponsavelRepo(db),
+		grants:       store.NewAssetEntidadeRepo(db),
 	}
 }
 
@@ -52,15 +61,19 @@ type DNSDetail struct {
 	Tags         []string             `json:"tags"`
 	HostIDs      []int64              `json:"host_ids"`
 	Responsaveis []models.Responsavel `json:"responsaveis"`
+	Entidades    models.AssetGrants   `json:"entidades"`
 }
 
 // DNSWrite carries the create/update payload (record + relations). For update,
 // nil relation slices mean "leave unchanged"; for create, len==0 means "none".
+// Grants is the already-resolved (store.ResolveGrants) entidade grant set; nil
+// leaves the grants untouched.
 type DNSWrite struct {
 	Record       models.DNSRecord
 	Tags         *[]string
 	HostIDs      *[]int64
 	Responsaveis *[]models.ResponsavelInput
+	Grants       *models.AssetGrants
 }
 
 // List returns the DNS records matching the filter (server-side filter/sort/
@@ -120,7 +133,13 @@ func (s *DNSService) Get(ctx context.Context, id int64) (*DNSDetail, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DNSDetail{Record: rec, Tags: tags, HostIDs: hostIDs, Responsaveis: resp}, nil
+	ents, _ := s.grants.Get(ctx, store.AssetDNS, id) // best effort: zero value on error
+	return &DNSDetail{Record: rec, Tags: tags, HostIDs: hostIDs, Responsaveis: resp, Entidades: ents}, nil
+}
+
+// Grants returns the record's current entidade grants (zero value when none).
+func (s *DNSService) Grants(ctx context.Context, id int64) (models.AssetGrants, error) {
+	return s.grants.Get(ctx, store.AssetDNS, id)
 }
 
 // Create inserts the record and applies its relations (only the non-empty ones).
@@ -128,6 +147,11 @@ func (s *DNSService) Get(ctx context.Context, id int64) (*DNSDetail, error) {
 func (s *DNSService) Create(ctx context.Context, w *DNSWrite) error {
 	if err := s.dns.Create(ctx, &w.Record); err != nil {
 		return err
+	}
+	if w.Grants != nil {
+		if err := s.grants.Replace(ctx, s.db, store.AssetDNS, w.Record.ID, *w.Grants); err != nil {
+			return fmt.Errorf("%w: %w", ErrSetEntidades, err)
+		}
 	}
 	if w.Tags != nil && len(*w.Tags) > 0 {
 		if err := s.tags.Set(ctx, "dns", w.Record.ID, *w.Tags); err != nil {
@@ -158,6 +182,11 @@ func (s *DNSService) Update(ctx context.Context, id int64, w *DNSWrite) (bool, e
 	if err := s.dns.Update(ctx, &w.Record); err != nil {
 		return true, err
 	}
+	if w.Grants != nil {
+		if err := s.grants.Replace(ctx, s.db, store.AssetDNS, id, *w.Grants); err != nil {
+			return true, fmt.Errorf("%w: %w", ErrSetEntidades, err)
+		}
+	}
 	if w.Tags != nil {
 		if err := s.tags.Set(ctx, "dns", id, *w.Tags); err != nil {
 			return true, err
@@ -176,8 +205,12 @@ func (s *DNSService) Update(ctx context.Context, id int64, w *DNSWrite) (bool, e
 	return true, nil
 }
 
-// Delete removes the record and its tags.
+// Delete removes the record and its tags. Absent/invisible records are a no-op
+// (so an out-of-scope caller cannot strip tags off a record it cannot see).
 func (s *DNSService) Delete(ctx context.Context, id int64) error {
+	if rec, err := s.dns.Get(ctx, id); err != nil || rec == nil {
+		return err
+	}
 	if err := s.tags.Delete(ctx, "dns", id); err != nil {
 		return err
 	}
