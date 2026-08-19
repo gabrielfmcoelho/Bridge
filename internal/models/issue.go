@@ -95,6 +95,11 @@ type IssueFilter struct {
 	AssigneeID      int64
 	Search          string
 	ExcludeArchived bool
+	// VisibleSQL/VisibleArgs: entidade visibility predicate over
+	// (entity_type, entity_id); empty = unscoped; built by callers with
+	// store.VisibleExprDyn (models cannot import store).
+	VisibleSQL  string
+	VisibleArgs []any
 }
 
 func ListIssues(db *sql.DB, f IssueFilter) ([]Issue, error) {
@@ -139,6 +144,10 @@ func ListIssues(db *sql.DB, f IssueFilter) ([]Issue, error) {
 	if f.ExcludeArchived {
 		where = append(where, "NOT archived")
 	}
+	if f.VisibleSQL != "" {
+		where = append(where, f.VisibleSQL)
+		args = append(args, f.VisibleArgs...)
+	}
 
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
@@ -160,19 +169,6 @@ func ListIssues(db *sql.DB, f IssueFilter) ([]Issue, error) {
 		issues = append(issues, i)
 	}
 	return issues, rows.Err()
-}
-
-// Legacy functions for backward compat
-func ListIssuesByProject(db *sql.DB, projectID int64, serviceID *int64) ([]Issue, error) {
-	f := IssueFilter{ProjectID: projectID}
-	if serviceID != nil {
-		f.ServiceID = *serviceID
-	}
-	return ListIssues(db, f)
-}
-
-func ListIssuesByService(db *sql.DB, serviceID int64) ([]Issue, error) {
-	return ListIssues(db, IssueFilter{ServiceID: serviceID})
 }
 
 func UpdateIssue(db *sql.DB, i *Issue) error {
@@ -354,6 +350,18 @@ func IssueCountByProject(db *sql.DB, projectID int64) (map[string]int, error) {
 func OpenIssueCount(db *sql.DB) (int, error) {
 	var n int
 	err := db.QueryRow(`SELECT COUNT(*) FROM issues WHERE status != 'done'`).Scan(&n)
+	return n, err
+}
+
+// OpenIssueCountVisible is OpenIssueCount restricted by an entidade visibility
+// predicate over (entity_type, entity_id) built with store.VisibleExprDyn;
+// empty visSQL = unscoped.
+func OpenIssueCountVisible(db *sql.DB, visSQL string, visArgs []any) (int, error) {
+	if visSQL == "" {
+		return OpenIssueCount(db)
+	}
+	var n int
+	err := db.QueryRow(`SELECT COUNT(*) FROM issues WHERE status != 'done' AND `+visSQL, visArgs...).Scan(&n)
 	return n, err
 }
 
