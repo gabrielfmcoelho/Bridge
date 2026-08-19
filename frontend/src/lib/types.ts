@@ -130,23 +130,11 @@ export interface Host {
   alerts?: HostAlert[];
   responsaveis?: HostResponsavel[];
   chamados?: HostChamado[];
-  entidades?: HostEntidade[];
   main_responsavel_name?: string;
   main_entidade?: string;
   chamados_count?: number;
 }
 
-export interface HostEntidade {
-  id?: number;
-  host_id?: number;
-  entidade: string;
-  is_main: boolean;
-}
-
-export interface HostEntidadeInput {
-  entidade: string;
-  is_main: boolean;
-}
 
 export type AlertLevel = "critical" | "warning" | "info";
 
@@ -180,7 +168,7 @@ export interface HostSortConfig {
 export interface HostFilters {
   situacao: string;
   tag: string;
-  entidade_responsavel: string;
+  entidade_id: string;
   responsavel_interno: string;
   key_test_status: string;
   password_test_status: string;

@@ -423,11 +423,11 @@ export const hostsAPI = {
       last_scan: { id: number; data: string; scanned_at: string } | null;
       responsaveis: import("./types").HostResponsavel[];
       chamados: import("./types").HostChamado[];
-      entidades: import("./types").HostEntidade[];
+      entidades?: import("./types").AssetGrants;
     }>(`/api/hosts/${slug}`),
-  create: (data: Partial<import("./types").Host> & { password?: string; tags?: string[]; dns_ids?: number[]; service_ids?: number[]; project_ids?: number[]; entidades?: import("./types").HostEntidadeInput[] }) =>
+  create: (data: Partial<import("./types").Host> & { password?: string; tags?: string[]; dns_ids?: number[]; service_ids?: number[]; project_ids?: number[]; } & import("./types").AssetGrantsInput) =>
     api.post<import("./types").Host>("/api/hosts", data),
-  update: (slug: string, data: Partial<import("./types").Host> & { password?: string; tags?: string[]; dns_ids?: number[]; service_ids?: number[]; project_ids?: number[]; entidades?: import("./types").HostEntidadeInput[] }) =>
+  update: (slug: string, data: Partial<import("./types").Host> & { password?: string; tags?: string[]; dns_ids?: number[]; service_ids?: number[]; project_ids?: number[]; } & import("./types").AssetGrantsInput) =>
     api.put<import("./types").Host>(`/api/hosts/${slug}`, data),
   delete: (slug: string) => api.delete(`/api/hosts/${slug}`),
   getPassword: (slug: string) => api.get<{ password: string }>(`/api/hosts/${slug}/password`),

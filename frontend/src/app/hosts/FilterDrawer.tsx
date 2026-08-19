@@ -6,13 +6,14 @@ import DrawerSection from "@/components/ui/DrawerSection";
 import Select from "@/components/ui/Select";
 import PillButton from "@/components/ui/PillButton";
 import InventoryFilterDrawer from "@/components/inventory/InventoryFilterDrawer";
-import { enumsAPI, contactsAPI, tagsAPI } from "@/lib/api";
+import { enumsAPI, contactsAPI, tagsAPI, entidadesAPI } from "@/lib/api";
+import { indentedLabel, withDepth } from "@/lib/entidades";
 import { contactsToOptions } from "@/lib/utils";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { HostFilters, HostSortConfig, SortField } from "@/lib/types";
 
 const emptyFilters: HostFilters = {
-  situacao: "", tag: "", entidade_responsavel: "",
+  situacao: "", tag: "", entidade_id: "",
   responsavel_interno: "", key_test_status: "", password_test_status: "",
   scan_result: "", has_scan: "", alert_level: "",
   idle: "",
@@ -45,7 +46,8 @@ export default function FilterDrawer({
   ];
 
   const { data: situacoes = [] } = useQuery({ queryKey: ["enums", "situacao"], queryFn: () => enumsAPI.list("situacao") });
-  const { data: entidades = [] } = useQuery({ queryKey: ["enums", "entidade_responsavel"], queryFn: () => enumsAPI.list("entidade_responsavel") });
+  const { data: entidadeRows = [] } = useQuery({ queryKey: ["entidades"], queryFn: entidadesAPI.list });
+  const entidades = withDepth(entidadeRows);
   const { data: rawContacts } = useQuery({ queryKey: ["contacts"], queryFn: contactsAPI.list });
   const contacts = Array.isArray(rawContacts) ? rawContacts : [];
   const { data: allTags = [] } = useQuery({ queryKey: ["tags", "host"], queryFn: () => tagsAPI.list("host") });
@@ -109,10 +111,10 @@ export default function FilterDrawer({
         </div>
       </DrawerSection>
 
-      <DrawerSection title={t("host.entidadeResponsavel")} open={openSection === "responsaveis"} onToggle={() => toggle("responsaveis")} active={!!filters.entidade_responsavel || !!filters.responsavel_interno}>
+      <DrawerSection title={t("host.entidadeResponsavel")} open={openSection === "responsaveis"} onToggle={() => toggle("responsaveis")} active={!!filters.entidade_id || !!filters.responsavel_interno}>
         <div className="space-y-3">
-          <FieldLabel label={t("host.entidadeResponsavel")}>
-            <Select value={filters.entidade_responsavel} onChange={(e) => set("entidade_responsavel", e.target.value)} options={entidades.map((e) => ({ value: e.value, label: e.value }))} />
+          <FieldLabel label={t("entidades.title")}>
+            <Select value={filters.entidade_id} onChange={(e) => set("entidade_id", e.target.value)} options={[{ value: "", label: t("common.all") }, ...entidades.map((e) => ({ value: String(e.id), label: indentedLabel(e) }))]} />
           </FieldLabel>
           <FieldLabel label={t("host.responsavelInterno")}>
             <Select value={filters.responsavel_interno} onChange={(e) => set("responsavel_interno", e.target.value)} options={contactsToOptions(contacts)} />
