@@ -60,6 +60,9 @@ type SecretView struct {
 	UpdatedAt         time.Time               `json:"updated_at"`
 	DeletedAt         *time.Time              `json:"deleted_at,omitempty"`
 	PayloadCiphertext []byte                  `json:"-"` // always nil; sentinel
+	// Entidades carries the own grants of a shared avulso secret; filled by the
+	// GET handler (best effort), nil otherwise.
+	Entidades *models.AssetGrants `json:"entidades,omitempty"`
 }
 
 // SecretPatch is a partial update. Nil fields are unchanged. Visibility is
@@ -75,7 +78,7 @@ type SecretPatch struct {
 // See docs/spec/secrets-manager.md §5 for the access-control rules baked in.
 type SecretRepo struct {
 	db  *sql.DB
-	enc  *database.Encryptor
+	enc *database.Encryptor
 }
 
 // NewSecretRepo wires a repo from a *DB.
@@ -338,10 +341,11 @@ func (r *SecretRepo) Reveal(ctx context.Context, actor ActorContext, id int64) (
 		typeStr, scopeStr, visStr string
 		s                         models.Secret
 	)
+	vis, vargs := secretVisibleSQL(ctx, "secrets")
 	err := r.db.QueryRowContext(ctx,
 		`SELECT id, type, scope, visibility, parent_id, owner_user_id, name,
 		        payload_ciphertext, payload_nonce, key_version, created_by
-		 FROM secrets WHERE id = ? AND deleted_at IS NULL`, id,
+		 FROM secrets WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...,
 	).Scan(&s.ID, &typeStr, &scopeStr, &visStr, &s.ParentID, &s.OwnerUserID,
 		&s.Name, &s.PayloadCiphertext, &s.PayloadNonce, &s.KeyVersion, &s.CreatedBy)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -484,10 +488,11 @@ func (r *SecretRepo) runList(ctx context.Context, actor ActorContext, f SecretFi
 		args = append(args, f.GroupLabel)
 	}
 
-	where := ""
-	if len(conds) > 0 {
-		where = " WHERE " + strings.Join(conds, " AND ")
-	}
+	vis, vargs := secretVisibleSQL(ctx, "secrets")
+	conds = append(conds, vis)
+	args = append(args, vargs...)
+
+	where := " WHERE " + strings.Join(conds, " AND ")
 	query := `SELECT id, type, scope, visibility, parent_id, owner_user_id, name,
 	                 group_label, description, key_version, created_by,
 	                 created_at, updated_at, deleted_at
@@ -531,6 +536,9 @@ func (r *SecretRepo) loadView(ctx context.Context, id int64, includeDeleted bool
 	if !includeDeleted {
 		where += " AND deleted_at IS NULL"
 	}
+	vis, vargs := secretVisibleSQL(ctx, "secrets")
+	where += " AND " + vis
+	args := append([]any{id}, vargs...)
 	var (
 		v                         SecretView
 		typeStr, scopeStr, visStr string
@@ -539,7 +547,7 @@ func (r *SecretRepo) loadView(ctx context.Context, id int64, includeDeleted bool
 		`SELECT id, type, scope, visibility, parent_id, owner_user_id, name,
 		        group_label, description, key_version, created_by,
 		        created_at, updated_at, deleted_at
-		 FROM secrets WHERE `+where, id,
+		 FROM secrets WHERE `+where, args...,
 	).Scan(&v.ID, &typeStr, &scopeStr, &visStr, &v.ParentID, &v.OwnerUserID,
 		&v.Name, &v.GroupLabel, &v.Description, &v.KeyVersion, &v.CreatedBy,
 		&v.CreatedAt, &v.UpdatedAt, &v.DeletedAt)
