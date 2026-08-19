@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -48,52 +47,3 @@ func TestHostRemoteUserRepo_UpsertGetDelete(t *testing.T) {
 	}
 }
 
-func TestHostEntidadeRepo_SyncEnforcesOneMain(t *testing.T) {
-	ctx := context.Background()
-	d := openDB(t)
-	var hostID int64
-	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h') RETURNING id`).Scan(&hostID); err != nil {
-		t.Fatalf("seed host: %v", err)
-	}
-	repo := store.NewHostEntidadeRepo(d.SQL)
-
-	// No main flagged -> alphabetically-first promoted.
-	if err := repo.Sync(ctx, hostID, []models.HostEntidadeInput{
-		{Entidade: "zeta"}, {Entidade: "alpha"},
-	}); err != nil {
-		t.Fatalf("sync: %v", err)
-	}
-	list, err := repo.List(ctx, hostID)
-	if err != nil || len(list) != 2 {
-		t.Fatalf("list = %+v, %v", list, err)
-	}
-	if !list[0].IsMain || list[0].Entidade != "alpha" {
-		t.Fatalf("main = %+v, want alpha promoted", list[0])
-	}
-	main, _ := repo.MainBulk(ctx)
-	if main[hostID] != "alpha" {
-		t.Fatalf("mainbulk = %v, want alpha", main)
-	}
-
-	// Explicit main honored; second main flag ignored.
-	if err := repo.Sync(ctx, hostID, []models.HostEntidadeInput{
-		{Entidade: "x", IsMain: true}, {Entidade: "y", IsMain: true},
-	}); err != nil {
-		t.Fatalf("sync2: %v", err)
-	}
-	list, _ = repo.List(ctx, hostID)
-	mains := 0
-	for _, e := range list {
-		if e.IsMain {
-			mains++
-		}
-	}
-	if mains != 1 {
-		t.Fatalf("main count = %d, want exactly 1", mains)
-	}
-
-	// Empty entidade rejected.
-	if err := repo.Sync(ctx, hostID, []models.HostEntidadeInput{{Entidade: ""}}); err == nil {
-		t.Fatalf("expected error for empty entidade")
-	}
-}

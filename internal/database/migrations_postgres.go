@@ -1356,4 +1356,9 @@ var migrationsPostgres = []string{
 		SELECT DISTINCT 'service', l.service_id, e.id, 'creator'
 		FROM service_host_links l, entidades e WHERE e.slug = 'etipi'
 		ON CONFLICT DO NOTHING;`,
+
+	// Version 83: host_entidades is superseded by asset_entidades (v82 backfilled
+	// every host as created by ETIPI; the legacy free-text labels don't map onto
+	// the entidade tree and are dropped with the table).
+	`DROP TABLE IF EXISTS host_entidades;`,
 }

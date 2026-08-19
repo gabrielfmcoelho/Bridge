@@ -73,7 +73,6 @@ var BoolColumns = map[string]map[string]bool{
 	"issues":               {"archived": true},
 	"contacts":             {"is_external": true},
 	"responsaveis":         {"is_main": true},
-	"host_entidades":       {"is_main": true},
 	"user_entidades":       {"is_primary": true},
 	"project_gitlab_links": {"sync_issues": true},
 }
