@@ -36,7 +36,7 @@ type HostService struct {
 	services     *store.ServiceRepo
 	dns          *store.DNSRepo
 	projects     *store.ProjectRepo
-	entidades    *store.HostEntidadeRepo
+	grants       *store.AssetEntidadeRepo
 	chamados     *store.HostChamadoRepo
 	orch         *store.OrchestratorRepo
 	sshKeys      *store.SSHKeyRepo
@@ -56,7 +56,7 @@ func NewHostService(db *database.DB) *HostService {
 		services:     store.NewServiceRepo(db.SQL),
 		dns:          store.NewDNSRepo(db.SQL),
 		projects:     store.NewProjectRepo(db.SQL),
-		entidades:    store.NewHostEntidadeRepo(db.SQL),
+		grants:       store.NewAssetEntidadeRepo(db.SQL),
 		chamados:     store.NewHostChamadoRepo(db.SQL),
 		orch:         store.NewOrchestratorRepo(db.SQL),
 		sshKeys:      store.NewSSHKeyRepo(db.SQL),
@@ -127,16 +127,16 @@ type HostListItem struct {
 
 // HostDetail is the full single-host view (host + relations).
 type HostDetail struct {
-	Host         *models.Host          `json:"host"`
-	Tags         []string              `json:"tags"`
-	Orchestrator *models.Orchestrator  `json:"orchestrator"`
-	DNSRecords   []models.DNSRecord    `json:"dns_records"`
-	Services     []models.Service      `json:"services"`
-	Projects     []models.Project      `json:"projects"`
-	LastScan     *models.HostScan      `json:"last_scan"`
-	Responsaveis []models.Responsavel  `json:"responsaveis"`
-	Chamados     []models.HostChamado  `json:"chamados"`
-	Entidades    []models.HostEntidade `json:"entidades"`
+	Host         *models.Host         `json:"host"`
+	Tags         []string             `json:"tags"`
+	Orchestrator *models.Orchestrator `json:"orchestrator"`
+	DNSRecords   []models.DNSRecord   `json:"dns_records"`
+	Services     []models.Service     `json:"services"`
+	Projects     []models.Project     `json:"projects"`
+	LastScan     *models.HostScan     `json:"last_scan"`
+	Responsaveis []models.Responsavel `json:"responsaveis"`
+	Chamados     []models.HostChamado `json:"chamados"`
+	Entidades    models.AssetGrants   `json:"entidades"`
 }
 
 // Count returns the number of hosts matching the filter (for pagination).
@@ -158,7 +158,7 @@ func (s *HostService) Get(ctx context.Context, slug string) (*HostDetail, error)
 	lastScan, _ := s.scans.GetLatest(ctx, host.ID)
 	responsaveis, _ := s.responsaveis.List(ctx, "host", host.ID)
 	chamados, _ := s.chamados.ListByHost(ctx, host.ID)
-	entidades, _ := s.entidades.List(ctx, host.ID)
+	entidades, _ := s.grants.Get(ctx, store.AssetHost, host.ID)
 
 	return &HostDetail{
 		Host:         host,
@@ -200,7 +200,7 @@ func (s *HostService) List(ctx context.Context, f models.HostFilter) ([]HostList
 	dnsCounts, _ := s.dns.CountsByHost(ctx)
 	issueCounts, _ := models.GetIssueCountsByEntity(s.sqlDB, "host")
 	mainRespNames, _ := s.responsaveis.MainNamesBulk(ctx, "host")
-	mainEntidades, _ := s.entidades.MainBulk(ctx)
+	mainEntidades, _ := s.grants.CreatorNamesBulk(ctx, store.AssetHost)
 	chamadosCounts, _ := s.chamados.CountsBulk(ctx)
 	manualAlertsBulk, _ := s.alerts.ListBulk(ctx)
 	alertLinkedIssues, _ := s.alerts.LinkedIssueIDsBulk(ctx)
@@ -364,7 +364,7 @@ type HostWrite struct {
 	ClearKey     bool
 	Responsaveis *[]models.ResponsavelInput
 	Chamados     *[]models.HostChamadoInput
-	Entidades    *[]models.HostEntidadeInput
+	Grants       *models.AssetGrants // resolved entidade grants; nil = leave unchanged
 	DNSIDs       *[]int64
 	ServiceIDs   *[]int64
 	ProjectIDs   *[]int64
@@ -476,7 +476,7 @@ func (s *HostService) LinkSSHKey(ctx context.Context, hostID, sshKeyID int64, sl
 	return nil
 }
 
-// applyMetaRelations syncs tags + responsáveis + chamados + entidades.
+// applyMetaRelations syncs tags + responsáveis + chamados + entidade grants.
 // Best-effort: an individual sync failure is logged, not fatal (matching prior
 // handler behavior). requireNonEmpty selects create (len>0) vs update (non-nil)
 // semantics.
@@ -496,9 +496,9 @@ func (s *HostService) applyMetaRelations(ctx context.Context, hostID int64, w *H
 			log.Printf("[hosts] SyncHostChamados id=%d: %v", hostID, err)
 		}
 	}
-	if present(w.Entidades, requireNonEmpty) {
-		if err := s.entidades.Sync(ctx, hostID, *w.Entidades); err != nil {
-			log.Printf("[hosts] SyncHostEntidades id=%d: %v", hostID, err)
+	if w.Grants != nil {
+		if err := s.grants.Replace(ctx, s.sqlDB, store.AssetHost, hostID, *w.Grants); err != nil {
+			log.Printf("[hosts] set entidades id=%d: %v", hostID, err)
 		}
 	}
 }

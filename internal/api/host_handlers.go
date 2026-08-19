@@ -25,20 +25,26 @@ type hostHandlers struct {
 	db   *database.DB
 }
 
+// entidadeIDParam reads ?entidade_id= (0 when absent/invalid).
+func entidadeIDParam(r *http.Request) int64 {
+	n, _ := strconv.ParseInt(r.URL.Query().Get("entidade_id"), 10, 64)
+	return n
+}
+
 func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	f := models.HostFilter{
-		Situacao:            r.URL.Query().Get("situacao"),
-		Tag:                 r.URL.Query().Get("tag"),
-		Hospedagem:          r.URL.Query().Get("hospedagem"),
-		Search:              r.URL.Query().Get("search"),
-		EntidadeResponsavel: r.URL.Query().Get("entidade_responsavel"),
-		ResponsavelInterno:  r.URL.Query().Get("responsavel_interno"),
-		KeyTestStatus:       r.URL.Query().Get("key_test_status"),
-		PasswordTestStatus:  r.URL.Query().Get("password_test_status"),
-		ScanResult:          r.URL.Query().Get("scan_result"),
-		HasScan:             r.URL.Query().Get("has_scan"),
-		SortBy:              r.URL.Query().Get("sort_by"),
-		SortDir:             r.URL.Query().Get("sort_dir"),
+		Situacao:           r.URL.Query().Get("situacao"),
+		Tag:                r.URL.Query().Get("tag"),
+		Hospedagem:         r.URL.Query().Get("hospedagem"),
+		Search:             r.URL.Query().Get("search"),
+		EntidadeID:         entidadeIDParam(r),
+		ResponsavelInterno: r.URL.Query().Get("responsavel_interno"),
+		KeyTestStatus:      r.URL.Query().Get("key_test_status"),
+		PasswordTestStatus: r.URL.Query().Get("password_test_status"),
+		ScanResult:         r.URL.Query().Get("scan_result"),
+		HasScan:            r.URL.Query().Get("has_scan"),
+		SortBy:             r.URL.Query().Get("sort_by"),
+		SortDir:            r.URL.Query().Get("sort_dir"),
 	}
 	if p := r.URL.Query().Get("page"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil && v > 0 {
@@ -125,15 +131,15 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		models.Host
-		Tags         []string                   `json:"tags"`
-		Password     string                     `json:"password"`
-		SSHKeyID     int64                      `json:"ssh_key_id"`
-		Responsaveis []models.ResponsavelInput  `json:"responsaveis"`
-		Chamados     []models.HostChamadoInput  `json:"chamados"`
-		Entidades    []models.HostEntidadeInput `json:"entidades"`
-		DNSIDs       []int64                    `json:"dns_ids"`
-		ServiceIDs   []int64                    `json:"service_ids"`
-		ProjectIDs   []int64                    `json:"project_ids"`
+		models.AssetGrantsInput
+		Tags         []string                  `json:"tags"`
+		Password     string                    `json:"password"`
+		SSHKeyID     int64                     `json:"ssh_key_id"`
+		Responsaveis []models.ResponsavelInput `json:"responsaveis"`
+		Chamados     []models.HostChamadoInput `json:"chamados"`
+		DNSIDs       []int64                   `json:"dns_ids"`
+		ServiceIDs   []int64                   `json:"service_ids"`
+		ProjectIDs   []int64                   `json:"project_ids"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -163,6 +169,11 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Host.PreferredAuth = preferredAuth
 
+	grants, ok := resolveGrants(w, r, req.AssetGrantsInput, nil)
+	if !ok {
+		return
+	}
+
 	w2 := &service.HostWrite{
 		Host:         req.Host,
 		Password:     req.Password,
@@ -170,7 +181,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Tags:         &req.Tags,
 		Responsaveis: &req.Responsaveis,
 		Chamados:     &req.Chamados,
-		Entidades:    &req.Entidades,
+		Grants:       &grants,
 		DNSIDs:       &req.DNSIDs,
 		ServiceIDs:   &req.ServiceIDs,
 		ProjectIDs:   &req.ProjectIDs,
@@ -222,16 +233,16 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		models.Host
-		Tags         []string                    `json:"tags"`
-		Password     string                      `json:"password"`
-		SSHKeyID     int64                       `json:"ssh_key_id"`
-		ClearKey     bool                        `json:"clear_key"`
-		Responsaveis *[]models.ResponsavelInput  `json:"responsaveis"`
-		Chamados     *[]models.HostChamadoInput  `json:"chamados"`
-		Entidades    *[]models.HostEntidadeInput `json:"entidades"`
-		DNSIDs       *[]int64                    `json:"dns_ids"`
-		ServiceIDs   *[]int64                    `json:"service_ids"`
-		ProjectIDs   *[]int64                    `json:"project_ids"`
+		models.AssetGrantsInput
+		Tags         []string                   `json:"tags"`
+		Password     string                     `json:"password"`
+		SSHKeyID     int64                      `json:"ssh_key_id"`
+		ClearKey     bool                       `json:"clear_key"`
+		Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
+		Chamados     *[]models.HostChamadoInput `json:"chamados"`
+		DNSIDs       *[]int64                   `json:"dns_ids"`
+		ServiceIDs   *[]int64                   `json:"service_ids"`
+		ProjectIDs   *[]int64                   `json:"project_ids"`
 	}
 	req.Host = *existing
 	if err := decodeJSON(r, &req); err != nil {
@@ -315,7 +326,6 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		ClearKey:     req.ClearKey,
 		Responsaveis: req.Responsaveis,
 		Chamados:     req.Chamados,
-		Entidades:    req.Entidades,
 		DNSIDs:       req.DNSIDs,
 		ServiceIDs:   req.ServiceIDs,
 		ProjectIDs:   req.ProjectIDs,
@@ -323,6 +333,14 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	// Tags is a non-pointer slice here; apply only when present in the request.
 	if req.Tags != nil {
 		w2.Tags = &req.Tags
+	}
+	if req.AssetGrantsInput.Present() {
+		current, _ := store.NewAssetEntidadeRepo(h.db.SQL).Get(r.Context(), store.AssetHost, existing.ID)
+		grants, ok := resolveGrants(w, r, req.AssetGrantsInput, &current)
+		if !ok {
+			return
+		}
+		w2.Grants = &grants
 	}
 	host, err := h.host.Update(r.Context(), actorID(r), w2)
 	if errors.Is(err, service.ErrHostKeyLink) {

@@ -234,3 +234,67 @@ func TestHostService_DeleteCascades(t *testing.T) {
 		t.Fatalf("host should be gone, got %+v", got)
 	}
 }
+
+// TestHostService_EntidadeScope covers the host vertical slice of entidade
+// visibility: Create writes the grants, List/Get/Update honour the caller's
+// scope, ?entidade_id= filters by grant, and the list decorates main_entidade
+// with the creator's name.
+func TestHostService_EntidadeScope(t *testing.T) {
+	bg := context.Background()
+	svc, d := newHostService(t)
+	var sga, etipi int64
+	d.SQL.QueryRow(`SELECT id FROM entidades WHERE slug = 'sga'`).Scan(&sga)
+	d.SQL.QueryRow(`SELECT id FROM entidades WHERE slug = 'etipi'`).Scan(&etipi)
+
+	mk := func(slug string, g *models.AssetGrants) *models.Host {
+		t.Helper()
+		w := &service.HostWrite{Host: models.Host{Nickname: slug, OficialSlug: slug}, Grants: g}
+		h, err := svc.Create(bg, 1, w)
+		if err != nil {
+			t.Fatalf("create %s: %v", slug, err)
+		}
+		return h
+	}
+	hSga := mk("h-sga", &models.AssetGrants{CreatorEntidadeID: &sga})
+	mk("h-etipi", &models.AssetGrants{CreatorEntidadeID: &etipi})
+	mk("h-none", nil)
+
+	sgaCtx := store.WithScope(bg, store.Scope{EntidadeIDs: []int64{sga}})
+	items, err := svc.List(sgaCtx, models.HostFilter{})
+	if err != nil || len(items) != 1 || items[0].Host.OficialSlug != "h-sga" || items[0].MainEntidade != "SGA" {
+		t.Fatalf("sga list = %+v, %v", items, err)
+	}
+	if n, _ := svc.Count(sgaCtx, models.HostFilter{}); n != 1 {
+		t.Fatalf("sga count = %d", n)
+	}
+	if all, _ := svc.List(bg, models.HostFilter{}); len(all) != 3 {
+		t.Fatalf("unscoped list = %d, want 3", len(all))
+	}
+	if byEnt, _ := svc.List(bg, models.HostFilter{EntidadeID: etipi}); len(byEnt) != 1 || byEnt[0].Host.OficialSlug != "h-etipi" {
+		t.Fatalf("entidade_id filter = %+v", byEnt)
+	}
+	if got, _ := svc.Get(sgaCtx, "h-etipi"); got != nil {
+		t.Fatal("sga must not get etipi host")
+	}
+	det, _ := svc.Get(sgaCtx, "h-sga")
+	if det == nil || det.Entidades.CreatorEntidadeID == nil || *det.Entidades.CreatorEntidadeID != sga {
+		t.Fatalf("detail grants = %+v", det)
+	}
+
+	// Update through a foreign scope touches nothing (0 rows), and a visible
+	// update can widen the grants.
+	h2 := *hSga
+	h2.Description = "changed"
+	if _, err := svc.Update(store.WithScope(bg, store.Scope{EntidadeIDs: []int64{etipi}}), 1, &service.HostWrite{Host: h2}); err != nil {
+		t.Fatalf("foreign update err: %v", err)
+	}
+	if got, _ := svc.Get(bg, "h-sga"); got.Host.Description != "" {
+		t.Fatal("foreign-scope update must not change the row")
+	}
+	if _, err := svc.Update(sgaCtx, 1, &service.HostWrite{Host: h2, Grants: &models.AssetGrants{CreatorEntidadeID: &sga, IsGlobal: true}}); err != nil {
+		t.Fatalf("own update: %v", err)
+	}
+	if got, _ := svc.Get(store.WithScope(bg, store.Scope{EntidadeIDs: []int64{etipi}}), "h-sga"); got == nil || got.Host.Description != "changed" {
+		t.Fatal("after is_global the etipi scope must see the updated host")
+	}
+}

@@ -83,7 +83,8 @@ func (r *HostRepo) Create(ctx context.Context, h *models.Host) error {
 // GetBySlug returns a host by oficial_slug, or (nil, nil) if absent.
 func (r *HostRepo) GetBySlug(ctx context.Context, slug string) (*models.Host, error) {
 	h := &models.Host{}
-	err := r.db.QueryRowContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE oficial_slug = ? AND deleted_at IS NULL`, slug).Scan(hostScanDest(h)...)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	err := r.db.QueryRowContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE oficial_slug = ? AND deleted_at IS NULL AND `+vis, append([]any{slug}, vargs...)...).Scan(hostScanDest(h)...)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -93,7 +94,8 @@ func (r *HostRepo) GetBySlug(ctx context.Context, slug string) (*models.Host, er
 // GetByID returns a host by id, or (nil, nil) if absent.
 func (r *HostRepo) GetByID(ctx context.Context, id int64) (*models.Host, error) {
 	h := &models.Host{}
-	err := r.db.QueryRowContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE id = ? AND deleted_at IS NULL`, id).Scan(hostScanDest(h)...)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	err := r.db.QueryRowContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...).Scan(hostScanDest(h)...)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -130,8 +132,8 @@ func (r *HostRepo) List(ctx context.Context, f models.HostFilter) ([]models.Host
 		                     FROM host_scans ORDER BY host_id, scanned_at DESC) ls ON ls.host_id = hosts.id`
 	}
 	query := `SELECT ` + hostColumns() + from
-	var args []any
-	where := []string{"deleted_at IS NULL"}
+	vis, args := VisibleExpr(ctx, AssetHost, "hosts.id")
+	where := []string{"deleted_at IS NULL", vis}
 
 	if f.Situacao != "" {
 		where = append(where, "situacao = ?")
@@ -151,9 +153,9 @@ func (r *HostRepo) List(ctx context.Context, f models.HostFilter) ([]models.Host
 		where = append(where, "id IN (SELECT entity_id FROM tags WHERE entity_type = 'host' AND tag = ?)")
 		args = append(args, f.Tag)
 	}
-	if f.EntidadeResponsavel != "" {
-		where = append(where, "id IN (SELECT host_id FROM host_entidades WHERE entidade = ?)")
-		args = append(args, f.EntidadeResponsavel)
+	if f.EntidadeID != 0 {
+		where = append(where, "id IN (SELECT asset_id FROM asset_entidades WHERE asset_type = 'host' AND entidade_id = ?)")
+		args = append(args, f.EntidadeID)
 	}
 	if f.ResponsavelInterno != "" {
 		where = append(where, "responsavel_interno = ?")
@@ -249,8 +251,8 @@ func (r *HostRepo) ListForSSHConfig(ctx context.Context) ([]models.Host, error) 
 // subset of the) filter — the same predicates the list view paginates over.
 func (r *HostRepo) Count(ctx context.Context, f models.HostFilter) (int, error) {
 	query := `SELECT COUNT(*) FROM hosts`
-	var args []any
-	where := []string{"deleted_at IS NULL"}
+	vis, args := VisibleExpr(ctx, AssetHost, "hosts.id")
+	where := []string{"deleted_at IS NULL", vis}
 
 	if f.Situacao != "" {
 		where = append(where, "situacao = ?")
@@ -270,6 +272,10 @@ func (r *HostRepo) Count(ctx context.Context, f models.HostFilter) (int, error) 
 		where = append(where, "id IN (SELECT entity_id FROM tags WHERE entity_type = 'host' AND tag = ?)")
 		args = append(args, f.Tag)
 	}
+	if f.EntidadeID != 0 {
+		where = append(where, "id IN (SELECT asset_id FROM asset_entidades WHERE asset_type = 'host' AND entidade_id = ?)")
+		args = append(args, f.EntidadeID)
+	}
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -282,13 +288,15 @@ func (r *HostRepo) Count(ctx context.Context, f models.HostFilter) (int, error) 
 // CountAll returns the total number of hosts.
 func (r *HostRepo) CountAll(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM hosts WHERE deleted_at IS NULL`).Scan(&n)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM hosts WHERE deleted_at IS NULL AND `+vis, vargs...).Scan(&n)
 	return n, err
 }
 
 // CountBySituacao returns situacao → host count.
 func (r *HostRepo) CountBySituacao(ctx context.Context) (map[string]int, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT situacao, COUNT(*) FROM hosts WHERE deleted_at IS NULL GROUP BY situacao`)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT situacao, COUNT(*) FROM hosts WHERE deleted_at IS NULL AND `+vis+` GROUP BY situacao`, vargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -298,13 +306,15 @@ func (r *HostRepo) CountBySituacao(ctx context.Context) (map[string]int, error) 
 // NeedingMaintenanceCount returns the number of hosts flagged precisa_manutencao.
 func (r *HostRepo) NeedingMaintenanceCount(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM hosts WHERE precisa_manutencao AND deleted_at IS NULL`).Scan(&n)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM hosts WHERE precisa_manutencao AND deleted_at IS NULL AND `+vis, vargs...).Scan(&n)
 	return n, err
 }
 
 // CountByHospedagem returns hospedagem (Unknown when empty) → host count.
 func (r *HostRepo) CountByHospedagem(ctx context.Context) (map[string]int, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT COALESCE(NULLIF(hospedagem, ''), 'Unknown'), COUNT(*) FROM hosts WHERE deleted_at IS NULL GROUP BY COALESCE(NULLIF(hospedagem, ''), 'Unknown')`)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT COALESCE(NULLIF(hospedagem, ''), 'Unknown'), COUNT(*) FROM hosts WHERE deleted_at IS NULL AND `+vis+` GROUP BY COALESCE(NULLIF(hospedagem, ''), 'Unknown')`, vargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -313,6 +323,19 @@ func (r *HostRepo) CountByHospedagem(ctx context.Context) (map[string]int, error
 
 // Update writes the mutable fields of a host by id (secret payloads excluded).
 func (r *HostRepo) Update(ctx context.Context, h *models.Host) error {
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	args := []any{
+		h.Nickname, h.OficialSlug, h.Hostname, h.Hospedagem, h.TipoMaquina,
+		h.User, h.HasPassword,
+		h.HasKey, h.KeyPath,
+		h.Port, h.IdentitiesOnly, h.ProxyJump, h.ForwardAgent,
+		h.Description, h.SetorResponsavel, h.ResponsavelInterno, h.ContatoResponsavelInterno,
+		h.AcessoEmpresaExterna, h.EmpresaResponsavel, h.ResponsavelExterno, h.ContatoResponsavelExterno,
+		h.RecursoCPU, h.RecursoRAM, h.RecursoArmazenamento,
+		h.Situacao, h.PrecisaManutencao, h.PreferredAuth, h.ConnectionsFailed, h.PasswordTestStatus, h.KeyTestStatus, h.DockerGroupStatus, h.Observacoes,
+		h.GrafanaDashboardUID,
+		h.ID,
+	}
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE hosts SET
 			nickname = ?, oficial_slug = ?, hostname = ?, hospedagem = ?, tipo_maquina = ?,
@@ -325,18 +348,8 @@ func (r *HostRepo) Update(ctx context.Context, h *models.Host) error {
 			situacao = ?, precisa_manutencao = ?, preferred_auth = ?, connections_failed = ?, password_test_status = ?, key_test_status = ?, docker_group_status = ?, observacoes = ?,
 			grafana_dashboard_uid = ?,
 			updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`,
-		h.Nickname, h.OficialSlug, h.Hostname, h.Hospedagem, h.TipoMaquina,
-		h.User, h.HasPassword,
-		h.HasKey, h.KeyPath,
-		h.Port, h.IdentitiesOnly, h.ProxyJump, h.ForwardAgent,
-		h.Description, h.SetorResponsavel, h.ResponsavelInterno, h.ContatoResponsavelInterno,
-		h.AcessoEmpresaExterna, h.EmpresaResponsavel, h.ResponsavelExterno, h.ContatoResponsavelExterno,
-		h.RecursoCPU, h.RecursoRAM, h.RecursoArmazenamento,
-		h.Situacao, h.PrecisaManutencao, h.PreferredAuth, h.ConnectionsFailed, h.PasswordTestStatus, h.KeyTestStatus, h.DockerGroupStatus, h.Observacoes,
-		h.GrafanaDashboardUID,
-		h.ID,
-	)
+		WHERE id = ? AND `+vis,
+		append(args, vargs...)...)
 	return err
 }
 
@@ -349,7 +362,8 @@ func (r *HostRepo) SetCoolifyUUID(ctx context.Context, hostID int64, uuid *strin
 // Delete removes a host row by id. (Vault cascade is handled separately via the
 // cascade registry in the delete path.)
 func (r *HostRepo) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM hosts WHERE id = ?`, id)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	_, err := r.db.ExecContext(ctx, `DELETE FROM hosts WHERE id = ? AND `+vis, append([]any{id}, vargs...)...)
 	return err
 }
 
@@ -397,7 +411,8 @@ func scanStringCountMap(rows *sql.Rows) (map[string]int, error) {
 
 // ListTrash returns soft-deleted hosts (deleted_at set), newest-slug order.
 func (r *HostRepo) ListTrash(ctx context.Context) ([]models.Host, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE deleted_at IS NOT NULL ORDER BY oficial_slug`)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE deleted_at IS NOT NULL AND `+vis+` ORDER BY oficial_slug`, vargs...)
 	if err != nil {
 		return nil, err
 	}

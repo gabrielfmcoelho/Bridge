@@ -56,20 +56,20 @@ type Host struct {
 // HostFilter is the value object describing list/count predicates, sort, and
 // pagination. Consumed by store.HostRepo.List / Count.
 type HostFilter struct {
-	Situacao            string
-	Tag                 string
-	Hospedagem          string
-	Search              string
-	EntidadeResponsavel string
-	ResponsavelInterno  string
-	KeyTestStatus       string // "success" | "failed" | "untested"
-	PasswordTestStatus  string // "success" | "failed" | "untested"
-	ScanResult          string // "failed" | "success" | "untested" — combined OR across both _test_status columns
-	HasScan             string // "with" | "without"
-	Page                int
-	PerPage             int
-	SortBy              string
-	SortDir             string
+	Situacao           string
+	Tag                string
+	Hospedagem         string
+	Search             string
+	EntidadeID         int64 // filter by entidade grant (creator or responsible)
+	ResponsavelInterno string
+	KeyTestStatus      string // "success" | "failed" | "untested"
+	PasswordTestStatus string // "success" | "failed" | "untested"
+	ScanResult         string // "failed" | "success" | "untested" — combined OR across both _test_status columns
+	HasScan            string // "with" | "without"
+	Page               int
+	PerPage            int
+	SortBy             string
+	SortDir            string
 }
 
 // FormatPort returns the port or "22" if empty, for display purposes.
