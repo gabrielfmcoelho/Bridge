@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"log"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
@@ -56,6 +57,19 @@ func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 		// the actor (it installed the sink on r's context before us).
 		recordActor(r.Context(), user.Username)
 		ctx := context.WithValue(r.Context(), userContextKey, user)
+		// Entidade visibility scope, loaded once per request. Admin bypasses;
+		// everyone else gets their visible set (own entidades + descendants).
+		// On lookup failure fall back to an empty scope (sees only global)
+		// rather than failing the request or silently widening access.
+		scope := store.Scope{Admin: user.Role == "admin"}
+		if !scope.Admin {
+			if sc, err := store.NewEntidadeRepo(db).ScopeForUser(ctx, user.ID); err == nil {
+				scope = sc
+			} else {
+				log.Printf("[auth] scope lookup for user %d failed: %v", user.ID, err)
+			}
+		}
+		ctx = store.WithScope(ctx, scope)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

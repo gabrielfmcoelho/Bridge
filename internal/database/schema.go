@@ -10,6 +10,7 @@ package database
 var TableCopyOrder = []string{
 	// independent
 	"users",
+	"entidades", // self-referencing parent_id; seeded parents have lower ids
 	"enum_options",
 	"app_settings",
 	"app_secrets",
@@ -37,6 +38,9 @@ var TableCopyOrder = []string{
 	// polymorphic responsáveis (FKs contacts only) — R3 unification of the
 	// former host/dns/service/project_responsaveis junctions.
 	"responsaveis",
+	// entidade membership + polymorphic visibility grants (FK entidades only)
+	"user_entidades",
+	"asset_entidades",
 	// link/dependent
 	"dns_host_links",
 	"project_host_links",
@@ -70,6 +74,7 @@ var BoolColumns = map[string]map[string]bool{
 	"contacts":             {"is_external": true},
 	"responsaveis":         {"is_main": true},
 	"host_entidades":       {"is_main": true},
+	"user_entidades":       {"is_primary": true},
 	"project_gitlab_links": {"sync_issues": true},
 }
 
@@ -129,6 +134,7 @@ var SerialTables = []string{
 	"host_chamados", "host_alerts", "issues", "releases",
 	"host_operation_logs", "user_external_identities",
 	"user_gitlab_tokens", "project_gitlab_links", "auth_role_mappings",
+	"entidades", "asset_entidades",
 }
 
 // ColumnRenames maps source → target column names for tables whose

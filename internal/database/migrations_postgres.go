@@ -1276,4 +1276,84 @@ var migrationsPostgres = []string{
 
 	CREATE INDEX IF NOT EXISTS idx_services_discovery
 		ON services (discovery_kind, discovery_key) WHERE discovery_key <> '';`,
+
+	// Version 82: entidades — hierarchical org units + per-asset visibility.
+	//
+	//   entidades       strict tree (parent_id), the "who" of visibility
+	//   user_entidades  a user belongs to N entidades, at most one primary
+	//   asset_entidades polymorphic grant rows: (asset_type, asset_id) is
+	//                   created by ONE entidade ('creator'), responsibility of
+	//                   N entidades ('responsible'), optionally visible to all
+	//                   ('global', entidade_id NULL). No rows ⇒ admin-only.
+	//
+	// Named asset_type/asset_id (not entity_type/entity_id like responsaveis)
+	// because "entity" would collide with "entidade". entidade FKs RESTRICT so
+	// deleting an entidade can never silently hide assets or orphan members.
+	//
+	// Seeds the GovPI tree and backfills every host (and every host-linked
+	// service) as created by ETIPI — "all VMs are created by ETIPI". All other
+	// existing rows stay unassigned (admin-only) until triaged in Settings.
+	`CREATE TABLE IF NOT EXISTS entidades (
+		id          BIGSERIAL PRIMARY KEY,
+		name        TEXT NOT NULL,
+		slug        TEXT NOT NULL UNIQUE,
+		parent_id   BIGINT REFERENCES entidades(id) ON DELETE RESTRICT,
+		description TEXT NOT NULL DEFAULT '',
+		created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_entidades_parent ON entidades (parent_id);
+
+	CREATE TABLE IF NOT EXISTS user_entidades (
+		user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		entidade_id BIGINT NOT NULL REFERENCES entidades(id) ON DELETE RESTRICT,
+		is_primary  BOOLEAN NOT NULL DEFAULT FALSE,
+		PRIMARY KEY (user_id, entidade_id)
+	);
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_user_entidades_primary
+		ON user_entidades (user_id) WHERE is_primary;
+
+	CREATE TABLE IF NOT EXISTS asset_entidades (
+		id          BIGSERIAL PRIMARY KEY,
+		asset_type  TEXT NOT NULL CHECK (asset_type IN
+			('host','dns','service','project','contact','tool','ssh_key','api_catalog','secret')),
+		asset_id    BIGINT NOT NULL,
+		entidade_id BIGINT REFERENCES entidades(id) ON DELETE RESTRICT,
+		relation    TEXT NOT NULL CHECK (relation IN ('creator','responsible','global')),
+		created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		CHECK ((relation = 'global') = (entidade_id IS NULL))
+	);
+	CREATE INDEX IF NOT EXISTS idx_asset_entidades_asset ON asset_entidades (asset_type, asset_id);
+	CREATE INDEX IF NOT EXISTS idx_asset_entidades_entidade ON asset_entidades (entidade_id);
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_asset_entidades_creator
+		ON asset_entidades (asset_type, asset_id) WHERE relation = 'creator';
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_asset_entidades_global
+		ON asset_entidades (asset_type, asset_id) WHERE relation = 'global';
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_asset_entidades_resp
+		ON asset_entidades (asset_type, asset_id, entidade_id) WHERE relation = 'responsible';
+
+	INSERT INTO entidades (name, slug) VALUES ('GovPI', 'govpi') ON CONFLICT (slug) DO NOTHING;
+	INSERT INTO entidades (name, slug, parent_id)
+		SELECT v.name, v.slug, p.id
+		FROM (VALUES ('ETIPI','etipi'), ('SEAD-PI','sead-pi'), ('Parceiros','parceiros')) v(name, slug),
+		     entidades p WHERE p.slug = 'govpi'
+		ON CONFLICT (slug) DO NOTHING;
+	INSERT INTO entidades (name, slug, parent_id)
+		SELECT v.name, v.slug, p.id
+		FROM (VALUES ('NTGD','ntgd'), ('SGA','sga'), ('SGP','sgp'), ('SGI','sgi')) v(name, slug),
+		     entidades p WHERE p.slug = 'sead-pi'
+		ON CONFLICT (slug) DO NOTHING;
+	INSERT INTO entidades (name, slug, parent_id)
+		SELECT v.name, v.slug, p.id
+		FROM (VALUES ('Trin','trin'), ('Syslae','syslae'), ('Vobys','vobys')) v(name, slug),
+		     entidades p WHERE p.slug = 'parceiros'
+		ON CONFLICT (slug) DO NOTHING;
+
+	INSERT INTO asset_entidades (asset_type, asset_id, entidade_id, relation)
+		SELECT 'host', h.id, e.id, 'creator' FROM hosts h, entidades e WHERE e.slug = 'etipi'
+		ON CONFLICT DO NOTHING;
+	INSERT INTO asset_entidades (asset_type, asset_id, entidade_id, relation)
+		SELECT DISTINCT 'service', l.service_id, e.id, 'creator'
+		FROM service_host_links l, entidades e WHERE e.slug = 'etipi'
+		ON CONFLICT DO NOTHING;`,
 }
