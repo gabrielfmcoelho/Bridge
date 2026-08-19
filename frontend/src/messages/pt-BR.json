@@ -1221,5 +1221,36 @@
       "app_login": "login de app",
       "raw": "bruto"
     }
+  },
+  "entidades": {
+    "title": "Entidades",
+    "intro": "Unidades organizacionais em árvore. Usuários pertencem a entidades; cada ativo é criado por uma entidade, pode ser responsabilidade de outras e fica visível para essas entidades e para tudo acima delas.",
+    "add": "Adicionar entidade",
+    "edit": "Editar entidade",
+    "parent": "Entidade pai",
+    "root": "(raiz)",
+    "creator": "Criado por (entidade)",
+    "responsibles": "Entidades responsáveis",
+    "global": "Global",
+    "globalHint": "Visível para todos os usuários, independente de entidade",
+    "none": "(nenhuma)",
+    "primary": "Entidade principal",
+    "unassigned": "Ativos sem entidade",
+    "unassignedIntro": "Registros sem entidade são visíveis apenas para administradores. Selecione alguns e atribua as permissões.",
+    "selectAll": "Selecionar todos",
+    "selected": "selecionados",
+    "nothingUnassigned": "Nada sem entidade aqui.",
+    "assign": "Atribuir",
+    "type": {
+      "host": "Hosts",
+      "dns": "DNS",
+      "service": "Serviços",
+      "project": "Projetos",
+      "contact": "Contatos",
+      "tool": "Ferramentas",
+      "ssh_key": "Chaves SSH",
+      "api_catalog": "APIs",
+      "secret": "Segredos (avulsos)"
+    }
   }
 }

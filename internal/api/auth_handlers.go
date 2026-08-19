@@ -321,6 +321,11 @@ func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 		extIDs = []identitySummary{}
 	}
 
+	entidades, _ := store.NewUserEntidadeRepo(h.db.SQL).ListForUser(r.Context(), user.ID)
+	if entidades == nil {
+		entidades = []models.UserEntidade{}
+	}
+
 	jsonOK(w, map[string]any{
 		"id":                  user.ID,
 		"username":            user.Username,
@@ -330,9 +335,34 @@ func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 		"email":               user.Email,
 		"permissions":         permissions,
 		"external_identities": extIDs,
+		"entidades":           entidades,
 		"created_at":          user.CreatedAt,
 		"updated_at":          user.UpdatedAt,
 	})
+}
+
+// userWithEntidades is the /api/users row: the user plus their memberships.
+type userWithEntidades struct {
+	models.User
+	Entidades []models.UserEntidade `json:"entidades"`
+}
+
+// applyUserEntidades replaces the user's memberships when the request carried
+// entidade_ids (nil = leave untouched). Returns false after writing a 400 on a
+// bad primary.
+func (h *authHandlers) applyUserEntidades(w http.ResponseWriter, r *http.Request, userID int64, ids *[]int64, primary *int64) bool {
+	if ids == nil {
+		return true
+	}
+	var p int64
+	if primary != nil {
+		p = *primary
+	}
+	if err := store.NewUserEntidadeRepo(h.db.SQL).Replace(r.Context(), userID, *ids, p); err != nil {
+		jsonBadRequest(w, r, "invalid entidade_ids / primary_entidade_id", err)
+		return false
+	}
+	return true
 }
 
 // User management (admin only)
@@ -343,15 +373,26 @@ func (h *authHandlers) handleListUsers(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to list users", err)
 		return
 	}
-	jsonPaged(w, r, users)
+	memberships, _ := store.NewUserEntidadeRepo(h.db.SQL).ListBulk(r.Context())
+	out := make([]userWithEntidades, len(users))
+	for i, u := range users {
+		ents := memberships[u.ID]
+		if ents == nil {
+			ents = []models.UserEntidade{}
+		}
+		out[i] = userWithEntidades{User: u, Entidades: ents}
+	}
+	jsonPaged(w, r, out)
 }
 
 func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Username    string `json:"username"`
-		Password    string `json:"password"`
-		DisplayName string `json:"display_name"`
-		Role        string `json:"role"`
+		Username          string   `json:"username"`
+		Password          string   `json:"password"`
+		DisplayName       string   `json:"display_name"`
+		Role              string   `json:"role"`
+		EntidadeIDs       *[]int64 `json:"entidade_ids"`
+		PrimaryEntidadeID *int64   `json:"primary_entidade_id"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -381,6 +422,9 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		jsonError(w, http.StatusConflict, "username already exists")
 		return
 	}
+	if !h.applyUserEntidades(w, r, u.ID, req.EntidadeIDs, req.PrimaryEntidadeID) {
+		return
+	}
 
 	jsonCreated(w, u)
 }
@@ -393,10 +437,12 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req struct {
-		Username    string `json:"username"`
-		DisplayName string `json:"display_name"`
-		Role        string `json:"role"`
-		Password    string `json:"password"`
+		Username          string   `json:"username"`
+		DisplayName       string   `json:"display_name"`
+		Role              string   `json:"role"`
+		Password          string   `json:"password"`
+		EntidadeIDs       *[]int64 `json:"entidade_ids"`
+		PrimaryEntidadeID *int64   `json:"primary_entidade_id"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -433,6 +479,9 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 			jsonServerError(w, r, "failed to update password", err)
 			return
 		}
+	}
+	if !h.applyUserEntidades(w, r, id, req.EntidadeIDs, req.PrimaryEntidadeID) {
+		return
 	}
 
 	jsonOK(w, user)

@@ -1671,9 +1671,38 @@ export const coolifyAPI = {
 // Users (admin)
 export const usersAPI = {
   list: () => api.getList<import("./types").User>("/api/users"),
-  create: (data: { username: string; password: string; display_name: string; role: string }) =>
-    api.post<import("./types").User>("/api/users", data),
-  update: (id: number, data: Partial<import("./types").User> & { password?: string }) =>
-    api.put<import("./types").User>(`/api/users/${id}`, data),
+  create: (data: {
+    username: string; password: string; display_name: string; role: string;
+    entidade_ids?: number[]; primary_entidade_id?: number | null;
+  }) => api.post<import("./types").User>("/api/users", data),
+  update: (
+    id: number,
+    data: Partial<Omit<import("./types").User, "entidades">> & {
+      password?: string; entidade_ids?: number[]; primary_entidade_id?: number | null;
+    },
+  ) => api.put<import("./types").User>(`/api/users/${id}`, data),
   delete: (id: number) => api.delete(`/api/users/${id}`),
+};
+
+// ── Entidades (org tree + per-asset visibility grants) ─────────────────────
+export const entidadesAPI = {
+  list: () => api.getList<import("./types").Entidade>("/api/entidades"),
+  create: (data: Pick<import("./types").Entidade, "name" | "parent_id"> & { slug?: string; description?: string }) =>
+    api.post<import("./types").Entidade>("/api/entidades", data),
+  update: (id: number, data: Pick<import("./types").Entidade, "name" | "slug" | "parent_id" | "description">) =>
+    api.put<import("./types").Entidade>(`/api/entidades/${id}`, data),
+  delete: (id: number) => api.delete(`/api/entidades/${id}`),
+  unassigned: (assetType: import("./types").AssetType, page = 1, perPage = 50) =>
+    api.getListPaginated<{ id: number; name: string }>(
+      `/api/entidades/unassigned?asset_type=${assetType}&page=${page}&per_page=${perPage}`,
+    ),
+  bulkAssign: (data: { asset_type: import("./types").AssetType; asset_ids: number[] } & import("./types").AssetGrantsInput) =>
+    api.post<{ status: string; count: number }>("/api/entidades/bulk-assign", data),
+};
+
+export const assetEntidadesAPI = {
+  get: (type: import("./types").AssetType, id: number) =>
+    api.get<import("./types").AssetGrants>(`/api/assets/${type}/${id}/entidades`),
+  put: (type: import("./types").AssetType, id: number, data: import("./types").AssetGrantsInput) =>
+    api.put<import("./types").AssetGrants>(`/api/assets/${type}/${id}/entidades`, data),
 };

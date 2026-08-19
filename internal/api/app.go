@@ -51,6 +51,7 @@ type App struct {
 	grafanaWebhook      *grafanaWebhookHandlers
 	outline             *outlineHandlers
 	glpi                *glpiHandlers
+	entidade            *entidadeHandlers
 }
 
 // newApp constructs the container: build the auth provider registry, the shared
@@ -102,5 +103,6 @@ func newApp(db *database.DB, configPath string) *App {
 		grafanaWebhook:      &grafanaWebhookHandlers{db: db},
 		outline:             &outlineHandlers{db: db},
 		glpi:                &glpiHandlers{db: db, cache: glpiclient.NewSessionCache(30 * time.Minute)},
+		entidade:            newEntidadeHandlers(db),
 	}
 }

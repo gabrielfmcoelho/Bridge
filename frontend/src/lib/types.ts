@@ -7,9 +7,49 @@ export interface User {
   email: string;
   permissions: string[];
   external_identities: { provider: string; external_id: string }[];
+  /** Entidade memberships (primary first). Present on /api/auth/me and /api/users. */
+  entidades?: UserEntidade[];
   created_at: string;
   updated_at: string;
 }
+
+// ── Entidades (org units; hierarchical visibility) ─────────────────────────
+
+export interface Entidade {
+  id: number;
+  name: string;
+  slug: string;
+  parent_id: number | null;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserEntidade {
+  id: number;
+  name: string;
+  slug: string;
+  is_primary: boolean;
+}
+
+/** Resolved grants of one asset (GET /api/assets/{type}/{id}/entidades). */
+export interface AssetGrants {
+  creator_entidade_id: number | null;
+  responsible_entidade_ids: number[];
+  is_global: boolean;
+}
+
+/** Write-side grants; every field optional = "leave untouched". Embedded in
+ *  create/update bodies of root assets and PUT .../entidades. */
+export interface AssetGrantsInput {
+  creator_entidade_id?: number | null;
+  responsible_entidade_ids?: number[];
+  is_global?: boolean;
+}
+
+export type AssetType =
+  | "host" | "dns" | "service" | "project" | "contact"
+  | "tool" | "ssh_key" | "api_catalog" | "secret";
 
 export interface AuthProviderInfo {
   name: string;

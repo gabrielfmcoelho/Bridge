@@ -3,7 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { enumsAPI, usersAPI, appearanceAPI, importAPI, backupAPI } from "@/lib/api";
+import { enumsAPI, usersAPI, appearanceAPI, importAPI, backupAPI, entidadesAPI } from "@/lib/api";
+import { indentedLabel, withDepth } from "@/lib/entidades";
 import type { ImportResult } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,11 +18,13 @@ import Badge from "@/components/ui/Badge";
 import Drawer from "@/components/ui/Drawer";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import FormError from "@/components/ui/FormError";
+import CheckboxList from "@/components/ui/CheckboxList";
 import IntegrationsTab from "./IntegrationsTab";
 import PermissionsTab from "./PermissionsTab";
 import RoleMappingsTab from "./RoleMappingsTab";
+import EntidadesTab from "./EntidadesTab";
 
-type Tab = "enums" | "users" | "appearance" | "import" | "backup" | "integrations" | "permissions" | "role-mappings";
+type Tab = "enums" | "users" | "entidades" | "appearance" | "import" | "backup" | "integrations" | "permissions" | "role-mappings";
 
 const roleColors: Record<string, string> = {
   admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
@@ -46,6 +49,7 @@ export default function SettingsPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: "enums", label: t("settings.enums") },
     ...(isAdmin ? [{ key: "users" as Tab, label: t("settings.users") }] : []),
+    ...(isAdmin ? [{ key: "entidades" as Tab, label: t("entidades.title") }] : []),
     ...(isAdmin ? [{ key: "appearance" as Tab, label: t("settings.appearance") }] : []),
     ...(isAdmin ? [{ key: "import" as Tab, label: t("settings.import") }] : []),
     ...(isAdmin ? [{ key: "backup" as Tab, label: t("settings.backup") }] : []),
@@ -112,6 +116,7 @@ export default function SettingsPage() {
       <div className="animate-fade-in">
         {activeTab === "enums" && <EnumSection />}
         {activeTab === "users" && isAdmin && <UsersSection />}
+        {activeTab === "entidades" && isAdmin && <EntidadesTab />}
         {activeTab === "appearance" && isAdmin && <AppearanceSection />}
         {activeTab === "import" && isAdmin && <ImportSection />}
         {activeTab === "backup" && isAdmin && <BackupSection />}
@@ -358,21 +363,24 @@ function UsersSection() {
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState<import("@/lib/types").User | null>(null);
-  const [newUser, setNewUser] = useState({ username: "", password: "", display_name: "", role: "viewer" });
-  const [editForm, setEditForm] = useState({ display_name: "", role: "", password: "" });
+  const emptyNew = { username: "", password: "", display_name: "", role: "viewer", entidade_ids: [] as number[], primary_entidade_id: null as number | null };
+  const [newUser, setNewUser] = useState(emptyNew);
+  const [editForm, setEditForm] = useState({ display_name: "", role: "", password: "", entidade_ids: [] as number[], primary_entidade_id: null as number | null });
   const [error, setError] = useState("");
 
   const { data: users = [] } = useQuery({
     queryKey: ["users"],
     queryFn: usersAPI.list,
   });
+  const { data: entidades = [] } = useQuery({ queryKey: ["entidades"], queryFn: entidadesAPI.list });
+  const entidadeNodes = withDepth(entidades);
 
   const createMutation = useMutation({
     mutationFn: () => usersAPI.create(newUser),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setShowForm(false);
-      setNewUser({ username: "", password: "", display_name: "", role: "viewer" });
+      setNewUser(emptyNew);
       setError("");
     },
     onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
@@ -381,10 +389,20 @@ function UsersSection() {
   const updateMutation = useMutation({
     mutationFn: () => {
       if (!editUser) return Promise.reject();
-      const data: Record<string, string> = {};
+      const data: Parameters<typeof usersAPI.update>[1] = {};
       if (editForm.display_name !== editUser.display_name) data.display_name = editForm.display_name;
-      if (editForm.role !== editUser.role) data.role = editForm.role;
+      if (editForm.role !== editUser.role) data.role = editForm.role as typeof editUser.role;
       if (editForm.password) data.password = editForm.password;
+      const currentIDs = (editUser.entidades ?? []).map((e) => e.id);
+      const currentPrimary = editUser.entidades?.find((e) => e.is_primary)?.id ?? null;
+      if (
+        editForm.entidade_ids.length !== currentIDs.length ||
+        editForm.entidade_ids.some((id) => !currentIDs.includes(id)) ||
+        editForm.primary_entidade_id !== currentPrimary
+      ) {
+        data.entidade_ids = editForm.entidade_ids;
+        data.primary_entidade_id = editForm.primary_entidade_id;
+      }
       return usersAPI.update(editUser.id, data);
     },
     onSuccess: () => {
@@ -402,7 +420,13 @@ function UsersSection() {
 
   const openEdit = (u: import("@/lib/types").User) => {
     setEditUser(u);
-    setEditForm({ display_name: u.display_name, role: u.role, password: "" });
+    setEditForm({
+      display_name: u.display_name,
+      role: u.role,
+      password: "",
+      entidade_ids: (u.entidades ?? []).map((e) => e.id),
+      primary_entidade_id: u.entidades?.find((e) => e.is_primary)?.id ?? null,
+    });
     setError("");
   };
 
@@ -456,6 +480,7 @@ function UsersSection() {
               <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
                 <th className="text-left px-4 py-3 font-semibold">{t("auth.username")}</th>
                 <th className="text-left px-4 py-3 font-semibold">{t("settings.role")}</th>
+                <th className="text-left px-4 py-3 font-semibold">{t("entidades.title")}</th>
                 <th className="text-left px-4 py-3 font-semibold">{t("settings.authProvider")}</th>
                 <th className="text-left px-4 py-3 font-semibold">{t("settings.createdAt")}</th>
                 <th className="text-right px-4 py-3 w-20" />
@@ -482,6 +507,16 @@ function UsersSection() {
                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${roleColors[u.role] || roleColors.viewer}`}>
                       {u.role}
                     </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs">
+                    <div className="flex flex-wrap gap-1">
+                      {(u.entidades ?? []).map((e) => (
+                        <span key={e.id} className={`px-1.5 py-0.5 rounded border text-[10px] ${e.is_primary ? "border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent-muted)]" : "border-[var(--border-subtle)] text-[var(--text-muted)]"}`} title={e.is_primary ? t("entidades.primary") : undefined}>
+                          {e.name}
+                        </span>
+                      ))}
+                      {(u.entidades ?? []).length === 0 && <span className="text-[var(--text-faint)]">-</span>}
+                    </div>
                   </td>
                   <td className="px-4 py-2.5 text-[var(--text-secondary)] text-xs">
                     {providerLabels[u.auth_provider] || u.auth_provider || "Local"}
@@ -570,6 +605,12 @@ function UsersSection() {
               ]}
             />
           </div>
+          <UserEntidadeFields
+            nodes={entidadeNodes}
+            ids={newUser.entidade_ids}
+            primary={newUser.primary_entidade_id}
+            onChange={(ids, primary) => setNewUser({ ...newUser, entidade_ids: ids, primary_entidade_id: primary })}
+          />
           <div className="flex justify-end">
             <Button type="submit" loading={createMutation.isPending}>{t("common.create")}</Button>
           </div>
@@ -598,12 +639,52 @@ function UsersSection() {
               />
               <Input label={`${t("auth.password")} (optional)`} type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} placeholder="Leave blank to keep current" />
             </div>
+            <UserEntidadeFields
+              nodes={entidadeNodes}
+              ids={editForm.entidade_ids}
+              primary={editForm.primary_entidade_id}
+              onChange={(ids, primary) => setEditForm({ ...editForm, entidade_ids: ids, primary_entidade_id: primary })}
+            />
             <div className="flex justify-end">
               <Button type="submit" loading={updateMutation.isPending}>{t("common.save")}</Button>
             </div>
           </form>
         )}
       </ResponsiveModal>
+    </div>
+  );
+}
+
+/** Membership picker for user forms: N entidades + which one is primary. */
+function UserEntidadeFields({
+  nodes,
+  ids,
+  primary,
+  onChange,
+}: {
+  nodes: ReturnType<typeof withDepth>;
+  ids: number[];
+  primary: number | null;
+  onChange: (ids: number[], primary: number | null) => void;
+}) {
+  const { t } = useLocale();
+  const chosen = nodes.filter((n) => ids.includes(n.id));
+  return (
+    <div className="space-y-3">
+      <CheckboxList
+        label={t("entidades.title")}
+        items={nodes.map((n) => ({ id: n.id, name: indentedLabel(n) }))}
+        selected={ids}
+        onChange={(next) => onChange(next, primary != null && next.includes(primary) ? primary : next[0] ?? null)}
+      />
+      {chosen.length > 1 && (
+        <Select
+          label={t("entidades.primary")}
+          value={primary != null ? String(primary) : ""}
+          onChange={(e) => onChange(ids, e.target.value ? Number(e.target.value) : null)}
+          options={chosen.map((n) => ({ value: String(n.id), label: n.name }))}
+        />
+      )}
     </div>
   );
 }

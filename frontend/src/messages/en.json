@@ -1221,5 +1221,36 @@
       "app_login": "app login",
       "raw": "raw"
     }
+  },
+  "entidades": {
+    "title": "Entidades",
+    "intro": "Organisational units in a tree. Users belong to entidades; every asset is created by one entidade, may be the responsibility of others, and is visible to those entidades and everything above them.",
+    "add": "Add entidade",
+    "edit": "Edit entidade",
+    "parent": "Parent",
+    "root": "(root)",
+    "creator": "Created by (entidade)",
+    "responsibles": "Responsible entidades",
+    "global": "Global",
+    "globalHint": "Visible to every user regardless of entidade",
+    "none": "(none)",
+    "primary": "Primary entidade",
+    "unassigned": "Unassigned assets",
+    "unassignedIntro": "Rows with no entidade are visible to admins only. Pick some and assign grants.",
+    "selectAll": "Select all",
+    "selected": "selected",
+    "nothingUnassigned": "Nothing unassigned here.",
+    "assign": "Assign",
+    "type": {
+      "host": "Hosts",
+      "dns": "DNS",
+      "service": "Services",
+      "project": "Projects",
+      "contact": "Contacts",
+      "tool": "Tools",
+      "ssh_key": "SSH Keys",
+      "api_catalog": "APIs",
+      "secret": "Secrets (avulso)"
+    }
   }
 }

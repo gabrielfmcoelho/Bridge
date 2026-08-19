@@ -55,6 +55,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	rr := routeRegistrar{mux: mux, db: db}
 	ah.registerRoutes(rr)  // /api/auth/*, /api/users/*
 	oah.registerRoutes(rr) // /api/auth/oauth/*
+	eth := app.entidade
+	eth.registerRoutes(rr) // /api/entidades/*, /api/assets/*
 	hh.registerRoutes(rr)  // /api/hosts/*
 	hah.registerRoutes(rr) // /api/hosts/{slug}/alerts/*
 	hch.registerRoutes(rr) // /api/hosts/{slug}/chamados/*

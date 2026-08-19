@@ -57,6 +57,15 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/backup"},
 		{"GET", "/api/ai/status"},
 		{"POST", "/api/ai/chat"},
+		{"GET", "/api/entidades"},
+		{"POST", "/api/entidades"},
+		{"GET", "/api/entidades/unassigned"},
+		{"POST", "/api/entidades/bulk-assign"},
+		{"GET", "/api/entidades/1"},
+		{"PUT", "/api/entidades/1"},
+		{"DELETE", "/api/entidades/1"},
+		{"GET", "/api/assets/host/1/entidades"},
+		{"PUT", "/api/assets/host/1/entidades"},
 
 		// Share bundles (owner routes)
 		{"POST", "/api/share-bundles"},
