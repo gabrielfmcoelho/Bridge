@@ -13,6 +13,20 @@ type releaseHandlers struct {
 	db *database.DB
 }
 
+// projectVisible 404s when the release's target project (if any) is outside
+// the caller's entidade scope, so a release can't be attached to an invisible project.
+func (h *releaseHandlers) projectVisible(w http.ResponseWriter, r *http.Request, projectID *int64) bool {
+	if projectID == nil {
+		return true
+	}
+	ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetProject, *projectID)
+	if err != nil || !ok {
+		jsonError(w, http.StatusNotFound, "project not found")
+		return false
+	}
+	return true
+}
+
 func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	releases, err := store.NewReleaseRepo(h.db.SQL).List(r.Context())
 	if err != nil {
@@ -68,6 +82,9 @@ func (h *releaseHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if req.Status == "" {
 		req.Status = "pending"
 	}
+	if !h.projectVisible(w, r, req.ProjectID) {
+		return
+	}
 
 	if err := store.NewReleaseRepo(h.db.SQL).Create(r.Context(), &req.Release); err != nil {
 		jsonServerError(w, r, "failed to create release", err)
@@ -104,6 +121,9 @@ func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req.Release.ID = id
+	if !h.projectVisible(w, r, req.ProjectID) {
+		return
+	}
 
 	// Auto-set live_date when status transitions to "live"
 	if req.Status == "live" && existing.Status != "live" {
@@ -138,9 +158,9 @@ func (h *releaseHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 // registerRoutes wires this group's routes (self-registration, R2).
 func (h *releaseHandlers) registerRoutes(rr routeRegistrar) {
-	rr.public("GET /api/releases", h.handleList)
+	rr.auth("GET /api/releases", h.handleList)
 	rr.role("editor", "POST /api/releases", h.handleCreate)
-	rr.public("GET /api/releases/{id}", h.handleGet)
+	rr.auth("GET /api/releases/{id}", h.handleGet)
 	rr.role("editor", "PUT /api/releases/{id}", h.handleUpdate)
 	rr.role("admin", "DELETE /api/releases/{id}", h.handleDelete)
 }

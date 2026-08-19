@@ -42,6 +42,7 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/projects/1/issues"},
 		{"GET", "/api/services/1/issues"},
 		{"GET", "/api/issues"},
+		{"GET", "/api/releases"},
 		{"POST", "/api/releases"},
 		{"GET", "/api/tools"},
 		{"GET", "/api/settings/alerts"},
@@ -196,7 +197,6 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 	// Public routes must be reachable without auth (not 401, not 404).
 	public := []struct{ method, path string }{
 		{"GET", "/api/auth/status"},
-		{"GET", "/api/releases"},
 		{"GET", "/api/settings/appearance"},
 		{"POST", "/api/webhooks/grafana/alerts"},
 	}

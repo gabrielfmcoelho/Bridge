@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sort"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -20,6 +21,7 @@ type ProjectService struct {
 	services     *store.ServiceRepo
 	tags         *store.TagRepo
 	responsaveis *store.ResponsavelRepo
+	grants       *store.AssetEntidadeRepo
 }
 
 // NewProjectService constructs a ProjectService over the given DB handle.
@@ -30,6 +32,7 @@ func NewProjectService(db *sql.DB) *ProjectService {
 		services:     store.NewServiceRepo(db),
 		tags:         store.NewTagRepo(db),
 		responsaveis: store.NewResponsavelRepo(db),
+		grants:       store.NewAssetEntidadeRepo(db),
 	}
 }
 
@@ -49,6 +52,7 @@ type ProjectDetail struct {
 	Services     []models.Service     `json:"services"`
 	HostIDs      []int64              `json:"host_ids"`
 	DNSIDs       []int64              `json:"dns_ids"`
+	Entidades    models.AssetGrants   `json:"entidades"`
 }
 
 // ProjectWrite carries the create/update payload (project + relations). For
@@ -58,6 +62,7 @@ type ProjectWrite struct {
 	Project      models.Project
 	Tags         *[]string
 	Responsaveis *[]models.ResponsavelInput
+	Grants       *models.AssetGrants // nil = leave unchanged
 }
 
 // List returns the projects matching the filter (server-side filter/sort/
@@ -115,6 +120,7 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	if err != nil {
 		return nil, err
 	}
+	grants, _ := s.grants.Get(ctx, store.AssetProject, id) // best effort
 	return &ProjectDetail{
 		Project:      p,
 		Tags:         tags,
@@ -122,7 +128,13 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 		Services:     services,
 		HostIDs:      hostIDs,
 		DNSIDs:       dnsIDs,
+		Entidades:    grants,
 	}, nil
+}
+
+// Grants returns the entidade grants of a project.
+func (s *ProjectService) Grants(ctx context.Context, id int64) (models.AssetGrants, error) {
+	return s.grants.Get(ctx, store.AssetProject, id)
 }
 
 // aggregateServiceLinks collects the deduplicated, sorted host and dns ids
@@ -168,6 +180,11 @@ func (s *ProjectService) Create(ctx context.Context, w *ProjectWrite) error {
 	if err := s.projects.Create(ctx, &w.Project); err != nil {
 		return err
 	}
+	if w.Grants != nil {
+		if err := s.grants.Replace(ctx, s.db, store.AssetProject, w.Project.ID, *w.Grants); err != nil {
+			return fmt.Errorf("failed to set entidades: %w", err)
+		}
+	}
 	if w.Tags != nil && len(*w.Tags) > 0 {
 		if err := s.tags.Set(ctx, "project", w.Project.ID, *w.Tags); err != nil {
 			return err
@@ -191,6 +208,11 @@ func (s *ProjectService) Update(ctx context.Context, id int64, w *ProjectWrite) 
 	w.Project.ID = id
 	if err := s.projects.Update(ctx, &w.Project); err != nil {
 		return true, err
+	}
+	if w.Grants != nil {
+		if err := s.grants.Replace(ctx, s.db, store.AssetProject, id, *w.Grants); err != nil {
+			return true, fmt.Errorf("failed to set entidades: %w", err)
+		}
 	}
 	if w.Tags != nil {
 		if err := s.tags.Set(ctx, "project", id, *w.Tags); err != nil {

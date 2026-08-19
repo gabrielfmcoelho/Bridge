@@ -22,6 +22,16 @@ func scanRelease(scanner interface{ Scan(...any) error }, r *models.Release) err
 	return scanner.Scan(&r.ID, &r.ProjectID, &r.Title, &r.Description, &r.Status, &r.TargetDate, &r.LiveDate, &r.CreatedAt, &r.UpdatedAt)
 }
 
+// releaseVisible is the entidade predicate for releases: a release is visible
+// iff its parent project is (orphans are admin-only; unscoped sees all).
+func releaseVisible(ctx context.Context) (string, []any) {
+	vis, vargs := VisibleExpr(ctx, AssetProject, "releases.project_id")
+	if vis == "TRUE" {
+		return vis, nil
+	}
+	return "(releases.project_id IS NOT NULL AND " + vis + ")", vargs
+}
+
 // Create inserts a release and sets rel.ID.
 func (r *ReleaseRepo) Create(ctx context.Context, rel *models.Release) error {
 	id, err := database.InsertReturningID(r.db,
@@ -39,7 +49,8 @@ func (r *ReleaseRepo) Create(ctx context.Context, rel *models.Release) error {
 // Get returns a release by id, or (nil, nil) if absent.
 func (r *ReleaseRepo) Get(ctx context.Context, id int64) (*models.Release, error) {
 	rel := &models.Release{}
-	err := scanRelease(r.db.QueryRowContext(ctx, `SELECT `+releaseCols+` FROM releases WHERE id = ?`, id), rel)
+	vis, vargs := releaseVisible(ctx)
+	err := scanRelease(r.db.QueryRowContext(ctx, `SELECT `+releaseCols+` FROM releases WHERE id = ? AND `+vis, append([]any{id}, vargs...)...), rel)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -48,14 +59,15 @@ func (r *ReleaseRepo) Get(ctx context.Context, id int64) (*models.Release, error
 
 // List returns all releases ordered by lifecycle status then recency.
 func (r *ReleaseRepo) List(ctx context.Context) ([]models.Release, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+releaseCols+` FROM releases ORDER BY
+	vis, vargs := releaseVisible(ctx)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+releaseCols+` FROM releases WHERE `+vis+` ORDER BY
 		CASE status
 			WHEN 'live' THEN 1
 			WHEN 'ready' THEN 2
 			WHEN 'ongoing' THEN 3
 			WHEN 'pending' THEN 4
 			WHEN 'canceled' THEN 5
-		END, created_at DESC`)
+		END, created_at DESC`, vargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -73,17 +85,19 @@ func (r *ReleaseRepo) List(ctx context.Context) ([]models.Release, error) {
 
 // Update writes the mutable fields of an existing release by id.
 func (r *ReleaseRepo) Update(ctx context.Context, rel *models.Release) error {
+	vis, vargs := releaseVisible(ctx)
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE releases SET project_id = ?, title = ?, description = ?, status = ?, target_date = ?, live_date = ?, updated_at = CURRENT_TIMESTAMP
-		 WHERE id = ?`,
-		rel.ProjectID, rel.Title, rel.Description, rel.Status, rel.TargetDate, rel.LiveDate, rel.ID,
+		 WHERE id = ? AND `+vis,
+		append([]any{rel.ProjectID, rel.Title, rel.Description, rel.Status, rel.TargetDate, rel.LiveDate, rel.ID}, vargs...)...,
 	)
 	return err
 }
 
 // Delete removes a release by id.
 func (r *ReleaseRepo) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM releases WHERE id = ?`, id)
+	vis, vargs := releaseVisible(ctx)
+	_, err := r.db.ExecContext(ctx, `DELETE FROM releases WHERE id = ? AND `+vis, append([]any{id}, vargs...)...)
 	return err
 }
 

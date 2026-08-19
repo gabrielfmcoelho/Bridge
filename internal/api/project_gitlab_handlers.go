@@ -51,6 +51,10 @@ func (h *projectGitLabHandlers) handleListLinks(w http.ResponseWriter, r *http.R
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
+	if ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetProject, projectID); err != nil || !ok {
+		jsonError(w, http.StatusNotFound, "project not found")
+		return
+	}
 
 	raw, err := store.NewProjectGitLabLinkRepo(h.db.SQL).List(r.Context(), projectID)
 	if err != nil {
@@ -113,6 +117,10 @@ func (h *projectGitLabHandlers) handleCreateLink(w http.ResponseWriter, r *http.
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
 		jsonBadRequest(w, r, "invalid project id", err)
+		return
+	}
+	if ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetProject, projectID); err != nil || !ok {
+		jsonError(w, http.StatusNotFound, "project not found")
 		return
 	}
 
@@ -196,6 +204,10 @@ func (h *projectGitLabHandlers) handleDeleteLink(w http.ResponseWriter, r *http.
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
+	if ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetProject, projectID); err != nil || !ok {
+		jsonError(w, http.StatusNotFound, "project not found")
+		return
+	}
 	linkID, err := pathInt64(r, "linkId")
 	if err != nil {
 		jsonBadRequest(w, r, "invalid link id", err)
@@ -242,6 +254,10 @@ func (h *projectGitLabHandlers) handleListCommits(w http.ResponseWriter, r *http
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
 		jsonBadRequest(w, r, "invalid project id", err)
+		return
+	}
+	if ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetProject, projectID); err != nil || !ok {
+		jsonError(w, http.StatusNotFound, "project not found")
 		return
 	}
 
