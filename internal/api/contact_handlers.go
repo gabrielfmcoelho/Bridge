@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -25,18 +26,34 @@ func (h *contactHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var req models.Contact
+	var req struct {
+		models.Contact
+		models.AssetGrantsInput
+	}
 	if !decodeBody(w, r, &req) {
 		return
 	}
 	if !requireFields(w, map[string]string{"name": req.Name}) {
 		return
 	}
-	if err := h.contacts.Create(r.Context(), &req); err != nil {
+	g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, nil)
+	if errors.Is(err, store.ErrEntidadeForbidden) {
+		jsonError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.contacts.Create(r.Context(), &req.Contact); err != nil {
 		jsonServerError(w, r, "failed to create contact", err)
 		return
 	}
-	jsonCreated(w, req)
+	if err := store.NewAssetEntidadeRepo(h.contacts.DB()).Replace(r.Context(), h.contacts.DB(), store.AssetContact, req.Contact.ID, g); err != nil {
+		jsonServerError(w, r, "failed to set entidades", err)
+		return
+	}
+	jsonCreated(w, req.Contact)
 }
 
 func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
@@ -44,19 +61,43 @@ func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req models.Contact
+	if c, err := h.contacts.Get(r.Context(), id); err != nil || c == nil {
+		jsonError(w, http.StatusNotFound, "contact not found")
+		return
+	}
+	var req struct {
+		models.Contact
+		models.AssetGrantsInput
+	}
 	if !decodeBody(w, r, &req) {
 		return
 	}
 	if !requireFields(w, map[string]string{"name": req.Name}) {
 		return
 	}
-	req.ID = id
-	if err := h.contacts.Update(r.Context(), &req); err != nil {
+	req.Contact.ID = id
+	if err := h.contacts.Update(r.Context(), &req.Contact); err != nil {
 		jsonServerError(w, r, "failed to update contact", err)
 		return
 	}
-	jsonOK(w, req)
+	if req.AssetGrantsInput.Present() {
+		grants := store.NewAssetEntidadeRepo(h.contacts.DB())
+		existing, _ := grants.Get(r.Context(), store.AssetContact, id)
+		g, err := store.ResolveGrants(r.Context(), req.AssetGrantsInput, &existing)
+		if errors.Is(err, store.ErrEntidadeForbidden) {
+			jsonError(w, http.StatusForbidden, err.Error())
+			return
+		}
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := grants.Replace(r.Context(), h.contacts.DB(), store.AssetContact, id, g); err != nil {
+			jsonServerError(w, r, "failed to set entidades", err)
+			return
+		}
+	}
+	jsonOK(w, req.Contact)
 }
 
 func (h *contactHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {

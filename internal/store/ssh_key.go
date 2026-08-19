@@ -28,9 +28,10 @@ func scanSSHKey(scanner interface{ Scan(...any) error }, k *models.SSHKey) error
 		&k.PasswordCiphertext, &k.PasswordNonce, &k.Fingerprint, &k.CreatedAt)
 }
 
-// List returns all ssh keys ordered by name.
+// List returns all visible ssh keys ordered by name.
 func (r *SSHKeyRepo) List(ctx context.Context) ([]models.SSHKey, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+sshKeyCols+` FROM ssh_keys ORDER BY name`)
+	vis, vargs := VisibleExpr(ctx, AssetSSHKey, "ssh_keys.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT `+sshKeyCols+` FROM ssh_keys WHERE `+vis+` ORDER BY name`, vargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -46,10 +47,11 @@ func (r *SSHKeyRepo) List(ctx context.Context) ([]models.SSHKey, error) {
 	return keys, rows.Err()
 }
 
-// Get returns the ssh key with the given id, or (nil, nil) if absent.
+// Get returns the visible ssh key with the given id, or (nil, nil) if absent.
 func (r *SSHKeyRepo) Get(ctx context.Context, id int64) (*models.SSHKey, error) {
+	vis, vargs := VisibleExpr(ctx, AssetSSHKey, "ssh_keys.id")
 	k := &models.SSHKey{}
-	err := scanSSHKey(r.db.QueryRowContext(ctx, `SELECT `+sshKeyCols+` FROM ssh_keys WHERE id = ?`, id), k)
+	err := scanSSHKey(r.db.QueryRowContext(ctx, `SELECT `+sshKeyCols+` FROM ssh_keys WHERE id = ? AND `+vis, append([]any{id}, vargs...)...), k)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -77,22 +79,24 @@ func (r *SSHKeyRepo) Create(ctx context.Context, k *models.SSHKey) error {
 	return nil
 }
 
-// Update writes all fields of an existing ssh key by id.
+// Update writes all fields of an existing visible ssh key by id.
 func (r *SSHKeyRepo) Update(ctx context.Context, k *models.SSHKey) error {
+	vis, vargs := VisibleExpr(ctx, AssetSSHKey, "ssh_keys.id")
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE ssh_keys SET name = ?, credential_type = ?, username = ?, description = ?,
 			pub_key_ciphertext = ?, pub_key_nonce = ?, priv_key_ciphertext = ?, priv_key_nonce = ?,
 			password_ciphertext = ?, password_nonce = ?, fingerprint = ?
-		 WHERE id = ?`,
-		k.Name, k.CredentialType, k.Username, k.Description,
-		k.PubKeyCiphertext, k.PubKeyNonce, k.PrivKeyCiphertext, k.PrivKeyNonce,
-		k.PasswordCiphertext, k.PasswordNonce, k.Fingerprint, k.ID,
+		 WHERE id = ? AND `+vis,
+		append([]any{k.Name, k.CredentialType, k.Username, k.Description,
+			k.PubKeyCiphertext, k.PubKeyNonce, k.PrivKeyCiphertext, k.PrivKeyNonce,
+			k.PasswordCiphertext, k.PasswordNonce, k.Fingerprint, k.ID}, vargs...)...,
 	)
 	return err
 }
 
-// Delete removes an ssh key by id.
+// Delete removes a visible ssh key by id.
 func (r *SSHKeyRepo) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM ssh_keys WHERE id = ?`, id)
+	vis, vargs := VisibleExpr(ctx, AssetSSHKey, "ssh_keys.id")
+	_, err := r.db.ExecContext(ctx, `DELETE FROM ssh_keys WHERE id = ? AND `+vis, append([]any{id}, vargs...)...)
 	return err
 }
