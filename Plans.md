@@ -94,6 +94,24 @@ frontend grouping concept derived from `GROUP BY group_label`.
 
 ---
 
+## 🚧 Phase 6 — Entidades (hierarchical org units & per-asset visibility)
+
+Spec SSOT: [`internal/spec/entidades.md`](internal/spec/entidades.md) · branch `feat/entidades`
+
+| Task | 内容 | DoD | Depends | Status |
+|------|------|-----|---------|--------|
+| 6.1 | Schema + scope core: migration v82 (`entidades` tree, `user_entidades`, polymorphic `asset_entidades` creator/responsible/global; GovPI seed tree; hosts + host-linked services backfilled creator=ETIPI), `store/scope.go` (`Scope` in ctx, `VisibleExpr`/`VisibleExprDyn`/`CanSee`, asset registry), `EntidadeRepo`/`UserEntidadeRepo`/`AssetEntidadeRepo`, `ResolveGrants`, `RequireAuth` loads scope once `[tdd:required]` | `scope_test` proves `[]int64`→`ANY(?)` through pgx-rebind, global/empty/union cases and the ancestor rule (GovPI member sees SGA's host) on real PG | — | cc:完了 [2a59238] |
+| 6.2 | Entidades CRUD + grants API + users/me + admin UI: `/api/entidades*`, `/api/entidades/unassigned`, `bulk-assign`, `/api/assets/{type}/{id}/entidades` (invisible ⇒ 404), users carry `entidade_ids`/`primary_entidade_id`, `/me.entidades`; Settings → Entidades tab (tree CRUD + triage), user forms pick memberships `[tdd:required]` | `entidade_handlers_test` (admin CRUD/cycle/409, scoped grants 404/403/200, triage + bulk-assign 400 for scope-less editor); routes_test; tsc/lint; node:test for tree helpers | 6.1 | cc:完了 [39361ef] |
+| 6.3 | Backend enforcement per module: hosts (+`?entidade_id=`), dns, services (+reconcile copies host grants), projects + releases (`rr.auth`) + project sub-resource guards, contacts/tools/ssh_keys, api_catalog (incl. multipart grants), secrets (`secretVisibleSQL`: personal pass, parented inherit, shared avulso own grants), issues (polymorphic parent), dashboard/trash counts, import per-item grants `[tdd:required]` | one `*_scope_test` per module (scoped List/Get/Update/Delete vs unscoped); full `go test -race ./...` green; live curl E2E: unassigned ⇒ admin-only, creator defaults to primary, 403 foreign creator, ancestor sees child's asset, dashboard scoped, releases 401 | 6.1 | cc:完了 [4d57be4…082fc10] |
+| 6.4 | Frontend forms: `EntidadeScopeFields` (creator select from user subtree, responsibles checklist, global toggle, `loadFrom` for edit) in host/dns/service/project/contact/tool/ssh-key/api-catalog/secret(avulso+shared) forms; hosts filter by entidade; `host_entidades` UI removed | `npx tsc --noEmit` + eslint green; Playwright: Settings → Entidades tab renders tree + triage; host form step 3 shows entidade fields | 6.2 | cc:完了 [79cc086, 379bbba, 4669794] |
+| 6.5 | Cleanup: migration v83 drops `host_entidades`; `HostEntidadeRepo`/model/test removed; one shared `api.resolveGrants` helper | `grep -rn HostEntidade internal frontend/src` empty; full suite green | 6.3, 6.4 | cc:完了 [906e7ec, 74a6d4a] |
+
+**Deploy note**: right after deploy non-admins see only what admins assign (hosts/host-services
+are ETIPI-created; everything else unassigned) → assign users to entidades + triage in Settings
+first. The repo `.env` DSN is prod and `database.Open` auto-migrates — never `make dev` against it.
+
+---
+
 ## 🏗️ Refactor Roadmap — Transport → Service → Store Architecture
 
 > **📝 後追いドキュメント (harness-sync 2026-06-05)**: この節は Plans.md とは別に
