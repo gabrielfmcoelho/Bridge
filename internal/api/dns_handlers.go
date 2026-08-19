@@ -1,10 +1,12 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // dnsHandlers is a Phase 2 reference handler: it holds a domain service (not a
@@ -61,10 +63,11 @@ func (h *dnsHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 // dnsWriteRequest is the create/update wire shape: a DNSRecord plus its
-// relations. Pointer slices distinguish "absent" (leave unchanged) from
-// "present but empty" (clear) on update.
+// relations and entidade grants. Pointer slices distinguish "absent" (leave
+// unchanged) from "present but empty" (clear) on update.
 type dnsWriteRequest struct {
 	models.DNSRecord
+	models.AssetGrantsInput
 	Tags         *[]string                  `json:"tags"`
 	HostIDs      *[]int64                   `json:"host_ids"`
 	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
@@ -72,6 +75,21 @@ type dnsWriteRequest struct {
 
 func (req *dnsWriteRequest) toWrite() *service.DNSWrite {
 	return &service.DNSWrite{Record: req.DNSRecord, Tags: req.Tags, HostIDs: req.HostIDs, Responsaveis: req.Responsaveis}
+}
+
+// dnsResolveGrants applies the caller's scope to the request's grants (existing
+// = nil on create) and writes the HTTP error on failure.
+func dnsResolveGrants(w http.ResponseWriter, r *http.Request, in models.AssetGrantsInput, existing *models.AssetGrants) (*models.AssetGrants, bool) {
+	g, err := store.ResolveGrants(r.Context(), in, existing)
+	if errors.Is(err, store.ErrEntidadeForbidden) {
+		jsonError(w, http.StatusForbidden, err.Error())
+		return nil, false
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return nil, false
+	}
+	return &g, true
 }
 
 func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +101,16 @@ func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wr := req.toWrite()
+	g, ok := dnsResolveGrants(w, r, req.AssetGrantsInput, nil)
+	if !ok {
+		return
+	}
+	wr.Grants = g
 	if err := h.dns.Create(r.Context(), wr); err != nil {
+		if errors.Is(err, service.ErrSetEntidades) {
+			jsonServerError(w, r, "failed to set entidades", err)
+			return
+		}
 		jsonError(w, http.StatusConflict, "domain already exists")
 		return
 	}
@@ -100,6 +127,18 @@ func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wr := req.toWrite()
+	if req.AssetGrantsInput.Present() {
+		existing, err := h.dns.Grants(r.Context(), id)
+		if err != nil {
+			jsonServerError(w, r, "failed to load entidades", err)
+			return
+		}
+		g, ok := dnsResolveGrants(w, r, req.AssetGrantsInput, &existing)
+		if !ok {
+			return
+		}
+		wr.Grants = g
+	}
 	found, err := h.dns.Update(r.Context(), id, wr)
 	if err != nil {
 		jsonServerError(w, r, "failed to update DNS record", err)
