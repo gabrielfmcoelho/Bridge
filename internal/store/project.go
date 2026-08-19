@@ -61,7 +61,8 @@ func (r *ProjectRepo) Create(ctx context.Context, p *models.Project) error {
 // Get returns a project by id, or (nil, nil) if absent.
 func (r *ProjectRepo) Get(ctx context.Context, id int64) (*models.Project, error) {
 	p := &models.Project{}
-	err := scanProject(r.db.QueryRowContext(ctx, `SELECT `+projectCols+` FROM projects WHERE id = ? AND deleted_at IS NULL`, id), p)
+	vis, vargs := VisibleExpr(ctx, AssetProject, "projects.id")
+	err := scanProject(r.db.QueryRowContext(ctx, `SELECT `+projectCols+` FROM projects WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...), p)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -70,7 +71,8 @@ func (r *ProjectRepo) Get(ctx context.Context, id int64) (*models.Project, error
 
 // List returns all projects ordered by name.
 func (r *ProjectRepo) List(ctx context.Context) ([]models.Project, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+projectCols+` FROM projects WHERE deleted_at IS NULL ORDER BY name`)
+	vis, vargs := VisibleExpr(ctx, AssetProject, "projects.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT `+projectCols+` FROM projects WHERE deleted_at IS NULL AND `+vis+` ORDER BY name`, vargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +92,10 @@ func (r *ProjectRepo) List(ctx context.Context) ([]models.Project, error) {
 // filtered list/count queries. Mirrors HostRepo's filter assembly: dynamic
 // clauses with `?` placeholders (the driver rebinds `?`→$N), ILIKE search via
 // database.LikeOp(), and a tag subquery against the unified tags table.
-func projectWhere(f models.ProjectFilter) ([]string, []any) {
-	var args []any
-	where := []string{"deleted_at IS NULL"}
+func projectWhere(ctx context.Context, f models.ProjectFilter) ([]string, []any) {
+	vis, vargs := VisibleExpr(ctx, AssetProject, "projects.id")
+	where := []string{"deleted_at IS NULL", vis}
+	args := append([]any{}, vargs...)
 
 	if f.Search != "" {
 		op := database.LikeOp()
@@ -116,7 +119,7 @@ func projectWhere(f models.ProjectFilter) ([]string, []any) {
 // (no LIMIT) — the path the frontend's full-list query uses.
 func (r *ProjectRepo) ListFiltered(ctx context.Context, f models.ProjectFilter) ([]models.Project, error) {
 	query := `SELECT ` + projectCols + ` FROM projects`
-	where, args := projectWhere(f)
+	where, args := projectWhere(ctx, f)
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -164,7 +167,7 @@ func (r *ProjectRepo) ListFiltered(ctx context.Context, f models.ProjectFilter) 
 // ListFiltered paginates over (no order/limit).
 func (r *ProjectRepo) CountFiltered(ctx context.Context, f models.ProjectFilter) (int, error) {
 	query := `SELECT COUNT(*) FROM projects`
-	where, args := projectWhere(f)
+	where, args := projectWhere(ctx, f)
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
@@ -175,18 +178,19 @@ func (r *ProjectRepo) CountFiltered(ctx context.Context, f models.ProjectFilter)
 
 // Update writes the mutable fields of a project by id.
 func (r *ProjectRepo) Update(ctx context.Context, p *models.Project) error {
+	vis, vargs := VisibleExpr(ctx, AssetProject, "projects.id")
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE projects SET name = ?, description = ?, situacao = ?, setor_responsavel = ?, responsavel = ?,
 			tem_empresa_externa_responsavel = ?, contato_empresa_responsavel = ?,
 			is_directly_managed = ?, is_responsible = ?, gitlab_url = ?, documentation_url = ?, outline_collection_id = ?,
 			glpi_token_id = ?, glpi_entity_id = ?, glpi_category_id = ?,
 			updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`,
-		p.Name, p.Description, p.Situacao, p.SetorResponsavel, p.Responsavel,
-		p.TemEmpresaExternaResponsavel, p.ContatoEmpresaResponsavel,
-		p.IsDirectlyManaged, p.IsResponsible, p.GitlabURL, p.DocumentationURL, p.OutlineCollectionID,
-		p.GlpiTokenID, p.GlpiEntityID, p.GlpiCategoryID,
-		p.ID,
+		WHERE id = ? AND `+vis,
+		append([]any{p.Name, p.Description, p.Situacao, p.SetorResponsavel, p.Responsavel,
+			p.TemEmpresaExternaResponsavel, p.ContatoEmpresaResponsavel,
+			p.IsDirectlyManaged, p.IsResponsible, p.GitlabURL, p.DocumentationURL, p.OutlineCollectionID,
+			p.GlpiTokenID, p.GlpiEntityID, p.GlpiCategoryID,
+			p.ID}, vargs...)...,
 	)
 	return err
 }
@@ -194,14 +198,16 @@ func (r *ProjectRepo) Update(ctx context.Context, p *models.Project) error {
 // Delete removes a project row by id. (Vault cascade is handled separately via
 // the cascade registry in the delete path.)
 func (r *ProjectRepo) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM projects WHERE id = ?`, id)
+	vis, vargs := VisibleExpr(ctx, AssetProject, "projects.id")
+	_, err := r.db.ExecContext(ctx, `DELETE FROM projects WHERE id = ? AND `+vis, append([]any{id}, vargs...)...)
 	return err
 }
 
 // Count returns the total number of projects.
 func (r *ProjectRepo) Count(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM projects WHERE deleted_at IS NULL`).Scan(&n)
+	vis, vargs := VisibleExpr(ctx, AssetProject, "projects.id")
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM projects WHERE deleted_at IS NULL AND `+vis, vargs...).Scan(&n)
 	return n, err
 }
 
@@ -225,10 +231,11 @@ func (r *ProjectRepo) SetProjectsForHost(ctx context.Context, hostID int64, proj
 
 // ProjectsByHost returns projects directly linked to a host, fully populated.
 func (r *ProjectRepo) ProjectsByHost(ctx context.Context, hostID int64) ([]models.Project, error) {
+	vis, vargs := VisibleExpr(ctx, AssetProject, "p.id")
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+projectColsP+`
 		 FROM projects p JOIN project_host_links l ON p.id = l.project_id
-		 WHERE l.host_id = ? AND p.deleted_at IS NULL ORDER BY p.name`, hostID)
+		 WHERE l.host_id = ? AND p.deleted_at IS NULL AND `+vis+` ORDER BY p.name`, append([]any{hostID}, vargs...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +262,8 @@ func (r *ProjectRepo) HostIDs(ctx context.Context, projectID int64) ([]int64, er
 
 // ListTrash returns soft-deleted projects (deleted_at set).
 func (r *ProjectRepo) ListTrash(ctx context.Context) ([]models.Project, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+projectCols+` FROM projects WHERE deleted_at IS NOT NULL ORDER BY name`)
+	vis, vargs := VisibleExpr(ctx, AssetProject, "projects.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT `+projectCols+` FROM projects WHERE deleted_at IS NOT NULL AND `+vis+` ORDER BY name`, vargs...)
 	if err != nil {
 		return nil, err
 	}

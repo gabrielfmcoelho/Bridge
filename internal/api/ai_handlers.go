@@ -150,6 +150,10 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 		jsonBadRequest(w, r, "invalid project id", err)
 		return
 	}
+	if ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetProject, projectID); err != nil || !ok {
+		jsonError(w, http.StatusNotFound, "project not found")
+		return
+	}
 
 	client, err := h.getClient()
 	if err != nil {
@@ -355,6 +359,10 @@ func (h *aiHandlers) handleGetProjectAnalysis(w http.ResponseWriter, r *http.Req
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
 		jsonBadRequest(w, r, "invalid project id", err)
+		return
+	}
+	if ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetProject, projectID); err != nil || !ok {
+		jsonError(w, http.StatusNotFound, "project not found")
 		return
 	}
 	cached, err := store.NewProjectAIAnalysisRepo(h.db.SQL).Get(r.Context(), projectID)
