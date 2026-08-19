@@ -13,13 +13,16 @@ import TagInput from "@/components/ui/TagInput";
 import CheckboxList from "@/components/ui/CheckboxList";
 import FormError from "@/components/ui/FormError";
 import ResponsavelList from "@/components/inventory/ResponsavelList";
-import type { DNSRecord, EntityResponsavel } from "@/lib/types";
+import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
+import { useAuth } from "@/contexts/AuthContext";
+import type { DNSRecord, EntityResponsavel, AssetGrants, AssetGrantsInput } from "@/lib/types";
 
 interface DnsFormProps {
   initial?: DNSRecord | null;
   initialTags?: string[];
   initialHostIds?: number[];
   initialResponsaveis?: EntityResponsavel[];
+  initialGrants?: AssetGrants | null;
   onSuccess: () => void;
   onFooterChange?: (footer: React.ReactNode) => void;
   onSubHeaderChange?: (subHeader: React.ReactNode) => void;
@@ -30,6 +33,7 @@ export default function DnsForm({
   initialTags,
   initialHostIds,
   initialResponsaveis,
+  initialGrants,
   onSuccess,
   onFooterChange,
   onSubHeaderChange,
@@ -45,6 +49,8 @@ export default function DnsForm({
   });
   const [tags, setTags] = useState<string[]>(initialTags || initial?.tags || []);
   const [responsaveis, setResponsaveis] = useState<EntityResponsavel[]>(initialResponsaveis || []);
+  const { user } = useAuth();
+  const [grants, setGrants] = useState<AssetGrantsInput>(initialGrants ?? defaultGrants(user));
   const [error, setError] = useState("");
 
   const { data: hosts = [] } = useQuery({ queryKey: ["hosts"], queryFn: () => hostsAPI.list() });
@@ -59,6 +65,7 @@ export default function DnsForm({
         tags,
         host_ids: form.host_ids.length ? form.host_ids : undefined,
         responsaveis: responsaveis.filter((r) => r.name),
+        ...grants,
       };
       return initial ? dnsAPI.update(initial.id, data) : dnsAPI.create(data);
     },
@@ -121,6 +128,7 @@ export default function DnsForm({
 
       {step === 3 && (
         <div className="space-y-4 animate-fade-in">
+          <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <TagInput label={t("common.tags")} tags={tags} onChange={setTags} entityType="dns" />
           <CheckboxList label="Linked Hosts" items={hosts.map((h) => ({ id: h.id, name: h.nickname }))} selected={form.host_ids} onChange={(ids) => set("host_ids", ids)} />
           {!hasExternalFooter && (

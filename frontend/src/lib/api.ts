@@ -467,10 +467,10 @@ export const hostChamadosAPI = {
 export const dnsAPI = {
   list: () => api.getList<import("./types").DNSRecord>("/api/dns"),
   listPaginated: (params: Record<string, string>) => api.getListPaginated<import("./types").DNSRecord>(`/api/dns?${new URLSearchParams(params).toString()}`),
-  get: (id: number) => api.get<{ dns_record: import("./types").DNSRecord; tags: string[]; host_ids: number[]; responsaveis: import("./types").EntityResponsavel[] }>(`/api/dns/${id}`),
-  create: (data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
+  get: (id: number) => api.get<{ dns_record: import("./types").DNSRecord; tags: string[]; host_ids: number[]; responsaveis: import("./types").EntityResponsavel[]; entidades?: import("./types").AssetGrants }>(`/api/dns/${id}`),
+  create: (data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>
     api.post<import("./types").DNSRecord>("/api/dns", data),
-  update: (id: number, data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
+  update: (id: number, data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>
     api.put<import("./types").DNSRecord>(`/api/dns/${id}`, data),
   delete: (id: number) => api.delete(`/api/dns/${id}`),
 };
@@ -553,6 +553,7 @@ export const projectsAPI = {
       services: import("./types").Service[];
       host_ids: number[];
       dns_ids: number[];
+      entidades?: import("./types").AssetGrants;
     }>(`/api/projects/${id}`),
   create: (data: Partial<import("./types").Project> & { tags?: string[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.post<import("./types").Project>("/api/projects", data),
@@ -577,6 +578,7 @@ export const servicesAPI = {
       depends_on_ids: number[];
       dependent_ids: number[];
       responsaveis: import("./types").EntityResponsavel[];
+      entidades?: import("./types").AssetGrants;
     }>(`/api/services/${id}`),
   create: (data: Partial<import("./types").Service> & { tags?: string[]; host_ids?: number[]; dns_ids?: number[]; depends_on_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
     api.post<import("./types").Service>("/api/services", data),

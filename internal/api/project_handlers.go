@@ -1,12 +1,10 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // projectHandlers is a Phase 2 (R2) handler: it holds a domain service (not a
@@ -74,23 +72,6 @@ func (req *projectWriteRequest) toWrite() *service.ProjectWrite {
 	return &service.ProjectWrite{Project: req.Project, Tags: req.Tags, Responsaveis: req.Responsaveis}
 }
 
-// resolveGrants applies the scope rules to the request's entidade input and
-// writes the result into wr. existing is nil on create. Returns false after
-// rendering the error (403 outside scope, 400 otherwise).
-func resolveGrants(w http.ResponseWriter, r *http.Request, in models.AssetGrantsInput, existing *models.AssetGrants, wr *service.ProjectWrite) bool {
-	g, err := store.ResolveGrants(r.Context(), in, existing)
-	if errors.Is(err, store.ErrEntidadeForbidden) {
-		jsonError(w, http.StatusForbidden, err.Error())
-		return false
-	}
-	if err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return false
-	}
-	wr.Grants = &g
-	return true
-}
-
 func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req projectWriteRequest
 	if !decodeBody(w, r, &req) {
@@ -100,9 +81,11 @@ func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wr := req.toWrite()
-	if !resolveGrants(w, r, req.AssetGrantsInput, nil, wr) {
+	grants, ok := resolveGrants(w, r, req.AssetGrantsInput, nil)
+	if !ok {
 		return
 	}
+	wr.Grants = &grants
 	if err := h.project.Create(r.Context(), wr); err != nil {
 		jsonServerError(w, r, "failed to create project", err)
 		return
@@ -122,9 +105,11 @@ func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	wr := req.toWrite()
 	if req.AssetGrantsInput.Present() {
 		existing, _ := h.project.Grants(r.Context(), id)
-		if !resolveGrants(w, r, req.AssetGrantsInput, &existing, wr) {
+		grants, ok := resolveGrants(w, r, req.AssetGrantsInput, &existing)
+		if !ok {
 			return
 		}
+		wr.Grants = &grants
 	}
 	found, err := h.project.Update(r.Context(), id, wr)
 	if err != nil {

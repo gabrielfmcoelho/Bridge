@@ -14,16 +14,21 @@ import TagInput from "@/components/ui/TagInput";
 import FormError from "@/components/ui/FormError";
 import ResponsavelList from "@/components/inventory/ResponsavelList";
 import GitLabLinksEditor from "./[id]/_components/GitLabLinksEditor";
-import type { Project, EntityResponsavel } from "@/lib/types";
+import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Project, EntityResponsavel, AssetGrants, AssetGrantsInput } from "@/lib/types";
 
 interface ProjectFormProps {
   initial?: Project | null;
+  initialGrants?: AssetGrants | null;
   onSuccess: () => void;
   onSubHeaderChange?: (subHeader: React.ReactNode) => void;
 }
 
-export default function ProjectForm({ initial, onSuccess, onSubHeaderChange }: ProjectFormProps) {
+export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHeaderChange }: ProjectFormProps) {
   const { t } = useLocale();
+  const { user } = useAuth();
+  const [grants, setGrants] = useState<AssetGrantsInput>(initialGrants ?? defaultGrants(user));
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     name: initial?.name || "",
@@ -90,6 +95,7 @@ export default function ProjectForm({ initial, onSuccess, onSubHeaderChange }: P
         ...form,
         tags,
         responsaveis: responsaveis.map((r) => ({ contact_id: r.contact_id, is_main: r.is_main })),
+        ...grants,
       };
       return initial ? projectsAPI.update(initial.id, payload) : projectsAPI.create(payload);
     },
@@ -161,6 +167,7 @@ export default function ProjectForm({ initial, onSuccess, onSubHeaderChange }: P
               t={t}
             />
           </div>
+          <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <TagInput label={t("common.tags")} tags={tags} onChange={setTags} entityType="project" />
 
           <section className="pt-2">

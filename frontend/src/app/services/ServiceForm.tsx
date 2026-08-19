@@ -12,16 +12,21 @@ import Select from "@/components/ui/Select";
 import TagInput from "@/components/ui/TagInput";
 import CheckboxList from "@/components/ui/CheckboxList";
 import FormError from "@/components/ui/FormError";
-import type { Service } from "@/lib/types";
+import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Service, AssetGrants, AssetGrantsInput } from "@/lib/types";
 
 interface ServiceFormProps {
   initial?: Service | null;
+  initialGrants?: AssetGrants | null;
   onSuccess: () => void;
   onSubHeaderChange?: (subHeader: React.ReactNode) => void;
 }
 
-export default function ServiceForm({ initial, onSuccess, onSubHeaderChange }: ServiceFormProps) {
+export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHeaderChange }: ServiceFormProps) {
   const { t } = useLocale();
+  const { user } = useAuth();
+  const [grants, setGrants] = useState<AssetGrantsInput>(initialGrants ?? defaultGrants(user));
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     nickname: initial?.nickname || "",
@@ -67,7 +72,7 @@ export default function ServiceForm({ initial, onSuccess, onSubHeaderChange }: S
 
   const mutation = useMutation({
     mutationFn: () => {
-      const data = { ...form, tags };
+      const data = { ...form, tags, ...grants };
       return initial ? servicesAPI.update(initial.id, data) : servicesAPI.create(data);
     },
     onSuccess: () => onSuccess(),
@@ -173,6 +178,7 @@ export default function ServiceForm({ initial, onSuccess, onSubHeaderChange }: S
       {/* Step 4: Links & Tags */}
       {step === 4 && (
         <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4 animate-fade-in">
+          <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <TagInput label={t("common.tags")} tags={tags} onChange={setTags} entityType="service" />
           <CheckboxList label="Hosts" items={hosts.map((h) => ({ id: h.id, name: h.nickname }))} selected={form.host_ids} onChange={(ids) => set("host_ids", ids)} />
           <CheckboxList label="DNS" items={dnsRecords.map((d) => ({ id: d.id, name: d.domain }))} selected={form.dns_ids} onChange={(ids) => set("dns_ids", ids)} />
