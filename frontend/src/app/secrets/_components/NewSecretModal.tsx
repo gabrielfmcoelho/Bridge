@@ -11,6 +11,9 @@ import Select from "@/components/ui/Select";
 import TabBar from "@/components/ui/TabBar";
 import { parseDotenv } from "@/lib/parseDotenv";
 import { buildEnvTargets } from "@/lib/envTargets";
+import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
+import { useAuth } from "@/contexts/AuthContext";
+import type { AssetGrantsInput } from "@/lib/types";
 
 interface NewSecretModalProps {
   open: boolean;
@@ -71,6 +74,10 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
   const [type, setType] = useState<SecretType>("password");
   const [scope, setScope] = useState<Scope>("avulso");
   const [visibility, setVisibility] = useState<Visibility>("personal");
+  // Entidade grants apply only to shared avulso secrets (parented ones inherit
+  // from their parent; personal ones are owner-only).
+  const { user } = useAuth();
+  const [grants, setGrants] = useState<AssetGrantsInput>(() => defaultGrants(user));
   const [parentID, setParentID] = useState<string>(""); // stored as string for Select compat
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -317,6 +324,9 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
       if (parsedParent != null) {
         body.parent_id = parsedParent;
       }
+      if (scope === "avulso" && visibility === "shared") {
+        Object.assign(body, grants);
+      }
       const created = await secretsAPI.create(body);
       // One-step: link the newly-created shared credential to the chosen hosts.
       if (type === "password" && scope === "avulso" && linkHostIDs.length > 0) {
@@ -419,6 +429,12 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
               />
             </FormRow>
           </div>
+
+          {scope === "avulso" && visibility === "shared" && (
+            <div className="mt-3">
+              <EntidadeScopeFields value={grants} onChange={setGrants} compact />
+            </div>
+          )}
 
           {scope !== "avulso" && (
             <div className="mt-3">

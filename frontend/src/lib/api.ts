@@ -677,9 +677,9 @@ export const sshKeysAPI = {
     fingerprint: string;
     created_at: string;
   }>(`/api/ssh-keys/${id}`),
-  create: (data: { name: string; credential_type?: string; username?: string; description?: string; public_key?: string; private_key?: string; password?: string }) =>
+  create: (data: { name: string; credential_type?: string; username?: string; description?: string; public_key?: string; private_key?: string; password?: string } & import("./types").AssetGrantsInput) =>
     api.post<{ id: number; name: string; fingerprint: string; created_at: string }>("/api/ssh-keys", data),
-  update: (id: number, data: { name?: string; credential_type?: string; username?: string; description?: string; public_key?: string; private_key?: string; password?: string }) =>
+  update: (id: number, data: { name?: string; credential_type?: string; username?: string; description?: string; public_key?: string; private_key?: string; password?: string } & import("./types").AssetGrantsInput) =>
     api.put<{ id: number; name: string; fingerprint: string; created_at: string }>(`/api/ssh-keys/${id}`, data),
   delete: (id: number) => api.delete(`/api/ssh-keys/${id}`),
 };
@@ -726,7 +726,7 @@ type ContactPayload = {
   entity?: string;
   notes?: string;
   is_external?: boolean;
-};
+} & import("./types").AssetGrantsInput;
 export const contactsAPI = {
   list: () => api.getList<import("./types").Contact>("/api/contacts"),
   create: (data: ContactPayload) =>
@@ -786,9 +786,9 @@ export const releasesAPI = {
 export const toolsAPI = {
   list: () => api.getList<import("./types").ExternalTool>("/api/tools"),
   get: (id: number) => api.get<import("./types").ExternalTool>(`/api/tools/${id}`),
-  create: (data: Partial<import("./types").ExternalTool>) =>
+  create: (data: Partial<import("./types").ExternalTool> & import("./types").AssetGrantsInput) =>
     api.post<import("./types").ExternalTool>("/api/tools", data),
-  update: (id: number, data: Partial<import("./types").ExternalTool>) =>
+  update: (id: number, data: Partial<import("./types").ExternalTool> & import("./types").AssetGrantsInput) =>
     api.put<import("./types").ExternalTool>(`/api/tools/${id}`, data),
   delete: (id: number) => api.delete(`/api/tools/${id}`),
   syncFromService: (data: { service_id: number; dns_id: number; embed_enabled?: boolean; icon?: string; sort_order?: number }) =>
@@ -826,7 +826,7 @@ export const secretsAPI = {
     group_label?: string;
     description?: string;
     payload: string;
-  }) => api.post<{ id: number }>("/api/secrets", data),
+  } & import("./types").AssetGrantsInput) => api.post<{ id: number }>("/api/secrets", data),
   update: (id: number, data: { name?: string; description?: string; group_label?: string; payload?: string }) =>
     api.put<{ id: number }>(`/api/secrets/${id}`, data),
   delete: (id: number) => api.delete(`/api/secrets/${id}`),
@@ -923,10 +923,10 @@ export const apiCatalogAPI = {
     source_url: string;
     base_url?: string;
     docs_url?: string;
-  }) => api.post<import("./types").ApiCatalog>("/api/api-catalog/import/url", body),
+  } & import("./types").AssetGrantsInput) => api.post<import("./types").ApiCatalog>("/api/api-catalog/import/url", body),
   importUpload: async (
     file: File,
-    meta: { name?: string; description?: string; scope: string; parent_id?: number; base_url?: string; docs_url?: string }
+    meta: { name?: string; description?: string; scope: string; parent_id?: number; base_url?: string; docs_url?: string } & import("./types").AssetGrantsInput
   ): Promise<import("./types").ApiCatalog> => {
     const form = new FormData();
     form.append("spec", file);
@@ -936,6 +936,9 @@ export const apiCatalogAPI = {
     if (meta.parent_id != null) form.append("parent_id", String(meta.parent_id));
     if (meta.base_url) form.append("base_url", meta.base_url);
     if (meta.docs_url) form.append("docs_url", meta.docs_url);
+    if (meta.creator_entidade_id != null) form.append("creator_entidade_id", String(meta.creator_entidade_id));
+    if (meta.responsible_entidade_ids?.length) form.append("responsible_entidade_ids", meta.responsible_entidade_ids.join(","));
+    if (meta.is_global != null) form.append("is_global", String(meta.is_global));
     const res = await fetch(`${API_BASE}/api/api-catalog/import/upload`, {
       method: "POST",
       credentials: "include",
@@ -947,7 +950,7 @@ export const apiCatalogAPI = {
     }
     return res.json();
   },
-  update: (id: number, body: { name: string; description?: string; base_url?: string; docs_url?: string }) =>
+  update: (id: number, body: { name: string; description?: string; base_url?: string; docs_url?: string } & import("./types").AssetGrantsInput) =>
     api.put<import("./types").ApiCatalog>(`/api/api-catalog/${id}`, body),
   refetch: (id: number) => api.post<import("./types").ApiCatalog>(`/api/api-catalog/${id}/refetch`),
   remove: (id: number) => api.delete(`/api/api-catalog/${id}`),

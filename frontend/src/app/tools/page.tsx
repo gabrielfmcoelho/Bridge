@@ -6,7 +6,8 @@ import { toolsAPI, servicesAPI, secretsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSecretReveal } from "@/hooks/useSecretReveal";
-import type { ExternalTool, Secret } from "@/lib/types";
+import type { ExternalTool, Secret, AssetGrantsInput } from "@/lib/types";
+import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
 import PageShell from "@/components/layout/PageShell";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
@@ -370,7 +371,9 @@ function ToolForm({ tool, onSuccess, onDelete }: {
   onDelete?: () => void;
 }) {
   const { t } = useLocale();
+  const { user } = useAuth();
   const isSynced = tool?.source === "service";
+  const [grants, setGrants] = useState<AssetGrantsInput>(tool ? {} : defaultGrants(user));
   const [form, setForm] = useState({
     name: tool?.name || "",
     description: tool?.description || "",
@@ -383,8 +386,8 @@ function ToolForm({ tool, onSuccess, onDelete }: {
 
   const mutation = useMutation({
     mutationFn: () => {
-      if (tool) return toolsAPI.update(tool.id, form);
-      return toolsAPI.create(form);
+      if (tool) return toolsAPI.update(tool.id, { ...form, ...grants });
+      return toolsAPI.create({ ...form, ...grants });
     },
     onSuccess: () => onSuccess(),
     onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
@@ -408,6 +411,7 @@ function ToolForm({ tool, onSuccess, onDelete }: {
         <Input label={t("tool.sortOrder")} type="number" value={form.sort_order.toString()} onChange={(e) => set("sort_order", parseInt(e.target.value) || 0)} />
       </div>
       <Checkbox label={t("tool.enableEmbed")} checked={form.embed_enabled} onChange={(v) => set("embed_enabled", v)} />
+      <EntidadeScopeFields value={grants} onChange={setGrants} compact loadFrom={tool ? { type: "tool", id: tool.id } : null} />
 
       <div className="flex items-center justify-between pt-2">
         {onDelete ? (

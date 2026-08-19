@@ -16,7 +16,8 @@ import FormError from "@/components/ui/FormError";
 import EmptyState from "@/components/ui/EmptyState";
 import Badge from "@/components/ui/Badge";
 import { SkeletonCard } from "@/components/ui/Skeleton";
-import type { Contact } from "@/lib/types";
+import type { Contact, AssetGrantsInput } from "@/lib/types";
+import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
 
 function formatPhone(raw: string): string {
   const d = raw.replace(/\D/g, "");
@@ -143,6 +144,10 @@ export default function ContactsPage() {
 
 function ContactForm({ initial, onSuccess }: { initial: Contact | null; onSuccess: () => void }) {
   const { t } = useLocale();
+  const { user } = useAuth();
+  // Edit: start empty (= leave untouched) and let EntidadeScopeFields load the
+  // current grants; create: default to the user's primary entidade.
+  const [grants, setGrants] = useState<AssetGrantsInput>(initial ? {} : defaultGrants(user));
   const [name, setName] = useState(initial?.name ?? "");
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [role, setRole] = useState(initial?.role ?? "");
@@ -173,7 +178,7 @@ function ContactForm({ initial, onSuccess }: { initial: Contact | null; onSucces
 
   const mutation = useMutation({
     mutationFn: () => {
-      const payload = { name, phone, role, entity, notes, is_external: isExternal };
+      const payload = { name, phone, role, entity, notes, is_external: isExternal, ...grants };
       return initial ? contactsAPI.update(initial.id, payload) : contactsAPI.create(payload);
     },
     onSuccess: () => onSuccess(),
@@ -226,6 +231,7 @@ function ContactForm({ initial, onSuccess }: { initial: Contact | null; onSucces
         checked={isExternal}
         onChange={setIsExternal}
       />
+      <EntidadeScopeFields value={grants} onChange={setGrants} compact loadFrom={initial ? { type: "contact", id: initial.id } : null} />
       <div className="flex justify-end gap-2">
         <Button type="submit" loading={mutation.isPending}>
           {initial ? t("common.save") : t("common.create")}

@@ -17,7 +17,8 @@ import StepIndicator from "@/components/ui/StepIndicator";
 import FormError from "@/components/ui/FormError";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
-import type { SSHKeyRecord } from "@/lib/types";
+import type { SSHKeyRecord, AssetGrantsInput } from "@/lib/types";
+import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
 
 export default function HostCredentialsPage() {
   const { t } = useLocale();
@@ -176,6 +177,8 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
 
 function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
   const { t } = useLocale();
+  const { user } = useAuth();
+  const [grants, setGrants] = useState<AssetGrantsInput>(defaultGrants(user));
   const [step, setStep] = useState(1);
   const [credType, setCredType] = useState<"key" | "password">("key");
   const [form, setForm] = useState({
@@ -197,6 +200,7 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
       public_key: credType === "key" ? form.public_key || undefined : undefined,
       private_key: credType === "key" ? form.private_key || undefined : undefined,
       password: credType === "password" ? form.password || undefined : undefined,
+      ...grants,
     }),
     onSuccess: () => onSuccess(),
     onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
@@ -265,6 +269,7 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
         <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4 animate-fade-in">
           <Textarea label="Public Key" value={form.public_key} onChange={(e) => setForm((f) => ({ ...f, public_key: e.target.value }))} rows={3} placeholder="ssh-ed25519 AAAA..." className="font-mono" />
           <Textarea label="Private Key" value={form.private_key} onChange={(e) => setForm((f) => ({ ...f, private_key: e.target.value }))} rows={4} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" className="font-mono" />
+          <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>{t("common.back")}</Button>
             <Button type="submit" className="flex-1" loading={mutation.isPending}>{t("common.create")}</Button>
@@ -275,6 +280,7 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
       {step === 2 && credType === "password" && (
         <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4 animate-fade-in">
           <Input label="Password" type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} required placeholder="Enter password" />
+          <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>{t("common.back")}</Button>
             <Button type="submit" className="flex-1" loading={mutation.isPending}>{t("common.create")}</Button>
@@ -290,6 +296,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", username: "", description: "", public_key: "", private_key: "", password: "" });
+  const [editGrants, setEditGrants] = useState<AssetGrantsInput>({});
   const [editError, setEditError] = useState("");
 
   const { data, isLoading } = useQuery({
@@ -322,6 +329,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       public_key: editForm.public_key || undefined,
       private_key: editForm.private_key || undefined,
       password: editForm.password || undefined,
+      ...editGrants,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ssh-key", id] });
@@ -366,6 +374,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
         {data.credential_type === "password" && (
           <Input label="Password" type="password" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} placeholder="Leave empty to keep current" />
         )}
+        <EntidadeScopeFields value={editGrants} onChange={setEditGrants} compact loadFrom={{ type: "ssh_key", id }} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>{t("common.cancel")}</Button>
           <Button type="submit" loading={updateMutation.isPending}>{t("common.save")}</Button>

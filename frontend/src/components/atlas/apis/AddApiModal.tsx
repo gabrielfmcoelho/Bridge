@@ -10,7 +10,9 @@ import Select from "@/components/ui/Select";
 import FormError from "@/components/ui/FormError";
 import { apiCatalogAPI, projectsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
-import type { ApiCatalog } from "@/lib/types";
+import type { ApiCatalog, AssetGrantsInput } from "@/lib/types";
+import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Tab = "upload" | "url";
 
@@ -24,6 +26,8 @@ export default function AddApiModal({
   onCreated: (api: ApiCatalog) => void;
 }) {
   const { t } = useLocale();
+  const { user } = useAuth();
+  const [grants, setGrants] = useState<AssetGrantsInput>(() => defaultGrants(user));
   const [tab, setTab] = useState<Tab>("upload");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -74,6 +78,7 @@ export default function AddApiModal({
       parent_id: scope === "projeto" ? Number(parentId) : undefined,
       base_url: baseUrl.trim() || undefined,
       docs_url: docsUrl.trim() || undefined,
+      ...grants,
     };
     setSubmitting(true);
     try {
@@ -198,6 +203,8 @@ export default function AddApiModal({
             options={projectOptions}
           />
         )}
+
+        <EntidadeScopeFields value={grants} onChange={setGrants} compact />
 
         {error && <FormError message={error} />}
 

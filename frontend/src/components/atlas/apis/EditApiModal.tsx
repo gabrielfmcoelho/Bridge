@@ -9,7 +9,8 @@ import Textarea from "@/components/ui/Textarea";
 import FormError from "@/components/ui/FormError";
 import { apiCatalogAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
-import type { ApiCatalog } from "@/lib/types";
+import type { ApiCatalog, AssetGrantsInput } from "@/lib/types";
+import EntidadeScopeFields from "@/components/entidades/EntidadeScopeFields";
 
 // EditApiModal edits a cataloged API's metadata: name, description, and the
 // Base URL (API host for Test Request) + Docs URL (open-externally target).
@@ -29,6 +30,7 @@ export default function EditApiModal({
   const [description, setDescription] = useState(api.description ?? "");
   const [baseUrl, setBaseUrl] = useState(api.base_url ?? "");
   const [docsUrl, setDocsUrl] = useState(api.docs_url ?? "");
+  const [grants, setGrants] = useState<AssetGrantsInput>({});
   const [error, setError] = useState<string | null>(null);
 
   // Re-sync when opened for a (possibly different / refetched) api.
@@ -51,6 +53,7 @@ export default function EditApiModal({
         description: description.trim() || undefined,
         base_url: baseUrl.trim() || undefined,
         docs_url: docsUrl.trim() || undefined,
+        ...grants,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["api-catalog", api.id] });
@@ -84,6 +87,7 @@ export default function EditApiModal({
           <Input label={t("atlas.apis.docsUrl")} value={docsUrl} onChange={(e) => setDocsUrl(e.target.value)} placeholder="https://api.example.com/docs" />
           <p className="text-[10px] text-[var(--text-faint)] mt-1">{t("atlas.apis.docsUrlHint")}</p>
         </div>
+        {open && <EntidadeScopeFields value={grants} onChange={setGrants} compact loadFrom={{ type: "api_catalog", id: api.id }} />}
 
         {error && <FormError message={error} />}
 
