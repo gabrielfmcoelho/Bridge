@@ -90,6 +90,7 @@ func (r *OrchestratorRepo) Delete(ctx context.Context, id int64) error {
 // Count returns the total number of orchestrators (dashboard metric).
 func (r *OrchestratorRepo) Count(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM orchestrators`).Scan(&n)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "host_id")
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM orchestrators WHERE `+vis, vargs...).Scan(&n)
 	return n, err
 }

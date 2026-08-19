@@ -38,8 +38,9 @@ type importResult struct {
 func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Request) {
 	var items []struct {
 		models.Host
-		Tags     []string `json:"tags"`
-		Password string   `json:"password"`
+		models.AssetGrantsInput          // optional per-item entidade grants; absent ⇒ admin-only until triaged
+		Tags                    []string `json:"tags"`
+		Password                string   `json:"password"`
 	}
 	if err := decodeJSON(r, &items); err != nil {
 		jsonBadRequest(w, r, "invalid JSON: expected array of host objects", err)
@@ -112,6 +113,7 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 		if len(item.Tags) > 0 {
 			store.NewTagRepo(h.db.SQL).Set(r.Context(), "host", item.Host.ID, item.Tags)
 		}
+		h.applyImportGrants(r, store.AssetHost, item.Host.ID, item.AssetGrantsInput)
 
 		result.Created++
 	}
@@ -122,8 +124,9 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 func (h *importHandlers) handleImportDNS(w http.ResponseWriter, r *http.Request) {
 	var items []struct {
 		models.DNSRecord
-		Tags    []string `json:"tags"`
-		HostIDs []int64  `json:"host_ids"`
+		models.AssetGrantsInput          // optional per-item entidade grants; absent ⇒ admin-only until triaged
+		Tags                    []string `json:"tags"`
+		HostIDs                 []int64  `json:"host_ids"`
 	}
 	if err := decodeJSON(r, &items); err != nil {
 		jsonBadRequest(w, r, "invalid JSON: expected array of DNS objects", err)
@@ -162,6 +165,7 @@ func (h *importHandlers) handleImportDNS(w http.ResponseWriter, r *http.Request)
 		if len(item.HostIDs) > 0 {
 			store.NewDNSRepo(h.db.SQL).SetHostLinks(r.Context(), item.DNSRecord.ID, item.HostIDs)
 		}
+		h.applyImportGrants(r, store.AssetDNS, item.DNSRecord.ID, item.AssetGrantsInput)
 
 		result.Created++
 	}
@@ -199,6 +203,22 @@ func (h *importHandlers) handleImport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonError(w, http.StatusBadRequest, "expected JSON object with 'type' ('hosts' or 'dns') and 'data' (array) fields")
+}
+
+// applyImportGrants writes an imported item's entidade grants when the item
+// carried any. Import is admin-only, so ResolveGrants imposes no scope rule;
+// items without grants stay unassigned (admin-only) until triaged in Settings.
+func (h *importHandlers) applyImportGrants(r *http.Request, t store.AssetType, id int64, in models.AssetGrantsInput) {
+	if !in.Present() {
+		return
+	}
+	g, err := store.ResolveGrants(r.Context(), in, nil)
+	if err == nil {
+		err = store.NewAssetEntidadeRepo(h.db.SQL).Replace(r.Context(), h.db.SQL, t, id, g)
+	}
+	if err != nil {
+		log.Printf("[import] entidade grants %s id=%d: %v", t, id, err)
+	}
 }
 
 // registerRoutes wires this group's routes (self-registration, R2).

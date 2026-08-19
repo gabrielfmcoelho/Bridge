@@ -73,19 +73,22 @@ func (r *HostScanRepo) Statuses(ctx context.Context) (map[int64]time.Time, error
 // CountHostsWithScans returns how many distinct hosts have at least one scan.
 func (r *HostScanRepo) CountHostsWithScans(ctx context.Context) (int, error) {
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT host_id) FROM host_scans`).Scan(&n)
+	vis, vargs := VisibleExpr(ctx, AssetHost, "host_id")
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT host_id) FROM host_scans WHERE `+vis, vargs...).Scan(&n)
 	return n, err
 }
 
 // RecentWithHost returns the newest scans joined to their host identity, as a
 // dashboard read-model (untyped rows, newest first).
 func (r *HostScanRepo) RecentWithHost(ctx context.Context, limit int) ([]map[string]any, error) {
+	vis, vargs := VisibleExpr(ctx, AssetHost, "h.id")
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT hs.id, hs.host_id, h.nickname, h.oficial_slug, hs.scanned_at
 		FROM host_scans hs
 		JOIN hosts h ON h.id = hs.host_id
+		WHERE `+vis+`
 		ORDER BY hs.scanned_at DESC
-		LIMIT ?`, limit)
+		LIMIT ?`, append(vargs, limit)...)
 	if err != nil {
 		return nil, err
 	}
