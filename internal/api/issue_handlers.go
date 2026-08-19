@@ -7,6 +7,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type issueHandlers struct {
@@ -20,14 +21,15 @@ func (h *issueHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var serviceID *int64
+	f := models.IssueFilter{ProjectID: projectID}
 	if s := r.URL.Query().Get("service_id"); s != "" {
 		if v, err := strconv.ParseInt(s, 10, 64); err == nil {
-			serviceID = &v
+			f.ServiceID = v
 		}
 	}
+	f.VisibleSQL, f.VisibleArgs = store.VisibleExprDyn(r.Context(), "entity_type", "entity_id")
 
-	issues, err := models.ListIssuesByProject(h.db.SQL, projectID, serviceID)
+	issues, err := models.ListIssues(h.db.SQL, f)
 	if err != nil {
 		jsonServerError(w, r, "failed to list issues", err)
 		return
@@ -63,6 +65,15 @@ func (h *issueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	if req.Priority == "" {
 		req.Priority = "medium"
 	}
+	// Same defaulting CreateIssue applies, done here so the parent check
+	// sees the resolved (entity_type, entity_id).
+	if req.EntityType == "" {
+		req.EntityType, req.EntityID = "project", projectID
+	}
+	if ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetType(req.EntityType), req.EntityID); err != nil || !ok {
+		jsonError(w, http.StatusNotFound, "parent not found")
+		return
+	}
 
 	if err := models.CreateIssue(h.db.SQL, &req); err != nil {
 		jsonServerError(w, r, "failed to create issue", err)
@@ -79,8 +90,8 @@ func (h *issueHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, err := models.GetIssue(h.db.SQL, issueID)
-	if err != nil || existing == nil {
+	existing := loadVisibleIssue(r, h.db.SQL, issueID)
+	if existing == nil {
 		jsonError(w, http.StatusNotFound, "issue not found")
 		return
 	}
@@ -128,6 +139,10 @@ func (h *issueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "status is required")
 		return
 	}
+	if loadVisibleIssue(r, h.db.SQL, issueID) == nil {
+		jsonError(w, http.StatusNotFound, "issue not found")
+		return
+	}
 
 	if err := models.MoveIssue(h.db.SQL, issueID, req.Status, req.Position); err != nil {
 		jsonServerError(w, r, "failed to move issue", err)
@@ -141,6 +156,10 @@ func (h *issueHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "issueId")
 	if err != nil {
 		jsonBadRequest(w, r, "invalid issue id", err)
+		return
+	}
+	if loadVisibleIssue(r, h.db.SQL, issueID) == nil {
+		jsonError(w, http.StatusNotFound, "issue not found")
 		return
 	}
 
@@ -159,7 +178,9 @@ func (h *issueHandlers) handleListByService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	issues, err := models.ListIssuesByService(h.db.SQL, serviceID)
+	f := models.IssueFilter{ServiceID: serviceID}
+	f.VisibleSQL, f.VisibleArgs = store.VisibleExprDyn(r.Context(), "entity_type", "entity_id")
+	issues, err := models.ListIssues(h.db.SQL, f)
 	if err != nil {
 		jsonServerError(w, r, "failed to list issues", err)
 		return

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"strconv"
@@ -13,6 +14,21 @@ import (
 
 type globalIssueHandlers struct {
 	db *database.DB
+}
+
+// loadVisibleIssue returns the issue iff it exists and its parent
+// (entity_type, entity_id) is visible to the caller; nil otherwise so
+// handlers answer 404 for invisible issues (never 403).
+func loadVisibleIssue(r *http.Request, db *sql.DB, id int64) *models.Issue {
+	issue, err := models.GetIssue(db, id)
+	if err != nil || issue == nil {
+		return nil
+	}
+	ok, err := store.CanSee(r.Context(), db, store.AssetType(issue.EntityType), issue.EntityID)
+	if err != nil || !ok {
+		return nil
+	}
+	return issue
 }
 
 func (h *globalIssueHandlers) handleList(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +50,7 @@ func (h *globalIssueHandlers) handleList(w http.ResponseWriter, r *http.Request)
 			f.AssigneeID = n
 		}
 	}
+	f.VisibleSQL, f.VisibleArgs = store.VisibleExprDyn(r.Context(), "entity_type", "entity_id")
 
 	issues, err := models.ListIssues(h.db.SQL, f)
 	if err != nil {
@@ -94,6 +111,10 @@ func (h *globalIssueHandlers) handleCreate(w http.ResponseWriter, r *http.Reques
 		id := req.EntityID
 		req.ProjectID = &id
 	}
+	if ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetType(req.EntityType), req.EntityID); err != nil || !ok {
+		jsonError(w, http.StatusNotFound, "parent not found")
+		return
+	}
 
 	log.Printf("[issues] Creating issue: entity_type=%s entity_id=%d project_id=%v title=%q source=%s alert_ids=%v",
 		req.EntityType, req.EntityID, req.ProjectID, req.Title, req.Source, req.AlertIDs)
@@ -127,8 +148,8 @@ func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	existing, err := models.GetIssue(h.db.SQL, issueID)
-	if err != nil || existing == nil {
+	existing := loadVisibleIssue(r, h.db.SQL, issueID)
+	if existing == nil {
 		jsonError(w, http.StatusNotFound, "issue not found")
 		return
 	}
@@ -212,6 +233,10 @@ func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request)
 		jsonError(w, http.StatusBadRequest, "status is required")
 		return
 	}
+	if loadVisibleIssue(r, h.db.SQL, issueID) == nil {
+		jsonError(w, http.StatusNotFound, "issue not found")
+		return
+	}
 
 	if err := models.MoveIssue(h.db.SQL, issueID, req.Status, req.Position); err != nil {
 		jsonServerError(w, r, "failed to move issue", err)
@@ -235,8 +260,8 @@ func (h *globalIssueHandlers) handleArchive(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	existing, err := models.GetIssue(h.db.SQL, issueID)
-	if err != nil || existing == nil {
+	existing := loadVisibleIssue(r, h.db.SQL, issueID)
+	if existing == nil {
 		jsonError(w, http.StatusNotFound, "issue not found")
 		return
 	}
@@ -254,6 +279,10 @@ func (h *globalIssueHandlers) handleDelete(w http.ResponseWriter, r *http.Reques
 	issueID, err := pathInt64(r, "id")
 	if err != nil {
 		jsonBadRequest(w, r, "invalid issue id", err)
+		return
+	}
+	if loadVisibleIssue(r, h.db.SQL, issueID) == nil {
+		jsonError(w, http.StatusNotFound, "issue not found")
 		return
 	}
 
