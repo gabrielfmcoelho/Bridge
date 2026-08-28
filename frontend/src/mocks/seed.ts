@@ -615,14 +615,18 @@ function events(userList: User[]): RequestEvent[] {
   // request 2 (delivered)
   out.push(status(2, "", "submitted", 1, "2026-02-03T08:30:00Z"));
   out.push(comment(2, 1, "Registro solicitado com urgência para o lançamento da nova versão do Portal.", "2026-02-03T08:35:00Z"));
+  out.push(status(2, "submitted", "under_review", 3, "2026-02-04T09:00:00Z"));
   out.push(status(2, "under_review", "approved", 3, "2026-02-04T10:00:00Z"));
+  out.push(status(2, "approved", "in_progress", 3, "2026-02-05T10:00:00Z"));
   out.push(status(2, "in_progress", "delivered", 3, "2026-02-06T16:00:00Z"));
   // request 3 (approved)
   out.push(status(3, "", "submitted", 8, "2026-05-11T14:00:00Z"));
   out.push(comment(3, 7, "Justificativa aceita, aguardando liberação do time de segurança.", "2026-05-12T09:00:00Z"));
+  out.push(status(3, "submitted", "under_review", 7, "2026-05-13T09:00:00Z"));
   out.push(status(3, "under_review", "approved", 7, "2026-05-13T11:00:00Z"));
   // request 4 (in_progress)
   out.push(status(4, "", "submitted", 3, "2026-06-01T09:10:00Z"));
+  out.push(status(4, "submitted", "under_review", 3, "2026-06-02T09:00:00Z"));
   out.push(status(4, "under_review", "approved", 3, "2026-06-03T09:00:00Z"));
   out.push(comment(4, 3, "Serviço de cache validado em ambiente de testes antes do vínculo.", "2026-06-04T09:30:00Z"));
   out.push(status(4, "approved", "in_progress", 3, "2026-06-04T10:00:00Z"));
@@ -630,14 +634,18 @@ function events(userList: User[]): RequestEvent[] {
   out.push(status(5, "", "submitted", 1, "2026-08-20T10:15:00Z"));
   // request 6 (delivered)
   out.push(status(6, "", "submitted", 3, "2026-01-15T08:00:00Z"));
+  out.push(status(6, "submitted", "under_review", 3, "2026-01-16T09:00:00Z"));
   out.push(status(6, "under_review", "approved", 3, "2026-01-17T09:00:00Z"));
+  out.push(status(6, "approved", "in_progress", 3, "2026-01-18T09:00:00Z"));
   out.push(status(6, "in_progress", "delivered", 3, "2026-01-20T15:00:00Z"));
   out.push(comment(6, 3, "Token de integração emitido e compartilhado com a equipe pelo canal seguro.", "2026-01-20T15:05:00Z"));
   // request 7 (rejected)
   out.push(status(7, "", "submitted", 2, "2026-03-02T08:00:00Z"));
+  out.push(status(7, "submitted", "under_review", 8, "2026-03-03T09:00:00Z"));
   out.push(status(7, "under_review", "rejected", 8, "2026-03-04T09:00:00Z", "Instabilidade já tratada pela correção de performance do último release."));
   // request 8 (needs_info)
   out.push(status(8, "", "submitted", 7, "2026-07-22T09:00:00Z"));
+  out.push(status(8, "submitted", "under_review", 7, "2026-07-22T10:00:00Z"));
   out.push(comment(8, 7, "Favor detalhar o volume estimado de dados para dimensionar o armazenamento.", "2026-07-23T09:00:00Z"));
   out.push(status(8, "under_review", "needs_info", 7, "2026-07-24T11:00:00Z"));
   // request 9 (cancelled)
@@ -645,33 +653,42 @@ function events(userList: User[]): RequestEvent[] {
   out.push(status(9, "submitted", "cancelled", 8, "2026-04-10T09:00:00Z"));
   // request 10 (delivered)
   out.push(status(10, "", "submitted", 3, "2026-01-05T09:00:00Z"));
+  out.push(status(10, "submitted", "under_review", 3, "2026-01-06T09:00:00Z"));
   out.push(status(10, "under_review", "approved", 3, "2026-01-06T10:00:00Z"));
+  out.push(status(10, "approved", "in_progress", 3, "2026-01-07T10:00:00Z"));
   out.push(status(10, "in_progress", "delivered", 3, "2026-01-08T14:00:00Z"));
   // request 11 (submitted)
   out.push(status(11, "", "submitted", 2, "2026-08-24T09:30:00Z"));
   // request 12 (approved)
   out.push(status(12, "", "submitted", 1, "2026-06-15T09:00:00Z"));
-  out.push(comment(12, 3, "Aprovado. Aguardando janela de manutenção para o vínculo do serviço.", "2026-06-17T09:05:00Z"));
+  out.push(status(12, "submitted", "under_review", 3, "2026-06-16T09:00:00Z"));
   out.push(status(12, "under_review", "approved", 3, "2026-06-17T09:00:00Z"));
+  out.push(comment(12, 3, "Aprovado. Aguardando janela de manutenção para o vínculo do serviço.", "2026-06-17T09:05:00Z"));
   // request 13 (in_progress)
   out.push(status(13, "", "submitted", 8, "2026-05-02T09:00:00Z"));
+  out.push(status(13, "submitted", "under_review", 7, "2026-05-04T09:00:00Z"));
   out.push(status(13, "under_review", "approved", 7, "2026-05-06T09:00:00Z"));
   out.push(status(13, "approved", "in_progress", 7, "2026-05-08T10:00:00Z"));
   // request 14 (approved)
   out.push(status(14, "", "submitted", 5, "2026-07-01T09:00:00Z"));
+  out.push(status(14, "submitted", "under_review", 3, "2026-07-02T09:00:00Z"));
   out.push(status(14, "under_review", "approved", 3, "2026-07-03T09:00:00Z"));
   // request 15 (delivered)
   out.push(status(15, "", "submitted", 7, "2026-02-20T08:00:00Z"));
+  out.push(status(15, "submitted", "under_review", 8, "2026-02-20T14:00:00Z"));
   out.push(status(15, "under_review", "approved", 8, "2026-02-21T09:00:00Z"));
+  out.push(status(15, "approved", "in_progress", 8, "2026-02-22T09:00:00Z"));
   out.push(status(15, "in_progress", "delivered", 8, "2026-02-24T17:00:00Z"));
   out.push(comment(15, 8, "Backup restabelecido, monitoramento reforçado por 72 horas.", "2026-02-24T17:10:00Z"));
   // request 16 (submitted)
   out.push(status(16, "", "submitted", 1, "2026-08-26T11:00:00Z"));
   // request 17 (rejected)
   out.push(status(17, "", "submitted", 3, "2026-03-18T09:00:00Z"));
+  out.push(status(17, "submitted", "under_review", 3, "2026-03-19T09:00:00Z"));
   out.push(status(17, "under_review", "rejected", 3, "2026-03-20T09:00:00Z", "Cluster de monitoramento já possui capacidade suficiente neste ciclo."));
   // request 18 (needs_info)
   out.push(status(18, "", "submitted", 8, "2026-08-05T09:00:00Z"));
+  out.push(status(18, "submitted", "under_review", 8, "2026-08-05T14:00:00Z"));
   out.push(comment(18, 8, "Poderia informar qual subdomínio deve apontar para o CNAME?", "2026-08-06T09:30:00Z"));
   out.push(status(18, "under_review", "needs_info", 8, "2026-08-06T10:00:00Z"));
   // request 19 (cancelled)
@@ -680,7 +697,9 @@ function events(userList: User[]): RequestEvent[] {
   out.push(status(19, "under_review", "cancelled", 6, "2026-04-29T09:00:00Z", "Migração adiada para o próximo trimestre."));
   // request 20 (delivered)
   out.push(status(20, "", "submitted", 3, "2026-01-28T09:00:00Z"));
+  out.push(status(20, "submitted", "under_review", 3, "2026-01-28T15:00:00Z"));
   out.push(status(20, "under_review", "approved", 3, "2026-01-29T09:00:00Z"));
+  out.push(status(20, "approved", "in_progress", 3, "2026-01-29T15:00:00Z"));
   out.push(status(20, "in_progress", "delivered", 3, "2026-01-30T15:00:00Z"));
   // request 21 (under_review)
   out.push(status(21, "", "submitted", 2, "2026-08-15T09:00:00Z"));
@@ -696,6 +715,7 @@ function events(userList: User[]): RequestEvent[] {
   out.push(status(24, "submitted", "under_review", 3, "2026-08-19T09:00:00Z"));
   // request 25 (approved)
   out.push(status(25, "", "submitted", 7, "2026-07-10T09:00:00Z"));
+  out.push(status(25, "submitted", "under_review", 3, "2026-07-11T09:00:00Z"));
   out.push(status(25, "under_review", "approved", 3, "2026-07-12T09:00:00Z"));
 
   return out;

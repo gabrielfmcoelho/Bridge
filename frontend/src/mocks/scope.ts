@@ -64,7 +64,7 @@ export function isVisible(
 /** Mirrors the RequestAbilities rules exactly (task-a2-brief.md):
  *   approve: submitted/under_review, role editor+, approver_entidade_id in scope
  *   fulfill: approved/in_progress, role editor+, approver_entidade_id in scope
- *   cancel:  requester on a non-terminal status, or admin
+ *   cancel:  non-terminal status, and (requester or admin) — non-terminal applies to admin too
  *   edit:    requester, status submitted or needs_info
  *  `isTerminal` is injected rather than imported so this file stays free of
  *  the cross-directory value import described above — db.ts supplies the
@@ -86,7 +86,12 @@ export function computeAbilities(
   const approve = roleEditorPlus && approverMatch && (request.status === "submitted" || request.status === "under_review");
   const fulfill = roleEditorPlus && approverMatch && (request.status === "approved" || request.status === "in_progress");
   const isRequester = request.requester_user_id === actor.id;
-  const cancel = actor.role === "admin" || (isRequester && !isTerminal(request.status));
+  // Non-terminal for EVERYONE, admin included — TRANSITIONS[status] is []
+  // for delivered/rejected/cancelled, so an admin "cancelling" one of those
+  // would always 422. Every other status's TRANSITIONS entry does include
+  // "cancelled" as a legal target (see scope.test.ts), so this is exactly
+  // "can legally transition to cancelled", not a separate rule.
+  const cancel = !isTerminal(request.status) && (actor.role === "admin" || isRequester);
   const edit = isRequester && (request.status === "submitted" || request.status === "needs_info");
   return { approve, fulfill, cancel, edit };
 }

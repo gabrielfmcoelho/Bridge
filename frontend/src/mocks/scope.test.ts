@@ -62,3 +62,18 @@ test("computeAbilities: approve requires editor+ role and approver_entidade_id i
   assert.equal(computeAbilities(tree, editorETIPI, submitted, null, neverTerminal).approve, false);
   assert.equal(computeAbilities(tree, admin, submitted, null, neverTerminal).approve, true);
 });
+
+test("computeAbilities: cancel requires a non-terminal status for EVERYONE, admin included", () => {
+  // Regression for fix round 1: TRANSITIONS.delivered/rejected/cancelled are
+  // all [] (terminal), so a "cancel" that ignores that would always 422 on
+  // the real transition endpoint — admin's short-circuit must not skip it.
+  const isTerminal = (s: string) => s === "delivered" || s === "rejected" || s === "cancelled";
+  const delivered = { requester_user_id: 999, status: "delivered" as const };
+  const submitted = { requester_user_id: 999, status: "submitted" as const };
+  assert.equal(computeAbilities(tree, admin, delivered, null, isTerminal).cancel, false);
+  assert.equal(computeAbilities(tree, admin, submitted, null, isTerminal).cancel, true);
+  // Same status, non-admin requester: also gated on non-terminal, not just "is the requester".
+  const requester: Actor = { id: 999, role: "viewer", entidadeIds: [] };
+  assert.equal(computeAbilities(tree, requester, delivered, null, isTerminal).cancel, false);
+  assert.equal(computeAbilities(tree, requester, submitted, null, isTerminal).cancel, true);
+});
