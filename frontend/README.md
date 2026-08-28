@@ -13,12 +13,12 @@ This frontend is built using a modern, fast, and fully-typed stack:
 - **Framework**: [Next.js 16 (App Router)](https://nextjs.org/) + [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) + Custom Design Tokens (CSS Variables)
 - **Data Fetching & Caching**: [@tanstack/react-query (v5)](https://tanstack.com/query) for robust server-state synchronization
-- **Form State & Validation**: [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/) for typed schemas
+- **Forms & Schema Validation**: Hand-rolled form state (`useState` per field, manual validation, `<FormError>`) — not [React Hook Form](https://react-hook-form.com/), which is installed but unused. [Zod](https://zod.dev/) is installed and used, but only to validate/type the Atlas data-lineage schema (`src/lib/lineage/types.ts`), not for forms
 - **Graph & Topology**: [@xyflow/react](https://reactflow.dev/) + [@dagrejs/dagre](https://github.com/dagrejs/dagre) for automated dependency layout calculations
 - **Interactive Primitives**: [Vaul](https://github.com/emilkowalski/vaul) (bottom sheets/drawers) + [Radix UI](https://www.radix-ui.com/) (Popover, Tooltip)
-- **Localization**: [Next-intl](https://next-intl-docs.vercel.app/) with full support for:
+- **Localization**: Hand-rolled (`contexts/LocaleContext.tsx` + `messages/*.json`) — not [Next-intl](https://next-intl-docs.vercel.app/), which is installed but unused. Supports:
   - English (`en`)
-  - Brazilian Portuguese (`pt-BR`)
+  - Brazilian Portuguese (`pt-BR`, default locale)
 - **API Documentation**: Integrated [@scalar/api-reference-react](https://github.com/scalar/scalar) for interactive API browsing
 
 ---

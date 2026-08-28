@@ -30,7 +30,7 @@ environment-variable bundles, with per-user ownership and guest share links.
 | D4 | Share-link crypto: master-key decrypt or per-link key? | **Per-link derived key**: HKDF-SHA256(`master_key`, salt=`raw_token`, info=`"secret-share-v1"`) → AES-256 key for share payload. Raw token lives only in URL; DB stores `token_hash` and HKDF salt is the raw token, so DB compromise alone cannot decrypt. |
 | D5 | Env-var bundles: single payload or per-var rows? | **Per-var rows.** Each env var is its own `Secret` with `type='env_var'` and a new `group_label TEXT NULL` column carrying the environment (`"prod"`, `"staging"`, …). "Bundle" is a frontend grouping concept only; backend just sees a flat list filtered by `group_label`. Unique constraint widens to `(scope, parent_id, name, group_label)`. |
 | D6 | Admin metadata visibility for personal secrets | **Names + types + scope visible** to admin (compliance/inventory). Values, audit details, and share-link tokens not. Owner sees full. |
-| D7 | Scope vs personal: one enum or two axes? | **Two orthogonal axes.** `scope ∈ {service, host, tool, avulso}` describes *what the secret is attached to* (avulso = unattached). `visibility ∈ {personal, shared}` describes *who can see it* — `personal` = owner-only, `shared` = role-based ACL. Any combination is valid (e.g. a `host`-scoped `personal` SSH key, an `avulso` `shared` team password). **External share links are only valid when `visibility='personal'`** (shared secrets are already internally accessible — there is no use case for sharing them externally). |
+| D7 | Scope vs personal: one enum or two axes? | **Two orthogonal axes.** `scope ∈ {service, host, tool, projeto, avulso}` describes *what the secret is attached to* (avulso = unattached). `visibility ∈ {personal, shared}` describes *who can see it* — `personal` = owner-only, `shared` = role-based ACL. Any combination is valid (e.g. a `host`-scoped `personal` SSH key, an `avulso` `shared` team password). **External share links are only valid when `visibility='personal'`** (shared secrets are already internally accessible — there is no use case for sharing them externally). |
 
 ## 4. Data model
 
@@ -133,7 +133,7 @@ Authorization decomposes along the two D7 axes. Let `me` = caller.
 
 ### 5.1 visibility=shared (RBAC governs)
 
-| Caller role | scope=service/host/tool | scope=avulso |
+| Caller role | scope=service/host/tool/projeto | scope=avulso |
 |---|---|---|
 | viewer | list + reveal | list + reveal |
 | editor | list + reveal + create + update | same |
