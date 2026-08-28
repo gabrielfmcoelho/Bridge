@@ -5,28 +5,37 @@ This version has breaking changes — APIs, conventions, and file structure may 
 <!-- END:nextjs-agent-rules -->
 
 <!-- BEGIN:secrets-path-edit-workaround -->
-## Editing files under `src/app/secrets/`
+## A guardrail false positive under `src/app/secrets/`
 
-A project `Write|Edit` hook matches any path containing secret/credential
-patterns and blocks the write as a "secret or credential file" — including
-legitimate source components such as
-`src/app/secrets/_components/NewSecretModal.tsx`. The `Write` and `Edit` tools
-fail with `保護パスへのファイル書き込み は禁止されています（secret or credential file）`.
+Rule **R02** of the `claude-code-harness` plugin's guardrail
+(`go/internal/guardrail/rules.go:150`) denies `Write`/`Edit` on paths that
+look credential-shaped — `.env`, `.git/`, `*.pem`, `*.key`, `id_rsa` and
+similar. Its path pattern also matches any path segment literally named
+`secret`/`secrets`, so it denies edits under `src/app/secrets/` too, even
+though that directory holds ordinary React source — the *path* contains the
+word "secrets", not a credential.
 
-The hook only intercepts the `Write`/`Edit` tools, not shell `cp`. To edit a
-file under this path, edit a copy outside the guarded directory and copy it
-back:
+**Never route around a guardrail** (e.g. editing a copy elsewhere and
+shell-`cp`-ing it back into place). A blocked write is a signal to stop, not
+a puzzle to solve around the tool. If a legitimate edit under this path is
+denied, do one of:
 
-```sh
-cp src/app/secrets/_components/NewSecretModal.tsx /tmp/work/NewSecretModal.tsx
-# make edits in /tmp/work/NewSecretModal.tsx
-cp /tmp/work/NewSecretModal.tsx src/app/secrets/_components/NewSecretModal.tsx
-```
+- Ask the user to allow that specific path for the session.
+- Hand the user the diff and have them apply it.
 
-Because the in-editor advisory hooks are bypassed this way, verify manually
-afterwards: `npx tsc --noEmit` and `npx eslint <file>`.
+This is the same call the project's own later work made when it hit the
+identical guard on `ShareLinkModal.tsx` — see
+`docs/superpowers/specs/2026-06-26-share-metadata-audit-index-design.md:39`.
 
-The proper fix is to tighten the hook's matcher so it excludes `*.ts`/`*.tsx`
-source under `src/app/secrets/` (config lives in `hooks/hooks.json` /
-`.claude-plugin/hooks.json`); until then, use the copy-back workaround.
+The route itself is already structured to shrink this surface:
+`src/app/secrets/page.tsx` is a one-line re-export of
+`@/components/vault/VaultPage`, and the page-level logic lives in
+`src/components/vault/` — outside the guarded path. That split is
+intentional; don't "fix" the re-export back into `src/app/secrets/`.
+
+The modal/drawer components (`NewSecretModal.tsx`, `HistoryDrawer.tsx`,
+`ShareLinkModal.tsx`, etc.) still live under `src/app/secrets/_components/`,
+so they still sit inside the guarded path and R02 will still legitimately
+fire on them — that's not a bug to work around, it's the same
+ask-to-allow-or-hand-the-diff flow above.
 <!-- END:secrets-path-edit-workaround -->
