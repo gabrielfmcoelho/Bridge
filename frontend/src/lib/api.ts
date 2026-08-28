@@ -1,4 +1,7 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE =
+  process.env.NEXT_PUBLIC_USE_MOCK_API === "1"
+    ? "/mock"
+    : process.env.NEXT_PUBLIC_API_URL || "";
 
 export type OperationLog = {
   id: number;
