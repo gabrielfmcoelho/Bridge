@@ -809,7 +809,7 @@ var migrationsPostgres = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_host_remote_users_host ON host_remote_users(host_id);`,
 
-	// Version 52: GitLab Code Management — see migrations_sqlite.go for rationale.
+	// Version 52: GitLab Code Management.
 	`ALTER TABLE project_gitlab_links ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'project';
 	ALTER TABLE project_gitlab_links ADD COLUMN IF NOT EXISTS ref_name TEXT NOT NULL DEFAULT '';
 	ALTER TABLE project_gitlab_links ADD COLUMN IF NOT EXISTS display_name TEXT NOT NULL DEFAULT '';
@@ -818,7 +818,7 @@ var migrationsPostgres = []string{
 	INSERT INTO app_settings (key, value) VALUES ('gitlab_code_service_token_nonce', '') ON CONFLICT DO NOTHING;
 	INSERT INTO app_settings (key, value) VALUES ('gitlab_code_default_ref', '') ON CONFLICT DO NOTHING;`,
 
-	// Version 53: cache per-project AI analyses — see migrations_sqlite.go for rationale.
+	// Version 53: cache per-project AI analyses.
 	`CREATE TABLE IF NOT EXISTS project_ai_analyses (
 		project_id    BIGINT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
 		content       TEXT NOT NULL DEFAULT '',
@@ -828,7 +828,7 @@ var migrationsPostgres = []string{
 		generated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`,
 
-	// Version 54: Grafana integration scaffolding — see migrations_sqlite.go for details.
+	// Version 54: Grafana integration scaffolding.
 	`ALTER TABLE hosts ADD COLUMN IF NOT EXISTS grafana_dashboard_uid TEXT NOT NULL DEFAULT '';
 	ALTER TABLE services ADD COLUMN IF NOT EXISTS grafana_dashboard_uid TEXT NOT NULL DEFAULT '';
 	ALTER TABLE host_alerts ADD COLUMN IF NOT EXISTS external_id TEXT NOT NULL DEFAULT '';
@@ -849,7 +849,7 @@ var migrationsPostgres = []string{
 	INSERT INTO app_settings (key, value) VALUES ('grafana_prom_remote_write_password_nonce', '') ON CONFLICT DO NOTHING;
 	INSERT INTO app_settings (key, value) VALUES ('grafana_datasource_uid', '') ON CONFLICT DO NOTHING;`,
 
-	// Version 55: Outline integration — see migrations_sqlite.go for rationale.
+	// Version 55: Outline integration.
 	`ALTER TABLE projects ADD COLUMN IF NOT EXISTS outline_collection_id TEXT NOT NULL DEFAULT '';
 
 	INSERT INTO app_settings (key, value) VALUES ('outline_enabled', 'false') ON CONFLICT DO NOTHING;
@@ -858,7 +858,7 @@ var migrationsPostgres = []string{
 	INSERT INTO app_settings (key, value) VALUES ('outline_api_token_nonce', '') ON CONFLICT DO NOTHING;
 	INSERT INTO app_settings (key, value) VALUES ('outline_common_collection_id', '') ON CONFLICT DO NOTHING;`,
 
-	// Version 56: GLPI integration — see migrations_sqlite.go for rationale.
+	// Version 56: GLPI integration.
 	`CREATE TABLE IF NOT EXISTS glpi_tokens (
 		id                BIGSERIAL PRIMARY KEY,
 		name              TEXT NOT NULL UNIQUE,
@@ -892,7 +892,7 @@ var migrationsPostgres = []string{
 	INSERT INTO app_settings (key, value) VALUES ('glpi_app_token_nonce', '') ON CONFLICT DO NOTHING;
 	INSERT INTO app_settings (key, value) VALUES ('glpi_default_entity_id', '0') ON CONFLICT DO NOTHING;`,
 
-	// Version 57: GLPI dropdown catalogue — see migrations_sqlite.go for rationale.
+	// Version 57: GLPI dropdown catalogue.
 	`CREATE TABLE IF NOT EXISTS glpi_dropdown_catalogues (
 		id           BIGSERIAL PRIMARY KEY,
 		itemtype     TEXT NOT NULL UNIQUE,
@@ -945,8 +945,8 @@ var migrationsPostgres = []string{
 		SELECT id, setor_responsavel, TRUE FROM hosts WHERE setor_responsavel != ''
 	ON CONFLICT DO NOTHING;`,
 
-	// Version 61: unified secrets manager (Phase 1.3) — see migrations_sqlite.go
-	// for full rationale. Same schema, postgres syntax.
+	// Version 61: unified secrets manager (Phase 1.3). Same schema, postgres
+	// syntax.
 	//
 	// Translation notes:
 	//   - INTEGER PRIMARY KEY AUTOINCREMENT  -> BIGSERIAL PRIMARY KEY
@@ -1026,14 +1026,12 @@ var migrationsPostgres = []string{
 	CREATE INDEX IF NOT EXISTS idx_secret_audit_log_secret ON secret_audit_log(secret_id, at);
 	CREATE INDEX IF NOT EXISTS idx_secret_audit_log_actor  ON secret_audit_log(actor_user_id, at);`,
 
-	// Version 62: soft-delete for external_tools — see migrations_sqlite.go
-	// for the design rationale.
+	// Version 62: soft-delete for external_tools.
 	`ALTER TABLE external_tools ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	CREATE INDEX IF NOT EXISTS idx_external_tools_live    ON external_tools (id) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_external_tools_trash   ON external_tools (deleted_at) WHERE deleted_at IS NOT NULL;`,
 
-	// Version 63: payload columns on secret_share_links — see
-	// migrations_sqlite.go for the D4 design rationale.
+	// Version 63: payload columns on secret_share_links (D4 design).
 	`ALTER TABLE secret_share_links ADD COLUMN IF NOT EXISTS payload_ciphertext BYTEA;
 	ALTER TABLE secret_share_links ADD COLUMN IF NOT EXISTS payload_nonce BYTEA;`,
 
@@ -1046,8 +1044,7 @@ var migrationsPostgres = []string{
 	ALTER TABLE secrets ADD CONSTRAINT secrets_scope_check
 		CHECK (scope IN ('service','host','tool','avulso','projeto'));`,
 
-	// Version 65: Atlas REST API catalog (Phase A) — see migrations_sqlite.go
-	// for the design rationale.
+	// Version 65: Atlas REST API catalog (Phase A).
 	`CREATE TABLE IF NOT EXISTS api_catalog (
 		id            BIGSERIAL PRIMARY KEY,
 		scope         TEXT NOT NULL,
@@ -1074,7 +1071,7 @@ var migrationsPostgres = []string{
 	CREATE INDEX IF NOT EXISTS idx_api_catalog_scope_parent ON api_catalog (scope, parent_id) WHERE deleted_at IS NULL;
 	CREATE INDEX IF NOT EXISTS idx_api_catalog_owner        ON api_catalog (owner_user_id) WHERE deleted_at IS NULL;`,
 
-	// Version 66: derived operation index — see migrations_sqlite.go.
+	// Version 66: derived operation index.
 	`CREATE TABLE IF NOT EXISTS api_operations (
 		id           BIGSERIAL PRIMARY KEY,
 		api_id       BIGINT NOT NULL REFERENCES api_catalog(id) ON DELETE CASCADE,
@@ -1090,8 +1087,8 @@ var migrationsPostgres = []string{
 	CREATE INDEX        IF NOT EXISTS idx_api_operations_api ON api_operations (api_id);
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_api_operations_key ON api_operations (api_id, op_key);`,
 
-	// Version 67: generic share bundles (Phase D) — see migrations_sqlite.go
-	// for the design rationale (live-resolve, no sealed payload).
+	// Version 67: generic share bundles (Phase D; live-resolve, no sealed
+	// payload).
 	`CREATE TABLE IF NOT EXISTS share_bundles (
 		id              BIGSERIAL PRIMARY KEY,
 		token_hash      BYTEA NOT NULL,
@@ -1108,7 +1105,7 @@ var migrationsPostgres = []string{
 	CREATE INDEX        IF NOT EXISTS idx_share_bundles_expires ON share_bundles (expires_at);
 	CREATE INDEX        IF NOT EXISTS idx_share_bundles_creator ON share_bundles (created_by);`,
 
-	// Version 68: bundle items — see migrations_sqlite.go.
+	// Version 68: bundle items.
 	`CREATE TABLE IF NOT EXISTS share_bundle_items (
 		id         BIGSERIAL PRIMARY KEY,
 		bundle_id  BIGINT NOT NULL REFERENCES share_bundles(id) ON DELETE CASCADE,
@@ -1120,12 +1117,12 @@ var migrationsPostgres = []string{
 	);
 	CREATE INDEX IF NOT EXISTS idx_share_bundle_items_bundle ON share_bundle_items (bundle_id);`,
 
-	// Version 69: base_url + docs_url on api_catalog — see migrations_sqlite.go.
+	// Version 69: base_url + docs_url on api_catalog.
 	`ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS base_url TEXT NOT NULL DEFAULT '';
 	ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS docs_url TEXT NOT NULL DEFAULT '';`,
 
-	// Version 70 (R3): unify *_responsaveis into one polymorphic table — see
-	// migrations_sqlite.go. is_main is BOOLEAN here (Go reads it into bool).
+	// Version 70 (R3): unify *_responsaveis into one polymorphic table.
+	// is_main is BOOLEAN here (Go reads it into bool).
 	`CREATE TABLE IF NOT EXISTS responsaveis (
 		id          BIGSERIAL PRIMARY KEY,
 		entity_type TEXT NOT NULL CHECK (entity_type IN ('host','dns','service','project')),
@@ -1152,8 +1149,7 @@ var migrationsPostgres = []string{
 	DROP TABLE project_responsaveis;
 	CREATE INDEX IF NOT EXISTS idx_responsaveis_entity ON responsaveis (entity_type, entity_id);`,
 
-	// Version 71 (R3): app_settings cipher sprawl → app_secrets — see
-	// migrations_sqlite.go.
+	// Version 71 (R3): app_settings cipher sprawl → app_secrets.
 	`CREATE TABLE IF NOT EXISTS app_secrets (
 		key    TEXT PRIMARY KEY,
 		cipher TEXT NOT NULL DEFAULT '',
@@ -1167,12 +1163,12 @@ var migrationsPostgres = []string{
 		ON CONFLICT (key) DO NOTHING;
 	DELETE FROM app_settings WHERE key LIKE '%\_cipher' ESCAPE '\' OR key LIKE '%\_nonce' ESCAPE '\';`,
 
-	// Version 72 (R3): retire secret_share_links — see migrations_sqlite.go.
+	// Version 72 (R3): retire secret_share_links.
 	`DROP TABLE IF EXISTS secret_share_links;`,
 
-	// Version 73 (R3 optional): extend soft-delete to hosts/services/projects —
-	// see migrations_sqlite.go. Symmetric with sqlite: just add the column; the
-	// slug stays reserved while soft-deleted (restore, don't recreate).
+	// Version 73 (R3 optional): extend soft-delete to hosts/services/projects.
+	// Symmetric with sqlite: just add the column; the slug stays reserved
+	// while soft-deleted (restore, don't recreate).
 	`ALTER TABLE hosts    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	ALTER TABLE services ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;`,

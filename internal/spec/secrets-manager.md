@@ -40,7 +40,7 @@ environment-variable bundles, with per-user ownership and guest share links.
 ```
 id                 BIGSERIAL PK
 type               ENUM('cred', 'sshkey', 'password', 'app_login', 'env_var')
-scope              ENUM('service', 'host', 'tool', 'avulso')  -- where it lives (D7)
+scope              ENUM('service', 'host', 'tool', 'projeto', 'avulso')  -- where it lives (D7); projeto is parented (parent_id -> projects.id)
 visibility         ENUM('personal', 'shared')                  -- who can see it (D7)
 parent_id          BIGINT NULL    -- polymorphic FK by scope: service.id | host.id | external_tool.id; NULL for avulso
 owner_user_id      BIGINT NOT NULL -- creator; ALWAYS set, regardless of scope/visibility
