@@ -1261,8 +1261,11 @@
     "searchPlaceholder": "Search the catalog…",
     "resultsExisting": "Existing",
     "resultsOfferings": "Offerings",
+    "searchPrompt": "Search the catalog",
+    "searchPromptHint": "Look for a host, service, DNS record, or project before opening a request for something new.",
     "empty": "Nothing found",
-    "emptyHint": "Try another keyword or browse by category.",
+    "emptyHint": "Try another keyword, or open a request if it doesn't exist yet.",
+    "error": "Couldn't load results. Try again.",
     "request": "Request",
     "view": "View"
   },

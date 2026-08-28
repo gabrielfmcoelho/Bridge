@@ -33,6 +33,13 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    key: "serviceCatalog",
+    items: [
+      { href: "/catalog", label: "nav.serviceCatalog", icon: "Boxes" },
+      { href: "/requests", label: "nav.requests", icon: "ClipboardList" },
+    ],
+  },
+  {
     key: "management",
     label: "nav.management",
     items: [

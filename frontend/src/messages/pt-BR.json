@@ -1261,8 +1261,11 @@
     "searchPlaceholder": "Buscar no catálogo…",
     "resultsExisting": "Já existentes",
     "resultsOfferings": "Ofertas",
+    "searchPrompt": "Busque no catálogo",
+    "searchPromptHint": "Procure um host, serviço, registro DNS ou projeto antes de abrir uma solicitação para algo novo.",
     "empty": "Nada encontrado",
-    "emptyHint": "Tente outra palavra-chave ou busque por categoria.",
+    "emptyHint": "Tente outra palavra-chave, ou abra uma solicitação se ainda não existir.",
+    "error": "Não foi possível carregar os resultados. Tente novamente.",
     "request": "Solicitar",
     "view": "Ver"
   },
