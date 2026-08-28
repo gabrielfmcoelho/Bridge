@@ -36,7 +36,9 @@
     "lineage": "Lineage",
     "catalog": "Catalog",
     "pipeline": "Pipeline",
-    "apis": "APIs"
+    "apis": "APIs",
+    "serviceCatalog": "Service Catalog",
+    "requests": "Requests"
   },
   "atlas": {
     "apis": {
@@ -1251,6 +1253,72 @@
       "ssh_key": "SSH Keys",
       "api_catalog": "APIs",
       "secret": "Secrets (avulso)"
+    }
+  },
+  "catalog": {
+    "title": "Service Catalog",
+    "subtitle": "Find what you need, or open a request",
+    "searchPlaceholder": "Search the catalog…",
+    "resultsExisting": "Existing",
+    "resultsOfferings": "Offerings",
+    "empty": "Nothing found",
+    "emptyHint": "Try another keyword or browse by category.",
+    "request": "Request",
+    "view": "View"
+  },
+  "requests": {
+    "title": "Requests",
+    "subtitle": "Track your requests and the ones waiting on your review",
+    "new": "New Request",
+    "detail": "Request Detail",
+    "empty": "No requests found",
+    "emptyHint": "Your requests will show up here.",
+    "searchPlaceholder": "Search requests…",
+    "titleField": "Title",
+    "priority": "Priority",
+    "requester": "Requester",
+    "assignee": "Assignee",
+    "entidade": "Entity",
+    "offering": "Offering",
+    "createdAt": "Opened",
+    "updatedAt": "Updated",
+    "view": {
+      "mine": "My Requests",
+      "approve": "To Approve",
+      "fulfill": "To Fulfill",
+      "all": "All"
+    },
+    "status": {
+      "submitted": "Submitted",
+      "under_review": "Under Review",
+      "approved": "Approved",
+      "in_progress": "In Progress",
+      "delivered": "Delivered",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled",
+      "needs_info": "Needs Info"
+    },
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "requestInfo": "Request More Info",
+      "resubmit": "Resubmit",
+      "startWork": "Start Work",
+      "markDelivered": "Mark as Delivered",
+      "cancel": "Cancel",
+      "comment": "Comment",
+      "edit": "Edit"
+    },
+    "event": {
+      "comment": "Comment",
+      "status": "Status Change",
+      "assign": "Assignment",
+      "link": "Linked",
+      "delivery": "Delivery",
+      "integration": "Integration"
+    },
+    "form": {
+      "required": "This field is required"
     }
   }
 }

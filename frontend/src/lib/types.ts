@@ -49,7 +49,7 @@ export interface AssetGrantsInput {
 
 export type AssetType =
   | "host" | "dns" | "service" | "project" | "contact"
-  | "tool" | "ssh_key" | "api_catalog" | "secret";
+  | "tool" | "ssh_key" | "api_catalog" | "secret" | "offering";
 
 export interface AuthProviderInfo {
   name: string;
@@ -624,4 +624,126 @@ export interface ShareBundleAccessEntry {
   remote_ip: string;
   user_agent: string;
   used_passphrase: boolean;
+}
+
+// ── Service Catalog & Requests ──────────────────────────────────────────────
+
+export type RequestStatus =
+  | "submitted" | "under_review" | "approved"
+  | "in_progress" | "delivered" | "rejected" | "cancelled" | "needs_info";
+
+export type RequestType =
+  | "vm" | "service" | "dns" | "api_token" | "feature" | "account" | "support";
+
+export type FormFieldType =
+  | "text" | "textarea" | "number" | "select"
+  | "checkbox" | "date" | "tags" | "asset_ref";
+
+/** One field descriptor in an offering's form schema. Labels are bilingual
+ *  because offerings are user-authored data, not code, and the UI is bilingual. */
+export interface FormField {
+  key: string;
+  type: FormFieldType;
+  label_en: string;
+  label_pt: string;
+  required: boolean;
+  options?: string[]; // for "select"
+  help_en?: string;
+  help_pt?: string;
+  max_length?: number;
+  asset_type?: AssetType; // for "asset_ref"
+}
+
+export interface FormSchema {
+  fields: FormField[];
+}
+
+export interface Offering {
+  id: number;
+  slug: string;
+  name: string;
+  category: string;
+  description: string;
+  request_type: RequestType;
+  form_schema: FormSchema;
+  approver_entidade_id?: number | null;
+  glpi_mode: "inherit" | "never" | "always";
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+  entidades?: AssetGrants; // detail endpoint returns grants alongside
+}
+
+export interface ServiceRequest {
+  id: number;
+  offering_id: number;
+  title: string;
+  status: RequestStatus;
+  priority: string;
+  form_data: Record<string, unknown>;
+  form_schema_snapshot: FormSchema;
+  requester_user_id: number;
+  requester_entidade_id?: number | null;
+  assignee_user_id?: number | null;
+  decided_by_user_id?: number | null;
+  decided_at?: string | null;
+  delivered_by_user_id?: number | null;
+  delivered_at?: string | null;
+  fulfilled_asset_type: string;
+  fulfilled_asset_id?: number | null;
+  external_source: string;
+  external_ref: string;
+  external_url: string;
+  cached_title: string;
+  cached_status: string;
+  cached_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  // Display-only joined fields the list endpoint returns.
+  offering_name?: string;
+  requester_name?: string;
+  entidade_name?: string;
+}
+
+export interface RequestEvent {
+  id: number;
+  request_id: number;
+  user_id?: number | null;
+  user_name?: string;
+  kind: "comment" | "status" | "assign" | "link" | "delivery" | "integration";
+  body: string;
+  from_status: string;
+  to_status: string;
+  created_at: string;
+}
+
+/** The server is the single source of truth for what the current user may do
+ *  with a request; the UI must never re-derive these rules. */
+export interface RequestAbilities {
+  approve: boolean;
+  fulfill: boolean;
+  cancel: boolean;
+  edit: boolean;
+}
+
+export interface RequestDetail {
+  request: ServiceRequest;
+  offering: Offering;
+  events: RequestEvent[];
+  can: RequestAbilities;
+}
+
+/** Unified discovery result (GET /api/catalog/search) — one flat shape so the
+ *  UI renders a single list of existing assets alongside requestable offerings. */
+export interface CatalogHit {
+  kind: "offering" | "asset";
+  asset_type: string; // empty for offerings
+  id: number;
+  name: string;
+  description: string;
+  href: string;
+  entidade_name?: string;
+  slug?: string;
 }

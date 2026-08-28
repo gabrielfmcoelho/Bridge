@@ -1711,3 +1711,60 @@ export const assetEntidadesAPI = {
   put: (type: import("./types").AssetType, id: number, data: import("./types").AssetGrantsInput) =>
     api.put<import("./types").AssetGrants>(`/api/assets/${type}/${id}/entidades`, data),
 };
+
+// Offerings (Service Catalog)
+export const offeringsAPI = {
+  list: (params?: { active?: boolean; category?: string; q?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.active != null) q.set("active", String(params.active));
+    if (params?.category) q.set("category", params.category);
+    if (params?.q) q.set("q", params.q);
+    const qs = q.toString();
+    return api.getList<import("./types").Offering>(`/api/offerings${qs ? `?${qs}` : ""}`);
+  },
+  get: (id: number) => api.get<import("./types").Offering>(`/api/offerings/${id}`),
+  create: (data: Partial<import("./types").Offering> & import("./types").AssetGrantsInput) =>
+    api.post<import("./types").Offering>("/api/offerings", data),
+  update: (id: number, data: Partial<import("./types").Offering> & import("./types").AssetGrantsInput) =>
+    api.put<import("./types").Offering>(`/api/offerings/${id}`, data),
+  delete: (id: number) => api.delete(`/api/offerings/${id}`),
+};
+
+// Catalog (unified discovery: offerings + existing assets)
+export const catalogAPI = {
+  search: (params: { q?: string; kind?: "all" | "offering" | "asset"; page?: number; per_page?: number }) => {
+    const q = new URLSearchParams();
+    if (params.q) q.set("q", params.q);
+    if (params.kind) q.set("kind", params.kind);
+    if (params.page != null) q.set("page", String(params.page));
+    if (params.per_page != null) q.set("per_page", String(params.per_page));
+    const qs = q.toString();
+    return api.getListPaginated<import("./types").CatalogHit>(`/api/catalog/search${qs ? `?${qs}` : ""}`);
+  },
+};
+
+// Service Requests
+export const requestsAPI = {
+  listPaginated: (params: { view?: "mine" | "approve" | "fulfill" | "all"; status?: string; offering_id?: number; q?: string; page?: number; per_page?: number }) => {
+    const q = new URLSearchParams();
+    if (params.view) q.set("view", params.view);
+    if (params.status) q.set("status", params.status);
+    if (params.offering_id != null) q.set("offering_id", String(params.offering_id));
+    if (params.q) q.set("q", params.q);
+    if (params.page != null) q.set("page", String(params.page));
+    if (params.per_page != null) q.set("per_page", String(params.per_page));
+    const qs = q.toString();
+    return api.getListPaginated<import("./types").ServiceRequest>(`/api/service-requests${qs ? `?${qs}` : ""}`);
+  },
+  get: (id: number) => api.get<import("./types").RequestDetail>(`/api/service-requests/${id}`),
+  create: (data: { offering_id: number; title: string; priority?: string; form_data: Record<string, unknown> }) =>
+    api.post<import("./types").ServiceRequest>("/api/service-requests", data),
+  patch: (id: number, data: Partial<Pick<import("./types").ServiceRequest, "title" | "priority" | "form_data">>) =>
+    api.patch<import("./types").ServiceRequest>(`/api/service-requests/${id}`, data),
+  transition: (id: number, data: { to: import("./types").RequestStatus; note?: string; assignee_user_id?: number; fulfilled_asset_type?: string; fulfilled_asset_id?: number }) =>
+    api.post<import("./types").ServiceRequest>(`/api/service-requests/${id}/transition`, data),
+  comment: (id: number, body: string) =>
+    api.post<import("./types").RequestEvent>(`/api/service-requests/${id}/comments`, { body }),
+  glpiRefresh: (id: number) =>
+    api.post<import("./types").ServiceRequest>(`/api/service-requests/${id}/glpi/refresh`, {}),
+};

@@ -36,7 +36,9 @@
     "lineage": "Linhagem",
     "catalog": "Catálogo",
     "pipeline": "Pipeline",
-    "apis": "APIs"
+    "apis": "APIs",
+    "serviceCatalog": "Catálogo de Serviços",
+    "requests": "Solicitações"
   },
   "atlas": {
     "apis": {
@@ -1251,6 +1253,72 @@
       "ssh_key": "Chaves SSH",
       "api_catalog": "APIs",
       "secret": "Segredos (avulsos)"
+    }
+  },
+  "catalog": {
+    "title": "Catálogo de Serviços",
+    "subtitle": "Encontre o que você precisa ou abra uma solicitação",
+    "searchPlaceholder": "Buscar no catálogo…",
+    "resultsExisting": "Já existentes",
+    "resultsOfferings": "Ofertas",
+    "empty": "Nada encontrado",
+    "emptyHint": "Tente outra palavra-chave ou busque por categoria.",
+    "request": "Solicitar",
+    "view": "Ver"
+  },
+  "requests": {
+    "title": "Solicitações",
+    "subtitle": "Acompanhe suas solicitações e as que aguardam sua análise",
+    "new": "Nova solicitação",
+    "detail": "Detalhe da solicitação",
+    "empty": "Nenhuma solicitação encontrada",
+    "emptyHint": "Suas solicitações vão aparecer aqui.",
+    "searchPlaceholder": "Buscar solicitações…",
+    "titleField": "Título",
+    "priority": "Prioridade",
+    "requester": "Solicitante",
+    "assignee": "Responsável",
+    "entidade": "Entidade",
+    "offering": "Oferta",
+    "createdAt": "Aberta em",
+    "updatedAt": "Atualizada em",
+    "view": {
+      "mine": "Minhas solicitações",
+      "approve": "Para aprovar",
+      "fulfill": "Para atender",
+      "all": "Todas"
+    },
+    "status": {
+      "submitted": "Enviada",
+      "under_review": "Em análise",
+      "approved": "Aprovada",
+      "in_progress": "Em andamento",
+      "delivered": "Entregue",
+      "rejected": "Rejeitada",
+      "cancelled": "Cancelada",
+      "needs_info": "Aguardando informações"
+    },
+    "actions": {
+      "approve": "Aprovar",
+      "reject": "Rejeitar",
+      "requestInfo": "Solicitar mais informações",
+      "resubmit": "Reenviar",
+      "startWork": "Iniciar atendimento",
+      "markDelivered": "Marcar como entregue",
+      "cancel": "Cancelar",
+      "comment": "Comentar",
+      "edit": "Editar"
+    },
+    "event": {
+      "comment": "Comentário",
+      "status": "Mudança de situação",
+      "assign": "Atribuição",
+      "link": "Vinculado",
+      "delivery": "Entrega",
+      "integration": "Integração"
+    },
+    "form": {
+      "required": "Este campo é obrigatório"
     }
   }
 }
