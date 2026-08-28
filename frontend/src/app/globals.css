@@ -83,6 +83,10 @@
 
   --success-muted: rgba(16, 185, 129, 0.14);
   --warning-muted: rgba(245, 158, 11, 0.16);
+  /* Dark-baseline --danger (#f87171) is ~2.7:1 on light surfaces — fails
+     WCAG AA for text. Matches the codebase's existing light-mode error-text
+     convention (Input.tsx/FormError.tsx's theme-branched text-red-600). */
+  --danger: #dc2626;
   --danger-muted: rgba(239, 68, 68, 0.13);
   --purple-muted: rgba(139, 92, 246, 0.14);
   --amber-muted: rgba(245, 158, 11, 0.14);
