@@ -38,7 +38,9 @@
     "pipeline": "Pipeline",
     "apis": "APIs",
     "serviceCatalog": "Service Catalog",
-    "requests": "Requests"
+    "requests": "Requests",
+    "wiki": "Wiki",
+    "chamados": "Tickets"
   },
   "atlas": {
     "apis": {
@@ -1320,8 +1322,19 @@
       "delivery": "Delivery",
       "integration": "Integration"
     },
+    "priorityLevels": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
     "form": {
-      "required": "This field is required"
+      "required": "This field is required",
+      "loadError": "Could not load the request form. Try again.",
+      "invalidNumber": "Must be a number",
+      "maxLength": "Maximum of {max} characters",
+      "invalidOption": "Choose a valid option",
+      "submitError": "Could not submit the request. Try again."
     }
   }
 }

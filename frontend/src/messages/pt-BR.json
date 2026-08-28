@@ -38,7 +38,9 @@
     "pipeline": "Pipeline",
     "apis": "APIs",
     "serviceCatalog": "Catálogo de Serviços",
-    "requests": "Solicitações"
+    "requests": "Solicitações",
+    "wiki": "Wiki",
+    "chamados": "Chamados"
   },
   "atlas": {
     "apis": {
@@ -1320,8 +1322,19 @@
       "delivery": "Entrega",
       "integration": "Integração"
     },
+    "priorityLevels": {
+      "low": "Baixa",
+      "medium": "Média",
+      "high": "Alta",
+      "critical": "Crítica"
+    },
     "form": {
-      "required": "Este campo é obrigatório"
+      "required": "Este campo é obrigatório",
+      "loadError": "Não foi possível carregar o formulário da solicitação. Tente novamente.",
+      "invalidNumber": "Deve ser um número",
+      "maxLength": "Máximo de {max} caracteres",
+      "invalidOption": "Escolha uma opção válida",
+      "submitError": "Não foi possível enviar a solicitação. Tente novamente."
     }
   }
 }

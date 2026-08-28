@@ -15,6 +15,7 @@ import { catalogAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { CatalogHit } from "@/lib/types";
 import CatalogResultRow from "./CatalogResultRow";
+import RequestFormModal from "./RequestFormModal";
 
 const PER_PAGE = 20;
 const DEBOUNCE_MS = 300;
@@ -170,13 +171,7 @@ export default function CatalogSearch() {
         </div>
       )}
 
-      {/* Placeholder confirmation that the "Request" action is wired through
-          to state — task A4 replaces this with the actual request modal. */}
-      {selectedOffering && (
-        <p className="text-xs text-[var(--text-faint)] mt-4">
-          {t("catalog.request")}: {selectedOffering.name}
-        </p>
-      )}
+      <RequestFormModal hit={selectedOffering} onClose={() => setSelectedOffering(null)} />
     </PageShell>
   );
 }
