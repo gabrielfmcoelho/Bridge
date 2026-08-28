@@ -39,7 +39,10 @@ Layering: `internal/api` (transport, thin handlers) → `internal/service`
   a gap to "fix" opportunistically.
 - `internal/models/issue.go` is a known pre-refactor leftover that puts raw
   SQL inside the model package. Don't copy that pattern in new code.
-- Handlers must not contain raw SQL.
+- New handler code must not contain raw SQL — route through `internal/store`
+  repos. A handful of existing handlers still do (`ai_handlers.go`'s
+  dashboard-stat counters, `glpi_handlers.go`, `secret_host_link_handlers.go`
+  each have an inline query); don't use them as a template.
 
 **Routing:** each handler struct has a `registerRoutes(rr routeRegistrar)`
 method. `routeRegistrar` (`internal/api/routes.go`) exposes `.public`,
@@ -86,10 +89,6 @@ per element, currently at **v83**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 
-A number of comments in that file still say "see migrations_sqlite.go" —
-**that file no longer exists** (the project went Postgres-only); those
-references are dead, ignore them.
-
 ## Conventions
 
 - Portuguese domain nouns stay Portuguese in identifiers and schema:
@@ -99,9 +98,12 @@ references are dead, ignore them.
   `frontend/src/messages/en.json` and `pt-BR.json`. Parity is currently
   exact — keep it that way. Default locale is pt-BR.
 - Frontend forms are hand-rolled: `useState` per field, manual validation,
-  `useMutation`, `<FormError>`. `react-hook-form`, `zod` and `next-intl` are
-  in `package.json` but are **100% unused** in `frontend/src` — do not start
-  using them.
+  `useMutation`, `<FormError>`. `react-hook-form` and `next-intl` are in
+  `package.json` but **100% unused** in `frontend/src` — do not start using
+  them. `zod` is used, but only to type the Atlas lineage schema
+  (`frontend/src/lib/lineage/types.ts`) — not for form validation. Forms
+  stay hand-rolled; don't take zod's presence there as a cue to convert
+  them.
 - There is no toast component. Use `StatusAlert` for banners, `FormError`
   inline.
 - Styling is Tailwind v4 with **no config file**; design tokens are CSS
