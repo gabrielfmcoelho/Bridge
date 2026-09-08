@@ -23,8 +23,9 @@ import IntegrationsTab from "./IntegrationsTab";
 import PermissionsTab from "./PermissionsTab";
 import RoleMappingsTab from "./RoleMappingsTab";
 import EntidadesTab from "./EntidadesTab";
+import OfferingsTab from "./OfferingsTab";
 
-type Tab = "enums" | "users" | "entidades" | "appearance" | "import" | "backup" | "integrations" | "permissions" | "role-mappings";
+type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "import" | "backup" | "integrations" | "permissions" | "role-mappings";
 
 const roleColors: Record<string, string> = {
   admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
@@ -43,6 +44,9 @@ export default function SettingsPage() {
   const { t } = useLocale();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  // ponytail: role gate until Phase B ships the catalog.manage permission;
+  // then this becomes user?.permissions?.includes("catalog.manage").
+  const canManageCatalog = isAdmin || user?.role === "editor";
   const [activeTab, setActiveTab] = useState<Tab>("enums");
   const [showTabDrawer, setShowTabDrawer] = useState(false);
 
@@ -50,6 +54,7 @@ export default function SettingsPage() {
     { key: "enums", label: t("settings.enums") },
     ...(isAdmin ? [{ key: "users" as Tab, label: t("settings.users") }] : []),
     ...(isAdmin ? [{ key: "entidades" as Tab, label: t("entidades.title") }] : []),
+    ...(canManageCatalog ? [{ key: "offerings" as Tab, label: t("settings.offerings.title") }] : []),
     ...(isAdmin ? [{ key: "appearance" as Tab, label: t("settings.appearance") }] : []),
     ...(isAdmin ? [{ key: "import" as Tab, label: t("settings.import") }] : []),
     ...(isAdmin ? [{ key: "backup" as Tab, label: t("settings.backup") }] : []),
@@ -117,6 +122,7 @@ export default function SettingsPage() {
         {activeTab === "enums" && <EnumSection />}
         {activeTab === "users" && isAdmin && <UsersSection />}
         {activeTab === "entidades" && isAdmin && <EntidadesTab />}
+        {activeTab === "offerings" && canManageCatalog && <OfferingsTab />}
         {activeTab === "appearance" && isAdmin && <AppearanceSection />}
         {activeTab === "import" && isAdmin && <ImportSection />}
         {activeTab === "backup" && isAdmin && <BackupSection />}

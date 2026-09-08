@@ -13,7 +13,7 @@ import { NextRequest } from "next/server";
 import { canTransition } from "@/lib/requests";
 import { extractJSON, coerceToSchema, coercePriority } from "@/lib/aiDraft";
 import type {
-  Offering, ServiceRequest, RequestEvent, RequestStatus, CatalogHit,
+  Offering, ServiceRequest, RequestEvent, RequestStatus, CatalogHit, AssetGrantsInput,
   Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool,
 } from "@/lib/types";
 import {
@@ -148,14 +148,14 @@ function searchCatalog(q: string, kind: string): CatalogHit[] {
     hits.push(...db.tools.filter((t) => textMatch(q, [t.name, t.description])).map(toolHit));
   }
   if (kind !== "asset") {
-    hits.push(...db.offerings.filter((o) => o.is_active && textMatch(q, [o.name, o.description, o.category])).map(offeringHit));
+    hits.push(...liveOfferings().filter((o) => o.is_active && textMatch(q, [o.name, o.description, o.category])).map(offeringHit));
   }
   return hits;
 }
 
 // ── Request bodies (only what our handlers actually read) ──────────────
 
-type OfferingBody = Partial<Offering>;
+type OfferingBody = Partial<Offering> & AssetGrantsInput;
 interface CreateRequestBody { offering_id: number; title: string; priority?: string; requester_entidade_id?: number; contact_name?: string; contact_phone?: string; form_data?: Record<string, unknown> }
 interface PatchRequestBody { title?: string; priority?: string; form_data?: Record<string, unknown> }
 interface TransitionBody {
@@ -177,6 +177,47 @@ const TAGS_BY_TYPE: Record<string, string[]> = {
   project: ["prioritário", "legado", "modernização"],
 };
 const ALL_TAGS = Array.from(new Set(Object.values(TAGS_BY_TYPE).flat()));
+
+// ── Offering writes ───────────────────────────────────────────────────────
+// Stands in for B5's ~60 lines of server validation and B3's ResolveGrants:
+// only known columns are copied (a stray `id` or `created_at` in the body must
+// not land), grant inputs are lifted into `entidades`, and the same checks the
+// Go handler will make return the same 400/409 so the UI's error path is real.
+
+const REQUEST_TYPES = ["vm", "service", "dns", "api_token", "feature", "account", "support"];
+const GLPI_MODES = ["inherit", "never", "always"];
+
+const liveOfferings = () => db.offerings.filter((o) => !o.deleted_at);
+
+/** Same convention as entidades: an empty slug is derived server-side. */
+function slugify(name: string): string {
+  return name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function pickOffering(body: OfferingBody): Partial<Offering> {
+  const out: Partial<Offering> = {};
+  for (const k of ["slug", "name", "category", "description", "request_type", "templates", "use_cases",
+    "form_schema", "approver_entidade_id", "glpi_mode", "is_active", "sort_order"] as const) {
+    if (body[k] !== undefined) (out as Record<string, unknown>)[k] = body[k];
+  }
+  if (body.creator_entidade_id !== undefined || body.responsible_entidade_ids !== undefined || body.is_global !== undefined) {
+    out.entidades = {
+      creator_entidade_id: body.creator_entidade_id ?? null,
+      responsible_entidade_ids: body.responsible_entidade_ids ?? [],
+      is_global: body.is_global ?? false,
+    };
+  }
+  return out;
+}
+
+function validateOffering(o: Offering): Response | null {
+  if (!o.name.trim()) return json({ error: "name is required" }, 400);
+  if (!REQUEST_TYPES.includes(o.request_type)) return json({ error: `invalid request_type: ${o.request_type}` }, 400);
+  if (!GLPI_MODES.includes(o.glpi_mode)) return json({ error: `invalid glpi_mode: ${o.glpi_mode}` }, 400);
+  if (!Array.isArray(o.form_schema?.fields)) return json({ error: "form_schema.fields must be an array" }, 400);
+  if (liveOfferings().some((x) => x.slug === o.slug && x.id !== o.id)) return json({ error: `slug already in use: ${o.slug}` }, 409);
+  return null;
+}
 
 
 // ── AI assist ─────────────────────────────────────────────────────────────
@@ -259,8 +300,10 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   }
 
   // ── Offerings ────────────────────────────────────────────────────────
+  // Soft-deleted offerings vanish from every list but stay in db.offerings so
+  // offeringFor() keeps hydrating the requests that reference them.
   if (method === "GET" && p === "offerings") {
-    let rows = db.offerings;
+    let rows = liveOfferings();
     const active = qs.get("active");
     if (active != null) rows = rows.filter((o) => o.is_active === (active === "true"));
     const category = qs.get("category");
@@ -270,42 +313,41 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     return json(paginate(rows, qs.get("page"), qs.get("per_page")));
   }
   if (method === "POST" && p === "offerings") {
+    if (currentUser().role === "viewer") return json({ error: "forbidden: catalog.manage required" }, 403);
     const body = await readJSON<OfferingBody>(request);
     const now = new Date().toISOString();
     const offering: Offering = {
       id: Math.max(0, ...db.offerings.map((o) => o.id)) + 1,
-      slug: body.slug ?? "",
-      name: body.name ?? "",
-      category: body.category ?? "",
-      description: body.description ?? "",
-      request_type: body.request_type ?? "support",
-      form_schema: body.form_schema ?? { fields: [] },
-      approver_entidade_id: body.approver_entidade_id ?? null,
-      glpi_mode: body.glpi_mode ?? "inherit",
-      is_active: body.is_active ?? true,
-      sort_order: body.sort_order ?? db.offerings.length + 1,
-      created_at: now,
-      updated_at: now,
+      slug: "", name: "", category: "", description: "", request_type: "support",
+      form_schema: { fields: [] }, approver_entidade_id: null, glpi_mode: "inherit",
+      is_active: true, sort_order: db.offerings.length + 1,
+      created_at: now, updated_at: now,
+      ...pickOffering(body),
     };
+    if (!offering.slug) offering.slug = slugify(offering.name);
+    const invalid = validateOffering(offering);
+    if (invalid) return invalid;
     db.offerings.push(offering);
     return json(offering, 201);
   }
   if (segs[0] === "offerings" && segs.length === 2) {
     const id = Number(segs[1]);
-    const offering = db.offerings.find((o) => o.id === id);
-    if (method === "GET") {
-      if (!offering) return notFound(`offering ${id} not found`);
-      return json(offering);
-    }
+    const offering = liveOfferings().find((o) => o.id === id);
+    if (!offering) return notFound(`offering ${id} not found`);
+    if (method === "GET") return json(offering);
     if (method === "PUT") {
-      if (!offering) return notFound(`offering ${id} not found`);
+      if (currentUser().role === "viewer") return json({ error: "forbidden: catalog.manage required" }, 403);
       const body = await readJSON<OfferingBody>(request);
-      Object.assign(offering, body, { updated_at: new Date().toISOString() });
+      const next: Offering = { ...offering, ...pickOffering(body), updated_at: new Date().toISOString() };
+      if (!next.slug) next.slug = slugify(next.name);
+      const invalid = validateOffering(next);
+      if (invalid) return invalid;
+      Object.assign(offering, next);
       return json(offering);
     }
     if (method === "DELETE") {
-      if (!offering) return notFound(`offering ${id} not found`);
-      db.offerings = db.offerings.filter((o) => o.id !== id);
+      if (currentUser().role !== "admin") return json({ error: "forbidden: admin required" }, 403);
+      offering.deleted_at = new Date().toISOString();
       return json({ status: "ok" });
     }
   }

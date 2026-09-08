@@ -888,7 +888,12 @@ function events(userList: User[]): RequestEvent[] {
 export function seed(): Seed {
   const entidadeList = entidades();
   const userList = users();
-  const offeringList = offerings();
+  // Every seeded offering carries a `global` grant, as B1's v85 migration will —
+  // without it a fresh install would show an empty catalog to non-admins.
+  const offeringList = offerings().map((o) => ({
+    ...o,
+    entidades: o.entidades ?? { creator_entidade_id: null, responsible_entidade_ids: [], is_global: true },
+  }));
   return {
     entidades: entidadeList,
     users: userList,
