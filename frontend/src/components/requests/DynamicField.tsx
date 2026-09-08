@@ -41,6 +41,9 @@ export default function DynamicField({ field, value, onChange, error }: DynamicF
   const { locale, t } = useLocale();
   const label = locale === "pt-BR" ? field.label_pt : field.label_en;
   const help = locale === "pt-BR" ? field.help_pt : field.help_en;
+  // The format rule, stated to the user instead of only enforced on submit.
+  const patternHint = locale === "pt-BR" ? field.pattern_hint_pt : field.pattern_hint_en;
+  const placeholder = locale === "pt-BR" ? field.placeholder_pt : field.placeholder_en;
 
   // Remembers the display label of whatever asset_ref selection was made this
   // session, since AsyncPicker's single-select mode stores only the numeric
@@ -57,6 +60,7 @@ export default function DynamicField({ field, value, onChange, error }: DynamicF
       )}
       {control}
       {help && <p className="text-xs text-[var(--text-muted)]">{help}</p>}
+      {patternHint && <p className="text-xs text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>{patternHint}</p>}
       {error && <FormError message={error} />}
     </div>
   );
@@ -64,7 +68,13 @@ export default function DynamicField({ field, value, onChange, error }: DynamicF
   switch (field.type) {
     case "text":
       return wrap(
-        <Input value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} maxLength={field.max_length} />
+        <Input
+          value={(value as string) ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={field.max_length}
+          pattern={field.pattern}
+          placeholder={placeholder}
+        />
       );
 
     case "textarea":
@@ -74,6 +84,7 @@ export default function DynamicField({ field, value, onChange, error }: DynamicF
           onChange={(e) => onChange(e.target.value)}
           maxLength={field.max_length}
           rows={4}
+          placeholder={placeholder}
         />
       );
 
@@ -81,6 +92,9 @@ export default function DynamicField({ field, value, onChange, error }: DynamicF
       return wrap(
         <Input
           type="number"
+          min={field.min}
+          max={field.max}
+          placeholder={placeholder}
           value={value === "" || value == null ? "" : String(value)}
           onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
         />
@@ -108,11 +122,11 @@ export default function DynamicField({ field, value, onChange, error }: DynamicF
       return wrap(<DateTimeInput variant="date" value={(value as string) ?? ""} onChange={onChange} />);
 
     case "tags":
-      // suggestions=[] skips TagInput's own tag-suggestion fetch: the mock
-      // backend has no /api/tags endpoint (a gap in A2's scope, not this
-      // task's to fix), and the app's asset-tagging vocabulary isn't a
-      // meaningful autocomplete source for an arbitrary offering-authored
-      // tags field anyway.
+      // suggestions=[] skips TagInput's own tag-suggestion fetch. Task A5
+      // has since added GET /api/tags to the mock, so the endpoint exists —
+      // but the app's asset-tagging vocabulary (host/service/dns/project
+      // tags) still isn't a meaningful autocomplete source for an arbitrary
+      // offering-authored tags field, so this stays empty on purpose.
       return wrap(<TagInput tags={Array.isArray(value) ? (value as string[]) : []} onChange={onChange} suggestions={[]} />);
 
     case "asset_ref": {

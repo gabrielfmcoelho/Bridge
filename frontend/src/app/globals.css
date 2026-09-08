@@ -81,7 +81,14 @@
   --accent-muted: rgba(6, 182, 212, 0.12);
   --accent-glow: rgba(6, 182, 212, 0.06);
 
+  /* Same defect --danger had below: the dark baselines (#34d399 / #fbbf24)
+     were never overridden here, so every light-theme consumer of the base
+     token rendered at ~1.9-2.0:1. settings/page.tsx:888 uses --success as
+     text today. -700 tier matches the light-mode amber convention already in
+     VMInfoDisplay.tsx (light:text-amber-700) and share/[token]/page.tsx. */
+  --success: #047857;
   --success-muted: rgba(16, 185, 129, 0.14);
+  --warning: #b45309;
   --warning-muted: rgba(245, 158, 11, 0.16);
   /* Dark-baseline --danger (#f87171) is ~2.7:1 on light surfaces — fails
      WCAG AA for text. Matches the codebase's existing light-mode error-text
@@ -256,6 +263,16 @@ body {
 .stagger-8 { animation-delay: 420ms; }
 .stagger-9 { animation-delay: 480ms; }
 
+/* Index-driven variant of the fixed .stagger-N classes above, for lists whose
+   length isn't known up front — the catalog grid runs past 9. The item sets
+   --i to its position; `forwards` holds the end state so nothing flashes back
+   to opacity 0 after the run. */
+.stagger-in {
+  opacity: 0;
+  animation: slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
 /* ─── Skeleton ─── */
 .skeleton {
   border-radius: var(--radius-sm);
@@ -374,4 +391,19 @@ input[type="checkbox"]:hover {
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+}
+
+/* ─── Reduced motion ───
+   Honour the OS-level setting: collapse every animation and transition rather
+   than removing them per-component. .stagger-in resolves to its end state
+   (opacity 1) instead of staying invisible, so content still appears. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

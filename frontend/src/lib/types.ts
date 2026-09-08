@@ -650,12 +650,49 @@ export interface FormField {
   options?: string[]; // for "select"
   help_en?: string;
   help_pt?: string;
+  /** Shown inside the empty control. A placeholder is an example, never a
+   *  label — the label always sits above the input. */
+  placeholder_en?: string;
+  placeholder_pt?: string;
   max_length?: number;
   asset_type?: AssetType; // for "asset_ref"
+
+  // ── Rules the offering declares; the form adapts to whatever is present ──
+  /** Inclusive bounds for "number". Without these a user can ask for 9999 vCPUs
+   *  and nothing objects until a human reads it. */
+  min?: number;
+  max?: number;
+  /** Anchored regex source for "text"/"textarea", e.g. a hostname or a database
+   *  identifier. Stored as a string because form_schema is authored data (JSONB),
+   *  not code. Invalid patterns are ignored rather than throwing — a typo in an
+   *  admin's regex must not break the whole form. */
+  pattern?: string;
+  pattern_hint_en?: string;
+  pattern_hint_pt?: string;
+  /** Conditional visibility: render this field only while another field's value
+   *  is one of `equals`. A hidden field is not validated and its answer is
+   *  dropped at submit, so form_data never carries an answer the user could not
+   *  see themselves giving. */
+  depends_on?: { key: string; equals: string[] };
 }
 
 export interface FormSchema {
   fields: FormField[];
+}
+
+/** A named preset over one offering's form_schema. Lets an offering answer
+ *  "what size do I need?" with worked examples instead of making every
+ *  requester invent numbers. Authored data, like the schema itself — the UI
+ *  renders whatever templates an offering declares, and none is a valid
+ *  answer (the "customised" path). */
+export interface OfferingTemplate {
+  key: string;
+  name_en: string;
+  name_pt: string;
+  summary_en: string;
+  summary_pt: string;
+  /** Partial form_data. Keys not present are left for the user to fill. */
+  values: Record<string, unknown>;
 }
 
 export interface Offering {
@@ -665,6 +702,13 @@ export interface Offering {
   category: string;
   description: string;
   request_type: RequestType;
+  templates?: OfferingTemplate[];
+  /** Short, concrete situations this offering is meant for, shown on the
+   *  catalog card so a user can tell "is this the thing I need?" without
+   *  opening the request form. Authored content like `name`/`description`,
+   *  so it is stored in the offering's own language, not the i18n bundle.
+   *  ponytail: needs a `use_cases` JSONB column in B1's migration. */
+  use_cases?: string[];
   form_schema: FormSchema;
   approver_entidade_id?: number | null;
   glpi_mode: "inherit" | "never" | "always";
@@ -685,6 +729,15 @@ export interface ServiceRequest {
   form_data: Record<string, unknown>;
   form_schema_snapshot: FormSchema;
   requester_user_id: number;
+  /** Who to contact about this request, and how. Defaults to the signed-in
+   *  user's name but stays editable: the person who files a request is often
+   *  not the person the fulfilling team needs to call, and `users` carries no
+   *  phone at all (only Contact/Responsavel do). Kept separate from
+   *  requester_user_id on purpose — editing a contact detail must never
+   *  silently reassign who owns the request.
+   *  ponytail: needs two columns in B1's migration. */
+  contact_name?: string;
+  contact_phone?: string;
   requester_entidade_id?: number | null;
   assignee_user_id?: number | null;
   decided_by_user_id?: number | null;
@@ -743,6 +796,11 @@ export interface CatalogHit {
   id: number;
   name: string;
   description: string;
+  /** One short, type-specific fact — a host's FQDN, a service's stack and
+   *  port, an API's spec version. The discovery table is polymorphic, so this
+   *  is the column that lets one row shape say something true about six
+   *  different asset types without six sets of columns. */
+  detail?: string;
   href: string;
   entidade_name?: string;
   slug?: string;

@@ -51,18 +51,27 @@ function users(): User[] {
   const mk = (
     id: number, display_name: string, username: string, role: User["role"],
     entidadeId: number, entidadeName: string, entidadeSlug: string,
+    /** Extra non-primary memberships. entidades.md:12 — "a user belongs to N
+     *  entidades, at most one primary" — and toActor() unions them all into the
+     *  visible scope, so a second membership genuinely widens what they see. */
+    ...extra: [number, string, string][]
   ): User => ({
     id, username, display_name, role,
     auth_provider: "local",
     email: `${username}@sead.pi.gov.br`,
     permissions: [],
     external_identities: [],
-    entidades: [{ id: entidadeId, name: entidadeName, slug: entidadeSlug, is_primary: true }],
+    entidades: [
+      { id: entidadeId, name: entidadeName, slug: entidadeSlug, is_primary: true },
+      ...extra.map(([id, name, slug]) => ({ id, name, slug, is_primary: false })),
+    ],
     created_at: "2025-09-15T09:00:00Z",
     updated_at: "2025-09-15T09:00:00Z",
   });
   return [
-    mk(1, "Marcos Vinícius Rêgo Sousa", "marcos.sousa", "editor", SGA, "SGA", "sga"),
+    // Two memberships on purpose: exercises the requester step's entity picker
+    // and the "above sees all that below sees" union in toActor().
+    mk(1, "Marcos Vinícius Rêgo Sousa", "marcos.sousa", "editor", SGA, "SGA", "sga", [SGI, "SGI", "sgi"]),
     mk(2, "Francisca das Chagas Lima Ferraz", "francisca.ferraz", "viewer", SGP, "SGP", "sgp"),
     mk(3, "Antônio Carlos Bezerra Melo", "antonio.melo", "editor", ETIPI, "ETIPI", "etipi"),
     mk(4, "Raimunda Nonata Ferreira Castro", "raimunda.castro", "editor", GOVPI, "GovPI", "govpi"),
@@ -223,6 +232,34 @@ function services(): Service[] {
       description: "Provedor de identidade único (SSO) do governo do Piauí.",
       service_type: "auth", technology_stack: "Keycloak 25", port: "8443",
     }),
+    // pg-homolog-01 is the second half of the "postgres" collision: searching it
+    // must surface two running databases before the Managed Postgres offering.
+    mkService({
+      id: 6, nickname: "pg-homolog-01", project_id: 1,
+      description: "Cluster PostgreSQL de homologação do Portal do Servidor.",
+      service_type: "database", service_subtype: "relational", technology_stack: "PostgreSQL 16", port: "5432", version: "16.4",
+      environment: "staging",
+    }),
+    mkService({
+      id: 7, nickname: "rabbitmq-prod", project_id: 2,
+      description: "Barramento de mensageria dos serviços de chamados e notificações.",
+      service_type: "messaging", technology_stack: "RabbitMQ 3.13", port: "5672",
+    }),
+    mkService({
+      id: 8, nickname: "minio-arquivos", project_id: 1,
+      description: "Armazenamento de objetos para anexos e documentos do Portal do Servidor.",
+      service_type: "storage", technology_stack: "MinIO", port: "9000",
+    }),
+    mkService({
+      id: 9, nickname: "grafana-observabilidade", project_id: 3,
+      description: "Painéis de observabilidade e alertas da infraestrutura da ETIPI.",
+      service_type: "monitoring", technology_stack: "Grafana 11", port: "3001",
+    }),
+    mkService({
+      id: 10, nickname: "nginx-gateway", project_id: 3,
+      description: "Proxy reverso e terminação TLS dos serviços publicados do governo.",
+      service_type: "web", service_subtype: "proxy", technology_stack: "Nginx 1.27", port: "443",
+    }),
   ];
 }
 
@@ -288,11 +325,34 @@ function offerings(): Offering[] {
       category: "Infraestrutura", description: "Solicita uma nova máquina virtual dimensionada conforme a necessidade do projeto.",
       request_type: "vm", approver_entidade_id: ETIPI, glpi_mode: "always", is_active: true, sort_order: 1,
       created_at: at("2026-01-05T09:00:00Z"), updated_at: at("2026-01-05T09:00:00Z"),
+      use_cases: ["Subir um sistema novo em produção", "Ambiente isolado para teste de carga", "Migrar aplicação de servidor legado"],
+      templates: [
+        {
+          key: "api-frontend", name_pt: "API + frontend, poucos usuários", name_en: "API + frontend, few users",
+          summary_pt: "Uma API (FastAPI/Go) e um frontend para até ~50 pessoas. Porte equivalente a um t3.medium.",
+          summary_en: "One API (FastAPI/Go) plus a frontend for up to ~50 people. Comparable to a t3.medium.",
+          values: { vcpu: 2, ram_gb: 4, sistema_operacional: "Ubuntu 24.04 LTS" },
+        },
+        {
+          key: "app-com-banco", name_pt: "Aplicação com banco no mesmo host", name_en: "App with a co-located database",
+          summary_pt: "Sistema interno com PostgreSQL local e uso diário constante. Equivalente a um t3.large.",
+          summary_en: "Internal system with a local PostgreSQL and steady daily use. Comparable to a t3.large.",
+          values: { vcpu: 4, ram_gb: 8, sistema_operacional: "Ubuntu 24.04 LTS" },
+        },
+        {
+          key: "processamento-lote", name_pt: "Processamento em lote e relatórios", name_en: "Batch processing and reports",
+          summary_pt: "Cargas noturnas, ETL e relatórios pesados. Equivalente a um m5.2xlarge.",
+          summary_en: "Overnight jobs, ETL and heavy reporting. Comparable to an m5.2xlarge.",
+          values: { vcpu: 8, ram_gb: 32, sistema_operacional: "Rocky Linux 9" },
+        },
+      ],
       form_schema: { fields: [
         { key: "ambiente", type: "select", label_pt: "Ambiente", label_en: "Environment", required: true, options: ["Produção", "Homologação", "Desenvolvimento"] },
-        { key: "vcpu", type: "number", label_pt: "vCPUs", label_en: "vCPUs", required: true },
-        { key: "ram_gb", type: "number", label_pt: "RAM (GB)", label_en: "RAM (GB)", required: true },
+        { key: "vcpu", type: "number", label_pt: "vCPUs", label_en: "vCPUs", required: true, min: 1, max: 64, placeholder_pt: "4", placeholder_en: "4" },
+        { key: "ram_gb", type: "number", label_pt: "RAM (GB)", label_en: "RAM (GB)", required: true, min: 1, max: 256, placeholder_pt: "8", placeholder_en: "8" },
         { key: "sistema_operacional", type: "select", label_pt: "Sistema operacional", label_en: "Operating system", required: true, options: ["Ubuntu 24.04 LTS", "Rocky Linux 9", "Debian 12"] },
+        // Only asked for when the answer above makes it matter.
+        { key: "justificativa_producao", type: "textarea", label_pt: "Justificativa para produção", label_en: "Production justification", required: true, max_length: 600, depends_on: { key: "ambiente", equals: ["Produção"] }, help_pt: "Produção exige aprovação da ETIPI; descreva o impacto se não for provisionado.", help_en: "Production needs ETIPI approval; describe the impact of not provisioning it.", placeholder_pt: "Sem este ambiente a folha de setembro não é publicada no prazo.", placeholder_en: "Without this environment the September payroll misses its deadline." },
       ] },
     },
     {
@@ -300,9 +360,10 @@ function offerings(): Offering[] {
       category: "Rede", description: "Solicita o registro de um novo subdomínio sob os domínios do governo.",
       request_type: "dns", approver_entidade_id: ETIPI, glpi_mode: "inherit", is_active: true, sort_order: 2,
       created_at: at("2026-01-06T09:00:00Z"), updated_at: at("2026-01-06T09:00:00Z"),
+      use_cases: ["Publicar um novo portal", "Apontar um subdomínio para o balanceador", "Validar domínio para emissão de certificado"],
       form_schema: { fields: [
-        { key: "subdominio", type: "text", label_pt: "Subdomínio desejado", label_en: "Desired subdomain", required: true, max_length: 80, help_pt: "Ex.: portal.sead.pi.gov.br" },
-        { key: "tipo_registro", type: "select", label_pt: "Tipo de registro", label_en: "Record type", required: true, options: ["A", "CNAME", "TXT"] },
+        { key: "subdominio", type: "text", label_pt: "Subdomínio desejado", label_en: "Desired subdomain", required: true, max_length: 80, placeholder_pt: "portal.sead.pi.gov.br", placeholder_en: "portal.sead.pi.gov.br", pattern: "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$", pattern_hint_pt: "minúsculas, números, hífen e ponto", pattern_hint_en: "lowercase, digits, hyphen and dot" },
+        { key: "escopo", type: "select", label_pt: "Quem precisa resolver este nome?", label_en: "Who needs to resolve this name?", required: true, options: ["Interno (apenas rede do governo)", "Externo (internet pública)", "Ambos"], help_pt: "Interno atende sistemas administrativos; externo é para o cidadão. Na dúvida, escolha Ambos e a equipe ajusta.", help_en: "Internal serves administrative systems; external is citizen-facing. If unsure pick Both and the team adjusts." },
       ] },
     },
     {
@@ -310,6 +371,7 @@ function offerings(): Offering[] {
       category: "Acessos", description: "Solicita uma conta de acesso a um sistema corporativo já em produção.",
       request_type: "account", approver_entidade_id: NTGD, glpi_mode: "never", is_active: true, sort_order: 3,
       created_at: at("2026-01-08T09:00:00Z"), updated_at: at("2026-01-08T09:00:00Z"),
+      use_cases: ["Servidor recém-empossado", "Acesso temporário para auditoria", "Mudança de setor ou de função"],
       form_schema: { fields: [
         { key: "justificativa", type: "textarea", label_pt: "Justificativa de acesso", label_en: "Access justification", required: true, max_length: 500 },
         { key: "acesso_administrativo", type: "checkbox", label_pt: "Necessita acesso administrativo?", label_en: "Needs administrative access?", required: false },
@@ -320,6 +382,7 @@ function offerings(): Offering[] {
       category: "Infraestrutura", description: "Vincula um serviço já catalogado a um host existente no inventário.",
       request_type: "service", approver_entidade_id: ETIPI, glpi_mode: "inherit", is_active: true, sort_order: 4,
       created_at: at("2026-01-10T09:00:00Z"), updated_at: at("2026-01-10T09:00:00Z"),
+      use_cases: ["Registrar serviço já em execução", "Corrigir o inventário após uma migração"],
       form_schema: { fields: [
         { key: "host_alvo", type: "asset_ref", asset_type: "host", label_pt: "Host de destino", label_en: "Target host", required: true },
         { key: "porta", type: "text", label_pt: "Porta do serviço", label_en: "Service port", required: false },
@@ -330,6 +393,7 @@ function offerings(): Offering[] {
       category: "Desenvolvimento", description: "Solicita uma melhoria ou nova funcionalidade em um sistema já existente.",
       request_type: "feature", approver_entidade_id: SGP, glpi_mode: "never", is_active: true, sort_order: 5,
       created_at: at("2026-01-12T09:00:00Z"), updated_at: at("2026-01-12T09:00:00Z"),
+      use_cases: ["Novo relatório ou exportação", "Ajuste em regra de negócio", "Integração com sistema de outro órgão"],
       form_schema: { fields: [
         { key: "descricao", type: "textarea", label_pt: "Descrição da melhoria", label_en: "Improvement description", required: true, max_length: 1000 },
         { key: "data_desejada", type: "date", label_pt: "Data desejada para entrega", label_en: "Desired delivery date", required: false },
@@ -341,8 +405,9 @@ function offerings(): Offering[] {
       category: "Integrações", description: "Solicita a emissão de um token para consumo de APIs internas.",
       request_type: "api_token", approver_entidade_id: ETIPI, glpi_mode: "always", is_active: true, sort_order: 6,
       created_at: at("2026-01-14T09:00:00Z"), updated_at: at("2026-01-14T09:00:00Z"),
+      use_cases: ["Consumir a API de chamados", "Integrar sistema de terceiro", "Rotacionar credencial vencida"],
       form_schema: { fields: [
-        { key: "nome_integracao", type: "text", label_pt: "Nome da integração", label_en: "Integration name", required: true, max_length: 120 },
+        { key: "nome_integracao", type: "text", label_pt: "Nome da integração", label_en: "Integration name", required: true, max_length: 120, placeholder_pt: "Folha de Pagamento × Portal do Servidor", placeholder_en: "Payroll × Portal do Servidor" },
         { key: "escopo", type: "select", label_pt: "Escopo de acesso", label_en: "Access scope", required: true, options: ["Leitura", "Leitura e escrita", "Administrativo"] },
       ] },
     },
@@ -351,8 +416,9 @@ function offerings(): Offering[] {
       category: "Suporte", description: "Abre uma solicitação de suporte técnico especializado para um sistema ou serviço.",
       request_type: "support", approver_entidade_id: SGI, glpi_mode: "always", is_active: true, sort_order: 7,
       created_at: at("2026-01-16T09:00:00Z"), updated_at: at("2026-01-16T09:00:00Z"),
+      use_cases: ["Lentidão em produção", "Erro intermitente sem causa clara", "Dúvida de configuração de ambiente"],
       form_schema: { fields: [
-        { key: "descricao_problema", type: "textarea", label_pt: "Descrição do problema", label_en: "Problem description", required: true, max_length: 800 },
+        { key: "descricao_problema", type: "textarea", label_pt: "Descrição do problema", label_en: "Problem description", required: true, max_length: 800, placeholder_pt: "O que acontece, desde quando, e o que já foi tentado.", placeholder_en: "What happens, since when, and what has already been tried." },
         { key: "urgencia", type: "select", label_pt: "Urgência", label_en: "Urgency", required: true, options: ["Baixa", "Média", "Alta", "Crítica"] },
       ] },
     },
@@ -364,10 +430,108 @@ function offerings(): Offering[] {
       category: "Infraestrutura", description: "Provisionamento de um banco de dados PostgreSQL gerenciado, com backups automáticos.",
       request_type: "service", approver_entidade_id: NTGD, glpi_mode: "inherit", is_active: true, sort_order: 8,
       created_at: at("2026-01-18T09:00:00Z"), updated_at: at("2026-01-18T09:00:00Z"),
+      use_cases: ["Banco para um sistema novo", "Separar produção de homologação", "Sair de um banco auto-hospedado"],
       form_schema: { fields: [
         { key: "plano", type: "select", label_pt: "Plano do banco", label_en: "Database plan", required: true, options: ["Standard - 2 vCPU / 8GB", "Performance - 4 vCPU / 16GB"] },
-        { key: "armazenamento_gb", type: "number", label_pt: "Armazenamento (GB)", label_en: "Storage (GB)", required: true },
-        { key: "nome_banco", type: "text", label_pt: "Nome do banco de dados", label_en: "Database name", required: true, max_length: 60 },
+        { key: "armazenamento_gb", type: "number", label_pt: "Armazenamento (GB)", label_en: "Storage (GB)", required: true, min: 10, max: 4096 },
+        { key: "nome_banco", type: "text", label_pt: "Nome do banco de dados", label_en: "Database name", required: true, max_length: 60, placeholder_pt: "portal_servidor", placeholder_en: "portal_servidor", pattern: "^[a-z][a-z0-9_]*$", pattern_hint_pt: "começa com letra; minúsculas, números e _", pattern_hint_en: "starts with a letter; lowercase, digits and _" },
+      ] },
+    },
+    // Breadth added for the checkpoint demo. Two of these deliberately overlap
+    // the inventory the way "Managed Postgres" overlaps pg-prod-01: searching
+    // "banco" or "homologa" must return offerings AND existing assets, which is
+    // the entire point of the discovery page.
+    {
+      id: 9, slug: "certificado-ssl", name: "Certificado SSL/TLS",
+      category: "Rede", description: "Emissão ou renovação de certificado SSL/TLS para um domínio do governo.",
+      request_type: "service", approver_entidade_id: ETIPI, glpi_mode: "always", is_active: true, sort_order: 9,
+      created_at: at("2026-02-02T09:00:00Z"), updated_at: at("2026-02-02T09:00:00Z"),
+      use_cases: ["Publicar um site em HTTPS", "Renovar certificado a vencer", "Cobrir vários subdomínios de uma vez"],
+      form_schema: { fields: [
+        { key: "dominio", type: "text", label_pt: "Domínio", label_en: "Domain", required: true, max_length: 120, placeholder_pt: "portal.sead.pi.gov.br", placeholder_en: "portal.sead.pi.gov.br" },
+        { key: "tipo_certificado", type: "select", label_pt: "Tipo de certificado", label_en: "Certificate type", required: true, options: ["Simples", "Wildcard", "SAN (múltiplos domínios)"] },
+        { key: "dominios_adicionais", type: "tags", label_pt: "Domínios adicionais", label_en: "Additional domains", required: true, depends_on: { key: "tipo_certificado", equals: ["SAN (múltiplos domínios)"] }, help_pt: "Um por vez; o domínio principal acima já está incluído.", help_en: "One at a time; the primary domain above is already included." },
+        { key: "gestao_certificado", type: "select", label_pt: "Como o certificado será gerenciado?", label_en: "How will the certificate be managed?", required: true, options: ["Auto-gerenciado (renovação automática)", "Emitido e instalado pela equipe"], help_pt: "Auto-gerenciado renova sozinho a cada 90 dias, sem chamado. Exige que a aplicação já esteja no ar.", help_en: "Self-managed renews itself every 90 days with no ticket. Requires the application to already be live." },
+        { key: "porta_aplicacao", type: "number", label_pt: "Porta em que a aplicação já responde", label_en: "Port the application already answers on", required: true, min: 1, max: 65535, placeholder_pt: "443", placeholder_en: "443", depends_on: { key: "gestao_certificado", equals: ["Auto-gerenciado (renovação automática)"] }, help_pt: "A validação automática acessa o domínio pela internet antes de emitir. Se a aplicação ainda não estiver publicada e respondendo, a emissão falha — publique primeiro, depois solicite.", help_en: "Automatic validation reaches the domain over the internet before issuing. If the application is not published and answering yet, issuance fails — publish first, then request." },
+        { key: "renovacao", type: "checkbox", label_pt: "É uma renovação?", label_en: "Is this a renewal?", required: false },
+      ] },
+    },
+    {
+      id: 10, slug: "backup-agendado", name: "Backup Agendado",
+      category: "Infraestrutura", description: "Configura uma rotina de backup automático para um host ou serviço já existente.",
+      request_type: "service", approver_entidade_id: NTGD, glpi_mode: "inherit", is_active: true, sort_order: 10,
+      created_at: at("2026-02-04T09:00:00Z"), updated_at: at("2026-02-04T09:00:00Z"),
+      use_cases: ["Proteger um banco de produção", "Atender exigência de auditoria", "Retenção extra antes de migrar"],
+      form_schema: { fields: [
+        { key: "host_alvo", type: "asset_ref", asset_type: "host", label_pt: "Host de destino", label_en: "Target host", required: true },
+        { key: "frequencia", type: "select", label_pt: "Frequência", label_en: "Frequency", required: true, options: ["Diário", "Semanal", "Mensal"] },
+        { key: "retencao_dias", type: "number", label_pt: "Retenção (dias)", label_en: "Retention (days)", required: true, min: 1, max: 3650 },
+      ] },
+    },
+    {
+      id: 11, slug: "ambiente-homologacao", name: "Ambiente de Homologação",
+      category: "Infraestrutura", description: "Provisiona um ambiente completo de homologação para um projeto já cadastrado.",
+      request_type: "vm", approver_entidade_id: ETIPI, glpi_mode: "always", is_active: true, sort_order: 11,
+      created_at: at("2026-02-06T09:00:00Z"), updated_at: at("2026-02-06T09:00:00Z"),
+      use_cases: ["Validar uma entrega antes da produção", "Treinar usuários sem risco", "Teste integrado entre órgãos"],
+      form_schema: { fields: [
+        { key: "projeto", type: "asset_ref", asset_type: "project", label_pt: "Projeto", label_en: "Project", required: true },
+        { key: "porte", type: "select", label_pt: "Porte do ambiente", label_en: "Environment size", required: true, options: ["Pequeno - 2 vCPU / 4GB", "Médio - 4 vCPU / 8GB", "Grande - 8 vCPU / 16GB"] },
+        { key: "data_limite", type: "date", label_pt: "Data limite para disponibilização", label_en: "Needed by", required: false },
+      ] },
+    },
+    {
+      id: 12, slug: "acesso-vpn", name: "Acesso VPN",
+      category: "Acessos", description: "Solicita acesso à VPN corporativa para trabalho remoto ou manutenção de servidores.",
+      request_type: "account", approver_entidade_id: NTGD, glpi_mode: "never", is_active: true, sort_order: 12,
+      created_at: at("2026-02-09T09:00:00Z"), updated_at: at("2026-02-09T09:00:00Z"),
+      use_cases: ["Trabalho remoto continuado", "Manutenção fora do horário", "Fornecedor com acesso por prazo"],
+      form_schema: { fields: [
+        { key: "justificativa", type: "textarea", label_pt: "Justificativa", label_en: "Justification", required: true, max_length: 500 },
+        { key: "prazo", type: "select", label_pt: "Prazo de acesso", label_en: "Access period", required: true, options: ["30 dias", "90 dias", "180 dias", "Permanente"] },
+        { key: "equipamento_proprio", type: "checkbox", label_pt: "Utilizará equipamento próprio?", label_en: "Will use a personal device?", required: false },
+      ] },
+    },
+    {
+      id: 13, slug: "banco-gerenciado-mysql", name: "Banco de Dados Gerenciado (MySQL)",
+      category: "Infraestrutura", description: "Provisionamento de um banco MySQL/MariaDB gerenciado, com backups automáticos.",
+      request_type: "service", approver_entidade_id: NTGD, glpi_mode: "inherit", is_active: true, sort_order: 13,
+      created_at: at("2026-02-11T09:00:00Z"), updated_at: at("2026-02-11T09:00:00Z"),
+      use_cases: ["Sistema legado que exige MySQL", "Migrar de instância própria", "Separar carga de leitura"],
+      form_schema: { fields: [
+        { key: "plano", type: "select", label_pt: "Plano do banco", label_en: "Database plan", required: true, options: ["Standard - 2 vCPU / 8GB", "Performance - 4 vCPU / 16GB"] },
+        { key: "armazenamento_gb", type: "number", label_pt: "Armazenamento (GB)", label_en: "Storage (GB)", required: true, min: 10, max: 4096 },
+        { key: "nome_banco", type: "text", label_pt: "Nome do banco de dados", label_en: "Database name", required: true, max_length: 60, placeholder_pt: "portal_servidor", placeholder_en: "portal_servidor", pattern: "^[a-z][a-z0-9_]*$", pattern_hint_pt: "começa com letra; minúsculas, números e _", pattern_hint_en: "starts with a letter; lowercase, digits and _" },
+      ] },
+    },
+    {
+      id: 14, slug: "publicacao-api-barramento", name: "Publicação de API no Barramento",
+      category: "Integrações", description: "Publica uma API já catalogada no barramento de integração do estado.",
+      request_type: "api_token", approver_entidade_id: SGI, glpi_mode: "always", is_active: true, sort_order: 14,
+      created_at: at("2026-02-13T09:00:00Z"), updated_at: at("2026-02-13T09:00:00Z"),
+      use_cases: ["Expor dados para outro órgão", "Padronizar uma integração existente", "Controlar consumo por chave"],
+      form_schema: { fields: [
+        { key: "api", type: "asset_ref", asset_type: "api_catalog", label_pt: "API a publicar", label_en: "API to publish", required: true },
+        { key: "ambiente", type: "select", label_pt: "Ambiente", label_en: "Environment", required: true, options: ["Homologação", "Produção"] },
+        { key: "consumidores", type: "tags", label_pt: "Órgãos consumidores", label_en: "Consuming agencies", required: false },
+      ] },
+    },
+    // The catch-all. /catalog surfaces this as "Solicitação Avulsa" in the
+    // header and in the offerings empty state, so a user whose need is not in
+    // the catalog still has a way in. Deliberately a normal offering rather
+    // than a request with a null offering_id: the plan's ruling is one state
+    // machine and no special case, and modelling the escape hatch as data
+    // means an admin can reword it later without a migration.
+    {
+      id: 15, slug: "solicitacao-avulsa", name: "Solicitação Avulsa",
+      category: "Geral", description: "Para o que não está no catálogo. Descreva o que precisa e a equipe encaminha para o time certo.",
+      request_type: "support", approver_entidade_id: ETIPI, glpi_mode: "always", is_active: true, sort_order: 99,
+      created_at: at("2026-02-16T09:00:00Z"), updated_at: at("2026-02-16T09:00:00Z"),
+      use_cases: ["Preciso de algo que não está listado", "Não sei qual oferta se aplica", "Pedido que envolve mais de uma equipe"],
+      form_schema: { fields: [
+        { key: "descricao", type: "textarea", label_pt: "O que você precisa?", label_en: "What do you need?", required: true, max_length: 1000, help_pt: "Descreva o resultado esperado, não a solução técnica.", help_en: "Describe the outcome you need, not the technical solution.", placeholder_pt: "A equipe de planejamento precisa consultar os indicadores do Portal todo mês.", placeholder_en: "The planning team needs to review Portal indicators every month." },
+        { key: "justificativa", type: "textarea", label_pt: "Por que é necessário?", label_en: "Why is it needed?", required: false, max_length: 500 },
+        { key: "prazo_desejado", type: "date", label_pt: "Prazo desejado", label_en: "Needed by", required: false },
       ] },
     },
   ];

@@ -11,6 +11,7 @@
 // cleverness here; nothing here is meant to outlive this phase.
 import { NextRequest } from "next/server";
 import { canTransition } from "@/lib/requests";
+import { extractJSON, coerceToSchema, coercePriority } from "@/lib/aiDraft";
 import type {
   Offering, ServiceRequest, RequestEvent, RequestStatus, CatalogHit,
   Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool,
@@ -50,36 +51,94 @@ const offeringHit = (o: Offering): CatalogHit => ({
   kind: "offering", asset_type: "", id: o.id, name: o.name, description: o.description,
   href: `/catalog/${o.slug}`, slug: o.slug,
 });
+// Which entidade owns each discovery fixture. The real backend derives this
+// from asset_entidades grants; the fixtures carry no grants, so the projection
+// is stated here instead of left blank — knowing that pg-prod-01 belongs to
+// SEAD-PI is exactly what tells a user whether it is *their* duplicate.
+//
+// ponytail: display-only. The mock does NOT scope discovery results by
+// entidade — every persona sees all 25 assets. B7 must apply VisibleExpr per
+// UNION branch; this map only proves the column has somewhere to come from.
+const ASSET_ENTIDADE: Record<string, string> = {
+  "host:1": "SEAD-PI", "host:2": "SGA", "host:3": "ETIPI", "host:4": "NTGD", "host:5": "SGI",
+  "service:1": "SEAD-PI", "service:2": "SEAD-PI", "service:3": "SGI", "service:4": "ETIPI",
+  "service:5": "ETIPI", "service:6": "SEAD-PI", "service:7": "SGI", "service:8": "SEAD-PI",
+  "service:9": "ETIPI", "service:10": "ETIPI",
+  "dns:1": "SEAD-PI", "dns:2": "SGI", "dns:3": "GovPI", "dns:4": "SEAD-PI",
+  "project:1": "SEAD-PI", "project:2": "SGI", "project:3": "ETIPI",
+  "api_catalog:1": "SEAD-PI", "api_catalog:2": "SGI",
+  "tool:1": "ETIPI",
+};
+const entidadeOf = (assetType: string, id: number) => ASSET_ENTIDADE[`${assetType}:${id}`];
+
+// `detail` is the one type-specific fact each asset contributes to the shared
+// discovery table — the FQDN for a host, stack and port for a service, spec
+// version for an API. Everything else about the row is type-agnostic.
 const hostHit = (h: Host): CatalogHit => ({
-  kind: "asset", asset_type: "host", id: h.id, name: h.nickname, description: h.hostname,
+  kind: "asset", asset_type: "host", id: h.id, name: h.nickname, description: h.description,
+  detail: h.hostname,
+  entidade_name: entidadeOf("host", h.id),
   href: `/hosts/${h.oficial_slug}`,
 });
 const serviceHit = (s: Service): CatalogHit => ({
   kind: "asset", asset_type: "service", id: s.id, name: s.nickname, description: s.description,
+  detail: [s.technology_stack, s.port && `:${s.port}`].filter(Boolean).join(" · "),
+  entidade_name: entidadeOf("service", s.id),
   href: `/services/${s.id}`,
 });
 const dnsHit = (d: DNSRecord): CatalogHit => ({
   kind: "asset", asset_type: "dns", id: d.id, name: d.domain, description: d.observacoes,
+  detail: d.has_https ? "HTTPS" : "HTTP",
+  entidade_name: entidadeOf("dns", d.id),
   href: `/dns/${d.id}`,
 });
 const projectHit = (p: Project): CatalogHit => ({
   kind: "asset", asset_type: "project", id: p.id, name: p.name, description: p.description,
+  detail: p.setor_responsavel,
+  entidade_name: entidadeOf("project", p.id),
   href: `/projects/${p.id}`,
 });
 const apiCatalogHit = (a: ApiCatalog): CatalogHit => ({
   kind: "asset", asset_type: "api_catalog", id: a.id, name: a.name, description: a.description,
+  detail: a.spec_version,
+  entidade_name: entidadeOf("api_catalog", a.id),
   href: `/atlas/apis/${a.id}`,
 });
 const toolHit = (t: ExternalTool): CatalogHit => ({
   kind: "asset", asset_type: "tool", id: t.id, name: t.name, description: t.description,
+  detail: t.url ? new URL(t.url).host : "",
+  entidade_name: entidadeOf("tool", t.id),
   href: "/tools",
 });
 
+// Sorting runs over the whole matched set, before paginate() slices it — a
+// table that reorders only the rows already on screen tells the user something
+// false about the rest. B7's UNION ALL needs the same ORDER BY.
+const HIT_SORT_FIELDS: Record<string, (h: CatalogHit) => string> = {
+  name: (h) => h.name,
+  asset_type: (h) => h.asset_type,
+  detail: (h) => h.detail ?? "",
+  entidade_name: (h) => h.entidade_name ?? "",
+};
+
+function sortHits(hits: CatalogHit[], sort: string | null, dir: string | null): CatalogHit[] {
+  const get = sort ? HIT_SORT_FIELDS[sort] : undefined;
+  if (!get) return hits;
+  const sorted = [...hits].sort((a, b) => get(a).localeCompare(get(b), "pt-BR", { sensitivity: "base" }));
+  return dir === "desc" ? sorted.reverse() : sorted;
+}
+
 function searchCatalog(q: string, kind: string): CatalogHit[] {
   const hits: CatalogHit[] = [];
-  if (kind !== "asset") {
-    hits.push(...db.offerings.filter((o) => o.is_active && textMatch(q, [o.name, o.description, o.category])).map(offeringHit));
-  }
+  // Assets are pushed FIRST, before offerings. paginate() slices this flat
+  // array, so whichever group leads is the one guaranteed a place on page 1 —
+  // and the page exists to show you what already runs before you request a
+  // duplicate. A broad query matching every offering must not be able to push
+  // pg-prod-01 onto page 2. This mirrors the constraint the plan puts on B7's
+  // UNION ALL; the client re-groups for display either way (CatalogSearch.tsx:95).
+  //
+  // The catalog page asks for each group by kind in its own request, so it
+  // never depends on how one mixed page happens to be sliced.
   if (kind !== "offering") {
     hits.push(...db.hosts.filter((h) => textMatch(q, [h.nickname, h.hostname, h.description])).map(hostHit));
     hits.push(...db.services.filter((s) => textMatch(q, [s.nickname, s.description, s.technology_stack])).map(serviceHit));
@@ -88,13 +147,16 @@ function searchCatalog(q: string, kind: string): CatalogHit[] {
     hits.push(...db.apiCatalogs.filter((a) => textMatch(q, [a.name, a.description, a.title])).map(apiCatalogHit));
     hits.push(...db.tools.filter((t) => textMatch(q, [t.name, t.description])).map(toolHit));
   }
+  if (kind !== "asset") {
+    hits.push(...db.offerings.filter((o) => o.is_active && textMatch(q, [o.name, o.description, o.category])).map(offeringHit));
+  }
   return hits;
 }
 
 // ── Request bodies (only what our handlers actually read) ──────────────
 
 type OfferingBody = Partial<Offering>;
-interface CreateRequestBody { offering_id: number; title: string; priority?: string; form_data?: Record<string, unknown> }
+interface CreateRequestBody { offering_id: number; title: string; priority?: string; requester_entidade_id?: number; contact_name?: string; contact_phone?: string; form_data?: Record<string, unknown> }
 interface PatchRequestBody { title?: string; priority?: string; form_data?: Record<string, unknown> }
 interface TransitionBody {
   to: RequestStatus; note?: string; assignee_user_id?: number;
@@ -102,6 +164,38 @@ interface TransitionBody {
 }
 interface CommentBody { body: string }
 interface SwitchUserBody { role: "admin" | "editor" | "viewer"; entidade_slug: string }
+
+// GET /api/tags — closes a gap task A4 had to work around (see task-a5-brief.md):
+// tagsAPI.list (src/lib/api.ts:716) does `Array.isArray(data) ? data : []`, so
+// this must return a bare array, never the {data,meta} list envelope. Static,
+// plausible-per-entity-type set; no seed data backs it (no form/inventory
+// record actually stores a tags list to read from yet).
+const TAGS_BY_TYPE: Record<string, string[]> = {
+  host: ["produção", "homologação", "desenvolvimento", "crítico", "monitorado"],
+  service: ["api", "banco-de-dados", "cache", "mensageria", "autenticação"],
+  dns: ["público", "interno", "cdn", "e-mail"],
+  project: ["prioritário", "legado", "modernização"],
+};
+const ALL_TAGS = Array.from(new Set(Object.values(TAGS_BY_TYPE).flat()));
+
+
+// ── AI assist ─────────────────────────────────────────────────────────────
+// Bridge already ships an OpenAI-compatible LLM client (internal/integrations/
+// llm) whose base URL, model and encrypted API key live in app settings. So the
+// mock does NOT hold a key or pick a provider — it forwards to the real Go
+// backend and reuses whatever the admin configured. If Go is down or the LLM is
+// unconfigured this degrades to 503 and the UI simply hides the affordance.
+//
+// ponytail: prompt-building and JSON coercion live here because at cutover they
+// move to a Go handler verbatim; the browser only ever sends free text.
+const GO_API = process.env.API_URL || "http://localhost:8080";
+
+async function goFetch(path: string, init: RequestInit, request: NextRequest): Promise<Response> {
+  return fetch(`${GO_API}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", cookie: request.headers.get("cookie") ?? "", ...(init.headers ?? {}) },
+  });
+}
 
 // ── Dispatcher ───────────────────────────────────────────────────────────
 
@@ -145,6 +239,10 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   if (method === "GET" && p === "entidades") {
     return json(paginate(db.entidades, qs.get("page"), qs.get("per_page")));
   }
+  if (method === "GET" && p === "tags") {
+    const type = qs.get("type");
+    return json(type ? (TAGS_BY_TYPE[type] ?? []) : ALL_TAGS);
+  }
 
   // ── Discovery fixtures ──────────────────────────────────────────────
   if (method === "GET" && p === "hosts") return json(paginate(db.hosts, qs.get("page"), qs.get("per_page")));
@@ -157,7 +255,7 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   // ── Catalog search ───────────────────────────────────────────────────
   if (method === "GET" && p === "catalog/search") {
     const hits = searchCatalog((qs.get("q") ?? "").trim(), qs.get("kind") ?? "all");
-    return json(paginate(hits, qs.get("page"), qs.get("per_page")));
+    return json(paginate(sortHits(hits, qs.get("sort"), qs.get("dir")), qs.get("page"), qs.get("per_page")));
   }
 
   // ── Offerings ────────────────────────────────────────────────────────
@@ -168,7 +266,7 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     const category = qs.get("category");
     if (category) rows = rows.filter((o) => o.category === category);
     const q = qs.get("q");
-    if (q) rows = rows.filter((o) => textMatch(q, [o.name, o.description]));
+    if (q) rows = rows.filter((o) => textMatch(q, [o.name, o.description, o.category, ...(o.use_cases ?? [])]));
     return json(paginate(rows, qs.get("page"), qs.get("per_page")));
   }
   if (method === "POST" && p === "offerings") {
@@ -212,6 +310,78 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     }
   }
 
+  // ── AI assist (proxied to the real backend; see GO_API above) ────────
+  if (method === "GET" && p === "ai/status") {
+    // Availability is a question, never an error. Backend down, not signed in,
+    // LLM unconfigured — all mean the same thing to the caller ("no AI"), and
+    // answering 401 here would log a console error on every form open for a
+    // capability the page is perfectly happy to do without.
+    const unavailable = { enabled: false, configured: false, model: "" };
+    try {
+      const upstream = await goFetch("/api/ai/status", { method: "GET" }, request);
+      if (!upstream.ok) return json(unavailable);
+      return json(await upstream.json());
+    } catch {
+      return json(unavailable);
+    }
+  }
+
+  if (method === "POST" && p === "ai/assist/request-form") {
+    const body = await readJSON<{ offering_id: number; description: string }>(request);
+    const offering = db.offerings.find((o) => o.id === body.offering_id);
+    if (!offering) return notFound(`offering ${body.offering_id} not found`);
+    if (!body.description?.trim()) return json({ error: "description is required" }, 400);
+
+    const fields = offering.form_schema.fields;
+    // The schema IS the prompt: whatever an admin authored is what the model is
+    // asked to fill, so this needs no update when offerings change.
+    const spec = fields.map((f) => ({
+      key: f.key, type: f.type, required: f.required, label: f.label_pt,
+      ...(f.options ? { options: f.options } : {}),
+      ...(f.min != null ? { min: f.min } : {}), ...(f.max != null ? { max: f.max } : {}),
+      ...(f.pattern ? { pattern: f.pattern } : {}),
+    }));
+
+    const prompt = [
+      `Você preenche formulários de solicitação de TI do governo do Piauí.`,
+      `Oferta: "${offering.name}" — ${offering.description}`,
+      `Campos (JSON): ${JSON.stringify(spec)}`,
+      ``,
+      `Pedido do usuário: "${body.description.trim()}"`,
+      ``,
+      `Responda APENAS com um objeto JSON, sem texto ao redor e sem cerca de markdown:`,
+      `{"title": string, "priority": "low"|"medium"|"high"|"critical", "form_data": {chave: valor}}`,
+      `- title: uma linha objetiva, em português, descrevendo o pedido.`,
+      `- Tipos: text/textarea/date => string; number => número; checkbox => booleano; select => exatamente uma das options; tags => array de strings.`,
+      `- Campos do tipo asset_ref: NÃO preencha.`,
+      `- Se o pedido não der base para um campo, OMITA esse campo. Nunca invente hostnames, domínios, IPs ou nomes de sistemas.`,
+    ].join("\n");
+
+    let completion: string;
+    try {
+      const upstream = await goFetch("/api/ai/chat", { method: "POST", body: JSON.stringify({ message: prompt }) }, request);
+      if (!upstream.ok) {
+        const err = await upstream.json().catch(() => ({}));
+        return json({ error: (err as { error?: string }).error || "AI request failed" }, upstream.status);
+      }
+      completion = ((await upstream.json()) as { response?: string }).response ?? "";
+    } catch {
+      return json({ error: "AI backend unreachable" }, 503);
+    }
+
+    const parsed = extractJSON(completion);
+    if (!parsed) return json({ error: "AI returned no usable JSON" }, 502);
+
+    const priority = coercePriority(parsed.priority);
+    const form_data = coerceToSchema(fields, parsed.form_data);
+    return json({
+      title: typeof parsed.title === "string" ? parsed.title.slice(0, 200) : "",
+      priority,
+      form_data,
+      filled_keys: Object.keys(form_data),
+    });
+  }
+
   // ── Service requests ─────────────────────────────────────────────────
   if (method === "GET" && p === "service-requests") {
     const actor = currentUser();
@@ -243,7 +413,18 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
       form_data: body.form_data ?? {},
       form_schema_snapshot: offering.form_schema,
       requester_user_id: actor.id,
-      requester_entidade_id: actor.entidades?.[0]?.id ?? null,
+      // Contact defaults to the actor but is whatever the form sent — the
+      // request still belongs to actor.id either way.
+      contact_name: body.contact_name?.trim() || actor.display_name,
+      contact_phone: body.contact_phone?.trim() || "",
+      // Honour the caller's choice ONLY if it is one of their own entidades —
+      // otherwise fall back to the primary. Mirrors the membership check B4/B5
+      // must perform: filing under an entidade you don't belong to would widen
+      // who can see the request.
+      requester_entidade_id:
+        (body.requester_entidade_id != null && actor.entidades?.some((e) => e.id === body.requester_entidade_id)
+          ? body.requester_entidade_id
+          : actor.entidades?.[0]?.id) ?? null,
       assignee_user_id: null,
       decided_by_user_id: null,
       decided_at: null,

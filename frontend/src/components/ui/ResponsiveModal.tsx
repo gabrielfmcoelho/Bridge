@@ -26,9 +26,8 @@ export default function ResponsiveModal({ open, onClose, title, subHeader, foote
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={title} subHeader={subHeader}>
+    <Modal open={open} onClose={onClose} title={title} subHeader={subHeader} footer={footer}>
       {children}
-      {footer}
     </Modal>
   );
 }

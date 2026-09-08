@@ -310,6 +310,16 @@ export type ProcessDetail = {
 // can override via the third arg (e.g. cheap reads can pass 30000).
 const DEFAULT_REQUEST_TIMEOUT_MS = 120000;
 
+/** Error thrown by every `request()`-backed call, carrying the HTTP status. */
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -348,7 +358,9 @@ async function request<T>(
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `Request failed: ${res.status}`);
+      // Carry the HTTP status on the Error so callers can tell "gone / not
+      // yours" (404) from "broken" (5xx) without string-matching the message.
+      throw new ApiError(body.error || `Request failed: ${res.status}`, res.status);
     }
     return res.json();
   } catch (err) {
@@ -1195,6 +1207,14 @@ export const aiAPI = {
     api.post<{ documentation: string }>("/api/ai/assist/host-doc", { host_slug: hostSlug }),
   chat: (message: string) =>
     api.post<{ response: string }>("/api/ai/chat", { message }),
+  /** Turns a free-text description into a draft answer set for one offering's
+   *  form_schema. The server coerces the model's reply through that schema, so
+   *  anything returned here already satisfies the field types and rules. */
+  assistRequestForm: (offering_id: number, description: string) =>
+    api.post<{ title: string; priority: string; form_data: Record<string, unknown>; filled_keys: string[] }>(
+      "/api/ai/assist/request-form",
+      { offering_id, description }
+    ),
   analyzeProject: (projectId: number, locale: string) =>
     api.post<ProjectAIAnalysisRecord>(`/api/projects/${projectId}/ai/analyze`, { locale }),
   getProjectAnalysis: (projectId: number) =>
@@ -1735,10 +1755,12 @@ export const offeringsAPI = {
 
 // Catalog (unified discovery: offerings + existing assets)
 export const catalogAPI = {
-  search: (params: { q?: string; kind?: "all" | "offering" | "asset"; page?: number; per_page?: number }) => {
+  search: (params: { q?: string; kind?: "all" | "offering" | "asset"; sort?: string; dir?: "asc" | "desc"; page?: number; per_page?: number }) => {
     const q = new URLSearchParams();
     if (params.q) q.set("q", params.q);
     if (params.kind) q.set("kind", params.kind);
+    if (params.sort) q.set("sort", params.sort);
+    if (params.dir) q.set("dir", params.dir);
     if (params.page != null) q.set("page", String(params.page));
     if (params.per_page != null) q.set("per_page", String(params.per_page));
     const qs = q.toString();
@@ -1760,7 +1782,11 @@ export const requestsAPI = {
     return api.getListPaginated<import("./types").ServiceRequest>(`/api/service-requests${qs ? `?${qs}` : ""}`);
   },
   get: (id: number) => api.get<import("./types").RequestDetail>(`/api/service-requests/${id}`),
-  create: (data: { offering_id: number; title: string; priority?: string; form_data: Record<string, unknown> }) =>
+  /** `requester_entidade_id` names which of the caller's OWN entidades the
+   *  request is filed under — it drives who else can see it. The server must
+   *  re-check membership rather than trust this (see B4/B5): a client-supplied
+   *  entidade is a request, not a fact. Omitted ⇒ server picks the primary. */
+  create: (data: { offering_id: number; title: string; priority?: string; requester_entidade_id?: number; contact_name?: string; contact_phone?: string; form_data: Record<string, unknown> }) =>
     api.post<import("./types").ServiceRequest>("/api/service-requests", data),
   patch: (id: number, data: Partial<Pick<import("./types").ServiceRequest, "title" | "priority" | "form_data">>) =>
     api.patch<import("./types").ServiceRequest>(`/api/service-requests/${id}`, data),

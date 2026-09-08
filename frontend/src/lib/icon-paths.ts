@@ -1,3 +1,5 @@
+import type { RequestType } from "./types";
+
 /**
  * Centralized SVG path constants for inventory card indicators.
  * Each value is a `d` attribute for a 24x24 viewBox, stroke-based icon.
@@ -22,6 +24,8 @@ export const ICON_PATHS = {
     "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
   checkCircle:
     "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+  // Same path Modal.tsx inlines for its dismiss button.
+  close: "M6 18L18 6M6 6l12 12",
 
   // Infrastructure
   scan:
@@ -82,3 +86,16 @@ export const ICON_PATHS = {
   exportDoc:
     "M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
 } as const;
+
+/** One icon per request_type, from the existing ICON_PATHS set. Shared by the
+ *  catalog card and the request form header so an offering looks like itself
+ *  wherever it appears. */
+export const REQUEST_TYPE_ICON: Record<RequestType, string> = {
+  vm: ICON_PATHS.server,
+  dns: ICON_PATHS.globe,
+  service: ICON_PATHS.container,
+  api_token: ICON_PATHS.key,
+  feature: ICON_PATHS.bolt,
+  account: ICON_PATHS.user,
+  support: ICON_PATHS.clipboard,
+};
