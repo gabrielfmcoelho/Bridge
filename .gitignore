@@ -58,3 +58,6 @@ Thumbs.db
 # Harness (per-developer state and one-off output)
 .harness-mem/
 /out/
+
+# Playwright MCP screenshots / console logs
+.playwright-mcp/
