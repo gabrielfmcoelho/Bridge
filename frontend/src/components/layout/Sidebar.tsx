@@ -48,13 +48,15 @@ interface SidebarProps {
   onCloseMobile: () => void;
 }
 
-// Filter nav sections by user permissions — items without a permission field are always visible.
-function filterSections(sections: NavSection[], permissions: string[]): NavSection[] {
+// Filter nav sections by user permissions/role — items without a permission or role field are always visible.
+function filterSections(sections: NavSection[], permissions: string[], role?: string): NavSection[] {
   return sections
     .map((section) => ({
       ...section,
       items: section.items.filter(
-        (item) => !item.permission || permissions.includes(item.permission)
+        (item) =>
+          (!item.permission || permissions.includes(item.permission)) &&
+          (!item.role || item.role === role)
       ),
     }))
     .filter((section) => section.items.length > 0);
@@ -65,7 +67,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
   const { t } = useLocale();
   const { appName, appColor, appLogo } = useAppearance();
   const { user } = useAuth();
-  const sections = filterSections(NAV_SECTIONS, user?.permissions ?? []);
+  const sections = filterSections(NAV_SECTIONS, user?.permissions ?? [], user?.role);
 
   const sidebarContent = (
     <aside className={`bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] flex flex-col h-full transition-all duration-200 ${collapsed ? "w-16" : "w-60"}`}>

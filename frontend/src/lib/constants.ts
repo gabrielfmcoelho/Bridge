@@ -10,7 +10,9 @@ export const SITUACAO_DOT_COLORS: Record<string, string> = {
   maintenance: "bg-yellow-400",
 };
 
-export type NavItem = { href: string; label: string; icon: string; permission?: string };
+// ponytail: `role` gates by users.role; `permission` by permission code. Permission codes are
+// empty under dev:mock (mocks/seed.ts), so admin-only dev pages use `role` instead.
+export type NavItem = { href: string; label: string; icon: string; permission?: string; role?: "admin" };
 export type NavSection = { key: string; label?: string; items: NavItem[] };
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -78,6 +80,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/ssh-config", label: "nav.sshConfig", icon: "Terminal" },
       { href: "/tools", label: "nav.tools", icon: "Wrench" },
       { href: "/settings", label: "nav.settings", icon: "Settings" },
+      { href: "/design-system", label: "nav.designSystem", icon: "LayoutDashboard", role: "admin" },
     ],
   },
 ];

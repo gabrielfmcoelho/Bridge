@@ -40,7 +40,8 @@
     "serviceCatalog": "Service Catalog",
     "requests": "Requests",
     "wiki": "Wiki",
-    "chamados": "Tickets"
+    "chamados": "Tickets",
+    "designSystem": "Design System"
   },
   "atlas": {
     "apis": {
