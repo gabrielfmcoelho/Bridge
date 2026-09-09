@@ -1,7 +1,7 @@
 "use client";
 
 import { Section, Specimen } from "./Section";
-import Card from "@/components/ui/Card";
+import Card, { CardIcon } from "@/components/ui/Card";
 import StatCard from "@/components/ui/StatCard";
 import KpiGrid from "@/components/inventory/KpiGrid";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
@@ -15,7 +15,7 @@ import type { TableRecord } from "@/lib/atlas/types";
 
 const noop = () => {};
 
-const CARD_ACCENTS = ["cyan", "emerald", "purple", "amber", "red", "none"] as const;
+const CARD_ACCENTS = ["success", "warning", "danger", "info", "cyan", "purple", "rose", "accent", "muted"] as const;
 const STAT_CARD_COLORS = ["cyan", "emerald", "purple", "amber", "red", "sky", "rose"] as const;
 
 const OFFERING_1: Offering = {
@@ -70,9 +70,28 @@ export default function CardsSection() {
               <p className="text-sm font-semibold" style={{ fontFamily: "var(--font-mono)" }}>
                 accent={accent}
               </p>
-              <p className="text-xs text-[var(--text-muted)] mt-1">Card surface with accent border.</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">Left stripe from the token; legacy hue keys still resolve.</p>
             </Card>
           ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+          <Card accent="info" decorator="stripe-top" padding="sm">
+            <p className="text-sm font-semibold font-mono">decorator=&quot;stripe-top&quot;</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Atlas TableCard stripe.</p>
+          </Card>
+          <Card accent="purple" decorator="tint" padding="sm">
+            <p className="text-sm font-semibold font-mono relative">decorator=&quot;tint&quot;</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1 relative">Border and wash from the accent (StatCard).</p>
+          </Card>
+          <Card as="button" accent="cyan" decorator="none" onClick={noop} selected>
+            <div className="flex items-center gap-3">
+              <CardIcon path={ICON_PATHS.server} />
+              <div>
+                <p className="text-sm font-semibold font-mono">as=&quot;button&quot; selected</p>
+                <p className="text-xs text-[var(--text-muted)]">CardIcon takes the accent on hover.</p>
+              </div>
+            </div>
+          </Card>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
           <Card hover={false}>
@@ -159,7 +178,7 @@ export default function CardsSection() {
           <OfferingCard offering={OFFERING_2} onRequest={noop} index={1} />
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
-          Does not use <code>Card</code> — hand-rolled container with <code>stagger-in</code>.
+          <code>Card as=&quot;button&quot;</code> + <code>CardIcon</code>; keeps its <code>stagger-in</code> reveal.
         </p>
       </Specimen>
 
@@ -168,6 +187,9 @@ export default function CardsSection() {
           <TableCard table={TABLE_RECORD} onClick={noop} />
           <TableCard table={TABLE_RECORD} selected onClick={noop} />
         </div>
+        <p className="text-xs text-[var(--text-muted)] mt-2">
+          <code>Card as=&quot;button&quot; decorator=&quot;stripe-top&quot; selected</code>; accent from <code>getLayerAccent()</code>.
+        </p>
       </Specimen>
 
       <Specimen title="LinkedEntityList" source="components/ui/LinkedEntityList.tsx" wide>
@@ -182,7 +204,7 @@ export default function CardsSection() {
           <LinkedEntityList title="Linked services" items={[]} emptyMessage="No linked services" />
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
-          Re-implements the <code>Card</code> box inline.
+          <code>Card hover={"{false}"} padding=&quot;sm&quot;</code> around the list.
         </p>
       </Specimen>
 
@@ -190,11 +212,13 @@ export default function CardsSection() {
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Worklist</h3>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
-            Entity cards {"app/{hosts,dns,services,projects}/_components/*Card.tsx"} all compose <code>Card</code> +
-            inventory parts (need full entity objects — not rendered).
+            Entity cards {"app/{hosts,dns,services,projects}/_components/*Card.tsx"}, the ssh-keys credential card and the
+            settings user card all pass <code>accent</code> now (<code>situacaoAccent()</code> for situacao) — the four inline{" "}
+            <code>borderLeftColor</code> sources are gone. Not rendered here (need full entity objects).
           </li>
           <li>
-            <code>app/ssh-keys/page.tsx:119</code> inline card.
+            Still their own box: <code>components/glpi/TicketList.tsx</code> rows, <code>app/wiki/page.tsx:328</code> rows,{" "}
+            <code>app/catalog/_components/AiPrefillPanel.tsx</code>, <code>app/issues/IssueBoard.tsx</code> kanban columns.
           </li>
           <li>
             <strong>66 files</strong> carry ad-hoc <code>rounded-* border bg-[var(--bg-surface)]</code> containers

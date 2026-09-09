@@ -24,7 +24,7 @@ export default function TabBar({
         <button
           key={tab.key}
           onClick={() => onChange(tab.key)}
-          className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 md:px-4 py-1.5 text-xs md:text-sm font-medium rounded-[var(--radius-sm)] transition-all duration-150 whitespace-nowrap ${
+          className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 md:px-4 py-1.5 text-xs md:text-sm font-medium rounded-[var(--radius-sm)] transition-all duration-150 whitespace-nowrap active:scale-[0.97] ${
             activeTab === tab.key
               ? "bg-[var(--accent-muted)] text-[var(--accent)]"
               : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"

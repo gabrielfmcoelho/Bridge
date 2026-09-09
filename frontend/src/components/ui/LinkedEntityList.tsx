@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Card from "./Card";
 
 interface LinkedItem {
   id: number | string;
@@ -17,7 +18,7 @@ interface LinkedEntityListProps {
 
 export default function LinkedEntityList({ title, items, emptyMessage = "-" }: LinkedEntityListProps) {
   return (
-    <div className="bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-4">
+    <Card hover={false} padding="sm">
       <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">
         {title}
       </h3>
@@ -58,6 +59,6 @@ export default function LinkedEntityList({ title, items, emptyMessage = "-" }: L
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

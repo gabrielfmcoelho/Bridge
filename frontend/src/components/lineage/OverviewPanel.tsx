@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
+import Card from "@/components/ui/Card";
 import StatCard from "@/components/ui/StatCard";
 import type { LineageIndexes } from "@/lib/lineage/indexes";
 import { LAYER_COLORS, NODE_TYPE_LABELS } from "@/lib/lineage/style";
@@ -111,18 +112,14 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {domains.map(([ns, s]) => (
-              <button
-                key={ns}
-                onClick={() => onNavigate("graph", { focus: `ns:${ns}` })}
-                className="text-left bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-4 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] transition-all"
-              >
+              <Card key={ns} as="button" padding="sm" onClick={() => onNavigate("graph", { focus: `ns:${ns}` })}>
                 <div className="text-xs uppercase tracking-wider text-[var(--text-muted)]">{t("atlas.lineage.namespace")}</div>
                 <div className="text-lg font-bold mt-0.5" style={{ fontFamily: "var(--font-display)" }}>{ns}</div>
                 <div className="text-xs text-[var(--text-secondary)] mt-1 flex gap-3">
                   <span>{s.dags} DAGs</span>
                   <span>{s.models} models</span>
                 </div>
-              </button>
+              </Card>
             ))}
           </div>
         </div>
@@ -136,10 +133,7 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {layers.map(([layer, count]) => (
-              <div
-                key={layer}
-                className="bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-4"
-              >
+              <Card key={layer} padding="sm" hover={false}>
                 <div className={`text-xs uppercase tracking-wider font-semibold ${LAYER_COLORS[layer] ?? "text-[var(--text-muted)]"}`}>
                   {layer}
                 </div>
@@ -147,7 +141,7 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
                 <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
                   {NODE_TYPE_LABELS.dbt_model.toLowerCase()}s
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
@@ -158,9 +152,9 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
 
 function CountCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-4">
-      <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium">{label}</p>
-      <p className="text-2xl font-bold mt-0.5" style={{ fontFamily: "var(--font-display)" }}>{value}</p>
-    </div>
+    <Card padding="sm" hover={false}>
+      <p className="text-2xs text-[var(--text-muted)] uppercase tracking-wider font-medium">{label}</p>
+      <p className="text-2xl font-bold mt-0.5 font-display">{value}</p>
+    </Card>
   );
 }

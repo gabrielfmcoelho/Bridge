@@ -112,11 +112,10 @@ export default function HostCredentialsPage() {
 
 function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onClick: () => void; onDelete?: () => void }) {
   const isKey = cred.credential_type === "key";
-  const borderColor = isKey ? "#06b6d4" : "#a855f7";
 
   return (
     <div onClick={onClick} className="cursor-pointer h-full">
-      <Card className="h-full border-l-[3px] flex flex-col" style={{ borderLeftColor: borderColor }}>
+      <Card accent={isKey ? "cyan" : "purple"} className="h-full flex flex-col">
         <div className="flex items-start justify-between mb-2">
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold text-[var(--text-primary)] text-sm truncate" style={{ fontFamily: "var(--font-mono)" }}>

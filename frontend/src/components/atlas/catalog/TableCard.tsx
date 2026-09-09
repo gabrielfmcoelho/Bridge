@@ -2,7 +2,8 @@
 
 import { useLocale } from "@/contexts/LocaleContext";
 import type { TableRecord } from "@/lib/atlas/types";
-import LayerBadge, { getLayerStyle } from "../shared/LayerBadge";
+import Card from "@/components/ui/Card";
+import LayerBadge, { getLayerAccent } from "../shared/LayerBadge";
 import RoleBadge from "../shared/RoleBadge";
 
 interface Props {
@@ -17,21 +18,18 @@ interface Props {
  */
 export default function TableCard({ table, selected, onClick }: Props) {
   const { t } = useLocale();
-  const s = getLayerStyle(table.layer);
   const fq = qualifiedName(table);
 
   return (
-    <button
+    <Card
+      as="button"
       onClick={onClick}
-      className={`group relative w-full text-left flex flex-col overflow-hidden rounded-[var(--radius-md)] border bg-[var(--bg-surface)] transition-all duration-150 ${
-        selected
-          ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30 -translate-y-0.5 shadow-[var(--shadow-md)]"
-          : "border-[var(--border-subtle)] hover:border-[var(--border-default)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"
-      }`}
+      selected={selected}
+      accent={getLayerAccent(table.layer)}
+      decorator="stripe-top"
+      padding="none"
+      className="flex flex-col overflow-hidden"
     >
-      {/* Layer color stripe */}
-      <span className={`h-[3px] w-full ${s.dot.replace("bg-", "bg-")}`} />
-
       <div className="flex flex-col gap-2 p-3">
         <div className="flex items-start gap-2 justify-between">
           <div className="flex flex-col gap-0.5 min-w-0 flex-1">
@@ -46,7 +44,7 @@ export default function TableCard({ table, selected, onClick }: Props) {
           </div>
           {table.hasWarning && (
             <span
-              className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 mt-1.5"
+              className="w-1.5 h-1.5 rounded-full bg-[var(--danger)] shrink-0 mt-1.5"
               aria-label="Has warnings"
               title="Has warnings"
             />
@@ -68,7 +66,7 @@ export default function TableCard({ table, selected, onClick }: Props) {
           </span>
         </div>
       </div>
-    </button>
+    </Card>
   );
 }
 

@@ -441,9 +441,9 @@ function UsersSection() {
   };
 
   const roleAccentColor: Record<string, string> = {
-    admin: "var(--accent)",
-    editor: "#a78bfa",
-    viewer: "#6b7280",
+    admin: "accent",
+    editor: "purple",
+    viewer: "muted",
   };
 
   return (
@@ -544,8 +544,8 @@ function UsersSection() {
           {users.map((u, i) => (
             <Card
               key={u.id}
-              className={`border-l-[3px] animate-slide-up stagger-${Math.min(i + 1, 9)}`}
-              style={{ borderLeftColor: roleAccentColor[u.role] || roleAccentColor.viewer }}
+              accent={roleAccentColor[u.role] || roleAccentColor.viewer}
+              className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">

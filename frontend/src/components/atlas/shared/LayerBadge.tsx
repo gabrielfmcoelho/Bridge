@@ -36,3 +36,19 @@ export default function LayerBadge({ layer, label, dot = true, size = "sm", clas
 export function getLayerStyle(layer: TableLayer) {
   return LAYER_STYLES[layer] ?? LAYER_STYLES.other;
 }
+
+// ponytail: raw hex mirrors the `dot` classes above so Card accents match the
+// badges exactly; both go away together when the atlas palette is tokenised.
+const LAYER_ACCENT: Record<TableLayer, string> = {
+  source: "#60a5fa",
+  bronze: "#f59e0b",
+  silver: "#cbd5e1",
+  gold: "#facc15",
+  iapep: "#a78bfa",
+  iaspi: "#f472b6",
+  other: "#9ca3af",
+};
+
+export function getLayerAccent(layer: TableLayer): string {
+  return LAYER_ACCENT[layer] ?? LAYER_ACCENT.other;
+}

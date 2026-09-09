@@ -15,6 +15,7 @@ import CheckboxList from "@/components/ui/CheckboxList";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import FormError from "@/components/ui/FormError";
 import Card from "@/components/ui/Card";
+import StatCard from "@/components/ui/StatCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import type { Issue } from "@/lib/types";
@@ -250,57 +251,10 @@ export default function IssueBoard() {
       {/* ── KPI row ── */}
       {!isLoading && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          {[
-            {
-              label: "Total Open",
-              value: kpis.totalOpen,
-              textColor: "text-cyan-400",
-              borderColor: "border-cyan-500/20",
-              gradient: "from-cyan-500/10 to-transparent",
-              icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
-            },
-            {
-              label: "Critical",
-              value: kpis.critical,
-              textColor: "text-red-400",
-              borderColor: "border-red-500/20",
-              gradient: "from-red-500/10 to-transparent",
-              icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
-            },
-            {
-              label: "Assigned to Me",
-              value: kpis.assignedToMe,
-              textColor: "text-purple-400",
-              borderColor: "border-purple-500/20",
-              gradient: "from-purple-500/10 to-transparent",
-              icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
-            },
-            {
-              label: "Unassigned",
-              value: kpis.unassigned,
-              textColor: "text-amber-400",
-              borderColor: "border-amber-500/20",
-              gradient: "from-amber-500/10 to-transparent",
-              icon: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-            },
-          ].map((kpi) => (
-            <div
-              key={kpi.label}
-              className={`relative overflow-hidden bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border ${kpi.borderColor} p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]`}
-            >
-              <div className={`absolute inset-0 bg-gradient-to-br ${kpi.gradient} pointer-events-none`} />
-              <svg
-                className={`absolute right-2.5 top-2.5 w-8 h-8 ${kpi.textColor} opacity-[0.08]`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d={kpi.icon} />
-              </svg>
-              <div className="relative">
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium">{kpi.label}</p>
-                <p className={`text-2xl font-bold mt-0.5 ${kpi.textColor}`} style={{ fontFamily: "var(--font-display)" }}>{kpi.value}</p>
-              </div>
-            </div>
-          ))}
+          <StatCard label="Total Open" value={kpis.totalOpen} color="cyan" icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          <StatCard label="Critical" value={kpis.critical} color="red" icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <StatCard label="Assigned to Me" value={kpis.assignedToMe} color="purple" icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          <StatCard label="Unassigned" value={kpis.unassigned} color="amber" icon="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </div>
       )}
 

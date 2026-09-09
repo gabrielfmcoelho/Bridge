@@ -10,14 +10,15 @@ import type { Service } from "@/lib/types";
 
 export default function ServiceCard({ svc }: { svc: Service }) {
   const { t } = useLocale();
-  const borderColor = svc.is_external_dependency ? "#ef4444" : svc.developed_by === "internal" ? "#06b6d4" : "#f59e0b";
+  // red = external dependency, cyan = built in-house, amber = external vendor
+  const accent = svc.is_external_dependency ? "danger" : svc.developed_by === "internal" ? "cyan" : "warning";
   const linkedHostsCount = svc.host_ids?.length || 0;
   const linkedDnsCount = svc.dns_ids?.length || 0;
   const depsCount = svc.depends_on_ids?.length || 0;
 
   return (
     <Link href={`/services/${svc.id}`}>
-      <Card className="h-full border-l-[3px] flex flex-col overflow-hidden" style={{ borderLeftColor: borderColor }} clickIndicator="link">
+      <Card accent={accent} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
         <CardHeader
           title={svc.nickname}
           subtitle={svc.service_type ? `${svc.service_type}${svc.service_subtype ? ` / ${svc.service_subtype}` : ""}` : undefined}

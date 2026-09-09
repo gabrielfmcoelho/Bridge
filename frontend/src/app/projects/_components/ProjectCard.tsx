@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
+import { situacaoAccent } from "@/lib/constants";
 import Badge from "@/components/ui/Badge";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -17,11 +18,10 @@ export default function ProjectCard({ project }: { project: Project }) {
     queryFn: () => enumsAPI.list("situacao"),
   });
   const situacaoColor = situacoes.find((s) => s.value === project.situacao)?.color;
-  const fallbackColor = project.situacao === "active" ? "#10b981" : project.situacao === "maintenance" ? "#f59e0b" : "#6b7280";
 
   return (
     <Link href={`/projects/${project.id}`}>
-      <Card className="h-full border-l-[3px] flex flex-col overflow-hidden" style={{ borderLeftColor: situacaoColor || fallbackColor }} clickIndicator="link">
+      <Card accent={situacaoAccent(project.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
         <CardHeader
           title={project.name}
           subtitle={project.setor_responsavel || undefined}

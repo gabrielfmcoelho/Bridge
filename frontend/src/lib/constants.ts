@@ -12,6 +12,13 @@ export const SITUACAO_DOT_COLORS: Record<string, string> = {
   maintenance: "bg-[var(--warning)]",
 };
 
+// Card accent for an entity's situacao: the enum's own colour when it has one,
+// otherwise the semantic token. Replaces the per-card hex fallbacks.
+export function situacaoAccent(situacao: string | undefined, enumColor?: string): string {
+  if (enumColor) return enumColor;
+  return situacao === "active" ? "success" : situacao === "maintenance" ? "warning" : "muted";
+}
+
 // ponytail: `role` gates by users.role; `permission` by permission code. Permission codes are
 // empty under dev:mock (mocks/seed.ts), so admin-only dev pages use `role` instead.
 export type NavItem = { href: string; label: string; icon: string; permission?: string; role?: "admin" };

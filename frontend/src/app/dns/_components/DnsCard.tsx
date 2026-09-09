@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
+import { situacaoAccent } from "@/lib/constants";
 import Badge from "@/components/ui/Badge";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -17,13 +18,12 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
     queryFn: () => enumsAPI.list("situacao"),
   });
   const situacaoColor = situacoes.find((s) => s.value === dns.situacao)?.color;
-  const fallbackColor = dns.situacao === "active" ? "#10b981" : dns.situacao === "maintenance" ? "#f59e0b" : "#6b7280";
   const linkedHostsCount = dns.host_ids?.length || 0;
   const mainResp = dns.main_responsavel_name || dns.responsavel || "-";
 
   return (
     <Link href={`/dns/${dns.id}`}>
-      <Card className="h-full border-l-[3px] flex flex-col overflow-hidden" style={{ borderLeftColor: situacaoColor || fallbackColor }} clickIndicator="link">
+      <Card accent={situacaoAccent(dns.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
         <CardHeader
           title={dns.domain}
           description={dns.observacoes || t("common.noDescription")}
