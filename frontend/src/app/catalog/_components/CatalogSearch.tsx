@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
+import SectionHeading from "@/components/ui/SectionHeading";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Pagination from "@/components/ui/Pagination";
@@ -157,7 +158,7 @@ export default function CatalogSearch() {
 
   const assetsSection = (
         <section>
-          <SectionLabel label={t("catalog.resultsExisting")} count={assetsQuery.isLoading ? undefined : assetTotal} />
+          <SectionHeading variant="rule" count={assetsQuery.isLoading ? undefined : assetTotal}>{t("catalog.resultsExisting")}</SectionHeading>
           {assetsQuery.isLoading ? (
             <Skeleton className="h-[320px] rounded-[var(--radius-lg)]" />
           ) : assetsQuery.isError ? (
@@ -184,7 +185,7 @@ export default function CatalogSearch() {
 
   const offeringsSection = (
         <section>
-          <SectionLabel label={t("catalog.resultsOfferings")} count={offeringsQuery.isLoading ? undefined : offerings.length} />
+          <SectionHeading variant="rule" count={offeringsQuery.isLoading ? undefined : offerings.length}>{t("catalog.resultsOfferings")}</SectionHeading>
           {offeringsQuery.isLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -221,10 +222,10 @@ export default function CatalogSearch() {
     <PageShell>
       <PageHeader
         title={t("catalog.title")}
+        subtitle={t("catalog.subtitle")}
         addLabel={catchAll ? t("catalog.avulsa") : undefined}
         onAdd={catchAll ? () => setSelectedOffering(catchAll) : undefined}
       />
-      <p className="-mt-4 mb-6 text-sm text-[var(--text-muted)]">{t("catalog.subtitle")}</p>
 
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex-1 sm:max-w-md">
@@ -280,20 +281,5 @@ export default function CatalogSearch() {
         onClose={() => setSelectedOffering(null)}
       />
     </PageShell>
-  );
-}
-
-// Section labels sit on a hairline rule rather than inside a card header —
-// the groups are separated by structure and space, not by another box.
-function SectionLabel({ label, count }: { label: string; count?: number }) {
-  return (
-    <div className="mb-4 flex items-baseline gap-2.5 border-b border-[var(--border-subtle)] pb-2.5">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{label}</h2>
-      {count !== undefined && (
-        <span className="text-xs text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-          {count}
-        </span>
-      )}
-    </div>
   );
 }

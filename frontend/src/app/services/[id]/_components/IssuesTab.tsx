@@ -3,6 +3,7 @@
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import type { Issue } from "@/lib/types";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 interface IssuesTabProps {
   issues: Issue[];
@@ -13,12 +14,9 @@ export default function IssuesTab({ issues, t }: IssuesTabProps) {
   return (
     <div className="space-y-5 animate-fade-in">
       <Card hover={false}>
-        <h2
-          className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
+        <SectionHeading variant="section">
           {t("issue.title")}
-        </h2>
+        </SectionHeading>
         {issues.length > 0 ? (
           <div className="space-y-1">
             {issues.map((issue) => (

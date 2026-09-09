@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import TopologyGraph from "@/components/graph/TopologyGraph";
 import type { GraphData, Host, Service } from "@/lib/types";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 interface TopologyTabProps {
   filteredGraph: GraphData;
@@ -44,9 +45,9 @@ export default function DnsTopologyTab({ filteredGraph, linkedHosts, linkedServi
         <div className="space-y-4">
           {linkedHosts.length > 0 && (
             <Card hover={false}>
-              <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3" style={{ fontFamily: "var(--font-display)" }}>
+              <SectionHeading variant="section">
                 Linked Hosts
-              </h2>
+              </SectionHeading>
               <div className="space-y-2">
                 {linkedHosts.map((h) => (
                   <Link
@@ -67,9 +68,9 @@ export default function DnsTopologyTab({ filteredGraph, linkedHosts, linkedServi
 
           {linkedServices.length > 0 && (
             <Card hover={false}>
-              <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3" style={{ fontFamily: "var(--font-display)" }}>
+              <SectionHeading variant="section">
                 Linked Services
-              </h2>
+              </SectionHeading>
               <div className="space-y-2">
                 {linkedServices.map((svc) => (
                   <Link

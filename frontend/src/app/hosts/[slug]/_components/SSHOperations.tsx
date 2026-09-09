@@ -15,6 +15,7 @@ import OperationOutput from "@/components/ui/OperationOutput";
 import VMInfoDisplay from "./VMInfoDisplay";
 import IntegrationsSection from "./IntegrationsSection";
 import type { VMInfoType, OperationLog, RemoteKeyInfo, DockerStatusType, NginxCleanupStatusType, RemoteUserInfo, NetworkTestResult } from "@/lib/api";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 type ConsoleEntry = {
   label: string;
@@ -764,7 +765,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       {/* Custom scripts */}
       {customScripts.length > 0 && (
       <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("operation.customScripts")}</h3>
+        <SectionHeading as="h3">{t("operation.customScripts")}</SectionHeading>
         {customScripts.map((script) => (
           <div key={script.id} className="border border-[var(--border-subtle)] rounded-[var(--radius-md)] overflow-hidden">
             <div className="flex items-center gap-3 px-4 py-3">
@@ -910,9 +911,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
               {/* ── Identity section ── */}
               <section>
-                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                <SectionHeading as="h3">
                   {t("operation.createRemoteUserIdentitySection")}
-                </h3>
+                </SectionHeading>
                 <input
                   placeholder={t("operation.createRemoteUserPlaceholder")}
                   value={createUserName}
@@ -928,9 +929,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
               {/* ── Access section ── */}
               <section>
-                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                <SectionHeading as="h3">
                   {t("operation.createRemoteUserAccessSection")}
-                </h3>
+                </SectionHeading>
                 {eligibleKeys.length > 0 ? (
                   <div className="space-y-2">
                     <select
@@ -1025,9 +1026,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
               {/* ── Target user section ── */}
               <section>
-                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                <SectionHeading as="h3">
                   {t("operation.deleteRemoteUserTargetSection")}
-                </h3>
+                </SectionHeading>
                 {usePicker ? (
                   <div className="space-y-2">
                     <select
@@ -1089,9 +1090,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
               {/* ── Options section ── */}
               <section>
-                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                <SectionHeading as="h3">
                   {t("operation.deleteRemoteUserOptionsSection")}
-                </h3>
+                </SectionHeading>
                 <label className="flex items-start gap-2 text-xs cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -1162,9 +1163,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               <p className="text-xs text-[var(--text-muted)]">{t("operation.networkTestFormDesc")}</p>
 
               <section>
-                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                <SectionHeading as="h3">
                   {t("operation.networkTestPortSection")}
-                </h3>
+                </SectionHeading>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -1266,17 +1267,17 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             <div className="space-y-6">
               {/* ── Wizard section ── */}
               <section>
-                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                <SectionHeading as="h3">
                   {t("operation.consoleWizard")}
-                </h3>
+                </SectionHeading>
                 <p className="text-sm font-medium text-[var(--text-primary)]">{consoleEntry.label}</p>
               </section>
 
               {/* ── Status section ── */}
               <section>
-                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                <SectionHeading as="h3">
                   {t("operation.consoleStatus")}
-                </h3>
+                </SectionHeading>
                 <div className="flex items-center gap-2 text-sm">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass}`} />
                   <span className={`font-medium ${statusTextClass}`}>{statusLabel}</span>
@@ -1288,9 +1289,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
               {/* ── Output section ── */}
               <section>
-                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                <SectionHeading as="h3">
                   {t("operation.consoleOutput")}
-                </h3>
+                </SectionHeading>
                 <div className="text-sm text-[var(--text-primary)]">
                   {typeof consoleEntry.content === "string" ? <p>{consoleEntry.content}</p> : consoleEntry.content}
                 </div>

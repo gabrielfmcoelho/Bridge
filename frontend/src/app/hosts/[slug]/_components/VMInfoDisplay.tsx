@@ -7,6 +7,7 @@ import { UsageBar } from "./UsageBar";
 import { ContainersList } from "./SortableResourceList";
 import { formatUptime, parseLoginEntry, formatLoginDate, portIcon, parseServiceRow } from "@/lib/utils";
 import type { VMInfoType, ProcessDetail, PortOwner, CronInfo, CronJob, Agent, DiscoveredService, ResourceUsageSnapshot, ResourceProcess, ResourceDiskItem } from "@/lib/api";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 // Login users that aren't real accounts — these come from `last`'s wtmp
 // rollover and reboot bookkeeping. Filter them out before grouping logins
@@ -22,7 +23,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
   return (
     <div className="space-y-6 text-sm">
       {/* Resources */}
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.resources")}</h3>
+      <SectionHeading as="h3">{t("scan.resources")}</SectionHeading>
       <Card hover={false}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {info.cpu_usage && <UsageBar label={t("vm.cpu")} total={info.cpu} used={info.cpu_usage} percent={info.cpu_usage} />}
@@ -50,7 +51,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
         const rows = [info.os && [t("vm.os"), info.os], info.kernel && [t("vm.kernel"), info.kernel], uptime && [t("vm.uptime"), uptime], info.hostname_remote && [t("vm.hostname"), info.hostname_remote], info.public_ip && [t("vm.publicIp"), info.public_ip], info.load_avg && [t("vm.loadAvg"), info.load_avg], info.logged_users && [t("vm.usersOnline"), info.logged_users], info.swap_total && [t("vm.swap"), `${info.swap_total} (used: ${info.swap_used})`]].filter(Boolean) as [string, string][];
         return rows.length > 0 ? (
           <>
-          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.system")}</h3>
+          <SectionHeading as="h3">{t("scan.system")}</SectionHeading>
           <Card hover={false}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
               {rows.map(([label, value]) => (
@@ -253,7 +254,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
 
         return (
           <>
-            <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.remoteUsers")}</h3>
+            <SectionHeading as="h3">{t("scan.remoteUsers")}</SectionHeading>
             {/* auto-rows-fr forces every row to share the tallest row's
                 height, so cards without keys don't collapse and the grid
                 stays visually aligned across rows. */}
@@ -407,7 +408,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
           with scans persisted before the inventory was introduced. */}
       {!info.service_inventory && info.systemd_services && info.systemd_services.length > 0 && (
         <>
-          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.systemdServices")}</h3>
+          <SectionHeading as="h3">{t("scan.systemdServices")}</SectionHeading>
           <Card hover={false}>
             <div className="flex flex-wrap gap-1.5">
               {info.systemd_services.map((svc, i) => (
@@ -433,7 +434,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
       {/* Installed Packages */}
       {info.installed_packages && info.installed_packages.length > 0 && (
         <>
-          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.installedPackages")}</h3>
+          <SectionHeading as="h3">{t("scan.installedPackages")}</SectionHeading>
           <Card hover={false}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
               {info.installed_packages.map((pkg, i) => (
@@ -456,7 +457,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
       ) : (
         info.cron_jobs && info.cron_jobs.length > 0 && (
           <>
-            <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.cronJobs")}</h3>
+            <SectionHeading as="h3">{t("scan.cronJobs")}</SectionHeading>
             <Card hover={false}>
               <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
                 {info.cron_jobs.join("\n")}
@@ -469,7 +470,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
       {/* Firewall Status */}
       {info.firewall_status && (
         <>
-          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.firewallStatus")}</h3>
+          <SectionHeading as="h3">{t("scan.firewallStatus")}</SectionHeading>
           <Card hover={false}>
             <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
               {info.firewall_status}
@@ -576,7 +577,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
 
   return (
     <>
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.sshAuthPolicy")}</h3>
+      <SectionHeading as="h3">{t("scan.sshAuthPolicy")}</SectionHeading>
       <Card hover={false}>
         {/* Verdict line */}
         <div className="flex items-center gap-2 mb-3">
@@ -766,7 +767,7 @@ function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string) 
 
   return (
     <>
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.runningServices")}</h3>
+      <SectionHeading as="h3">{t("scan.runningServices")}</SectionHeading>
       <div className={`grid ${gridCols} gap-2`}>
         {processes.map((p) => (
           <Card key={p.key} hover={false} className={`!p-3 flex flex-col ${p.isSystem ? "opacity-60" : ""}`}>
@@ -934,7 +935,7 @@ function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string) => string })
 
   return (
     <>
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">{t("scan.cronJobs")}</h3>
+      <SectionHeading as="h3">{t("scan.cronJobs")}</SectionHeading>
       <Card hover={false}>
         {/* Daemon state row */}
         <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
@@ -1104,9 +1105,9 @@ function AgentsCard({ agents, t }: { agents: Agent[]; t: (k: string) => string }
 
   return (
     <>
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">
+      <SectionHeading as="h3">
         {t("scan.agents.title")}
-      </h3>
+      </SectionHeading>
       <Card hover={false}>
         <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
           <span className="text-[10px] text-[var(--text-muted)]">
@@ -1283,9 +1284,9 @@ function ServiceInventoryCard({ services, t }: { services: DiscoveredService[]; 
 
   return (
     <>
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">
+      <SectionHeading as="h3">
         {t("scan.services.title")}
-      </h3>
+      </SectionHeading>
       <Card hover={false}>
         <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
           <span className="text-[10px] text-[var(--text-muted)]">{t("scan.services.summary")}</span>

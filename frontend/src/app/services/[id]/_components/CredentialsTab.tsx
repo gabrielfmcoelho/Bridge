@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { secretsAPI } from "@/lib/api";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 interface CredentialsTabProps {
   serviceId: number;
@@ -25,12 +26,9 @@ export default function CredentialsTab({ serviceId, isAdmin, t }: CredentialsTab
   return (
     <div className="space-y-5 animate-fade-in">
       <Card hover={false}>
-        <h2
-          className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
+        <SectionHeading variant="section">
           {t("service.credentials")}
-        </h2>
+        </SectionHeading>
         {secrets.length > 0 ? (
           <div className="space-y-2">
             {secrets.map((s) => (

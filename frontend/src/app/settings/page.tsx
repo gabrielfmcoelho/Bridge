@@ -10,6 +10,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
 import PageShell from "@/components/layout/PageShell";
+import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -67,20 +68,20 @@ export default function SettingsPage() {
 
   return (
     <PageShell>
-      <div className="flex items-center justify-between gap-2 mb-6">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{t("settings.title")}</h1>
-
-        {/* Mobile: tab selector button */}
-        <button
-          onClick={() => setShowTabDrawer(true)}
-          className="md:hidden flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-default)] text-[var(--text-primary)]"
-        >
-          {activeLabel}
-          <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-      </div>
+      <PageHeader
+        title={t("settings.title")}
+        actions={
+          <button
+            onClick={() => setShowTabDrawer(true)}
+            className="md:hidden flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-default)] text-[var(--text-primary)]"
+          >
+            {activeLabel}
+            <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        }
+      />
 
       {/* Desktop: scrollable tab bar */}
       <div className="hidden md:flex gap-1 mb-6 p-1 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-x-auto">

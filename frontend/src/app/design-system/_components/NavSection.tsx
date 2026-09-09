@@ -24,17 +24,30 @@ export default function NavSection() {
       <Specimen
         title="PageHeader"
         source="components/ui/PageHeader.tsx"
-        alsoIn={["12 pages hand-roll the <h1> instead; see Typography"]}
+        alsoIn={["7 pages still hand-roll the <h1> (atlas/*, tools, login, setup, share); see Typography"]}
         wide
       >
-        <PageHeader title="Hosts" addLabel="Host" onAdd={noop} />
+        <div className="space-y-2">
+          <PageHeader title="Hosts" addLabel="Host" onAdd={noop} />
+          <PageHeader
+            title="Catálogo de Serviços"
+            subtitle="Encontre o que você precisa ou abra uma solicitação"
+            addLabel="Solicitação avulsa"
+            onAdd={noop}
+            actions={<Button size="sm" variant="secondary">Action</Button>}
+          />
+        </div>
+        <p className="text-[11px] text-[var(--text-muted)] mt-1">
+          <code>subtitle</code> replaces the <code>-mt-4 mb-6</code> paragraph hack on /catalog and /requests;{" "}
+          <code>actions</code> is the slot the five inline copies needed (settings, issues, releases, ssh-keys, dashboard now use it).
+        </p>
       </Specimen>
 
       <Specimen title="InventoryPageHeader" source="components/inventory/InventoryPageHeader.tsx" wide>
         <InventoryPageHeader title="Hosts" viewMode={viewMode} onViewModeChange={setViewMode} addLabel="Host" onAdd={noop} />
         <p className="text-[11px] text-[var(--text-muted)] mt-1">
-          Same markup as <code>PageHeader</code> + a <code>ViewToggle</code> (<code>hidden sm:flex</code>); used by
-          exactly the 4 inventory pages.
+          <code>PageHeader</code> with a <code>ViewToggle</code> in <code>actions</code> (<code>hidden sm:flex</code>); used by
+          exactly the 4 inventory pages, which hide the add button on phones because they carry a FAB.
         </p>
       </Specimen>
 

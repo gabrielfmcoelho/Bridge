@@ -14,7 +14,7 @@ import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import ListToolbar from "@/components/ui/ListToolbar";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
-import ListingLabel from "@/components/ui/ListingLabel";
+import SectionHeading from "@/components/ui/SectionHeading";
 import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
 import InventoryContent from "@/components/inventory/InventoryContent";
 import ServiceCard from "./_components/ServiceCard";
@@ -136,7 +136,7 @@ export default function ServicesPage() {
       {!isLoading && allServices.length > 0 && <KpiSection services={allServices} t={t} />}
 
       <SearchBadge search={search} onClear={() => setSearch("")} />
-      <ListingLabel label={t("service.listing") || "Services"} show={!isLoading && allServices.length > 0} />
+      {!isLoading && allServices.length > 0 && <SectionHeading>{t("service.listing") || "Services"}</SectionHeading>}
 
       {/* Toolbar */}
       <ListToolbar

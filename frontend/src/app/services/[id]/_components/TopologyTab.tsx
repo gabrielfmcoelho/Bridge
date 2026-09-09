@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import TopologyGraph from "@/components/graph/TopologyGraph";
 import type { GraphData, Service, Host, DNSRecord } from "@/lib/types";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 interface TopologyTabProps {
   filteredGraph: GraphData;
@@ -67,12 +68,9 @@ export default function ServiceTopologyTab({
         <div className="space-y-4">
           {dependsOnServices.length > 0 && (
             <Card hover={false}>
-              <h2
-                className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
+              <SectionHeading variant="section">
                 {t("service.dependencies")}
-              </h2>
+              </SectionHeading>
               <div className="space-y-1">
                 {dependsOnServices.map((dep) => (
                   <Link
@@ -90,12 +88,9 @@ export default function ServiceTopologyTab({
 
           {dependentServices.length > 0 && (
             <Card hover={false}>
-              <h2
-                className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
+              <SectionHeading variant="section">
                 {t("service.dependents")}
-              </h2>
+              </SectionHeading>
               <div className="space-y-1">
                 {dependentServices.map((dep) => (
                   <Link
@@ -113,12 +108,9 @@ export default function ServiceTopologyTab({
 
           {linkedHosts.length > 0 && (
             <Card hover={false}>
-              <h2
-                className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
+              <SectionHeading variant="section">
                 Linked Hosts
-              </h2>
+              </SectionHeading>
               <div className="space-y-1">
                 {linkedHosts.map((host) => (
                   <Link
@@ -135,12 +127,9 @@ export default function ServiceTopologyTab({
 
           {linkedDns.length > 0 && (
             <Card hover={false}>
-              <h2
-                className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
+              <SectionHeading variant="section">
                 Linked DNS
-              </h2>
+              </SectionHeading>
               <div className="space-y-1">
                 {linkedDns.map((dns) => (
                   <Link

@@ -6,10 +6,10 @@ import { sshKeysAPI, coolifyAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
+import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import IconButton from "@/components/ui/IconButton";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
@@ -45,21 +45,11 @@ export default function HostCredentialsPage() {
 
   return (
     <PageShell>
-      <div className="flex items-center justify-between gap-2 mb-6">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{t("nav.hostCredentials")}</h1>
-        <div className="flex items-center gap-1.5">
-          {canEdit && (
-            <div className="hidden sm:block">
-              <Button size="sm" onClick={() => setShowForm(true)}><span className="mr-1">+</span> {t("common.add")}</Button>
-            </div>
-          )}
-          {canEdit && (
-            <IconButton variant="accent" size="md" onClick={() => setShowForm(true)} title={t("common.add")} className="sm:hidden">
-              <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-            </IconButton>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title={t("nav.hostCredentials")}
+        addLabel={canEdit ? t("common.add") : undefined}
+        onAdd={canEdit ? () => setShowForm(true) : undefined}
+      />
 
       {/* Search */}
       <div className="flex items-center gap-2 mb-5">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import type { Service, Host, DNSRecord } from "@/lib/types";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 interface ConnectionsTabProps {
   dependsOnServices: Service[];
@@ -18,12 +19,9 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
     <div className="space-y-5 animate-fade-in">
       {/* Dependencies */}
       <Card hover={false}>
-        <h2
-          className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
+        <SectionHeading variant="section">
           {t("service.dependencies")}
-        </h2>
+        </SectionHeading>
         {dependsOnServices.length > 0 ? (
           <div className="space-y-1">
             {dependsOnServices.map((dep) => (
@@ -50,12 +48,9 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
 
       {/* Dependents */}
       <Card hover={false}>
-        <h2
-          className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
+        <SectionHeading variant="section">
           {t("service.dependents")}
-        </h2>
+        </SectionHeading>
         {dependentServices.length > 0 ? (
           <div className="space-y-1">
             {dependentServices.map((dep) => (
@@ -79,12 +74,9 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
 
       {/* Linked Hosts */}
       <Card hover={false}>
-        <h2
-          className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
+        <SectionHeading variant="section">
           Linked Hosts
-        </h2>
+        </SectionHeading>
         {linkedHosts.length > 0 ? (
           <div className="space-y-1">
             {linkedHosts.map((host) => (
@@ -110,12 +102,9 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
 
       {/* Linked DNS */}
       <Card hover={false}>
-        <h2
-          className="text-sm font-semibold text-[var(--text-secondary)] mb-3"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
+        <SectionHeading variant="section">
           Linked DNS
-        </h2>
+        </SectionHeading>
         {linkedDns.length > 0 ? (
           <div className="space-y-1">
             {linkedDns.map((dns) => (

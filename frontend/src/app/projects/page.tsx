@@ -14,7 +14,7 @@ import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import ListToolbar from "@/components/ui/ListToolbar";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
-import ListingLabel from "@/components/ui/ListingLabel";
+import SectionHeading from "@/components/ui/SectionHeading";
 import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
 import InventoryContent from "@/components/inventory/InventoryContent";
 import ProjectCard from "./_components/ProjectCard";
@@ -128,7 +128,7 @@ export default function ProjectsPage() {
       {!isLoading && allProjects.length > 0 && <KpiSection projects={allProjects} t={t} />}
 
       <SearchBadge search={search} onClear={() => setSearch("")} />
-      <ListingLabel label={t("project.listing") || "Projects"} show={!isLoading && allProjects.length > 0} />
+      {!isLoading && allProjects.length > 0 && <SectionHeading>{t("project.listing") || "Projects"}</SectionHeading>}
 
       <ListToolbar
         search={search}

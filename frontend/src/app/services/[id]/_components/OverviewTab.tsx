@@ -28,12 +28,9 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
 
       {/* Main info grid */}
       <Card accent="purple" hover={false}>
-        <h2
-          className="text-sm font-semibold text-[var(--text-secondary)] mb-4"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
+        <SectionHeading variant="section">
           Service Info
-        </h2>
+        </SectionHeading>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Field label={t("service.serviceType")} value={[service.service_type, service.service_subtype].filter(Boolean).join(" / ")} />
           <Field label={t("service.technologyStack")} value={service.technology_stack} />
@@ -66,12 +63,9 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
           a host service shows its catalog identity and the same lifecycle. */}
       {service.discovery_kind && (
         <Card accent="cyan" hover={false}>
-          <h2
-            className="text-sm font-semibold text-[var(--text-secondary)] mb-4"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
+          <SectionHeading variant="section">
             {service.discovery_kind === "container" ? t("service.containerInfo") : t("service.kindHost")}
-          </h2>
+          </SectionHeading>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {service.discovery_kind === "container" ? (
               <>
@@ -95,12 +89,9 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
       {/* External dependency section */}
       {service.is_external_dependency && (
         <Card accent="amber" hover={false}>
-          <h2
-            className="text-sm font-semibold text-[var(--text-secondary)] mb-4"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
+          <SectionHeading variant="section">
             External Dependency
-          </h2>
+          </SectionHeading>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Field label={t("service.externalProvider")} value={service.external_provider} />
             <Field label={t("service.externalUrl")} value={service.external_url} link />

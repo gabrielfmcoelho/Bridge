@@ -9,6 +9,7 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Badge from "@/components/ui/Badge";
 import Icon from "@/components/ui/Icon";
+import SectionHeading from "@/components/ui/SectionHeading";
 import StepIndicator from "@/components/ui/StepIndicator";
 import { Skeleton } from "@/components/ui/Skeleton";
 import StatusAlert from "@/components/ui/StatusAlert";
@@ -35,18 +36,6 @@ interface RequestFormModalProps {
 /** Steps present for every offering; "start" is inserted only when the offering
  *  actually declares templates, so nobody clicks through an empty screen. */
 type StepId = "requester" | "start" | "details" | "review";
-
-function StepHeading({ title, hint, icon }: { title: string; hint?: string; icon: string }) {
-  return (
-    <div className="space-y-1 border-b border-[var(--border-subtle)] pb-2">
-      <div className="flex items-center gap-2">
-        <Icon path={icon} className="h-3.5 w-3.5 text-[var(--text-faint)]" strokeWidth={2} />
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{title}</h3>
-      </div>
-      {hint && <p className="text-xs leading-relaxed text-[var(--text-muted)]">{hint}</p>}
-    </div>
-  );
-}
 
 function ReviewRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -291,7 +280,7 @@ export default function RequestFormModal({ target, onClose }: RequestFormModalPr
 
           {step === "requester" && (
             <div className="space-y-4">
-              <StepHeading title={t("catalog.steps.requester")} icon={ICON_PATHS.user} hint={t("catalog.steps.contactHint")} />
+              <SectionHeading variant="rule" as="h3" icon={ICON_PATHS.user} hint={t("catalog.steps.contactHint")}>{t("catalog.steps.requester")}</SectionHeading>
 
               <div className="space-y-1.5">
                 <label className="block text-xs font-medium tracking-wide text-[var(--text-secondary)]">
@@ -347,7 +336,7 @@ export default function RequestFormModal({ target, onClose }: RequestFormModalPr
 
           {step === "start" && offering.templates && (
             <div className="space-y-4">
-              <StepHeading title={t("catalog.templates.title")} icon={ICON_PATHS.cube} />
+              <SectionHeading variant="rule" as="h3" icon={ICON_PATHS.cube}>{t("catalog.templates.title")}</SectionHeading>
               <TemplatePicker
                 templates={offering.templates}
                 fields={offering.form_schema.fields}
@@ -359,7 +348,7 @@ export default function RequestFormModal({ target, onClose }: RequestFormModalPr
 
           {step === "details" && (
             <div className="space-y-5">
-              <StepHeading title={t("requests.form.sectionDetails")} icon={ICON_PATHS.gear} />
+              <SectionHeading variant="rule" as="h3" icon={ICON_PATHS.gear}>{t("requests.form.sectionDetails")}</SectionHeading>
               <AiPrefillPanel offeringId={offering.id} onDraft={applyDraft} />
 
               <div className="space-y-1.5">
@@ -394,7 +383,7 @@ export default function RequestFormModal({ target, onClose }: RequestFormModalPr
 
           {step === "review" && (
             <div className="space-y-4">
-              <StepHeading title={t("catalog.steps.review")} icon={ICON_PATHS.checkCircle} hint={t("catalog.steps.reviewIntro")} />
+              <SectionHeading variant="rule" as="h3" icon={ICON_PATHS.checkCircle} hint={t("catalog.steps.reviewIntro")}>{t("catalog.steps.review")}</SectionHeading>
               <dl className="space-y-3">
                 <ReviewRow label={t("requests.offering")}>{offering.name}</ReviewRow>
                 <ReviewRow label={t("catalog.steps.contactName")}>{contactName.trim() || "—"}</ReviewRow>

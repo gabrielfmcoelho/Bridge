@@ -10,6 +10,7 @@ import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import FormcreatorFormDrawer from "@/components/glpi/FormcreatorFormDrawer";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 export default function FormcreatorFormsPage() {
   const [profileID, setProfileID] = useState<number | null>(null);
@@ -121,9 +122,9 @@ export default function FormcreatorFormsPage() {
       <div className="space-y-6">
         {grouped.map(([categoryID, forms]) => (
           <section key={categoryID}>
-            <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+            <SectionHeading as="h3">
               {categoryID === 0 ? "Sem categoria" : `Categoria #${categoryID}`}
-            </h3>
+            </SectionHeading>
             <ul className="space-y-1.5">
               {forms.map((f) => (
                 <li key={f.id}>

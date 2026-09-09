@@ -17,6 +17,7 @@ import {
   type FormcreatorQuestion as Question,
   type FormcreatorSection,
 } from "@/lib/api";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 interface Props {
   open: boolean;
@@ -390,9 +391,9 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
               return (
                 <section key={section.id}>
                   {section.name && (
-                    <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">
+                    <SectionHeading as="h3">
                       {section.name}
-                    </h3>
+                    </SectionHeading>
                   )}
                   <div className="space-y-4">
                     {qs.map((q) => (

@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { glpiAPI, type GlpiTicketEvent } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { getTimeAgo } from "@/lib/utils";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 // Some GLPI deployments (< 10.0.4) ignore the ?sanitize=false flag and still
 // return HTML as entity-encoded text ("&lt;div&gt;…"). The textarea trick
@@ -211,9 +212,9 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
             {/* Description */}
             {data.ticket.content && (
               <section>
-                <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+                <SectionHeading as="h3">
                   Descrição
-                </h3>
+                </SectionHeading>
                 <div
                   className="text-sm text-[var(--text-primary)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2.5 glpi-content"
                   // GLPI stores content as HTML. We render it directly — the source is
@@ -227,9 +228,9 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
 
             {/* Timeline */}
             <section>
-              <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-2">
+              <SectionHeading as="h3">
                 Timeline
-              </h3>
+              </SectionHeading>
               {data.events.length === 0 ? (
                 <p className="text-xs text-[var(--text-muted)]">Sem follow-ups, tarefas ou soluções.</p>
               ) : (

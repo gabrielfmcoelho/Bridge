@@ -77,9 +77,9 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
       {/* Services */}
       {services && services.length > 0 && (
         <Card hover={false} className="animate-slide-up stagger-3" style={{ animationFillMode: "both" } as React.CSSProperties}>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3" style={{ fontFamily: "var(--font-display)" }}>
+          <SectionHeading variant="section">
             {t("service.title")}
-          </h2>
+          </SectionHeading>
           <div className="space-y-1">
             {services.map((svc) => (
               <Link key={svc.id} href={`/services/${svc.id}`} className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-primary)] hover:text-[var(--accent)]">
@@ -99,9 +99,9 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
       {/* Linked DNS records */}
       {linkedDns.length > 0 && (
         <Card hover={false} className="animate-slide-up stagger-4" style={{ animationFillMode: "both" } as React.CSSProperties}>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3" style={{ fontFamily: "var(--font-display)" }}>
+          <SectionHeading variant="section">
             DNS Records
-          </h2>
+          </SectionHeading>
           <div className="space-y-1">
             {linkedDns.map((dns) => (
               <div key={dns.id} className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors">
@@ -123,9 +123,9 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
       {/* Linked Hosts */}
       {linkedHosts.length > 0 && (
         <Card hover={false} className="animate-slide-up stagger-5" style={{ animationFillMode: "both" } as React.CSSProperties}>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3" style={{ fontFamily: "var(--font-display)" }}>
+          <SectionHeading variant="section">
             Hosts
-          </h2>
+          </SectionHeading>
           <div className="space-y-1">
             {linkedHosts.map((host) => (
               <Link key={host.id} href={`/hosts/${host.oficial_slug}`} className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-primary)] hover:text-[var(--accent)]">

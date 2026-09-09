@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Card from "./Card";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 interface LinkedItem {
   id: number | string;
@@ -19,9 +20,9 @@ interface LinkedEntityListProps {
 export default function LinkedEntityList({ title, items, emptyMessage = "-" }: LinkedEntityListProps) {
   return (
     <Card hover={false} padding="sm">
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">
+      <SectionHeading as="h3">
         {title}
-      </h3>
+      </SectionHeading>
 
       {items.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">{emptyMessage}</p>

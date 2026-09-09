@@ -2,7 +2,7 @@
 
 import Button from "@/components/ui/Button";
 import SectionHeading from "@/components/ui/SectionHeading";
-import ListingLabel from "@/components/ui/ListingLabel";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import { MarkdownContent } from "@/components/ui/MarkdownEditor";
 import { Section, Specimen } from "./Section";
 
@@ -86,11 +86,9 @@ export default function TypographySection() {
           </div>
           {/* specimen: components/ui/PageHeader.tsx:15 */}
           <div className="flex flex-wrap items-baseline gap-3">
-            <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
-              Hosts
-            </h1>
+            <h1 className="text-xl sm:text-2xl font-bold font-display">Hosts</h1>
             <code className="text-[11px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-              text-2xl font-bold (ui/PageHeader.tsx:15 — mb-6 sits on the wrapper div, not the h1)
+              text-xl sm:text-2xl font-bold font-display (ui/PageHeader.tsx — the one page title now; mb-6 on the wrapper)
             </code>
           </div>
         </div>
@@ -106,21 +104,23 @@ export default function TypographySection() {
         </div>
       </Specimen>
 
-      <Specimen
-        title="Uppercase heading (h3)"
-        source="components/ui/SectionHeading.tsx"
-        alsoIn={["components/ui/ListingLabel.tsx"]}
-        wide
-      >
-        <div className="space-y-3">
+      <Specimen title="SectionHeading" source="components/ui/SectionHeading.tsx" wide>
+        <div className="space-y-4">
           <SectionHeading actions={<Button size="sm" variant="ghost">Action</Button>}>
-            Section Heading
+            variant=&quot;label&quot; (default)
           </SectionHeading>
-          <ListingLabel label="Listing Label" show />
+          <SectionHeading variant="section">variant=&quot;section&quot;</SectionHeading>
+          <SectionHeading variant="rule" count={15}>
+            variant=&quot;rule&quot; count
+          </SectionHeading>
+          <SectionHeading variant="rule" as="h3" icon={ICON_PATHS.user} hint="Who is asking, and how to reach them.">
+            variant=&quot;rule&quot; as=&quot;h3&quot; icon hint
+          </SectionHeading>
           <p className="text-xs text-[var(--text-muted)]">
-            Same type ramp, different wrapper (<code>SectionHeading</code> adds a flex row and{" "}
-            <code>gap-1.5</code>; <code>ListingLabel</code> puts <code>mb-3</code> on the <code>h2</code>);
-            hand-written 37&times; in 14 files.
+            The three heading recipes in one component. Replaced <code>ListingLabel</code>, the catalog&apos;s{" "}
+            <code>SectionLabel</code> and <code>StepHeading</code>, and <code>KpiGrid</code>&apos;s h2. The same class
+            strings are still hand-written in ~70 places (<code>text-sm font-semibold text-secondary</code> 29&times;,{" "}
+            <code>text-xs … uppercase tracking-wider</code> 37&times;) — the sweep is the next pass.
           </p>
         </div>
       </Specimen>

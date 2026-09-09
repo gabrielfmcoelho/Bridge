@@ -6,10 +6,12 @@ import Link from "next/link";
 import { dashboardAPI, hostsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import PageShell from "@/components/layout/PageShell";
+import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import StatCard from "@/components/ui/StatCard";
 import { SkeletonStats } from "@/components/ui/Skeleton";
+import SectionHeading from "@/components/ui/SectionHeading";
 
 const statConfig = [
   { key: "hosts", color: "cyan", icon: "M5 3h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm0 10h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2z" },
@@ -172,9 +174,7 @@ export default function DashboardPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold mb-6" style={{ fontFamily: "var(--font-display)" }}>
-        {t("dashboard.title")}
-      </h1>
+      <PageHeader title={t("dashboard.title")} />
 
       {isLoading ? (
         <SkeletonStats />
@@ -295,9 +295,9 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {/* Recent Scans */}
             <Card hover={false} className="animate-slide-up stagger-8" style={{ animationFillMode: "both" } as React.CSSProperties}>
-              <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-4" style={{ fontFamily: "var(--font-display)" }}>
+              <SectionHeading variant="section">
                 {t("dashboard.recentScans")}
-              </h2>
+              </SectionHeading>
               {recentScans.length > 0 ? (
                 <div className="space-y-2">
                   {recentScans.map((scan) => (
@@ -324,9 +324,9 @@ export default function DashboardPage() {
             {/* Hosts by status */}
             {Object.keys(stats.hosts.by_situacao).length > 0 && (
               <Card hover={false} className="animate-slide-up stagger-9" style={{ animationFillMode: "both" } as React.CSSProperties}>
-                <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-4" style={{ fontFamily: "var(--font-display)" }}>
+                <SectionHeading variant="section">
                   {t("host.title")} by {t("common.status")}
-                </h2>
+                </SectionHeading>
                 <div className="space-y-5">
                   {Object.entries(stats.hosts.by_situacao).map(([situacao, count]) => {
                     const total = stats.hosts.total || 1;

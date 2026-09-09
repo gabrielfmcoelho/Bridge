@@ -162,8 +162,7 @@ export default function RequestList() {
 
   return (
     <PageShell>
-      <PageHeader title={t("requests.title")} addLabel={t("requests.new")} onAdd={() => router.push("/catalog")} />
-      <p className="text-sm text-[var(--text-muted)] -mt-4 mb-6">{t("requests.subtitle")}</p>
+      <PageHeader title={t("requests.title")} subtitle={t("requests.subtitle")} addLabel={t("requests.new")} onAdd={() => router.push("/catalog")} />
 
       <TabBar tabs={tabs} activeTab={view} onChange={(k) => setView(k as View)} className="mb-4" />
 

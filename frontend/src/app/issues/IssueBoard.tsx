@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { globalIssuesAPI, usersAPI, hostsAPI, dnsAPI, servicesAPI, projectsAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
+import PageHeader from "@/components/ui/PageHeader";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -237,16 +238,7 @@ export default function IssueBoard() {
   return (
     <PageShell>
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-2 mb-6">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>Issues</h1>
-        {canEdit && (
-          <div className="hidden sm:block">
-            <Button size="sm" onClick={() => setShowCreate(true)}>
-              <span className="mr-1">+</span> Add Issue
-            </Button>
-          </div>
-        )}
-      </div>
+      <PageHeader title="Issues" addLabel={canEdit ? "Add Issue" : undefined} onAdd={canEdit ? () => setShowCreate(true) : undefined} />
 
       {/* ── KPI row ── */}
       {!isLoading && (

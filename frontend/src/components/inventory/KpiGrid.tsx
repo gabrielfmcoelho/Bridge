@@ -1,3 +1,4 @@
+import SectionHeading from "@/components/ui/SectionHeading";
 import StatCard from "@/components/ui/StatCard";
 
 interface Kpi {
@@ -25,11 +26,7 @@ export default function KpiGrid({ kpis, heading, columns }: KpiGridProps) {
 
   return (
     <div className="mb-5">
-      {heading && (
-        <h2 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-3">
-          {heading}
-        </h2>
-      )}
+      {heading && <SectionHeading>{heading}</SectionHeading>}
       <div className={`grid ${gridCols[cols] || gridCols[4]} gap-3`}>
         {kpis.map((kpi) => (
           <StatCard key={kpi.label} label={kpi.label} value={kpi.value} color={kpi.color} icon={kpi.icon} />
