@@ -13,6 +13,12 @@ import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import TabBar from "@/components/ui/TabBar";
+import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
+import IconButton from "@/components/ui/IconButton";
+import PillButton from "@/components/ui/PillButton";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Badge from "@/components/ui/Badge";
@@ -71,33 +77,16 @@ export default function SettingsPage() {
       <PageHeader
         title={t("settings.title")}
         actions={
-          <button
-            onClick={() => setShowTabDrawer(true)}
-            className="md:hidden flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-default)] text-[var(--text-primary)]"
-          >
+          <Button variant="secondary" size="sm" className="md:hidden" onClick={() => setShowTabDrawer(true)}>
             {activeLabel}
-            <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+            <Icon path={ICON_PATHS.chevronUp} className="w-4 h-4 rotate-180 text-[var(--text-muted)]" />
+          </Button>
         }
       />
 
       {/* Desktop: scrollable tab bar */}
-      <div className="hidden md:flex gap-1 mb-6 p-1 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 text-sm font-medium rounded-[var(--radius-sm)] transition-all duration-150 whitespace-nowrap ${
-              activeTab === tab.key
-                ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="hidden md:block mb-6">
+        <TabBar tabs={tabs} activeTab={activeTab} onChange={(k) => setActiveTab(k as Tab)} />
       </div>
 
       {/* Mobile: tab drawer */}
@@ -342,24 +331,16 @@ function EnumSection() {
 function UserActions({ u, onEdit, onDelete }: { u: import("@/lib/types").User; onEdit: () => void; onDelete: () => void }) {
   return (
     <div className="flex items-center gap-1">
-      <button
-        onClick={onEdit}
-        className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-overlay)] transition-colors"
-        title="Edit"
-      >
+      <IconButton onClick={onEdit} title="Edit">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
         </svg>
-      </button>
-      <button
-        onClick={onDelete}
-        className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
-        title="Delete"
-      >
+      </IconButton>
+      <IconButton variant="danger" onClick={onDelete} title="Delete">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
         </svg>
-      </button>
+      </IconButton>
     </div>
   );
 }
@@ -455,25 +436,15 @@ function UsersSection() {
         </h2>
         <div className="flex items-center gap-1.5">
           {/* View toggle */}
-          <div className="hidden sm:flex border border-[var(--border-default)] rounded-[var(--radius-md)] overflow-hidden">
-            <button
-              onClick={() => setViewMode("cards")}
-              className={`px-2.5 py-1.5 transition-colors ${viewMode === "cards" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
-              title="Card view"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setViewMode("table")}
-              className={`px-2.5 py-1.5 transition-colors ${viewMode === "table" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
-              title="Table view"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
-            </button>
+          <div className="hidden sm:flex">
+            <ViewToggle
+              value={viewMode}
+              onChange={(v) => setViewMode(v as "cards" | "table")}
+              options={[
+                { key: "cards", label: "Card view", icon: VIEW_ICONS.cards },
+                { key: "table", label: "Table view", icon: VIEW_ICONS.table },
+              ]}
+            />
           </div>
           <Button size="sm" onClick={() => setShowForm(true)}>+ {t("settings.addUser")}</Button>
         </div>
@@ -984,36 +955,18 @@ function ImportSection() {
           {t("settings.importType")}
         </h3>
         <div className="flex gap-2">
-          <button
-            onClick={() => setImportType("hosts")}
-            className={`px-4 py-2 text-sm font-medium rounded-[var(--radius-md)] border transition-all ${
-              importType === "hosts"
-                ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
-                : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <PillButton size="lg" active={importType === "hosts"} onClick={() => setImportType("hosts")}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
               </svg>
-              Hosts
-            </div>
-          </button>
-          <button
-            onClick={() => setImportType("dns")}
-            className={`px-4 py-2 text-sm font-medium rounded-[var(--radius-md)] border transition-all ${
-              importType === "dns"
-                ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
-                : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            Hosts
+          </PillButton>
+          <PillButton size="lg" active={importType === "dns"} onClick={() => setImportType("dns")}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
               </svg>
-              DNS
-            </div>
-          </button>
+            DNS
+          </PillButton>
         </div>
       </Card>
 

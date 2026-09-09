@@ -22,30 +22,6 @@ const SHARE_TABS = [
   { key: "wiki", label: "Wiki", count: 7 },
 ];
 
-// specimen: app/catalog/_components/CatalogSearch.tsx:151
-const chipClass = (active: boolean) =>
-  `rounded-full border px-3.5 py-1.5 text-xs transition-[color,background-color,border-color,transform] duration-200 active:scale-[0.97] ${
-    active
-      ? "border-[var(--accent)] bg-[var(--accent-muted)] text-[var(--accent)]"
-      : "border-[var(--border-default)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-  }`;
-
-// specimen: components/vault/VaultPage.tsx:191
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1 text-xs rounded-[var(--radius-md)] border transition-colors ${
-        active
-          ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/50"
-          : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)]"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 export default function TabsSection() {
   const [tab, setTab] = useState("overview");
   const [settingsTab, setSettingsTab] = useState("enums");
@@ -55,8 +31,6 @@ export default function TabsSection() {
   const [viewMode, setViewMode] = useState<"tree" | "list" | "graph">("tree");
   const [layers, setLayers] = useState<string[]>([]);
   const [layers2, setLayers2] = useState<string[]>(["silver"]);
-  const [chip, setChip] = useState("offering");
-  const [vaultChip, setVaultChip] = useState("shared");
 
   return (
     <Section id="tabs" title="Tabs & Toggles">
@@ -99,8 +73,8 @@ export default function TabsSection() {
           ))}
         </div>
         <p className="text-xs text-[var(--text-muted)]">
-          Pixel-identical to <code>TabBar</code> minus icons and badges — and <code>hidden md:flex</code>, so it
-          is invisible on a phone where a separate button + <code>Drawer</code> list takes over.
+          Historical copy: settings now renders <code>TabBar</code> inside a <code>hidden md:block</code> wrapper (step 4).
+          The phone-side button + <code>Drawer</code> list is still local to settings.
         </p>
       </Specimen>
 
@@ -222,43 +196,36 @@ export default function TabsSection() {
         </p>
       </Specimen>
 
-      <Specimen title="chipClass()" source="app/catalog/_components/CatalogSearch.tsx:151">
-        {(["all", "offering", "asset"] as const).map((k) => (
-          <button key={k} type="button" onClick={() => setChip(k)} className={chipClass(chip === k)}>
-            {k === "all" ? "All" : k === "offering" ? "Offerings" : "Existing"}
-          </button>
-        ))}
-      </Specimen>
-
-      <Specimen title="VaultPage Chip" source="components/vault/VaultPage.tsx:191">
-        {(["personal", "shared"] as const).map((k) => (
-          <Chip key={k} active={vaultChip === k} onClick={() => setVaultChip(k)}>
-            {k === "personal" ? "Personal" : "Shared"}
-          </Chip>
-        ))}
+      <Specimen title="Retired chips" source="components/ui/PillButton.tsx" wide>
+        <p className="text-xs text-[var(--text-muted)]">
+          <code>CatalogSearch.chipClass()</code> and <code>VaultPage.Chip</code> were deleted in phase 2 step 4; both
+          are <code>PillButton shape=&quot;pill&quot;</code> / <code>shape=&quot;rounded&quot;</code> now, and{" "}
+          <code>PillFilter</code> composes <code>PillButton size=&quot;sm&quot;</code>. See Buttons for the shapes.
+        </p>
       </Specimen>
 
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Cross-references &amp; worklist</h3>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
-            <code>components/ui/PillButton.tsx</code> — the fourth filter-chip style; rendered under Buttons.
+            <code>components/ui/PillButton.tsx</code> — the one filter chip now (<code>shape</code>, <code>size</code>,{" "}
+            <code>count</code>, <code>lead</code>); rendered under Buttons.
           </li>
           <li>
             <code>components/ui/Toggle.tsx</code> — the on/off switch; rendered under Inputs &amp; Forms.
           </li>
           <li>
-            Tab implementations &times;5: <code>TabBar</code>, <code>app/settings/page.tsx</code>,{" "}
+            Tab implementations still separate: <code>TabBar</code> (now also settings),{" "}
             <code>app/share/[token]/page.tsx</code>, <code>components/atlas/apis/AddApiModal.tsx</code>,{" "}
             <code>components/atlas/shared/ViewModeToggle.tsx</code>.
           </li>
           <li>
-            View toggles &times;4: <code>ViewToggle</code>, <code>ViewModeToggle</code>,{" "}
-            <code>app/settings/page.tsx:455-476</code>, <code>app/issues/IssueBoard.tsx:348-360</code>.
+            View toggles: <code>ViewToggle</code> (now also settings users), <code>ViewModeToggle</code>,{" "}
+            <code>app/issues/IssueBoard.tsx:348-360</code> inline.
           </li>
           <li>
-            Filter chips &times;4: <code>PillButton</code>, <code>PillFilter</code>, <code>chipClass()</code>,{" "}
-            <code>VaultPage.Chip</code>.
+            Filter chips: <code>PillButton</code> (absorbed <code>chipClass()</code> and <code>VaultPage.Chip</code>;{" "}
+            <code>PillFilter</code> composes it).
           </li>
           <li>
             <code>app/hosts/[slug]/_components/SSHConfigDrawer.tsx:40-62</code> also rolls its own two-button

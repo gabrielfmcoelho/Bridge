@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
+import PillButton from "@/components/ui/PillButton";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
@@ -149,12 +150,6 @@ export default function CatalogSearch() {
   const kindLabel = (k: KindFilter) =>
     k === "all" ? t("common.all") : k === "offering" ? t("catalog.resultsOfferings") : t("catalog.resultsExisting");
 
-  const chipClass = (active: boolean) =>
-    `rounded-full border px-3.5 py-1.5 text-xs transition-[color,background-color,border-color,transform] duration-200 active:scale-[0.97] ${
-      active
-        ? "border-[var(--accent)] bg-[var(--accent-muted)] text-[var(--accent)]"
-        : "border-[var(--border-default)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-    }`;
 
   const assetsSection = (
         <section>
@@ -233,9 +228,9 @@ export default function CatalogSearch() {
         </div>
         <div className="flex gap-1.5">
           {KIND_FILTERS.map((k) => (
-            <button key={k} type="button" className={chipClass(kind === k)} onClick={() => setKind(k)}>
+            <PillButton key={k} shape="pill" active={kind === k} onClick={() => setKind(k)}>
               {kindLabel(k)}
-            </button>
+            </PillButton>
           ))}
         </div>
       </div>
@@ -244,21 +239,14 @@ export default function CatalogSearch() {
           are on screen. They act on the already-fetched list — no refetch. */}
       {showOfferings && typeTags.length > 1 && (
         <div className="mb-4 flex flex-wrap items-center gap-1.5">
-          <button type="button" className={chipClass(types.size === 0)} onClick={() => setTypes(new Set())}>
+          <PillButton shape="pill" active={types.size === 0} onClick={() => setTypes(new Set())}>
             {t("catalog.allTypes")}
-          </button>
+          </PillButton>
           <span aria-hidden className="mx-1 h-4 w-px bg-[var(--border-subtle)]" />
           {typeTags.map(([rt, count]) => (
-            <button
-              key={rt}
-              type="button"
-              aria-pressed={types.has(rt)}
-              className={chipClass(types.has(rt))}
-              onClick={() => toggleType(rt)}
-            >
+            <PillButton key={rt} shape="pill" active={types.has(rt)} count={count} onClick={() => toggleType(rt)}>
               {t(`catalog.requestType.${rt}`)}
-              <span className="ml-1.5 text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>{count}</span>
-            </button>
+            </PillButton>
           ))}
         </div>
       )}

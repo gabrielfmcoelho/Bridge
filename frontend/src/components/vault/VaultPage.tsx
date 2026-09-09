@@ -15,6 +15,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import EmptyState from "@/components/ui/EmptyState";
+import PillButton from "@/components/ui/PillButton";
 import ShareLinkModal from "@/app/secrets/_components/ShareLinkModal";
 import HistoryDrawer from "@/app/secrets/_components/HistoryDrawer";
 import NewSecretModal from "@/app/secrets/_components/NewSecretModal";
@@ -125,17 +126,17 @@ function VaultPageInner() {
         </div>
         <FilterRow label="Scope">
           {SCOPES.map((s) => (
-            <Chip key={s} active={scope === s} onClick={() => setScope(s)}>{s}</Chip>
+            <PillButton key={s} active={scope === s} onClick={() => setScope(s)}>{s}</PillButton>
           ))}
         </FilterRow>
         <FilterRow label="Visibility">
           {VISIBILITIES.map((v) => (
-            <Chip key={v} active={visibility === v} onClick={() => setVisibility(v)}>{v}</Chip>
+            <PillButton key={v} active={visibility === v} onClick={() => setVisibility(v)}>{v}</PillButton>
           ))}
         </FilterRow>
         <FilterRow label="Type">
           {TYPES.map((t) => (
-            <Chip key={t} active={typeF === t} onClick={() => setTypeF(t)}>{t.replace("_", " ")}</Chip>
+            <PillButton key={t} active={typeF === t} onClick={() => setTypeF(t)}>{t.replace("_", " ")}</PillButton>
           ))}
         </FilterRow>
       </Card>
@@ -188,20 +189,6 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1 text-xs rounded-[var(--radius-md)] border transition-colors ${
-        active
-          ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/50"
-          : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)]"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
 function SecretRow({
   secret,

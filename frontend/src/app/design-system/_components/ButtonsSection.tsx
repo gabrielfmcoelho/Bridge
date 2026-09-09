@@ -65,12 +65,35 @@ export default function ButtonsSection() {
         <p className="text-xs text-[var(--text-muted)] w-full mt-1">No loading state.</p>
       </Specimen>
 
-      <Specimen title="PillButton" source="components/ui/PillButton.tsx">
-        {PILL_KEYS.map((key) => (
-          <PillButton key={key} active={pillFilter === key} onClick={() => setPillFilter(key)}>
-            {key}
+      <Specimen title="PillButton" source="components/ui/PillButton.tsx" wide>
+        <div className="flex flex-wrap items-center gap-2">
+          {PILL_KEYS.map((key) => (
+            <PillButton key={key} active={pillFilter === key} onClick={() => setPillFilter(key)}>
+              {key}
+            </PillButton>
+          ))}
+          <span className="text-2xs text-[var(--text-faint)]">shape=&quot;rounded&quot; (default)</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          {PILL_KEYS.map((key, i) => (
+            <PillButton key={key} shape="pill" count={[15, 9, 6][i]} active={pillFilter === key} onClick={() => setPillFilter(key)}>
+              {key}
+            </PillButton>
+          ))}
+          <span className="text-2xs text-[var(--text-faint)]">shape=&quot;pill&quot; count</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <PillButton size="sm" shape="pill" active lead={<span className="w-1.5 h-1.5 rounded-full bg-[var(--warning)]" />} onClick={noop}>
+            size=&quot;sm&quot; lead
           </PillButton>
-        ))}
+          <PillButton size="lg" active={false} onClick={noop}>
+            size=&quot;lg&quot;
+          </PillButton>
+        </div>
+        <p className="text-xs text-[var(--text-muted)] mt-2">
+          Sets <code>aria-pressed</code>; absorbed <code>CatalogSearch.chipClass()</code>, <code>VaultPage.Chip</code> and{" "}
+          <code>PillFilter</code>&apos;s chips.
+        </p>
       </Specimen>
 
       <Specimen title="ToolbarActionButton" source="components/ui/ToolbarActionButton.tsx">

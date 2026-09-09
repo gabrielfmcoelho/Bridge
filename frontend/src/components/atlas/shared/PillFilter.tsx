@@ -1,5 +1,7 @@
 "use client";
 
+import PillButton from "@/components/ui/PillButton";
+
 interface PillFilterProps<T extends string> {
   label: string;
   options: Array<{ value: T; label: string; count?: number }>;
@@ -40,38 +42,23 @@ export default function PillFilter<T extends string>({
           {label}
         </span>
       )}
-      <button
-        type="button"
-        onClick={() => onChange([])}
-        className={`text-[11px] px-2.5 py-1 rounded-full border font-medium transition-all ${
-          isAll
-            ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/30"
-            : "bg-transparent text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
-        }`}
-      >
+      <PillButton shape="pill" size="sm" active={isAll} onClick={() => onChange([])}>
         All
-      </button>
+      </PillButton>
       {options.map(opt => {
         const active = value.includes(opt.value);
         return (
-          <button
+          <PillButton
             key={opt.value}
-            type="button"
+            shape="pill"
+            size="sm"
+            active={active}
+            count={opt.count}
+            lead={renderLead?.(opt.value)}
             onClick={() => toggle(opt.value)}
-            className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border font-medium transition-all ${
-              active
-                ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/30"
-                : "bg-transparent text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
-            }`}
           >
-            {renderLead?.(opt.value)}
-            <span>{opt.label}</span>
-            {opt.count !== undefined && (
-              <span className={`text-[9px] tabular-nums ${active ? "opacity-80" : "text-[var(--text-faint)]"}`}>
-                {opt.count}
-              </span>
-            )}
-          </button>
+            {opt.label}
+          </PillButton>
         );
       })}
     </div>
