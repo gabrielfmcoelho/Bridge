@@ -40,8 +40,8 @@ export default function FeedbackSection() {
           ))}
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
-          Uses raw tailwind palette (<code>emerald-500/10</code>…), not <code>--success</code>/<code>--danger</code>{" "}
-          tokens — does not adapt in light theme.
+          Reads <code>--success</code>/<code>--danger</code>/<code>--warning</code>/<code>--info</code> with opacity
+          modifiers, so it follows the theme. (Before step 1 it used the raw palette and washed out in light mode.)
         </p>
       </Specimen>
 

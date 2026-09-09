@@ -13,7 +13,7 @@ const COLORS = [
   "--accent", "--accent-hover", "--accent-muted", "--accent-glow",
   "--success", "--success-muted", "--warning", "--warning-muted",
   "--danger", "--danger-muted", "--purple", "--purple-muted",
-  "--amber", "--amber-muted", "--glass-bg", "--grid-line",
+  "--amber", "--amber-muted", "--info", "--info-muted", "--cyan", "--rose", "--glass-bg", "--grid-line",
   "--selection-bg", "--selection-fg",
 ];
 const RADII = ["--radius-sm", "--radius-md", "--radius-lg", "--radius-xl"];

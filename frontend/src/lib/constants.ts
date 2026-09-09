@@ -1,13 +1,15 @@
+// Fallbacks when the situacao enum carries no colour. Semantic tokens so they
+// follow the theme (the light-mode values are WCAG-tuned in globals.css).
 export const SITUACAO_COLORS: Record<string, string> = {
-  active: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  inactive: "bg-gray-500/15 text-gray-400 border-gray-500/30",
-  maintenance: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+  active: "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30",
+  inactive: "bg-[var(--bg-overlay)] text-[var(--text-secondary)] border-[var(--border-default)]",
+  maintenance: "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30",
 };
 
 export const SITUACAO_DOT_COLORS: Record<string, string> = {
-  active: "bg-emerald-400",
-  inactive: "bg-gray-400",
-  maintenance: "bg-yellow-400",
+  active: "bg-[var(--success)]",
+  inactive: "bg-[var(--text-faint)]",
+  maintenance: "bg-[var(--warning)]",
 };
 
 // ponytail: `role` gates by users.role; `permission` by permission code. Permission codes are

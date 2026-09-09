@@ -108,7 +108,7 @@ export default function FormsSection() {
           <Textarea label="Notes" rows={3} error="Too long" />
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          Its error text is hardcoded <code>text-red-400</code>, not theme-branched like <code>Input</code>.
+          Error border and text read <code>--danger</code>, same as <code>Input</code>.
         </p>
       </Specimen>
 
@@ -281,7 +281,7 @@ export default function FormsSection() {
       >
         <FormError message="Hostname already exists" />
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          Form-level banner, theme-branched. There is no toast component — banners are <code>StatusAlert</code>,
+          Form-level banner on <code>--danger</code>. There is no toast component — banners are <code>StatusAlert</code>,
           inline errors are this or an input&apos;s own <code>error</code> prop.
         </p>
       </Specimen>

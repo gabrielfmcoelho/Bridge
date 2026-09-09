@@ -1,9 +1,9 @@
 const variantStyles: Record<string, string> = {
-  success: "bg-emerald-500/10 border border-emerald-500/25 text-emerald-400",
-  error: "bg-red-500/10 border border-red-500/25 text-red-400",
-  warning: "bg-amber-500/10 border border-amber-500/25 text-amber-300",
-  info: "bg-cyan-500/10 border border-cyan-500/25 text-cyan-400",
-  loading: "bg-cyan-500/10 border border-cyan-500/25 text-cyan-400",
+  success: "bg-[var(--success)]/10 border border-[var(--success)]/25 text-[var(--success)]",
+  error: "bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)]",
+  warning: "bg-[var(--warning)]/10 border border-[var(--warning)]/25 text-[var(--warning)]",
+  info: "bg-[var(--info)]/10 border border-[var(--info)]/25 text-[var(--info)]",
+  loading: "bg-[var(--info)]/10 border border-[var(--info)]/25 text-[var(--info)]",
 };
 
 const icons: Record<string, React.ReactNode> = {

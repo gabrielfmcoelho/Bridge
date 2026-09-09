@@ -36,6 +36,14 @@
   --purple-muted: rgba(167, 139, 250, 0.15);
   --amber: #fbbf24;
   --amber-muted: rgba(251, 191, 36, 0.15);
+  --info: #38bdf8;
+  --info-muted: rgba(56, 189, 248, 0.15);
+
+  /* Categorical hues for entity identity (hosts=cyan, ...). Kept apart from
+     --accent, which the backend overrides with app_color. Derive tints with
+     Tailwind opacity modifiers: bg-[var(--cyan)]/15, border-[var(--cyan)]/30. */
+  --cyan: #22d3ee;
+  --rose: #fb7185;
 
   --font-display: 'JetBrains Mono', monospace;
   --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -95,8 +103,16 @@
      convention (Input.tsx/FormError.tsx's theme-branched text-red-600). */
   --danger: #dc2626;
   --danger-muted: rgba(239, 68, 68, 0.13);
+  /* -600/-700 tiers: the dark baselines (#a78bfa, #fbbf24, #38bdf8, #22d3ee,
+     #fb7185) all sit under 3:1 on white. */
+  --purple: #7c3aed;
   --purple-muted: rgba(139, 92, 246, 0.14);
+  --amber: #b45309;
   --amber-muted: rgba(245, 158, 11, 0.14);
+  --info: #0369a1;
+  --info-muted: rgba(14, 165, 233, 0.14);
+  --cyan: #0e7490;
+  --rose: #be123c;
 
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
@@ -114,6 +130,13 @@
   --color-foreground: var(--text-primary);
   --font-sans: var(--font-body);
   --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
+  /* Two steps below text-xs. The UI's labels, counts and chips live at 10px;
+     without these the codebase reaches for text-[10px] (343×) instead. */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 0.875rem;
+  --text-3xs: 0.5625rem;
+  --text-3xs--line-height: 0.75rem;
 }
 
 /* Light-theme variant: the app swaps themes by toggling
@@ -208,15 +231,6 @@ body {
   50% { opacity: 1; }
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
@@ -231,21 +245,6 @@ body {
 
 .animate-scale-in {
   animation: scale-in 0.2s ease-out;
-}
-
-.animate-slide-right {
-  animation: slide-right 0.2s ease-out;
-}
-
-@keyframes slide-right {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
-}
-
-.animate-shimmer {
-  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-overlay) 50%, var(--bg-elevated) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
 }
 
 .animate-pulse-glow {

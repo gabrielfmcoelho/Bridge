@@ -2,17 +2,32 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { enumsAPI } from "@/lib/api";
-import { SITUACAO_COLORS } from "@/lib/constants";
+import { SITUACAO_COLORS, SITUACAO_DOT_COLORS } from "@/lib/constants";
 
+// Full literals on purpose: Tailwind's scanner only generates utilities it can
+// read verbatim from source, so these cannot be built from a template string.
+const success = "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30";
+const warning = "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30";
+const danger = "bg-[var(--danger)]/15 text-[var(--danger)] border-[var(--danger)]/30";
+const info = "bg-[var(--info)]/15 text-[var(--info)] border-[var(--info)]/30";
+const neutral = "bg-[var(--bg-overlay)] text-[var(--text-secondary)] border-[var(--border-default)]";
+
+// Semantic names are the vocabulary; the hue names are the legacy keys 52 call
+// sites still pass. Both resolve to the same theme-aware tokens.
 const colorVariants: Record<string, string> = {
-  default: "bg-[var(--bg-overlay)] text-[var(--text-secondary)] border-[var(--border-default)]",
-  emerald: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  cyan: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
-  amber: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  purple: "bg-purple-500/15 text-purple-400 border-purple-500/30",
-  red: "bg-red-500/15 text-red-400 border-red-500/30",
-  rose: "bg-rose-500/15 text-rose-400 border-rose-500/30",
-  gray: "bg-gray-500/15 text-gray-400 border-gray-500/30",
+  default: neutral,
+  success,
+  warning,
+  danger,
+  info,
+  emerald: success,
+  amber: warning,
+  red: danger,
+  sky: info,
+  cyan: "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/30",
+  purple: "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/30",
+  rose: "bg-[var(--rose)]/15 text-[var(--rose)] border-[var(--rose)]/30",
+  gray: neutral,
 };
 
 interface BadgeProps {
@@ -36,7 +51,8 @@ export default function Badge({ children, variant = "default", color, situacao, 
   const situacaoColor = situacoes.find((s) => s.value === situacao)?.color;
 
   if (variant === "situacao" && situacao) {
-    const dotColor = situacaoColor || (situacao === "active" ? "#10b981" : situacao === "maintenance" ? "#eab308" : "#6b7280");
+    const dotColor =
+      situacaoColor || (situacao === "active" ? "var(--success)" : situacao === "maintenance" ? "var(--warning)" : "var(--text-faint)");
 
     if (compact) {
       return (
@@ -70,7 +86,11 @@ export default function Badge({ children, variant = "default", color, situacao, 
 
     return (
       <span className={`${base} ${SITUACAO_COLORS[situacao] || SITUACAO_COLORS.inactive} ${className}`}>
-        {dot && <span className={`w-2 h-2 rounded-full ${situacao === "active" ? "bg-emerald-400 animate-pulse-glow" : situacao === "maintenance" ? "bg-yellow-400" : "bg-gray-400"}`} />}
+        {dot && (
+          <span
+            className={`w-2 h-2 rounded-full ${SITUACAO_DOT_COLORS[situacao] || SITUACAO_DOT_COLORS.inactive} ${situacao === "active" ? "animate-pulse-glow" : ""}`}
+          />
+        )}
         {children}
       </span>
     );

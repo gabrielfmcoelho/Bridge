@@ -1,5 +1,4 @@
 import { type InputHTMLAttributes, forwardRef } from "react";
-import { useTheme } from "@/contexts/ThemeContext";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -8,7 +7,6 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, className = "", ...props }, ref) => {
-    const { theme } = useTheme();
     return (
       <div className="space-y-1.5">
         {label && (
@@ -19,12 +17,12 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2.5 md:py-2 text-base md:text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)] disabled:opacity-40 ${
-            error ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : ""
+            error ? "border-[var(--danger)] focus:border-[var(--danger)] focus:ring-[var(--danger)]/20" : ""
           } ${className}`}
           {...props}
         />
         {error && (
-          <p className={`text-xs ${theme === "light" ? "text-red-600" : "text-red-400"}`}>
+          <p className="text-xs text-[var(--danger)]">
             {error}
           </p>
         )}

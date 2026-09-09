@@ -4,7 +4,7 @@ const variants = {
   default: "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)] border-transparent",
   outline: "text-[var(--text-muted)] border-[var(--border-default)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)]",
   accent: "bg-[var(--accent)] text-white border-transparent hover:brightness-110",
-  danger: "text-red-400 hover:bg-red-500/10 hover:text-red-300 border-transparent",
+  danger: "text-[var(--danger)] hover:bg-[var(--danger)]/10 hover:brightness-110 border-transparent",
   active: "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20",
 };
 

@@ -49,8 +49,8 @@ export default function ButtonsSection() {
           <Button disabled>Disabled</Button>
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
-          <code>danger</code> is theme-branched red-50/red-500 via <code>useTheme()</code> — it does not use the{" "}
-          <code>--danger</code> token.
+          <code>danger</code> reads <code>--danger</code> (theme-tuned in globals.css); the old light/dark branch via{" "}
+          <code>useTheme()</code> is gone.
         </p>
       </Specimen>
 
@@ -160,8 +160,8 @@ export default function ButtonsSection() {
             <code>components/ui/Modal.tsx:47</code> hand-rolls an <code>IconButton</code>.
           </li>
           <li>
-            <code>danger</code> styling differs across <code>Button</code> / <code>IconButton</code> / ad-hoc (
-            <code>bg-red-500/10 text-red-400</code>) — none use <code>--danger</code>.
+            <code>Button</code> and <code>IconButton</code> danger now use <code>--danger</code>; the ad-hoc copies (
+            <code>bg-red-500/10 text-red-400</code>) still do not.
           </li>
         </ul>
       </div>
