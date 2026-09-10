@@ -44,6 +44,7 @@ export default function ServiceDetail({ id }: { id: number }) {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
+  const [formFooter, setFormFooter] = useState<React.ReactNode>(null);
 
   // ── Data queries ──
   const { data, isLoading } = useQuery({
@@ -246,11 +247,13 @@ export default function ServiceDetail({ id }: { id: number }) {
             onClose={() => setShowEditDrawer(false)}
             title={t("common.edit")}
             subHeader={formSubHeader}
+            footer={formFooter}
           >
             <ServiceForm
               initial={data.service}
               initialGrants={data.entidades}
               onSubHeaderChange={setFormSubHeader}
+              onFooterChange={setFormFooter}
               onSuccess={() => {
                 setShowEditDrawer(false);
                 queryClient.invalidateQueries({ queryKey: ["service", id] });

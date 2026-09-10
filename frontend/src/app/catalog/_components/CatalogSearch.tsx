@@ -19,6 +19,7 @@ import type { Offering, RequestType } from "@/lib/types";
 import CatalogAssetsTable, { type AssetSortKey } from "./CatalogAssetsTable";
 import OfferingCard from "./OfferingCard";
 import RequestFormModal from "./RequestFormModal";
+import Divider from "@/components/ui/Divider";
 
 const ASSETS_PER_PAGE = 12;
 // The catch-all offering, surfaced as the header action and as the way out of
@@ -242,7 +243,7 @@ export default function CatalogSearch() {
           <PillButton shape="pill" active={types.size === 0} onClick={() => setTypes(new Set())}>
             {t("catalog.allTypes")}
           </PillButton>
-          <span aria-hidden className="mx-1 h-4 w-px bg-[var(--border-subtle)]" />
+          <Divider vertical className="h-4 mx-1" />
           {typeTags.map(([rt, count]) => (
             <PillButton key={rt} shape="pill" active={types.has(rt)} count={count} onClick={() => toggleType(rt)}>
               {t(`catalog.requestType.${rt}`)}

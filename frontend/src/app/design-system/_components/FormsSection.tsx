@@ -15,6 +15,8 @@ import AsyncPicker, { type AsyncPickerItem } from "@/components/ui/AsyncPicker";
 import ContactInput from "@/components/ui/ContactInput";
 import MarkdownEditor from "@/components/ui/MarkdownEditor";
 import FormError from "@/components/ui/FormError";
+import FormFooter from "@/components/ui/FormFooter";
+import Button from "@/components/ui/Button";
 import StepIndicator from "@/components/ui/StepIndicator";
 import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
 import PasswordField from "@/app/hosts/[slug]/_components/PasswordField";
@@ -283,6 +285,27 @@ export default function FormsSection() {
         <p className="text-xs text-[var(--text-muted)] mt-3">
           Form-level banner on <code>--danger</code>. There is no toast component — banners are <code>StatusAlert</code>,
           inline errors are this or an input&apos;s own <code>error</code> prop.
+        </p>
+      </Specimen>
+
+      <Specimen title="FormFooter" source="components/ui/FormFooter.tsx" wide>
+        <div className="space-y-3">
+          <FormFooter onCancel={noop} cancelLabel="Cancel" submitLabel="Save" onSubmit={noop} />
+          <FormFooter onCancel={noop} cancelLabel="Cancel" submitLabel="Reject request" onSubmit={noop} variant="danger" />
+          <FormFooter
+            onCancel={noop}
+            cancelLabel="Cancel"
+            submitLabel="Create"
+            onSubmit={noop}
+            loading
+            start={<Button variant="ghost" size="sm" onClick={noop}>Back</Button>}
+          />
+        </div>
+        <p className="text-xs text-[var(--text-muted)] mt-2">
+          The one Cancel/Confirm bar, meant for a Modal or Drawer <code>footer</code> slot (use <code>submitType=&quot;submit&quot;</code>{" "}
+          + <code>form=</code> when the form body is inside). Replaced the four ad-hoc geometries in TransitionModal,
+          OfferingFormModal, CreateDocumentModal and CreateTicketModal. Multi-step entity forms keep the full-width Back/Next
+          pair from <code>useMultiStepForm</code>, which now drives Dns/Service/Project forms too (their inline fallbacks are gone).
         </p>
       </Specimen>
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { glpiAPI, type GlpiTokenProfile } from "@/lib/api";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
-import Button from "@/components/ui/Button";
+import FormFooter from "@/components/ui/FormFooter";
 import Input from "@/components/ui/Input";
 import MarkdownEditor from "@/components/ui/MarkdownEditor";
 
@@ -84,7 +84,21 @@ export default function CreateTicketModal({
   const hasProfiles = (profiles?.length ?? 0) > 0;
 
   return (
-    <ResponsiveModal open={open} onClose={onClose} title="Abrir chamado no GLPI">
+    <ResponsiveModal
+      open={open}
+      onClose={onClose}
+      title="Abrir chamado no GLPI"
+      footer={
+        <FormFooter
+          onCancel={onClose}
+          cancelLabel="Cancelar"
+          submitLabel="Abrir chamado"
+          onSubmit={() => mutation.mutate()}
+          loading={mutation.isPending}
+          disabled={!hasProfiles || !profileID || !title.trim()}
+        />
+      }
+    >
       <div className="space-y-4">
         {!hasProfiles && (
           <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2">
@@ -142,17 +156,6 @@ export default function CreateTicketModal({
             {error}
           </div>
         )}
-        <div className="flex gap-2 justify-end">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={mutation.isPending}>Cancelar</Button>
-          <Button
-            type="button"
-            onClick={() => mutation.mutate()}
-            loading={mutation.isPending}
-            disabled={!hasProfiles || !profileID || !title.trim()}
-          >
-            Abrir chamado
-          </Button>
-        </div>
       </div>
     </ResponsiveModal>
   );

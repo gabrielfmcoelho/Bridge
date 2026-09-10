@@ -36,6 +36,7 @@ export default function DNSPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<DNSRecord | null>(null);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
+  const [formFooter, setFormFooter] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [tablePage, setTablePage] = useState(1);
 
@@ -154,10 +155,11 @@ export default function DNSPage() {
         renderTable={(items) => <DnsTableView records={items} total={tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}
       />
 
-      <Drawer open={showForm} onClose={() => setShowForm(false)} title={editing ? t("common.edit") : t("dns.addDns")} subHeader={formSubHeader}>
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title={editing ? t("common.edit") : t("dns.addDns")} subHeader={formSubHeader} footer={formFooter}>
         <DnsForm
           initial={editing}
           onSubHeaderChange={setFormSubHeader}
+          onFooterChange={setFormFooter}
           onSuccess={() => { setShowForm(false); setEditing(null); queryClient.invalidateQueries({ queryKey: ["dns"] }); }}
         />
       </Drawer>

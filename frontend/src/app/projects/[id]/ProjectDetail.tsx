@@ -36,6 +36,7 @@ export default function ProjectDetail({ id }: { id: number }) {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [formSubHeader, setFormSubHeader] = useState<ReactNode>(null);
+  const [formFooter, setFormFooter] = useState<React.ReactNode>(null);
 
   // -- Data queries --
   const { data, isLoading } = useQuery({ queryKey: ["project", id], queryFn: () => projectsAPI.get(id) });
@@ -173,11 +174,13 @@ export default function ProjectDetail({ id }: { id: number }) {
             onClose={() => setShowEditDrawer(false)}
             title={t("common.edit")}
             subHeader={formSubHeader}
+            footer={formFooter}
           >
             <ProjectForm
               initial={data.project}
               initialGrants={data.entidades}
               onSubHeaderChange={setFormSubHeader}
+              onFooterChange={setFormFooter}
               onSuccess={() => {
                 setShowEditDrawer(false);
                 queryClient.invalidateQueries({ queryKey: ["project", id] });

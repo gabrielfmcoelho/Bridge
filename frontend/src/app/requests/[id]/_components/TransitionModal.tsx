@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
-import Button from "@/components/ui/Button";
+import FormFooter from "@/components/ui/FormFooter";
 import Textarea from "@/components/ui/Textarea";
 import StatusAlert from "@/components/ui/StatusAlert";
 import FormError from "@/components/ui/FormError";
@@ -81,20 +81,13 @@ export default function TransitionModal({ requestId, to, onClose, onDone }: Tran
         )
       }
       footer={
-        <div className="flex gap-2 justify-end">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={mutation.isPending}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="button"
-            variant={to ? transitionVariant(to) : "primary"}
-            onClick={handleSubmit}
-            loading={mutation.isPending}
-            disabled={mutation.isPending}
-          >
-            {t("common.confirm")}
-          </Button>
-        </div>
+        <FormFooter
+          onCancel={onClose}
+          submitLabel={t("common.confirm")}
+          onSubmit={handleSubmit}
+          loading={mutation.isPending}
+          variant={to && transitionVariant(to) === "danger" ? "danger" : "primary"}
+        />
       }
     >
       <div className="space-y-4">

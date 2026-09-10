@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Section, Specimen } from "./Section";
 import Button from "@/components/ui/Button";
 import PageHeader from "@/components/ui/PageHeader";
+import Divider from "@/components/ui/Divider";
 import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
 import DetailHeader from "@/components/ui/DetailHeader";
 import DetailActions from "@/components/ui/DetailActions";
@@ -92,6 +93,22 @@ export default function NavSection() {
         <p className="text-[11px] text-[var(--text-muted)]">
           <code>mb-5</code> baked in; 5 consumers; the de-facto search box — 11 other files inline the magnifier SVG
           with their own input markup.
+        </p>
+      </Specimen>
+
+      <Specimen title="Divider" source="components/ui/Divider.tsx" wide>
+        <p className="text-xs text-[var(--text-secondary)]">Above the rule</p>
+        <Divider className="my-3" />
+        <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+          <span>Chip</span>
+          <Divider vertical className="h-4" />
+          <span>Chip</span>
+          <Divider vertical className="h-4" />
+          <span>Chip</span>
+        </div>
+        <p className="text-xs text-[var(--text-muted)] mt-3">
+          Free-standing rules and rails only (Sidebar sections, catalog chip row, atlas list header, share page,{" "}
+          <code>CardIndicatorSeparator</code>). Padded section containers keep their own <code>border-t</code>.
         </p>
       </Specimen>
 

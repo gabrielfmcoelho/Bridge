@@ -89,7 +89,6 @@ export default function DnsForm({
 
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
 
-  const hasExternalFooter = !!onFooterChange;
 
   return (
     <div className="space-y-4">
@@ -101,11 +100,6 @@ export default function DnsForm({
           <Select label={t("host.situacao")} value={form.situacao} onChange={(e) => set("situacao", e.target.value)} options={situacoes.map((e) => ({ value: e.value, label: e.value }))} />
           <Checkbox label={t("dns.hasHttps")} checked={form.has_https} onChange={(v) => set("has_https", v)} />
           <Input label={t("common.observacoes")} value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} placeholder="Notes about this DNS record..." />
-          {!hasExternalFooter && (
-            <Button type="button" className="w-full" disabled={!form.domain.trim()} onClick={() => setStep(2)}>
-              {t("host.nextStep")}
-            </Button>
-          )}
         </div>
       )}
 
@@ -117,12 +111,6 @@ export default function DnsForm({
             contacts={contacts}
             t={t}
           />
-          {!hasExternalFooter && (
-            <div className="flex gap-2 pt-2">
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>{t("common.back")}</Button>
-              <Button type="button" className="flex-1" onClick={() => setStep(3)}>{t("host.nextStep")}</Button>
-            </div>
-          )}
         </div>
       )}
 
@@ -131,14 +119,6 @@ export default function DnsForm({
           <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <TagInput label={t("common.tags")} tags={tags} onChange={setTags} entityType="dns" />
           <CheckboxList label="Linked Hosts" items={hosts.map((h) => ({ id: h.id, name: h.nickname }))} selected={form.host_ids} onChange={(ids) => set("host_ids", ids)} />
-          {!hasExternalFooter && (
-            <div className="flex gap-2 pt-2">
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(2)}>{t("common.back")}</Button>
-              <Button type="button" className="flex-1" onClick={() => mutation.mutate()} loading={mutation.isPending}>
-                {initial ? t("common.save") : t("common.create")}
-              </Button>
-            </div>
-          )}
         </div>
       )}
     </div>

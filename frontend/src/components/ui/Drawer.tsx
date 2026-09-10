@@ -55,21 +55,21 @@ export default function Drawer({ open, onClose, title, subHeader, headerAction, 
           >
             {title ? (
               <div className="border-b border-[var(--border-subtle)]">
-                <div className="flex items-center gap-2 p-4">
+                <div className="flex items-center gap-2 p-4 md:p-5">
                   {BackButton}
                   <VaulDrawer.Title className="text-lg font-semibold flex-1 min-w-0 truncate" style={{ fontFamily: "var(--font-display)" }}>
                     {title}
                   </VaulDrawer.Title>
                   {headerAction}
                 </div>
-                {subHeader && <div className="px-4 pb-3">{subHeader}</div>}
+                {subHeader && <div className="px-4 md:px-5 pb-3">{subHeader}</div>}
               </div>
             ) : (
               <VaulDrawer.Title className="sr-only">Menu</VaulDrawer.Title>
             )}
-            <div className="flex-1 overflow-y-auto p-4">{children}</div>
+            <div className="flex-1 overflow-y-auto p-4 md:p-5">{children}</div>
             {footer && (
-              <div className="p-4 border-t border-[var(--border-subtle)]">
+              <div className="shrink-0 border-t border-[var(--border-subtle)] p-4 md:p-5">
                 {footer}
               </div>
             )}
@@ -105,14 +105,14 @@ export default function Drawer({ open, onClose, title, subHeader, headerAction, 
                 </VaulDrawer.Title>
                 {headerAction}
               </div>
-              {subHeader && <div className="px-4 pb-3">{subHeader}</div>}
+              {subHeader && <div className="px-4 md:px-5 pb-3">{subHeader}</div>}
             </div>
           ) : (
             <VaulDrawer.Title className="sr-only">Menu</VaulDrawer.Title>
           )}
-          <div className="flex-1 overflow-y-auto p-4">{children}</div>
+          <div className="flex-1 overflow-y-auto p-4 md:p-5">{children}</div>
           {footer && (
-            <div className="p-4 border-t border-[var(--border-subtle)]">
+            <div className="shrink-0 border-t border-[var(--border-subtle)] p-4 md:p-5">
               {footer}
             </div>
           )}

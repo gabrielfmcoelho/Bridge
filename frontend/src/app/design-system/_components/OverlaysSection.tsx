@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Section, Specimen } from "./Section";
 import Button from "@/components/ui/Button";
+import FormFooter from "@/components/ui/FormFooter";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import Drawer from "@/components/ui/Drawer";
@@ -55,12 +56,7 @@ export default function OverlaysSection() {
           onClose={close}
           title="Edit host"
           subHeader={<StepIndicator steps={["Basics", "Scope"]} current={1} />}
-          footer={
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={close}>Cancel</Button>
-              <Button>Save</Button>
-            </div>
-          }
+          footer={<FormFooter onCancel={close} cancelLabel="Cancel" submitLabel="Save" onSubmit={close} />}
         >
           <Input label="Hostname" defaultValue="web-01" />
         </Modal>
@@ -83,12 +79,7 @@ export default function OverlaysSection() {
             </IconButton>
           }
           onBack={noop}
-          footer={
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={close}>Cancel</Button>
-              <Button>Save</Button>
-            </div>
-          }
+          footer={<FormFooter onCancel={close} cancelLabel="Cancel" submitLabel="Save" onSubmit={close} />}
         >
           <Input label="Hostname" defaultValue="web-01" />
         </Drawer>

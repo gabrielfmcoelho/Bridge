@@ -15,6 +15,7 @@ import { apiCatalogAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { ApiCatalog, OperationSearchResult } from "@/lib/types";
 import AddApiModal from "./AddApiModal";
+import Divider from "@/components/ui/Divider";
 
 const SCOPES = ["all", "projeto", "avulso"] as const;
 type SearchMode = "apis" | "endpoints";
@@ -77,7 +78,7 @@ export default function ApiListView() {
             {t("atlas.apis.searchModeEndpoints")}
           </button>
         </div>
-        <div className="hidden sm:block w-px h-6 bg-[var(--border-subtle)]" />
+        <Divider vertical className="hidden sm:block h-6" />
         {/* Scope chips */}
         <div className="flex gap-1.5">
           {SCOPES.map((s) => (

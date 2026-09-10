@@ -23,9 +23,10 @@ interface ProjectFormProps {
   initialGrants?: AssetGrants | null;
   onSuccess: () => void;
   onSubHeaderChange?: (subHeader: React.ReactNode) => void;
+  onFooterChange?: (footer: React.ReactNode) => void;
 }
 
-export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHeaderChange }: ProjectFormProps) {
+export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHeaderChange, onFooterChange }: ProjectFormProps) {
   const { t } = useLocale();
   const { user } = useAuth();
   const [grants, setGrants] = useState<AssetGrantsInput>(initialGrants ?? defaultGrants(user));
@@ -115,6 +116,7 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
     isPending: mutation.isPending,
     submitLabel: initial ? t("common.save") : t("common.create"),
     t,
+    onFooterChange,
     onSubHeaderChange,
   });
 
@@ -144,9 +146,6 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
             </div>
           )}
           <Input label={t("project.documentationUrl")} value={form.documentation_url} onChange={(e) => set("documentation_url", e.target.value)} type="url" placeholder="https://docs..." />
-          <Button type="button" className="w-full" disabled={!form.name.trim()} onClick={() => setStep(2)}>
-            {t("host.nextStep")}
-          </Button>
         </div>
       )}
 
@@ -230,10 +229,6 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
             )}
           </section>
 
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>{t("common.back")}</Button>
-            <Button type="submit" className="flex-1" loading={mutation.isPending}>{initial ? t("common.save") : t("common.create")}</Button>
-          </div>
         </form>
       )}
     </div>

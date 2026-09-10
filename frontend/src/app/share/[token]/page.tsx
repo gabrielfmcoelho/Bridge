@@ -11,6 +11,7 @@ import type { BundlePayload } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
 import { useLocale } from "@/contexts/LocaleContext";
+import Divider from "@/components/ui/Divider";
 
 // Public reveal page. Reached for BOTH kinds of share link:
 //   - a single secret  (ShareLinkModal → GET /api/share/{token})
@@ -475,7 +476,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
               {/* Co-Branding Divider & Sector Info */}
               {SECTOR_BRANDING.enabled && (
                 <>
-                  <div className="w-px h-4 bg-[var(--border-default)] mx-1" />
+                  <Divider vertical className="h-4 mx-1" />
                   <div className="flex items-center gap-1.5 pl-0.5">
                     <div className="w-6 h-6 rounded-[var(--radius-sm)] flex items-center justify-center overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-subtle)] shrink-0">
                       {SECTOR_BRANDING.logoUrl ? (
@@ -647,7 +648,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
             {/* Co-Branding Divider & Sector Info */}
             {SECTOR_BRANDING.enabled && (
               <>
-                <div className="w-px h-5 bg-[var(--border-default)] mx-1" />
+                <Divider vertical className="h-5 mx-1" />
                 <div className="flex items-center gap-1.5 pl-0.5">
                   <div className="w-6 h-6 rounded-[var(--radius-sm)] flex items-center justify-center overflow-hidden bg-[var(--bg-elevated)] border border-[var(--border-subtle)] shrink-0">
                     {SECTOR_BRANDING.logoUrl ? (

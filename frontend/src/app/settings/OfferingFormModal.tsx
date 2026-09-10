@@ -10,7 +10,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import type { AssetGrantsInput, FormField, Offering, RequestType } from "@/lib/types";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
-import Button from "@/components/ui/Button";
+import FormFooter from "@/components/ui/FormFooter";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Textarea from "@/components/ui/Textarea";
@@ -124,8 +124,21 @@ export default function OfferingFormModal({ offering, categories, onClose }: {
   const shownFields = visibleFields(fields, previewValues);
 
   return (
-    <ResponsiveModal open onClose={onClose} title={offering ? t("settings.offerings.edit") : t("settings.offerings.add")}>
-      <form onSubmit={submit} className="space-y-6">
+    <ResponsiveModal
+      open
+      onClose={onClose}
+      title={offering ? t("settings.offerings.edit") : t("settings.offerings.add")}
+      footer={
+        <FormFooter
+          onCancel={onClose}
+          submitLabel={offering ? t("common.save") : t("common.create")}
+          submitType="submit"
+          form="offering-form"
+          loading={save.isPending}
+        />
+      }
+    >
+      <form id="offering-form" onSubmit={submit} className="space-y-6">
         <FormError message={submitError} />
 
         {/* ── Basics ─────────────────────────────────────────────────────── */}
@@ -225,10 +238,6 @@ export default function OfferingFormModal({ offering, categories, onClose }: {
           </div>
         </section>
 
-        <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border-subtle)]">
-          <Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
-          <Button type="submit" loading={save.isPending}>{offering ? t("common.save") : t("common.create")}</Button>
-        </div>
       </form>
     </ResponsiveModal>
   );

@@ -16,6 +16,7 @@ import WikiShareModal, { type WikiShareTarget } from "@/components/wiki/WikiShar
 import WikiSearchBar from "@/components/wiki/WikiSearchBar";
 import WikiTree from "@/components/wiki/WikiTree";
 import WikiDocumentViewer from "@/components/wiki/WikiDocumentViewer";
+import Divider from "@/components/ui/Divider";
 
 type ViewMode = "docs" | "search";
 
@@ -443,7 +444,7 @@ function WikiPageInner() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
-            <div className="w-6 border-t border-[var(--border-subtle)] my-1" />
+            <Divider className="w-6 my-1" />
             <button
               type="button"
               onClick={enterSearchMode}

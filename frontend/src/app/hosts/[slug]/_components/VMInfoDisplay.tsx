@@ -8,6 +8,7 @@ import { ContainersList } from "./SortableResourceList";
 import { formatUptime, parseLoginEntry, formatLoginDate, portIcon, parseServiceRow } from "@/lib/utils";
 import type { VMInfoType, ProcessDetail, PortOwner, CronInfo, CronJob, Agent, DiscoveredService, ResourceUsageSnapshot, ResourceProcess, ResourceDiskItem } from "@/lib/api";
 import SectionHeading from "@/components/ui/SectionHeading";
+import Divider from "@/components/ui/Divider";
 
 // Login users that aren't real accounts — these come from `last`'s wtmp
 // rollover and reboot bookkeeping. Filter them out before grouping logins
@@ -314,7 +315,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                         and extends edge-to-edge through the card padding, so
                         every card has the same visual rhythm regardless of
                         how much key content follows. */}
-                    <div className="-mx-3 mt-2 border-t border-[var(--border-subtle)]/50" />
+                    <Divider className="-mx-3 mt-2 opacity-50" />
                     {userKeys.length === 0 ? (
                       <p className="text-[10px] text-[var(--text-faint)] italic mt-auto pt-2">
                         {t("scan.userNoKeys")}

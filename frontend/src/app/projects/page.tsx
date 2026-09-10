@@ -36,6 +36,7 @@ export default function ProjectsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
+  const [formFooter, setFormFooter] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [tablePage, setTablePage] = useState(1);
 
@@ -157,10 +158,11 @@ export default function ProjectsPage() {
         renderTable={(items) => <ProjectsTableView projects={items} total={tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}
       />
 
-      <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={editing ? t("common.edit") : t("project.addProject")} subHeader={formSubHeader}>
+      <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={editing ? t("common.edit") : t("project.addProject")} subHeader={formSubHeader} footer={formFooter}>
         <ProjectForm
           initial={editing}
           onSubHeaderChange={setFormSubHeader}
+          onFooterChange={setFormFooter}
           onSuccess={() => {
             setShowForm(false);
             setEditing(null);

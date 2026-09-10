@@ -21,9 +21,10 @@ interface ServiceFormProps {
   initialGrants?: AssetGrants | null;
   onSuccess: () => void;
   onSubHeaderChange?: (subHeader: React.ReactNode) => void;
+  onFooterChange?: (footer: React.ReactNode) => void;
 }
 
-export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHeaderChange }: ServiceFormProps) {
+export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHeaderChange, onFooterChange }: ServiceFormProps) {
   const { t } = useLocale();
   const { user } = useAuth();
   const [grants, setGrants] = useState<AssetGrantsInput>(initialGrants ?? defaultGrants(user));
@@ -91,6 +92,7 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
     canProceed: step === 1 ? !!form.nickname.trim() : true,
     isPending: mutation.isPending,
     t,
+    onFooterChange,
     onSubHeaderChange,
   });
 
@@ -109,9 +111,6 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
             <Select label={t("service.serviceSubtype")} value={form.service_subtype} onChange={(e) => set("service_subtype", e.target.value)} options={enumOpts(serviceSubtypes)} />
           </div>
           <Select label={t("service.technologyStack")} value={form.technology_stack} onChange={(e) => set("technology_stack", e.target.value)} options={enumOpts(techStacks)} />
-          <Button type="button" className="w-full" disabled={!form.nickname.trim()} onClick={() => setStep(2)}>
-            {t("host.nextStep")}
-          </Button>
         </div>
       )}
 
@@ -149,10 +148,6 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
               onProvisioned={(uid) => set("grafana_dashboard_uid", uid)}
             />
           )}
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>{t("common.back")}</Button>
-            <Button type="button" className="flex-1" onClick={() => setStep(3)}>{t("host.nextStep")}</Button>
-          </div>
         </div>
       )}
 
@@ -168,10 +163,6 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
             <Input label={t("service.port")} value={form.port} onChange={(e) => set("port", e.target.value)} placeholder="8080" />
           </div>
           <Input label={t("service.version")} value={form.version} onChange={(e) => set("version", e.target.value)} placeholder="v1.2.3" />
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(2)}>{t("common.back")}</Button>
-            <Button type="button" className="flex-1" onClick={() => setStep(4)}>{t("host.nextStep")}</Button>
-          </div>
         </div>
       )}
 
@@ -183,10 +174,6 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
           <CheckboxList label="Hosts" items={hosts.map((h) => ({ id: h.id, name: h.nickname }))} selected={form.host_ids} onChange={(ids) => set("host_ids", ids)} />
           <CheckboxList label="DNS" items={dnsRecords.map((d) => ({ id: d.id, name: d.domain }))} selected={form.dns_ids} onChange={(ids) => set("dns_ids", ids)} />
           <CheckboxList label={t("service.dependencies")} items={allServices.map((s) => ({ id: s.id, name: s.nickname }))} selected={form.depends_on_ids} onChange={(ids) => set("depends_on_ids", ids)} />
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(3)}>{t("common.back")}</Button>
-            <Button type="submit" className="flex-1" loading={mutation.isPending}>{t("common.create")}</Button>
-          </div>
         </form>
       )}
     </div>

@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { NAV_SECTIONS, type NavSection } from "@/lib/constants";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
+import Divider from "@/components/ui/Divider";
 
 const icons: Record<string, string> = {
   LayoutDashboard: "M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z",
@@ -99,7 +100,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
       <nav className="flex-1 p-2.5 overflow-y-auto">
         {sections.map((section, sIdx) => (
           <div key={section.key}>
-            {sIdx > 0 && <div className="my-3 border-t border-[var(--border-subtle)]" />}
+            {sIdx > 0 && <Divider className="my-3" />}
             {section.label && !collapsed && (
               <p className="px-3 py-1 text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-widest">
                 {t(section.label)}

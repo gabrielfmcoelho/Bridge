@@ -56,7 +56,7 @@ export default function Modal({ open, onClose, title, subHeader, footer, childre
         )}
         <div className="flex-1 overflow-y-auto p-4 md:p-5">{children}</div>
         {footer && (
-          <div className="shrink-0 border-t border-[var(--border-subtle)] glass p-4 md:p-5">{footer}</div>
+          <div className="shrink-0 border-t border-[var(--border-subtle)] p-4 md:p-5 glass">{footer}</div>
         )}
       </div>
     </div>

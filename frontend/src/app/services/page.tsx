@@ -35,6 +35,7 @@ export default function ServicesPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
+  const [formFooter, setFormFooter] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [tablePage, setTablePage] = useState(1);
 
@@ -167,9 +168,10 @@ export default function ServicesPage() {
       />
 
       {/* Create modal */}
-      <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={t("service.addService")} subHeader={formSubHeader}>
+      <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={t("service.addService")} subHeader={formSubHeader} footer={formFooter}>
         <ServiceForm
           onSubHeaderChange={setFormSubHeader}
+          onFooterChange={setFormFooter}
           onSuccess={() => {
             setShowForm(false);
             queryClient.invalidateQueries({ queryKey: ["services"] });

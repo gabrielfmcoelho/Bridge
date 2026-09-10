@@ -1,4 +1,5 @@
-/** Vertical line separator between indicator groups. */
+import Divider from "@/components/ui/Divider";
+
 export default function CardIndicatorSeparator() {
-  return <span className="w-px h-3.5 bg-[var(--border-subtle)]" />;
+  return <Divider vertical className="h-3.5" />;
 }
