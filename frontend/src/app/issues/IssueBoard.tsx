@@ -43,11 +43,19 @@ const priorityColors: Record<string, string> = {
   low: "bg-[var(--text-faint)]",
 };
 
-const entityColors: Record<string, string> = {
+// Badge colour key per entity, and the chip classes as full literals
+// (Tailwind only generates classes it can read from source).
+const entityColors: Record<string, "cyan" | "success" | "purple" | "warning"> = {
   host: "cyan",
-  dns: "emerald",
+  dns: "success",
   service: "purple",
-  project: "amber",
+  project: "warning",
+};
+const entityChip: Record<string, string> = {
+  host: "text-[var(--cyan)] bg-[var(--cyan)]/10",
+  dns: "text-[var(--success)] bg-[var(--success)]/10",
+  service: "text-[var(--purple)] bg-[var(--purple)]/10",
+  project: "text-[var(--warning)] bg-[var(--warning)]/10",
 };
 
 // ─── Filters type ────────────────────────────────────────────────────────────
@@ -579,9 +587,7 @@ function IssueCard({
             {issue.entity_type && (
               <span
                 className={`text-2xs rounded px-1.5 py-0.5 ${
-                  entityColors[issue.entity_type]
-                    ? `text-${entityColors[issue.entity_type]}-400 bg-${entityColors[issue.entity_type]}-500/10`
-                    : "text-[var(--text-faint)] bg-[var(--bg-overlay)]"
+                  entityChip[issue.entity_type] ?? "text-[var(--text-faint)] bg-[var(--bg-overlay)]"
                 }`}
               >
                 {issue.entity_type}: {entityLabel}
@@ -739,7 +745,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 {/* Entity */}
                 <td className={tableClasses.td}>
                   {issue.entity_type ? (
-                    <Badge color={entityColors[issue.entity_type] as "cyan" | "emerald" | "purple" | "amber" | undefined}>
+                    <Badge color={entityColors[issue.entity_type]}>
                       {issue.entity_type}: {getEntityLabel(issue)}
                     </Badge>
                   ) : (

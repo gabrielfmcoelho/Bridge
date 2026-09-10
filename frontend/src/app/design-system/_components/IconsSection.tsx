@@ -78,15 +78,15 @@ export default function IconsSection() {
 
       <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
         <li>
-          One registry now: <code>lib/icon-paths.ts</code> holds <code>ICON_PATHS</code> (55 keys, the 20 paths that were
-          inlined 2+ times added and named) plus <code>NAV_ICONS</code> (the sidebar set, still its own drawing).{" "}
+          One registry now: <code>lib/icon-paths.ts</code> holds <code>ICON_PATHS</code> (86 keys after two naming passes) plus <code>NAV_ICONS</code> (the sidebar set, still its own drawing).{" "}
           <code>EmptyState</code>, <code>ViewToggle</code>, <code>StatusAlert</code>, <code>Modal</code>, <code>PageHeader</code>{" "}
           and <code>Card</code> read from it instead of private maps.
         </li>
         <li>
-          Inline <code>&lt;svg&gt;</code> went from 239 to 82 (2026-09-10): 141 registered paths swept into{" "}
-          <code>Icon</code> across 70 files. What remains: 46 one-off paths (add a name, then sweep), 6 with extra
-          attributes, 4 non-stroke, plus <code>Header.tsx</code> (in-flight) and <code>app/secrets</code> (guardrailed).
+          Inline <code>&lt;svg&gt;</code> went from 239 to 45 over two sweeps (2026-09-10): 175 sites in 90 files now render{" "}
+          <code>Icon</code>, and the registry holds 86 named paths. What remains is meant to stay inline: multi-path glyphs,
+          filled brand marks (WhatsApp, Keycloak, login providers), the Spinner arc, plus <code>Header.tsx</code> (in flight)
+          and <code>app/secrets</code> (guardrailed).
         </li>
         <li>
           The magnifier path <code>M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z</code> alone is inlined in 11 files.

@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { globalIssuesAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import Card from "@/components/ui/Card";
+import StatusDot from "@/components/ui/StatusDot";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -19,6 +20,13 @@ const priorityColors: Record<string, string> = {
   high: "amber",
   medium: "cyan",
   low: "gray",
+};
+// Token names for the dot; the Badge keeps the hue keys above.
+const priorityDot: Record<string, "danger" | "warning" | "cyan" | "muted"> = {
+  critical: "danger",
+  high: "warning",
+  medium: "cyan",
+  low: "muted",
 };
 
 const statusLabels: Record<string, string> = {
@@ -101,7 +109,7 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
               {openIssues.map((issue) => (
                 <Card key={issue.id} hover={false} className="!p-3">
                   <div className="flex items-start gap-3">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 bg-${priorityColors[issue.priority] || "gray"}-400`} />
+                    <StatusDot color={priorityDot[issue.priority] ?? "muted"} className="mt-1.5" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--text-primary)] truncate">{issue.title}</p>
                       {issue.description && (

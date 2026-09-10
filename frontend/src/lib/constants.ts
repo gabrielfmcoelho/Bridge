@@ -97,16 +97,16 @@ export const NAV_SECTIONS: NavSection[] = [
 // Flat list for mobile drawer and backward compat
 export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap(s => s.items);
 
-/** Semantic colors for entity-link indicators on inventory cards. */
+/** Token names for entity-link indicators on inventory cards (see CardIndicator). */
 export const ENTITY_INDICATOR_COLORS = {
   hosts: "cyan",
-  dns: "emerald",
-  services: "amber",
-  projects: "violet",
-  containers: "sky",
-  processes: "violet",
-  dependencies: "amber",
-  alerts: "amber",
+  dns: "success",
+  services: "warning",
+  projects: "purple",
+  containers: "info",
+  processes: "purple",
+  dependencies: "warning",
+  alerts: "warning",
   issues: "purple",
-  chamados: "orange",
+  chamados: "warning",
 } as const;

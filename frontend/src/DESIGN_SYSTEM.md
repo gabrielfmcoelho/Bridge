@@ -20,7 +20,8 @@ reprints them.
    `--purple` `--rose` for categorical identity. Tints are opacity modifiers:
    `bg-[var(--success)]/15 border-[var(--success)]/30`. No raw palette classes
    (`text-emerald-400`) and no hex in tsx: the light theme only works through
-   the tokens. Remaining raw-palette sites are the page-by-page sweep.
+   the tokens. Swept app-wide on 2026-09-10; what is left is `Header.tsx`, `app/secrets`
+   and the atlas layer palette in `LayerBadge`.
 2. **One registry for icons.** `lib/icon-paths.ts` (`ICON_PATHS`, `NAV_ICONS`)
    through `<Icon path size>`; `size` scales stroke with the box. Adding an
    icon means adding a named path there, never an inline `<svg>`.
@@ -104,8 +105,7 @@ Each piece of data should appear in **exactly one** card section:
 | Containers | `--info` |
 | Chamados | `--warning` |
 
-`lib/constants.ts` `ENTITY_INDICATOR_COLORS` still names Tailwind hues; it moves to
-tokens with the page-by-page sweep.
+`lib/constants.ts` `ENTITY_INDICATOR_COLORS` is on tokens as of the 2026-09-10 sweep.
 
 ---
 
