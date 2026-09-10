@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { sshAPI } from "@/lib/api";
+import { useCopy } from "@/hooks/useCopy";
 import { useLocale } from "@/contexts/LocaleContext";
 import Drawer from "@/components/ui/Drawer";
 import Button from "@/components/ui/Button";
@@ -18,7 +19,7 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
 }) {
   const { t } = useLocale();
   const [includeKey, setIncludeKey] = useState(!!host.has_key);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopy();
 
   const { data } = useQuery({
     queryKey: ["ssh-config", slug, includeKey],
@@ -28,12 +29,7 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
 
   const config = data?.config || "";
 
-  const handleCopy = async () => {
-    if (!config) return;
-    await navigator.clipboard.writeText(config);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const handleCopy = () => { if (config) copy(config); };
 
   return (
     <Drawer open={open} onClose={onClose} title={t("host.sshConfig")}>

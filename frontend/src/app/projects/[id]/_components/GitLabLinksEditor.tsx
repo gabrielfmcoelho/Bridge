@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectGitlabAPI, type ProjectGitLabLink } from "@/lib/api";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import StatusDot from "@/components/ui/StatusDot";
 
 interface Props {
   projectId: number;
@@ -261,24 +262,18 @@ function LinkHealthIcon({ link, integrationActive }: { link: ProjectGitLabLink; 
   // When the integration isn't active we can't verify — show a neutral dot.
   if (!integrationActive || link.reachable === undefined) {
     return (
-      <span
-        className="w-2 h-2 rounded-full bg-[var(--text-faint)] shrink-0"
-        title="Link not verified (GitLab integration inactive)"
-      />
+      <StatusDot color="muted"
+        title="Link not verified (GitLab integration inactive)" />
     );
   }
   if (link.reachable) {
     return (
-      <span
-        className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"
-        title="Resolved on GitLab"
-      />
+      <StatusDot className="bg-emerald-400"
+        title="Resolved on GitLab" />
     );
   }
   return (
-    <span
-      className="w-2 h-2 rounded-full bg-red-400 shrink-0"
-      title={link.health_error || "Not reachable on GitLab"}
-    />
+    <StatusDot className="bg-red-400"
+      title={link.health_error || "Not reachable on GitLab"} />
   );
 }

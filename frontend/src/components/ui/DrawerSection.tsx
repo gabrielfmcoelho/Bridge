@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import StatusDot from "@/components/ui/StatusDot";
 
 interface DrawerSectionProps {
   title: string;
@@ -29,7 +30,7 @@ export default function DrawerSection({ title, open, onToggle, active, children 
         <span className="flex items-center gap-2">
           {title}
           {active && !open && (
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+            <StatusDot size="xs" color="accent" />
           )}
         </span>
         <Icon path={ICON_PATHS.chevronDown} className={`w-4 h-4 text-[var(--text-faint)] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />

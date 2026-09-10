@@ -4,6 +4,7 @@ import { useState } from "react";
 import { NODE_COLORS, NODE_TYPE_LABELS, edgeStyle, EDGE_LABELS } from "@/lib/lineage/style";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import StatusDot from "@/components/ui/StatusDot";
 
 const NODE_KEYS = ["dag", "task", "dbt_source", "dbt_model", "table", "script", "dbt_macro"];
 const EDGE_KEYS = ["ref", "uses_source", "writes", "executes", "triggers", "column_lineage"];
@@ -54,8 +55,8 @@ export default function LineageLegend() {
           <div>
             <div className="text-[9px] uppercase tracking-wider text-[var(--text-faint)] mb-1">Markers</div>
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /><span className="text-[10px] text-[var(--text-secondary)]">warning</span></span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /><span className="text-[10px] text-[var(--text-secondary)]">gap</span></span>
+              <span className="flex items-center gap-1"><StatusDot className="bg-red-500" /><span className="text-[10px] text-[var(--text-secondary)]">warning</span></span>
+              <span className="flex items-center gap-1"><StatusDot className="bg-amber-500" /><span className="text-[10px] text-[var(--text-secondary)]">gap</span></span>
             </div>
           </div>
         </div>

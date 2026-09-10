@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import Drawer from "@/components/ui/Drawer";
+import CopyButton from "@/components/ui/CopyButton";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
@@ -41,14 +41,8 @@ function parseFields(raw: string): { label: string; value: string }[] {
 // visually clips newlines.
 function CopyField({ label, value }: { label: string; value: string }) {
   const { t } = useLocale();
-  const [copied, setCopied] = useState(false);
   const multiline = value.includes("\n") || value.length > 120;
 
-  async function copy() {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   return (
     <div>
@@ -63,9 +57,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
         ) : (
           <Input readOnly value={value} className="flex-1 font-mono text-xs" />
         )}
-        <Button variant="secondary" size="sm" type="button" onClick={copy}>
-          {copied ? t("atlas.apis.copied") : t("atlas.apis.copyValue")}
-        </Button>
+        <CopyButton value={value} size="sm" label={t("atlas.apis.copyValue")} copiedLabel={t("atlas.apis.copied")} />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import Button from "@/components/ui/Button";
 import type { Host } from "@/lib/types";
 import type { BatchProgress } from "./useBatchRunner";
+import StatusDot from "@/components/ui/StatusDot";
 
 export interface ScopeOption {
   key: string;
@@ -131,10 +132,10 @@ export default function BatchOperationShell({
             if (!s) return null;
             return (
               <div key={host.oficial_slug} className="flex items-center gap-2 py-1.5 px-2 rounded text-xs">
-                {s.status === "pending" && <span className="w-2 h-2 rounded-full bg-[var(--text-faint)]" />}
-                {s.status === "running" && <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />}
-                {s.status === "success" && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
-                {s.status === "failed" && <span className="w-2 h-2 rounded-full bg-red-400" />}
+                {s.status === "pending" && <StatusDot color="muted" />}
+                {s.status === "running" && <StatusDot color="accent" className="animate-pulse" />}
+                {s.status === "success" && <StatusDot className="bg-emerald-400" />}
+                {s.status === "failed" && <StatusDot className="bg-red-400" />}
                 <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{host.nickname}</span>
                 {s.status === "running" && <span className="text-[var(--accent)] ml-auto">{runningLabel}{s.attempt && s.attempt > 1 ? ` (${s.attempt})` : ""}</span>}
                 {s.status === "success" && <span className="text-emerald-400 ml-auto">OK</span>}

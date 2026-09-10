@@ -1,4 +1,5 @@
 import { type ButtonHTMLAttributes } from "react";
+import Spinner from "./Spinner";
 
 const variants = {
   primary:
@@ -24,15 +25,6 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
-function Spinner({ size }: { size: string }) {
-  const sizeClass = size === "sm" ? "w-3 h-3" : size === "lg" ? "w-5 h-5" : "w-4 h-4";
-  return (
-    <svg className={`${sizeClass} animate-spin`} viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-      <path d="M12 2a10 10 0 019.17 6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 export default function Button({
   variant = "primary",
@@ -49,7 +41,7 @@ export default function Button({
       disabled={disabled || loading}
       {...props}
     >
-      {loading && <Spinner size={size} />}
+      {loading && <Spinner size={size === "lg" ? "md" : size === "sm" ? "xs" : "sm"} />}
       {children}
     </button>
   );

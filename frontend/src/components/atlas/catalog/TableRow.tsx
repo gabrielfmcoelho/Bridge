@@ -7,6 +7,7 @@ import RoleBadge from "../shared/RoleBadge";
 import { qualifiedName } from "./TableCard";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import StatusDot from "@/components/ui/StatusDot";
 
 interface Props {
   table: TableRecord;
@@ -38,7 +39,7 @@ export default function TableRow({ table, selected, onClick }: Props) {
         >
           {table.node.label}
         </span>
-        {table.hasWarning && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}
+        {table.hasWarning && <StatusDot size="xs" className="bg-red-500" />}
       </div>
 
       <span className="text-[10px] text-[var(--text-muted)] font-mono truncate min-w-0 hidden md:inline">{fq}</span>

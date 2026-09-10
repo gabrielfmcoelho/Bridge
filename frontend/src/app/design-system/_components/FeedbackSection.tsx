@@ -6,12 +6,14 @@ import OperationOutput from "@/components/ui/OperationOutput";
 import { Skeleton, SkeletonCard, SkeletonTable, SkeletonStats } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
 import Badge from "@/components/ui/Badge";
+import Spinner from "@/components/ui/Spinner";
+import StatusDot from "@/components/ui/StatusDot";
+import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
 import LayerBadge from "@/components/atlas/shared/LayerBadge";
 import RoleBadge from "@/components/atlas/shared/RoleBadge";
 import AlertBadge from "@/app/hosts/_components/AlertBadge";
 import { UsageBar, ResourceCard } from "@/app/hosts/[slug]/_components/UsageBar";
-import { SITUACAO_DOT_COLORS } from "@/lib/constants";
 import { TABLE_LAYERS } from "@/lib/lineage/indexes";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -66,10 +68,11 @@ export default function FeedbackSection() {
           <SkeletonStats />
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
-          <code>.skeleton</code> class in <code>globals.css</code>; 4 hand-rolled spinners exist (<code>Button</code>{" "}
-          private <code>Spinner</code>, <code>StatusAlert loading</code>,{" "}
-          <code>components/inventory/InventoryContent.tsx</code>,{" "}
-          <code>app/hosts/[slug]/_components/PasswordField.tsx</code>) — no shared <code>Spinner</code>.
+          <code>.skeleton</code> class in <code>globals.css</code>. The loading glyph is <code>Spinner</code> now
+          (Button, StatusAlert, InventoryContent, PasswordField all use it):{" "}
+          <span className="inline-flex items-center gap-2 align-middle text-[var(--text-secondary)]">
+            <Spinner size="xs" /> <Spinner /> <Spinner size="md" /> <Spinner size="lg" />
+          </span>
         </p>
       </Specimen>
 
@@ -122,20 +125,22 @@ export default function FeedbackSection() {
         </p>
       </Specimen>
 
-      <Specimen title="Status dots" source="lib/constants.ts (SITUACAO_DOT_COLORS)">
-        {Object.entries(SITUACAO_DOT_COLORS).map(([key, cls]) => (
-          <span key={key} className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-            <span className={`w-2 h-2 rounded-full ${cls}`} />
-            {key}
+      <Specimen title="StatusDot" source="components/ui/StatusDot.tsx">
+        {(["success", "warning", "danger", "info", "accent", "cyan", "purple", "rose", "muted"] as const).map((c) => (
+          <span key={c} className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+            <StatusDot color={c} />
+            {c}
           </span>
         ))}
         <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-glow" />
-          active (animate-pulse-glow)
+          <StatusDot color="success" pulse /> pulse
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+          <StatusDot size="xs" color="warning" /> xs <StatusDot color="warning" /> sm <StatusDot size="md" color="warning" /> md
         </span>
         <p className="text-xs text-[var(--text-muted)] w-full mt-1">
-          No component — inline spans in <code>Badge</code>, <code>AlertBadge</code>, <code>LayerBadge</code>,{" "}
-          <code>AsyncPicker</code>.
+          21 literal dots in 9 files swept in; the ones built from a class expression (Badge, AlertBadge, LayerBadge,
+          AsyncPicker, TicketList) still draw their own span.
         </p>
       </Specimen>
 
@@ -271,32 +276,13 @@ export default function FeedbackSection() {
         </span>
       </Specimen>
 
-      <Specimen
-        title="Initials avatar"
-        source="app/settings/page.tsx:503"
-        alsoIn={[
-          "components/layout/Header.tsx:153 (+hover classes)",
-          "components/layout/Header.tsx:200 (+md:hidden ml-auto)",
-          "app/settings/page.tsx:552",
-        ]}
-      >
-        {/* specimen: app/settings/page.tsx:503 */}
-        <div className="w-8 h-8 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] flex items-center justify-center text-xs font-semibold text-[var(--text-secondary)] shrink-0">
-          A
-        </div>
-        {/* specimen: components/layout/Header.tsx:163 */}
-        <div className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] flex items-center justify-center text-sm font-semibold text-[var(--text-secondary)]">
-          A
-        </div>
-        {/* specimen: components/layout/Header.tsx:214 (mobile drawer avatar; brief cited :202, which
-            is a distinct w-8 instance a few lines above — the w-12 block sits at :213-214) */}
-        <div className="w-12 h-12 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] flex items-center justify-center text-lg font-semibold text-[var(--text-secondary)]">
-          A
-        </div>
+      <Specimen title="Avatar" source="components/ui/Avatar.tsx" alsoIn={["components/layout/Header.tsx:153, :200, :214 (in flight)"]}>
+        <Avatar name="Ana Souza" />
+        <Avatar name="Ana Souza" size="md" />
+        <Avatar name="Ana Souza" size="lg" />
         <p className="text-xs text-[var(--text-muted)] w-full mt-1">
-          No <code>Avatar</code> component. This w-8 is the settings-table cell (carries <code>shrink-0</code>);
-          the Header.tsx w-8 sites above add their own hover or layout classes on top rather than matching this
-          byte-for-byte.
+          Initials only, sized to the row. The two settings sites (table cell, user card) use it; Header keeps its copies
+          until that file lands.
         </p>
       </Specimen>
 

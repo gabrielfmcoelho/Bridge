@@ -2,6 +2,7 @@ import Button from "@/components/ui/Button";
 import type { Host } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import StatusDot from "@/components/ui/StatusDot";
 
 export default function BatchScanModal({
   scanning,
@@ -181,11 +182,11 @@ export default function BatchScanModal({
             if (!s) return null;
             return (
               <div key={host.oficial_slug} className="flex items-center gap-2 py-1.5 px-2 rounded text-xs">
-                {s.status === "pending" && <span className="w-2 h-2 rounded-full bg-[var(--text-faint)]" />}
-                {s.status === "scanning" && <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />}
-                {s.status === "success" && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
-                {s.status === "failed" && <span className="w-2 h-2 rounded-full bg-red-400" />}
-                {s.status === "skipped" && <span className="w-2 h-2 rounded-full bg-slate-400" />}
+                {s.status === "pending" && <StatusDot color="muted" />}
+                {s.status === "scanning" && <StatusDot color="accent" className="animate-pulse" />}
+                {s.status === "success" && <StatusDot className="bg-emerald-400" />}
+                {s.status === "failed" && <StatusDot className="bg-red-400" />}
+                {s.status === "skipped" && <StatusDot className="bg-slate-400" />}
                 <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{host.nickname}</span>
                 {s.status === "scanning" && <span className="text-[var(--accent)] ml-auto">{t("host.scanning")}{s.attempt && s.attempt > 1 ? ` (${s.attempt}/3)` : ""}</span>}
                 {s.status === "success" && <span className="text-emerald-400 ml-auto">OK</span>}

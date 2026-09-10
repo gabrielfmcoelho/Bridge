@@ -6,7 +6,9 @@ import { contactsAPI, enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
+import { formatPhone } from "@/lib/utils";
 import Button from "@/components/ui/Button";
+import { tableClasses } from "@/components/ui/Table";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Checkbox from "@/components/ui/Checkbox";
@@ -18,16 +20,6 @@ import Badge from "@/components/ui/Badge";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import type { Contact, AssetGrantsInput } from "@/lib/types";
 import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
-
-function formatPhone(raw: string): string {
-  const d = raw.replace(/\D/g, "");
-  if (d.length === 0) return "";
-  if (d.length <= 2) return `(${d}`;
-  if (d.length <= 4) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  if (d.length <= 5) return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4)}`;
-  if (d.length <= 9) return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4, 5)} ${d.slice(5)}`;
-  return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4, 5)} ${d.slice(5, 9)}-${d.slice(9, 13)}`;
-}
 
 function toRawDigits(val: string): string {
   return val.replace(/\D/g, "");
@@ -86,28 +78,28 @@ export default function ContactsPage() {
           action={canEdit && !search ? <Button size="sm" onClick={() => setShowForm(true)}>+ {t("common.add")}</Button> : undefined}
         />
       ) : (
-        <div className="border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className={tableClasses.wrapper}>
+          <table className={tableClasses.table}>
             <thead>
-              <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs">
-                <th className="text-left px-4 py-2.5 font-medium">{t("responsavel.name")}</th>
-                <th className="text-left px-4 py-2.5 font-medium">{t("responsavel.phone")}</th>
-                <th className="text-left px-4 py-2.5 font-medium">{t("responsavel.role")}</th>
-                <th className="text-left px-4 py-2.5 font-medium">{t("responsavel.entity")}</th>
-                <th className="text-left px-4 py-2.5 font-medium w-24">{t("responsavel.external")}</th>
-                {canEdit && <th className="text-right px-4 py-2.5 font-medium w-24">Actions</th>}
+              <tr className={tableClasses.headRow}>
+                <th className={tableClasses.th}>{t("responsavel.name")}</th>
+                <th className={tableClasses.th}>{t("responsavel.phone")}</th>
+                <th className={tableClasses.th}>{t("responsavel.role")}</th>
+                <th className={tableClasses.th}>{t("responsavel.entity")}</th>
+                <th className={`${tableClasses.th} w-24`}>{t("responsavel.external")}</th>
+                {canEdit && <th className={`${tableClasses.th} text-right w-24`}>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {filtered.map((c, i) => (
-                <tr key={c.id} className={`border-t border-[var(--border-subtle)] ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}>
-                  <td className="px-4 py-2.5 text-[var(--text-primary)] font-medium">{c.name}</td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>{c.phone ? formatPhone(c.phone) : "-"}</td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.role || "-"}</td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.entity || "-"}</td>
-                  <td className="px-4 py-2.5">{c.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}</td>
+                <tr key={c.id} className={`${tableClasses.row} ${i % 2 === 1 ? tableClasses.rowAlt : ""}`}>
+                  <td className={`${tableClasses.td} text-[var(--text-primary)] font-medium`}>{c.name}</td>
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)] font-mono`}>{c.phone ? formatPhone(c.phone) : "-"}</td>
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)]`}>{c.role || "-"}</td>
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)]`}>{c.entity || "-"}</td>
+                  <td className={tableClasses.td}>{c.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}</td>
                   {canEdit && (
-                    <td className="px-4 py-2.5 text-right">
+                    <td className={`${tableClasses.td} text-right`}>
                       <div className="flex justify-end gap-1">
                         <Button size="sm" variant="secondary" onClick={() => { setEditing(c); setShowForm(true); }}>
                           {t("common.edit")}

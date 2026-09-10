@@ -13,6 +13,7 @@ import Icon from "@/components/ui/Icon";
 import StepIndicator from "@/components/ui/StepIndicator";
 import Tooltip from "@/components/ui/Tooltip";
 import SortDropdown from "@/components/ui/SortDropdown";
+import DropdownMenu, { DropdownMenuItem } from "@/components/ui/DropdownMenu";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 const noop = () => {};
@@ -134,6 +135,24 @@ export default function OverlaysSection() {
         />
         <p className="text-[11px] text-[var(--text-muted)] w-full">
           Ad-hoc dropdown with a <code>fixed inset-0</code> click-catcher; 2 consumers.
+        </p>
+      </Specimen>
+
+      <Specimen title="DropdownMenu" source="components/ui/DropdownMenu.tsx">
+        <DropdownMenu
+          trigger={
+            <Button size="sm" variant="secondary">
+              Actions <Icon path={ICON_PATHS.chevronDown} className="w-3 h-3" />
+            </Button>
+          }
+        >
+          <DropdownMenuItem onClick={noop}>Edit</DropdownMenuItem>
+          <DropdownMenuItem active onClick={noop}>Duplicate</DropdownMenuItem>
+          <DropdownMenuItem danger onClick={noop}>Delete</DropdownMenuItem>
+        </DropdownMenu>
+        <p className="text-xs text-[var(--text-muted)] w-full mt-2">
+          Radix Popover with the app&apos;s panel skin; items close the menu. <code>SortDropdown</code> and the ssh-config
+          write menu use it; Header&apos;s user menu (below) is the last hand-rolled one.
         </p>
       </Specimen>
 

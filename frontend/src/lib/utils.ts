@@ -174,3 +174,14 @@ export function parseContainerRow(raw: string) {
   const net = netMatch?.[1]?.trim() || "";
   return { name, cpu, mem, net, cpuNum: parseFloat(cpu) || 0, memNum: parseFloat(mem) || 0 };
 }
+
+/** Brazilian mobile mask over raw digits: (XX) XX 9 XXXX-XXXX, partial while typing. */
+export function formatPhone(raw: string): string {
+  const d = raw.replace(/\D/g, "");
+  if (d.length === 0) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 4) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 5) return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4)}`;
+  if (d.length <= 9) return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4, 5)} ${d.slice(5)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4, 5)} ${d.slice(5, 9)}-${d.slice(9, 13)}`;
+}

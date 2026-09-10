@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { EntityResponsavel, Contact } from "@/lib/types";
+import { formatPhone } from "@/lib/utils";
 import Select from "@/components/ui/Select";
 import IconButton from "@/components/ui/IconButton";
 import Button from "@/components/ui/Button";
@@ -15,16 +16,6 @@ interface ResponsavelListProps {
   onChange: (v: EntityResponsavel[]) => void;
   contacts: Contact[];
   t: (k: string) => string;
-}
-
-function formatPhone(raw: string): string {
-  const d = raw.replace(/\D/g, "");
-  if (d.length === 0) return "";
-  if (d.length <= 2) return `(${d}`;
-  if (d.length <= 4) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  if (d.length <= 5) return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4)}`;
-  if (d.length <= 9) return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4, 5)} ${d.slice(5)}`;
-  return `(${d.slice(0, 2)}) ${d.slice(2, 4)} ${d.slice(4, 5)} ${d.slice(5, 9)}-${d.slice(9, 13)}`;
 }
 
 function fromContact(c: Contact, isMain: boolean): EntityResponsavel {

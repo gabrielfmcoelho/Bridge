@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import PageShell from "@/components/layout/PageShell";
@@ -15,6 +15,7 @@ import StatusAlert from "@/components/ui/StatusAlert";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { catalogAPI, offeringsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useDebounce } from "@/hooks/useDebounce";
 import type { Offering, RequestType } from "@/lib/types";
 import CatalogAssetsTable, { type AssetSortKey } from "./CatalogAssetsTable";
 import OfferingCard from "./OfferingCard";
@@ -51,7 +52,7 @@ export default function CatalogSearch() {
 
   const initialQ = searchParams.get("q") ?? "";
   const [inputValue, setInputValue] = useState(initialQ);
-  const [debouncedQ, setDebouncedQ] = useState(initialQ);
+  const debouncedQ = useDebounce(inputValue.trim(), DEBOUNCE_MS);
   const [kind, setKind] = useState<KindFilter>("all");
   const [assetPage, setAssetPage] = useState(1);
   const [assetSort, setAssetSort] = useState<{ key: AssetSortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
@@ -59,15 +60,6 @@ export default function CatalogSearch() {
   const [types, setTypes] = useState<Set<RequestType>>(new Set());
   const [selectedOffering, setSelectedOffering] = useState<Offering | null>(null);
 
-  // Debounce: echo the input instantly, push it into the queries ~300ms later.
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => setDebouncedQ(inputValue.trim()), DEBOUNCE_MS);
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [inputValue]);
 
   useEffect(() => {
     setAssetPage(1);

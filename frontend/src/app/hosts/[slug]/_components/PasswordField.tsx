@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Spinner from "@/components/ui/Spinner";
 import { hostsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 
@@ -56,10 +57,7 @@ export default function PasswordField({ slug }: { slug: string }) {
           aria-label={visible ? t("common.hide") : t("common.show")}
         >
           {loading ? (
-            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
-              <path d="M12 2a10 10 0 019.17 6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-            </svg>
+            <Spinner />
           ) : (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               {visible ? (

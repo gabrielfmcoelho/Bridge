@@ -14,6 +14,7 @@ import { SkeletonStats } from "@/components/ui/Skeleton";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import StatusDot from "@/components/ui/StatusDot";
 
 const statConfig = [
   { key: "hosts", color: "cyan", icon: "M5 3h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm0 10h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2z" },
@@ -304,7 +305,7 @@ export default function DashboardPage() {
                       href={`/hosts/${scan.slug}`}
                       className="flex items-center gap-3 p-2 -mx-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors"
                     >
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                      <StatusDot className="bg-emerald-400" />
                       <span className="text-sm text-[var(--text-primary)] font-medium truncate" style={{ fontFamily: "var(--font-mono)" }}>
                         {scan.nickname}
                       </span>

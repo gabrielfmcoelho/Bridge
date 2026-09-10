@@ -13,6 +13,7 @@ import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import Avatar from "@/components/ui/Avatar";
 import TabBar from "@/components/ui/TabBar";
 import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
 import IconButton from "@/components/ui/IconButton";
@@ -470,9 +471,7 @@ function UsersSection() {
                 >
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] flex items-center justify-center text-xs font-semibold text-[var(--text-secondary)] shrink-0">
-                        {(u.display_name || u.username).charAt(0).toUpperCase()}
-                      </div>
+                      <Avatar name={u.display_name || u.username} size="sm" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-[var(--text-primary)] truncate">{u.display_name || u.username}</p>
                         <p className="text-[11px] text-[var(--text-faint)]">@{u.username}</p>
@@ -519,9 +518,7 @@ function UsersSection() {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] flex items-center justify-center text-sm font-semibold text-[var(--text-secondary)] shrink-0">
-                    {(u.display_name || u.username).charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar name={u.display_name || u.username} size="md" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-[var(--text-primary)] truncate">{u.display_name || u.username}</p>
                     <p className="text-[11px] text-[var(--text-faint)]">@{u.username}</p>

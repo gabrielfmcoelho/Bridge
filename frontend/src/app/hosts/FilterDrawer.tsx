@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import DrawerSection from "@/components/ui/DrawerSection";
+import FormField from "@/components/ui/FormField";
 import Select from "@/components/ui/Select";
 import PillButton from "@/components/ui/PillButton";
 import InventoryFilterDrawer from "@/components/inventory/InventoryFilterDrawer";
@@ -113,46 +114,46 @@ export default function FilterDrawer({
 
       <DrawerSection title={t("host.entidadeResponsavel")} open={openSection === "responsaveis"} onToggle={() => toggle("responsaveis")} active={!!filters.entidade_id || !!filters.responsavel_interno}>
         <div className="space-y-3">
-          <FieldLabel label={t("entidades.title")}>
+          <FormField label={t("entidades.title")}>
             <Select value={filters.entidade_id} onChange={(e) => set("entidade_id", e.target.value)} options={[{ value: "", label: t("common.all") }, ...entidades.map((e) => ({ value: String(e.id), label: indentedLabel(e) }))]} />
-          </FieldLabel>
-          <FieldLabel label={t("host.responsavelInterno")}>
+          </FormField>
+          <FormField label={t("host.responsavelInterno")}>
             <Select value={filters.responsavel_interno} onChange={(e) => set("responsavel_interno", e.target.value)} options={contactsToOptions(contacts)} />
-          </FieldLabel>
+          </FormField>
         </div>
       </DrawerSection>
 
       <DrawerSection title={t("filters.tests")} open={openSection === "tests"} onToggle={() => toggle("tests")} active={!!filters.scan_result || !!filters.key_test_status || !!filters.password_test_status}>
         <div className="space-y-3">
-          <FieldLabel label={t("filters.scanResult")}>
+          <FormField label={t("filters.scanResult")}>
             <Select value={filters.scan_result} onChange={(e) => set("scan_result", e.target.value)} options={testStatusOptions} />
-          </FieldLabel>
+          </FormField>
           <div className="grid grid-cols-2 gap-3">
-            <FieldLabel label={t("filters.keyTest")}>
+            <FormField label={t("filters.keyTest")}>
               <Select value={filters.key_test_status} onChange={(e) => set("key_test_status", e.target.value)} options={testStatusOptions} />
-            </FieldLabel>
-            <FieldLabel label={t("filters.pwdTest")}>
+            </FormField>
+            <FormField label={t("filters.pwdTest")}>
               <Select value={filters.password_test_status} onChange={(e) => set("password_test_status", e.target.value)} options={testStatusOptions} />
-            </FieldLabel>
+            </FormField>
           </div>
         </div>
       </DrawerSection>
 
       <DrawerSection title={t("filters.scanAndAlerts")} open={openSection === "scan"} onToggle={() => toggle("scan")} active={!!filters.has_scan || !!filters.alert_level}>
         <div className="grid grid-cols-2 gap-3">
-          <FieldLabel label={t("filters.scan")}>
+          <FormField label={t("filters.scan")}>
             <Select value={filters.has_scan} onChange={(e) => set("has_scan", e.target.value)} options={scanOptions} />
-          </FieldLabel>
-          <FieldLabel label={t("filters.alerts")}>
+          </FormField>
+          <FormField label={t("filters.alerts")}>
             <Select value={filters.alert_level} onChange={(e) => set("alert_level", e.target.value)} options={alertOptions} />
-          </FieldLabel>
+          </FormField>
         </div>
       </DrawerSection>
 
       <DrawerSection title={t("filters.idleSection")} open={openSection === "idle"} onToggle={() => toggle("idle")} active={!!filters.idle}>
-        <FieldLabel label={t("host.idle")}>
+        <FormField label={t("host.idle")}>
           <Select value={filters.idle} onChange={(e) => set("idle", e.target.value)} options={idleOptions} />
-        </FieldLabel>
+        </FormField>
         <p className="mt-2 text-[10px] text-[var(--text-muted)] leading-relaxed">
           {t("filters.idleHint")}
         </p>
@@ -161,13 +162,5 @@ export default function FilterDrawer({
   );
 }
 
-function FieldLabel({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide mb-1.5">{label}</label>
-      {children}
-    </div>
-  );
-}
 
 export { emptyFilters };

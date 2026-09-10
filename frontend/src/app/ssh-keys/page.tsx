@@ -7,6 +7,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
+import Field from "@/components/ui/Field";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -449,13 +450,3 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
   );
 }
 
-function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <span className="text-xs text-[var(--text-muted)]">{label}</span>
-      <p className={`text-sm text-[var(--text-secondary)] ${mono ? "" : ""}`} style={mono ? { fontFamily: "var(--font-mono)" } : undefined}>
-        {value}
-      </p>
-    </div>
-  );
-}

@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import EmptyState from "@/components/ui/EmptyState";
+import Spinner from "@/components/ui/Spinner";
 import { SkeletonCard, SkeletonTable } from "@/components/ui/Skeleton";
 
 interface InventoryContentProps<T extends { id: number }> {
@@ -87,10 +88,7 @@ export default function InventoryContent<T extends { id: number }>({
           className="mt-6 flex flex-col items-center gap-3 py-4 text-sm text-[var(--text-muted)]"
         >
           <div className="inline-flex items-center gap-2">
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+            <Spinner />
             <span>
               {loadingMoreLabel ?? "Loading more..."} ({visibleCount}/{items.length})
             </span>

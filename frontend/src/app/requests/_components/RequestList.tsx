@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -18,6 +18,7 @@ import StatusAlert from "@/components/ui/StatusAlert";
 import { requestsAPI } from "@/lib/api";
 import { statusColor, statusLabelKey } from "@/lib/requests";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useDebounce } from "@/hooks/useDebounce";
 import type { ServiceRequest, RequestStatus } from "@/lib/types";
 import RequestFilterDrawer from "./RequestFilterDrawer";
 
@@ -46,23 +47,13 @@ export default function RequestList() {
 
   const [view, setView] = useState<View>(isView(searchParams.get("view")) ? (searchParams.get("view") as View) : "mine");
   const [inputValue, setInputValue] = useState("");
-  const [debouncedQ, setDebouncedQ] = useState("");
+  const debouncedQ = useDebounce(inputValue.trim(), DEBOUNCE_MS);
   const [status, setStatus] = useState("");
   const [offeringId, setOfferingId] = useState("");
   const [priority, setPriority] = useState("");
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // Debounce the free-text search the same way src/app/catalog/_components/
-  // CatalogSearch.tsx does: instant local echo, ~300ms before it hits the query.
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => setDebouncedQ(inputValue.trim()), DEBOUNCE_MS);
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [inputValue]);
 
   // Keep ?view= in sync so a tab is shareable — same pattern as CatalogSearch's ?q= sync.
   useEffect(() => {

@@ -5,6 +5,7 @@ import { Section, Specimen } from "./Section";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import PillButton from "@/components/ui/PillButton";
+import CopyButton from "@/components/ui/CopyButton";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import FloatingActionButton from "@/components/ui/FloatingActionButton";
 import Icon from "@/components/ui/Icon";
@@ -20,17 +21,6 @@ const PILL_KEYS = ["all", "prod", "staging"] as const;
 
 export default function ButtonsSection() {
   const [pillFilter, setPillFilter] = useState<string>("all");
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard
-      .writeText("Host web-01\n  HostName 10.0.0.4")
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {});
-  };
 
   return (
     <Section id="buttons" title="Buttons">
@@ -117,52 +107,18 @@ export default function ButtonsSection() {
         </p>
       </Specimen>
 
-      <Specimen
-        title="Copy to clipboard"
-        source="app/hosts/[slug]/_components/SSHConfigDrawer.tsx:68-90"
-        alsoIn={[
-          "components/atlas/apis/ShareBundleModal.tsx:328",
-          "components/atlas/apis/ProjectSecretsSheet.tsx:48",
-          "components/wiki/WikiShareModal.tsx:100",
-          "components/glpi/DropdownCatalogueEditorModal.tsx:112",
-          "app/ssh-config/page.tsx:77",
-          "app/settings/IntegrationsTab.tsx:1475",
-          "app/share/[token]/page.tsx:429",
-          "app/secrets/_components/ShareLinkModal.tsx:111 (guardrailed path)",
-        ]}
-        wide
-      >
-        {/* specimen: app/hosts/[slug]/_components/SSHConfigDrawer.tsx:68-90 */}
-        <div className="relative group">
-          <pre
-            className="text-xs text-[var(--text-primary)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-4 overflow-x-auto whitespace-pre"
-            style={{ fontFamily: "var(--font-mono)" }}
-          >
-            {"Host web-01\n  HostName 10.0.0.4"}
-          </pre>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="absolute top-2 right-2 p-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition-all"
-            title="Copy"
-          >
-            {copied ? (
-              <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
-            )}
-          </button>
+      <Specimen title="CopyButton / useCopy" source="components/ui/CopyButton.tsx, hooks/useCopy.ts" wide>
+        <div className="flex flex-wrap items-center gap-3">
+          <CopyButton value="Host web-01" />
+          <CopyButton value="Host web-01" icon label="Copy config" copiedLabel="Copied" />
+          <CopyButton value="ssh-rsa AAAA…" size="sm" variant="ghost" label="Copy key" />
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
-          9 inline implementations, no shared <code>CopyButton</code>.
+          <code>useCopy()</code> owns the clipboard call, the 2 s flash and the non-secure-context fallback;{" "}
+          <code>CopyButton</code> is Button + the hook for the plain case. Migrated: ssh-config, SSHConfigDrawer (hook, two
+          controls share one state), WikiShareModal, ShareBundleModal, ProjectSecretsSheet. Still inline:{" "}
+          <code>glpi/DropdownCatalogueEditorModal.tsx:112</code>, <code>settings/IntegrationsTab.tsx:1464</code> (prompt
+          fallback), <code>share/[token]/page.tsx:428</code> (keyed multi-copy), <code>secrets/ShareLinkModal.tsx</code> (guardrailed).
         </p>
       </Specimen>
 

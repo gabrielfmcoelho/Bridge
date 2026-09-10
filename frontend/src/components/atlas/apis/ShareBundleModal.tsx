@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/ui/Modal";
+import CopyButton from "@/components/ui/CopyButton";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FormError from "@/components/ui/FormError";
@@ -115,7 +116,6 @@ export default function ShareBundleModal({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   // When set, the top form is editing an existing link's items in place (same
   // URL) rather than creating a new one; `notice` shows a transient confirmation.
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -192,7 +192,6 @@ export default function ShareBundleModal({
     setError(null);
     setSubmitting(false);
     setResult(null);
-    setCopied(false);
     setOpenLog(null);
     setEditingId(null);
     setNotice(null);
@@ -323,12 +322,6 @@ export default function ShareBundleModal({
     }
   }
 
-  async function copy() {
-    if (!result) return;
-    await navigator.clipboard.writeText(result);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   const ModeBtn = ({ m, label }: { m: Mode; label: string }) => (
     <button
@@ -351,9 +344,7 @@ export default function ShareBundleModal({
           <p className="text-sm text-[var(--text-secondary)]">{t("atlas.apis.linkCreated")}</p>
           <div className="flex gap-2">
             <Input value={result} readOnly className="font-mono text-xs" />
-            <Button type="button" onClick={copy}>
-              {copied ? t("atlas.apis.copied") : t("atlas.apis.copyLink")}
-            </Button>
+            <CopyButton value={result} variant="primary" label={t("atlas.apis.copyLink")} copiedLabel={t("atlas.apis.copied")} />
           </div>
           <p className="text-xs text-amber-400">⚠ {t("atlas.apis.tokenOnce")}</p>
           <div className="flex justify-end pt-2">

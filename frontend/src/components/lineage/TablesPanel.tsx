@@ -7,6 +7,7 @@ import { buildTableMatrix, TABLE_LAYERS, type TableLayer } from "@/lib/lineage/i
 import type { LineageNode } from "@/lib/lineage/types";
 import { LAYER_COLORS } from "@/lib/lineage/style";
 import DetailDrawer from "./DetailDrawer";
+import StatusDot from "@/components/ui/StatusDot";
 
 interface Props {
   indexes: LineageIndexes;
@@ -192,7 +193,7 @@ function TableCard({
         <span className="text-xs font-mono text-[var(--text-primary)] truncate flex-1" title={table.id}>
           {table.label}
         </span>
-        {hasWarning && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}
+        {hasWarning && <StatusDot size="xs" className="bg-red-500" />}
         {colCount > 0 && (
           <span className="text-[9px] px-1 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] shrink-0">
             {colCount}

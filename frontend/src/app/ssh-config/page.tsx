@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { sshAPI } from "@/lib/api";
+import CopyButton from "@/components/ui/CopyButton";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import DropdownMenu, { DropdownMenuItem } from "@/components/ui/DropdownMenu";
 import Badge from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import StatusDot from "@/components/ui/StatusDot";
 
 function highlightSSHConfig(content: string): string {
   return content
@@ -37,10 +40,7 @@ export default function SSHConfigPage() {
   const { t } = useLocale();
   const { user } = useAuth();
   const [genResult, setGenResult] = useState<{ status: string; host_count: number; path: string } | null>(null);
-  const [copied, setCopied] = useState(false);
 
-  const [showWriteMenu, setShowWriteMenu] = useState(false);
-  const writeMenuRef = useRef<HTMLDivElement>(null);
 
   const { data: preview, isLoading } = useQuery({
     queryKey: ["ssh-config-preview"],
@@ -56,31 +56,11 @@ export default function SSHConfigPage() {
     mutationFn: sshAPI.generateConfig,
     onSuccess: (data) => {
       setGenResult(data);
-      setShowWriteMenu(false);
     },
   });
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
-  // Close write menu on outside click
-  useEffect(() => {
-    if (!showWriteMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (writeMenuRef.current && !writeMenuRef.current.contains(e.target as Node)) {
-        setShowWriteMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showWriteMenu]);
-
-  const handleCopy = async () => {
-    if (preview?.content) {
-      await navigator.clipboard.writeText(preview.content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   const handleDownload = () => {
     if (preview?.content) {
@@ -108,32 +88,19 @@ export default function SSHConfigPage() {
             </svg>
             {t("sshConfig.download")}
           </Button>
-          <Button variant="secondary" onClick={handleCopy} disabled={!preview?.content}>
-            {copied ? (
-              <>
-                <Icon path={ICON_PATHS.check} className="w-4 h-4 text-emerald-400" />
-                {t("sshConfig.copied")}
-              </>
-            ) : (
-              <>
-                <Icon path={ICON_PATHS.copy} />
-                {t("sshConfig.copy")}
-              </>
-            )}
-          </Button>
+          <CopyButton value={preview?.content ?? ""} icon label={t("sshConfig.copy")} copiedLabel={t("sshConfig.copied")} disabled={!preview?.content} />
           {canEdit && (
-            <div className="relative" ref={writeMenuRef}>
-              <Button
-                variant="secondary"
-                onClick={() => setShowWriteMenu((v) => !v)}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <DropdownMenu
+              trigger={
+                <Button variant="secondary">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
                 </svg>
-              </Button>
-              {showWriteMenu && (
-                <div className="absolute right-0 top-full mt-1 z-50 w-72 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] shadow-xl animate-fade-in">
-                  <div className="p-3 border-b border-[var(--border-subtle)]">
+                </Button>
+              }
+              className="w-72"
+            >
+              <div className="p-3 border-b border-[var(--border-subtle)]">
                     <p className="text-xs text-amber-400 flex items-center gap-1.5">
                       <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
@@ -146,18 +113,16 @@ export default function SSHConfigPage() {
                       </code>
                     )}
                   </div>
-                  <div className="p-1.5">
-                    <button
-                      className="w-full text-left px-3 py-2 text-sm rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] transition-colors disabled:opacity-50"
-                      onClick={() => generateMutation.mutate()}
-                      disabled={generateMutation.isPending}
-                    >
-                      {generateMutation.isPending ? t("sshConfig.writing") : t("sshConfig.writeToServer")}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+              <div className="p-1.5">
+                <DropdownMenuItem
+                  className="rounded-[var(--radius-sm)] py-2 text-[var(--text-primary)]"
+                  onClick={() => generateMutation.mutate()}
+                  disabled={generateMutation.isPending}
+                >
+                  {generateMutation.isPending ? t("sshConfig.writing") : t("sshConfig.writeToServer")}
+                </DropdownMenuItem>
+              </div>
+            </DropdownMenu>
           )}
         </div>
       </div>
@@ -227,9 +192,9 @@ export default function SSHConfigPage() {
             <div className="bg-[var(--bg-base)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] overflow-hidden">
               {/* Terminal header */}
               <div className="flex items-center gap-1.5 px-4 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                <StatusDot size="md" className="bg-red-500/60" />
+                <StatusDot size="md" className="bg-yellow-500/60" />
+                <StatusDot size="md" className="bg-emerald-500/60" />
                 <span className="ml-2 text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>~/.ssh/config</span>
               </div>
               <div className="flex max-h-[70vh] overflow-auto">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/ui/Modal";
+import CopyButton from "@/components/ui/CopyButton";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FormError from "@/components/ui/FormError";
@@ -37,7 +38,6 @@ export default function WikiShareModal({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [renewChoice, setRenewChoice] = useState<Record<number, number>>({});
 
   const linksKey = ["share-bundles", "wiki", target?.kind, target?.refKey] as const;
@@ -65,7 +65,6 @@ export default function WikiShareModal({
     setError(null);
     setSubmitting(false);
     setResult(null);
-    setCopied(false);
   }
 
   function close() {
@@ -95,12 +94,6 @@ export default function WikiShareModal({
     }
   }
 
-  async function copy() {
-    if (!result) return;
-    await navigator.clipboard.writeText(result);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   return (
     <Modal open={open} onClose={close} title={t("atlas.apis.shareWikiTitle")}>
@@ -109,9 +102,7 @@ export default function WikiShareModal({
           <p className="text-sm text-[var(--text-secondary)]">{t("atlas.apis.linkCreated")}</p>
           <div className="flex gap-2">
             <Input value={result} readOnly className="font-mono text-xs" />
-            <Button type="button" onClick={copy}>
-              {copied ? t("atlas.apis.copied") : t("atlas.apis.copyLink")}
-            </Button>
+            <CopyButton value={result} variant="primary" label={t("atlas.apis.copyLink")} copiedLabel={t("atlas.apis.copied")} />
           </div>
           <p className="text-xs text-amber-400">⚠ {t("atlas.apis.tokenOnce")}</p>
           <div className="flex justify-end pt-2">

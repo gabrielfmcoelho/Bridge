@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, type ReactNode } from "react";
+import { tableClasses } from "./Table";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -58,10 +59,10 @@ export default function SortableTable<K extends string>({
   };
 
   return (
-    <div className="border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-x-auto">
-      <table className="w-full text-sm">
+    <div className={tableClasses.wrapper}>
+      <table className={tableClasses.table}>
         <thead>
-          <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
+          <tr className={tableClasses.headRow}>
             {columns.map((col) => {
               const sortable = col.sortable !== false;
               return (
