@@ -7,7 +7,8 @@
     "toggleTheme": "Toggle theme",
     "themeLabel": "Theme",
     "themeLight": "Light",
-    "themeDark": "Dark"
+    "themeDark": "Dark",
+    "breadcrumbs": "Breadcrumb"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -41,6 +42,7 @@
     "requests": "Requests",
     "wiki": "Wiki",
     "chamados": "Tickets",
+    "chamadosForms": "Forms",
     "designSystem": "Design System"
   },
   "atlas": {
@@ -107,7 +109,6 @@
       "ttlHours": "Expires in (hours)",
       "passphraseOptional": "Passphrase (optional)",
       "createLink": "Create link",
-      "edit": "Edit",
       "saveChanges": "Save changes",
       "cancelEdit": "Cancel edit",
       "editingNotice": "Editing this link's contents in place — the URL stays the same and current recipients will see the changes.",
@@ -1414,10 +1415,22 @@
     "emptyFiltered": "No results for this filter",
     "emptyFilteredHint": "Try a different priority, or clear the filters.",
     "empty": {
-      "mine": { "title": "You haven't requested anything yet", "hint": "Open the catalog to ask for a VM, an access, or anything else you need." },
-      "approve": { "title": "Nothing is waiting on you", "hint": "Requests that need your approval will show up here as soon as someone submits one." },
-      "fulfill": { "title": "Nothing to fulfill right now", "hint": "Approved requests assigned to your scope will appear here once someone approves them." },
-      "all": { "title": "No requests in view", "hint": "Nothing has been submitted yet within the scope you can see." }
+      "mine": {
+        "title": "You haven't requested anything yet",
+        "hint": "Open the catalog to ask for a VM, an access, or anything else you need."
+      },
+      "approve": {
+        "title": "Nothing is waiting on you",
+        "hint": "Requests that need your approval will show up here as soon as someone submits one."
+      },
+      "fulfill": {
+        "title": "Nothing to fulfill right now",
+        "hint": "Approved requests assigned to your scope will appear here once someone approves them."
+      },
+      "all": {
+        "title": "No requests in view",
+        "hint": "Nothing has been submitted yet within the scope you can see."
+      }
     },
     "searchPlaceholder": "Search requests…",
     "titleField": "Title",
