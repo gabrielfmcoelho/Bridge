@@ -5,7 +5,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import Button from "@/components/ui/Button";
 import { Section, Specimen } from "./Section";
 
-// Data-driven token lists — see app/globals.css for the source of truth.
+// Data-driven token lists; see app/globals.css for the source of truth.
 const COLORS = [
   "--bg-base", "--bg-surface", "--bg-elevated", "--bg-overlay",
   "--border-subtle", "--border-default", "--border-strong",
@@ -37,7 +37,7 @@ export default function TokensSection() {
   const [replay, setReplay] = useState(0);
 
   useEffect(() => {
-    // ponytail: rAF — child effects run before ThemeProvider sets data-theme; a sync read here sees the old theme
+    // ponytail: rAF; child effects run before ThemeProvider sets data-theme; a sync read here sees the old theme
     const id = requestAnimationFrame(() => {
       const cs = getComputedStyle(document.documentElement);
       setVals(
@@ -106,7 +106,7 @@ export default function TokensSection() {
           {FONTS.map((n) => (
             <div key={n} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
               <p style={{ fontFamily: `var(${n})` }} className="text-sm text-[var(--text-primary)]">
-                The quick brown fox — 0123456789
+                The quick brown fox; 0123456789
               </p>
               <code className="text-[11px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
                 {n}
@@ -116,7 +116,7 @@ export default function TokensSection() {
           ))}
           <p className="text-xs text-[var(--text-muted)]">
             <code>--font-display</code> and <code>--font-mono</code> are both JetBrains Mono; applied via inline{" "}
-            <code>style</code> (201&times; mono / 90&times; display) — no <code>.font-display</code> utility exists.
+            <code>style</code> (201&times; mono / 90&times; display); no <code>.font-display</code> utility exists.
           </p>
         </div>
       </Specimen>
@@ -185,7 +185,7 @@ export default function TokensSection() {
       </Specimen>
 
       <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
-        <li>No font-size tokens exist — the type scale lives in roughly 1,600 scattered classes.</li>
+        <li>No font-size tokens exist; the type scale lives in roughly 1,600 scattered classes.</li>
         <li>
           <code>@theme inline</code> maps only <code>--color-background</code> / <code>--color-foreground</code> /{" "}
           <code>--font-sans</code> / <code>--font-mono</code>.

@@ -6,7 +6,7 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 import { MarkdownContent } from "@/components/ui/MarkdownEditor";
 import { Section, Specimen } from "./Section";
 
-// Data-driven ramps — counts are grep tallies across src at the time this
+// Data-driven ramps; counts are grep tallies across src at the time this
 // catalog was written, not live (ponytail: a live grep-on-render is not
 // worth the complexity for a dev-facing inventory page).
 const SIZE_RAMP: [string, number][] = [
@@ -88,17 +88,17 @@ export default function TypographySection() {
           <div className="flex flex-wrap items-baseline gap-3">
             <h1 className="text-xl sm:text-2xl font-bold font-display">Hosts</h1>
             <code className="text-[11px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-              text-xl sm:text-2xl font-bold font-display (ui/PageHeader.tsx — the one page title now; mb-6 on the wrapper)
+              text-xl sm:text-2xl font-bold font-display (ui/PageHeader.tsx; the one page title now; mb-6 on the wrapper)
             </code>
           </div>
         </div>
       </Specimen>
 
-      <Specimen title="Section title (h2)" source="ad-hoc — no single canonical file" wide>
+      <Specimen title="Section title (h2)" source="ad-hoc; no single canonical file" wide>
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-[var(--text-secondary)]">Section title</h2>
           <p className="text-xs text-[var(--text-muted)]">
-            <code>text-sm font-semibold text-[var(--text-secondary)]</code> — 7 different spacing permutations
+            <code>text-sm font-semibold text-[var(--text-secondary)]</code>; 7 different spacing permutations
             around it across pages.
           </p>
         </div>
@@ -120,7 +120,7 @@ export default function TypographySection() {
             The three heading recipes in one component. Replaced <code>ListingLabel</code>, the catalog&apos;s{" "}
             <code>SectionLabel</code> and <code>StepHeading</code>, and <code>KpiGrid</code>&apos;s h2. The same class
             strings are still hand-written in ~70 places (<code>text-sm font-semibold text-secondary</code> 29&times;,{" "}
-            <code>text-xs … uppercase tracking-wider</code> 37&times;) — the sweep is the next pass.
+            <code>text-xs … uppercase tracking-wider</code> 37&times;); the sweep is the next pass.
           </p>
         </div>
       </Specimen>
@@ -141,10 +141,10 @@ export default function TypographySection() {
 
       <Specimen title="Colour ramp" source="app/globals.css" wide>
         <div className="space-y-1.5">
-          <p className="text-sm text-[var(--text-primary)]">text-primary — primary body text</p>
-          <p className="text-sm text-[var(--text-secondary)]">text-secondary — secondary text</p>
-          <p className="text-sm text-[var(--text-muted)]">text-muted — muted / helper text</p>
-          <p className="text-sm text-[var(--text-faint)]">text-faint — faint / label text</p>
+          <p className="text-sm text-[var(--text-primary)]">text-primary; primary body text</p>
+          <p className="text-sm text-[var(--text-secondary)]">text-secondary; secondary text</p>
+          <p className="text-sm text-[var(--text-muted)]">text-muted; muted / helper text</p>
+          <p className="text-sm text-[var(--text-faint)]">text-faint; faint / label text</p>
         </div>
       </Specimen>
 
@@ -170,7 +170,7 @@ export default function TypographySection() {
           <p className="text-xs text-[var(--text-muted)]">
             2&times; in src. <code>components/ui/Field.tsx</code> link variant uses{" "}
             <code>text-sm text-[var(--accent)] hover:text-[var(--accent-hover)]</code>. External links follow{" "}
-            <code>target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;</code> (24&times;) — no{" "}
+            <code>target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;</code> (24&times;); no{" "}
             <code>&lt;ExternalLink&gt;</code> component exists.
           </p>
         </div>

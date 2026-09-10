@@ -172,7 +172,7 @@ export default function TablesSection() {
         <Field label="URL" link href="#tables" value="https://bridge.gov.pi/hosts/web-01" />
         <Field label="Empty" value="" />
         <p className="text-[11px] text-[var(--text-muted)] w-full">
-          Read-only label/value display — not a form field (name collision with the local <code>Field</code> in{" "}
+          Read-only label/value display; not a form field (name collision with the local <code>Field</code> in{" "}
           <code>app/ssh-keys/page.tsx:469</code>).
         </p>
       </Specimen>
@@ -216,7 +216,7 @@ export default function TablesSection() {
 
       <Specimen title="Accordion" source="components/ui/Accordion.tsx">
         <Accordion sections={ACCORDION_SECTIONS} />
-        <p className="text-[11px] text-[var(--text-muted)] mt-2 w-full">Zero consumers in the app — dead code.</p>
+        <p className="text-[11px] text-[var(--text-muted)] mt-2 w-full">Zero consumers in the app; dead code.</p>
       </Specimen>
 
       <Specimen title="DrawerSection" source="components/ui/DrawerSection.tsx">
@@ -230,17 +230,17 @@ export default function TablesSection() {
         <p className="text-xs text-[var(--text-muted)] mb-1">Describe only:</p>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
-            Trees ×4 — <code>components/wiki/WikiTree.tsx</code> (role=tree), <code>components/atlas/catalog/DomainTree.tsx</code>,{" "}
+            Trees ×4; <code>components/wiki/WikiTree.tsx</code> (role=tree), <code>components/atlas/catalog/DomainTree.tsx</code>,{" "}
             <code>app/settings/EntidadesTab.tsx</code> (flattened via <code>lib/entidades.ts withDepth</code>),{" "}
             <code>components/atlas/apis/ShareBundleModal.tsx</code>
           </li>
           <li>
-            List renderers with private formatters — <code>components/glpi/TicketList.tsx</code> (own{" "}
+            List renderers with private formatters; <code>components/glpi/TicketList.tsx</code> (own{" "}
             <code>formatDate</code> + <code>statusColor</code>), <code>components/inventory/ResponsavelList.tsx</code> (own{" "}
             <code>formatPhone</code>, duplicated in <code>app/contacts/page.tsx</code>)
           </li>
           <li>
-            <code>components/inventory/InventoryContent.tsx</code> — loading/empty/cards/table state machine + infinite scroll
+            <code>components/inventory/InventoryContent.tsx</code>; loading/empty/cards/table state machine + infinite scroll
           </li>
           <li>No bytes/number formatter and no truncate helper in <code>src/lib</code></li>
         </ul>

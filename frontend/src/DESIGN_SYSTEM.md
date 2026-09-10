@@ -1,12 +1,58 @@
-# SSHCM Design System
+# Bridge Design System
 
-Reference guide for maintaining visual and code consistency across all inventory pages. **Host pages are the canonical reference** — DNS, Services, and Projects follow the same patterns.
+Rules for the parts of the UI a page cannot show. Everything renderable lives
+at **`/design-system`** in the app (admin only; `npm run dev:mock`, admin
+persona): every primitive with its variants, next to the ad-hoc copies still
+waiting to be migrated, with "Also implemented in" notes per block. When this
+file and that page disagree, the page is the current state and this file is
+the intent.
+
+Counts quoted below are grep tallies as of 2026-09-10; `frontend/scripts/ds-counts.sh`
+reprints them.
 
 ---
 
-## 1. Card Anatomy
+## 1. Rules
 
-Every inventory card has **5 vertical sections**, top to bottom:
+1. **Colour comes from tokens.** `--bg-*`, `--border-*`, `--text-*` for surfaces;
+   `--success` `--warning` `--danger` `--info` for meaning; `--accent` for the
+   one interactive colour (runtime-overridden by `app_color`); `--cyan`
+   `--purple` `--rose` for categorical identity. Tints are opacity modifiers:
+   `bg-[var(--success)]/15 border-[var(--success)]/30`. No raw palette classes
+   (`text-emerald-400`) and no hex in tsx: the light theme only works through
+   the tokens. Remaining raw-palette sites are the page-by-page sweep.
+2. **One registry for icons.** `lib/icon-paths.ts` (`ICON_PATHS`, `NAV_ICONS`)
+   through `<Icon path size>`; `size` scales stroke with the box. Adding an
+   icon means adding a named path there, never an inline `<svg>`.
+3. **One card.** `<Card accent decorator padding selected as>`; children read
+   `var(--card-accent)`. Inventory cards compose `CardHeader`, `CardMetadataGrid`,
+   `CardTagsSection`, `CardIndicator` inside it. KPI tiles are `StatCard`.
+4. **Three headings.** `PageHeader` (title, subtitle, actions, add) for the page;
+   `SectionHeading variant="section|label|rule"` inside it. No inline `<h1>`/`<h2>`
+   recipes.
+5. **One field anatomy.** `FormField` = label, control, hint, error, required
+   asterisk. `Input`, `Textarea`, `Select` (searchable), `NativeSelect` (plain)
+   render through it; wrap anything else in it. Actions sit in the Modal/Drawer
+   `footer` slot: `FormFooter` for Cancel/Confirm, `useMultiStepForm` for wizards.
+6. **Buttons are `Button`, `IconButton`, `PillButton`** (chips: `shape`, `count`,
+   `lead`), `ViewToggle`, `TabBar`, `ToolbarActionButton`, `CopyButton`. All press
+   (`active:scale`); the global `*:focus-visible` ring is the focus indicator.
+7. **Motion**: `.stagger-in` with `--i` per item is the only entrance cascade;
+   `transition` (Tailwind's default list), never `transition-all`, except an
+   element that animates a size, which names it (`transition-[width]`).
+8. **Type scale** ends at `text-2xs` (10px) and `text-3xs` (9px); no `text-[Npx]`.
+   `font-display` and `font-mono` are utilities; no inline `fontFamily` styles.
+9. **Radius** only through `--radius-sm|md|lg|xl`; `rounded-full` for pills and
+   dots. **Shadows** through `--shadow-sm|md|lg`.
+10. **Small parts have a home**: `StatusDot`, `Avatar`, `Spinner`, `Divider`,
+    `DropdownMenu`, `Field` (read-only key/value), `tableClasses` (table skin),
+    `useCopy`, `useDebounce`, `formatPhone` in `lib/utils`.
+
+---
+
+## 2. Card Anatomy
+
+Every inventory card has five vertical sections inside `<Card accent={situacaoAccent(...)}>`:
 
 ```
 +------------------------------------------+
@@ -22,194 +68,14 @@ Every inventory card has **5 vertical sections**, top to bottom:
 +------------------------------------------+
 ```
 
-### Header (3 lines)
-- **Line 1** — Title: `font-mono, text-sm, font-semibold, text-primary` (nickname, domain, name)
-- **Line 2** — Subtitle: `font-mono, text-xs, text-faint` (slug, service type, setor)
-- **Line 3** — Description: `font-body, text-xs, text-muted, truncate`
-- **Badge** — Right-aligned, `compact` situacao badge or categorical badge
+- Title: mono, sm, semibold. Subtitle: mono, xs, faint. Description: body, xs, muted, truncate.
+- Metadata grid `grid-cols-2 gap-x-4 gap-y-3`; labels faint xs, values secondary xs (mono for IDs, hosts, tech).
+- Tags: `mt-3 pt-3 border-t border-subtle`, max 4 + `+N`, `min-h-[28px]`.
+- Indicators: `mt-auto pt-4 border-t`; icons always visible (faint at count 0), counts only when > 0.
+- Card accent: entity cards pass `situacaoAccent(situacao, enumColor)`; services pass
+  `danger | cyan | warning` for external-dependency / in-house / vendor.
 
-### Metadata Grid
-- 2x2 grid: `grid-cols-2 gap-x-4 gap-y-3`
-- Labels: `text-xs text-faint`
-- Values: `text-xs text-secondary truncate` (add `font-mono` for IDs, hostnames, tech values)
-- **No redundancy** — if data appears in header or indicators, don't repeat it here
-
-### Tags Section
-- Border-top separator: `mt-3 pt-3 border-t border-subtle`
-- Max 4 visible, `+N` overflow pill
-- Empty: show `-`
-- Min height: `min-h-[28px]` (prevents layout shift)
-
-### Bottom Indicators
-- `mt-auto pt-4 border-t border-subtle mt-4`
-- Icons **always visible** (active color when count > 0, `text-faint` when 0)
-- Counts shown **only when > 0**, mono font, active color
-- Vertical separators between semantic groups
-
----
-
-## 2. Color System
-
-### Entity Colors (for cross-entity indicators)
-
-| Entity       | Color   | Tailwind     |
-|-------------|---------|--------------|
-| Hosts       | cyan    | cyan-400     |
-| DNS         | emerald | emerald-400  |
-| Services    | amber   | amber-400    |
-| Projects    | violet  | violet-400   |
-| Containers  | sky     | sky-400      |
-| Processes   | violet  | violet-400   |
-| Dependencies| amber   | amber-400    |
-| Alerts      | amber   | amber-400    |
-| Issues      | purple  | purple-400   |
-| Chamados    | orange  | orange-400   |
-
-Defined in `lib/constants.ts` as `ENTITY_INDICATOR_COLORS`.
-
-### Situacao Colors
-Dynamic from backend enums. Fallbacks:
-- `active` = `#10b981` (emerald)
-- `maintenance` = `#f59e0b` (amber)
-- everything else = `#6b7280` (gray)
-
-### Card Border-Left Color
-- **Hosts/DNS/Projects**: situacao-based (from enum or fallback)
-- **Services**: dependency-based (red=external dep, cyan=internal, amber=external)
-
-### Semantic Colors (status)
-- Success/Active: emerald (`#10b981`)
-- Warning/Caution: amber (`#f59e0b`)
-- Danger/Critical: red (`#ef4444`)
-- Info: sky (`#0ea5e9`)
-- External: amber or red (for dependencies)
-
----
-
-## 3. Typography
-
-| Context              | Font          | Size   | Weight     |
-|---------------------|---------------|--------|------------|
-| Page titles         | `--font-display` (JetBrains Mono) | 2xl | bold |
-| Card titles         | `--font-mono`  | sm     | semibold   |
-| Card subtitles      | `--font-mono`  | xs     | normal     |
-| Card descriptions   | `--font-body`  | xs     | normal     |
-| Labels              | `--font-body`  | xs     | normal     |
-| Values (IDs, tech)  | `--font-mono`  | xs     | normal     |
-| Values (text)       | `--font-body`  | xs     | normal     |
-| Indicator counts    | `--font-mono`  | xs     | semibold   |
-| Section headings    | `--font-body`  | xs     | semibold, uppercase, tracking-wider |
-
-### When to use mono font
-- Nicknames, slugs, hostnames, domains
-- Technology stacks, versions, ports
-- IDs, timestamps, IP addresses
-- Indicator counts
-- Code/commands
-
----
-
-## 4. Spacing Tokens
-
-| Element                  | Spacing                     |
-|-------------------------|-----------------------------|
-| Page header margin      | `mb-6`                      |
-| KPI section             | `mb-5` wrapper              |
-| KPI grid                | `gap-3`                     |
-| Listing label           | `mb-3`                      |
-| Toolbar                 | `mb-5` (built into ListToolbar) |
-| Card grid               | `gap-4`                     |
-| Card header to metadata | `mb-3`                      |
-| Metadata grid           | `gap-x-4 gap-y-3`          |
-| Tags separator          | `mt-3 pt-3 border-t`       |
-| Indicators separator    | `mt-auto pt-4 border-t mt-4` |
-| Indicator items         | `gap-3`                     |
-
----
-
-## 5. Icon Rules
-
-- Size: `w-3.5 h-3.5` for card indicators, `w-4 h-4` for toolbar buttons
-- Style: stroke-based, `stroke="currentColor"`, `strokeWidth={2}`
-- ViewBox: `0 0 24 24`
-- Color: contextual (`text-{color}-400` when active, `text-[var(--text-faint)]` when inactive)
-- **Icons always visible** even when the associated count is 0 (they appear in faint color)
-- SVG paths centralized in `lib/icon-paths.ts`
-
----
-
-## 6. Badge Rules
-
-| Usage                | Variant                | Props                    |
-|---------------------|------------------------|--------------------------|
-| Entity status       | `variant="situacao"`   | `situacao={value} compact` |
-| External dependency | `color="red"`          | `compact`                |
-| Internal/External   | `color="cyan"/"amber"` | `compact`                |
-| Tags                | default (no props)     |                          |
-
-Compact badges: dot only, expand with label on hover.
-
----
-
-## 7. Card Navigation
-
-- **All cards use `<Link>`** wrapping (semantic HTML, SSR-friendly, right-click works)
-- Cards have `clickIndicator="link"` on the `<Card>` component
-- **Never use `onClick` + `useRouter.push()`** for card navigation
-
----
-
-## 8. List Page Pattern
-
-Every inventory list page follows this canonical structure:
-
-```tsx
-<PageShell>
-  {/* 1. Header: title + ViewToggle + Add button */}
-  <div className="flex items-center justify-between gap-2 mb-6">
-    <h1 style={{ fontFamily: "var(--font-display)" }}>{title}</h1>
-    <div className="flex items-center gap-1.5">
-      <ViewToggle />        {/* hidden sm:flex */}
-      <Button>+ Add</Button> {/* hidden sm:block, canEdit */}
-    </div>
-  </div>
-
-  {/* 2. KPI Section (if data) */}
-  <KpiSection />
-
-  {/* 3. Active Search Display (if searching) */}
-  <SearchDisplay />
-
-  {/* 4. Listing Label (if data) */}
-  <h2 className="text-xs font-semibold text-faint uppercase tracking-wider mb-3">
-    {listingLabel}
-  </h2>
-
-  {/* 5. ListToolbar: search + filter + export + domain actions */}
-  <ListToolbar />
-
-  {/* 6. Content: cards grid | table | skeleton | empty state */}
-  <Content />
-
-  {/* 7. Overlays: Form drawer/modal + FilterDrawer */}
-  {/* 8. Mobile FAB */}
-</PageShell>
-```
-
-### KPI Section
-- Wrapped in `<div className="mb-5">`
-- Label: `<h2>` with `common.indicators` translation key
-- Grid: `grid-cols-2 sm:grid-cols-4 gap-3` (or `sm:grid-cols-3 lg:grid-cols-5` for 5 KPIs)
-- Uses `<StatCard>` components
-
-### Content Grid
-- Cards: `grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`
-- Stagger animation: `animate-slide-up stagger-{min(i+1, 9)}`
-- Skeleton: 6 `<SkeletonCard />` during loading
-
----
-
-## 9. Redundancy Rules
+### Redundancy rules
 
 Each piece of data should appear in **exactly one** card section:
 
@@ -224,52 +90,97 @@ Each piece of data should appear in **exactly one** card section:
 | Categorical metadata  | Grid            | Header, indicators|
 | Tags                  | Tags section    | Nowhere else      |
 
----
-
-## 10. Component Reference
-
-### Shared (from `components/inventory/`)
-- `CardHeader` — 3-line header with badge
-- `CardMetadataGrid` — 2x2 label+value grid
-- `CardTagsSection` — Tags row with overflow
-- `CardIndicator` — Icon + count atomic unit
-- `CardIndicatorSeparator` — Vertical divider
-
-### UI Primitives (from `components/ui/`)
-- `Card` — Surface container with accent border
-- `Badge` — Status/categorical badges
-- `StatCard` — KPI stat display
-- `ListToolbar` — Search + filter + actions toolbar
-- `ViewToggle` — Cards/table view switcher
-- `EmptyState` — No-data placeholder
-- `Skeleton` / `SkeletonCard` — Loading states
-- `TabBar` — Detail page tab navigation
-- `DetailHeader` / `DetailActions` — Detail page header
-- `Drawer` / `ResponsiveModal` — Form containers
-- `FloatingActionButton` — Mobile FAB
-
-### Constants
-- `lib/icon-paths.ts` — All SVG path `d` attributes
-- `lib/constants.ts` — `ENTITY_INDICATOR_COLORS`, `SITUACAO_COLORS`, navigation
 
 ---
 
-## 11. Adding a New Inventory Page
+## 3. Entity Colours
 
-1. Create `app/{entity}/page.tsx` following the List Page Pattern (section 8)
-2. Create `app/{entity}/_components/EntityCard.tsx` using shared card components
-3. Create `app/{entity}/_components/KpiSection.tsx` with `common.indicators` label
-4. Create `app/{entity}/_components/EntityTableView.tsx` with `SortableTable` + `Pagination`
-5. Create `app/{entity}/_components/EntityFAB.tsx` for mobile
-6. Create `app/{entity}/FilterDrawer.tsx` with collapsible sections
-7. Create `app/{entity}/EntityForm.tsx` (multi-step in Drawer, see section 14)
-8. Create `app/{entity}/[id]/` detail page with DetailHeader + TabBar + tabs (see section 12)
-9. Add SVG paths to `lib/icon-paths.ts` if new icons needed
-10. Add translations to both locale files
+| Entity | Token |
+|---|---|
+| Hosts | `--cyan` |
+| DNS | `--success` |
+| Services | `--warning` |
+| Projects, Issues | `--purple` |
+| Containers | `--info` |
+| Chamados | `--warning` |
+
+`lib/constants.ts` `ENTITY_INDICATOR_COLORS` still names Tailwind hues; it moves to
+tokens with the page-by-page sweep.
 
 ---
 
-## 12. Detail Page Pattern
+## 4. Spacing
+
+| Element | Spacing |
+|---|---|
+| Page header margin | `mb-6` (inside `PageHeader`) |
+| KPI section | `mb-5` (inside `KpiGrid`) |
+| Listing label | `mb-3` (inside `SectionHeading`) |
+| Toolbar | `mb-5` (inside `ListToolbar`) |
+| Card grid | `gap-4` |
+| Card padding | `p-3.5 md:p-5` (`Card padding="md"`), `p-4` (`"sm"`) |
+| Modal / Drawer body and footer | `p-4 md:p-5` |
+| Metadata grid | `gap-x-4 gap-y-3` |
+
+---
+
+## 5. Badges
+
+| Usage | Props |
+|---|---|
+| Entity status | `<Badge variant="situacao" situacao compact>` |
+| Meaning | `color="success | warning | danger | info"` |
+| Category | `color="cyan | purple | rose"` (hue keys `emerald`, `amber`, `red`, `sky` still resolve) |
+| Tags | default |
+
+Compact badges are a dot that expands with its label on hover.
+
+---
+
+## 6. Card Navigation
+
+- All cards wrap in `<Link>` (semantic HTML, SSR-friendly, right-click works) with `clickIndicator="link"`.
+- Whole-card controls that are not navigation (catalog offerings, atlas tables) are `<Card as="button">`.
+- Never `onClick` + `router.push()` for navigation.
+
+---
+
+## 7. List Page Pattern
+
+```tsx
+<PageShell>
+  <InventoryPageHeader title viewMode onViewModeChange addLabel onAdd />   {/* PageHeader + ViewToggle */}
+  <KpiGrid heading={t("common.indicators")} kpis={...} />
+  <SearchBadge search onClear />                                            {/* when searching */}
+  {hasItems && <SectionHeading>{t("x.listing")}</SectionHeading>}
+  <ListToolbar search onSearchChange onFilterClick activeFilterCount actions />
+  <InventoryContent ... />          {/* loading / empty / cards / table; cards use stagger-in */}
+  <Drawer footer={formFooter}> <EntityForm onFooterChange={setFormFooter} /> </Drawer>
+  <InventoryFilterDrawer ... />
+  <InventoryFAB ... />                                                       {/* phones */}
+</PageShell>
+```
+
+Content grid: `grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`, items
+`className="stagger-in" style={{ "--i": i }}`. Skeleton: six `<SkeletonCard />`.
+
+---
+
+## 8. Adding a New Inventory Page
+
+1. `app/{entity}/page.tsx` following section 7.
+2. `app/{entity}/_components/EntityCard.tsx` from `Card` + inventory parts (section 2).
+3. `app/{entity}/_components/EntityTableView.tsx` from `SortableTable` (controlled) + `Pagination`.
+4. `app/{entity}/FilterDrawer.tsx` from `Drawer` + `DrawerSection` + `PillButton`.
+5. `app/{entity}/EntityForm.tsx` following section 10 (footer slot, `FormField`).
+6. `app/{entity}/[id]/` detail page following section 9.
+7. Icons: add named paths to `lib/icon-paths.ts`.
+8. Strings: both `messages/en.json` and `messages/pt-BR.json`, exact parity.
+9. Scoped asset? Follow the entidades contract in the root CLAUDE.md.
+
+---
+
+## 9. Detail Page Pattern
 
 Every inventory detail page follows this canonical structure:
 
@@ -336,9 +247,33 @@ counters={
 }
 ```
 
+
 ---
 
-## 13. Responsaveis Pattern
+## 10. Form Pattern
+
+Every entity form is a multi-step wizard on create and the same component with
+`initial` on edit. The form owns fields; the container owns actions.
+
+```tsx
+<Drawer title subHeader={formSubHeader} footer={formFooter}>
+  <EntityForm initial onSuccess onSubHeaderChange={setFormSubHeader} onFooterChange={setFormFooter} />
+</Drawer>
+```
+
+- `useMultiStepFormEffects({ step, setStep, totalSteps, stepLabels, onSubmit, canProceed, isPending, onFooterChange, onSubHeaderChange })`
+  pushes `StepIndicator` into `subHeader` and Back / Next / Save into `footer`. Forms render no action bars of their own.
+- Fields: `Input`, `Textarea`, `Select`, `NativeSelect`, `Checkbox`, `CheckboxList`, `RadioGroup`, `Toggle`,
+  `DateTimeInput`, `TagInput`, `AsyncPicker`, `ContactInput`, `MarkdownEditor`; anything else inside `<FormField label required hint error>`.
+- `required` draws the asterisk; `hint` is the helper line; per-field `error` under the control; form-level `<FormError>` at the top.
+- Scope: `<EntidadeScopeFields value onChange compact>` with `defaultGrants(user)`; spread `...grants` into the payload.
+- Cancel/Confirm dialogs (not wizards): `<ResponsiveModal footer={<FormFooter onCancel submitLabel onSubmit loading variant />}>`;
+  a submit button outside its `<form>` uses `submitType="submit" form="<id>"`.
+- Submit: `useState` per field, `useMutation`, `loading={mutation.isPending}`. No react-hook-form, no zod.
+
+---
+
+## 11. Responsaveis Pattern
 
 Every entity supports **N responsaveis** (NOT a single `empresa` or `responsavel` text field). The pattern is uniform across hosts, DNS, services, and projects.
 
@@ -373,47 +308,15 @@ Use `<ResponsaveisSection>` from `components/inventory/ResponsaveisSection.tsx`:
 
 ### Backend Pattern
 - Junction table per entity: `{entity}_responsaveis` (links to `contacts`)
-- `Sync{Entity}Responsaveis()` — transactional replace pattern
-- `Get{Entity}MainResponsavelNamesBulk()` — single query for list enrichment
-- `List{Entity}Responsaveis()` — joined with contacts for detail pages
+- `Sync{Entity}Responsaveis()`: transactional replace pattern
+- `Get{Entity}MainResponsavelNamesBulk()`: single query for list enrichment
+- `List{Entity}Responsaveis()`: joined with contacts for detail pages
 
 ---
 
-## 14. Form Pattern
-
-All entity forms follow the same architecture:
-
-### Create Mode: Multi-step wizard
-```tsx
-<StepIndicator steps={["Basic Info", "Responsaveis", "Links & Tags"]} current={step} />
-```
-- Step 1: Basic identity fields
-- Step 2: Responsaveis (using `<ResponsavelList>`)
-- Step 3: Links & Tags (linked entities, tag input)
-
-### Edit Mode
-Same form component with `initial` prop. Steps still available for navigation.
-
-### Container
-- **Always in Drawer** (NOT `ResponsiveModal` or inline)
-- Footer managed via `onFooterChange` callback for Drawer integration
-- SubHeader via `onSubHeaderChange` for StepIndicator
-
-### Key Props
-```ts
-interface EntityFormProps {
-  initial?: Entity | null;
-  initialTags?: string[];
-  initialResponsaveis?: EntityResponsavel[];
-  onSuccess: () => void;
-  onFooterChange?: (footer: React.ReactNode) => void;
-  onSubHeaderChange?: (subHeader: React.ReactNode) => void;
-}
-```
-
 ---
 
-## 15. Acontecimentos Tab Pattern
+## 12. Acontecimentos Tab Pattern
 
 Detail pages should include an "Acontecimentos" (Issues/Tracking) tab:
 
@@ -434,30 +337,34 @@ Detail pages should include an "Acontecimentos" (Issues/Tracking) tab:
 
 ---
 
-## 16. Table View Pattern
+---
 
-All inventory table views follow this structure:
+## 13. Table View Pattern
 
-### Components
-- `SortableTable` — Header with sort toggles, generic column types
-- `Pagination` — Page controls (previous/next, current/total)
+- `SortableTable` (controlled `sortKey/sortDir/onSortChange` for server sort) + `Pagination`, 20 rows per page.
+- Hand-written tables use `tableClasses` from `components/ui/Table` (`wrapper`, `table`, `headRow`, `th`, `row`, `rowAlt`, `td`).
+- No inline edit/delete in inventory tables; actions live on the detail page. Row click navigates.
+- Mono for IDs, hostnames, domains, tech values. Tags column shows 3 + `+N`.
 
-### Rules
-- **No inline edit/delete buttons** — actions belong in the detail page only
-- Row click navigates to detail page
-- 20 rows per page (configurable)
-- Mono font for IDs, hostnames, domains, tech values
-- Tags column shows max 3 with `+N` overflow
-- Consistent columns: entity-specific fields + status + tags
+---
 
-### Usage
-```tsx
-<SortableTable columns={[...]} defaultSort="name">
-  {(sortKey, sortDir) => {
-    const sorted = sortRows(items, sortKey, sortDir, sortFns);
-    const paged = sorted.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-    return paged.map((item) => <tr key={item.id}>...</tr>);
-  }}
-</SortableTable>
-<Pagination page={page} totalPages={totalPages} total={total} perPage={PER_PAGE} onChange={setPage} />
-```
+## 14. Component Reference
+
+`components/ui/`: Avatar, AsyncPicker, Badge, Button, Card (+CardIcon), Checkbox, CheckboxList, ContactInput,
+CopyButton, DateTimeInput, DetailActions, DetailHeader, Divider, Drawer, DrawerSection, DropdownMenu (+Item),
+EmptyState, Field, FloatingActionButton, FormError, FormField, FormFooter, Icon, IconButton, Input,
+LinkedEntityList, ListToolbar, MarkdownEditor, Modal, NativeSelect, OperationOutput, PageHeader, Pagination,
+PillButton, RadioGroup, ResponsiveModal, SearchBadge, SectionHeading, Select, Skeleton (+Card/Table/Stats),
+SortDropdown, SortableTable, Spinner, StatCard, StatusAlert, StatusDot, StepIndicator, TabBar, Table
+(`tableClasses`), TagInput, Textarea, Toggle, ToolbarActionButton, Tooltip, ViewToggle.
+
+`components/inventory/`: CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator,
+InventoryPageHeader, InventoryContent, InventoryFilterDrawer, InventoryFAB, KpiGrid, ResponsavelList,
+ResponsaveisSection.
+
+`hooks/`: useMultiStepForm, useCopy, useDebounce, useInventoryFilters, useSecretReveal, useMediaQuery.
+`lib/`: icon-paths (`ICON_PATHS`, `NAV_ICONS`, `REQUEST_TYPE_ICON`), constants (`SITUACAO_*`, `situacaoAccent`,
+`NAV_SECTIONS`), utils (`formatPhone`, `getTimeAgo`, ...), requests (`transitionVariant`, ...).
+
+Retired: `ListingLabel`, the catalog's `SectionLabel`/`StepHeading`/`chipClass`, `VaultPage.Chip`, the
+`.stagger-1..9` classes, `--shadow-glow`, `.animate-shimmer`, `.animate-slide-right`.

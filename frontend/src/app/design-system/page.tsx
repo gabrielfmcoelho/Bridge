@@ -8,6 +8,7 @@ import TokensSection from "./_components/TokensSection";
 import TypographySection from "./_components/TypographySection";
 import ButtonsSection from "./_components/ButtonsSection";
 import FormsSection from "./_components/FormsSection";
+import CatalogSection from "./_components/CatalogSection";
 import FeedbackSection from "./_components/FeedbackSection";
 import CardsSection from "./_components/CardsSection";
 import TablesSection from "./_components/TablesSection";
@@ -24,6 +25,7 @@ const SECTIONS = [
   ["typography", "Typography"],
   ["buttons", "Buttons"],
   ["forms", "Inputs & Forms"],
+  ["catalog", "Catálogo & Requests"],
   ["feedback", "Feedback"],
   ["cards", "Cards"],
   ["tables", "Tables & Lists"],
@@ -51,7 +53,7 @@ export default function DesignSystemPage() {
         Design System
       </h1>
       <p className="text-sm text-[var(--text-muted)] mb-4">
-        Inventory of every UI primitive in Bridge — shared components from <code>components/ui</code> next to the
+        Inventory of every UI primitive in Bridge; shared components from <code>components/ui</code> next to the
         ad-hoc copies scattered through pages. Each block names its source and the places that duplicate it. Counts
         on this page are grep tallies taken as of 2026-09-09 and will drift as the codebase changes.
       </p>
@@ -73,29 +75,29 @@ export default function DesignSystemPage() {
       <div className="space-y-14">
         <TokensSection />
 
-        {/* ponytail: shells are prose — you are looking at them. */}
+        {/* ponytail: shells are prose; you are looking at them. */}
         <Section id="shells" title="Shells">
           <ul className="text-sm text-[var(--text-secondary)] space-y-2 list-disc pl-5">
             <li>
-              <code>components/layout/PageShell.tsx</code> — <code>{"{children, fullBleed?}"}</code>. Auth guard + redirect
+              <code>components/layout/PageShell.tsx</code>; <code>{"{children, fullBleed?}"}</code>. Auth guard + redirect
               to <code>/setup</code> / <code>/login</code>, private <code>LoadingSkeleton</code>, then Sidebar + Header +{" "}
               <code>{"<main>"}</code> + MobileBottomNav. Every authenticated page wraps itself in it.
             </li>
             <li>
-              <code>components/layout/Sidebar.tsx</code> — <code>{"{collapsed, mobileOpen, onCloseMobile}"}</code>. Sections
+              <code>components/layout/Sidebar.tsx</code>; <code>{"{collapsed, mobileOpen, onCloseMobile}"}</code>. Sections
               from <code>NAV_SECTIONS</code> (<code>lib/constants.ts</code>) filtered by <code>user.permissions</code> /{" "}
               <code>user.role</code>. Owns a private 21-key icon map (separate from <code>lib/icon-paths.ts</code>).
             </li>
             <li>
-              <code>components/layout/Header.tsx</code> — collapse toggle, Breadcrumbs, AI-chat trigger (<code>ai.use</code>
-              ), EN/PT segmented toggle, theme toggle, avatar dropdown (ad-hoc — see Overlays).
+              <code>components/layout/Header.tsx</code>; collapse toggle, Breadcrumbs, AI-chat trigger (<code>ai.use</code>
+              ), EN/PT segmented toggle, theme toggle, avatar dropdown (ad-hoc; see Overlays).
             </li>
             <li>
-              <code>components/layout/Breadcrumbs.tsx</code> + <code>lib/breadcrumbs.ts</code> — pure{" "}
+              <code>components/layout/Breadcrumbs.tsx</code> + <code>lib/breadcrumbs.ts</code>; pure{" "}
               <code>buildCrumbs(pathname, NAV_ITEMS)</code>; this page&apos;s crumb resolves from the nav entry.
             </li>
             <li>
-              <code>components/layout/MobileBottomNav.tsx</code> — its own hardcoded 5-item Portuguese list, not{" "}
+              <code>components/layout/MobileBottomNav.tsx</code>; its own hardcoded 5-item Portuguese list, not{" "}
               <code>NAV_SECTIONS</code>, not i18n&apos;d.
             </li>
           </ul>
@@ -104,6 +106,7 @@ export default function DesignSystemPage() {
         <TypographySection />
         <ButtonsSection />
         <FormsSection />
+        <CatalogSection />
         <FeedbackSection />
         <CardsSection />
         <TablesSection />

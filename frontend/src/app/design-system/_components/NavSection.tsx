@@ -91,7 +91,7 @@ export default function NavSection() {
           searchAdornment={<Badge color="cyan" compact>3</Badge>}
         />
         <p className="text-[11px] text-[var(--text-muted)]">
-          <code>mb-5</code> baked in; 5 consumers; the de-facto search box — 11 other files inline the magnifier SVG
+          <code>mb-5</code> baked in; 5 consumers; the de-facto search box; 11 other files inline the magnifier SVG
           with their own input markup.
         </p>
       </Specimen>
@@ -117,7 +117,7 @@ export default function NavSection() {
       </Specimen>
 
       <p className="text-xs text-[var(--text-muted)]">
-        <strong>SectionHeading</strong> / <strong>ToolbarActionButton</strong> — see Typography / Buttons.
+        <strong>SectionHeading</strong> / <strong>ToolbarActionButton</strong>; see Typography / Buttons.
       </p>
 
       <p className="text-xs text-[var(--text-muted)]">
@@ -130,7 +130,7 @@ export default function NavSection() {
         <p className="text-xs text-[var(--text-muted)] mb-1">Describe only:</p>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
-            <code>components/atlas/shared/AtlasToolbar.tsx</code> — pill filters + counts + ⌘K (needs{" "}
+            <code>components/atlas/shared/AtlasToolbar.tsx</code>; pill filters + counts + ⌘K (needs{" "}
             <code>AtlasIndexes</code>)
           </li>
           <li><code>components/lineage/LineageToolbar.tsx</code></li>

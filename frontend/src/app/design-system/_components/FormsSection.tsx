@@ -27,7 +27,7 @@ import type { AssetGrantsInput } from "@/lib/types";
 
 const noop = () => {};
 
-// AsyncPicker keeps `fetcher` in a useEffect dep array — an inline lambda would
+// AsyncPicker keeps `fetcher` in a useEffect dep array; an inline lambda would
 // re-run the debounced search on every render while the popover is open.
 const PICKER_ITEMS: AsyncPickerItem[] = [
   { id: 1, label: "web-01", secondary: "10.0.0.11" },
@@ -164,7 +164,7 @@ export default function FormsSection() {
             onChange={(e) => setSelect3(e.target.value)}
           />
           <Select
-            label="Distro (7 options — searchable)"
+            label="Distro (7 options; searchable)"
             options={OPTIONS_7}
             value={select7}
             onChange={(e) => setSelect7(e.target.value)}
@@ -238,7 +238,7 @@ export default function FormsSection() {
           <DateTimeInput variant="time" label="Time" value={time} onChange={setTime} />
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          Thin wrapper over the native inputs that normalises to and from the GLPI wire format —{" "}
+          Thin wrapper over the native inputs that normalises to and from the GLPI wire format -{" "}
           <code>YYYY-MM-DD HH:MM:SS</code> for datetime, <code>HH:MM:SS</code> for time.
         </p>
       </Specimen>
@@ -271,7 +271,7 @@ export default function FormsSection() {
         <p className="text-xs text-[var(--text-muted)] mt-3">
           Discriminated union on <code>multi</code>: single mode stores the id and needs{" "}
           <code>selectedLabel</code> to redraw; multi mode makes the caller own the full items so labels and
-          colours survive without a re-fetch. <code>fetcher</code> sits in a <code>useEffect</code> dep array —
+          colours survive without a re-fetch. <code>fetcher</code> sits in a <code>useEffect</code> dep array -
           it must be a stable reference.
         </p>
       </Specimen>
@@ -283,7 +283,7 @@ export default function FormsSection() {
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-3">
           Both instances hit <code>contactsAPI.list</code>. Under <code>dev:mock</code> that 404s (three
-          react-query retries in the console) and the field degrades to no suggestions — the mask and validation
+          react-query retries in the console) and the field degrades to no suggestions; the mask and validation
           still work.
         </p>
       </Specimen>
@@ -324,7 +324,7 @@ export default function FormsSection() {
       >
         <FormError message="Hostname already exists" />
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          Form-level banner on <code>--danger</code>. There is no toast component — banners are <code>StatusAlert</code>,
+          Form-level banner on <code>--danger</code>. There is no toast component; banners are <code>StatusAlert</code>,
           inline errors are this or an input&apos;s own <code>error</code> prop.
         </p>
       </Specimen>
@@ -360,7 +360,7 @@ export default function FormsSection() {
       </Specimen>
 
       <Specimen title="PasswordField" source="app/hosts/[slug]/_components/PasswordField.tsx" wide>
-        {/* ponytail: demo slug — clicking the eye hits a 404 and exercises the error path */}
+        {/* ponytail: demo slug; clicking the eye hits a 404 and exercises the error path */}
         <PasswordField slug="demo-host" />
         <p className="text-xs text-[var(--text-muted)] mt-3">
           Three password-reveal implementations: this one, <code>hooks/useSecretReveal.ts</code> plus three
@@ -407,14 +407,14 @@ export default function FormsSection() {
         <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
           Name<span className="text-[var(--danger)] ml-0.5">*</span>
         </label>
-        {/* specimen: app/secrets/_components/NewSecretModal.tsx:44 — copied, NOT imported (guardrailed path) */}
+        {/* specimen: app/secrets/_components/NewSecretModal.tsx:44; copied, NOT imported (guardrailed path) */}
         <label className="text-xs font-medium text-[var(--text-muted)] block">
           Name<span className="text-red-400 ml-0.5">*</span>
         </label>
       </Specimen>
       <p className="text-xs text-[var(--text-muted)]">
         The two <code>text-red-400</code> sites are byte-identical private <code>FormRow</code> components (
-        <code>NewSecretModal.tsx:29</code>, <code>AppLoginForm.tsx:25</code>) — the token version above is the
+        <code>NewSecretModal.tsx:29</code>, <code>AppLoginForm.tsx:25</code>); the token version above is the
         one that follows the theme.
       </p>
 
@@ -440,7 +440,7 @@ export default function FormsSection() {
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Gaps (described, not rendered)</h3>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
-            No shared file upload — 5 raw <code>type=&quot;file&quot;</code>:{" "}
+            No shared file upload; 5 raw <code>type=&quot;file&quot;</code>:{" "}
             <code>components/atlas/apis/AddApiModal.tsx:139</code>,{" "}
             <code>components/glpi/FormcreatorFileInput.tsx:80</code>, <code>app/settings/page.tsx:862</code>,{" "}
             <code>:1068</code>, <code>:1301</code>.
@@ -451,7 +451,7 @@ export default function FormsSection() {
             <code>app/catalog/_components/CatalogSearch.tsx</code>, <code>components/lineage/TablesPanel.tsx</code>,
             plus the private ones inside <code>Select</code>, <code>CheckboxList</code> and{" "}
             <code>AsyncPicker</code>. The 300 ms debounce is duplicated in{" "}
-            <code>CatalogSearch.tsx:59</code> and <code>app/requests/_components/RequestList.tsx:58</code> — no{" "}
+            <code>CatalogSearch.tsx:59</code> and <code>app/requests/_components/RequestList.tsx:58</code>; no{" "}
             <code>useDebounce</code>.
           </li>
           <li>
@@ -460,7 +460,7 @@ export default function FormsSection() {
             <code>components/atlas/apis/ProjectSecretsSheet.tsx:62</code>.
           </li>
           <li>
-            Canonical form wiring: <code>app/dns/DnsForm.tsx</code> — <code>useState</code> per field →{" "}
+            Canonical form wiring: <code>app/dns/DnsForm.tsx</code>; <code>useState</code> per field →{" "}
             <code>useMutation</code> → <code>&lt;FormError&gt;</code> →{" "}
             <code>loading={"{mutation.isPending}"}</code>. <code>hasExternalFooter</code> makes Dns/Host/Service/
             ProjectForm render two action bars.

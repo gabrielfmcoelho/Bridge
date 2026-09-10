@@ -45,7 +45,7 @@ export default function TabsSection() {
           onChange={setTab}
         />
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          The shared one — 8 consumers. Labels are <code>hidden sm:inline</code>, so below <code>sm</code> only
+          The shared one; 8 consumers. Labels are <code>hidden sm:inline</code>, so below <code>sm</code> only
           the icon and badge show. <code>icon</code> is a raw SVG <code>d</code> string, not a component.
         </p>
       </Specimen>
@@ -98,7 +98,7 @@ export default function TabsSection() {
           ))}
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          Underline style with a count suffix — the only tab bar in the app that is not the pill/segment look,
+          Underline style with a count suffix; the only tab bar in the app that is not the pill/segment look,
           and the only one rendered on the public unauthenticated page.
         </p>
       </Specimen>
@@ -160,7 +160,7 @@ export default function TabsSection() {
         />
         <p className="text-xs text-[var(--text-muted)] mt-3">
           Generic over the value type and takes <code>ReactNode</code> icons instead of path strings. Its own
-          docblock says it &quot;mirrors the styling vocabulary of the existing ViewToggle&quot; — which is four
+          docblock says it &quot;mirrors the styling vocabulary of the existing ViewToggle&quot;; which is four
           view-toggle implementations, not one.
         </p>
       </Specimen>
@@ -208,11 +208,11 @@ export default function TabsSection() {
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Cross-references &amp; worklist</h3>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
-            <code>components/ui/PillButton.tsx</code> — the one filter chip now (<code>shape</code>, <code>size</code>,{" "}
+            <code>components/ui/PillButton.tsx</code>; the one filter chip now (<code>shape</code>, <code>size</code>,{" "}
             <code>count</code>, <code>lead</code>); rendered under Buttons.
           </li>
           <li>
-            <code>components/ui/Toggle.tsx</code> — the on/off switch; rendered under Inputs &amp; Forms.
+            <code>components/ui/Toggle.tsx</code>; the on/off switch; rendered under Inputs &amp; Forms.
           </li>
           <li>
             Tab implementations still separate: <code>TabBar</code> (now also settings),{" "}

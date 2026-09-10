@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 // One anchor-addressable block of the catalog. Ids are fixed by SECTIONS in page.tsx.
 export function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    // [&_code]:break-all — brace-grouped paths like app/{a,b}/x.tsx have no break opportunity and overflow phones.
+    // [&_code]:break-all; brace-grouped paths like app/{a,b}/x.tsx have no break opportunity and overflow phones.
     <section id={id} className="scroll-mt-20 space-y-6 [&_code]:break-all">
       <h2 className="text-lg font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>
         {title}

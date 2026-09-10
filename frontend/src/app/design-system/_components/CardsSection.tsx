@@ -213,7 +213,7 @@ export default function CardsSection() {
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
             Entity cards {"app/{hosts,dns,services,projects}/_components/*Card.tsx"}, the ssh-keys credential card and the
-            settings user card all pass <code>accent</code> now (<code>situacaoAccent()</code> for situacao) — the four inline{" "}
+            settings user card all pass <code>accent</code> now (<code>situacaoAccent()</code> for situacao); the four inline{" "}
             <code>borderLeftColor</code> sources are gone. Not rendered here (need full entity objects).
           </li>
           <li>

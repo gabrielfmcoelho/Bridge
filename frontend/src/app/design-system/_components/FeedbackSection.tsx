@@ -23,7 +23,7 @@ const EMPTY_STATE_ICONS = ["server", "globe", "folder", "box", "search", "key", 
 const ROLES = ["admin", "editor", "viewer"] as const;
 
 // roleColors copied verbatim from app/settings/page.tsx:30 (duplicated again at
-// components/layout/Header.tsx:13 — same object, two separate consts).
+// components/layout/Header.tsx:13; same object, two separate consts).
 const roleColors: Record<string, string> = {
   admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
   editor: "bg-purple-500/10 text-purple-400/70 border-purple-500/15",
@@ -120,7 +120,7 @@ export default function FeedbackSection() {
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
           <code>situacao</code> mode runs <code>useQuery([&quot;enums&quot;,&quot;situacao&quot;])</code> inside the
-          badge — a network call per badge instance (deduped by key); falls back to <code>SITUACAO_COLORS</code> on
+          badge; a network call per badge instance (deduped by key); falls back to <code>SITUACAO_COLORS</code> on
           error.
         </p>
       </Specimen>
@@ -257,7 +257,7 @@ export default function FeedbackSection() {
           </div>
           <p className="text-[11px] text-[var(--text-muted)]">
             The mobile-drawer chip (<code>Header.tsx:219</code>) is byte-identical to the avatar-dropdown chip
-            above except <code>text-[10px]</code> instead of <code>text-[9px]</code> — one pixel of type size
+            above except <code>text-[10px]</code> instead of <code>text-[9px]</code>; one pixel of type size
             apart.
           </p>
         </div>

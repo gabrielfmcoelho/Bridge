@@ -63,7 +63,7 @@ export default function OverlaysSection() {
         </Modal>
         <p className="text-[11px] text-[var(--text-muted)]">
           Hand-rolled (no Radix/vaul), <code>.glass</code> panel, <code>max-w-2xl</code>, sets{" "}
-          <code>document.body.style.overflow</code>; desktop-only — 4 components use it bare and get a cramped
+          <code>document.body.style.overflow</code>; desktop-only; 4 components use it bare and get a cramped
           modal on phones (<code>components/wiki/WikiShareModal.tsx</code>,{" "}
           <code>components/atlas/apis/{"{AddApiModal,EditApiModal,ShareBundleModal}"}.tsx</code>).
         </p>
@@ -102,7 +102,7 @@ export default function OverlaysSection() {
           <Input label="Hostname" defaultValue="web-01" />
         </ResponsiveModal>
         <p className="text-[11px] text-[var(--text-muted)] w-full">
-          Drawer below 768px, Modal above; 22 consumers — the default choice.
+          Drawer below 768px, Modal above; 22 consumers; the default choice.
         </p>
       </Specimen>
 
@@ -211,14 +211,14 @@ export default function OverlaysSection() {
       </Specimen>
 
       <p className="text-xs text-[var(--text-muted)]">
-        <strong>FloatingActionButton</strong> — rendered in Buttons (mobile-only).
+        <strong>FloatingActionButton</strong>; rendered in Buttons (mobile-only).
       </p>
 
       <div>
         <p className="text-xs text-[var(--text-muted)] mb-1">Describe only:</p>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
-            <code>components/lineage/SearchOmnibar.tsx</code> — the only command palette, ⌘K from{" "}
+            <code>components/lineage/SearchOmnibar.tsx</code>; the only command palette, ⌘K from{" "}
             <code>AtlasToolbar</code>/<code>LineageToolbar</code>
           </li>
           <li><code>components/ai/AiChatDrawer.tsx</code></li>
@@ -229,7 +229,7 @@ export default function OverlaysSection() {
             <code>app/hosts/[slug]/_components/{"{ChamadoDrawer,SSHConfigDrawer,SSHOperations,IssueDrawers}"}.tsx</code>
           </li>
           <li>
-            Filter drawers — <code>components/inventory/InventoryFilterDrawer.tsx</code> (generic),{" "}
+            Filter drawers; <code>components/inventory/InventoryFilterDrawer.tsx</code> (generic),{" "}
             <code>app/requests/_components/RequestFilterDrawer.tsx</code>,{" "}
             <code>app/{"{hosts,dns,services,projects}"}/FilterDrawer.tsx</code> (4 near-identical)
           </li>

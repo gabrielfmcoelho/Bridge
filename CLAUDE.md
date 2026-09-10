@@ -109,7 +109,16 @@ per element, currently at **v83**. Use idempotent idioms:
   inline.
 - Styling is Tailwind v4 with **no config file**; design tokens are CSS
   custom properties in `frontend/src/app/globals.css`. Never hardcode a hex
-  value.
+  value or a raw palette class (`text-emerald-400`): use `--success` /
+  `--warning` / `--danger` / `--info` / `--accent` with opacity modifiers
+  (`bg-[var(--danger)]/10`), so the light theme keeps working.
+- Build UI from `frontend/src/components/ui/` (`Card`, `PageHeader`,
+  `SectionHeading`, `FormField`, `FormFooter`, `Icon` + `lib/icon-paths.ts`,
+  `PillButton`, `StatusDot`, ...). No inline `<svg>`, no hand-written page
+  headers or field labels. `frontend/src/DESIGN_SYSTEM.md` has the rules;
+  `/design-system` in the app (admin, works under `dev:mock`) shows every
+  primitive next to the ad-hoc copies still to migrate;
+  `frontend/scripts/ds-counts.sh` reprints the drift tallies.
 - List endpoints return `{data, meta:{page,per_page,total}}`
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.

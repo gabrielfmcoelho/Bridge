@@ -98,12 +98,12 @@ export default function ButtonsSection() {
         <FloatingActionButton
           actions={[
             { label: "New host", icon: ICON_PATHS.plus, onClick: noop },
-            // ponytail: FAB color prop is a plain string — a CSS var works, no hex needed.
+            // ponytail: FAB color prop is a plain string; a CSS var works, no hex needed.
             { label: "Scan", icon: ICON_PATHS.scan, onClick: noop, color: "var(--purple)" },
           ]}
         />
         <p className="text-xs text-[var(--text-muted)] w-full mt-1">
-          Mobile only (<code>md:hidden</code>, fixed bottom-right) — resize below 768px to see it.
+          Mobile only (<code>md:hidden</code>, fixed bottom-right); resize below 768px to see it.
         </p>
       </Specimen>
 
