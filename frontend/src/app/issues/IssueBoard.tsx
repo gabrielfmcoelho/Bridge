@@ -261,14 +261,14 @@ export default function IssueBoard() {
             placeholder="Search issues..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 pr-3 py-1.5 text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
+            className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 pr-3 py-1.5 text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
           />
         </div>
 
         {/* Filter button */}
         <button
           onClick={openFilterDrawer}
-          className={`relative flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-[var(--radius-md)] border transition-all ${
+          className={`relative flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-[var(--radius-md)] border transition ${
             activeFilterCount > 0
               ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
               : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"

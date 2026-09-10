@@ -11,7 +11,7 @@ export function UsageBar({ label, total, used, percent }: { label: string; total
         <span className={textColor} style={{ fontFamily: "var(--font-mono)" }}>{used} / {total} ({percent})</span>
       </div>
       <div className="w-full h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${Math.min(pctNum, 100)}%` }} />
+        <div className={`h-full rounded-full ${color} transition`} style={{ width: `${Math.min(pctNum, 100)}%` }} />
       </div>
     </div>
   );

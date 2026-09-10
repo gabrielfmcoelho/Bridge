@@ -131,7 +131,7 @@ export default function IssueBoard({ projectId, services, canEdit }: IssueBoardP
                     draggable={canEdit}
                     onDragStart={() => setDraggedIssue(issue)}
                     onClick={() => canEdit && setEditIssue(issue)}
-                    className={`p-2.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] transition-all duration-150 ${
+                    className={`p-2.5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] transition duration-150 ${
                       canEdit ? "cursor-grab hover:border-[var(--border-default)] hover:shadow-[var(--shadow-sm)] active:cursor-grabbing" : ""
                     } ${draggedIssue?.id === issue.id ? "opacity-40" : ""}`}
                   >

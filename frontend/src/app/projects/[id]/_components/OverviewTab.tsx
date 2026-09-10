@@ -31,7 +31,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
   return (
     <div className="space-y-5">
       {/* Project info */}
-      <Card accent="amber" hover={false} className="animate-slide-up stagger-1" style={{ animationFillMode: "both" } as React.CSSProperties}>
+      <Card accent="amber" hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
             <span className="text-[var(--text-muted)] text-xs font-medium">{t("project.setorResponsavel")}</span>
@@ -76,7 +76,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
 
       {/* Services */}
       {services && services.length > 0 && (
-        <Card hover={false} className="animate-slide-up stagger-3" style={{ animationFillMode: "both" } as React.CSSProperties}>
+        <Card hover={false} className="stagger-in" style={{ "--i": 2 } as React.CSSProperties}>
           <SectionHeading variant="section">
             {t("service.title")}
           </SectionHeading>
@@ -98,7 +98,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
 
       {/* Linked DNS records */}
       {linkedDns.length > 0 && (
-        <Card hover={false} className="animate-slide-up stagger-4" style={{ animationFillMode: "both" } as React.CSSProperties}>
+        <Card hover={false} className="stagger-in" style={{ "--i": 3 } as React.CSSProperties}>
           <SectionHeading variant="section">
             DNS Records
           </SectionHeading>
@@ -120,7 +120,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
 
       {/* Linked Hosts */}
       {linkedHosts.length > 0 && (
-        <Card hover={false} className="animate-slide-up stagger-5" style={{ animationFillMode: "both" } as React.CSSProperties}>
+        <Card hover={false} className="stagger-in" style={{ "--i": 4 } as React.CSSProperties}>
           <SectionHeading variant="section">
             Hosts
           </SectionHeading>

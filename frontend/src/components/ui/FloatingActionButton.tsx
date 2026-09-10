@@ -38,7 +38,7 @@ export default function FloatingActionButton({ actions }: FloatingActionButtonPr
       )}
 
       {/* Action bubbles */}
-      <div className={`fixed bottom-36 right-4 z-[45] flex flex-col items-end gap-2.5 transition-all duration-200 ${open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
+      <div className={`fixed bottom-36 right-4 z-[45] flex flex-col items-end gap-2.5 transition duration-200 ${open ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
         {actions.map((action, i) => (
           <button
             key={i}
@@ -62,7 +62,7 @@ export default function FloatingActionButton({ actions }: FloatingActionButtonPr
       {/* Main FAB */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-20 right-4 z-[45] w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-all duration-200"
+        className="fixed bottom-20 right-4 z-[45] w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition duration-200"
         style={{
           backgroundColor: appColor,
           boxShadow: `0 6px 20px ${appColor}50`,

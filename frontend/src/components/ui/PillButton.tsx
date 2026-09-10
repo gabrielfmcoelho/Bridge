@@ -50,7 +50,7 @@ export default function PillButton({
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 border font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97] ${s.base} ${sizes[size]} ${active ? s.active : s.idle} ${className}`}
+      className={`inline-flex items-center gap-1.5 border font-medium whitespace-nowrap transition duration-150 active:scale-[0.97] ${s.base} ${sizes[size]} ${active ? s.active : s.idle} ${className}`}
       {...props}
     >
       {lead}

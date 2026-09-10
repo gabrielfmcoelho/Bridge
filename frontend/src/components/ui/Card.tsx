@@ -99,7 +99,7 @@ export default function Card({
       className={`
         group/card relative
         bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border ${borderClass} ${paddings[padding]}
-        transition-all duration-200 ease-out
+        transition duration-200 ease-out
         ${hoverClass}
         ${clickable ? "cursor-pointer active:scale-[0.99]" : ""}
         ${Tag === "button" ? "w-full text-left" : ""}

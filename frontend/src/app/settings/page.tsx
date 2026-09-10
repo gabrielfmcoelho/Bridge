@@ -97,7 +97,7 @@ export default function SettingsPage() {
             <button
               key={tab.key}
               onClick={() => { setActiveTab(tab.key); setShowTabDrawer(false); }}
-              className={`w-full text-left px-4 py-3 text-sm font-medium rounded-[var(--radius-md)] transition-all ${
+              className={`w-full text-left px-4 py-3 text-sm font-medium rounded-[var(--radius-md)] transition ${
                 activeTab === tab.key
                   ? "bg-[var(--accent-muted)] text-[var(--accent)]"
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
@@ -192,7 +192,7 @@ function EnumSection() {
   return (
     <div className="space-y-4">
       {Object.entries(mergedEnums).map(([category, options], i) => (
-        <Card key={category} hover={false} className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" } as React.CSSProperties}>
+        <Card key={category} hover={false} className="stagger-in" style={{ "--i": i } as React.CSSProperties}>
           <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
             {category}
           </h3>
@@ -509,12 +509,12 @@ function UsersSection() {
         </div>
       ) : (
         /* Card view */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 animate-fade-in">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {users.map((u, i) => (
             <Card
               key={u.id}
               accent={roleAccentColor[u.role] || roleAccentColor.viewer}
-              className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`}
+              className="stagger-in" style={{ "--i": i } as React.CSSProperties}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -732,7 +732,7 @@ function AppearanceSection() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* App Name */}
-      <Card hover={false} className="animate-slide-up stagger-1" style={{ animationFillMode: "both" } as React.CSSProperties}>
+      <Card hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
         <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
           {t("settings.appName")}
         </h3>
@@ -748,7 +748,7 @@ function AppearanceSection() {
       </Card>
 
       {/* Main Color */}
-      <Card hover={false} className="animate-slide-up stagger-2" style={{ animationFillMode: "both" } as React.CSSProperties}>
+      <Card hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
         <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
           {t("settings.mainColor")}
         </h3>
@@ -762,7 +762,7 @@ function AppearanceSection() {
             <button
               key={c.value}
               onClick={() => setAppColor(c.value)}
-              className="group relative w-8 h-8 rounded-[var(--radius-sm)] border-2 transition-all duration-150 hover:scale-110"
+              className="group relative w-8 h-8 rounded-[var(--radius-sm)] border-2 transition duration-150 hover:scale-110"
               style={{
                 backgroundColor: c.value,
                 borderColor: appColor === c.value ? "var(--text-primary)" : "transparent",
@@ -798,7 +798,7 @@ function AppearanceSection() {
       </Card>
 
       {/* Logo */}
-      <Card hover={false} className="animate-slide-up stagger-3" style={{ animationFillMode: "both" } as React.CSSProperties}>
+      <Card hover={false} className="stagger-in" style={{ "--i": 2 } as React.CSSProperties}>
         <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
           {t("settings.logo")}
         </h3>
@@ -851,7 +851,7 @@ function AppearanceSection() {
       </Card>
 
       {/* Save button */}
-      <div className="flex items-center gap-3 animate-slide-up stagger-4" style={{ animationFillMode: "both" } as React.CSSProperties}>
+      <div className="flex items-center gap-3 stagger-in" style={{ "--i": 3 } as React.CSSProperties}>
         <Button onClick={handleSave} loading={saving}>
           {t("common.save")}
         </Button>
@@ -943,7 +943,7 @@ function ImportSection() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Import type selector */}
-      <Card hover={false} className="animate-slide-up stagger-1" style={{ animationFillMode: "both" } as React.CSSProperties}>
+      <Card hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
         <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
           {t("settings.importType")}
         </h3>
@@ -960,7 +960,7 @@ function ImportSection() {
       </Card>
 
       {/* File upload */}
-      <Card hover={false} className="animate-slide-up stagger-2" style={{ animationFillMode: "both" } as React.CSSProperties}>
+      <Card hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
         <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
           JSON File
         </h3>
@@ -1017,7 +1017,7 @@ function ImportSection() {
         {!fileData ? (
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="w-full py-8 border-2 border-dashed border-[var(--border-default)] rounded-[var(--radius-lg)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)]/5 transition-all group"
+            className="w-full py-8 border-2 border-dashed border-[var(--border-default)] rounded-[var(--radius-lg)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)]/5 transition group"
           >
             <div className="flex flex-col items-center gap-2">
               <svg className="w-8 h-8 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -1195,7 +1195,7 @@ function BackupSection() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Backup */}
-      <Card hover={false} className="animate-slide-up stagger-1" style={{ animationFillMode: "both" } as React.CSSProperties}>
+      <Card hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
             <Icon path={ICON_PATHS.exportDoc} className="w-5 h-5 text-emerald-400" />
@@ -1216,7 +1216,7 @@ function BackupSection() {
       </Card>
 
       {/* Restore */}
-      <Card hover={false} className="animate-slide-up stagger-2" style={{ animationFillMode: "both" } as React.CSSProperties}>
+      <Card hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
             <Icon path={ICON_PATHS.upload} className="w-5 h-5 text-amber-400" />

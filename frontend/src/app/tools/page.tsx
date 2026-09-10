@@ -249,7 +249,7 @@ export default function ToolsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {toolList.map((tool, i) => (
-            <div key={tool.id} className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" }}>
+            <div key={tool.id} className="stagger-in" style={{ "--i": i } as React.CSSProperties}>
               <Card className="h-full">
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--accent-muted)] border border-[var(--accent)]/20 flex items-center justify-center shrink-0">

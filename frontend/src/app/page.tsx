@@ -34,7 +34,7 @@ function ResourceMiniBar({ label, value, total }: { label: string; value: number
         <span className={`text-[10px] font-semibold ${textColor}`} style={{ fontFamily: "var(--font-mono)" }}>{value}%</span>
       </div>
       <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all duration-500`} style={{ width: `${value}%` }} />
+        <div className={`h-full rounded-full ${color} transition duration-500`} style={{ width: `${value}%` }} />
       </div>
       {total && <p className="text-[9px] text-[var(--text-faint)] mt-0.5 text-right" style={{ fontFamily: "var(--font-mono)" }}>{total}</p>}
     </div>
@@ -192,7 +192,7 @@ export default function DashboardPage() {
                 value={statValues[i]}
                 icon={cfg.icon}
                 color={cfg.color}
-                className={`animate-slide-up stagger-${i + 1}`}
+                className="stagger-in" style={{ "--i": i } as React.CSSProperties}
               />
             ))}
           </div>
@@ -200,7 +200,7 @@ export default function DashboardPage() {
           {/* Insight cards row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {/* Scan Coverage */}
-            <Card hover={false} className="animate-slide-up stagger-6" style={{ animationFillMode: "both" } as React.CSSProperties}>
+            <Card hover={false} className="stagger-in" style={{ "--i": 5 } as React.CSSProperties}>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
                   {t("dashboard.scanCoverage")}
@@ -215,7 +215,7 @@ export default function DashboardPage() {
               </div>
               <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-[var(--accent)] transition-all duration-700"
+                  className="h-full rounded-full bg-[var(--accent)] transition duration-700"
                   style={{ width: `${scanPct}%` }}
                 />
               </div>
@@ -223,7 +223,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Alerts */}
-            <Card hover={false} className="animate-slide-up stagger-7" style={{ animationFillMode: "both" } as React.CSSProperties}>
+            <Card hover={false} className="stagger-in" style={{ "--i": 6 } as React.CSSProperties}>
               {(() => {
                 const alertCount = hosts.filter(h => h.alerts && h.alerts.length > 0).length;
                 const criticalCount = hosts.filter(h => h.alerts?.some(a => a.level === "critical")).length;
@@ -254,7 +254,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Hosting Distribution */}
-            <Card hover={false} className="animate-slide-up stagger-8" style={{ animationFillMode: "both" } as React.CSSProperties}>
+            <Card hover={false} className="stagger-in" style={{ "--i": 7 } as React.CSSProperties}>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
                   {t("dashboard.infrastructure")}
@@ -273,7 +273,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-purple-500/60 transition-all duration-500"
+                            className="h-full rounded-full bg-purple-500/60 transition duration-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -293,7 +293,7 @@ export default function DashboardPage() {
           {/* Bottom section: Recent Scans + Hosts by Status */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {/* Recent Scans */}
-            <Card hover={false} className="animate-slide-up stagger-8" style={{ animationFillMode: "both" } as React.CSSProperties}>
+            <Card hover={false} className="stagger-in" style={{ "--i": 8 } as React.CSSProperties}>
               <SectionHeading variant="section">
                 {t("dashboard.recentScans")}
               </SectionHeading>
@@ -322,7 +322,7 @@ export default function DashboardPage() {
 
             {/* Hosts by status */}
             {Object.keys(stats.hosts.by_situacao).length > 0 && (
-              <Card hover={false} className="animate-slide-up stagger-9" style={{ animationFillMode: "both" } as React.CSSProperties}>
+              <Card hover={false} className="stagger-in" style={{ "--i": 9 } as React.CSSProperties}>
                 <SectionHeading variant="section">
                   {t("host.title")} by {t("common.status")}
                 </SectionHeading>
@@ -340,7 +340,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                           <div
-                            className="h-full rounded-full transition-all duration-700"
+                            className="h-full rounded-full transition duration-700"
                             style={{ width: `${pct}%`, backgroundColor: "var(--accent)" }}
                           />
                         </div>
@@ -356,7 +356,7 @@ export default function DashboardPage() {
           {resourceAnalysis && resourceAnalysis.totalScanned > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Resources by Infrastructure */}
-              <Card hover={false} className="animate-slide-up stagger-9" style={{ animationFillMode: "both" } as React.CSSProperties}>
+              <Card hover={false} className="stagger-in" style={{ "--i": 10 } as React.CSSProperties}>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
                     {t("dashboard.resourcesByInfra")}
@@ -383,7 +383,7 @@ export default function DashboardPage() {
               </Card>
 
               {/* Resources by Situação */}
-              <Card hover={false} className="animate-slide-up stagger-9" style={{ animationFillMode: "both" } as React.CSSProperties}>
+              <Card hover={false} className="stagger-in" style={{ "--i": 11 } as React.CSSProperties}>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
                     {t("dashboard.resourcesBySituacao")}

@@ -42,7 +42,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
   const sections = filterSections(NAV_SECTIONS, user?.permissions ?? [], user?.role);
 
   const sidebarContent = (
-    <aside className={`bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] flex flex-col h-full transition-all duration-200 ${collapsed ? "w-16" : "w-60"}`}>
+    <aside className={`bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] flex flex-col h-full transition-[width] duration-200 ${collapsed ? "w-16" : "w-60"}`}>
       {/* Branding — matches header h-13 */}
       <div className="h-13 px-4 flex items-center border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2.5">
@@ -98,7 +98,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
                     href={item.href}
                     onClick={onCloseMobile}
                     title={collapsed ? t(item.label) : undefined}
-                    className={`group flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-medium transition-all duration-150 relative ${
+                    className={`group flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-medium transition duration-150 relative ${
                       collapsed ? "justify-center" : ""
                     } ${!isActive ? "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)]" : ""}`}
                     style={isActive ? { backgroundColor: `${appColor}18`, color: appColor } : undefined}
@@ -188,7 +188,7 @@ function MobileDrawer({
                       key={item.href}
                       href={item.href}
                       onClick={onClose}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-[var(--radius-md)] text-[11px] font-medium transition-all ${
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-[var(--radius-md)] text-[11px] font-medium transition ${
                         isActive ? "text-white" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]"
                       }`}
                       style={isActive ? { backgroundColor: appColor, color: "#fff" } : undefined}

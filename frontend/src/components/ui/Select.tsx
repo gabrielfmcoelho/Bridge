@@ -50,7 +50,7 @@ export default function Select({
           <button
             type="button"
             disabled={disabled}
-            className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border rounded-[var(--radius-md)] px-3 py-2 text-sm text-left transition-all duration-200 flex items-center justify-between gap-2 disabled:opacity-40 ${
+            className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border rounded-[var(--radius-md)] px-3 py-2 text-sm text-left transition duration-200 flex items-center justify-between gap-2 disabled:opacity-40 ${
               open ? "border-[var(--accent)] ring-2 ring-[var(--accent-muted)]" : error ? "border-[var(--danger)]" : "border-[var(--border-default)]"
             } ${className}`}
           >

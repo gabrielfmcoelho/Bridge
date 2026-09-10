@@ -115,7 +115,7 @@ export default function AiChatDrawer({ open, onClose }: AiChatDrawerProps) {
             <button
               onClick={handleSend}
               disabled={loading || !input.trim()}
-              className="shrink-0 h-[40px] px-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40 transition-all hover:opacity-90 flex items-center justify-center"
+              className="shrink-0 h-[40px] px-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40 transition hover:opacity-90 flex items-center justify-center"
               aria-label="Send"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

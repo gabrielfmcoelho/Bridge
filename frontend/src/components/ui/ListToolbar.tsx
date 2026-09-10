@@ -31,7 +31,7 @@ export default function ListToolbar({
             placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 ${searchAdornment ? "pr-9" : "pr-3"} py-2 text-base md:text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]`}
+            className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 ${searchAdornment ? "pr-9" : "pr-3"} py-2 text-base md:text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]`}
           />
           {searchAdornment && (
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
@@ -43,7 +43,7 @@ export default function ListToolbar({
         {/* Filter button */}
         <button
           onClick={onFilterClick}
-          className={`relative flex items-center gap-1.5 px-3 py-2 text-sm rounded-[var(--radius-md)] border transition-all ${
+          className={`relative flex items-center gap-1.5 px-3 py-2 text-sm rounded-[var(--radius-md)] border transition ${
             activeFilterCount > 0
               ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
               : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"

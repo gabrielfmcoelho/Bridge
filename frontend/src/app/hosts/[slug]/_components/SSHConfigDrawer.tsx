@@ -40,7 +40,7 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
             <button
               type="button"
               onClick={() => setIncludeKey(true)}
-              className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition-all duration-150 ${
+              className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition duration-150 ${
                 includeKey
                   ? "bg-[var(--accent-muted)] text-[var(--accent)]"
                   : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
@@ -51,7 +51,7 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
             <button
               type="button"
               onClick={() => setIncludeKey(false)}
-              className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition-all duration-150 ${
+              className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition duration-150 ${
                 !includeKey
                   ? "bg-[var(--accent-muted)] text-[var(--accent)]"
                   : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
@@ -73,7 +73,7 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
           <button
             type="button"
             onClick={handleCopy}
-            className="absolute top-2 right-2 p-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition-all"
+            className="absolute top-2 right-2 p-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition"
             title={t("common.copy")}
           >
             {copied ? (

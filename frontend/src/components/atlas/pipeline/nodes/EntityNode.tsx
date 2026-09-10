@@ -20,7 +20,7 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
 
   return (
     <div
-      className={`relative group flex flex-col rounded-[var(--radius-md)] border bg-[var(--bg-surface)] overflow-hidden transition-all ${
+      className={`relative group flex flex-col rounded-[var(--radius-md)] border bg-[var(--bg-surface)] overflow-hidden transition ${
         selected
           ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30 shadow-[var(--shadow-md)]"
           : `${color.border} hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)]`

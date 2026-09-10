@@ -44,7 +44,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
           {hasResolved && onToggleResolved && (
             <button
               onClick={onToggleResolved}
-              className={`inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition-all ${
+              className={`inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition ${
                 showResolved
                   ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
                   : "bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"

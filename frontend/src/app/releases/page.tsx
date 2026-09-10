@@ -116,13 +116,13 @@ export default function ReleasesPage() {
             placeholder={t("common.search")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 pr-3 py-1.5 text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
+            className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 pr-3 py-1.5 text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
           />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setStatusFilter("")}
-            className={`px-3 py-1.5 text-xs rounded-[var(--radius-md)] border transition-all duration-150 font-medium whitespace-nowrap ${
+            className={`px-3 py-1.5 text-xs rounded-[var(--radius-md)] border transition duration-150 font-medium whitespace-nowrap ${
               !statusFilter
                 ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
                 : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-secondary)]"
@@ -134,7 +134,7 @@ export default function ReleasesPage() {
             <button
               key={status}
               onClick={() => setStatusFilter(status === statusFilter ? "" : status)}
-              className={`px-3 py-1.5 text-xs rounded-[var(--radius-md)] border transition-all duration-150 font-medium whitespace-nowrap ${
+              className={`px-3 py-1.5 text-xs rounded-[var(--radius-md)] border transition duration-150 font-medium whitespace-nowrap ${
                 status === statusFilter
                   ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
                   : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-secondary)]"
@@ -166,7 +166,7 @@ export default function ReleasesPage() {
 
           <div className="space-y-4">
             {filteredReleases.map((rel, i) => (
-              <div key={rel.id} className={`relative pl-12 animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" }}>
+              <div key={rel.id} className="relative pl-12 stagger-in" style={{ "--i": i } as React.CSSProperties}>
                 {/* Timeline dot */}
                 <div className={`absolute left-[12px] top-5 w-[15px] h-[15px] rounded-full border-2 ${timelineLineColors[rel.status]} ${statusDots[rel.status]}`} />
 
@@ -229,7 +229,7 @@ export default function ReleasesPage() {
               <div className="flex flex-wrap gap-1.5">
                 <button
                   onClick={() => setStatusFilter("")}
-                  className={`px-3 py-1.5 text-xs rounded-full border transition-all duration-150 font-medium ${
+                  className={`px-3 py-1.5 text-xs rounded-full border transition duration-150 font-medium ${
                     !statusFilter
                       ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
                       : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)]"
@@ -241,7 +241,7 @@ export default function ReleasesPage() {
                   <button
                     key={status}
                     onClick={() => setStatusFilter(status === statusFilter ? "" : status)}
-                    className={`px-3 py-1.5 text-xs rounded-full border transition-all duration-150 font-medium ${
+                    className={`px-3 py-1.5 text-xs rounded-full border transition duration-150 font-medium ${
                       status === statusFilter
                         ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
                         : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)]"

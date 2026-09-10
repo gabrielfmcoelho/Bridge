@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import Card, { type CardAccent } from "./Card";
 
 interface StatCardProps {
@@ -7,12 +8,13 @@ interface StatCardProps {
   /** Card accent: `cyan`, `emerald`, `purple`, `amber`, `red`, `sky`, `rose` or any token/colour. */
   color: CardAccent;
   className?: string;
+  style?: CSSProperties;
 }
 
 // KPI tile = Card with the `tint` decorator; every colour below reads --card-accent.
-export default function StatCard({ label, value, icon, color, className = "" }: StatCardProps) {
+export default function StatCard({ label, value, icon, color, className = "", style }: StatCardProps) {
   return (
-    <Card accent={color} decorator="tint" padding="sm" className={className}>
+    <Card accent={color} decorator="tint" padding="sm" className={className} style={style}>
       <svg
         className="absolute right-2.5 top-2.5 w-8 h-8 text-[var(--card-accent)] opacity-[0.08]"
         fill="none"

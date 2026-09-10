@@ -57,7 +57,6 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 40px rgba(6, 182, 212, 0.08);
 
   /* Translucent glass fill used by .glass — recoloured per theme so the
      floating panels (drawers, modals, popovers) read correctly in both. */
@@ -117,7 +116,6 @@
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.14);
-  --shadow-glow: 0 0 32px rgba(6, 182, 212, 0.12);
 
   --glass-bg: rgba(255, 255, 255, 0.82);
   --grid-line: rgba(15, 23, 42, 0.07);
@@ -252,20 +250,8 @@ body {
 }
 
 /* ─── Staggered entrance ─── */
-.stagger-1 { animation-delay: 0ms; }
-.stagger-2 { animation-delay: 60ms; }
-.stagger-3 { animation-delay: 120ms; }
-.stagger-4 { animation-delay: 180ms; }
-.stagger-5 { animation-delay: 240ms; }
-.stagger-6 { animation-delay: 300ms; }
-.stagger-7 { animation-delay: 360ms; }
-.stagger-8 { animation-delay: 420ms; }
-.stagger-9 { animation-delay: 480ms; }
-
-/* Index-driven variant of the fixed .stagger-N classes above, for lists whose
-   length isn't known up front — the catalog grid runs past 9. The item sets
-   --i to its position; `forwards` holds the end state so nothing flashes back
-   to opacity 0 after the run. */
+/* The one entrance cascade. The item sets --i to its position; `forwards`
+   holds the end state so nothing flashes back to opacity 0 after the run. */
 .stagger-in {
   opacity: 0;
   animation: slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;

@@ -173,7 +173,7 @@ function TrailStep({
       />
       <button
         onClick={() => onSelectColumn(step.column.id)}
-        className="group w-full text-left rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)] transition-all p-2.5 flex flex-col gap-1.5"
+        className="group w-full text-left rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)] transition p-2.5 flex flex-col gap-1.5"
       >
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-[12px] text-[var(--text-primary)]">{step.column.label}</span>

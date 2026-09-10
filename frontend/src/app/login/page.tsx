@@ -146,7 +146,7 @@ export default function LoginPage() {
                   <a
                     key={p.name}
                     href={`/api/auth/oauth/${p.name}/authorize`}
-                    className="flex items-center justify-center gap-2.5 w-full py-3 px-4 rounded-[var(--radius-md)] text-sm font-semibold transition-all border-2 hover:shadow-md"
+                    className="flex items-center justify-center gap-2.5 w-full py-3 px-4 rounded-[var(--radius-md)] text-sm font-semibold transition border-2 hover:shadow-md"
                     style={{
                       borderColor: p.color,
                       color: "var(--text-primary)",
@@ -198,7 +198,7 @@ export default function LoginPage() {
                       key={p.name}
                       type="button"
                       onClick={() => setActiveProvider(p.name)}
-                      className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-[var(--radius-sm)] transition-all flex items-center justify-center gap-1.5 ${
+                      className={`flex-1 py-1.5 px-3 text-xs font-medium rounded-[var(--radius-sm)] transition flex items-center justify-center gap-1.5 ${
                         activeProvider === p.name
                           ? "bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm"
                           : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"

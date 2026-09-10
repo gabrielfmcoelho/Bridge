@@ -145,7 +145,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
             <button
               key={v}
               onClick={() => setMobileView(v)}
-              className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition-all duration-150 capitalize ${
+              className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition duration-150 capitalize ${
                 mobileView === v
                   ? "bg-[var(--accent-muted)] text-[var(--accent)]"
                   : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"

@@ -162,7 +162,7 @@ export default function BatchScanModal({
           </div>
           <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
+              className="h-full rounded-full bg-[var(--accent)] transition duration-300"
               style={{ width: `${scannableHosts.length ? (scannedCount / scannableHosts.length) * 100 : 0}%` }}
             />
           </div>

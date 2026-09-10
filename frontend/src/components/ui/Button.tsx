@@ -37,7 +37,7 @@ export default function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-[var(--radius-md)] border font-medium transition-all duration-200 enabled:active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:transform-none ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-[var(--radius-md)] border font-medium transition duration-200 enabled:active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:transform-none ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >

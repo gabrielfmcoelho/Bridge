@@ -72,7 +72,7 @@ function ChainStep({
               <button
                 key={t.id}
                 onClick={() => onSelectTable(t.id)}
-                className={`text-left px-2 py-1.5 rounded-[var(--radius-sm)] border text-[11px] font-mono truncate transition-all ${
+                className={`text-left px-2 py-1.5 rounded-[var(--radius-sm)] border text-[11px] font-mono truncate transition ${
                   isFocal
                     ? "bg-[var(--accent-muted)] border-[var(--accent)]/40 text-[var(--accent)] shadow-[0_0_0_1px_var(--accent)/0.2,0_4px_12px_-4px_var(--accent)/0.4]"
                     : "bg-[var(--bg-base)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)] hover:text-[var(--text-primary)]"

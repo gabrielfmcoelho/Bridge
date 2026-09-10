@@ -46,7 +46,7 @@ export default function Modal({ open, onClose, title, subHeader, footer, childre
               <h2 className="text-lg font-semibold" style={{ fontFamily: "var(--font-display)" }}>{title}</h2>
               <button
                 onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-overlay)] transition-all duration-150"
+                className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-overlay)] transition duration-150"
               >
                 <Icon path={ICON_PATHS.close} />
               </button>

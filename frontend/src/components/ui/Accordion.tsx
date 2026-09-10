@@ -41,7 +41,7 @@ export default function Accordion({ sections, defaultOpen }: AccordionProps) {
               <Icon path={ICON_PATHS.chevronDown} className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
             </button>
             <div
-              className={`grid transition-all duration-200 ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+              className={`grid transition duration-200 ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
             >
               <div className="overflow-hidden">
                 <div className="p-4 space-y-3">{section.content}</div>

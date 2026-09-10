@@ -23,7 +23,7 @@ export default function TableRow({ table, selected, onClick }: Props) {
   return (
     <button
       onClick={onClick}
-      className={`group w-full text-left flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] border transition-all ${
+      className={`group w-full text-left flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] border transition ${
         selected
           ? "bg-[var(--accent-muted)] border-[var(--accent)]/40"
           : "bg-[var(--bg-surface)] border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)]"

@@ -320,7 +320,7 @@ function LocaleToggle() {
     <div className="flex h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] overflow-hidden">
       <button
         onClick={() => setLocale("en")}
-        className={`px-3 text-[11px] font-medium transition-all duration-150 cursor-pointer ${
+        className={`px-3 text-[11px] font-medium transition duration-150 cursor-pointer ${
           locale === "en"
             ? "bg-[var(--accent-muted)] text-[var(--accent)]"
             : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
@@ -330,7 +330,7 @@ function LocaleToggle() {
       </button>
       <button
         onClick={() => setLocale("pt-BR")}
-        className={`px-3 text-[11px] font-medium border-l border-[var(--border-default)] transition-all duration-150 cursor-pointer ${
+        className={`px-3 text-[11px] font-medium border-l border-[var(--border-default)] transition duration-150 cursor-pointer ${
           locale === "pt-BR"
             ? "bg-[var(--accent-muted)] text-[var(--accent)]"
             : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"

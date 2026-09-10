@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 // Select and NativeSelect render through it; use it directly around any
 // control that has no `label` prop of its own.
 export const INPUT_CLASS =
-  "w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2.5 md:py-2 text-base md:text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)] disabled:opacity-40";
+  "w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2.5 md:py-2 text-base md:text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)] disabled:opacity-40";
 export const INPUT_ERROR_CLASS = "border-[var(--danger)] focus:border-[var(--danger)] focus:ring-[var(--danger)]/20";
 
 interface FormFieldProps {

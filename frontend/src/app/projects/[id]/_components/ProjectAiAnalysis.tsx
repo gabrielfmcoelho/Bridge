@@ -74,7 +74,7 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
   }, [cached, timestampDisplay, isPt]);
 
   return (
-    <Card accent="purple" hover={false} className="animate-slide-up stagger-2" style={{ animationFillMode: "both" } as React.CSSProperties}>
+    <Card accent="purple" hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>

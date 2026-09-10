@@ -826,11 +826,11 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               {t("operation.chooseKeySource")}
             </label>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setSetupKeySource("generate")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition-all ${setupKeySource === "generate" ? "border-cyan-400 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
+              <button type="button" onClick={() => setSetupKeySource("generate")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition ${setupKeySource === "generate" ? "border-cyan-400 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
                 <strong className="block mb-0.5">{t("operation.generateNewKey")}</strong>
                 <span className="text-[var(--text-faint)]">{t("operation.generateNewKeyDesc")}</span>
               </button>
-              <button type="button" onClick={() => setSetupKeySource("existing")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition-all ${setupKeySource === "existing" ? "border-cyan-400 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
+              <button type="button" onClick={() => setSetupKeySource("existing")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition ${setupKeySource === "existing" ? "border-cyan-400 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
                 <strong className="block mb-0.5">{t("operation.useExistingKey")}</strong>
                 <span className="text-[var(--text-faint)]">{t("operation.useExistingKeyDesc")}</span>
               </button>

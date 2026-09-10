@@ -56,10 +56,10 @@ export default function Badge({ children, variant = "default", color, situacao, 
 
     if (compact) {
       return (
-        <span className={`group/badge inline-flex items-center gap-0 rounded-full transition-all duration-300 cursor-default ${className}`}>
+        <span className={`group/badge inline-flex items-center gap-0 rounded-full transition duration-300 cursor-default ${className}`}>
           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
           <span
-            className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/badge:max-w-[120px] group-hover/badge:opacity-100 group-hover/badge:ml-1.5 group-hover/badge:pr-1 transition-all duration-300"
+            className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/badge:max-w-[120px] group-hover/badge:opacity-100 group-hover/badge:ml-1.5 group-hover/badge:pr-1 transition-[max-width,opacity,margin,padding] duration-300"
             style={{ color: dotColor }}
           >
             {children}

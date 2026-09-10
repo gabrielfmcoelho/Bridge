@@ -4,7 +4,7 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 
 export default function ServiceNode({ data }: NodeProps) {
   return (
-    <div className="rounded-[10px] min-w-[180px] shadow-lg cursor-pointer transition-all duration-200 hover:shadow-xl overflow-hidden" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)" }}>
+    <div className="rounded-[10px] min-w-[180px] shadow-lg cursor-pointer transition duration-200 hover:shadow-xl overflow-hidden" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)" }}>
       <Handle type="target" position={Position.Top} className="!bg-purple-500 !w-2 !h-2" />
       <div className="h-1 bg-gradient-to-r from-purple-500 to-purple-400" />
       <div className="px-3 py-2">

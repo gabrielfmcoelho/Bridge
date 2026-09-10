@@ -140,10 +140,10 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
                     </span>
                   </div>
                   {/* Expandable status dot — same pattern as host situacao compact badge */}
-                  <span className="group/status inline-flex items-center gap-0 rounded-full transition-all duration-300 cursor-default shrink-0">
+                  <span className="group/status inline-flex items-center gap-0 rounded-full transition duration-300 cursor-default shrink-0">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor }} />
                     <span
-                      className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/status:max-w-[120px] group-hover/status:opacity-100 group-hover/status:ml-1.5 group-hover/status:pr-1 transition-all duration-300"
+                      className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/status:max-w-[120px] group-hover/status:opacity-100 group-hover/status:ml-1.5 group-hover/status:pr-1 transition duration-300"
                       style={{ color: statusColor }}
                     >
                       {statusLabel}

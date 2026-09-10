@@ -62,7 +62,7 @@ export default function HostCredentialsPage() {
             placeholder={t("common.search")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 pr-3 py-1.5 text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
+            className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 pr-3 py-1.5 text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
           />
         </div>
       </div>
@@ -80,7 +80,7 @@ export default function HostCredentialsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {keys.map((cred, i) => (
-            <div key={cred.id} className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" }}>
+            <div key={cred.id} className="stagger-in" style={{ "--i": i } as React.CSSProperties}>
               <CredentialCard cred={cred} onClick={() => setViewingKey(cred.id)} onDelete={canEdit ? () => { if (confirm(`Delete ${cred.name}?`)) deleteMutation.mutate(cred.id); } : undefined} />
             </div>
           ))}
@@ -210,7 +210,7 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
               <button
                 type="button"
                 onClick={() => setCredType("key")}
-                className={`p-3 rounded-[var(--radius-md)] border text-left transition-all ${
+                className={`p-3 rounded-[var(--radius-md)] border text-left transition ${
                   credType === "key"
                     ? "border-[var(--accent)]/30 bg-[var(--accent-muted)]"
                     : "border-[var(--border-default)] bg-[var(--bg-elevated)] hover:border-[var(--border-default)]"
@@ -225,7 +225,7 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
               <button
                 type="button"
                 onClick={() => setCredType("password")}
-                className={`p-3 rounded-[var(--radius-md)] border text-left transition-all ${
+                className={`p-3 rounded-[var(--radius-md)] border text-left transition ${
                   credType === "password"
                     ? "border-purple-500/30 bg-purple-500/10"
                     : "border-[var(--border-default)] bg-[var(--bg-elevated)] hover:border-[var(--border-default)]"

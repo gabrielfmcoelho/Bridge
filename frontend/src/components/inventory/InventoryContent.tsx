@@ -72,7 +72,7 @@ export default function InventoryContent<T extends { id: number }>({
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
         {displayItems.map((item, i) => (
-          <div key={item.id} className={`animate-slide-up stagger-${Math.min(i + 1, 9)}`} style={{ animationFillMode: "both" }}>
+          <div key={item.id} className="stagger-in" style={{ "--i": i } as React.CSSProperties}>
             {renderCard(item, i)}
           </div>
         ))}

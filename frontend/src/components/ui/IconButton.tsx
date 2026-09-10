@@ -27,7 +27,7 @@ export default function IconButton({
 }: IconButtonProps) {
   return (
     <button
-      className={`flex items-center justify-center rounded-[var(--radius-md)] border transition-all duration-150 enabled:active:scale-[0.95] ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`flex items-center justify-center rounded-[var(--radius-md)] border transition duration-150 enabled:active:scale-[0.95] ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >
       {children}

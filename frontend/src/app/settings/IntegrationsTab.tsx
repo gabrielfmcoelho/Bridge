@@ -64,7 +64,7 @@ function GeneralAuthSection() {
         {AUTH_PROVIDERS.map((p) => (
           <label
             key={p.value}
-            className={`flex items-start gap-3 p-3 rounded-[var(--radius-md)] border cursor-pointer transition-all ${
+            className={`flex items-start gap-3 p-3 rounded-[var(--radius-md)] border cursor-pointer transition ${
               activeProvider === p.value
                 ? "border-[var(--accent)] bg-[var(--accent-muted)]"
                 : "border-[var(--border-default)] bg-[var(--bg-elevated)] hover:border-[var(--border-hover)]"
@@ -333,7 +333,7 @@ function KeycloakSection() {
                   key={env}
                   type="button"
                   onClick={() => applyPreset(env)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-overlay)] border border-[var(--border-default)] transition-all capitalize"
+                  className="px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-overlay)] border border-[var(--border-default)] transition capitalize"
                 >
                   {env}
                 </button>

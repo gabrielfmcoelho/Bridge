@@ -4,7 +4,7 @@ import { SITUACAO_DOT_COLORS } from "@/lib/constants";
 export default function HostNode({ data }: NodeProps) {
   const status = (data.status as string) || "active";
   return (
-    <div className="rounded-[10px] min-w-[180px] shadow-lg cursor-pointer transition-all duration-200 hover:shadow-xl overflow-hidden" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)" }}>
+    <div className="rounded-[10px] min-w-[180px] shadow-lg cursor-pointer transition duration-200 hover:shadow-xl overflow-hidden" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)" }}>
       <Handle type="target" position={Position.Top} className="!bg-cyan-500 !w-2 !h-2" />
       {/* Color bar */}
       <div className="h-1 bg-gradient-to-r from-cyan-500 to-cyan-400" />

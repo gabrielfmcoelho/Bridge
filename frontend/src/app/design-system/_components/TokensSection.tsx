@@ -17,12 +17,9 @@ const COLORS = [
   "--selection-bg", "--selection-fg",
 ];
 const RADII = ["--radius-sm", "--radius-md", "--radius-lg", "--radius-xl"];
-const SHADOWS = ["--shadow-sm", "--shadow-md", "--shadow-lg", "--shadow-glow"];
+const SHADOWS = ["--shadow-sm", "--shadow-md", "--shadow-lg"];
 const FONTS = ["--font-display", "--font-body", "--font-mono"];
-const ANIMS = [
-  "animate-fade-in", "animate-slide-up", "animate-slide-down", "animate-scale-in",
-  "animate-slide-right", "animate-shimmer", "animate-pulse-glow",
-];
+const ANIMS = ["animate-fade-in", "animate-slide-up", "animate-slide-down", "animate-scale-in", "animate-pulse-glow"];
 const SPACING: [string, string][] = [
   ["mb-6", "page header margin"],
   ["mb-5", "KPI section / toolbar"],
@@ -156,21 +153,7 @@ export default function TokensSection() {
 
           <div>
             <p className="text-[11px] text-[var(--text-faint)] mb-1.5" style={{ fontFamily: "var(--font-mono)" }}>
-              .stagger-1..9
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {Array.from({ length: 9 }, (_, i) => i + 1).map((i) => (
-                <div
-                  key={i}
-                  className={`w-10 h-10 rounded-[var(--radius-md)] bg-[var(--accent-muted)] border border-[var(--accent)]/30 animate-slide-up stagger-${i}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-[11px] text-[var(--text-faint)] mb-1.5" style={{ fontFamily: "var(--font-mono)" }}>
-              .stagger-in (index-driven)
+              .stagger-in (the one entrance cascade; set --i per item)
             </p>
             <div className="flex flex-wrap gap-2">
               {Array.from({ length: 6 }, (_, i) => i).map((i) => (
@@ -215,6 +198,13 @@ export default function TokensSection() {
         </li>
         <li>
           <code>@media (prefers-reduced-motion: reduce)</code> collapses all animations.
+        </li>
+        <li>
+          Motion pass (2026-09-10): <code>.stagger-in</code> + <code>--i</code> is the only entrance cascade
+          (<code>.stagger-1..9</code> and the 20 hand-typed <code>animationFillMode</code> sites are gone); dead
+          keyframes and <code>--shadow-glow</code> removed; <code>transition-all</code> replaced by Tailwind&apos;s{" "}
+          <code>transition</code> (colours, opacity, shadow, transform) everywhere except the Sidebar width and the
+          compact Badge&apos;s max-width, which animate a size on purpose.
         </li>
         <li>
           Light-theme <code>--success</code> / <code>--warning</code> / <code>--danger</code> carry WCAG contrast

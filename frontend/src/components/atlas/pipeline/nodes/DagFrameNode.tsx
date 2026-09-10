@@ -16,7 +16,7 @@ function DagFrameNodeImpl({ data, selected }: NodeProps) {
 
   return (
     <div
-      className={`relative w-full h-full rounded-[var(--radius-md)] border bg-[var(--bg-base)]/40 transition-all overflow-hidden ${
+      className={`relative w-full h-full rounded-[var(--radius-md)] border bg-[var(--bg-base)]/40 transition overflow-hidden ${
         selected
           ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30"
           : "border-cyan-500/30 hover:border-cyan-500/50"

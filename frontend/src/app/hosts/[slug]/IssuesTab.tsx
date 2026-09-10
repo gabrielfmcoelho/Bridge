@@ -201,7 +201,7 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
             {hostIssues.some(i => i.archived) && (
               <button
                 onClick={() => setShowArchivedIssues(v => !v)}
-                className={`inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition-all ${
+                className={`inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition ${
                   showArchivedIssues
                     ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
                     : "bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"
