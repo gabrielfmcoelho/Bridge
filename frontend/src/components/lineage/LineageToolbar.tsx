@@ -5,6 +5,8 @@ import { useLocale } from "@/contexts/LocaleContext";
 import type { LineageIndexes } from "@/lib/lineage/indexes";
 import { LAYERS } from "@/lib/lineage/types";
 import { NODE_TYPE_LABELS } from "@/lib/lineage/style";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 export type TraceMode = "none" | "upstream" | "downstream";
 
@@ -84,9 +86,7 @@ export default function LineageToolbar({ indexes, filters, onChange, onOpenSearc
           onClick={onOpenSearch}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-base)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition-colors"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Icon path={ICON_PATHS.search} className="w-3.5 h-3.5" strokeWidth={1.5} />
           <span>{t("atlas.lineage.toolbar.search")}</span>
           <kbd className="text-[9px] px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-faint)]">⌘K</kbd>
         </button>

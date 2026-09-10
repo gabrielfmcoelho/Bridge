@@ -16,6 +16,8 @@ import CheckboxList from "@/components/ui/CheckboxList";
 import StepIndicator from "@/components/ui/StepIndicator";
 import type { Issue, HostAlert } from "@/lib/types";
 import { ALERT_DOT_COLOR, ALERT_TEXT_COLOR, PRIORITY_DOT_COLOR } from "../../_components/alert-colors";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 /* ─── Constants ─── */
 
@@ -233,18 +235,14 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
 
         {isResolved && (
           <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 rounded-[var(--radius-md)] p-2.5 border border-emerald-500/20">
-            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0" />
             {t("common.resolved") || "Resolved"}
           </div>
         )}
 
         {hasLinkedIssue && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-2.5 border border-[var(--border-subtle)]">
-            <svg className="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
+            <Icon path={ICON_PATHS.clipboard} className="w-3.5 h-3.5 text-purple-400 shrink-0" />
             {isResolved
               ? `Issue #${alert.linked_issue_id} — resolved`
               : `Issue #${alert.linked_issue_id} linked — resolve the issue to conclude this alert`
@@ -382,9 +380,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
           <div className="flex gap-2">
             {issue.status === "done" && onArchive && (
               <Button variant="secondary" size="sm" onClick={() => onArchive(issue.id)} className="mr-auto">
-                <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                </svg>
+                <Icon path={ICON_PATHS.archive} className="w-3.5 h-3.5 mr-1" />
                 {issue.archived ? t("issue.unarchive") : t("issue.archive")}
               </Button>
             )}
@@ -397,9 +393,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
           <div className="flex items-center gap-2">
             <p className="text-base font-semibold text-[var(--text-primary)] flex-1">{issue.title}</p>
             {issue.status === "done" && (
-              <svg className="w-5 h-5 shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <Icon path={ICON_PATHS.checkCircle} className="w-5 h-5 shrink-0 text-emerald-400" />
             )}
             {issue.archived && (
               <Badge>{t("issue.archived")}</Badge>
@@ -463,9 +457,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
           {/* Source info */}
           {issue.source === "alert" && (
             <div className="flex items-center gap-2 text-xs text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-2.5 border border-[var(--border-subtle)]">
-              <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+              <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               {t("alert.createdFromAlert")} {issue.source_ref}
             </div>
           )}

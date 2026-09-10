@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { NODE_COLORS, NODE_TYPE_LABELS, edgeStyle, EDGE_LABELS } from "@/lib/lineage/style";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 const NODE_KEYS = ["dag", "task", "dbt_source", "dbt_model", "table", "script", "dbt_macro"];
 const EDGE_KEYS = ["ref", "uses_source", "writes", "executes", "triggers", "column_lineage"];
@@ -15,9 +17,7 @@ export default function LineageLegend() {
         className="px-2.5 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1"
       >
         Legend
-        <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        <Icon path={ICON_PATHS.chevronDown} className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={1.5} />
       </button>
       {open && (
         <div className="px-3 pb-2 space-y-2 max-w-[260px]">

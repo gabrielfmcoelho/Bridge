@@ -18,6 +18,8 @@ import SplitView from "./modes/SplitView";
 import TableDetailPanel from "./TableDetailPanel";
 import ColumnLineagePanel from "./ColumnLineagePanel";
 import LayerBadge from "../shared/LayerBadge";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 const MODE_ICONS: Record<CatalogViewMode, React.ReactNode> = {
   tree: (
@@ -26,9 +28,7 @@ const MODE_ICONS: Record<CatalogViewMode, React.ReactNode> = {
     </svg>
   ),
   cards: (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-    </svg>
+    <Icon path={ICON_PATHS.viewCards} className="w-3.5 h-3.5" strokeWidth={1.75} />
   ),
   split: (
     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>

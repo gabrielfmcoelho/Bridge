@@ -6,6 +6,8 @@ import type { AtlasIndexes, AtlasFilters, TableRole } from "@/lib/atlas/types";
 import type { TableLayer } from "@/lib/lineage/indexes";
 import PillFilter from "./PillFilter";
 import { getLayerStyle } from "./LayerBadge";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   indexes: AtlasIndexes;
@@ -51,9 +53,7 @@ export default function AtlasToolbar({ indexes, filters, onChange, showRoleFilte
           onClick={onOpenSearch}
           className="group flex-1 min-w-0 inline-flex items-center gap-2 h-8 px-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] text-left text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--border-strong)] transition-colors"
         >
-          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Icon path={ICON_PATHS.search} className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
           <span className="truncate flex-1">{t("atlas.catalog.toolbar.searchPlaceholder")}</span>
           <kbd className="text-[9px] px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-faint)] font-mono">⌘K</kbd>
         </button>

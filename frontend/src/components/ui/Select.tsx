@@ -3,6 +3,8 @@
 import { useState, useRef, type SelectHTMLAttributes } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import FormField from "./FormField";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "onChange"> {
   label?: string;
@@ -55,9 +57,7 @@ export default function Select({
             <span className={value ? "" : "text-[var(--text-faint)]"}>
               {selectedLabel || "--"}
             </span>
-            <svg className={`w-3.5 h-3.5 text-[var(--text-faint)] shrink-0 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
+            <Icon path={ICON_PATHS.chevronDown} className={`w-3.5 h-3.5 text-[var(--text-faint)] shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
           </button>
         </Popover.Trigger>
         <Popover.Portal>

@@ -6,6 +6,8 @@ import { grafanaAPI } from "@/lib/api";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   serviceId: number;
@@ -62,9 +64,7 @@ export default function ServiceMetricsTab({ serviceId, nickname }: Props) {
           className="text-xs text-[var(--accent)] hover:underline shrink-0 inline-flex items-center gap-1"
         >
           Open in Grafana
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
+          <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
         </a>
       </Card>
 

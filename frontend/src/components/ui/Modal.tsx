@@ -1,5 +1,7 @@
 "use client";
 
+import Icon from "./Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import { useEffect, type ReactNode } from "react";
 
 interface ModalProps {
@@ -46,9 +48,7 @@ export default function Modal({ open, onClose, title, subHeader, footer, childre
                 onClick={onClose}
                 className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-overlay)] transition-all duration-150"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <Icon path={ICON_PATHS.close} />
               </button>
             </div>
             {subHeader && <div className="px-4 md:px-5 pb-3">{subHeader}</div>}

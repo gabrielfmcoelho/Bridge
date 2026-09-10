@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Card from "./Card";
 import SectionHeading from "@/components/ui/SectionHeading";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface LinkedItem {
   id: number | string;
@@ -47,15 +49,7 @@ export default function LinkedEntityList({ title, items, emptyMessage = "-" }: L
                 )}
               </div>
               {item.badge}
-              <svg
-                className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
+              <Icon path={ICON_PATHS.chevronRight} className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors shrink-0" />
             </Link>
           ))}
         </div>

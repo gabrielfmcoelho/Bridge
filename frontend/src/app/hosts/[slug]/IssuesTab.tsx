@@ -10,6 +10,8 @@ import { AlertsSection, IssuesKanban, IssuesTableView } from "./_components/Issu
 import { AlertDrawer, AlertDetailDrawer, IssueDrawer } from "./_components/IssueDrawers";
 import ChamadoSection from "./_components/ChamadoSection";
 import type { Issue, HostAlert, HostChamado } from "@/lib/types";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 function alertToPriority(level: string): string {
   return level === "critical" ? "critical" : level === "warning" ? "high" : "medium";
@@ -206,9 +208,7 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
                 }`}
                 title={showArchivedIssues ? t("issue.hideArchived") : t("issue.showArchived")}
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                </svg>
+                <Icon path={ICON_PATHS.archive} className="w-3 h-3" />
               </button>
             )}
             <ViewToggle

@@ -7,6 +7,8 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 /** SVG icons for known auth providers. */
 function ProviderIcon({ name, color, size = 20 }: { name: string; color: string; size?: number }) {
@@ -131,9 +133,7 @@ export default function LoginPage() {
         <div className="glass border border-[var(--border-default)] rounded-[var(--radius-xl)] p-6 space-y-5 shadow-[var(--shadow-lg)]">
           {error && (
             <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-sm rounded-[var(--radius-md)] p-3 animate-slide-down flex items-center gap-2">
-              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-              </svg>
+              <Icon path={ICON_PATHS.exclamationCircle} className="w-4 h-4 shrink-0" />
               {error}
             </div>
           )}
@@ -175,12 +175,7 @@ export default function LoginPage() {
                   <div className="flex-1 h-px bg-[var(--border-subtle)]" />
                   <span className="flex items-center gap-1.5 px-2">
                     {t("auth.orUseCredentials")}
-                    <svg
-                      className={`w-3 h-3 transition-transform ${showCredentials ? "rotate-180" : ""}`}
-                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <Icon path={ICON_PATHS.chevronDown} className={`w-3 h-3 transition-transform ${showCredentials ? "rotate-180" : ""}`} />
                   </span>
                   <div className="flex-1 h-px bg-[var(--border-subtle)]" />
                 </button>

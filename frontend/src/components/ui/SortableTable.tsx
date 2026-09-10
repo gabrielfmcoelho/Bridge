@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo, type ReactNode } from "react";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 export interface SortableColumn<K extends string> {
   key: K;
@@ -71,9 +73,7 @@ export default function SortableTable<K extends string>({
                   <span className="inline-flex items-center gap-1">
                     {col.label}
                     {sortable && sortKey === col.key && (
-                      <svg className={`w-3 h-3 text-[var(--accent)] transition-transform ${sortDir === "desc" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-                      </svg>
+                      <Icon path={ICON_PATHS.chevronUp} className={`w-3 h-3 text-[var(--accent)] transition-transform ${sortDir === "desc" ? "rotate-180" : ""}`} />
                     )}
                   </span>
                 </th>

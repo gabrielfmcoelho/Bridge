@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import Icon from "./Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 // Named accents resolve to theme tokens; anything else passes through as a CSS
 // colour (the situacao enum ships hex from the backend). The hue keys are the
@@ -52,7 +53,7 @@ interface CardProps {
 }
 
 const indicatorIcons: Record<string, string> = {
-  link: "M9 5l7 7-7 7",
+  link: ICON_PATHS.chevronRight,
   drawer: "M4 6h16M4 12h16M4 18h7",
 };
 
@@ -112,15 +113,10 @@ export default function Card({
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--card-accent)]/10 to-transparent pointer-events-none" />
       )}
       {clickIndicator && (
-        <svg
-          className="absolute bottom-2 right-2.5 w-3.5 h-3.5 text-[var(--text-faint)] opacity-80 group-hover/card:opacity-100 transition-opacity shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d={indicatorIcons[clickIndicator]} />
-        </svg>
+        <Icon
+          path={indicatorIcons[clickIndicator]}
+          className="absolute bottom-2 right-2.5 w-3.5 h-3.5 text-[var(--text-faint)] opacity-80 group-hover/card:opacity-100 transition-opacity"
+        />
       )}
       {children}
     </Tag>

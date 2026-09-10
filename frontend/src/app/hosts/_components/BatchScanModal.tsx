@@ -1,5 +1,7 @@
 import Button from "@/components/ui/Button";
 import type { Host } from "@/lib/types";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 export default function BatchScanModal({
   scanning,
@@ -207,9 +209,7 @@ export default function BatchScanModal({
             )}
             <Button variant="secondary" size="sm" onClick={onClose}>{t("common.cancel")}</Button>
             <Button size="sm" onClick={onStart}>
-              <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-              </svg>
+              <Icon path={ICON_PATHS.scan} className="w-3.5 h-3.5 mr-1" />
               {scannedCount > 0 ? t("host.rescan") : t("host.startScan")}
             </Button>
           </>

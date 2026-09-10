@@ -5,6 +5,8 @@ import type { TableRecord } from "@/lib/atlas/types";
 import LayerBadge from "../shared/LayerBadge";
 import RoleBadge from "../shared/RoleBadge";
 import { qualifiedName } from "./TableCard";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   table: TableRecord;
@@ -46,15 +48,7 @@ export default function TableRow({ table, selected, onClick }: Props) {
         {t("atlas.catalog.list.columnsLabel")}
       </span>
       <RoleBadge role={table.role} size="sm" />
-      <svg
-        className="w-3 h-3 text-[var(--text-faint)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-      </svg>
+      <Icon path={ICON_PATHS.chevronRight} className="w-3 h-3 text-[var(--text-faint)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </button>
   );
 }

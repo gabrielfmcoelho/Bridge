@@ -9,6 +9,8 @@ import Badge from "@/components/ui/Badge";
 import ResponsaveisSection from "@/components/inventory/ResponsaveisSection";
 import ProjectAiAnalysis from "./ProjectAiAnalysis";
 import type { Project, ProjectResponsavel, Service } from "@/lib/types";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface OverviewTabProps {
   project: Project;
@@ -46,9 +48,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
             <a href={project.gitlab_url} target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
               title={t("project.gitlabUrl")}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
+              <Icon path={ICON_PATHS.code} strokeWidth={1.5} />
               GitLab
             </a>
           )}
@@ -108,9 +108,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
                 <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{dns.domain}</span>
                 {dns.has_https && (
                   <Badge color="emerald">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
+                    <Icon path={ICON_PATHS.lock} className="w-3 h-3" />
                   </Badge>
                 )}
                 <Badge variant="situacao" situacao={dns.situacao} dot>{dns.situacao}</Badge>

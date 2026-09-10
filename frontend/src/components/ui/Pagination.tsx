@@ -1,6 +1,8 @@
 "use client";
 
 import Button from "./Button";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface PaginationProps {
   page: number;
@@ -23,17 +25,13 @@ export default function Pagination({ page, totalPages, total, perPage, onChange 
       </span>
       <div className="flex items-center gap-1">
         <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => onChange(page - 1)} className="!p-2">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
+          <Icon path={ICON_PATHS.back} />
         </Button>
         <span className="text-xs text-[var(--text-secondary)] px-2" style={{ fontFamily: "var(--font-mono)" }}>
           {page}/{totalPages}
         </span>
         <Button size="sm" variant="ghost" disabled={page >= totalPages} onClick={() => onChange(page + 1)} className="!p-2">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
+          <Icon path={ICON_PATHS.chevronRight} />
         </Button>
       </div>
     </div>

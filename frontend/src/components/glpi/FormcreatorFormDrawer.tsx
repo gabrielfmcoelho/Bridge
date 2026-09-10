@@ -18,6 +18,8 @@ import {
   type FormcreatorSection,
 } from "@/lib/api";
 import SectionHeading from "@/components/ui/SectionHeading";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   open: boolean;
@@ -366,9 +368,7 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90"
                 >
                   Abrir no GLPI
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
+                  <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
                 </Link>
               )}
               <Button type="button" variant="secondary" onClick={onClose}>

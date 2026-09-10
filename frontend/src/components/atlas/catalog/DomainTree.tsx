@@ -5,6 +5,8 @@ import { useLocale } from "@/contexts/LocaleContext";
 import type { AtlasIndexes, AtlasFilters, TableRecord } from "@/lib/atlas/types";
 import type { TableLayer } from "@/lib/lineage/indexes";
 import { getLayerStyle } from "../shared/LayerBadge";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   indexes: AtlasIndexes;
@@ -165,14 +167,6 @@ export default function DomainTree({ indexes, tables, selectedId, onSelect, filt
 
 function Chevron({ open }: { open: boolean }) {
   return (
-    <svg
-      className={`w-3 h-3 text-[var(--text-faint)] transition-transform ${open ? "rotate-90" : ""}`}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-    </svg>
+    <Icon path={ICON_PATHS.chevronRight} className={`w-3 h-3 text-[var(--text-faint)] transition-transform ${open ? "rotate-90" : ""}`} />
   );
 }

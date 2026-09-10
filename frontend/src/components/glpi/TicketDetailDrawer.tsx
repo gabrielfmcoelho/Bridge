@@ -8,6 +8,8 @@ import { glpiAPI, type GlpiTicketEvent } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { getTimeAgo } from "@/lib/utils";
 import SectionHeading from "@/components/ui/SectionHeading";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 // Some GLPI deployments (< 10.0.4) ignore the ?sanitize=false flag and still
 // return HTML as entity-encoded text ("&lt;div&gt;…"). The textarea trick
@@ -159,9 +161,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
             className="text-xs text-[var(--accent)] hover:underline inline-flex items-center gap-1"
           >
             Abrir no GLPI
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
+            <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
           </Link>
         ) : undefined
       }

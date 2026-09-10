@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import Button from "./Button";
 import IconButton from "./IconButton";
+import Icon from "./Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface PageHeaderProps {
   title: string;
@@ -31,9 +33,7 @@ export default function PageHeader({ title, subtitle, actions, addLabel, onAdd }
                 <Button onClick={onAdd}>+ {addLabel}</Button>
               </div>
               <IconButton variant="accent" size="md" onClick={onAdd} title={addLabel} className="sm:hidden">
-                <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
+                <Icon path={ICON_PATHS.plus} size="md" />
               </IconButton>
             </>
           )}

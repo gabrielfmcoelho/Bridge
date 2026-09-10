@@ -1,3 +1,6 @@
+import Icon from "./Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
+
 const variantStyles: Record<string, string> = {
   success: "bg-[var(--success)]/10 border border-[var(--success)]/25 text-[var(--success)]",
   error: "bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)]",
@@ -7,26 +10,10 @@ const variantStyles: Record<string, string> = {
 };
 
 const icons: Record<string, React.ReactNode> = {
-  success: (
-    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  error: (
-    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  warning: (
-    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-    </svg>
-  ),
-  info: (
-    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
+  success: <Icon path={ICON_PATHS.checkCircle} />,
+  error: <Icon path={ICON_PATHS.xCircle} />,
+  warning: <Icon path={ICON_PATHS.alert} />,
+  info: <Icon path={ICON_PATHS.infoCircle} />,
   loading: (
     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

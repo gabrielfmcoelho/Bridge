@@ -3,6 +3,8 @@
 import { useMemo, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { OutlineWorkspaceCollection } from "@/lib/api";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   label?: string;
@@ -161,9 +163,7 @@ export default function CollectionMultiSelect({
                           aria-hidden
                         >
                           {checked && (
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
+                            <Icon path={ICON_PATHS.check} className="w-3 h-3" strokeWidth={3} />
                           )}
                         </span>
                         <span className="min-w-0 flex-1">

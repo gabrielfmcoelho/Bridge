@@ -3,6 +3,8 @@
 import { useLocale } from "@/contexts/LocaleContext";
 import type { LineageChainStep } from "@/lib/atlas/tableLineageChain";
 import LayerBadge from "./LayerBadge";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   steps: LineageChainStep[];
@@ -85,9 +87,7 @@ function ChainStep({
       </div>
       {!isLast && (
         <div className="flex items-center px-1 text-[var(--text-faint)]">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
+          <Icon path={ICON_PATHS.chevronRight} className="w-3.5 h-3.5" />
         </div>
       )}
     </div>

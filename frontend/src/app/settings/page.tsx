@@ -337,9 +337,7 @@ function UserActions({ u, onEdit, onDelete }: { u: import("@/lib/types").User; o
         </svg>
       </IconButton>
       <IconButton variant="danger" onClick={onDelete} title="Delete">
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-        </svg>
+        <Icon path={ICON_PATHS.trash} className="w-3.5 h-3.5" />
       </IconButton>
     </div>
   );
@@ -776,9 +774,7 @@ function AppearanceSection() {
               title={c.label}
             >
               {appColor === c.value && (
-                <svg className="w-4 h-4 text-white absolute inset-0 m-auto drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
+                <Icon path={ICON_PATHS.check} className="w-4 h-4 text-white absolute inset-0 m-auto drop-shadow" strokeWidth={3} />
               )}
             </button>
           ))}
@@ -956,15 +952,11 @@ function ImportSection() {
         </h3>
         <div className="flex gap-2">
           <PillButton size="lg" active={importType === "hosts"} onClick={() => setImportType("hosts")}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-              </svg>
+            <Icon path={ICON_PATHS.serverStack} />
             Hosts
           </PillButton>
           <PillButton size="lg" active={importType === "dns"} onClick={() => setImportType("dns")}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
-              </svg>
+            <Icon path={ICON_PATHS.globeMeridian} />
             DNS
           </PillButton>
         </div>
@@ -1043,9 +1035,7 @@ function ImportSection() {
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-default)]">
               <div className="flex items-center gap-2 min-w-0">
-                <svg className="w-4 h-4 shrink-0 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <Icon path={ICON_PATHS.document} className="w-4 h-4 shrink-0 text-[var(--accent)]" />
                 <span className="text-sm text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{fileName}</span>
               </div>
               <button onClick={reset} className="text-xs text-[var(--text-faint)] hover:text-red-400 transition-colors shrink-0 ml-2">
@@ -1211,9 +1201,7 @@ function BackupSection() {
       <Card hover={false} className="animate-slide-up stagger-1" style={{ animationFillMode: "both" } as React.CSSProperties}>
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            <Icon path={ICON_PATHS.exportDoc} className="w-5 h-5 text-emerald-400" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>
@@ -1223,9 +1211,7 @@ function BackupSection() {
               {t("settings.backupDescription")}
             </p>
             <Button size="sm" variant="secondary" onClick={handleBackup} loading={downloading}>
-              <svg className="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              <Icon path={ICON_PATHS.exportDoc} className="w-3.5 h-3.5 mr-1.5" />
               {t("settings.downloadBackup")}
             </Button>
           </div>
@@ -1236,9 +1222,7 @@ function BackupSection() {
       <Card hover={false} className="animate-slide-up stagger-2" style={{ animationFillMode: "both" } as React.CSSProperties}>
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
+            <Icon path={ICON_PATHS.upload} className="w-5 h-5 text-amber-400" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>
@@ -1258,9 +1242,7 @@ function BackupSection() {
               className="hidden"
             />
             <Button size="sm" variant="danger" onClick={() => restoreInputRef.current?.click()} loading={restoring}>
-              <svg className="w-3.5 h-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
+              <Icon path={ICON_PATHS.upload} className="w-3.5 h-3.5 mr-1.5" />
               {t("settings.uploadRestore")}
             </Button>
           </div>

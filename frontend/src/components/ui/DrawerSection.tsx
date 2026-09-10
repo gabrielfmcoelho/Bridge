@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface DrawerSectionProps {
   title: string;
@@ -30,15 +32,7 @@ export default function DrawerSection({ title, open, onToggle, active, children 
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
           )}
         </span>
-        <svg
-          className={`w-4 h-4 text-[var(--text-faint)] transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
+        <Icon path={ICON_PATHS.chevronDown} className={`w-4 h-4 text-[var(--text-faint)] transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && <div className="pb-4 space-y-3 animate-fade-in">{children}</div>}
     </div>

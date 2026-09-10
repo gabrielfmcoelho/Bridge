@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 export interface AccordionSection {
   id: string;
@@ -36,15 +38,7 @@ export default function Accordion({ sections, defaultOpen }: AccordionProps) {
               style={{ fontFamily: "var(--font-display)" }}
             >
               {section.title}
-              <svg
-                className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              <Icon path={ICON_PATHS.chevronDown} className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
             </button>
             <div
               className={`grid transition-all duration-200 ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}

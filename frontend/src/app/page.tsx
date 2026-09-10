@@ -12,6 +12,8 @@ import Badge from "@/components/ui/Badge";
 import StatCard from "@/components/ui/StatCard";
 import { SkeletonStats } from "@/components/ui/Skeleton";
 import SectionHeading from "@/components/ui/SectionHeading";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 const statConfig = [
   { key: "hosts", color: "cyan", icon: "M5 3h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm0 10h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2z" },
@@ -202,9 +204,7 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
                   {t("dashboard.scanCoverage")}
                 </h2>
-                <svg className="w-4 h-4 text-[var(--accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                </svg>
+                <Icon path={ICON_PATHS.scan} className="w-4 h-4 text-[var(--accent)]" />
               </div>
               <div className="flex items-end gap-3 mb-3">
                 <span className="text-2xl font-bold text-[var(--accent)]" style={{ fontFamily: "var(--font-display)" }}>
@@ -258,9 +258,7 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
                   {t("dashboard.infrastructure")}
                 </h2>
-                <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
+                <Icon path={ICON_PATHS.archiveBox} className="w-4 h-4 text-purple-400" />
               </div>
               {hospedagemEntries.length > 0 ? (
                 <div className="space-y-2">

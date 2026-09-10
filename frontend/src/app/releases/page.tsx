@@ -21,6 +21,8 @@ import FormError from "@/components/ui/FormError";
 import CheckboxList from "@/components/ui/CheckboxList";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 const RELEASE_STATUSES = ["pending", "ongoing", "ready", "live", "canceled"] as const;
 
@@ -101,9 +103,7 @@ export default function ReleasesPage() {
                 title={t("common.filter")}
                 className="sm:hidden"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
+                <Icon path={ICON_PATHS.filter} />
               </IconButton>
         }
       />
@@ -111,9 +111,7 @@ export default function ReleasesPage() {
       {/* Filters — desktop */}
       <div className="hidden sm:flex flex-wrap items-center gap-3 mb-5">
         <div className="relative max-w-xs flex-1 min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Icon path={ICON_PATHS.search} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)] pointer-events-none" />
           <input
             placeholder={t("common.search")}
             value={search}

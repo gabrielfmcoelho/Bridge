@@ -1,6 +1,8 @@
 "use client";
 
 import type { OutlineDocumentNode } from "@/lib/api";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   nodes: OutlineDocumentNode[];
@@ -70,15 +72,7 @@ function TreeNode({
             className="w-5 h-5 inline-flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] shrink-0"
             aria-label={isExpanded ? "Collapse" : "Expand"}
           >
-            <svg
-              className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
+            <Icon path={ICON_PATHS.chevronRight} className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
           </button>
         ) : (
           <span className="w-5 shrink-0" aria-hidden />

@@ -22,6 +22,8 @@ import IssueBoard from "./_components/IssueBoard";
 import CommitsTab from "./_components/CommitsTab";
 import WikiTab from "./_components/WikiTab";
 import ChamadosTab from "./_components/ChamadosTab";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 type TabKey = "overview" | "topology" | "issues" | "commits" | "wiki" | "chamados";
 
@@ -104,9 +106,7 @@ export default function ProjectDetail({ id }: { id: number }) {
             counters={
               safeIssues.length > 0 ? (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-400">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
+                  <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5" />
                   {safeIssues.length}
                 </span>
               ) : undefined

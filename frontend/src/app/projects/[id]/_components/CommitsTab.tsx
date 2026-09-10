@@ -9,6 +9,8 @@ import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useLocale } from "@/contexts/LocaleContext";
 import { getTimeAgo } from "@/lib/utils";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   projectId: number;
@@ -172,18 +174,8 @@ function RepoGroup({ group }: { group: RepoCommitGroup }) {
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-overlay)] transition-colors text-left"
         title={group.projectPath}
       >
-        <svg
-          className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-        <svg className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
+        <Icon path={ICON_PATHS.chevronRight} className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${open ? "rotate-90" : ""}`} />
+        <Icon path={ICON_PATHS.archiveBox} className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
         <div className="min-w-0 flex-1 flex flex-col leading-tight">
           <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{repoTitle}</span>
           {group.projectPath && (

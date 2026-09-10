@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { coolifyAPI, sshKeysAPI } from "@/lib/api";
 import type { CoolifyServer } from "@/lib/api";
 import Button from "@/components/ui/Button";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 type Props = {
   slug: string;
@@ -127,9 +129,7 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
       <div className="px-4 py-3 space-y-3">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-          </svg>
+          <Icon path={ICON_PATHS.serverStack} className="w-4 h-4 text-violet-400 shrink-0" />
           <span className="text-sm font-medium text-[var(--text-primary)]">Coolify</span>
           {linked && (
             <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-violet-500/15 text-[10px] text-violet-400 border border-violet-500/20">

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { LineageIndexes } from "@/lib/lineage/indexes";
 import { NODE_TYPE_LABELS, NODE_COLORS } from "@/lib/lineage/style";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   open: boolean;
@@ -61,9 +63,7 @@ export default function SearchOmnibar({ open, indexes, onClose, onPick }: Props)
     <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] bg-black/60" onClick={onClose}>
       <div className="w-full max-w-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-subtle)]">
-          <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Icon path={ICON_PATHS.search} className="w-4 h-4 text-[var(--text-muted)]" strokeWidth={1.5} />
           <input
             ref={inputRef}
             value={q}

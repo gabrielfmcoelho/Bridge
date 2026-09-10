@@ -9,6 +9,8 @@ import { formatUptime, parseLoginEntry, formatLoginDate, portIcon, parseServiceR
 import type { VMInfoType, ProcessDetail, PortOwner, CronInfo, CronJob, Agent, DiscoveredService, ResourceUsageSnapshot, ResourceProcess, ResourceDiskItem } from "@/lib/api";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Divider from "@/components/ui/Divider";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 // Login users that aren't real accounts — these come from `last`'s wtmp
 // rollover and reboot bookkeeping. Filter them out before grouping logins
@@ -137,9 +139,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
               const privKeys = info.ssh_keys.filter(k => k.source !== "authorized_keys");
               const renderKey = (k: typeof info.ssh_keys[0], i: number) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
-                  <svg className={`w-3.5 h-3.5 shrink-0 ${k.managed ? "text-emerald-400" : "text-[var(--text-faint)]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
+                  <Icon path={ICON_PATHS.key} className={`w-3.5 h-3.5 shrink-0 ${k.managed ? "text-emerald-400" : "text-[var(--text-faint)]"}`} />
                   <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{k.name}</span>
                   <span className="text-[var(--text-faint)]">{k.type}</span>
                   {k.managed ? (

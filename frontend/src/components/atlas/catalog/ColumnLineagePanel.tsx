@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { AtlasIndexes } from "@/lib/atlas/types";
 import { buildColumnLineagePath, type ColumnLineageStep } from "@/lib/atlas/columnLineagePath";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   indexes: AtlasIndexes;
@@ -37,9 +39,7 @@ export default function ColumnLineagePanel({ indexes, columnId, onBack, onSelect
           onClick={onBack}
           className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors w-fit"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
+          <Icon path={ICON_PATHS.back} className="w-3.5 h-3.5" />
           {t("atlas.catalog.column.backToTable")}{table ? `: ${table.label}` : ""}
         </button>
 

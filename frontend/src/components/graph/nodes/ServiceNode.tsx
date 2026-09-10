@@ -1,4 +1,6 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 export default function ServiceNode({ data }: NodeProps) {
   return (
@@ -7,9 +9,7 @@ export default function ServiceNode({ data }: NodeProps) {
       <div className="h-1 bg-gradient-to-r from-purple-500 to-purple-400" />
       <div className="px-3 py-2">
         <div className="flex items-center gap-2 mb-1">
-          <svg className="w-3.5 h-3.5 text-purple-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-          </svg>
+          <Icon path={ICON_PATHS.folder} className="w-3.5 h-3.5 text-purple-400 shrink-0" strokeWidth={1.5} />
           <span className="text-xs font-bold text-purple-400 truncate">{data.label as string}</span>
         </div>
         {(data.technology_stack as string) && (

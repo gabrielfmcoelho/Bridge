@@ -20,6 +20,8 @@ import OverviewTab from "./_components/OverviewTab";
 import TopologyTab from "./_components/TopologyTab";
 import IssuesTab from "./_components/IssuesTab";
 import type { Service } from "@/lib/types";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 type TabKey = "overview" | "topology" | "issues";
 
@@ -119,9 +121,7 @@ export default function DnsDetail({ id }: { id: number }) {
                 <Badge variant="situacao" situacao={dns.situacao} dot>{dns.situacao}</Badge>
                 {dns.has_https && (
                   <Badge color="emerald">
-                    <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
+                    <Icon path={ICON_PATHS.lock} className="w-3 h-3 mr-1" />
                     HTTPS
                   </Badge>
                 )}
@@ -130,9 +130,7 @@ export default function DnsDetail({ id }: { id: number }) {
             counters={
               dnsIssues.length > 0 ? (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-400">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
+                  <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5" />
                   {dnsIssues.length}
                 </span>
               ) : undefined

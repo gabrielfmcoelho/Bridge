@@ -19,6 +19,8 @@ import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import type { SSHKeyRecord, AssetGrantsInput } from "@/lib/types";
 import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 export default function HostCredentialsPage() {
   const { t } = useLocale();
@@ -54,9 +56,7 @@ export default function HostCredentialsPage() {
       {/* Search */}
       <div className="flex items-center gap-2 mb-5">
         <div className="relative flex-1 max-w-sm min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <Icon path={ICON_PATHS.search} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)] pointer-events-none" />
           <input
             placeholder={t("common.search")}
             value={search}
@@ -216,9 +216,7 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <svg className={`w-4 h-4 ${credType === "key" ? "text-[var(--accent)]" : "text-[var(--text-faint)]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
+                  <Icon path={ICON_PATHS.key} className={`w-4 h-4 ${credType === "key" ? "text-[var(--accent)]" : "text-[var(--text-faint)]"}`} />
                   <span className={`text-sm font-medium ${credType === "key" ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}>SSH Key</span>
                 </div>
                 <p className="text-[10px] text-[var(--text-faint)]">Public/private key pair</p>
@@ -233,9 +231,7 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <svg className={`w-4 h-4 ${credType === "password" ? "text-purple-400" : "text-[var(--text-faint)]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
+                  <Icon path={ICON_PATHS.lock} className={`w-4 h-4 ${credType === "password" ? "text-purple-400" : "text-[var(--text-faint)]"}`} />
                   <span className={`text-sm font-medium ${credType === "password" ? "text-purple-400" : "text-[var(--text-secondary)]"}`}>Password</span>
                 </div>
                 <p className="text-[10px] text-[var(--text-faint)]">Encrypted password storage</p>
@@ -417,9 +413,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       {coolifyStatus?.enabled && isKey && data.fingerprint && (
         <div className="pt-3 mt-3 border-t border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <svg className="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
-            </svg>
+            <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5 text-violet-400 shrink-0" />
             <span className="text-xs font-medium text-[var(--text-primary)]">Coolify</span>
             {coolifyChecking ? (
               <span className="text-[10px] text-[var(--text-faint)] ml-auto">{t("common.loading")}</span>

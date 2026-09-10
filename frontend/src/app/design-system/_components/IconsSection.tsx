@@ -58,58 +58,35 @@ export default function IconsSection() {
 
       <Specimen title="Icon" source="components/ui/Icon.tsx" wide>
         <div className="flex flex-wrap items-end gap-6">
+          {(["xs", "sm", "md", "lg"] as const).map((size) => (
+            <div key={size} className="flex flex-col items-center gap-1">
+              <Icon path={ICON_PATHS.server} size={size} />
+              <code className="text-2xs text-[var(--text-faint)] font-mono">size=&quot;{size}&quot;</code>
+            </div>
+          ))}
           <div className="flex flex-col items-center gap-1">
-            <Icon path={ICON_PATHS.server} className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-            <code className="text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-              w-3.5 h-3.5
-            </code>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <Icon path={ICON_PATHS.server} className="w-4 h-4 text-[var(--text-secondary)]" />
-            <code className="text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-              w-4 h-4 (default)
-            </code>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <Icon path={ICON_PATHS.server} className="w-5 h-5 text-[var(--text-secondary)]" />
-            <code className="text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-              w-5 h-5
-            </code>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <Icon path={ICON_PATHS.server} className="w-6 h-6 text-[var(--text-secondary)]" />
-            <code className="text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-              w-6 h-6
-            </code>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <Icon path={ICON_PATHS.server} className="w-5 h-5 text-[var(--text-secondary)]" strokeWidth={1.5} />
-            <code className="text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-              strokeWidth=1.5
-            </code>
-          </div>
-          <div className="flex flex-col items-center gap-1">
-            <Icon path={ICON_PATHS.server} className="w-5 h-5 text-[var(--text-secondary)]" strokeWidth={2} />
-            <code className="text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-              strokeWidth=2 (default)
-            </code>
+            <Icon path={ICON_PATHS.server} className="w-8 h-8 text-[var(--text-secondary)]" strokeWidth={1} />
+            <code className="text-2xs text-[var(--text-faint)] font-mono">className + strokeWidth override</code>
           </div>
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-3">
+          <code>size</code> maps xs/sm/md/lg to w-3.5/4/5/6 with strokes 2/2/1.75/1.5, so small glyphs stop reading heavier
+          than large ones. <code>className</code> and <code>strokeWidth</code> still override for one-offs.
           DESIGN_SYSTEM.md &sect;5: <code>w-3.5</code> for card indicators, <code>w-4</code> for toolbar buttons.
         </p>
       </Specimen>
 
       <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
         <li>
-          Five separate icon registries: <code>lib/icon-paths.ts</code> (canonical, ~39 keys, imported by 15
-          files), <code>components/layout/Sidebar.tsx</code> private <code>icons</code> map (21 keys),{" "}
-          <code>components/ui/EmptyState.tsx</code> private map (7), <code>components/ui/ViewToggle.tsx</code>{" "}
-          <code>VIEW_ICONS</code> (3), <code>components/ui/Card.tsx</code> <code>clickIndicator</code> (2).
+          One registry now: <code>lib/icon-paths.ts</code> holds <code>ICON_PATHS</code> (55 keys, the 20 paths that were
+          inlined 2+ times added and named) plus <code>NAV_ICONS</code> (the sidebar set, still its own drawing).{" "}
+          <code>EmptyState</code>, <code>ViewToggle</code>, <code>StatusAlert</code>, <code>Modal</code>, <code>PageHeader</code>{" "}
+          and <code>Card</code> read from it instead of private maps.
         </li>
         <li>
-          <code>Icon.tsx</code> is imported by only 5 files while 239 raw inline <code>&lt;svg&gt;</code> exist
-          across <code>.tsx</code> files.
+          Inline <code>&lt;svg&gt;</code> went from 239 to 82 (2026-09-10): 141 registered paths swept into{" "}
+          <code>Icon</code> across 70 files. What remains: 46 one-off paths (add a name, then sweep), 6 with extra
+          attributes, 4 non-stroke, plus <code>Header.tsx</code> (in-flight) and <code>app/secrets</code> (guardrailed).
         </li>
         <li>
           The magnifier path <code>M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z</code> alone is inlined in 11 files.

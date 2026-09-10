@@ -23,6 +23,8 @@ import ScansTab from "./_components/ScansTab";
 import MetricsTab from "./_components/MetricsTab";
 import IssuesTab from "./IssuesTab";
 import SSHConfigDrawer from "./_components/SSHConfigDrawer";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 type TabKey = "overview" | "scans" | "operations" | "alerts" | "topology" | "metrics";
 
@@ -123,9 +125,7 @@ export default function HostDetail({ slug }: { slug: string }) {
       {/* Back link */}
       <div className="mb-5">
         <Link href="/hosts" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider hover:text-[var(--accent)] transition-colors">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
+          <Icon path={ICON_PATHS.back} className="w-3.5 h-3.5" />
           {t("common.back")}
         </Link>
       </div>
@@ -177,23 +177,17 @@ export default function HostDetail({ slug }: { slug: string }) {
               )}
               {/* Alerts */}
               <span className={`inline-flex items-center gap-1 text-xs ${alertCount > 0 ? "text-amber-400" : "text-[var(--text-faint)]"}`} title={`${alertCount} alerts`}>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+                <Icon path={ICON_PATHS.alert} />
                 {alertCount > 0 && <span style={{ fontFamily: "var(--font-mono)" }}>{alertCount}</span>}
               </span>
               {/* Issues */}
               <span className={`inline-flex items-center gap-1 text-xs ${openIssuesCount > 0 ? "text-purple-400" : "text-[var(--text-faint)]"}`} title={`${openIssuesCount} open issues`}>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
+                <Icon path={ICON_PATHS.clipboard} />
                 {openIssuesCount > 0 && <span style={{ fontFamily: "var(--font-mono)" }}>{openIssuesCount}</span>}
               </span>
               {/* Chamados */}
               <span className={`inline-flex items-center gap-1 text-xs ${(data.host.chamados_count || 0) > 0 ? "text-orange-400" : "text-[var(--text-faint)]"}`} title={`${data.host.chamados_count || 0} chamados`}>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <Icon path={ICON_PATHS.document} />
                 {(data.host.chamados_count || 0) > 0 && <span style={{ fontFamily: "var(--font-mono)" }}>{data.host.chamados_count}</span>}
               </span>
             </div>
@@ -204,22 +198,16 @@ export default function HostDetail({ slug }: { slug: string }) {
             <TabBar tabs={tabs} activeTab={activeTab} onChange={(k) => setActiveTab(k as TabKey)} />
             <div className="hidden md:flex items-center gap-1.5 shrink-0">
               <IconButton onClick={() => setShowSSHConfigDrawer(true)} title={t("host.sshConfig")}>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                </svg>
+                <Icon path={ICON_PATHS.code} />
               </IconButton>
               {canEdit && (
                 <IconButton onClick={() => setShowEditDrawer(true)} title={t("common.edit")}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
+                  <Icon path={ICON_PATHS.edit} />
                 </IconButton>
               )}
               {isAdmin && (
                 <IconButton variant="danger" onClick={() => { if (confirm(`Delete "${data.host.nickname}"?`)) deleteMutation.mutate(); }} title={t("common.delete")}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                  <Icon path={ICON_PATHS.trashOutline} />
                 </IconButton>
               )}
             </div>

@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { LineageIndexes } from "@/lib/lineage/indexes";
 import type { LineageWarning } from "@/lib/lineage/types";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   indexes: LineageIndexes;
@@ -77,9 +79,7 @@ export default function IssuesPanel({ indexes, filterKind, onNavigate }: Props) 
                   className="w-full px-4 py-2 flex items-center justify-between text-left hover:bg-[var(--bg-elevated)] transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <svg className={`w-3 h-3 transition-transform ${isOpen ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
+                    <Icon path={ICON_PATHS.chevronRight} className={`w-3 h-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
                     <span className="font-medium text-sm">{t(g.labelKey)}</span>
                     <span className="text-xs text-[var(--text-muted)]">({ids.length})</span>
                   </div>

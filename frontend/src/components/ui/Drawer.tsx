@@ -3,6 +3,8 @@
 import { Drawer as VaulDrawer } from "vaul";
 import type { ReactNode } from "react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface DrawerProps {
   open: boolean;
@@ -31,9 +33,7 @@ export default function Drawer({ open, onClose, title, subHeader, headerAction, 
       aria-label="Back"
       title="Back"
     >
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-      </svg>
+      <Icon path={ICON_PATHS.back} />
     </button>
   ) : null;
   const isMobile = useMediaQuery("(max-width: 767px)");

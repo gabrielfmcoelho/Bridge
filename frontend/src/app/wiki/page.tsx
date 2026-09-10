@@ -17,6 +17,8 @@ import WikiSearchBar from "@/components/wiki/WikiSearchBar";
 import WikiTree from "@/components/wiki/WikiTree";
 import WikiDocumentViewer from "@/components/wiki/WikiDocumentViewer";
 import Divider from "@/components/ui/Divider";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 type ViewMode = "docs" | "search";
 
@@ -174,9 +176,7 @@ function WikiPageInner() {
           : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
       }`}
     >
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
-      </svg>
+      <Icon path={ICON_PATHS.magnifier} />
       Search
     </button>
   );
@@ -208,15 +208,7 @@ function WikiPageInner() {
                   onClick={() => toggleCollection(section.collection_id)}
                   className="flex-1 min-w-0 flex items-center gap-1.5 text-left"
                 >
-                  <svg
-                    className={`w-3 h-3 text-[var(--text-faint)] shrink-0 transition-transform ${collapsed ? "" : "rotate-90"}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
+                  <Icon path={ICON_PATHS.chevronRight} className={`w-3 h-3 text-[var(--text-faint)] shrink-0 transition-transform ${collapsed ? "" : "rotate-90"}`} />
                   <CollectionIconPip icon={section.collection?.icon} color={section.collection?.color} size={14} />
                   <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider truncate">
                     {section.collection?.name ?? section.collection_id}
@@ -235,9 +227,7 @@ function WikiPageInner() {
                     className="text-[var(--text-faint)] hover:text-[var(--accent)] text-xs px-1"
                     title={t("atlas.apis.shareWikiCollection")}
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                    </svg>
+                    <Icon path={ICON_PATHS.share} className="w-3.5 h-3.5" />
                   </button>
                 )}
                 {canEdit && section.collection && (
@@ -403,9 +393,7 @@ function WikiPageInner() {
                   className="shrink-0 inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
                   title={t("atlas.apis.shareWikiPage")}
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
+                  <Icon path={ICON_PATHS.share} className="w-3.5 h-3.5" />
                   {t("atlas.apis.shareWikiPage")}
                 </button>
               </div>
@@ -440,9 +428,7 @@ function WikiPageInner() {
               title="Expand nav"
               className="w-8 h-8 inline-flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
+              <Icon path={ICON_PATHS.chevronRight} />
             </button>
             <Divider className="w-6 my-1" />
             <button
@@ -455,9 +441,7 @@ function WikiPageInner() {
                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
               }`}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
-              </svg>
+              <Icon path={ICON_PATHS.magnifier} />
             </button>
             <div className="flex-1 w-full overflow-y-auto flex flex-col items-center gap-1 pt-1">
               {(tree?.sections ?? []).map((s) => (
@@ -489,9 +473,7 @@ function WikiPageInner() {
                 title="Open in Outline"
                 className="w-full h-10 inline-flex items-center justify-center bg-[var(--accent)] text-white hover:opacity-90 transition-opacity"
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
+                <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
               </Link>
             </div>
           </aside>
@@ -510,9 +492,7 @@ function WikiPageInner() {
                   title="Collapse nav"
                   className="hidden md:inline-flex w-8 h-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] shrink-0"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                  </svg>
+                  <Icon path={ICON_PATHS.back} className="w-3.5 h-3.5" />
                 </button>
                 <div className="flex-1 min-w-0">{searchNavButton}</div>
               </div>
@@ -530,9 +510,7 @@ function WikiPageInner() {
               className="w-full h-10 inline-flex items-center justify-center gap-1.5 bg-[var(--accent)] text-white text-[11px] font-medium hover:opacity-90 transition-opacity"
             >
               Open in Outline
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
+              <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
             </Link>
           </div>
           </aside>
