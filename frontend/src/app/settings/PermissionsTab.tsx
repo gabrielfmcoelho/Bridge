@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState, useEffect, useMemo } from "react";
 import { permissionsAPI } from "@/lib/api";
 import Card from "@/components/ui/Card";
+import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
 
 const ROLES = ["viewer", "editor", "admin"] as const;
@@ -91,10 +92,10 @@ export default function PermissionsTab() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className={tableClasses.compact.table}>
           <thead>
-            <tr className="border-b border-[var(--border-subtle)]">
-              <th className="text-left py-2 px-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider w-1/3">
+            <tr className={tableClasses.compact.headRow}>
+              <th className={`${tableClasses.compact.th} w-1/3`}>
                 Permission
               </th>
               {ROLES.map((role) => (
@@ -131,7 +132,7 @@ export default function PermissionsTab() {
                     key={p.code}
                     className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
-                    <td className="py-2 px-2">
+                    <td className={tableClasses.compact.td}>
                       <div className="text-[var(--text-secondary)]">{p.description}</div>
                       <div className="text-2xs text-[var(--text-faint)] font-mono">{p.code}</div>
                     </td>

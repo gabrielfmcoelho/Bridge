@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { roleMappingsAPI } from "@/lib/api";
 import Card from "@/components/ui/Card";
+import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import NativeSelect from "@/components/ui/NativeSelect";
@@ -66,16 +67,16 @@ export default function RoleMappingsTab() {
       {/* Existing mappings */}
       {mappings.length > 0 ? (
         <div className="overflow-x-auto mb-4">
-          <table className="w-full text-sm">
+          <table className={tableClasses.compact.table}>
             <thead>
-              <tr className="border-b border-[var(--border-subtle)]">
-                <th className="text-left py-2 px-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+              <tr className={tableClasses.compact.headRow}>
+                <th className={tableClasses.compact.th}>
                   Provider
                 </th>
-                <th className="text-left py-2 px-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                <th className={tableClasses.compact.th}>
                   External Group
                 </th>
-                <th className="text-left py-2 px-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                <th className={tableClasses.compact.th}>
                   Local Role
                 </th>
                 <th className="w-10" />
@@ -83,8 +84,8 @@ export default function RoleMappingsTab() {
             </thead>
             <tbody>
               {mappings.map((m) => (
-                <tr key={m.id} className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors">
-                  <td className="py-2 px-2">
+                <tr key={m.id} className={tableClasses.compact.row}>
+                  <td className={tableClasses.compact.td}>
                     <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]">
                       <span className="w-2 h-2 rounded-full" style={{
                         backgroundColor: m.provider_name === "keycloak" ? "#22c55e" : m.provider_name === "gitlab" ? "#e24329" : "#3b82f6"
@@ -92,10 +93,10 @@ export default function RoleMappingsTab() {
                       {m.provider_name}
                     </span>
                   </td>
-                  <td className="py-2 px-2 font-mono text-xs text-[var(--text-secondary)]">
+                  <td className={`${tableClasses.compact.td} font-mono text-xs text-[var(--text-secondary)]`}>
                     {m.external_group}
                   </td>
-                  <td className="py-2 px-2">
+                  <td className={tableClasses.compact.td}>
                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${
                       m.local_role === "admin"
                         ? "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/25"
@@ -106,7 +107,7 @@ export default function RoleMappingsTab() {
                       {m.local_role}
                     </span>
                   </td>
-                  <td className="py-2 px-2">
+                  <td className={tableClasses.compact.td}>
                     <button
                       onClick={() => deleteMutation.mutate(m.id)}
                       className="text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors p-1"

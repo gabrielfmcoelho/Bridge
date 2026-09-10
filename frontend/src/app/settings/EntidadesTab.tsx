@@ -7,6 +7,7 @@ import { indentedLabel, withDepth } from "@/lib/entidades";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { AssetGrantsInput, AssetType, Entidade } from "@/lib/types";
 import Card from "@/components/ui/Card";
+import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -58,23 +59,23 @@ export default function EntidadesTab() {
           <div className="animate-pulse space-y-2">{[...Array(4)].map((_, i) => <div key={i} className="h-8 bg-[var(--bg-elevated)] rounded-[var(--radius-md)]" />)}</div>
         ) : (
           <div className="overflow-x-auto mb-4">
-            <table className="w-full text-sm">
+            <table className={tableClasses.compact.table}>
               <thead>
-                <tr className="border-b border-[var(--border-subtle)]">
-                  <th className="text-left py-2 px-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">{t("common.name")}</th>
-                  <th className="text-left py-2 px-2 text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">Slug</th>
+                <tr className={tableClasses.compact.headRow}>
+                  <th className={tableClasses.compact.th}>{t("common.name")}</th>
+                  <th className={tableClasses.compact.th}>Slug</th>
                   <th className="w-24" />
                 </tr>
               </thead>
               <tbody>
                 {nodes.map((e) => (
-                  <tr key={e.id} className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors">
-                    <td className="py-2 px-2 text-[var(--text-primary)]" style={{ paddingLeft: `${8 + e.depth * 18}px` }}>
+                  <tr key={e.id} className={tableClasses.compact.row}>
+                    <td className={`${tableClasses.compact.td} text-[var(--text-primary)]`} style={{ paddingLeft: `${8 + e.depth * 18}px` }}>
                       {e.depth > 0 && <span className="text-[var(--text-faint)] mr-1">↳</span>}{e.name}
                       {e.description && <span className="ml-2 text-xs text-[var(--text-faint)]">{e.description}</span>}
                     </td>
-                    <td className="py-2 px-2 font-mono text-xs text-[var(--text-secondary)]">{e.slug}</td>
-                    <td className="py-2 px-2 text-right whitespace-nowrap">
+                    <td className={`${tableClasses.compact.td} font-mono text-xs text-[var(--text-secondary)]`}>{e.slug}</td>
+                    <td className={`${tableClasses.compact.td} text-right whitespace-nowrap`}>
                       <button onClick={() => edit(e)} className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] mr-3">{t("common.edit")}</button>
                       <button
                         onClick={() => { if (confirm(`${t("common.delete")} ${e.name}?`)) deleteMutation.mutate(e.id); }}

@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
+import { tableClasses } from "@/components/ui/Table";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Avatar from "@/components/ui/Avatar";
@@ -452,13 +453,13 @@ function UsersSection() {
         <div className="border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-x-auto animate-fade-in">
           <table className="w-full text-sm min-w-[600px]">
             <thead>
-              <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs uppercase tracking-wider">
-                <th className="text-left px-4 py-3 font-semibold">{t("auth.username")}</th>
-                <th className="text-left px-4 py-3 font-semibold">{t("settings.role")}</th>
-                <th className="text-left px-4 py-3 font-semibold">{t("entidades.title")}</th>
-                <th className="text-left px-4 py-3 font-semibold">{t("settings.authProvider")}</th>
-                <th className="text-left px-4 py-3 font-semibold">{t("settings.createdAt")}</th>
-                <th className="text-right px-4 py-3 w-20" />
+              <tr className={tableClasses.headRow}>
+                <th className={tableClasses.th}>{t("auth.username")}</th>
+                <th className={tableClasses.th}>{t("settings.role")}</th>
+                <th className={tableClasses.th}>{t("entidades.title")}</th>
+                <th className={tableClasses.th}>{t("settings.authProvider")}</th>
+                <th className={tableClasses.th}>{t("settings.createdAt")}</th>
+                <th className={`${tableClasses.th} text-right w-20`} />
               </tr>
             </thead>
             <tbody>
@@ -467,7 +468,7 @@ function UsersSection() {
                   key={u.id}
                   className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
                 >
-                  <td className="px-4 py-2.5">
+                  <td className={tableClasses.td}>
                     <div className="flex items-center gap-2.5">
                       <Avatar name={u.display_name || u.username} size="sm" />
                       <div className="min-w-0">
@@ -476,12 +477,12 @@ function UsersSection() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className={tableClasses.td}>
                     <span className={`text-2xs px-1.5 py-0.5 rounded-full border font-medium ${roleColors[u.role] || roleColors.viewer}`}>
                       {u.role}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-xs">
+                  <td className={`${tableClasses.td} text-xs`}>
                     <div className="flex flex-wrap gap-1">
                       {(u.entidades ?? []).map((e) => (
                         <span key={e.id} className={`px-1.5 py-0.5 rounded border text-2xs ${e.is_primary ? "border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent-muted)]" : "border-[var(--border-subtle)] text-[var(--text-muted)]"}`} title={e.is_primary ? t("entidades.primary") : undefined}>
@@ -491,13 +492,13 @@ function UsersSection() {
                       {(u.entidades ?? []).length === 0 && <span className="text-[var(--text-faint)]">-</span>}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)] text-xs">
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)] text-xs`}>
                     {providerLabels[u.auth_provider] || u.auth_provider || "Local"}
                   </td>
-                  <td className="px-4 py-2.5 text-[var(--text-muted)] text-xs">
+                  <td className={`${tableClasses.td} text-[var(--text-muted)] text-xs`}>
                     {u.created_at ? formatDate(u.created_at) : "-"}
                   </td>
-                  <td className="px-4 py-2.5 text-right">
+                  <td className={`${tableClasses.td} text-right`}>
                     <UserActions u={u} onEdit={() => openEdit(u)} onDelete={() => confirmDelete(u)} />
                   </td>
                 </tr>

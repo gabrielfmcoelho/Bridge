@@ -6,6 +6,7 @@ import { entidadesAPI, offeringsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { Offering } from "@/lib/types";
 import Card from "@/components/ui/Card";
+import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import FormError from "@/components/ui/FormError";
@@ -88,20 +89,20 @@ export default function OfferingsTab() {
             {(sortKey, sortDir) =>
               sortRows(offerings, sortKey, sortDir, comparators).map((o, i) => (
                 <tr key={o.id} className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}>
-                  <td className="px-4 py-2.5 text-right text-[var(--text-muted)] tabular-nums">{o.sort_order}</td>
-                  <td className="px-4 py-2.5">
+                  <td className={`${tableClasses.td} text-right text-[var(--text-muted)] tabular-nums`}>{o.sort_order}</td>
+                  <td className={tableClasses.td}>
                     <div className="font-medium text-[var(--text-primary)]">{o.name}</div>
                     <div className="font-mono text-xs text-[var(--text-faint)]">{o.slug}</div>
                   </td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{o.category || "—"}</td>
-                  <td className="px-4 py-2.5"><Badge color="cyan">{t(`catalog.requestType.${o.request_type}`)}</Badge></td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{entidadeName(o.approver_entidade_id)}</td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{t(GLPI_MODE_KEY[o.glpi_mode])}</td>
-                  <td className="px-4 py-2.5 text-right text-[var(--text-muted)] tabular-nums">{o.form_schema.fields.length}</td>
-                  <td className="px-4 py-2.5">
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)]`}>{o.category || "—"}</td>
+                  <td className={tableClasses.td}><Badge color="cyan">{t(`catalog.requestType.${o.request_type}`)}</Badge></td>
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)]`}>{entidadeName(o.approver_entidade_id)}</td>
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)]`}>{t(GLPI_MODE_KEY[o.glpi_mode])}</td>
+                  <td className={`${tableClasses.td} text-right text-[var(--text-muted)] tabular-nums`}>{o.form_schema.fields.length}</td>
+                  <td className={tableClasses.td}>
                     <Badge color={o.is_active ? "emerald" : "gray"} dot>{o.is_active ? t("common.active") : t("common.inactive")}</Badge>
                   </td>
-                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                  <td className={`${tableClasses.td} text-right whitespace-nowrap`}>
                     <button onClick={() => setEditing(o)} className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] mr-3">{t("common.edit")}</button>
                     <button
                       onClick={() => { if (confirm(t("settings.offerings.deleteConfirm", { name: o.name }))) deleteMutation.mutate(o.id); }}

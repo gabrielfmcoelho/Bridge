@@ -6,6 +6,7 @@ import { globalIssuesAPI, usersAPI, hostsAPI, dnsAPI, servicesAPI, projectsAPI }
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
+import { tableClasses } from "@/components/ui/Table";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -681,7 +682,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
     <div className="border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-x-auto animate-fade-in">
       <table className="w-full text-sm min-w-[640px]">
         <thead>
-          <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs uppercase tracking-wider">
+          <tr className={tableClasses.headRow}>
             <th
               className="text-left px-4 py-3 font-semibold cursor-pointer select-none hover:text-[var(--text-secondary)] w-8"
               onClick={() => onSort("priority")}
@@ -694,14 +695,14 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
             >
               <span className="flex items-center">Title<SortIcon field="title" /></span>
             </th>
-            <th className="text-left px-4 py-3 font-semibold">Entity</th>
+            <th className={tableClasses.th}>Entity</th>
             <th
               className="text-left px-4 py-3 font-semibold cursor-pointer select-none hover:text-[var(--text-secondary)]"
               onClick={() => onSort("status")}
             >
               <span className="flex items-center">Status<SortIcon field="status" /></span>
             </th>
-            <th className="text-left px-4 py-3 font-semibold">Assignees</th>
+            <th className={tableClasses.th}>Assignees</th>
             <th
               className="text-left px-4 py-3 font-semibold cursor-pointer select-none hover:text-[var(--text-secondary)] hidden sm:table-cell"
               onClick={() => onSort("created_at")}
@@ -720,7 +721,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
               >
                 {/* Priority dot */}
-                <td className="px-4 py-2.5">
+                <td className={tableClasses.td}>
                   <span
                     title={issue.priority}
                     className={`block w-2 h-2 rounded-full ${priorityColors[issue.priority] || "bg-[var(--text-faint)]"}`}
@@ -728,7 +729,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 </td>
 
                 {/* Title */}
-                <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] max-w-xs">
+                <td className={`${tableClasses.td} font-medium text-[var(--text-primary)] max-w-xs`}>
                   <span className="line-clamp-1">{issue.title}</span>
                   {issue.source === "alert" && (
                     <span className="ml-1.5 text-2xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">alert</span>
@@ -736,7 +737,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 </td>
 
                 {/* Entity */}
-                <td className="px-4 py-2.5">
+                <td className={tableClasses.td}>
                   {issue.entity_type ? (
                     <Badge color={entityColors[issue.entity_type] as "cyan" | "emerald" | "purple" | "amber" | undefined}>
                       {issue.entity_type}: {getEntityLabel(issue)}
@@ -747,7 +748,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 </td>
 
                 {/* Status */}
-                <td className="px-4 py-2.5">
+                <td className={tableClasses.td}>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
                       issue.status === "done"
@@ -764,7 +765,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 </td>
 
                 {/* Assignees */}
-                <td className="px-4 py-2.5">
+                <td className={tableClasses.td}>
                   {assignees.length > 0 ? (
                     <div className="flex -space-x-1">
                       {assignees.slice(0, 4).map((name) => (
@@ -788,7 +789,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 </td>
 
                 {/* Created */}
-                <td className="px-4 py-2.5 text-xs text-[var(--text-muted)] hidden sm:table-cell">
+                <td className={`${tableClasses.td} text-xs text-[var(--text-muted)] hidden sm:table-cell`}>
                   {new Date(issue.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                 </td>
               </tr>
