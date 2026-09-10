@@ -83,11 +83,11 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
                 <span className={`text-sm font-medium truncate flex-1 ${alert.status === "resolved" ? "text-[var(--text-muted)] line-through" : "text-[var(--text-primary)]"}`}>{alert.message}</span>
                 {alert.status === "resolved" && (
                   <span title={t("common.resolved")}>
-                    <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                    <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0 text-[var(--success)]" />
                   </span>
                 )}
                 <span title={alert.linked_issue_id ? `Issue #${alert.linked_issue_id}` : t("alert.noIssueLinked")}>
-                  <Icon path={ICON_PATHS.clipboard} className={`w-3.5 h-3.5 shrink-0 ${alert.linked_issue_id ? "text-purple-400" : "text-[var(--text-faint)]/30"}`} />
+                  <Icon path={ICON_PATHS.clipboard} className={`w-3.5 h-3.5 shrink-0 ${alert.linked_issue_id ? "text-[var(--purple)]" : "text-[var(--text-faint)]/30"}`} />
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3 text-xs">
@@ -102,7 +102,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
                 <div>
                   <span className="text-[var(--text-faint)] block mb-0.5">{t("alert.source")}</span>
                   {alert.source === "grafana" ? (
-                    <span className="inline-flex items-center gap-1 text-purple-400">
+                    <span className="inline-flex items-center gap-1 text-[var(--purple)]">
                       <Icon path={ICON_PATHS.bolt} className="w-3 h-3" />
                       Grafana
                     </span>
@@ -136,7 +136,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
                 <td className="px-4 py-2.5">
                   <span className={`inline-flex items-center gap-1.5 ${alert.status === "resolved" ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>
                     {alert.status === "resolved" && (
-                      <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                      <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0 text-[var(--success)]" />
                     )}
                     {alert.message}
                   </span>
@@ -218,7 +218,7 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
                                 >
                                   <div className="flex items-start gap-1.5 mb-4 min-h-[1.25rem]">
                                     {issue.status === "done" && (
-                                      <Icon path={ICON_PATHS.checkCircle} className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+                                      <Icon path={ICON_PATHS.checkCircle} className="w-4 h-4 shrink-0 mt-0.5 text-[var(--success)]" />
                                     )}
                                     {issue.archived && (
                                       <Icon path={ICON_PATHS.archive} className="w-4 h-4 shrink-0 mt-0.5 text-[var(--text-faint)]" />
@@ -258,19 +258,19 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
                                   </div>
                                   {/* Entity link icons */}
                                   <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[var(--border-subtle)]">
-                                    <span className={`${issue.entity_type === "host" ? "text-emerald-400" : "text-[var(--text-faint)]/30"}`} title="Host">
+                                    <span className={`${issue.entity_type === "host" ? "text-[var(--success)]" : "text-[var(--text-faint)]/30"}`} title="Host">
                                       <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5" />
                                     </span>
-                                    <span className={`${issue.entity_type === "dns" ? "text-cyan-400" : "text-[var(--text-faint)]/30"}`} title="DNS">
+                                    <span className={`${issue.entity_type === "dns" ? "text-[var(--cyan)]" : "text-[var(--text-faint)]/30"}`} title="DNS">
                                       <Icon path={ICON_PATHS.globeMeridian} className="w-3.5 h-3.5" />
                                     </span>
-                                    <span className={`${issue.entity_type === "service" ? "text-amber-400" : "text-[var(--text-faint)]/30"}`} title="Service">
+                                    <span className={`${issue.entity_type === "service" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title="Service">
                                       <Icon path={ICON_PATHS.cube} className="w-3.5 h-3.5" />
                                     </span>
-                                    <span className={`${issue.entity_type === "project" ? "text-violet-400" : "text-[var(--text-faint)]/30"}`} title="Project">
+                                    <span className={`${issue.entity_type === "project" ? "text-[var(--purple)]" : "text-[var(--text-faint)]/30"}`} title="Project">
                                       <Icon path={ICON_PATHS.folder} className="w-3.5 h-3.5" />
                                     </span>
-                                    <span className={`${(issue.alert_ids?.length || 0) > 0 || issue.source === "alert" ? "text-amber-400" : "text-[var(--text-faint)]/30"}`} title="Alert">
+                                    <span className={`${(issue.alert_ids?.length || 0) > 0 || issue.source === "alert" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title="Alert">
                                       <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5" />
                                     </span>
                                   </div>

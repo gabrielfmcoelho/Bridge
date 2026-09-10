@@ -53,7 +53,7 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
               <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
                 <div className="flex items-center gap-1.5">
                   {svc.container_status && (
-                    <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${svc.container_status === "online" ? "bg-emerald-400" : "bg-gray-400"}`} />
+                    <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${svc.container_status === "online" ? "bg-[var(--success)]" : "bg-[var(--text-faint)]"}`} />
                   )}
                   {svc.nickname}
                 </div>

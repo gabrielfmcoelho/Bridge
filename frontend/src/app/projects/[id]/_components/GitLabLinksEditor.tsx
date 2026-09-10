@@ -139,7 +139,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
       </div>
 
       {!integrationActive && (
-        <p className="mb-3 text-xs text-amber-400">
+        <p className="mb-3 text-xs text-[var(--warning)]">
           {!integrationEnabled
             ? "GitLab Code Management is disabled — ask an admin to enable it in Settings → Integrations → GitLab → Code Management."
             : "GitLab service token is not configured — ask an admin to set one in Settings → Integrations → GitLab → Code Management."}
@@ -184,7 +184,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
             }}
             placeholder="leave blank for all branches"
           />
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
           <div className="flex gap-2">
             <Button type="button" size="sm" onClick={() => addMutation.mutate()} loading={addMutation.isPending} disabled={!path.trim()}>
               Add
@@ -213,8 +213,8 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
                 <LinkHealthIcon link={link} integrationActive={integrationActive} />
                 <span className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
                   link.kind === "group"
-                    ? "bg-purple-500/10 text-purple-400"
-                    : "bg-cyan-500/10 text-cyan-400"
+                    ? "bg-[var(--purple)]/10 text-[var(--purple)]"
+                    : "bg-[var(--cyan)]/10 text-[var(--cyan)]"
                 }`}>
                   {link.kind === "group" ? "group" : "repo"}
                 </span>
@@ -229,7 +229,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
                 <button
                   type="button"
                   onClick={() => deleteMutation.mutate(link.id)}
-                  className="text-[var(--text-muted)] hover:text-red-400 transition-colors text-sm"
+                  className="text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors text-sm"
                   aria-label="Remove link"
                   disabled={deleteMutation.isPending}
                 >
@@ -248,11 +248,11 @@ function IntegrationStatusBadge({ enabled, configured }: { enabled: boolean; con
   const active = enabled && configured;
   const label = active ? "code mgmt active" : !enabled ? "code mgmt disabled" : "no service token";
   const classes = active
-    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-    : "bg-amber-500/10 text-amber-400 border-amber-500/30";
+    ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30"
+    : "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30";
   return (
     <span className={`inline-flex items-center gap-1 text-2xs font-medium uppercase tracking-wide px-1.5 py-0.5 rounded border ${classes}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-400" : "bg-amber-400"}`} />
+      <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`} />
       {label}
     </span>
   );
@@ -268,12 +268,12 @@ function LinkHealthIcon({ link, integrationActive }: { link: ProjectGitLabLink; 
   }
   if (link.reachable) {
     return (
-      <StatusDot className="bg-emerald-400"
+      <StatusDot className="bg-[var(--success)]"
         title="Resolved on GitLab" />
     );
   }
   return (
-    <StatusDot className="bg-red-400"
+    <StatusDot className="bg-[var(--danger)]"
       title={link.health_error || "Not reachable on GitLab"} />
   );
 }

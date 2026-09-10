@@ -55,11 +55,11 @@ export default function DateTimeInput({
         onChange={(e) => onChange(toGLPI(e.target.value))}
         disabled={disabled}
         className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border rounded-[var(--radius-md)] px-3 py-2 text-sm transition duration-200 disabled:opacity-40 focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] ${
-          error ? "border-red-500" : "border-[var(--border-default)]"
+          error ? "border-[var(--danger)]" : "border-[var(--border-default)]"
         } ${className ?? ""}`}
         {...rest}
       />
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
     </div>
   );
 }

@@ -9,10 +9,10 @@ import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 const legendItems = [
-  { type: "host", color: "bg-cyan-500", label: "Hosts" },
-  { type: "service", color: "bg-purple-500", label: "Services" },
-  { type: "dns", color: "bg-emerald-500", label: "DNS" },
-  { type: "project", color: "bg-amber-500", label: "Projects" },
+  { type: "host", color: "bg-[var(--cyan)]", label: "Hosts" },
+  { type: "service", color: "bg-[var(--purple)]", label: "Services" },
+  { type: "dns", color: "bg-[var(--success)]", label: "DNS" },
+  { type: "project", color: "bg-[var(--warning)]", label: "Projects" },
 ];
 
 export default function TopologyPage() {

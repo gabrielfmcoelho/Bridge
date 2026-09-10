@@ -589,8 +589,8 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
           {b.secrets.length === 0 && b.api_docs.length === 0 && b.wiki.length === 0 && (
             <div className={`text-sm rounded-[var(--radius-md)] p-3 ${
               theme === "light"
-                ? "bg-amber-50 border border-amber-200 text-amber-700"
-                : "bg-amber-500/10 border border-amber-500/25 text-amber-400"
+                ? "bg-[var(--warning)] border border-[var(--warning)] text-[var(--warning)]"
+                : "bg-[var(--warning)]/10 border border-[var(--warning)]/25 text-[var(--warning)]"
             }`}>
               {t("share.noContent")}
             </div>
@@ -599,12 +599,12 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
           {/* Security Notice */}
           <div className={`flex gap-2.5 items-start p-3.5 rounded-[var(--radius-md)] border text-xs ${
             theme === "light"
-              ? "bg-sky-50/50 border-sky-100/80 text-sky-800"
-              : "bg-sky-950/20 border-sky-900/30 text-[var(--text-muted)]"
+              ? "bg-[var(--info)]/50 border-[var(--info)]/80 text-[var(--info)]"
+              : "bg-[var(--info)]/20 border-[var(--info)]/30 text-[var(--text-muted)]"
           }`}>
-            <Icon path={ICON_PATHS.alert} className={`w-4 h-4 shrink-0 mt-0.5 ${theme === "light" ? "text-sky-600" : "text-sky-400"}`} />
+            <Icon path={ICON_PATHS.alert} className={`w-4 h-4 shrink-0 mt-0.5 ${theme === "light" ? "text-[var(--info)]" : "text-[var(--info)]"}`} />
             <div>
-              <strong className={`font-semibold block mb-0.5 ${theme === "light" ? "text-sky-900" : "text-[var(--text-secondary)]"}`}>
+              <strong className={`font-semibold block mb-0.5 ${theme === "light" ? "text-[var(--info)]" : "text-[var(--text-secondary)]"}`}>
                 {t("share.securityNotice")}
               </strong>
               {t("share.securityNoticeDesc")}
@@ -711,12 +711,12 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
               />
               <div className={`flex gap-2.5 items-start p-3 rounded-[var(--radius-md)] border text-xs ${
                 theme === "light"
-                  ? "bg-sky-50/50 border-sky-100/80 text-sky-800"
-                  : "bg-sky-950/10 border-sky-900/20 text-[var(--text-muted)]"
+                  ? "bg-[var(--info)]/50 border-[var(--info)]/80 text-[var(--info)]"
+                  : "bg-[var(--info)]/10 border-[var(--info)]/20 text-[var(--text-muted)]"
               }`}>
-                <Icon path={ICON_PATHS.alert} className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${theme === "light" ? "text-sky-600" : "text-sky-400"}`} />
+                <Icon path={ICON_PATHS.alert} className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${theme === "light" ? "text-[var(--info)]" : "text-[var(--info)]"}`} />
                 <div>
-                  <strong className={`font-semibold block mb-0.5 ${theme === "light" ? "text-sky-900" : "text-[var(--text-secondary)]"}`}>
+                  <strong className={`font-semibold block mb-0.5 ${theme === "light" ? "text-[var(--info)]" : "text-[var(--text-secondary)]"}`}>
                     {t("share.securityNotice")}
                   </strong>
                   {t("share.securityNoticeDescSingle")}
@@ -728,8 +728,8 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
           {state.kind === "gone" && (
             <div className={`text-sm rounded-[var(--radius-md)] p-3 ${
               theme === "light"
-                ? "bg-amber-50 border border-amber-200 text-amber-700"
-                : "bg-amber-500/10 border border-amber-500/25 text-amber-400"
+                ? "bg-[var(--warning)] border border-[var(--warning)] text-[var(--warning)]"
+                : "bg-[var(--warning)]/10 border border-[var(--warning)]/25 text-[var(--warning)]"
             }`}>
               {t("share.expired")}
             </div>
@@ -738,8 +738,8 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
           {state.kind === "error" && (
             <div className={`text-sm rounded-[var(--radius-md)] p-3 ${
               theme === "light"
-                ? "bg-red-50 border border-red-200 text-red-700"
-                : "bg-red-500/10 border border-red-500/25 text-red-400"
+                ? "bg-[var(--danger)] border border-[var(--danger)] text-[var(--danger)]"
+                : "bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)]"
             }`}>
               {state.message.startsWith("share.requestFailed:")
                 ? t("share.requestFailed", { status: state.message.split(":")[1] })

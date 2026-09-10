@@ -36,9 +36,9 @@ const statusLabels: Record<string, string> = {
 };
 
 const priorityColors: Record<string, string> = {
-  critical: "bg-red-400",
-  high: "bg-amber-400",
-  medium: "bg-cyan-400",
+  critical: "bg-[var(--danger)]",
+  high: "bg-[var(--warning)]",
+  medium: "bg-[var(--cyan)]",
   low: "bg-[var(--text-faint)]",
 };
 
@@ -587,7 +587,7 @@ function IssueCard({
               </span>
             )}
             {issue.source === "alert" && (
-              <span className="text-2xs text-red-400 bg-red-500/10 rounded px-1.5 py-0.5 font-medium">alert</span>
+              <span className="text-2xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">alert</span>
             )}
           </div>
         </div>
@@ -733,7 +733,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] max-w-xs">
                   <span className="line-clamp-1">{issue.title}</span>
                   {issue.source === "alert" && (
-                    <span className="ml-1.5 text-2xs text-red-400 bg-red-500/10 rounded px-1.5 py-0.5 font-medium">alert</span>
+                    <span className="ml-1.5 text-2xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">alert</span>
                   )}
                 </td>
 
@@ -753,11 +753,11 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
                       issue.status === "done"
-                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        ? "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30"
                         : issue.status === "in_progress"
-                        ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
+                        ? "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/30"
                         : issue.status === "review"
-                        ? "bg-purple-500/15 text-purple-400 border-purple-500/30"
+                        ? "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/30"
                         : "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]"
                     }`}
                   >
@@ -969,7 +969,7 @@ function IssueForm({
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-3 space-y-1.5">
           <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Source</p>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-red-400 bg-red-500/10 rounded px-1.5 py-0.5 font-medium">{issue.source}</span>
+            <span className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">{issue.source}</span>
             {issue.source_ref && (
               <span className="text-xs text-[var(--text-faint)] font-mono">{issue.source_ref}</span>
             )}
@@ -988,7 +988,7 @@ function IssueForm({
             type="button"
             variant="secondary"
             onClick={onDelete}
-            className="text-red-400 border-red-500/20 hover:bg-red-500/10"
+            className="text-[var(--danger)] border-[var(--danger)]/20 hover:bg-[var(--danger)]/10"
           >
             Delete
           </Button>

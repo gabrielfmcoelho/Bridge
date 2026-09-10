@@ -109,7 +109,7 @@ export default function HostLiveKpis({ slug }: Props) {
         </details>
       )}
       {data.host_up === false && (
-        <div className="-mt-2 mb-3 rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <div className="-mt-2 mb-3 rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2 text-xs text-[var(--danger)]">
           Prometheus reports this host as <strong>down</strong> (up=0). The tiles above show the last values Prometheus scraped.
         </div>
       )}

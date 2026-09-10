@@ -12,11 +12,11 @@ import type { BundleApiDocItem, BundleSecretItem, BundleWikiDoc, BundleWikiItem 
 // scroll to their API section — deep-scroll into Scalar's DOM is out of scope.
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: "text-emerald-400",
-  POST: "text-sky-400",
-  PUT: "text-amber-400",
-  PATCH: "text-amber-400",
-  DELETE: "text-red-400",
+  GET: "text-[var(--success)]",
+  POST: "text-[var(--info)]",
+  PUT: "text-[var(--warning)]",
+  PATCH: "text-[var(--warning)]",
+  DELETE: "text-[var(--danger)]",
 };
 
 function scrollToAnchor(id: string) {

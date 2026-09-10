@@ -74,7 +74,7 @@ export default function AiChatDrawer({ open, onClose }: AiChatDrawerProps) {
               return (
                 <div
                   key={i}
-                  className="text-sm rounded-[var(--radius-md)] px-3 py-2 max-w-[85%] mr-auto bg-red-500/10 border border-red-500/30 text-red-300"
+                  className="text-sm rounded-[var(--radius-md)] px-3 py-2 max-w-[85%] mr-auto bg-[var(--danger)]/10 border border-[var(--danger)]/30 text-[var(--danger)]"
                 >
                   <div className="whitespace-pre-wrap break-words">{msg.content}</div>
                 </div>

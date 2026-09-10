@@ -98,9 +98,9 @@ export default function RoleMappingsTab() {
                   <td className="py-2 px-2">
                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${
                       m.local_role === "admin"
-                        ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/25"
+                        ? "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/25"
                         : m.local_role === "editor"
-                        ? "bg-purple-500/15 text-purple-400 border-purple-500/25"
+                        ? "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/25"
                         : "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]"
                     }`}>
                       {m.local_role}
@@ -109,7 +109,7 @@ export default function RoleMappingsTab() {
                   <td className="py-2 px-2">
                     <button
                       onClick={() => deleteMutation.mutate(m.id)}
-                      className="text-[var(--text-faint)] hover:text-red-400 transition-colors p-1"
+                      className="text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors p-1"
                       title="Delete mapping"
                     >
                       <Icon path={ICON_PATHS.trashOutline} />

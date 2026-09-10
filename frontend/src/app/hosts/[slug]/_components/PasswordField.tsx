@@ -83,7 +83,7 @@ export default function PasswordField({ slug }: { slug: string }) {
         )}
       </div>
       {error && (
-        <p className="mt-1 text-2xs text-red-400 font-mono">{error}</p>
+        <p className="mt-1 text-2xs text-[var(--danger)] font-mono">{error}</p>
       )}
     </div>
   );

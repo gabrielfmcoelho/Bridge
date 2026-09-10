@@ -31,8 +31,8 @@ export default function HostCard({ host }: { host: Host }) {
 
   const authIconColor = (has: boolean, status?: "success" | "failed" | null) => {
     if (!has) return "text-[var(--text-faint)]/30";
-    if (status === "success") return "text-emerald-400";
-    if (status === "failed") return "text-red-400";
+    if (status === "success") return "text-[var(--success)]";
+    if (status === "failed") return "text-[var(--danger)]";
     return "text-[var(--text-faint)]";
   };
 
@@ -59,7 +59,7 @@ export default function HostCard({ host }: { host: Host }) {
               {host.has_scan && (
                 <span
                   className={`inline-flex items-center justify-center ${
-                    host.idle ? "text-slate-300 light:text-slate-700" : "text-[var(--text-faint)] opacity-40"
+                    host.idle ? "text-[var(--text-muted)] " : "text-[var(--text-faint)] opacity-40"
                   }`}
                   title={
                     host.idle
@@ -152,8 +152,8 @@ function MiniResource({ label, value, usage }: { label: string; value?: string; 
   if (usage && (usage.toLowerCase().includes('bash') || usage.toLowerCase().includes('permission') || usage.toLowerCase().includes('/dev/null'))) return null;
 
   const pct = parseInt(usage || "0") || 0;
-  const color = pct >= 80 ? "text-red-400" : pct >= 50 ? "text-amber-400" : "text-emerald-400";
-  const barColor = pct >= 80 ? "bg-red-500" : pct >= 50 ? "bg-amber-500" : "bg-emerald-500";
+  const color = pct >= 80 ? "text-[var(--danger)]" : pct >= 50 ? "text-[var(--warning)]" : "text-[var(--success)]";
+  const barColor = pct >= 80 ? "bg-[var(--danger)]" : pct >= 50 ? "bg-[var(--warning)]" : "bg-[var(--success)]";
   return (
     <div>
       <div className="flex items-center justify-between mb-1">

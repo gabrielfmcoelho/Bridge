@@ -156,8 +156,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function NodeChip({ node }: { node: LineageNode }) {
   const isTask = node.type === "task";
   const isModel = node.type === "dbt_model";
-  const color = isModel ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
-              : isTask ? "bg-purple-500/10 text-purple-300 border-purple-500/30"
+  const color = isModel ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30"
+              : isTask ? "bg-[var(--purple)]/10 text-[var(--purple)] border-[var(--purple)]/30"
               : "bg-[var(--bg-base)] text-[var(--text-muted)] border-[var(--border-subtle)]";
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-mono px-2 py-1 rounded-[var(--radius-sm)] border ${color}`}>
@@ -175,7 +175,7 @@ function TableChip({ node, indexes, onClick }: { node: LineageNode; indexes: Atl
       className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)] transition-colors"
       title={node.id}
     >
-      {rec && <span className={`w-1.5 h-1.5 rounded-full ${rec.layer === "source" ? "bg-blue-400" : rec.layer === "bronze" ? "bg-amber-500" : rec.layer === "silver" ? "bg-slate-300" : rec.layer === "gold" ? "bg-yellow-400" : "bg-gray-400"}`} />}
+      {rec && <span className={`w-1.5 h-1.5 rounded-full ${rec.layer === "source" ? "bg-[var(--info)]" : rec.layer === "bronze" ? "bg-[var(--warning)]" : rec.layer === "silver" ? "bg-[var(--text-faint)]" : rec.layer === "gold" ? "bg-[var(--warning)]" : "bg-[var(--text-faint)]"}`} />}
       <span>{node.label}</span>
     </button>
   );

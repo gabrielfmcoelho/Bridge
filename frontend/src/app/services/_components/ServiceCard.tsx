@@ -36,7 +36,7 @@ export default function ServiceCard({ svc }: { svc: Service }) {
                 </Badge>
               )}
               {svc.container_status && (
-                <span className={`inline-block w-2 h-2 rounded-full ${svc.container_status === "online" ? "bg-emerald-400" : "bg-gray-400"}`} title={svc.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")} />
+                <span className={`inline-block w-2 h-2 rounded-full ${svc.container_status === "online" ? "bg-[var(--success)]" : "bg-[var(--text-faint)]"}`} title={svc.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")} />
               )}
               {svc.is_external_dependency ? (
                 <Badge color="red" compact>{t("service.isExternalDependency") || "External Dep"}</Badge>

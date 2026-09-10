@@ -153,7 +153,7 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
             {onDelete && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                className="text-2xs text-[var(--text-faint)] hover:text-red-400 transition-colors"
+                className="text-2xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
               >
                 Delete
               </button>
@@ -227,13 +227,13 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
                 onClick={() => setCredType("password")}
                 className={`p-3 rounded-[var(--radius-md)] border text-left transition ${
                   credType === "password"
-                    ? "border-purple-500/30 bg-purple-500/10"
+                    ? "border-[var(--purple)]/30 bg-[var(--purple)]/10"
                     : "border-[var(--border-default)] bg-[var(--bg-elevated)] hover:border-[var(--border-default)]"
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Icon path={ICON_PATHS.lock} className={`w-4 h-4 ${credType === "password" ? "text-purple-400" : "text-[var(--text-faint)]"}`} />
-                  <span className={`text-sm font-medium ${credType === "password" ? "text-purple-400" : "text-[var(--text-secondary)]"}`}>Password</span>
+                  <Icon path={ICON_PATHS.lock} className={`w-4 h-4 ${credType === "password" ? "text-[var(--purple)]" : "text-[var(--text-faint)]"}`} />
+                  <span className={`text-sm font-medium ${credType === "password" ? "text-[var(--purple)]" : "text-[var(--text-secondary)]"}`}>Password</span>
                 </div>
                 <p className="text-2xs text-[var(--text-faint)]">Encrypted password storage</p>
               </button>
@@ -342,12 +342,12 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
   };
 
   if (isLoading) return <div className="text-sm text-[var(--text-muted)]">Loading...</div>;
-  if (!data) return <div className="text-sm text-red-400">Credential not found</div>;
+  if (!data) return <div className="text-sm text-[var(--danger)]">Credential not found</div>;
 
   if (isEditing) {
     return (
       <form onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }} className="space-y-4">
-        {editError && <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-sm rounded-[var(--radius-md)] p-3">{editError}</div>}
+        {editError && <div className="bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)] text-sm rounded-[var(--radius-md)] p-3">{editError}</div>}
         <Input label="Name" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required />
         <Input label="Username" value={editForm.username} onChange={(e) => setEditForm((f) => ({ ...f, username: e.target.value }))} />
         <Input label="Description" value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} />
@@ -414,13 +414,13 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       {coolifyStatus?.enabled && isKey && data.fingerprint && (
         <div className="pt-3 mt-3 border-t border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+            <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5 text-[var(--purple)] shrink-0" />
             <span className="text-xs font-medium text-[var(--text-primary)]">Coolify</span>
             {coolifyChecking ? (
               <span className="text-2xs text-[var(--text-faint)] ml-auto">{t("common.loading")}</span>
             ) : coolifyCheck?.found ? (
               <>
-                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-2xs text-emerald-400 border border-emerald-500/20">
+                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--success)]/15 text-2xs text-[var(--success)] border border-[var(--success)]/20">
                   {coolifyCheck.coolify_name}
                 </span>
                 <span className="text-2xs text-[var(--text-faint)] ml-auto font-mono">
@@ -437,12 +437,12 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
             )}
           </div>
           {syncMutation.isSuccess && (
-            <p className="text-2xs text-emerald-400 mt-1">
+            <p className="text-2xs text-[var(--success)] mt-1">
               {syncMutation.data?.already_existed ? t("sshKey.coolifyAlreadyExists") : t("sshKey.coolifySynced")}
             </p>
           )}
           {syncMutation.isError && (
-            <p className="text-2xs text-red-400 mt-1">{syncMutation.error instanceof Error ? syncMutation.error.message : "Failed"}</p>
+            <p className="text-2xs text-[var(--danger)] mt-1">{syncMutation.error instanceof Error ? syncMutation.error.message : "Failed"}</p>
           )}
         </div>
       )}

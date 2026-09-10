@@ -100,8 +100,8 @@ export default function DetailDrawer({ node, indexes, onClose, onSelect, onOpenI
             {data.warnings.map((w, i) => (
               <div key={i} className={`p-2 rounded-[var(--radius-sm)] border text-xs ${
                 w.severity === "error"
-                  ? "bg-red-500/10 border-red-500/30 text-red-300"
-                  : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                  ? "bg-[var(--danger)]/10 border-[var(--danger)]/30 text-[var(--danger)]"
+                  : "bg-[var(--warning)]/10 border-[var(--warning)]/30 text-[var(--warning)]"
               }`}>
                 <div className="font-mono text-2xs uppercase opacity-80">{w.kind}</div>
                 <div className="mt-0.5">{w.message}</div>
@@ -148,7 +148,7 @@ export default function DetailDrawer({ node, indexes, onClose, onSelect, onOpenI
         <div className="pt-3 mt-4 border-t border-[var(--border-subtle)]">
           <button
             onClick={() => onOpenInGraph(node.id)}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[var(--radius-md)] bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-sm font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--cyan)]/15 hover:bg-[var(--cyan)]/25 border border-[var(--cyan)]/40 text-[var(--cyan)] text-sm font-medium transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -244,9 +244,9 @@ function NeighborList({ title, edges, side, indexes, onSelect, t }: {
 
 function ConfidenceDot({ c }: { c?: string }) {
   const color =
-    c === "exact" ? "bg-emerald-400" :
-    c === "inferred" ? "bg-amber-400" :
-    c === "dynamic" ? "bg-rose-400" : "bg-[var(--border-strong)]";
+    c === "exact" ? "bg-[var(--success)]" :
+    c === "inferred" ? "bg-[var(--warning)]" :
+    c === "dynamic" ? "bg-[var(--rose)]" : "bg-[var(--border-strong)]";
   return <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle ${color}`} title={c ?? ""} />;
 }
 

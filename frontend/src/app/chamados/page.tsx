@@ -164,7 +164,7 @@ export default function ChamadosPage() {
       }
       if (profileTickets.isError) {
         return (
-          <div className="rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 text-red-300 text-sm px-4 py-3">
+          <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-4 py-3">
             Falha: {(profileTickets.error as Error).message}
           </div>
         );
@@ -183,7 +183,7 @@ export default function ChamadosPage() {
             {" "}· {includeClosed ? "abertos e fechados" : "apenas abertos"}
           </p>
           {warnings.length > 0 && (
-            <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2 space-y-1">
+            <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)] text-xs px-3 py-2 space-y-1">
               {warnings.map((w, i) => (
                 <p key={i}>{w}</p>
               ))}
@@ -233,7 +233,7 @@ export default function ChamadosPage() {
               </p>
             </div>
             {g.warning && (
-              <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2">
+              <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)] text-xs px-3 py-2">
                 {g.warning}
               </div>
             )}

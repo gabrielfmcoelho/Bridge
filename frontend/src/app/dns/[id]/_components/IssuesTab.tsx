@@ -125,7 +125,7 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
               {closedIssues.map((issue) => (
                 <Card key={issue.id} hover={false} className="!p-3 opacity-60">
                   <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-emerald-400" />
+                    <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-[var(--success)]" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--text-primary)] truncate line-through">{issue.title}</p>
                       <div className="flex items-center gap-2 mt-1">

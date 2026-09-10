@@ -193,7 +193,7 @@ function TableCard({
         <span className="text-xs font-mono text-[var(--text-primary)] truncate flex-1" title={table.id}>
           {table.label}
         </span>
-        {hasWarning && <StatusDot size="xs" className="bg-red-500" />}
+        {hasWarning && <StatusDot size="xs" className="bg-[var(--danger)]" />}
         {colCount > 0 && (
           <span className="text-3xs px-1 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] shrink-0">
             {colCount}

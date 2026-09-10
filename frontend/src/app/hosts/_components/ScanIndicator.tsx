@@ -10,7 +10,7 @@ export default function ScanIndicator({ hasScan, lastScanAt }: { hasScan?: boole
       className="inline-flex items-center gap-1"
       title={hasScan ? `Last scan: ${timeAgo}` : "No scan data"}
     >
-      <Icon path={ICON_PATHS.scan} className={`w-3.5 h-3.5 ${hasScan ? "text-emerald-400" : "text-[var(--text-faint)]"}`} />
+      <Icon path={ICON_PATHS.scan} className={`w-3.5 h-3.5 ${hasScan ? "text-[var(--success)]" : "text-[var(--text-faint)]"}`} />
     </span>
   );
 }

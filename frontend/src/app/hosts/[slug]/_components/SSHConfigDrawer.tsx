@@ -76,7 +76,7 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
             title={t("common.copy")}
           >
             {copied ? (
-              <Icon path={ICON_PATHS.check} className="w-4 h-4 text-emerald-400" />
+              <Icon path={ICON_PATHS.check} className="w-4 h-4 text-[var(--success)]" />
             ) : (
               <Icon path={ICON_PATHS.copy} />
             )}

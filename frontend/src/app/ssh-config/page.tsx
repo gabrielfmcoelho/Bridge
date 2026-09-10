@@ -25,11 +25,11 @@ function highlightSSHConfig(content: string): string {
       }
       if (line.startsWith("Host ")) {
         const parts = line.split(" ");
-        return `<span class="text-cyan-400 font-semibold">${parts[0]}</span> <span class="text-amber-400">${parts.slice(1).join(" ")}</span>`;
+        return `<span class="text-[var(--cyan)] font-semibold">${parts[0]}</span> <span class="text-[var(--warning)]">${parts.slice(1).join(" ")}</span>`;
       }
       const match = line.match(/^(\s+)(\S+)\s+(.*)/);
       if (match) {
-        return `${match[1]}<span class="text-purple-400">${match[2]}</span> <span class="text-[var(--text-primary)]">${match[3]}</span>`;
+        return `${match[1]}<span class="text-[var(--purple)]">${match[2]}</span> <span class="text-[var(--text-primary)]">${match[3]}</span>`;
       }
       return `<span class="text-[var(--text-secondary)]">${line}</span>`;
     })
@@ -101,7 +101,7 @@ export default function SSHConfigPage() {
               className="w-72"
             >
               <div className="p-3 border-b border-[var(--border-subtle)]">
-                    <p className="text-xs text-amber-400 flex items-center gap-1.5">
+                    <p className="text-xs text-[var(--warning)] flex items-center gap-1.5">
                       <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
                       </svg>
@@ -131,8 +131,8 @@ export default function SSHConfigPage() {
       {serverInfo && (
         <div className={`mb-4 rounded-[var(--radius-md)] border p-3 text-sm flex items-center justify-between animate-fade-in ${
           serverInfo.is_local
-            ? "bg-cyan-500/8 border-cyan-500/20 text-cyan-400"
-            : "bg-amber-500/8 border-amber-500/20 text-amber-400"
+            ? "bg-[var(--cyan)]/8 border-[var(--cyan)]/20 text-[var(--cyan)]"
+            : "bg-[var(--warning)]/8 border-[var(--warning)]/20 text-[var(--warning)]"
         }`}>
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -142,8 +142,8 @@ export default function SSHConfigPage() {
           </div>
           <div className="flex items-center gap-2">
             <Badge className={serverInfo.is_local
-              ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
-              : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+              ? "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/30"
+              : "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30"
             }>
               {serverInfo.is_local ? "localhost" : "remote"}
             </Badge>
@@ -153,21 +153,21 @@ export default function SSHConfigPage() {
       )}
 
       {!serverInfo?.is_local && serverInfo && (
-        <div className="mb-4 rounded-[var(--radius-md)] border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-400/80 animate-fade-in">
+        <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--warning)]/20 bg-[var(--warning)]/5 p-3 text-xs text-[var(--warning)]/80 animate-fade-in">
           <strong>Remote server detected.</strong> The &quot;Generate Config&quot; button writes to <code className="font-mono">{serverInfo.config_path}</code> on <strong>{serverInfo.hostname}</strong>.
           To use this config on your local machine, use the <strong>Download</strong> or <strong>Copy</strong> buttons instead.
         </div>
       )}
 
       {genResult && (
-        <div className="mb-4 bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 rounded-[var(--radius-md)] p-3 text-sm animate-slide-down flex items-center gap-2">
+        <div className="mb-4 bg-[var(--success)]/10 border border-[var(--success)]/25 text-[var(--success)] rounded-[var(--radius-md)] p-3 text-sm animate-slide-down flex items-center gap-2">
           <Icon path={ICON_PATHS.checkCircle} className="w-4 h-4 shrink-0" />
           Config generated with {genResult.host_count} hosts at <code className="font-mono">{genResult.path}</code>
         </div>
       )}
 
       {generateMutation.isError && (
-        <div className="mb-4 bg-red-500/10 border border-red-500/25 text-red-400 rounded-[var(--radius-md)] p-3 text-sm animate-slide-down">
+        <div className="mb-4 bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)] rounded-[var(--radius-md)] p-3 text-sm animate-slide-down">
           {generateMutation.error instanceof Error ? generateMutation.error.message : "Generation failed"}
         </div>
       )}
@@ -192,9 +192,9 @@ export default function SSHConfigPage() {
             <div className="bg-[var(--bg-base)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] overflow-hidden">
               {/* Terminal header */}
               <div className="flex items-center gap-1.5 px-4 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]">
-                <StatusDot size="md" className="bg-red-500/60" />
-                <StatusDot size="md" className="bg-yellow-500/60" />
-                <StatusDot size="md" className="bg-emerald-500/60" />
+                <StatusDot size="md" className="bg-[var(--danger)]/60" />
+                <StatusDot size="md" className="bg-[var(--warning)]/60" />
+                <StatusDot size="md" className="bg-[var(--success)]/60" />
                 <span className="ml-2 text-2xs text-[var(--text-faint)] font-mono">~/.ssh/config</span>
               </div>
               <div className="flex max-h-[70vh] overflow-auto">

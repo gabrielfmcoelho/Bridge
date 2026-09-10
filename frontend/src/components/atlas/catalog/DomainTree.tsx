@@ -144,7 +144,7 @@ export default function DomainTree({ indexes, tables, selectedId, onSelect, filt
                                   >
                                     <span className="text-xs font-mono truncate">{tb.node.label}</span>
                                     {tb.hasWarning && (
-                                      <span className="w-1 h-1 rounded-full bg-red-500 shrink-0" />
+                                      <span className="w-1 h-1 rounded-full bg-[var(--danger)] shrink-0" />
                                     )}
                                   </button>
                                 </li>

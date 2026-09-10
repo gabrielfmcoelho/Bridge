@@ -21,11 +21,11 @@ const SCOPES = ["all", "projeto", "avulso"] as const;
 type SearchMode = "apis" | "endpoints";
 
 const methodColor: Record<string, string> = {
-  GET: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
-  POST: "text-cyan-400 border-cyan-500/30 bg-cyan-500/10",
-  PUT: "text-amber-400 border-amber-500/30 bg-amber-500/10",
-  PATCH: "text-amber-400 border-amber-500/30 bg-amber-500/10",
-  DELETE: "text-rose-400 border-rose-500/30 bg-rose-500/10",
+  GET: "text-[var(--success)] border-[var(--success)]/30 bg-[var(--success)]/10",
+  POST: "text-[var(--cyan)] border-[var(--cyan)]/30 bg-[var(--cyan)]/10",
+  PUT: "text-[var(--warning)] border-[var(--warning)]/30 bg-[var(--warning)]/10",
+  PATCH: "text-[var(--warning)] border-[var(--warning)]/30 bg-[var(--warning)]/10",
+  DELETE: "text-[var(--rose)] border-[var(--rose)]/30 bg-[var(--rose)]/10",
 };
 function methodClass(m: string): string {
   return methodColor[m.toUpperCase()] || "text-[var(--text-secondary)] border-[var(--border-default)] bg-[var(--bg-overlay)]";

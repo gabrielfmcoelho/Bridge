@@ -39,7 +39,7 @@ export default function TableRow({ table, selected, onClick }: Props) {
         >
           {table.node.label}
         </span>
-        {table.hasWarning && <StatusDot size="xs" className="bg-red-500" />}
+        {table.hasWarning && <StatusDot size="xs" className="bg-[var(--danger)]" />}
       </div>
 
       <span className="text-2xs text-[var(--text-muted)] font-mono truncate min-w-0 hidden md:inline">{fq}</span>

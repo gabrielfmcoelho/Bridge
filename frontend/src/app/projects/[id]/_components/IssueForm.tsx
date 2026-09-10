@@ -57,7 +57,7 @@ export default function IssueForm({ projectId, services, issue, onSuccess, onDel
   return (
     <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4">
       {error && (
-        <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-sm rounded-[var(--radius-md)] p-3 animate-slide-down">{error}</div>
+        <div className="bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)] text-sm rounded-[var(--radius-md)] p-3 animate-slide-down">{error}</div>
       )}
       <Input label={t("issue.titleField")} value={form.title} onChange={(e) => set("title", e.target.value)} required autoFocus />
       <MarkdownEditor
@@ -100,7 +100,7 @@ export default function IssueForm({ projectId, services, issue, onSuccess, onDel
           <button
             type="button"
             onClick={() => { if (confirm("Delete this issue?")) onDelete(); }}
-            className="text-xs text-[var(--text-faint)] hover:text-red-400 transition-colors"
+            className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
           >
             {t("common.delete")}
           </button>

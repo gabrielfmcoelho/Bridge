@@ -27,11 +27,11 @@ export default function IssuesTab({ issues, t }: IssuesTabProps) {
                 <span
                   className={`w-2 h-2 rounded-full shrink-0 ${
                     issue.priority === "critical"
-                      ? "bg-red-400"
+                      ? "bg-[var(--danger)]"
                       : issue.priority === "high"
-                      ? "bg-amber-400"
+                      ? "bg-[var(--warning)]"
                       : issue.priority === "medium"
-                      ? "bg-cyan-400"
+                      ? "bg-[var(--cyan)]"
                       : "bg-[var(--text-faint)]"
                   }`}
                 />

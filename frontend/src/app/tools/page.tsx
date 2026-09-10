@@ -300,7 +300,7 @@ export default function ToolsPage() {
                       {tool.source === "service" && (
                         <button
                           onClick={() => { if (confirm("Unsync this tool?")) unsyncMutation.mutate(tool.id); }}
-                          className="text-xs text-[var(--text-faint)] hover:text-red-400 transition-colors"
+                          className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
                         >
                           {t("tool.unsync")}
                         </button>
@@ -418,7 +418,7 @@ function ToolForm({ tool, onSuccess, onDelete }: {
           <button
             type="button"
             onClick={() => { if (confirm("Delete this tool?")) onDelete(); }}
-            className="text-xs text-[var(--text-faint)] hover:text-red-400 transition-colors"
+            className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
           >
             {t("common.delete")}
           </button>
@@ -628,7 +628,7 @@ function CredentialRow({ secret }: { secret: Secret }) {
         </pre>
       )}
       {r.error && (
-        <p className="text-xs text-red-400 mt-1">{r.error}</p>
+        <p className="text-xs text-[var(--danger)] mt-1">{r.error}</p>
       )}
     </div>
   );

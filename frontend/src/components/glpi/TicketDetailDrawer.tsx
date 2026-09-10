@@ -114,8 +114,8 @@ const eventLabel: Record<GlpiTicketEvent["type"], string> = {
 
 const eventAccent: Record<GlpiTicketEvent["type"], string> = {
   followup: "border-[var(--border-subtle)]",
-  task: "border-purple-500/30",
-  solution: "border-emerald-500/30",
+  task: "border-[var(--purple)]/30",
+  solution: "border-[var(--success)]/30",
 };
 
 const taskStateLabel: Record<number, string> = {
@@ -177,7 +177,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
         )}
 
         {error && (
-          <div className="rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 text-red-300 text-sm px-3 py-2">
+          <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-3 py-2">
             Falha: {(error as Error).message}
           </div>
         )}
@@ -202,7 +202,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
             </div>
 
             {data.warnings && data.warnings.length > 0 && (
-              <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2 space-y-1">
+              <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)] text-xs px-3 py-2 space-y-1">
                 {data.warnings.map((w, i) => (
                   <p key={i}>{w}</p>
                 ))}
@@ -247,17 +247,17 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
                           </span>
                           {ev.user_name && <span className="text-[var(--text-primary)]">{ev.user_name}</span>}
                           {ev.is_private && (
-                            <span className="text-2xs px-1 py-0 rounded border border-amber-500/30 text-amber-400">
+                            <span className="text-2xs px-1 py-0 rounded border border-[var(--warning)]/30 text-[var(--warning)]">
                               privado
                             </span>
                           )}
                           {ev.type === "task" && ev.state !== undefined && (
-                            <span className="text-2xs px-1 py-0 rounded border border-purple-500/30 text-purple-400">
+                            <span className="text-2xs px-1 py-0 rounded border border-[var(--purple)]/30 text-[var(--purple)]">
                               {taskStateLabel[ev.state] ?? `state ${ev.state}`}
                             </span>
                           )}
                           {ev.type === "solution" && ev.status !== undefined && (
-                            <span className="text-2xs px-1 py-0 rounded border border-emerald-500/30 text-emerald-400">
+                            <span className="text-2xs px-1 py-0 rounded border border-[var(--success)]/30 text-[var(--success)]">
                               {solutionStatusLabel[ev.status] ?? `status ${ev.status}`}
                             </span>
                           )}

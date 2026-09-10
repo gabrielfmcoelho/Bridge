@@ -19,20 +19,20 @@ function formatDate(d?: string, locale: string = "pt-BR") {
 }
 
 const statusColor: Record<string, string> = {
-  new: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
-  assigned: "bg-amber-500/10 text-amber-400 border-amber-500/30",
-  planned: "bg-purple-500/10 text-purple-400 border-purple-500/30",
-  waiting: "bg-gray-500/10 text-gray-400 border-gray-500/30",
-  solved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+  new: "bg-[var(--cyan)]/10 text-[var(--cyan)] border-[var(--cyan)]/30",
+  assigned: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30",
+  planned: "bg-[var(--purple)]/10 text-[var(--purple)] border-[var(--purple)]/30",
+  waiting: "bg-[var(--text-faint)]/10 text-[var(--text-muted)] border-[var(--border-default)]",
+  solved: "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30",
   closed: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-subtle)]",
   unknown: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-subtle)]",
 };
 
 const priorityColor: Record<number, string> = {
-  6: "bg-red-500",
-  5: "bg-red-400",
-  4: "bg-amber-400",
-  3: "bg-cyan-400",
+  6: "bg-[var(--danger)]",
+  5: "bg-[var(--danger)]",
+  4: "bg-[var(--warning)]",
+  3: "bg-[var(--cyan)]",
   2: "bg-[var(--text-muted)]",
   1: "bg-[var(--text-faint)]",
 };

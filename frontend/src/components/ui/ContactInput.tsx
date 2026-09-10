@@ -99,9 +99,9 @@ export default function ContactInput({ label, value, onChange, type = "name" }: 
         }}
         onFocus={() => setShowSuggestions(true)}
         placeholder={type === "phone" ? "(XX) XX 9 XXXX-XXXX" : undefined}
-        className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border ${error ? "border-red-500" : "border-[var(--border-default)]"} rounded-[var(--radius-md)] px-3 py-2 text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none`}
+        className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border ${error ? "border-[var(--danger)]" : "border-[var(--border-default)]"} rounded-[var(--radius-md)] px-3 py-2 text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none`}
       />
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
       {showSuggestions && suggestions.length > 0 && (
         <div className="absolute z-20 left-0 right-0 mt-1 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-[var(--radius-md)] shadow-lg max-h-32 overflow-y-auto">
           {suggestions.map((c) => (

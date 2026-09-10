@@ -244,7 +244,7 @@ function WikiPageInner() {
               {!collapsed && (
                 <>
                   {section.warning ? (
-                    <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-sm)] px-2 py-1">
+                    <p className="text-xs text-[var(--warning)] bg-[var(--warning)]/10 border border-[var(--warning)]/30 rounded-[var(--radius-sm)] px-2 py-1">
                       {section.warning}
                     </p>
                   ) : (

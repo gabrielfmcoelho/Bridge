@@ -27,27 +27,27 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 const RELEASE_STATUSES = ["pending", "ongoing", "ready", "live", "canceled"] as const;
 
 const statusColors: Record<string, string> = {
-  pending: "bg-gray-500/15 text-gray-400 border-gray-500/30",
-  ongoing: "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
-  ready: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  live: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  canceled: "bg-red-500/15 text-red-400 border-red-500/30",
+  pending: "bg-[var(--text-faint)]/15 text-[var(--text-muted)] border-[var(--border-default)]",
+  ongoing: "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/30",
+  ready: "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30",
+  live: "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30",
+  canceled: "bg-[var(--danger)]/15 text-[var(--danger)] border-[var(--danger)]/30",
 };
 
 const statusDots: Record<string, string> = {
-  pending: "bg-gray-400",
-  ongoing: "bg-cyan-400",
-  ready: "bg-amber-400",
-  live: "bg-emerald-400",
-  canceled: "bg-red-400",
+  pending: "bg-[var(--text-faint)]",
+  ongoing: "bg-[var(--cyan)]",
+  ready: "bg-[var(--warning)]",
+  live: "bg-[var(--success)]",
+  canceled: "bg-[var(--danger)]",
 };
 
 const timelineLineColors: Record<string, string> = {
-  pending: "border-gray-500/40",
-  ongoing: "border-cyan-500/40",
-  ready: "border-amber-500/40",
-  live: "border-emerald-500/40",
-  canceled: "border-red-500/20",
+  pending: "border-[var(--border-default)]",
+  ongoing: "border-[var(--cyan)]/40",
+  ready: "border-[var(--warning)]/40",
+  live: "border-[var(--success)]/40",
+  canceled: "border-[var(--danger)]/20",
 };
 
 export default function ReleasesPage() {
@@ -196,7 +196,7 @@ export default function ReleasesPage() {
                       <span>Target: {rel.target_date}</span>
                     )}
                     {rel.live_date && (
-                      <span className="text-emerald-400">Live: {rel.live_date}</span>
+                      <span className="text-[var(--success)]">Live: {rel.live_date}</span>
                     )}
                     {rel.issue_ids && rel.issue_ids.length > 0 && (
                       <span>{rel.issue_ids.length} {rel.issue_ids.length === 1 ? "issue" : "issues"}</span>
@@ -256,7 +256,7 @@ export default function ReleasesPage() {
             {(search || statusFilter) && (
               <button
                 onClick={() => { setSearch(""); setStatusFilter(""); }}
-                className="w-full py-2 text-xs text-[var(--text-faint)] hover:text-red-400 transition-colors"
+                className="w-full py-2 text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
               >
                 Clear all filters
               </button>
@@ -409,7 +409,7 @@ function ReleaseForm({ release, projects, onSuccess, onDelete }: {
             <button
               type="button"
               onClick={() => { if (confirm("Delete this release?")) onDelete(); }}
-              className="text-xs text-[var(--text-faint)] hover:text-red-400 transition-colors"
+              className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
             >
               {t("common.delete")}
             </button>

@@ -101,7 +101,7 @@ export default function CreateTicketModal({
     >
       <div className="space-y-4">
         {!hasProfiles && (
-          <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2">
+          <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)] text-xs px-3 py-2">
             No GLPI profiles configured. Ask an admin to add one in Settings → Integrations → GLPI.
           </div>
         )}
@@ -152,7 +152,7 @@ export default function CreateTicketModal({
           </label>
         )}
         {error && (
-          <div className="rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 text-red-300 text-xs px-3 py-2">
+          <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-xs px-3 py-2">
             {error}
           </div>
         )}

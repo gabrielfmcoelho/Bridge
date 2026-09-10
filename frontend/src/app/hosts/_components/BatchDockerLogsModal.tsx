@@ -244,11 +244,11 @@ function FleetAnalysisPanel({
           </summary>
           <div className="mt-2 space-y-1">
             {errors.map((e) => (
-              <div key={e.slug} className="px-2 py-1 rounded text-xs bg-red-500/5 border border-red-500/20">
+              <div key={e.slug} className="px-2 py-1 rounded text-xs bg-[var(--danger)]/5 border border-[var(--danger)]/20">
                 <span className="font-medium text-[var(--text-primary)] font-mono">
                   {e.nickname}
                 </span>
-                <span className="ml-2 text-red-400">{e.error}</span>
+                <span className="ml-2 text-[var(--danger)]">{e.error}</span>
               </div>
             ))}
           </div>
@@ -261,10 +261,10 @@ function FleetAnalysisPanel({
 function FleetRow({ host, report }: { host: Host; report: DockerLogsReport }) {
   const riskClass =
     report.risk_level === "critical"
-      ? "bg-red-500/15 text-red-300 light:text-red-800 border-red-500/40"
+      ? "bg-[var(--danger)]/15 text-[var(--danger)] border-[var(--danger)]/40"
       : report.risk_level === "warning"
-      ? "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40"
-      : "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40";
+      ? "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/40"
+      : "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40";
   return (
     <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-1.5 text-xs">
       <span className="text-[var(--text-primary)] font-medium truncate font-mono" title={host.nickname}>
@@ -274,7 +274,7 @@ function FleetRow({ host, report }: { host: Host; report: DockerLogsReport }) {
         {humanizeBytes(report.total_log_bytes)}
       </span>
       <span
-        className={`text-right ${report.unbounded_containers > 0 ? "text-amber-400" : "text-[var(--text-faint)]"} font-mono`}
+        className={`text-right ${report.unbounded_containers > 0 ? "text-[var(--warning)]" : "text-[var(--text-faint)]"} font-mono`}
         title={report.unbounded_containers > 0 ? "Containers without rotation" : "All containers have rotation"}
       >
         {report.unbounded_containers}
@@ -288,8 +288,8 @@ function FleetRow({ host, report }: { host: Host; report: DockerLogsReport }) {
 
 function Stat({ label, value, mono, tone }: { label: string; value: string; mono?: boolean; tone?: "ok" | "amber" | "red" }) {
   const valueClass =
-    tone === "amber" ? "text-amber-400"
-      : tone === "red" ? "text-red-400"
+    tone === "amber" ? "text-[var(--warning)]"
+      : tone === "red" ? "text-[var(--danger)]"
       : "text-[var(--text-primary)]";
   return (
     <div>
@@ -304,16 +304,16 @@ function Stat({ label, value, mono, tone }: { label: string; value: string; mono
 function RiskChip({ risk, count }: { risk: "critical" | "warning" | "ok"; count: number }) {
   const cls =
     risk === "critical"
-      ? "bg-red-500/15 text-red-300 light:text-red-800 border-red-500/40"
+      ? "bg-[var(--danger)]/15 text-[var(--danger)] border-[var(--danger)]/40"
       : risk === "warning"
-      ? "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40"
-      : "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40";
+      ? "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/40"
+      : "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40";
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${
-        risk === "critical" ? "bg-red-400"
-          : risk === "warning" ? "bg-amber-400"
-          : "bg-emerald-400"
+        risk === "critical" ? "bg-[var(--danger)]"
+          : risk === "warning" ? "bg-[var(--warning)]"
+          : "bg-[var(--success)]"
       }`} />
       {count} {risk}
     </span>

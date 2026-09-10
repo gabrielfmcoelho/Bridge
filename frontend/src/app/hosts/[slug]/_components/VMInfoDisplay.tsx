@@ -76,9 +76,9 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
               // visible edge over low-contrast light backgrounds.
               const ownerClasses = (ownerType?: string): string => {
                 switch (ownerType) {
-                  case "container": return "bg-cyan-500/15 text-cyan-200 light:text-cyan-800 border-cyan-500/40";
-                  case "nginx": return "bg-fuchsia-500/15 text-fuchsia-200 light:text-fuchsia-800 border-fuchsia-500/40";
-                  case "docker": return "bg-blue-500/15 text-blue-200 light:text-blue-800 border-blue-500/40";
+                  case "container": return "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/40";
+                  case "nginx": return "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/40";
+                  case "docker": return "bg-[var(--info)]/15 text-[var(--info)] border-[var(--info)]/40";
                   // "agent" and "service" are back-filled from the
                   // catalogs when ss couldn't read the owning process
                   // (Zabbix on :10050, PostgreSQL on :5432, MongoDB on
@@ -86,8 +86,8 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                   // Violet for agents, emerald for application services
                   // so the operator can distinguish "what's monitoring
                   // me" from "what am I actually running" at a glance.
-                  case "agent": return "bg-violet-500/15 text-violet-200 light:text-violet-800 border-violet-500/40";
-                  case "service": return "bg-emerald-500/15 text-emerald-200 light:text-emerald-800 border-emerald-500/40";
+                  case "agent": return "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/40";
+                  case "service": return "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40";
                   case "process": return "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-default)]";
                   default: return "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-default)]";
                 }
@@ -139,15 +139,15 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
               const privKeys = info.ssh_keys.filter(k => k.source !== "authorized_keys");
               const renderKey = (k: typeof info.ssh_keys[0], i: number) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
-                  <Icon path={ICON_PATHS.key} className={`w-3.5 h-3.5 shrink-0 ${k.managed ? "text-emerald-400" : "text-[var(--text-faint)]"}`} />
+                  <Icon path={ICON_PATHS.key} className={`w-3.5 h-3.5 shrink-0 ${k.managed ? "text-[var(--success)]" : "text-[var(--text-faint)]"}`} />
                   <span className="text-[var(--text-primary)] font-mono">{k.name}</span>
                   <span className="text-[var(--text-faint)]">{k.type}</span>
                   {k.managed ? (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-2xs text-emerald-400 border border-emerald-500/20">
+                    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--success)]/15 text-2xs text-[var(--success)] border border-[var(--success)]/20">
                       {k.managed_name || t("scan.managed")}
                     </span>
                   ) : (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-2xs text-amber-400 border border-amber-500/20">
+                    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--warning)]/15 text-2xs text-[var(--warning)] border border-[var(--warning)]/20">
                       {t("scan.unmanaged")}
                     </span>
                   )}
@@ -218,7 +218,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
         const renderKey = (k: Key, i: number) => (
           <div key={i} className="flex gap-2 text-xs">
             <svg
-              className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${k.managed ? "text-emerald-400" : "text-[var(--text-faint)]"}`}
+              className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${k.managed ? "text-[var(--success)]" : "text-[var(--text-faint)]"}`}
               fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
               aria-label={k.managed ? t("scan.managed") : t("scan.unmanaged")}
             >
@@ -241,7 +241,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                   chip keeps the height but doesn't render text/border. */}
               <div className="mt-1 h-[18px]">
                 {k.managed && k.managed_name ? (
-                  <span className="inline-block px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-2xs text-emerald-400 border border-emerald-500/20">
+                  <span className="inline-block px-1.5 py-0.5 rounded-full bg-[var(--success)]/10 text-2xs text-[var(--success)] border border-[var(--success)]/20">
                     {k.managed_name}
                   </span>
                 ) : (
@@ -270,7 +270,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                   <Card key={u.name} hover={false} className="!p-3 flex flex-col h-full">
                     <div className="flex items-center gap-2 mb-1">
                       <svg
-                        className={`w-3.5 h-3.5 shrink-0 ${u.is_current ? "text-cyan-400" : "text-[var(--text-faint)]"}`}
+                        className={`w-3.5 h-3.5 shrink-0 ${u.is_current ? "text-[var(--cyan)]" : "text-[var(--text-faint)]"}`}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
                         aria-label={u.is_current ? t("scan.userCurrent") : undefined}
                       >
@@ -284,7 +284,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                         </span>
                       )}
                       {u.password_status === "P" && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-2xs text-amber-400 light:text-amber-700 border border-amber-500/30" title={t("scan.userPasswordSetTooltip")}>
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--warning)]/10 text-2xs text-[var(--warning)] border border-[var(--warning)]/30" title={t("scan.userPasswordSetTooltip")}>
                           {t("scan.userPasswordSet")}
                         </span>
                       )}
@@ -294,7 +294,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                         </span>
                       )}
                       {u.password_status === "NP" && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-2xs text-emerald-400 light:text-emerald-800 border border-emerald-500/30" title={t("scan.userPasswordNoneTooltip")}>
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--success)]/10 text-2xs text-[var(--success)] border border-[var(--success)]/30" title={t("scan.userPasswordNoneTooltip")}>
                           {t("scan.userPasswordNone")}
                         </span>
                       )}
@@ -414,12 +414,12 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                   key={i}
                   className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-2xs border ${
                     svc.is_native
-                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                      : "bg-sky-500/10 text-sky-400 border-sky-500/20"
+                      ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20"
+                      : "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20"
                   }`}
                   title={svc.description || svc.unit}
                 >
-                  <span className={`w-1.5 h-1.5 rounded-full ${svc.is_native ? "bg-emerald-400" : "bg-sky-400"}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full ${svc.is_native ? "bg-[var(--success)]" : "bg-[var(--info)]"}`} />
                   {svc.unit.replace(".service", "")}
                   <span className="opacity-60">({svc.is_native ? t("scan.native") : t("scan.containerManaged")})</span>
                 </span>
@@ -508,9 +508,9 @@ function SSHAuthPolicyCard({ policy, users, t }: {
 
   const verdictClass =
     effectivePassword === "yes"
-      ? "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40"
+      ? "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/40"
       : effectivePassword === "no"
-      ? "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40"
+      ? "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40"
       : "bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-default)]";
 
   // Cross-reference users against AllowUsers/DenyUsers + their PasswordStatus
@@ -648,7 +648,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
                 {passwordCapableUsers.map((u) => (
                   <span
                     key={u.name}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 light:text-amber-800 border border-amber-500/30 text-xs font-mono"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--warning)]/10 text-[var(--warning)] border border-[var(--warning)]/30 text-xs font-mono"
                     title={`uid ${u.uid} · ${u.shell || ""}`}
                   >
                     {u.name}
@@ -666,14 +666,14 @@ function SSHAuthPolicyCard({ policy, users, t }: {
 function YesNoBadge({ value, t }: { value: "yes" | "no" | "unknown"; t: (k: string) => string }) {
   if (value === "yes") {
     return (
-      <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border border-emerald-500/30 text-2xs">
+      <span className="px-1.5 py-0.5 rounded-full bg-[var(--success)]/15 text-[var(--success)] border border-[var(--success)]/30 text-2xs">
         {t("common.yes")}
       </span>
     );
   }
   if (value === "no") {
     return (
-      <span className="px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-300 light:text-rose-800 border border-rose-500/30 text-2xs">
+      <span className="px-1.5 py-0.5 rounded-full bg-[var(--rose)]/15 text-[var(--rose)] border border-[var(--rose)]/30 text-2xs">
         {t("common.no")}
       </span>
     );
@@ -798,7 +798,7 @@ function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string) 
               {p.startedVia && (
                 <div>
                   <span className="text-[var(--text-faint)] block">{t("scan.startedVia")}</span>
-                  <span className={p.startedVia === "manual" ? "text-amber-400" : p.startedVia === "systemd" ? "text-emerald-400" : "text-[var(--text-secondary)]"}>
+                  <span className={p.startedVia === "manual" ? "text-[var(--warning)]" : p.startedVia === "systemd" ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}>
                     {p.startedVia}
                   </span>
                 </div>
@@ -917,10 +917,10 @@ function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string) => string })
     !cron.daemon_installed && !cron.daemon_active ? "missing" : cron.daemon_active ? "active" : "inactive";
   const daemonChip =
     daemonState === "active"
-      ? "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40"
+      ? "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40"
       : daemonState === "inactive"
-      ? "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40"
-      : "bg-slate-500/15 text-slate-300 light:text-slate-700 border-slate-500/40";
+      ? "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/40"
+      : "bg-[var(--text-faint)]/15 text-[var(--text-muted)] border-[var(--border-default)]";
   const daemonLabel =
     daemonState === "active"
       ? t("scan.cron.daemonActive")
@@ -935,7 +935,7 @@ function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string) => string })
         {/* Daemon state row */}
         <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs border ${daemonChip}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${daemonState === "active" ? "bg-emerald-400" : daemonState === "inactive" ? "bg-amber-400" : "bg-slate-400"}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${daemonState === "active" ? "bg-[var(--success)]" : daemonState === "inactive" ? "bg-[var(--warning)]" : "bg-[var(--text-faint)]"}`} />
             {(cron.daemon_name || "cron")}: {daemonLabel}
           </span>
           {cron.daemon_installed && (
@@ -998,7 +998,7 @@ function CronJobRow({ job, t }: { job: CronJob; t: (k: string) => string }) {
       </span>
       {job.user && (
         <span
-          className="shrink-0 px-1.5 py-0.5 rounded-full text-2xs bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 font-mono"
+          className="shrink-0 px-1.5 py-0.5 rounded-full text-2xs bg-[var(--info)]/10 text-[var(--info)] border border-[var(--info)]/30 font-mono"
           title={t("scan.cron.runAs")}
         >
           {job.user}
@@ -1011,7 +1011,7 @@ function CronJobRow({ job, t }: { job: CronJob; t: (k: string) => string }) {
         {job.command || "—"}
       </span>
       {job.disabled && (
-        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-slate-500/15 text-2xs text-slate-300 light:text-slate-700 border border-slate-500/30">
+        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--text-faint)]/15 text-2xs text-[var(--text-muted)] border border-[var(--border-default)]">
           {t("scan.cron.disabled")}
         </span>
       )}
@@ -1060,14 +1060,14 @@ function agentStateClasses(state?: string): string {
   switch (state) {
     case "active":
     case "running":
-      return "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40";
+      return "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40";
     case "failed":
-      return "bg-red-500/15 text-red-300 light:text-red-800 border-red-500/40";
+      return "bg-[var(--danger)]/15 text-[var(--danger)] border-[var(--danger)]/40";
     case "stopped":
     case "inactive":
-      return "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40";
+      return "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/40";
     default:
-      return "bg-slate-500/15 text-slate-300 light:text-slate-700 border-slate-500/40";
+      return "bg-[var(--text-faint)]/15 text-[var(--text-muted)] border-[var(--border-default)]";
   }
 }
 
@@ -1150,12 +1150,12 @@ function AgentRow({ agent, t }: { agent: Agent; t: (k: string) => string }) {
       <span className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs border ${agentStateClasses(agent.state)}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${
           agent.state === "active" || agent.state === "running"
-            ? "bg-emerald-400"
+            ? "bg-[var(--success)]"
             : agent.state === "failed"
-            ? "bg-red-400"
+            ? "bg-[var(--danger)]"
             : agent.state === "stopped" || agent.state === "inactive"
-            ? "bg-amber-400"
-            : "bg-slate-400"
+            ? "bg-[var(--warning)]"
+            : "bg-[var(--text-faint)]"
         }`} />
         {stateText}
       </span>
@@ -1173,7 +1173,7 @@ function AgentRow({ agent, t }: { agent: Agent; t: (k: string) => string }) {
       )}
       {agent.enabled && (
         <span
-          className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 text-2xs"
+          className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--info)]/10 text-[var(--info)] border border-[var(--info)]/30 text-2xs"
           title={t("scan.agents.enabledAtBootTooltip")}
         >
           {t("scan.agents.enabledAtBoot")}
@@ -1238,14 +1238,14 @@ function serviceStateClasses(state?: string): string {
   switch (state) {
     case "active":
     case "running":
-      return "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40";
+      return "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40";
     case "failed":
-      return "bg-red-500/15 text-red-300 light:text-red-800 border-red-500/40";
+      return "bg-[var(--danger)]/15 text-[var(--danger)] border-[var(--danger)]/40";
     case "stopped":
     case "inactive":
-      return "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40";
+      return "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/40";
     default:
-      return "bg-slate-500/15 text-slate-300 light:text-slate-700 border-slate-500/40";
+      return "bg-[var(--text-faint)]/15 text-[var(--text-muted)] border-[var(--border-default)]";
   }
 }
 
@@ -1324,12 +1324,12 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
       <span className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs border ${serviceStateClasses(service.state)}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${
           service.state === "active" || service.state === "running"
-            ? "bg-emerald-400"
+            ? "bg-[var(--success)]"
             : service.state === "failed"
-            ? "bg-red-400"
+            ? "bg-[var(--danger)]"
             : service.state === "stopped" || service.state === "inactive"
-            ? "bg-amber-400"
-            : "bg-slate-400"
+            ? "bg-[var(--warning)]"
+            : "bg-[var(--text-faint)]"
         }`} />
         {stateText}
       </span>
@@ -1347,7 +1347,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
       )}
       {service.enabled && (
         <span
-          className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 text-2xs"
+          className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--info)]/10 text-[var(--info)] border border-[var(--info)]/30 text-2xs"
           title={t("scan.services.enabledAtBootTooltip")}
         >
           {t("scan.services.enabledAtBoot")}
@@ -1355,7 +1355,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
       )}
       {service.host_running && (
         <span
-          className="shrink-0 text-2xs text-purple-300 light:text-purple-800 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30"
+          className="shrink-0 text-2xs text-[var(--purple)] px-1.5 py-0.5 rounded bg-[var(--purple)]/10 border border-[var(--purple)]/30"
           title={t("scan.services.hostInstanceTooltip")}
         >
           {t("scan.services.hostInstance")}
@@ -1363,7 +1363,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
       )}
       {service.container_image && (
         <span
-          className="shrink-0 text-2xs text-cyan-300 light:text-cyan-800 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 font-mono"
+          className="shrink-0 text-2xs text-[var(--cyan)] px-1.5 py-0.5 rounded bg-[var(--cyan)]/10 border border-[var(--cyan)]/30 font-mono"
           title={service.container_id ? `${service.container_image} (${service.container_id.slice(0, 12)})` : service.container_image}
         >
           {service.container_image}

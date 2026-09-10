@@ -121,7 +121,7 @@ function ToggleChip({ active, onClick, label }: { active: boolean; onClick: () =
       onClick={onClick}
       className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
         active
-          ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300"
+          ? "bg-[var(--cyan)]/15 border-[var(--cyan)]/40 text-[var(--cyan)]"
           : "bg-[var(--bg-base)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
       }`}
     >

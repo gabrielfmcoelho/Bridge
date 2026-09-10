@@ -71,7 +71,7 @@ export default function SetupPage() {
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">{t("auth.setupTitle")}</h2>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-sm rounded-[var(--radius-md)] p-3 animate-slide-down flex items-center gap-2">
+            <div className="bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)] text-sm rounded-[var(--radius-md)] p-3 animate-slide-down flex items-center gap-2">
               <Icon path={ICON_PATHS.exclamationCircle} className="w-4 h-4 shrink-0" />
               {error}
             </div>

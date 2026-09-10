@@ -129,10 +129,10 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
       <div className="px-4 py-3 space-y-3">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <Icon path={ICON_PATHS.serverStack} className="w-4 h-4 text-violet-400 shrink-0" />
+          <Icon path={ICON_PATHS.serverStack} className="w-4 h-4 text-[var(--purple)] shrink-0" />
           <span className="text-sm font-medium text-[var(--text-primary)]">Coolify</span>
           {linked && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-violet-500/15 text-2xs text-violet-400 border border-violet-500/20">
+            <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--purple)]/15 text-2xs text-[var(--purple)] border border-[var(--purple)]/20">
               {coolifyUUID}
             </span>
           )}
@@ -149,12 +149,12 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
             {sv && (
               <div className="flex items-center gap-2 text-xs flex-wrap">
                 <span className="text-[var(--text-muted)]">{sv.name} ({sv.ip}:{sv.port})</span>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_reachable ? "bg-emerald-400" : "bg-red-400"}`} title={sv.is_reachable ? "Reachable" : "Unreachable"} />
-                <span className={`text-2xs ${sv.is_reachable ? "text-emerald-400" : "text-red-400"}`}>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_reachable ? "bg-[var(--success)]" : "bg-[var(--danger)]"}`} title={sv.is_reachable ? "Reachable" : "Unreachable"} />
+                <span className={`text-2xs ${sv.is_reachable ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
                   {sv.is_reachable ? "reachable" : "unreachable"}
                 </span>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_usable ? "bg-emerald-400" : "bg-amber-400"}`} title={sv.is_usable ? "Usable" : "Not usable"} />
-                <span className={`text-2xs ${sv.is_usable ? "text-emerald-400" : "text-amber-400"}`}>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_usable ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`} title={sv.is_usable ? "Usable" : "Not usable"} />
+                <span className={`text-2xs ${sv.is_usable ? "text-[var(--success)]" : "text-[var(--warning)]"}`}>
                   {sv.is_usable ? "usable" : "not usable"}
                 </span>
               </div>
@@ -203,8 +203,8 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
         {message && (
           <div className={`rounded-[var(--radius-sm)] px-3 py-2 text-xs ${
             message.type === "success"
-              ? "bg-emerald-500/10 border border-emerald-500/25 text-emerald-400"
-              : "bg-red-500/10 border border-red-500/25 text-red-400"
+              ? "bg-[var(--success)]/10 border border-[var(--success)]/25 text-[var(--success)]"
+              : "bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)]"
           }`}>
             {message.text}
           </div>

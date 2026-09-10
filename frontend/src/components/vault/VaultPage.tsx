@@ -251,7 +251,7 @@ function SecretRow({
               {reveal.value}
             </pre>
           )}
-          {reveal.error && <p className="text-xs text-red-400 mt-1">{reveal.error}</p>}
+          {reveal.error && <p className="text-xs text-[var(--danger)] mt-1">{reveal.error}</p>}
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <Button size="sm" variant="secondary" onClick={handleToggleReveal} disabled={reveal.loading}>

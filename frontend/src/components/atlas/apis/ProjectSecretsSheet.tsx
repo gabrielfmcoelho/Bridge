@@ -89,7 +89,7 @@ function SecretRow({ secret }: { secret: Secret }) {
         )}
       </div>
       {secret.description && <p className="text-xs text-[var(--text-muted)] mb-2">{secret.description}</p>}
-      {r.error && <p className="text-xs text-red-400">{r.error}</p>}
+      {r.error && <p className="text-xs text-[var(--danger)]">{r.error}</p>}
       {r.revealed && r.value != null && (
         <div className="space-y-2">
           {parseFields(r.value).map((f, i) => (

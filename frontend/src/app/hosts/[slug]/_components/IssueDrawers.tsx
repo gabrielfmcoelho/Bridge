@@ -234,7 +234,7 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
         </div>
 
         {isResolved && (
-          <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 rounded-[var(--radius-md)] p-2.5 border border-emerald-500/20">
+          <div className="flex items-center gap-2 text-xs text-[var(--success)] bg-[var(--success)]/10 rounded-[var(--radius-md)] p-2.5 border border-[var(--success)]/20">
             <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0" />
             {t("common.resolved") || "Resolved"}
           </div>
@@ -242,7 +242,7 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
 
         {hasLinkedIssue && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-2.5 border border-[var(--border-subtle)]">
-            <Icon path={ICON_PATHS.clipboard} className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <Icon path={ICON_PATHS.clipboard} className="w-3.5 h-3.5 text-[var(--purple)] shrink-0" />
             {isResolved
               ? `Issue #${alert.linked_issue_id} — resolved`
               : `Issue #${alert.linked_issue_id} linked — resolve the issue to conclude this alert`
@@ -393,7 +393,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
           <div className="flex items-center gap-2">
             <p className="text-base font-semibold text-[var(--text-primary)] flex-1">{issue.title}</p>
             {issue.status === "done" && (
-              <Icon path={ICON_PATHS.checkCircle} className="w-5 h-5 shrink-0 text-emerald-400" />
+              <Icon path={ICON_PATHS.checkCircle} className="w-5 h-5 shrink-0 text-[var(--success)]" />
             )}
             {issue.archived && (
               <Badge>{t("issue.archived")}</Badge>
@@ -457,7 +457,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
           {/* Source info */}
           {issue.source === "alert" && (
             <div className="flex items-center gap-2 text-xs text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-2.5 border border-[var(--border-subtle)]">
-              <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5 text-[var(--warning)] shrink-0" />
               {t("alert.createdFromAlert")} {issue.source_ref}
             </div>
           )}

@@ -23,7 +23,7 @@ function WhatsAppButton({ phone, name }: { phone: string; name: string }) {
       target="_blank"
       rel="noopener noreferrer"
       title={`WhatsApp ${name}`}
-      className="w-7 h-7 rounded-full flex items-center justify-center bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+      className="w-7 h-7 rounded-full flex items-center justify-center bg-[var(--success)]/15 text-[var(--success)] hover:bg-[var(--success)]/25 transition-colors"
       onClick={(e) => e.stopPropagation()}
     >
       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -73,13 +73,13 @@ export default function ResponsaveisSection({
           {items.map((r, i) => (
             <Card key={r.id ?? i} hover={false} className="!p-3">
               <div className="flex items-center gap-2.5 mb-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${r.is_main ? "bg-cyan-500/15 text-cyan-400" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${r.is_main ? "bg-[var(--cyan)]/15 text-[var(--cyan)]" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
                   {getInitials(r.name)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-sm font-medium text-[var(--text-primary)] truncate flex items-center gap-1">
                     {r.is_main && (
-                      <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5 text-[var(--warning)] shrink-0" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                       </svg>
                     )}
@@ -130,11 +130,11 @@ export default function ResponsaveisSection({
               <tr key={r.id ?? i} className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}>
                 <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
                   <span className="flex items-center gap-2">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-3xs font-bold ${r.is_main ? "bg-cyan-500/15 text-cyan-400" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-3xs font-bold ${r.is_main ? "bg-[var(--cyan)]/15 text-[var(--cyan)]" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
                       {getInitials(r.name)}
                     </span>
                     {r.is_main && (
-                      <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5 text-[var(--warning)] shrink-0" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                       </svg>
                     )}

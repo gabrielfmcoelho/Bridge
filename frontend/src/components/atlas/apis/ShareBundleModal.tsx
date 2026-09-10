@@ -346,7 +346,7 @@ export default function ShareBundleModal({
             <Input value={result} readOnly className="font-mono text-xs" />
             <CopyButton value={result} variant="primary" label={t("atlas.apis.copyLink")} copiedLabel={t("atlas.apis.copied")} />
           </div>
-          <p className="text-xs text-amber-400">⚠ {t("atlas.apis.tokenOnce")}</p>
+          <p className="text-xs text-[var(--warning)]">⚠ {t("atlas.apis.tokenOnce")}</p>
           <div className="flex justify-end pt-2">
             <Button variant="secondary" type="button" onClick={close}>
               {t("common.close") || "Close"}
@@ -478,7 +478,7 @@ export default function ShareBundleModal({
             {t("atlas.apis.neverExpires")}
           </label>
           {neverExpiry && (
-            <p className="-mt-2 text-2xs text-amber-400">{t("atlas.apis.neverExpiresHint")}</p>
+            <p className="-mt-2 text-2xs text-[var(--warning)]">{t("atlas.apis.neverExpiresHint")}</p>
           )}
 
           <Input
@@ -489,7 +489,7 @@ export default function ShareBundleModal({
             className="font-mono text-xs"
           />
 
-          {notice && <p className="text-xs text-emerald-400">{notice}</p>}
+          {notice && <p className="text-xs text-[var(--success)]">{notice}</p>}
           {editingId != null && (
             <p className="text-xs text-[var(--text-muted)]">{t("atlas.apis.editingNotice")}</p>
           )}
@@ -555,7 +555,7 @@ export default function ShareBundleModal({
                             {t("atlas.apis.views")}
                           </span>
                           {link.has_passphrase && (
-                            <span className="text-2xs text-amber-400">
+                            <span className="text-2xs text-[var(--warning)]">
                               {t("atlas.apis.withPassphrase")}
                             </span>
                           )}
@@ -565,22 +565,22 @@ export default function ShareBundleModal({
                             </span>
                           )}
                           {revoked && (
-                            <span className="text-2xs text-red-400">
+                            <span className="text-2xs text-[var(--danger)]">
                               {t("atlas.apis.statusRevoked")}
                             </span>
                           )}
                           {!archived && !revoked && expired && (
-                            <span className="text-2xs text-red-400">
+                            <span className="text-2xs text-[var(--danger)]">
                               {t("atlas.apis.statusExpired")}
                             </span>
                           )}
                           {!archived && !revoked && !expired && exhausted && (
-                            <span className="text-2xs text-red-400">
+                            <span className="text-2xs text-[var(--danger)]">
                               {t("atlas.apis.statusExhausted")}
                             </span>
                           )}
                           {!dead && (
-                            <span className="text-2xs text-emerald-400">
+                            <span className="text-2xs text-[var(--success)]">
                               {t("atlas.apis.statusLive")}
                             </span>
                           )}

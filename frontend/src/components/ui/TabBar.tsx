@@ -37,7 +37,7 @@ export default function TabBar({
           )}
           <span className="hidden sm:inline">{tab.label}</span>
           {tab.badge !== undefined && tab.badge > 0 && (
-            <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 text-2xs font-bold flex items-center justify-center shrink-0">
+            <span className="w-4 h-4 rounded-full bg-[var(--warning)]/20 text-[var(--warning)] text-2xs font-bold flex items-center justify-center shrink-0">
               {tab.badge}
             </span>
           )}

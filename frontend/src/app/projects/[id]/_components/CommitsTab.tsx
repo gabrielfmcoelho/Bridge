@@ -74,7 +74,7 @@ export default function CommitsTab({ projectId }: Props) {
     <div className="space-y-5 animate-fade-in">
       {authError && (
         <Card accent="red" hover={false}>
-          <p className="text-sm text-red-400">
+          <p className="text-sm text-[var(--danger)]">
             GitLab rejected the service access token. Ask an admin to refresh it in Settings.
           </p>
         </Card>

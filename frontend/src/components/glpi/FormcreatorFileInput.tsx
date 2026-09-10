@@ -121,7 +121,7 @@ export default function FormcreatorFileInput({
                 <button
                   type="button"
                   onClick={() => remove(doc.id)}
-                  className="text-[var(--text-faint)] hover:text-red-400"
+                  className="text-[var(--text-faint)] hover:text-[var(--danger)]"
                   aria-label={`Remover ${doc.filename}`}
                 >
                   ×
@@ -131,8 +131,8 @@ export default function FormcreatorFileInput({
           ))}
         </ul>
       )}
-      {uploadErr && <p className="text-xs text-red-400">{uploadErr}</p>}
-      {error && !uploadErr && <p className="text-xs text-red-400">{error}</p>}
+      {uploadErr && <p className="text-xs text-[var(--danger)]">{uploadErr}</p>}
+      {error && !uploadErr && <p className="text-xs text-[var(--danger)]">{error}</p>}
     </div>
   );
 }

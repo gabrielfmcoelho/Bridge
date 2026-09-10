@@ -37,7 +37,7 @@ type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "impor
 
 const roleColors: Record<string, string> = {
   admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
-  editor: "bg-purple-500/10 text-purple-400/70 border-purple-500/15",
+  editor: "bg-[var(--purple)]/10 text-[var(--purple)]/70 border-[var(--purple)]/15",
   viewer: "bg-[var(--bg-overlay)] text-[var(--text-faint)] border-[var(--border-subtle)]",
 };
 
@@ -210,7 +210,7 @@ function EnumSection() {
                 {isAdmin && (
                   <button
                     onClick={() => deleteMutation.mutate({ category, value: opt.value })}
-                    className="opacity-0 group-hover:opacity-100 text-[var(--text-faint)] hover:text-red-400 text-xs transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 text-[var(--text-faint)] hover:text-[var(--danger)] text-xs transition-opacity"
                   >
                     &times;
                   </button>
@@ -297,7 +297,7 @@ function EnumSection() {
         {editing && (
           <form onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }} className="space-y-4">
             {editError && (
-              <div className="bg-red-500/10 border border-red-500/25 text-red-400 text-sm rounded-[var(--radius-md)] p-3 animate-slide-down">{editError}</div>
+              <div className="bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)] text-sm rounded-[var(--radius-md)] p-3 animate-slide-down">{editError}</div>
             )}
             <Input
               label="Value"
@@ -840,7 +840,7 @@ function AppearanceSection() {
             {appLogo && (
               <button
                 onClick={handleRemoveLogo}
-                className="text-xs hover:text-red-400 transition-colors text-left"
+                className="text-xs hover:text-[var(--danger)] transition-colors text-left"
                 style={{ color: "var(--text-faint)" }}
               >
                 {t("settings.removeLogo")}
@@ -1035,7 +1035,7 @@ function ImportSection() {
                 <Icon path={ICON_PATHS.document} className="w-4 h-4 shrink-0 text-[var(--accent)]" />
                 <span className="text-sm text-[var(--text-primary)] truncate font-mono">{fileName}</span>
               </div>
-              <button onClick={reset} className="text-xs text-[var(--text-faint)] hover:text-red-400 transition-colors shrink-0 ml-2">
+              <button onClick={reset} className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors shrink-0 ml-2">
                 Remove
               </button>
             </div>
@@ -1066,9 +1066,9 @@ function ImportSection() {
             </div>
 
             {detectedType && detectedType !== importType && (
-              <div className="p-2.5 rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+              <div className="p-2.5 rounded-[var(--radius-md)] bg-[var(--warning)]/10 border border-[var(--warning)]/25 text-[var(--warning)] text-xs">
                 File looks like <strong>{detectedType}</strong> data but import type is set to <strong>{importType}</strong>.
-                <button onClick={() => setImportType(detectedType as "hosts" | "dns")} className="ml-1 underline hover:text-amber-200">
+                <button onClick={() => setImportType(detectedType as "hosts" | "dns")} className="ml-1 underline hover:text-[var(--warning)]">
                   Switch to {detectedType}?
                 </button>
               </div>
@@ -1094,17 +1094,17 @@ function ImportSection() {
             Import Results
           </h3>
           <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="p-3 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/25 text-center">
-              <div className="text-lg font-bold text-emerald-400 font-mono">{result.created}</div>
-              <div className="text-2xs uppercase tracking-wider text-emerald-400/70">Created</div>
+            <div className="p-3 rounded-[var(--radius-md)] bg-[var(--success)]/10 border border-[var(--success)]/25 text-center">
+              <div className="text-lg font-bold text-[var(--success)] font-mono">{result.created}</div>
+              <div className="text-2xs uppercase tracking-wider text-[var(--success)]/70">Created</div>
             </div>
-            <div className="p-3 rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/25 text-center">
-              <div className="text-lg font-bold text-amber-400 font-mono">{result.skipped}</div>
-              <div className="text-2xs uppercase tracking-wider text-amber-400/70">Skipped</div>
+            <div className="p-3 rounded-[var(--radius-md)] bg-[var(--warning)]/10 border border-[var(--warning)]/25 text-center">
+              <div className="text-lg font-bold text-[var(--warning)] font-mono">{result.skipped}</div>
+              <div className="text-2xs uppercase tracking-wider text-[var(--warning)]/70">Skipped</div>
             </div>
-            <div className="p-3 rounded-[var(--radius-md)] bg-red-500/10 border border-red-500/25 text-center">
-              <div className="text-lg font-bold text-red-400 font-mono">{result.failed}</div>
-              <div className="text-2xs uppercase tracking-wider text-red-400/70">Failed</div>
+            <div className="p-3 rounded-[var(--radius-md)] bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-center">
+              <div className="text-lg font-bold text-[var(--danger)] font-mono">{result.failed}</div>
+              <div className="text-2xs uppercase tracking-wider text-[var(--danger)]/70">Failed</div>
             </div>
           </div>
 
@@ -1197,8 +1197,8 @@ function BackupSection() {
       {/* Backup */}
       <Card hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
         <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-            <Icon path={ICON_PATHS.exportDoc} className="w-5 h-5 text-emerald-400" />
+          <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--success)]/10 border border-[var(--success)]/20 flex items-center justify-center shrink-0">
+            <Icon path={ICON_PATHS.exportDoc} className="w-5 h-5 text-[var(--success)]" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-[var(--text-primary)] font-display">
@@ -1218,8 +1218,8 @@ function BackupSection() {
       {/* Restore */}
       <Card hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
         <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-            <Icon path={ICON_PATHS.upload} className="w-5 h-5 text-amber-400" />
+          <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--warning)]/10 border border-[var(--warning)]/20 flex items-center justify-center shrink-0">
+            <Icon path={ICON_PATHS.upload} className="w-5 h-5 text-[var(--warning)]" />
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-[var(--text-primary)] font-display">
@@ -1228,7 +1228,7 @@ function BackupSection() {
             <p className="text-xs text-[var(--text-faint)] mt-1 mb-1">
               {t("settings.restoreDescription")}
             </p>
-            <p className="text-xs text-red-400/80 mb-3">
+            <p className="text-xs text-[var(--danger)]/80 mb-3">
               {t("settings.restoreWarning")}
             </p>
             <input
@@ -1250,8 +1250,8 @@ function BackupSection() {
       {result && (
         <div className={`p-3 rounded-[var(--radius-md)] text-sm animate-slide-up ${
           result.ok
-            ? "bg-emerald-500/10 border border-emerald-500/25 text-emerald-400"
-            : "bg-red-500/10 border border-red-500/25 text-red-400"
+            ? "bg-[var(--success)]/10 border border-[var(--success)]/25 text-[var(--success)]"
+            : "bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)]"
         }`}>
           {result.message}
         </div>

@@ -104,7 +104,7 @@ export default function WikiShareModal({
             <Input value={result} readOnly className="font-mono text-xs" />
             <CopyButton value={result} variant="primary" label={t("atlas.apis.copyLink")} copiedLabel={t("atlas.apis.copied")} />
           </div>
-          <p className="text-xs text-amber-400">⚠ {t("atlas.apis.tokenOnce")}</p>
+          <p className="text-xs text-[var(--warning)]">⚠ {t("atlas.apis.tokenOnce")}</p>
           <div className="flex justify-end pt-2">
             <Button variant="secondary" type="button" onClick={close}>
               {t("common.close") || "Close"}
@@ -153,7 +153,7 @@ export default function WikiShareModal({
             {t("atlas.apis.neverExpires")}
           </label>
           {neverExpiry && (
-            <p className="-mt-2 text-2xs text-amber-400">{t("atlas.apis.neverExpiresHint")}</p>
+            <p className="-mt-2 text-2xs text-[var(--warning)]">{t("atlas.apis.neverExpiresHint")}</p>
           )}
 
           {error && <FormError message={error} />}
@@ -204,19 +204,19 @@ export default function WikiShareModal({
                               {t("atlas.apis.views")}
                             </span>
                             {!dead ? (
-                              <span className="text-2xs text-emerald-400">
+                              <span className="text-2xs text-[var(--success)]">
                                 {t("atlas.apis.statusLive")}
                               </span>
                             ) : revoked ? (
-                              <span className="text-2xs text-red-400">
+                              <span className="text-2xs text-[var(--danger)]">
                                 {t("atlas.apis.statusRevoked")}
                               </span>
                             ) : expired ? (
-                              <span className="text-2xs text-red-400">
+                              <span className="text-2xs text-[var(--danger)]">
                                 {t("atlas.apis.statusExpired")}
                               </span>
                             ) : exhausted ? (
-                              <span className="text-2xs text-red-400">
+                              <span className="text-2xs text-[var(--danger)]">
                                 {t("atlas.apis.statusExhausted")}
                               </span>
                             ) : (

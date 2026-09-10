@@ -14,9 +14,9 @@ import type { Issue, Service } from "@/lib/types";
 const STATUSES = ["backlog", "todo", "in_progress", "review", "done"] as const;
 
 const priorityColors: Record<string, string> = {
-  critical: "bg-red-400",
-  high: "bg-amber-400",
-  medium: "bg-cyan-400",
+  critical: "bg-[var(--danger)]",
+  high: "bg-[var(--warning)]",
+  medium: "bg-[var(--cyan)]",
   low: "bg-[var(--text-faint)]",
 };
 
@@ -144,7 +144,7 @@ export default function IssueBoard({ projectId, services, canEdit }: IssueBoardP
                         <span className="text-2xs text-[var(--text-muted)] bg-[var(--bg-overlay)] rounded px-1.5 py-0.5">{issue.assignee}</span>
                       )}
                       {issue.service_id && (
-                        <span className="text-2xs text-purple-400 bg-purple-500/10 rounded px-1.5 py-0.5">
+                        <span className="text-2xs text-[var(--purple)] bg-[var(--purple)]/10 rounded px-1.5 py-0.5">
                           {services.find((s) => s.id === issue.service_id)?.nickname || ""}
                         </span>
                       )}

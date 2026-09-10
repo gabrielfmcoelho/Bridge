@@ -25,7 +25,7 @@ export default function WikiDocumentViewer({ doc, isLoading, error }: Props) {
 
   if (error) {
     return (
-      <div className="rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 text-red-300 text-sm px-4 py-3">
+      <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-4 py-3">
         Failed to load document: {error.message}
       </div>
     );

@@ -78,7 +78,7 @@ export default function EntidadesTab() {
                       <button onClick={() => edit(e)} className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] mr-3">{t("common.edit")}</button>
                       <button
                         onClick={() => { if (confirm(`${t("common.delete")} ${e.name}?`)) deleteMutation.mutate(e.id); }}
-                        className="text-xs text-[var(--text-faint)] hover:text-red-400"
+                        className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)]"
                       >
                         {t("common.delete")}
                       </button>

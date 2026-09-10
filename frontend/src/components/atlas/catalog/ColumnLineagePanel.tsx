@@ -71,7 +71,7 @@ export default function ColumnLineagePanel({ indexes, columnId, onBack, onSelect
               </span>
             )}
             {inferred && (
-              <span className="text-2xs uppercase tracking-wider text-amber-400/80">
+              <span className="text-2xs uppercase tracking-wider text-[var(--warning)]/80">
                 {t("atlas.catalog.column.inferred")}
               </span>
             )}
@@ -157,9 +157,9 @@ function TrailStep({
   onSelectColumn: (id: string) => void;
 }) {
   const { t } = useLocale();
-  const dotColor = step.confidence === "exact" ? "bg-emerald-400"
-                  : step.confidence === "inferred" ? "bg-amber-400"
-                  : step.confidence === "dynamic" ? "bg-rose-400"
+  const dotColor = step.confidence === "exact" ? "bg-[var(--success)]"
+                  : step.confidence === "inferred" ? "bg-[var(--warning)]"
+                  : step.confidence === "dynamic" ? "bg-[var(--rose)]"
                   : "bg-[var(--border-strong)]";
 
   const tableRec = step.table ? indexes.tablesById.get(step.table.id) : null;
@@ -192,10 +192,10 @@ function TrailStep({
               <span className="flex items-center gap-1">
                 {tableRec && (
                   <span className={`w-1.5 h-1.5 rounded-full ${
-                    tableRec.layer === "source" ? "bg-blue-400" :
-                    tableRec.layer === "bronze" ? "bg-amber-500" :
-                    tableRec.layer === "silver" ? "bg-slate-300" :
-                    tableRec.layer === "gold" ? "bg-yellow-400" : "bg-gray-400"
+                    tableRec.layer === "source" ? "bg-[var(--info)]" :
+                    tableRec.layer === "bronze" ? "bg-[var(--warning)]" :
+                    tableRec.layer === "silver" ? "bg-[var(--text-faint)]" :
+                    tableRec.layer === "gold" ? "bg-[var(--warning)]" : "bg-[var(--text-faint)]"
                   }`} />
                 )}
                 <span title={step.table.id}>{step.table.label}</span>

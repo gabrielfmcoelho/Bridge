@@ -55,8 +55,8 @@ export default function LineageLegend() {
           <div>
             <div className="text-3xs uppercase tracking-wider text-[var(--text-faint)] mb-1">Markers</div>
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1"><StatusDot className="bg-red-500" /><span className="text-2xs text-[var(--text-secondary)]">warning</span></span>
-              <span className="flex items-center gap-1"><StatusDot className="bg-amber-500" /><span className="text-2xs text-[var(--text-secondary)]">gap</span></span>
+              <span className="flex items-center gap-1"><StatusDot className="bg-[var(--danger)]" /><span className="text-2xs text-[var(--text-secondary)]">warning</span></span>
+              <span className="flex items-center gap-1"><StatusDot className="bg-[var(--warning)]" /><span className="text-2xs text-[var(--text-secondary)]">gap</span></span>
             </div>
           </div>
         </div>

@@ -92,7 +92,7 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
             </span>
           </Card>
           {data.warning && (
-            <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2 mb-2">
+            <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)] text-xs px-3 py-2 mb-2">
               {data.warning}
             </div>
           )}

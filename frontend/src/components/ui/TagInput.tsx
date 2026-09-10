@@ -111,7 +111,7 @@ export default function TagInput({ label, tags, onChange, suggestions: externalS
           {tags.map((tag) => (
             <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-[var(--bg-overlay)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
               {tag}
-              <button type="button" onClick={() => removeTag(tag)} className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-red-500/20 hover:text-red-400 transition-colors text-xs leading-none">
+              <button type="button" onClick={() => removeTag(tag)} className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-[var(--danger)]/20 hover:text-[var(--danger)] transition-colors text-xs leading-none">
                 &times;
               </button>
             </span>

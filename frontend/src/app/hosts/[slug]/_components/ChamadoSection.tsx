@@ -21,13 +21,13 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_DOT: Record<string, string> = {
-  in_execution: "bg-amber-400",
-  solved: "bg-emerald-400",
+  in_execution: "bg-[var(--warning)]",
+  solved: "bg-[var(--success)]",
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  in_execution: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  solved: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  in_execution: "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30",
+  solved: "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30",
 };
 
 interface ChamadoSectionProps {
@@ -126,7 +126,7 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
               <Card key={c.id ?? i} onClick={() => openDetail(c)} clickIndicator="drawer" className="!p-3">
                 <div className="flex items-center gap-2.5 mb-2">
                   {/* Ticket icon */}
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-orange-500/15 text-orange-400">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--warning)]/15 text-[var(--warning)]">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                     </svg>

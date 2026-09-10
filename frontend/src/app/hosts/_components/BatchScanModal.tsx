@@ -168,8 +168,8 @@ export default function BatchScanModal({
           </div>
           {(successCount > 0 || failedCount > 0) && (
             <div className="flex gap-3 mt-1.5 text-xs">
-              <span className="text-emerald-400">{successCount} OK</span>
-              {failedCount > 0 && <span className="text-red-400">{failedCount} failed</span>}
+              <span className="text-[var(--success)]">{successCount} OK</span>
+              {failedCount > 0 && <span className="text-[var(--danger)]">{failedCount} failed</span>}
             </div>
           )}
         </div>
@@ -184,14 +184,14 @@ export default function BatchScanModal({
               <div key={host.oficial_slug} className="flex items-center gap-2 py-1.5 px-2 rounded text-xs">
                 {s.status === "pending" && <StatusDot color="muted" />}
                 {s.status === "scanning" && <StatusDot color="accent" className="animate-pulse" />}
-                {s.status === "success" && <StatusDot className="bg-emerald-400" />}
-                {s.status === "failed" && <StatusDot className="bg-red-400" />}
-                {s.status === "skipped" && <StatusDot className="bg-slate-400" />}
+                {s.status === "success" && <StatusDot className="bg-[var(--success)]" />}
+                {s.status === "failed" && <StatusDot className="bg-[var(--danger)]" />}
+                {s.status === "skipped" && <StatusDot className="bg-[var(--text-faint)]" />}
                 <span className="text-[var(--text-primary)] font-medium font-mono">{host.nickname}</span>
                 {s.status === "scanning" && <span className="text-[var(--accent)] ml-auto">{t("host.scanning")}{s.attempt && s.attempt > 1 ? ` (${s.attempt}/3)` : ""}</span>}
-                {s.status === "success" && <span className="text-emerald-400 ml-auto">OK</span>}
-                {s.status === "skipped" && <span className="text-slate-400 ml-auto">{t("host.scanSkipped")}</span>}
-                {s.error && <span className="text-red-400 ml-auto truncate max-w-[200px]" title={s.error}>{s.error}</span>}
+                {s.status === "success" && <span className="text-[var(--success)] ml-auto">OK</span>}
+                {s.status === "skipped" && <span className="text-[var(--text-muted)] ml-auto">{t("host.scanSkipped")}</span>}
+                {s.error && <span className="text-[var(--danger)] ml-auto truncate max-w-[200px]" title={s.error}>{s.error}</span>}
               </div>
             );
           })}

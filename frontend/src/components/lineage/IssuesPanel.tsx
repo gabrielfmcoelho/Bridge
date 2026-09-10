@@ -41,7 +41,7 @@ export default function IssuesPanel({ indexes, filterKind, onNavigate }: Props) 
       {/* Errors */}
       {errors.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-red-300 uppercase tracking-wider mb-2">
+          <h2 className="text-sm font-semibold text-[var(--danger)] uppercase tracking-wider mb-2">
             {t("atlas.lineage.issues.errors")} ({errors.length})
           </h2>
           <div className="space-y-2">
@@ -119,8 +119,8 @@ function WarningRow({ w, onNavigate, indexes, severity }: {
 }) {
   const node = w.source_id ? indexes.nodesById.get(w.source_id) : null;
   const cls = severity === "error"
-    ? "bg-red-500/10 border-red-500/30"
-    : "bg-amber-500/10 border-amber-500/30";
+    ? "bg-[var(--danger)]/10 border-[var(--danger)]/30"
+    : "bg-[var(--warning)]/10 border-[var(--warning)]/30";
 
   return (
     <div className={`p-3 rounded-[var(--radius-md)] border ${cls}`}>

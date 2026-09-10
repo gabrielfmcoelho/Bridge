@@ -128,7 +128,7 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
             )}
           </div>
           {form.is_external_dependency && (
-            <div className="space-y-3 p-3 rounded-[var(--radius-md)] border border-amber-500/20 bg-amber-500/5">
+            <div className="space-y-3 p-3 rounded-[var(--radius-md)] border border-[var(--warning)]/20 bg-[var(--warning)]/5">
               <Input label={t("service.externalProvider")} value={form.external_provider} onChange={(e) => set("external_provider", e.target.value)} placeholder="AWS, Stripe, etc." />
               <Input label={t("service.externalContact")} value={form.external_contact} onChange={(e) => set("external_contact", e.target.value)} />
               <Input label={t("service.externalUrl")} value={form.external_url} onChange={(e) => set("external_url", e.target.value)} type="url" />
@@ -212,15 +212,15 @@ function ServiceDashboardProvisionButton({ serviceId, onProvisioned }: { service
         {mutation.isPending ? "Provisioning…" : "Provision default dashboard in Grafana"}
       </button>
       {!datasourceSet && (
-        <p className="text-2xs text-amber-400">
+        <p className="text-2xs text-[var(--warning)]">
           Set the Prometheus datasource UID in Settings → Integrations → Grafana first.
         </p>
       )}
       {mutation.isSuccess && !mutation.isPending && (
-        <p className="text-2xs text-emerald-400">{mutation.data?.message}</p>
+        <p className="text-2xs text-[var(--success)]">{mutation.data?.message}</p>
       )}
       {mutation.isError && (
-        <p className="text-2xs text-red-400">
+        <p className="text-2xs text-[var(--danger)]">
           {mutation.error instanceof Error ? mutation.error.message : "Provision failed"}
         </p>
       )}

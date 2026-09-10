@@ -95,7 +95,7 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
       </div>
 
       {error && (
-        <div className="rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 text-red-300 text-xs px-3 py-2 mb-3">
+        <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-xs px-3 py-2 mb-3">
           {error}
         </div>
       )}

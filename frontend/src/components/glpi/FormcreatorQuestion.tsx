@@ -283,7 +283,7 @@ export default function FormcreatorQuestion({
         <label className="block text-xs font-medium text-[var(--text-secondary)]">
           {labelText}
         </label>
-        <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)]">
           <span>
             Tipo <code className="font-mono">{question.fieldtype}</code> ainda não é suportado em sshcm.
           </span>
@@ -291,7 +291,7 @@ export default function FormcreatorQuestion({
             href={fallbackHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-amber-200 hover:underline shrink-0"
+            className="text-[var(--warning)] hover:underline shrink-0"
           >
             Abrir no GLPI ↗
           </a>
@@ -410,7 +410,7 @@ export default function FormcreatorQuestion({
             selected={selectedIdx}
             onChange={(idx) => onChange(idx.map((i) => opts[i]?.value).filter(Boolean))}
           />
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
         </div>
       );
     }

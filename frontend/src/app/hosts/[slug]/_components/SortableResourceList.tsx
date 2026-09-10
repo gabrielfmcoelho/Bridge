@@ -138,7 +138,7 @@ type ServiceRow = ReturnType<typeof parseServiceRow>;
 type ContainerRow = ReturnType<typeof parseContainerRow>;
 
 function pctColor(pct: number): string {
-  return pct >= 80 ? "text-red-400" : pct >= 50 ? "text-amber-400" : "text-[var(--text-secondary)]";
+  return pct >= 80 ? "text-[var(--danger)]" : pct >= 50 ? "text-[var(--warning)]" : "text-[var(--text-secondary)]";
 }
 
 /* ─── ServicesList convenience wrapper ─── */
@@ -157,7 +157,7 @@ export function ServicesList({ details, title }: { details: string[]; title: str
       title={title}
       rows={rows}
       columns={columns}
-      getIcon={(row) => <span className="text-purple-400">{portIcon(row.name)}</span>}
+      getIcon={(row) => <span className="text-[var(--purple)]">{portIcon(row.name)}</span>}
       getName={(row) => row.name}
     />
   );
@@ -221,8 +221,8 @@ export function ContainersList({ stats, parsedContainers = [], title }: { stats:
             )}
             {c.status && (
               <div className="flex items-center gap-1.5 text-2xs">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${up ? "bg-emerald-400" : "bg-[var(--text-faint)]"}`} />
-                <span className={`font-mono ${up ? "text-emerald-400" : "text-[var(--text-muted)]"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${up ? "bg-[var(--success)]" : "bg-[var(--text-faint)]"}`} />
+                <span className={`font-mono ${up ? "text-[var(--success)]" : "text-[var(--text-muted)]"}`}>
                   {uptime.display}
                 </span>
               </div>
@@ -239,7 +239,7 @@ export function ContainersList({ stats, parsedContainers = [], title }: { stats:
             {bindings.map((b, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-2xs bg-cyan-500/15 text-cyan-200 light:text-cyan-800 border-cyan-500/40 font-mono"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-2xs bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/40 font-mono"
                 title={`host :${b.hostPort} → container :${b.containerPort}/${b.proto}`}
               >
                 :{b.hostPort}

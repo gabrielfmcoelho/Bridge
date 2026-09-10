@@ -99,7 +99,7 @@ export default function FormcreatorFormsPage() {
     }
     if (error) {
       return (
-        <div className="rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 text-red-300 text-sm px-4 py-3">
+        <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-4 py-3">
           Falha: {(error as Error).message}
         </div>
       );

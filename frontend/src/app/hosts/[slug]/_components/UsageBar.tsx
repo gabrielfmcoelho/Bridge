@@ -3,7 +3,7 @@ import { pctTextColor, pctBarColor } from "@/lib/utils";
 export function UsageBar({ label, total, used, percent }: { label: string; total: string; used: string; percent: string }) {
   const pctNum = parseInt(percent) || 0;
   const color = pctBarColor(pctNum);
-  const textColor = pctNum >= 80 ? "text-red-400" : pctNum >= 50 ? "text-amber-400" : "text-[var(--text-secondary)]";
+  const textColor = pctNum >= 80 ? "text-[var(--danger)]" : pctNum >= 50 ? "text-[var(--warning)]" : "text-[var(--text-secondary)]";
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between text-sm">

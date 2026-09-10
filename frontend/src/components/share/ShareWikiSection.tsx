@@ -89,7 +89,7 @@ export default function ShareWikiSection({
         />
       )}
       {item.truncated && (
-        <p className="text-2xs text-amber-400">{t("share.wikiTruncated")}</p>
+        <p className="text-2xs text-[var(--warning)]">{t("share.wikiTruncated")}</p>
       )}
       <Card className="space-y-4">
         {item.documents.length === 0 ? (

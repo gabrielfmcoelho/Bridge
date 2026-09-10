@@ -32,8 +32,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  in_execution: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  solved: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  in_execution: "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30",
+  solved: "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30",
 };
 
 interface ChamadoDrawerProps {
@@ -303,7 +303,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
       )}
 
       {mutation.isError && (
-        <p className="text-xs text-red-400">
+        <p className="text-xs text-[var(--danger)]">
           {mutation.error instanceof Error ? mutation.error.message : "Refresh failed"}
         </p>
       )}

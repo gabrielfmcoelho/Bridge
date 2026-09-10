@@ -271,7 +271,7 @@ function LDAPSection() {
               Test Connection
             </Button>
             {testResult && (
-              <span className={`text-sm ${testResult.success ? "text-emerald-400" : "text-red-400"}`}>
+              <span className={`text-sm ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
                 {testResult.success ? "Connection successful" : testResult.error}
               </span>
             )}
@@ -615,7 +615,7 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
                 Test connection
               </Button>
               {testResult && (
-                <span className={`text-xs ${testResult.success ? "text-green-400" : "text-red-400"}`}>
+                <span className={`text-xs ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
                   {testResult.message}
                 </span>
               )}
@@ -870,7 +870,7 @@ function OutlineIntegrationSection() {
               Test connection
             </Button>
             {testResult && (
-              <span className={`text-xs ${testResult.success ? "text-green-400" : "text-red-400"}`}>
+              <span className={`text-xs ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
                 {testResult.message}
               </span>
             )}
@@ -1133,14 +1133,14 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
                   if (!confirm(`Delete profile "${p.name}"? Any project pointing at it will become unassigned.`)) return;
                   deleteMutation.mutate(p.id);
                 }}
-                className="text-xs text-red-400 hover:text-red-300 disabled:opacity-40"
+                className="text-xs text-[var(--danger)] hover:text-[var(--danger)] disabled:opacity-40"
               >
                 Delete
               </button>
             </div>
           </div>
           {testResults[p.id] && (
-            <p className={`text-xs mt-1 ${testResults[p.id].ok ? "text-green-400" : "text-red-400"}`}>
+            <p className={`text-xs mt-1 ${testResults[p.id].ok ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
               {testResults[p.id].message}
             </p>
           )}
@@ -1153,7 +1153,7 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
           <Input label="Description (optional)" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
           <Input label="User token" type="password" value={newToken} onChange={(e) => setNewToken(e.target.value)} placeholder="GLPI personal API token" />
           <Input label="Default entity ID" type="number" value={newEntity} onChange={(e) => setNewEntity(e.target.value)} />
-          {error && <p className="text-xs text-red-400">{error}</p>}
+          {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
           <div className="flex gap-2">
             <Button type="button" size="sm" onClick={() => createMutation.mutate()} loading={createMutation.isPending} disabled={!newName.trim() || !newToken.trim()}>
               Add
@@ -1204,7 +1204,7 @@ function SecretInputWithClear({
           <button
             type="button"
             onClick={onClear}
-            className="text-xs text-red-400 hover:text-red-300 transition-colors pb-2.5 whitespace-nowrap"
+            className="text-xs text-[var(--danger)] hover:text-[var(--danger)] transition-colors pb-2.5 whitespace-nowrap"
           >
             Clear stored
           </button>
@@ -1497,7 +1497,7 @@ function GrafanaIntegrationSection() {
               Test connection
             </Button>
             {testResult && (
-              <span className={`text-xs ${testResult.success ? "text-green-400" : "text-red-400"}`}>
+              <span className={`text-xs ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
                 {testResult.message}
               </span>
             )}
@@ -1640,7 +1640,7 @@ function LLMSection() {
               Test connection
             </Button>
             {testResult && (
-              <span className={`text-xs ${testResult.success ? "text-green-400" : "text-red-400"}`}>
+              <span className={`text-xs ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
                 {testResult.message}
               </span>
             )}
@@ -1719,7 +1719,7 @@ function CoolifySection() {
             </Button>
           </div>
           {testResult && (
-            <div className={`rounded-[var(--radius-sm)] px-3 py-2 text-xs ${testResult.success ? "bg-emerald-500/10 border border-emerald-500/25 text-emerald-400" : "bg-red-500/10 border border-red-500/25 text-red-400"}`}>
+            <div className={`rounded-[var(--radius-sm)] px-3 py-2 text-xs ${testResult.success ? "bg-[var(--success)]/10 border border-[var(--success)]/25 text-[var(--success)]" : "bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)]"}`}>
               {testResult.success ? "Connection successful" : `Connection failed: ${testResult.error}`}
             </div>
           )}

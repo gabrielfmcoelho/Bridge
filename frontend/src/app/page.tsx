@@ -25,8 +25,8 @@ const statConfig = [
 ];
 
 function ResourceMiniBar({ label, value, total }: { label: string; value: number; total?: string }) {
-  const color = value > 80 ? "bg-red-500" : value > 60 ? "bg-amber-500" : "bg-emerald-500";
-  const textColor = value > 80 ? "text-red-400" : value > 60 ? "text-amber-400" : "text-emerald-400";
+  const color = value > 80 ? "bg-[var(--danger)]" : value > 60 ? "bg-[var(--warning)]" : "bg-[var(--success)]";
+  const textColor = value > 80 ? "text-[var(--danger)]" : value > 60 ? "text-[var(--warning)]" : "text-[var(--success)]";
   return (
     <div>
       <div className="flex items-center justify-between mb-0.5">
@@ -233,16 +233,16 @@ export default function DashboardPage() {
                       <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                         {t("dashboard.maintenanceAlerts")}
                       </h2>
-                      <svg className={`w-4 h-4 ${alertCount > 0 ? "text-amber-400" : "text-emerald-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className={`w-4 h-4 ${alertCount > 0 ? "text-[var(--warning)]" : "text-[var(--success)]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                     </div>
                     <div className="flex items-end gap-3 mb-2">
-                      <span className={`text-3xl font-bold ${alertCount > 0 ? "text-amber-400" : "text-emerald-400"} font-display`}>
+                      <span className={`text-3xl font-bold ${alertCount > 0 ? "text-[var(--warning)]" : "text-[var(--success)]"} font-display`}>
                         {alertCount}
                       </span>
                       {criticalCount > 0 && (
-                        <span className="text-xs text-red-400 font-semibold mb-1">{criticalCount} critical</span>
+                        <span className="text-xs text-[var(--danger)] font-semibold mb-1">{criticalCount} critical</span>
                       )}
                     </div>
                     <p className="text-xs text-[var(--text-faint)]">
@@ -259,7 +259,7 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                   {t("dashboard.infrastructure")}
                 </h2>
-                <Icon path={ICON_PATHS.archiveBox} className="w-4 h-4 text-purple-400" />
+                <Icon path={ICON_PATHS.archiveBox} className="w-4 h-4 text-[var(--purple)]" />
               </div>
               {hospedagemEntries.length > 0 ? (
                 <div className="space-y-2">
@@ -273,7 +273,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-purple-500/60 transition duration-500"
+                            className="h-full rounded-full bg-[var(--purple)]/60 transition duration-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -305,7 +305,7 @@ export default function DashboardPage() {
                       href={`/hosts/${scan.slug}`}
                       className="flex items-center gap-3 p-2 -mx-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors"
                     >
-                      <StatusDot className="bg-emerald-400" />
+                      <StatusDot className="bg-[var(--success)]" />
                       <span className="text-sm text-[var(--text-primary)] font-medium truncate font-mono">
                         {scan.nickname}
                       </span>

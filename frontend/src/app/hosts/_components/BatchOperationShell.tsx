@@ -99,7 +99,7 @@ export default function BatchOperationShell({
       </div>
 
       {targetHosts.length === 0 && emptyHint && (
-        <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/25 rounded-[var(--radius-md)] px-3 py-2">
+        <p className="text-xs text-[var(--warning)] bg-[var(--warning)]/10 border border-[var(--warning)]/25 rounded-[var(--radius-md)] px-3 py-2">
           {emptyHint}
         </p>
       )}
@@ -118,8 +118,8 @@ export default function BatchOperationShell({
           </div>
           {(successCount > 0 || failedCount > 0) && (
             <div className="flex gap-3 mt-1.5 text-xs">
-              <span className="text-emerald-400">{successCount} OK</span>
-              {failedCount > 0 && <span className="text-red-400">{failedCount} failed</span>}
+              <span className="text-[var(--success)]">{successCount} OK</span>
+              {failedCount > 0 && <span className="text-[var(--danger)]">{failedCount} failed</span>}
             </div>
           )}
         </div>
@@ -134,12 +134,12 @@ export default function BatchOperationShell({
               <div key={host.oficial_slug} className="flex items-center gap-2 py-1.5 px-2 rounded text-xs">
                 {s.status === "pending" && <StatusDot color="muted" />}
                 {s.status === "running" && <StatusDot color="accent" className="animate-pulse" />}
-                {s.status === "success" && <StatusDot className="bg-emerald-400" />}
-                {s.status === "failed" && <StatusDot className="bg-red-400" />}
+                {s.status === "success" && <StatusDot className="bg-[var(--success)]" />}
+                {s.status === "failed" && <StatusDot className="bg-[var(--danger)]" />}
                 <span className="text-[var(--text-primary)] font-medium font-mono">{host.nickname}</span>
                 {s.status === "running" && <span className="text-[var(--accent)] ml-auto">{runningLabel}{s.attempt && s.attempt > 1 ? ` (${s.attempt})` : ""}</span>}
-                {s.status === "success" && <span className="text-emerald-400 ml-auto">OK</span>}
-                {s.error && <span className="text-red-400 ml-auto truncate max-w-[200px]" title={s.error}>{s.error}</span>}
+                {s.status === "success" && <span className="text-[var(--success)] ml-auto">OK</span>}
+                {s.error && <span className="text-[var(--danger)] ml-auto truncate max-w-[200px]" title={s.error}>{s.error}</span>}
               </div>
             );
           })}

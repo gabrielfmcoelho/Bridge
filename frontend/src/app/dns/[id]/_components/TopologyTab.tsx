@@ -57,7 +57,7 @@ export default function DnsTopologyTab({ filteredGraph, linkedHosts, linkedServi
                     href={`/hosts/${h.oficial_slug}`}
                     className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-primary)] hover:text-[var(--accent)]"
                   >
-                    <Icon path={ICON_PATHS.server} className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+                    <Icon path={ICON_PATHS.server} className="w-3.5 h-3.5 shrink-0 text-[var(--cyan)]" />
                     <span className="truncate">{h.nickname || h.oficial_slug}</span>
                     {h.situacao && <Badge variant="situacao" situacao={h.situacao} dot>{h.situacao}</Badge>}
                   </Link>

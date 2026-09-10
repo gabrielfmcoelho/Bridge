@@ -134,7 +134,7 @@ export default function AsyncPicker(props: Props) {
               open
                 ? "border-[var(--accent)] ring-2 ring-[var(--accent-muted)]"
                 : error
-                ? "border-red-500"
+                ? "border-[var(--danger)]"
                 : "border-[var(--border-default)]"
             }`}
           >
@@ -218,7 +218,7 @@ export default function AsyncPicker(props: Props) {
                 <div className="px-3 py-2 text-xs text-[var(--text-muted)] animate-pulse">Carregando…</div>
               )}
               {fetchErr && (
-                <div className="px-3 py-2 text-xs text-red-400">{fetchErr}</div>
+                <div className="px-3 py-2 text-xs text-[var(--danger)]">{fetchErr}</div>
               )}
               {!loading && !fetchErr && items.length === 0 && (
                 <div className="px-3 py-2 text-xs text-[var(--text-faint)]">
@@ -273,7 +273,7 @@ export default function AsyncPicker(props: Props) {
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
     </div>
   );
 }

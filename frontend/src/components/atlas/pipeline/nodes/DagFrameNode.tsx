@@ -19,19 +19,19 @@ function DagFrameNodeImpl({ data, selected }: NodeProps) {
       className={`relative w-full h-full rounded-[var(--radius-md)] border bg-[var(--bg-base)]/40 transition overflow-hidden ${
         selected
           ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30"
-          : "border-cyan-500/30 hover:border-cyan-500/50"
+          : "border-[var(--cyan)]/30 hover:border-[var(--cyan)]/50"
       }`}
     >
-      <Handle type="target" position={Position.Left} className="!w-1.5 !h-1.5 !bg-cyan-400 !border-0" />
-      <Handle type="source" position={Position.Right} className="!w-1.5 !h-1.5 !bg-cyan-400 !border-0" />
+      <Handle type="target" position={Position.Left} className="!w-1.5 !h-1.5 !bg-[var(--cyan)] !border-0" />
+      <Handle type="source" position={Position.Right} className="!w-1.5 !h-1.5 !bg-[var(--cyan)] !border-0" />
 
-      <div className="absolute top-0 left-0 right-0 h-7 px-2.5 flex items-center gap-1.5 bg-cyan-500/10 border-b border-cyan-500/30">
-        <span className="text-3xs uppercase tracking-[0.14em] text-cyan-300 font-semibold shrink-0">DAG</span>
+      <div className="absolute top-0 left-0 right-0 h-7 px-2.5 flex items-center gap-1.5 bg-[var(--cyan)]/10 border-b border-[var(--cyan)]/30">
+        <span className="text-3xs uppercase tracking-[0.14em] text-[var(--cyan)] font-semibold shrink-0">DAG</span>
         <span className="text-xs font-mono text-[var(--text-primary)] truncate flex-1" title={node.id}>
           {node.label}
         </span>
         {Boolean(schedule) && (
-          <span className="text-3xs uppercase tracking-wider text-cyan-300/70 font-mono shrink-0">
+          <span className="text-3xs uppercase tracking-wider text-[var(--cyan)]/70 font-mono shrink-0">
             {String(schedule)}
           </span>
         )}

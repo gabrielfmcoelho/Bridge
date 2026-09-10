@@ -56,7 +56,7 @@ export default function InventoryFilterDrawer<F>({
         <button
           onClick={() => { onFiltersChange(emptyFilters); onSearchChange(""); }}
           disabled={activeCount === 0 && !search}
-          className="p-2 rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+          className="p-2 rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors disabled:opacity-30 disabled:pointer-events-none"
           title={t("filters.clearAll")}
         >
           <Icon path={ICON_PATHS.trash} />

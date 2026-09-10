@@ -70,7 +70,7 @@ export default function ServiceMetricsTab({ serviceId, nickname }: Props) {
 
       {iframeError && (
         <Card accent="amber" hover={false}>
-          <p className="text-sm text-amber-300">
+          <p className="text-sm text-[var(--warning)]">
             The dashboard took too long to load or blocked the embed. Verify Grafana's
             <code className="mx-1 text-[var(--text-secondary)]">allow_embedding</code>
             setting and that the base URL is reachable from the browser.

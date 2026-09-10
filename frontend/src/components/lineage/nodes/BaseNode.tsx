@@ -17,10 +17,10 @@ export default function BaseNode({ node, emoji, badge, gapMarker }: BaseNodeProp
   const layerCls = node.layer ? LAYER_COLORS[node.layer] : null;
 
   const gapColor =
-    gapMarker === "warning"  ? "bg-red-500" :
-    gapMarker === "orphan"   ? "bg-amber-500" :
-    gapMarker === "isolated" ? "bg-amber-500" :
-    gapMarker === "unused"   ? "bg-yellow-500/70" : null;
+    gapMarker === "warning"  ? "bg-[var(--danger)]" :
+    gapMarker === "orphan"   ? "bg-[var(--warning)]" :
+    gapMarker === "isolated" ? "bg-[var(--warning)]" :
+    gapMarker === "unused"   ? "bg-[var(--warning)]/70" : null;
 
   return (
     <div

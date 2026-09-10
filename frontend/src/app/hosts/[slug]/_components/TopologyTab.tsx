@@ -73,12 +73,12 @@ export default function TopologyTab({ data, filteredGraph, t }: {
             {data.dns_records.map((dns) => (
               <Card key={dns.id} hover={false} className="!p-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-400">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--success)]/15 text-[var(--success)]">
                     <Icon path={ICON_PATHS.globeMeridian} />
                   </div>
                   <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1 font-mono">{dns.domain}</span>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={`${dns.has_https ? "text-emerald-400" : "text-[var(--text-faint)]/30"}`} title={dns.has_https ? t("topology.https") : t("topology.noHttps")}>
+                    <span className={`${dns.has_https ? "text-[var(--success)]" : "text-[var(--text-faint)]/30"}`} title={dns.has_https ? t("topology.https") : t("topology.noHttps")}>
                       <Icon path={ICON_PATHS.lock} className="w-3.5 h-3.5" />
                     </span>
                     <Badge variant="situacao" situacao={dns.situacao} compact>{dns.situacao}</Badge>
@@ -99,7 +99,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
               <Link key={svc.id} href={`/services/${svc.id}`} className="block">
                 <Card clickIndicator="link" className="!p-3 !pb-7">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-purple-500/15 text-purple-400">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--purple)]/15 text-[var(--purple)]">
                       <Icon path={ICON_PATHS.serverStack} />
                     </div>
                     <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">{svc.nickname}</span>
@@ -121,7 +121,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
               <Link key={proj.id} href={`/projects/${proj.id}`} className="block">
                 <Card clickIndicator="link" className="!p-3 !pb-7">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-amber-500/15 text-amber-400">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--warning)]/15 text-[var(--warning)]">
                       <Icon path={ICON_PATHS.folder} />
                     </div>
                     <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">{proj.name}</span>

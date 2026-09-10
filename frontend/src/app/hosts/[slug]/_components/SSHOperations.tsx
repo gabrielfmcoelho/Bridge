@@ -130,7 +130,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             content: (
               <div className="space-y-3">
                 {warnings.length > 0 && (
-                  <div className="rounded-[var(--radius-md)] p-2.5 bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+                  <div className="rounded-[var(--radius-md)] p-2.5 bg-[var(--warning)]/10 border border-[var(--warning)]/25 text-[var(--warning)] text-xs">
                     <p className="font-medium mb-1">{t("operation.scanWarnings")}</p>
                     {warnings.map((w, i) => (
                       <p key={i} className="leading-relaxed">{"\u2022"} {w}</p>
@@ -317,7 +317,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               <div className="grid grid-cols-3 gap-2 text-2xs">
                 <div><span className="text-[var(--text-faint)] block">Docker</span><span className="font-mono">{s.docker_version?.replace("Docker version ", "").split(",")[0] || "-"}</span></div>
                 <div><span className="text-[var(--text-faint)] block">Compose</span><span className="font-mono">{s.compose_version?.replace(/.*version\s*/i, "").split(",")[0] || "-"}</span></div>
-                <div><span className="text-[var(--text-faint)] block">{t("operation.dockerGroup")}</span><span className={s.user_in_group ? "text-emerald-400" : "text-red-400"}>{s.user_in_group ? t("common.yes") : t("common.no")}</span></div>
+                <div><span className="text-[var(--text-faint)] block">{t("operation.dockerGroup")}</span><span className={s.user_in_group ? "text-[var(--success)]" : "text-[var(--danger)]"}>{s.user_in_group ? t("common.yes") : t("common.no")}</span></div>
               </div>
             )}
           </div>
@@ -389,7 +389,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             <div className="space-y-1">
               {s.steps.map((step, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${step.status === "success" ? "bg-emerald-400" : step.status === "failed" ? "bg-red-400" : "bg-gray-400"}`} />
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${step.status === "success" ? "bg-[var(--success)]" : step.status === "failed" ? "bg-[var(--danger)]" : "bg-[var(--text-faint)]"}`} />
                   <span className="text-[var(--text-primary)]">{step.name}</span>
                   {step.output && <span className="text-[var(--text-faint)] truncate font-mono">{step.output}</span>}
                 </div>
@@ -413,16 +413,16 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     onResult: (data: NetworkTestResult) => {
       const renderPort = (label: string, p: { port: number; ok: boolean; latency_ms: number; error?: string }) => (
         <div className="flex items-center gap-2 text-xs">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${p.ok ? "bg-emerald-400" : "bg-red-400"}`} />
+          <span className={`w-2 h-2 rounded-full shrink-0 ${p.ok ? "bg-[var(--success)]" : "bg-[var(--danger)]"}`} />
           <span className="text-[var(--text-primary)]">{label}</span>
           <span className="text-[var(--text-faint)] font-mono">tcp/{p.port}</span>
           {p.ok
             ? <span className="text-[var(--text-muted)] tabular-nums">{p.latency_ms}ms</span>
-            : <span className="text-red-400 truncate">{p.error || t("operation.networkTestFailed")}</span>}
+            : <span className="text-[var(--danger)] truncate">{p.error || t("operation.networkTestFailed")}</span>}
         </div>
       );
       const ping = data.ping;
-      const pingDot = ping.skipped ? "border border-[var(--border-default)]" : ping.ok ? "bg-emerald-400" : "bg-red-400";
+      const pingDot = ping.skipped ? "border border-[var(--border-default)]" : ping.ok ? "bg-[var(--success)]" : "bg-[var(--danger)]";
       return {
         status: data.success ? "success" : "error",
         content: (
@@ -435,7 +435,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                 ? <span className="text-[var(--text-faint)] truncate">{ping.error || t("operation.networkTestPingSkipped")}</span>
                 : ping.ok
                   ? <span className="text-[var(--text-muted)] tabular-nums">{ping.latency_ms ?? 0}ms</span>
-                  : <span className="text-red-400 truncate">{t("operation.networkTestFailed")}</span>}
+                  : <span className="text-[var(--danger)] truncate">{t("operation.networkTestFailed")}</span>}
             </div>
             {renderPort(t("operation.networkTestSshPort"), data.ssh_port)}
             {data.custom_port && renderPort(t("operation.networkTestCustomPort"), data.custom_port)}
@@ -721,7 +721,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-[var(--text-primary)]">{op.label}</span>
                   {op.showStatus && (
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${op.status === "success" ? "bg-emerald-400" : op.status === "failed" ? "bg-red-400" : "border border-[var(--border-default)]"}`} />
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${op.status === "success" ? "bg-[var(--success)]" : op.status === "failed" ? "bg-[var(--danger)]" : "border border-[var(--border-default)]"}`} />
                   )}
                 </div>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">{op.description}</p>
@@ -774,7 +774,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   <Icon path={ICON_PATHS.chevronDown} className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedOp === script.id ? "rotate-180" : ""}`} />
                 </button>
                 {isAdmin && (
-                  <button type="button" onClick={() => saveCustomScripts(customScripts.filter((s) => s.id !== script.id))} className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-red-400 hover:bg-red-500/10 transition-colors" title={t("common.delete")}>
+                  <button type="button" onClick={() => saveCustomScripts(customScripts.filter((s) => s.id !== script.id))} className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors" title={t("common.delete")}>
                     <Icon path={ICON_PATHS.trashOutline} className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -796,7 +796,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               </div>
             )}
             {customResult?.id === script.id && (
-              <div className={`mx-4 mb-3 rounded-[var(--radius-sm)] p-2.5 text-xs ${customResult.success ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+              <div className={`mx-4 mb-3 rounded-[var(--radius-sm)] p-2.5 text-xs ${customResult.success ? "bg-[var(--success)]/10 text-[var(--success)]" : "bg-[var(--danger)]/10 text-[var(--danger)]"}`}>
                 {customResult.success ? t("operation.executedSuccessfully") : `${t("filters.failed")}: ${customResult.error}`}
               </div>
             )}
@@ -824,11 +824,11 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               {t("operation.chooseKeySource")}
             </label>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setSetupKeySource("generate")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition ${setupKeySource === "generate" ? "border-cyan-400 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
+              <button type="button" onClick={() => setSetupKeySource("generate")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition ${setupKeySource === "generate" ? "border-[var(--cyan)] bg-[var(--cyan)]/15 text-[var(--cyan)]" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
                 <strong className="block mb-0.5">{t("operation.generateNewKey")}</strong>
                 <span className="text-[var(--text-faint)]">{t("operation.generateNewKeyDesc")}</span>
               </button>
-              <button type="button" onClick={() => setSetupKeySource("existing")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition ${setupKeySource === "existing" ? "border-cyan-400 bg-cyan-500/15 text-cyan-300" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
+              <button type="button" onClick={() => setSetupKeySource("existing")} className={`flex-1 p-3 rounded-[var(--radius-md)] border text-xs text-left transition ${setupKeySource === "existing" ? "border-[var(--cyan)] bg-[var(--cyan)]/15 text-[var(--cyan)]" : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)]"}`}>
                 <strong className="block mb-0.5">{t("operation.useExistingKey")}</strong>
                 <span className="text-[var(--text-faint)]">{t("operation.useExistingKeyDesc")}</span>
               </button>
@@ -884,7 +884,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="text-amber-400 border-amber-500/30"
+                  className="text-[var(--warning)] border-[var(--warning)]/30"
                   disabled={!canSubmit}
                   loading={createRemoteUserMutation.isPending}
                   onClick={() => runCreate(true)}
@@ -919,7 +919,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
                 />
                 {createUserName && !nameValid && (
-                  <p className="mt-1 text-xs text-amber-400">{t("operation.createRemoteUserInvalidName")}</p>
+                  <p className="mt-1 text-xs text-[var(--warning)]">{t("operation.createRemoteUserInvalidName")}</p>
                 )}
               </section>
 
@@ -957,7 +957,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                     )}
                   </div>
                 ) : (
-                  <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/25 rounded-[var(--radius-sm)] px-2.5 py-2">
+                  <p className="text-xs text-[var(--warning)] bg-[var(--warning)]/10 border border-[var(--warning)]/25 rounded-[var(--radius-sm)] px-2.5 py-2">
                     {t("operation.createRemoteUserNoEligibleKeys")}
                   </p>
                 )}
@@ -1077,10 +1077,10 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   </div>
                 )}
                 {deleteUserName && !nameValid && (
-                  <p className="mt-2 text-xs text-amber-400">{t("operation.createRemoteUserInvalidName")}</p>
+                  <p className="mt-2 text-xs text-[var(--warning)]">{t("operation.createRemoteUserInvalidName")}</p>
                 )}
                 {isProtected && (
-                  <p className="mt-2 text-xs text-amber-400">{t("operation.deleteRemoteUserProtected")}</p>
+                  <p className="mt-2 text-xs text-[var(--warning)]">{t("operation.deleteRemoteUserProtected")}</p>
                 )}
               </section>
 
@@ -1107,10 +1107,10 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
               {/* ── Warning section ── */}
               <section>
-                <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-semibold text-[var(--danger)] uppercase tracking-wider mb-2">
                   {t("operation.deleteRemoteUserWarningSection")}
                 </h3>
-                <div className="rounded-[var(--radius-sm)] bg-red-500/10 border border-red-500/25 px-2.5 py-2 text-xs leading-relaxed text-red-300">
+                <div className="rounded-[var(--radius-sm)] bg-[var(--danger)]/10 border border-[var(--danger)]/25 px-2.5 py-2 text-xs leading-relaxed text-[var(--danger)]">
                   {t("operation.deleteRemoteUserWarning")}
                 </div>
               </section>
@@ -1176,7 +1176,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   {t("operation.networkTestPortHint")}
                 </p>
                 {!portValid && (
-                  <p className="mt-2 text-xs text-amber-400">{t("operation.networkTestPortInvalid")}</p>
+                  <p className="mt-2 text-xs text-[var(--warning)]">{t("operation.networkTestPortInvalid")}</p>
                 )}
               </section>
             </div>
@@ -1205,7 +1205,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors"
                   onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
                 >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${log.status === "success" ? "bg-emerald-400" : "bg-red-400"}`} />
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${log.status === "success" ? "bg-[var(--success)]" : "bg-[var(--danger)]"}`} />
                   <span className="text-xs font-medium text-[var(--text-primary)] min-w-0 truncate font-mono">
                     {opTypeLabel(log.operation_type, t)}
                   </span>
@@ -1247,15 +1247,15 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             : consoleEntry.status === "warning" ? t("operation.statusWarning")
             : t("operation.statusRunning");
           const statusDotClass =
-            consoleEntry.status === "success" ? "bg-emerald-400"
-            : consoleEntry.status === "error" ? "bg-red-400"
-            : consoleEntry.status === "warning" ? "bg-amber-400"
-            : "bg-blue-400 animate-pulse";
+            consoleEntry.status === "success" ? "bg-[var(--success)]"
+            : consoleEntry.status === "error" ? "bg-[var(--danger)]"
+            : consoleEntry.status === "warning" ? "bg-[var(--warning)]"
+            : "bg-[var(--info)] animate-pulse";
           const statusTextClass =
-            consoleEntry.status === "success" ? "text-emerald-400"
-            : consoleEntry.status === "error" ? "text-red-400"
-            : consoleEntry.status === "warning" ? "text-amber-400"
-            : "text-blue-400";
+            consoleEntry.status === "success" ? "text-[var(--success)]"
+            : consoleEntry.status === "error" ? "text-[var(--danger)]"
+            : consoleEntry.status === "warning" ? "text-[var(--warning)]"
+            : "text-[var(--info)]";
 
           return (
             <div className="space-y-6">
@@ -1331,10 +1331,10 @@ function formatLogTime(dateStr: string, locale: string): string {
 function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLogsReport }) {
   const riskClass =
     report.risk_level === "critical"
-      ? "bg-red-500/15 text-red-300 light:text-red-800 border-red-500/40"
+      ? "bg-[var(--danger)]/15 text-[var(--danger)] border-[var(--danger)]/40"
       : report.risk_level === "warning"
-      ? "bg-amber-500/15 text-amber-300 light:text-amber-800 border-amber-500/40"
-      : "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40";
+      ? "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/40"
+      : "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40";
   const totalHuman = humanizeBytesClient(report.total_log_bytes);
   const largestHuman = humanizeBytesClient(report.largest_log_bytes);
 
@@ -1343,9 +1343,9 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
       <div className="flex flex-wrap items-center gap-2">
         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs border ${riskClass}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${
-            report.risk_level === "critical" ? "bg-red-400"
-              : report.risk_level === "warning" ? "bg-amber-400"
-              : "bg-emerald-400"
+            report.risk_level === "critical" ? "bg-[var(--danger)]"
+              : report.risk_level === "warning" ? "bg-[var(--warning)]"
+              : "bg-[var(--success)]"
           }`} />
           {report.risk_level.toUpperCase()}
         </span>
@@ -1383,7 +1383,7 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
             <span className="block">log-opts: <span className="font-mono">{JSON.stringify(report.daemon_log_opts)}</span></span>
           )}
           {report.daemon_json_unclean && (
-            <span className="block text-amber-400">daemon.json failed to parse — fix the syntax before applying rotation.</span>
+            <span className="block text-[var(--warning)]">daemon.json failed to parse — fix the syntax before applying rotation.</span>
           )}
         </div>
       )}
@@ -1404,8 +1404,8 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
                 <span
                   className={`ml-auto shrink-0 px-1.5 py-0.5 rounded text-2xs ${
                     c.has_rotation
-                      ? "bg-emerald-500/10 text-emerald-300 light:text-emerald-800 border border-emerald-500/30"
-                      : "bg-amber-500/10 text-amber-300 light:text-amber-800 border border-amber-500/30"
+                      ? "bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/30"
+                      : "bg-[var(--warning)]/10 text-[var(--warning)] border border-[var(--warning)]/30"
                   }`}
                   title={c.has_rotation ? "Container or daemon-level max-size set" : "No rotation — log can grow unboundedly"}
                 >

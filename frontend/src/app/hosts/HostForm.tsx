@@ -268,7 +268,7 @@ export default function HostForm({
             <p className="text-2xs text-[var(--text-faint)]">{t("host.sshKeyKeepCurrentHint")}</p>
           )}
           {selectedKeyId === "__clear__" && (
-            <p className="text-2xs text-amber-400">{t("host.sshKeyClearHint")}</p>
+            <p className="text-2xs text-[var(--warning)]">{t("host.sshKeyClearHint")}</p>
           )}
         </div>
       ) : isEdit && host?.has_key ? (
@@ -487,15 +487,15 @@ function HostDashboardProvisionButton({ slug, onProvisioned }: { slug: string; o
         {mutation.isPending ? "Provisioning…" : "Provision default dashboard in Grafana"}
       </button>
       {!datasourceSet && (
-        <p className="text-2xs text-amber-400">
+        <p className="text-2xs text-[var(--warning)]">
           Set the Prometheus datasource UID in Settings → Integrations → Grafana first.
         </p>
       )}
       {mutation.isSuccess && !mutation.isPending && (
-        <p className="text-2xs text-emerald-400">{mutation.data?.message}</p>
+        <p className="text-2xs text-[var(--success)]">{mutation.data?.message}</p>
       )}
       {mutation.isError && (
-        <p className="text-2xs text-red-400">
+        <p className="text-2xs text-[var(--danger)]">
           {mutation.error instanceof Error ? mutation.error.message : "Provision failed"}
         </p>
       )}

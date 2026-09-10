@@ -141,7 +141,7 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
             <Checkbox label={t("project.temEmpresaExterna")} checked={form.tem_empresa_externa_responsavel} onChange={(v) => set("tem_empresa_externa_responsavel", v)} />
           </div>
           {form.tem_empresa_externa_responsavel && (
-            <div className="p-3 rounded-[var(--radius-md)] border border-amber-500/20 bg-amber-500/5">
+            <div className="p-3 rounded-[var(--radius-md)] border border-[var(--warning)]/20 bg-[var(--warning)]/5">
               <Input label={t("project.temEmpresaExterna") + " - Contato"} value={form.contato_empresa_responsavel} onChange={(e) => set("contato_empresa_responsavel", e.target.value)} placeholder="Contact info" />
             </div>
           )}

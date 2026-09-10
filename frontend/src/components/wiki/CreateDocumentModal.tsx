@@ -59,7 +59,7 @@ export default function CreateDocumentModal({ open, onClose, onSubmit, submittin
         <p className="text-xs text-[var(--text-muted)]">
           The page will be created in Outline and opened in a new tab so you can fill in the content there.
         </p>
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
       </div>
     </ResponsiveModal>
   );
