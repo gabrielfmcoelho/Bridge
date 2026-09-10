@@ -49,7 +49,7 @@ export default function TableDetailPanel({ indexes, tableId, onSelectTable, onSe
         <div className="flex items-center gap-1.5 flex-wrap">
           <LayerBadge layer={rec.layer} size="md" />
           <RoleBadge role={rec.role} size="md" />
-          <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-faint)] ml-1">
+          <span className="text-2xs uppercase tracking-[0.12em] text-[var(--text-faint)] ml-1">
             {rec.namespace}
           </span>
         </div>
@@ -137,8 +137,8 @@ export default function TableDetailPanel({ indexes, tableId, onSelectTable, onSe
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] p-3 flex flex-col gap-1">
-      <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-faint)] font-semibold">{label}</span>
-      <span className="text-2xl text-[var(--text-primary)] font-semibold tabular-nums" style={{ fontFamily: "var(--font-display)" }}>
+      <span className="text-2xs uppercase tracking-[0.12em] text-[var(--text-faint)] font-semibold">{label}</span>
+      <span className="text-2xl text-[var(--text-primary)] font-semibold tabular-nums font-display">
         {value}
       </span>
     </div>
@@ -147,7 +147,7 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">
+    <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">
       {children}
     </span>
   );
@@ -160,8 +160,8 @@ function NodeChip({ node }: { node: LineageNode }) {
               : isTask ? "bg-purple-500/10 text-purple-300 border-purple-500/30"
               : "bg-[var(--bg-base)] text-[var(--text-muted)] border-[var(--border-subtle)]";
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-[var(--radius-sm)] border ${color}`}>
-      <span className="text-[9px] uppercase tracking-wider opacity-80">{node.type.replace("_", " ")}</span>
+    <span className={`inline-flex items-center gap-1.5 text-xs font-mono px-2 py-1 rounded-[var(--radius-sm)] border ${color}`}>
+      <span className="text-3xs uppercase tracking-wider opacity-80">{node.type.replace("_", " ")}</span>
       <span>{node.label}</span>
     </span>
   );
@@ -172,7 +172,7 @@ function TableChip({ node, indexes, onClick }: { node: LineageNode; indexes: Atl
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)] transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)] transition-colors"
       title={node.id}
     >
       {rec && <span className={`w-1.5 h-1.5 rounded-full ${rec.layer === "source" ? "bg-blue-400" : rec.layer === "bronze" ? "bg-amber-500" : rec.layer === "silver" ? "bg-slate-300" : rec.layer === "gold" ? "bg-yellow-400" : "bg-gray-400"}`} />}
@@ -204,16 +204,16 @@ function ColumnRow({
         isLast ? "" : "border-b border-[var(--border-subtle)]"
       }`}
     >
-      <span className="font-mono text-[12px] text-[var(--text-primary)] flex-1 truncate">
+      <span className="font-mono text-xs text-[var(--text-primary)] flex-1 truncate">
         {col.label}
       </span>
       {Boolean(dtype) && (
-        <span className="text-[10px] font-mono text-[var(--text-muted)] truncate">{String(dtype)}</span>
+        <span className="text-2xs font-mono text-[var(--text-muted)] truncate">{String(dtype)}</span>
       )}
       {inferred && (
-        <span className="text-[9px] uppercase tracking-wider text-[var(--text-faint)]">inferred</span>
+        <span className="text-3xs uppercase tracking-wider text-[var(--text-faint)]">inferred</span>
       )}
-      <span className="text-[9px] tabular-nums text-[var(--text-muted)] shrink-0 inline-flex items-center gap-2">
+      <span className="text-3xs tabular-nums text-[var(--text-muted)] shrink-0 inline-flex items-center gap-2">
         <span title="upstream column edges">↑ {upstreamCount}</span>
         <span title="downstream column edges">↓ {downstreamCount}</span>
       </span>

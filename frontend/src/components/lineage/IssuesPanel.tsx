@@ -127,15 +127,15 @@ function WarningRow({ w, onNavigate, indexes, severity }: {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">{w.kind}</span>
-            {w.file && <span className="text-[10px] font-mono text-[var(--text-faint)]">{w.file}{w.line ? `:${w.line}` : ""}</span>}
+            <span className="text-2xs font-mono uppercase tracking-wider text-[var(--text-muted)]">{w.kind}</span>
+            {w.file && <span className="text-2xs font-mono text-[var(--text-faint)]">{w.file}{w.line ? `:${w.line}` : ""}</span>}
           </div>
           <p className="text-xs text-[var(--text-primary)]">{w.message}</p>
         </div>
         {w.source_id && (
           <button
             onClick={() => onNavigate("graph", { focus: w.source_id })}
-            className="shrink-0 text-[10px] px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
+            className="shrink-0 text-2xs px-2 py-1 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors"
           >
             {node?.label ?? "open"} →
           </button>

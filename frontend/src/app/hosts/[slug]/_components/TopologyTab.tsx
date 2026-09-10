@@ -54,11 +54,11 @@ export default function TopologyTab({ data, filteredGraph, t }: {
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <span className="text-[var(--text-faint)] block mb-0.5">{t("topology.type")}</span>
-                <span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{data.orchestrator.type}</span>
+                <span className="text-[var(--text-muted)] font-mono">{data.orchestrator.type}</span>
               </div>
               <div>
                 <span className="text-[var(--text-faint)] block mb-0.5">{t("topology.version")}</span>
-                <span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{data.orchestrator.version}</span>
+                <span className="text-[var(--text-muted)] font-mono">{data.orchestrator.version}</span>
               </div>
             </div>
           </Card>
@@ -76,7 +76,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
                   <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-400">
                     <Icon path={ICON_PATHS.globeMeridian} />
                   </div>
-                  <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1" style={{ fontFamily: "var(--font-mono)" }}>{dns.domain}</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1 font-mono">{dns.domain}</span>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className={`${dns.has_https ? "text-emerald-400" : "text-[var(--text-faint)]/30"}`} title={dns.has_https ? t("topology.https") : t("topology.noHttps")}>
                       <Icon path={ICON_PATHS.lock} className="w-3.5 h-3.5" />

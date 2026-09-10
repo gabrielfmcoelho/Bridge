@@ -114,7 +114,7 @@ export default function ApiDetailInner({ id }: { id: number }) {
       <div className="flex flex-wrap items-start justify-between gap-3 mt-2 mb-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold truncate" style={{ fontFamily: "var(--font-display)" }}>
+            <h1 className="text-2xl font-bold truncate font-display">
               {api.name}
             </h1>
             <Badge color={api.scope === "projeto" ? "purple" : "gray"}>{scopeLabel}</Badge>

@@ -30,13 +30,13 @@ function ResourceMiniBar({ label, value, total }: { label: string; value: number
   return (
     <div>
       <div className="flex items-center justify-between mb-0.5">
-        <span className="text-[10px] text-[var(--text-faint)]">{label}</span>
-        <span className={`text-[10px] font-semibold ${textColor}`} style={{ fontFamily: "var(--font-mono)" }}>{value}%</span>
+        <span className="text-2xs text-[var(--text-faint)]">{label}</span>
+        <span className={`text-2xs font-semibold ${textColor} font-mono`}>{value}%</span>
       </div>
       <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
         <div className={`h-full rounded-full ${color} transition duration-500`} style={{ width: `${value}%` }} />
       </div>
-      {total && <p className="text-[9px] text-[var(--text-faint)] mt-0.5 text-right" style={{ fontFamily: "var(--font-mono)" }}>{total}</p>}
+      {total && <p className="text-3xs text-[var(--text-faint)] mt-0.5 text-right font-mono">{total}</p>}
     </div>
   );
 }
@@ -202,13 +202,13 @@ export default function DashboardPage() {
             {/* Scan Coverage */}
             <Card hover={false} className="stagger-in" style={{ "--i": 5 } as React.CSSProperties}>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
+                <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                   {t("dashboard.scanCoverage")}
                 </h2>
                 <Icon path={ICON_PATHS.scan} className="w-4 h-4 text-[var(--accent)]" />
               </div>
               <div className="flex items-end gap-3 mb-3">
-                <span className="text-2xl font-bold text-[var(--accent)]" style={{ fontFamily: "var(--font-display)" }}>
+                <span className="text-2xl font-bold text-[var(--accent)] font-display">
                   {stats.hosts.with_scans}
                 </span>
                 <span className="text-sm text-[var(--text-muted)] mb-0.5">/ {stats.hosts.total} {t("host.title").toLowerCase()}</span>
@@ -219,7 +219,7 @@ export default function DashboardPage() {
                   style={{ width: `${scanPct}%` }}
                 />
               </div>
-              <p className="text-xs text-[var(--text-faint)] mt-1.5" style={{ fontFamily: "var(--font-mono)" }}>{scanPct}% {t("dashboard.scanned")}</p>
+              <p className="text-xs text-[var(--text-faint)] mt-1.5 font-mono">{scanPct}% {t("dashboard.scanned")}</p>
             </Card>
 
             {/* Alerts */}
@@ -230,7 +230,7 @@ export default function DashboardPage() {
                 return (
                   <>
                     <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
+                      <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                         {t("dashboard.maintenanceAlerts")}
                       </h2>
                       <svg className={`w-4 h-4 ${alertCount > 0 ? "text-amber-400" : "text-emerald-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -238,7 +238,7 @@ export default function DashboardPage() {
                       </svg>
                     </div>
                     <div className="flex items-end gap-3 mb-2">
-                      <span className={`text-3xl font-bold ${alertCount > 0 ? "text-amber-400" : "text-emerald-400"}`} style={{ fontFamily: "var(--font-display)" }}>
+                      <span className={`text-3xl font-bold ${alertCount > 0 ? "text-amber-400" : "text-emerald-400"} font-display`}>
                         {alertCount}
                       </span>
                       {criticalCount > 0 && (
@@ -256,7 +256,7 @@ export default function DashboardPage() {
             {/* Hosting Distribution */}
             <Card hover={false} className="stagger-in" style={{ "--i": 7 } as React.CSSProperties}>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
+                <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                   {t("dashboard.infrastructure")}
                 </h2>
                 <Icon path={ICON_PATHS.archiveBox} className="w-4 h-4 text-purple-400" />
@@ -269,7 +269,7 @@ export default function DashboardPage() {
                       <div key={name}>
                         <div className="flex items-center justify-between text-xs mb-0.5">
                           <span className="text-[var(--text-secondary)] truncate">{name}</span>
-                          <span className="text-[var(--text-faint)] ml-2" style={{ fontFamily: "var(--font-mono)" }}>{count}</span>
+                          <span className="text-[var(--text-faint)] ml-2 font-mono">{count}</span>
                         </div>
                         <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                           <div
@@ -281,7 +281,7 @@ export default function DashboardPage() {
                     );
                   })}
                   {hospedagemEntries.length > 4 && (
-                    <p className="text-[10px] text-[var(--text-faint)]">+{hospedagemEntries.length - 4} more</p>
+                    <p className="text-2xs text-[var(--text-faint)]">+{hospedagemEntries.length - 4} more</p>
                   )}
                 </div>
               ) : (
@@ -306,7 +306,7 @@ export default function DashboardPage() {
                       className="flex items-center gap-3 p-2 -mx-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors"
                     >
                       <StatusDot className="bg-emerald-400" />
-                      <span className="text-sm text-[var(--text-primary)] font-medium truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                      <span className="text-sm text-[var(--text-primary)] font-medium truncate font-mono">
                         {scan.nickname}
                       </span>
                       <span className="text-xs text-[var(--text-faint)] ml-auto whitespace-nowrap">
@@ -334,7 +334,7 @@ export default function DashboardPage() {
                       <div key={situacao}>
                         <div className="flex items-center justify-between mb-2">
                           <Badge variant="situacao" situacao={situacao} dot>{situacao}</Badge>
-                          <span className="text-sm text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>
+                          <span className="text-sm text-[var(--text-secondary)] font-mono">
                             {count as number} <span className="text-[var(--text-faint)]">({pct}%)</span>
                           </span>
                         </div>
@@ -358,17 +358,17 @@ export default function DashboardPage() {
               {/* Resources by Infrastructure */}
               <Card hover={false} className="stagger-in" style={{ "--i": 10 } as React.CSSProperties}>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
+                  <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                     {t("dashboard.resourcesByInfra")}
                   </h2>
-                  <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider">{t("dashboard.avgUsage")}</span>
+                  <span className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("dashboard.avgUsage")}</span>
                 </div>
                 <div className="space-y-4">
                   {resourceAnalysis.byHospedagem.map((entry) => (
                     <div key={entry.name}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs text-[var(--text-primary)] font-medium">{entry.name}</span>
-                        <span className="text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+                        <span className="text-2xs text-[var(--text-faint)] font-mono">
                           {entry.count} {entry.count === 1 ? "host" : "hosts"}
                         </span>
                       </div>
@@ -385,17 +385,17 @@ export default function DashboardPage() {
               {/* Resources by Situação */}
               <Card hover={false} className="stagger-in" style={{ "--i": 11 } as React.CSSProperties}>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
+                  <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                     {t("dashboard.resourcesBySituacao")}
                   </h2>
-                  <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider">{t("dashboard.avgUsage")}</span>
+                  <span className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("dashboard.avgUsage")}</span>
                 </div>
                 <div className="space-y-4">
                   {resourceAnalysis.bySituacao.map((entry) => (
                     <div key={entry.name}>
                       <div className="flex items-center justify-between mb-2">
                         <Badge variant="situacao" situacao={entry.name} dot>{entry.name}</Badge>
-                        <span className="text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+                        <span className="text-2xs text-[var(--text-faint)] font-mono">
                           {entry.count} {entry.count === 1 ? "host" : "hosts"}
                         </span>
                       </div>

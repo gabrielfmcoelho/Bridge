@@ -13,7 +13,7 @@ export default function Field({
   href?: string;
   className?: string;
 }) {
-  const textStyle = mono ? { fontFamily: "var(--font-mono)" } : undefined;
+  const mono_ = mono ? " font-mono" : "";
   const displayValue = value || "-";
   const url = href || (link ? value : undefined);
 
@@ -25,13 +25,12 @@ export default function Field({
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] truncate block transition-colors"
-          style={textStyle}
+          className={`text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] truncate block transition-colors${mono_}`}
         >
           {displayValue}
         </a>
       ) : (
-        <p className="text-sm text-[var(--text-primary)] truncate" style={textStyle}>
+        <p className={`text-sm text-[var(--text-primary)] truncate${mono_}`}>
           {displayValue}
         </p>
       )}

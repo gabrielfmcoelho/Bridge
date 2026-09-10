@@ -42,7 +42,7 @@ const fromOffering = (o: Offering | null): Form => ({
 });
 
 const TEXTAREA_CLASS =
-  "w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-[12px] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)]";
+  "w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-xs focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)]";
 
 // Create/edit one offering. form_schema and templates are edited as the JSON
 // they are stored as — the parser (lib/offeringSchema) decides what is valid
@@ -200,8 +200,7 @@ export default function OfferingFormModal({ offering, categories, onClose }: {
               onChange={(e) => setSchemaText(e.target.value)}
               rows={16}
               spellCheck={false}
-              className={`${TEXTAREA_CLASS} ${errors.schema ? "border-[var(--danger)]" : ""}`}
-              style={{ fontFamily: "var(--font-mono)" }}
+              className={`${TEXTAREA_CLASS} ${errors.schema ? "border-[var(--danger)]" : ""} font-mono`}
               placeholder={t("settings.offerings.schemaHint")}
             />
             <IssueList issues={schema.errors} okText={schema.value ? t("settings.offerings.schemaValid", { n: String(fields.length) }) : null} render={issueText} />
@@ -213,8 +212,7 @@ export default function OfferingFormModal({ offering, categories, onClose }: {
               onChange={(e) => setTemplatesText(e.target.value)}
               rows={8}
               spellCheck={false}
-              className={`${TEXTAREA_CLASS} ${errors.templates ? "border-[var(--danger)]" : ""}`}
-              style={{ fontFamily: "var(--font-mono)" }}
+              className={`${TEXTAREA_CLASS} ${errors.templates ? "border-[var(--danger)]" : ""} font-mono`}
               placeholder={t("settings.offerings.templatesHint")}
             />
             <IssueList issues={templates.errors} okText={templates.value.length ? t("settings.offerings.templatesValid", { n: String(templates.value.length) }) : null} render={issueText} />

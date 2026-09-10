@@ -56,8 +56,8 @@ export default function HostsTableView({
               className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
               onClick={() => window.location.href = `/hosts/${host.oficial_slug}`}
             >
-              <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{host.nickname}</td>
-              <td className="px-4 py-2.5 text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>{host.hostname || "-"}</td>
+              <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] font-mono">{host.nickname}</td>
+              <td className="px-4 py-2.5 text-[var(--text-secondary)] font-mono">{host.hostname || "-"}</td>
               <td className="px-4 py-2.5 text-[var(--text-secondary)]">{host.hospedagem || "-"}</td>
               <td className="px-4 py-2.5" onClick={(e) => { if (canEdit) e.stopPropagation(); }}>
                 <SituacaoCell host={host} canEdit={canEdit} t={t} />
@@ -66,7 +66,7 @@ export default function HostsTableView({
               <td className="px-4 py-2.5">
                 <div className="flex flex-wrap gap-1">
                   {host.tags?.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}
-                  {host.tags && host.tags.length > 3 && <span className="text-[10px] text-[var(--text-faint)]">+{host.tags.length - 3}</span>}
+                  {host.tags && host.tags.length > 3 && <span className="text-2xs text-[var(--text-faint)]">+{host.tags.length - 3}</span>}
                 </div>
               </td>
             </tr>

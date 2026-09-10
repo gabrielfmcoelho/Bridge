@@ -108,11 +108,11 @@ export default function CatalogPageInner() {
         {/* Header */}
         <header className="flex flex-col gap-1.5">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+            <h1 className="text-2xl font-bold tracking-tight font-display">
               {t("atlas.catalog.title")}
             </h1>
             {generatedAt && (
-              <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)]">
+              <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)]">
                 {t("atlas.lineage.generatedAt")} · {new Date(generatedAt).toLocaleString()}
               </span>
             )}
@@ -141,7 +141,7 @@ export default function CatalogPageInner() {
 
         {/* Active filter readout */}
         {indexes && (
-          <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] px-1">
+          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] px-1">
             <span className="tabular-nums text-[var(--text-secondary)] font-semibold">{filteredTables.length}</span>
             <span>of</span>
             <span className="tabular-nums">{indexes.tables.length}</span>

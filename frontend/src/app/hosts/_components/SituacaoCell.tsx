@@ -116,7 +116,7 @@ export default function SituacaoCell({
             );
           })}
           {mutation.isError && (
-            <div className="px-2 py-1.5 text-[10px] text-red-400">
+            <div className="px-2 py-1.5 text-2xs text-red-400">
               {(mutation.error instanceof Error ? mutation.error.message : null) ?? "Update failed"}
             </div>
           )}

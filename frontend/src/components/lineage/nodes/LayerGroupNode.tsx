@@ -19,8 +19,7 @@ export default function LayerGroupNode({ data, width, height }: NodeProps) {
       }}
     >
       <span
-        className={`absolute top-2 left-3 text-[10px] uppercase tracking-[0.25em] font-bold ${s.text}`}
-        style={{ fontFamily: "var(--font-display)" }}
+        className={`absolute top-2 left-3 text-2xs uppercase tracking-[0.25em] font-bold ${s.text} font-display`}
       >
         {label}
       </span>

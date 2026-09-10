@@ -115,7 +115,7 @@ export default function ApiListView() {
                     <Badge color={api.scope === "projeto" ? "purple" : "gray"}>{scopeLabel(api.scope)}</Badge>
                   </div>
                   {api.description && <p className="text-xs text-[var(--text-muted)] line-clamp-2 mb-3">{api.description}</p>}
-                  <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
+                  <div className="flex items-center gap-2 text-2xs text-[var(--text-muted)]">
                     <span className="px-1.5 py-0.5 rounded border border-[var(--border-default)] bg-[var(--bg-overlay)]">{api.spec_version}</span>
                     <span>{api.operation_count} {t("atlas.apis.endpoints")}</span>
                     {api.version_label && <span>· v{api.version_label}</span>}
@@ -142,20 +142,20 @@ export default function ApiListView() {
               className="flex items-center gap-3 px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-elevated)] transition-colors"
             >
               <span
-                className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${methodClass(op.method)}`}
+                className={`shrink-0 text-2xs font-bold px-1.5 py-0.5 rounded border ${methodClass(op.method)}`}
                 style={{ minWidth: "3.25rem", textAlign: "center" }}
               >
                 {op.method}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-xs text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                <p className="font-mono text-xs text-[var(--text-primary)] truncate">
                   {op.path}
                 </p>
                 {(op.summary || op.description) && (
-                  <p className="text-[11px] text-[var(--text-muted)] truncate">{op.summary || op.description}</p>
+                  <p className="text-xs text-[var(--text-muted)] truncate">{op.summary || op.description}</p>
                 )}
               </div>
-              <span className="shrink-0 text-[11px] text-[var(--text-muted)] flex items-center gap-1.5">
+              <span className="shrink-0 text-xs text-[var(--text-muted)] flex items-center gap-1.5">
                 <Badge color={op.scope === "projeto" ? "purple" : "gray"}>{op.api_name}</Badge>
               </span>
             </Link>

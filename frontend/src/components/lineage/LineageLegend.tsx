@@ -15,7 +15,7 @@ export default function LineageLegend() {
     <div className="pointer-events-auto bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] text-xs shadow-[var(--shadow-md)]">
       <button
         onClick={() => setOpen(o => !o)}
-        className="px-2.5 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1"
+        className="px-2.5 py-1.5 text-2xs uppercase tracking-wider text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1"
       >
         Legend
         <Icon path={ICON_PATHS.chevronDown} className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={1.5} />
@@ -23,21 +23,21 @@ export default function LineageLegend() {
       {open && (
         <div className="px-3 pb-2 space-y-2 max-w-[260px]">
           <div>
-            <div className="text-[9px] uppercase tracking-wider text-[var(--text-faint)] mb-1">Nodes</div>
+            <div className="text-3xs uppercase tracking-wider text-[var(--text-faint)] mb-1">Nodes</div>
             <div className="grid grid-cols-2 gap-1">
               {NODE_KEYS.map(k => {
                 const c = NODE_COLORS[k];
                 return (
                   <div key={k} className="flex items-center gap-1.5">
                     <span className={`w-2.5 h-2.5 rounded ${c.bg} ${c.border} border`} />
-                    <span className="text-[10px] text-[var(--text-secondary)]">{NODE_TYPE_LABELS[k]}</span>
+                    <span className="text-2xs text-[var(--text-secondary)]">{NODE_TYPE_LABELS[k]}</span>
                   </div>
                 );
               })}
             </div>
           </div>
           <div>
-            <div className="text-[9px] uppercase tracking-wider text-[var(--text-faint)] mb-1">Edges</div>
+            <div className="text-3xs uppercase tracking-wider text-[var(--text-faint)] mb-1">Edges</div>
             <div className="space-y-1">
               {EDGE_KEYS.map(k => {
                 const s = edgeStyle(k);
@@ -46,17 +46,17 @@ export default function LineageLegend() {
                     <svg width="24" height="6" viewBox="0 0 24 6">
                       <line x1="0" y1="3" x2="24" y2="3" stroke={s.stroke} strokeWidth={s.strokeWidth} strokeDasharray={s.strokeDasharray} />
                     </svg>
-                    <span className="text-[10px] text-[var(--text-secondary)]">{EDGE_LABELS[k]}</span>
+                    <span className="text-2xs text-[var(--text-secondary)]">{EDGE_LABELS[k]}</span>
                   </div>
                 );
               })}
             </div>
           </div>
           <div>
-            <div className="text-[9px] uppercase tracking-wider text-[var(--text-faint)] mb-1">Markers</div>
+            <div className="text-3xs uppercase tracking-wider text-[var(--text-faint)] mb-1">Markers</div>
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1"><StatusDot className="bg-red-500" /><span className="text-[10px] text-[var(--text-secondary)]">warning</span></span>
-              <span className="flex items-center gap-1"><StatusDot className="bg-amber-500" /><span className="text-[10px] text-[var(--text-secondary)]">gap</span></span>
+              <span className="flex items-center gap-1"><StatusDot className="bg-red-500" /><span className="text-2xs text-[var(--text-secondary)]">warning</span></span>
+              <span className="flex items-center gap-1"><StatusDot className="bg-amber-500" /><span className="text-2xs text-[var(--text-secondary)]">gap</span></span>
             </div>
           </div>
         </div>

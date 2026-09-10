@@ -152,7 +152,7 @@ export default function VaultEntryEditor({ secret, onClose }: { secret: Secret |
           <Badge>{secret.type}</Badge>
           <Badge color={secret.visibility === "personal" ? "purple" : "amber"}>{secret.visibility}</Badge>
           <Badge>{secret.scope}</Badge>
-          <span className="text-[10px] text-[var(--text-faint)]">type, scope &amp; visibility can&apos;t be changed</span>
+          <span className="text-2xs text-[var(--text-faint)]">type, scope &amp; visibility can&apos;t be changed</span>
         </div>
 
         <label className="text-xs font-medium text-[var(--text-muted)] block">

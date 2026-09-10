@@ -34,8 +34,7 @@ export default function Accordion({ sections, defaultOpen }: AccordionProps) {
             <button
               type="button"
               onClick={() => toggle(section.id)}
-              className="w-full flex items-center justify-between px-4 py-2.5 bg-[var(--bg-elevated)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] transition-colors"
-              style={{ fontFamily: "var(--font-display)" }}
+              className="w-full flex items-center justify-between px-4 py-2.5 bg-[var(--bg-elevated)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] transition-colors font-display"
             >
               {section.title}
               <Icon path={ICON_PATHS.chevronDown} className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />

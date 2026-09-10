@@ -27,7 +27,7 @@ export default function TopologyPage() {
   return (
     <PageShell>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{t("topology.title")}</h1>
+        <h1 className="text-2xl font-bold font-display">{t("topology.title")}</h1>
       </div>
 
       {/* Legend bar */}

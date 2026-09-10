@@ -63,8 +63,8 @@ export default function MarkdownEditor({ value, onChange, label, rows = 5, place
             onChange={(e) => onChange(e.target.value)}
             rows={rows}
             placeholder={placeholder}
-            className="w-full bg-transparent px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none resize-none"
-            style={{ fontFamily: "var(--font-mono)", fontSize: "13px" }}
+            className="w-full bg-transparent px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none resize-none font-mono"
+            style={{ fontSize: "13px" }}
           />
         ) : (
           <div

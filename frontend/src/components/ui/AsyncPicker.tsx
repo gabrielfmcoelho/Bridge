@@ -263,7 +263,7 @@ export default function AsyncPicker(props: Props) {
                         <span className="block truncate">{item.label}</span>
                       </span>
                       {item.secondary && (
-                        <span className="block text-[11px] text-[var(--text-faint)]">{item.secondary}</span>
+                        <span className="block text-xs text-[var(--text-faint)]">{item.secondary}</span>
                       )}
                     </span>
                   </button>

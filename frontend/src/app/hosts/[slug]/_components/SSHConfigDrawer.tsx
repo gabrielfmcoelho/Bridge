@@ -65,8 +65,7 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
         {/* Config block */}
         <div className="relative group">
           <pre
-            className="text-xs text-[var(--text-primary)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-4 overflow-x-auto whitespace-pre"
-            style={{ fontFamily: "var(--font-mono)" }}
+            className="text-xs text-[var(--text-primary)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-4 overflow-x-auto whitespace-pre font-mono"
           >
             {config || "..."}
           </pre>
@@ -90,7 +89,7 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
         </Button>
 
         {/* Hint */}
-        <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+        <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
           {t("host.sshConfigHint")}
         </p>
       </div>

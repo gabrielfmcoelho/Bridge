@@ -37,7 +37,7 @@ export default function StepIndicator({ steps, current }: StepIndicatorProps) {
         );
       })}
       {/* Step counter */}
-      <span className="text-[10px] text-[var(--text-faint)] shrink-0 ml-auto" style={{ fontFamily: "var(--font-mono)" }}>
+      <span className="text-2xs text-[var(--text-faint)] shrink-0 ml-auto font-mono">
         {current}/{steps.length}
       </span>
     </div>

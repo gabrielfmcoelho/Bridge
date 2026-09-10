@@ -185,7 +185,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
         {data && (
           <>
             {/* Metadata row */}
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-muted)]">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
               <span className="px-2 py-0.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)]">
                 {data.ticket.status_label}
               </span>
@@ -202,7 +202,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
             </div>
 
             {data.warnings && data.warnings.length > 0 && (
-              <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] px-3 py-2 space-y-1">
+              <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2 space-y-1">
                 {data.warnings.map((w, i) => (
                   <p key={i}>{w}</p>
                 ))}
@@ -241,31 +241,30 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
                       className={`border rounded-[var(--radius-md)] px-3 py-2.5 bg-[var(--bg-elevated)] ${eventAccent[ev.type]}`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
-                        <div className="flex items-center gap-2 text-[11px]">
+                        <div className="flex items-center gap-2 text-xs">
                           <span className="font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                             {eventLabel[ev.type]}
                           </span>
                           {ev.user_name && <span className="text-[var(--text-primary)]">{ev.user_name}</span>}
                           {ev.is_private && (
-                            <span className="text-[10px] px-1 py-0 rounded border border-amber-500/30 text-amber-400">
+                            <span className="text-2xs px-1 py-0 rounded border border-amber-500/30 text-amber-400">
                               privado
                             </span>
                           )}
                           {ev.type === "task" && ev.state !== undefined && (
-                            <span className="text-[10px] px-1 py-0 rounded border border-purple-500/30 text-purple-400">
+                            <span className="text-2xs px-1 py-0 rounded border border-purple-500/30 text-purple-400">
                               {taskStateLabel[ev.state] ?? `state ${ev.state}`}
                             </span>
                           )}
                           {ev.type === "solution" && ev.status !== undefined && (
-                            <span className="text-[10px] px-1 py-0 rounded border border-emerald-500/30 text-emerald-400">
+                            <span className="text-2xs px-1 py-0 rounded border border-emerald-500/30 text-emerald-400">
                               {solutionStatusLabel[ev.status] ?? `status ${ev.status}`}
                             </span>
                           )}
                         </div>
                         <time
-                          className="text-[10px] text-[var(--text-faint)]"
+                          className="text-2xs text-[var(--text-faint)] font-mono"
                           title={ev.date}
-                          style={{ fontFamily: "var(--font-mono)" }}
                         >
                           {getTimeAgo(ev.date.replace(" ", "T"), locale)}
                         </time>

@@ -86,7 +86,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
                 <span>{svc.nickname}</span>
                 {svc.technology_stack && <Badge>{svc.technology_stack}</Badge>}
                 {svc.is_external_dependency && (
-                  <Badge color="amber" className="text-[10px]">
+                  <Badge color="amber" className="text-2xs">
                     {svc.external_provider || "External"}
                   </Badge>
                 )}
@@ -105,7 +105,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
           <div className="space-y-1">
             {linkedDns.map((dns) => (
               <div key={dns.id} className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors">
-                <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{dns.domain}</span>
+                <span className="text-[var(--text-primary)] font-mono">{dns.domain}</span>
                 {dns.has_https && (
                   <Badge color="emerald">
                     <Icon path={ICON_PATHS.lock} className="w-3 h-3" />
@@ -127,7 +127,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
           <div className="space-y-1">
             {linkedHosts.map((host) => (
               <Link key={host.id} href={`/hosts/${host.oficial_slug}`} className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-primary)] hover:text-[var(--accent)]">
-                <span style={{ fontFamily: "var(--font-mono)" }}>{host.nickname}</span>
+                <span className="font-mono">{host.nickname}</span>
                 <span className="text-[var(--text-faint)] text-xs">{host.hostname}</span>
                 <Badge variant="situacao" situacao={host.situacao} dot>{host.situacao}</Badge>
               </Link>

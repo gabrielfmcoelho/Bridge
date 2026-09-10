@@ -60,7 +60,7 @@ export default function SetupPage() {
               </svg>
             )}
           </div>
-          <h1 className="text-3xl font-bold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>
+          <h1 className="text-3xl font-bold text-[var(--text-primary)] font-display">
             {appName}
           </h1>
           <p className="text-[var(--text-muted)] mt-2 text-sm">{t("auth.setupDescription")}</p>
@@ -103,7 +103,7 @@ export default function SetupPage() {
           </Button>
         </form>
 
-        <p className="text-center mt-6 text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+        <p className="text-center mt-6 text-2xs text-[var(--text-faint)] font-mono">
           Initial setup - create the master administrator account
         </p>
       </div>

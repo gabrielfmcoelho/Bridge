@@ -61,13 +61,13 @@ export default function CatalogAssetsTable({
                 onClick={() => router.push(hit.href)}
                 className={`cursor-pointer border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--bg-elevated)] ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
               >
-                <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>
+                <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] font-mono">
                   {hit.name}
                 </td>
                 <td className="px-4 py-2.5">
                   <Badge color="gray">{typeLabelKey ? t(typeLabelKey) : hit.asset_type}</Badge>
                 </td>
-                <td className="px-4 py-2.5 text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)] font-mono">
                   {hit.detail || "-"}
                 </td>
                 <td className="max-w-[28rem] truncate px-4 py-2.5 text-[var(--text-muted)]">{hit.description || "-"}</td>

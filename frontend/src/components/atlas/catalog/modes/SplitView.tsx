@@ -57,12 +57,11 @@ export default function SplitView({ indexes, tables, selectedId, onSelect, filte
               <section key={ns} className="flex flex-col gap-2">
                 <div className="flex items-baseline gap-2 px-1">
                   <h3
-                    className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-primary)]"
-                    style={{ fontFamily: "var(--font-display)" }}
+                    className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-primary)] font-display"
                   >
                     {ns}
                   </h3>
-                  <span className="text-[10px] tabular-nums text-[var(--text-faint)]">
+                  <span className="text-2xs tabular-nums text-[var(--text-faint)]">
                     {items.length} {t("atlas.catalog.list.tablesLabel")}
                   </span>
                   <span className="flex-1 h-px bg-[var(--border-subtle)]" />

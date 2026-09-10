@@ -57,13 +57,13 @@ function AccessLogPanel({ bundleId }: { bundleId: number }) {
   return (
     <div className="mt-1.5 border-t border-[var(--border-subtle)] pt-1.5">
       {isLoading ? (
-        <p className="text-[10px] text-[var(--text-muted)]">{t("common.loading")}</p>
+        <p className="text-2xs text-[var(--text-muted)]">{t("common.loading")}</p>
       ) : entries.length === 0 ? (
-        <p className="text-[10px] text-[var(--text-muted)]">{t("atlas.apis.accessLogEmpty")}</p>
+        <p className="text-2xs text-[var(--text-muted)]">{t("atlas.apis.accessLogEmpty")}</p>
       ) : (
         <ul className="space-y-1 max-h-32 overflow-y-auto">
           {entries.map((e, i) => (
-            <li key={i} className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)]">
+            <li key={i} className="flex items-center gap-2 text-2xs text-[var(--text-secondary)]">
               <span className="text-[var(--text-faint)] shrink-0">
                 {new Date(e.accessed_at).toLocaleString()}
               </span>
@@ -381,7 +381,7 @@ export default function ShareBundleModal({
                 <label key={op.op_key} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                   <input type="checkbox" checked={selOps.has(op.op_key)} onChange={() => setSelOps((s) => toggle(s, op.op_key))} />
                   <span className="font-bold w-12 inline-block">{op.method}</span>
-                  <span className="font-mono truncate" style={{ fontFamily: "var(--font-mono)" }}>{op.path}</span>
+                  <span className="font-mono truncate">{op.path}</span>
                 </label>
               ))}
             </div>
@@ -396,7 +396,7 @@ export default function ShareBundleModal({
                 {secrets.map((s) => (
                   <label key={s.id} className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                     <input type="checkbox" checked={selSecrets.has(s.id)} onChange={() => setSelSecrets((set) => toggle(set, s.id))} />
-                    <span className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--border-default)] bg-[var(--bg-overlay)] text-[var(--text-muted)]">{s.type}</span>
+                    <span className="text-2xs px-1.5 py-0.5 rounded border border-[var(--border-default)] bg-[var(--bg-overlay)] text-[var(--text-muted)]">{s.type}</span>
                     {s.name}
                   </label>
                 ))}
@@ -419,7 +419,7 @@ export default function ShareBundleModal({
                         onChange={() => setSelWikiCols((s) => toggle(s, section.collection_id))}
                       />
                       <span className="truncate">{section.collection?.name ?? section.collection_id}</span>
-                      <span className="text-[9px] font-normal text-[var(--text-faint)]">
+                      <span className="text-3xs font-normal text-[var(--text-faint)]">
                         {t("share.wikiCollection")}
                       </span>
                     </label>
@@ -478,7 +478,7 @@ export default function ShareBundleModal({
             {t("atlas.apis.neverExpires")}
           </label>
           {neverExpiry && (
-            <p className="-mt-2 text-[10px] text-amber-400">{t("atlas.apis.neverExpiresHint")}</p>
+            <p className="-mt-2 text-2xs text-amber-400">{t("atlas.apis.neverExpiresHint")}</p>
           )}
 
           <Input
@@ -491,7 +491,7 @@ export default function ShareBundleModal({
 
           {notice && <p className="text-xs text-emerald-400">{notice}</p>}
           {editingId != null && (
-            <p className="text-[11px] text-[var(--text-muted)]">{t("atlas.apis.editingNotice")}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t("atlas.apis.editingNotice")}</p>
           )}
 
           {error && <FormError message={error} />}
@@ -555,37 +555,37 @@ export default function ShareBundleModal({
                             {t("atlas.apis.views")}
                           </span>
                           {link.has_passphrase && (
-                            <span className="text-[10px] text-amber-400">
+                            <span className="text-2xs text-amber-400">
                               {t("atlas.apis.withPassphrase")}
                             </span>
                           )}
                           {archived && (
-                            <span className="text-[10px] text-[var(--text-muted)]">
+                            <span className="text-2xs text-[var(--text-muted)]">
                               {t("atlas.apis.statusArchived")}
                             </span>
                           )}
                           {revoked && (
-                            <span className="text-[10px] text-red-400">
+                            <span className="text-2xs text-red-400">
                               {t("atlas.apis.statusRevoked")}
                             </span>
                           )}
                           {!archived && !revoked && expired && (
-                            <span className="text-[10px] text-red-400">
+                            <span className="text-2xs text-red-400">
                               {t("atlas.apis.statusExpired")}
                             </span>
                           )}
                           {!archived && !revoked && !expired && exhausted && (
-                            <span className="text-[10px] text-red-400">
+                            <span className="text-2xs text-red-400">
                               {t("atlas.apis.statusExhausted")}
                             </span>
                           )}
                           {!dead && (
-                            <span className="text-[10px] text-emerald-400">
+                            <span className="text-2xs text-emerald-400">
                               {t("atlas.apis.statusLive")}
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-[var(--text-faint)] mt-0.5">
+                        <div className="text-2xs text-[var(--text-faint)] mt-0.5">
                           {link.expires_at
                             ? `${t("atlas.apis.expiresLabel")} ${new Date(link.expires_at).toLocaleString()}`
                             : t("atlas.apis.expiryNever")}
@@ -596,7 +596,7 @@ export default function ShareBundleModal({
                           <button
                             type="button"
                             onClick={() => beginEdit(link)}
-                            className={`text-[10px] px-1.5 py-0.5 rounded-[var(--radius-sm)] border cursor-pointer ${
+                            className={`text-2xs px-1.5 py-0.5 rounded-[var(--radius-sm)] border cursor-pointer ${
                               editingId === link.id
                                 ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10"
                                 : "border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)]"
@@ -611,7 +611,7 @@ export default function ShareBundleModal({
                           onClick={() =>
                             setOpenLog((cur) => (cur === link.id ? null : link.id))
                           }
-                          className="text-[10px] px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] cursor-pointer"
+                          className="text-2xs px-1.5 py-0.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] cursor-pointer"
                         >
                           {openLog === link.id
                             ? t("atlas.apis.accessLogHide")
@@ -623,7 +623,7 @@ export default function ShareBundleModal({
                           onChange={(e) =>
                             setRenewChoice((m) => ({ ...m, [link.id]: Number(e.target.value) }))
                           }
-                          className="text-[10px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-1 py-0.5 text-[var(--text-secondary)]"
+                          className="text-2xs bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-1 py-0.5 text-[var(--text-secondary)]"
                         >
                           <option value={3600}>1h</option>
                           <option value={86400}>24h</option>

@@ -135,12 +135,11 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
               onChange={(e) => setText(e.target.value)}
               rows={16}
               spellCheck={false}
-              className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-[12px] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)]"
-              style={{ fontFamily: "var(--font-mono)" }}
+              className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-xs focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] font-mono"
               placeholder={'[\n  { "id": 1, "name": "…", "completename": "A > B > …" }\n]'}
               disabled={isFetching}
             />
-            <p className="text-[11px] text-[var(--text-muted)]">
+            <p className="text-xs text-[var(--text-muted)]">
               {parseErr ? (
                 <span className="text-red-400">⚠ {parseErr}</span>
               ) : parsed ? (
@@ -168,18 +167,18 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
             </div>
             <div>
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">
+                <span className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">
                   Snippet
                 </span>
                 <button
                   type="button"
                   onClick={copySnippet}
-                  className="text-[11px] text-[var(--accent)] hover:underline"
+                  className="text-xs text-[var(--accent)] hover:underline"
                 >
                   {snippetCopied ? "Copiado ✓" : "Copiar"}
                 </button>
               </div>
-              <pre className="whitespace-pre-wrap break-all bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] p-2 text-[10.5px] leading-tight" style={{ fontFamily: "var(--font-mono)" }}>
+              <pre className="whitespace-pre-wrap break-all bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] p-2 text-[10.5px] leading-tight font-mono">
                 {SCRAPER_SNIPPET}
               </pre>
             </div>

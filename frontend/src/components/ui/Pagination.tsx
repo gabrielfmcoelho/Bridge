@@ -27,7 +27,7 @@ export default function Pagination({ page, totalPages, total, perPage, onChange 
         <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => onChange(page - 1)} className="!p-2">
           <Icon path={ICON_PATHS.back} />
         </Button>
-        <span className="text-xs text-[var(--text-secondary)] px-2" style={{ fontFamily: "var(--font-mono)" }}>
+        <span className="text-xs text-[var(--text-secondary)] px-2 font-mono">
           {page}/{totalPages}
         </span>
         <Button size="sm" variant="ghost" disabled={page >= totalPages} onClick={() => onChange(page + 1)} className="!p-2">

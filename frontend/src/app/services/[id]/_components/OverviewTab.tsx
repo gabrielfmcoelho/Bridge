@@ -39,7 +39,7 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
           <Field label={t("service.port")} value={service.port} mono />
           <Field label={t("service.version")} value={service.version} />
           <div>
-            <span className="text-[var(--text-faint)] text-[11px]">{t("service.developedBy")}</span>
+            <span className="text-[var(--text-faint)] text-xs">{t("service.developedBy")}</span>
             {service.developed_by ? (
               <Badge className="mt-1">{service.developed_by}</Badge>
             ) : (

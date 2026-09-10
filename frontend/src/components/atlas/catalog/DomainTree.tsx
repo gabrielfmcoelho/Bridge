@@ -92,10 +92,10 @@ export default function DomainTree({ indexes, tables, selectedId, onSelect, filt
                 className="group flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-elevated)] transition-colors"
               >
                 <Chevron open={nsOpen} />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)]">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)]">
                   {bucket.ns}
                 </span>
-                <span className="ml-auto text-[10px] tabular-nums text-[var(--text-faint)]">{bucket.total}</span>
+                <span className="ml-auto text-2xs tabular-nums text-[var(--text-faint)]">{bucket.total}</span>
               </button>
               {nsOpen && (
                 <div className="flex flex-col gap-0.5 pl-3 border-l border-[var(--border-subtle)] ml-3 mt-0.5">
@@ -121,10 +121,10 @@ export default function DomainTree({ indexes, tables, selectedId, onSelect, filt
                             title={`Filter by ${layer}`}
                           >
                             <span className={`w-1.5 h-1.5 rounded-full ${s.dot} shrink-0`} />
-                            <span className={`text-[11px] font-mono ${filterActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"} group-hover:text-[var(--text-primary)]`}>
+                            <span className={`text-xs font-mono ${filterActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"} group-hover:text-[var(--text-primary)]`}>
                               {layer}
                             </span>
-                            <span className="ml-auto text-[10px] tabular-nums text-[var(--text-faint)]">{items.length}</span>
+                            <span className="ml-auto text-2xs tabular-nums text-[var(--text-faint)]">{items.length}</span>
                           </button>
                         </div>
                         {layerOpen && !scaffoldOnly && (
@@ -142,7 +142,7 @@ export default function DomainTree({ indexes, tables, selectedId, onSelect, filt
                                     }`}
                                     title={tb.node.id}
                                   >
-                                    <span className="text-[11px] font-mono truncate">{tb.node.label}</span>
+                                    <span className="text-xs font-mono truncate">{tb.node.label}</span>
                                     {tb.hasWarning && (
                                       <span className="w-1 h-1 rounded-full bg-red-500 shrink-0" />
                                     )}

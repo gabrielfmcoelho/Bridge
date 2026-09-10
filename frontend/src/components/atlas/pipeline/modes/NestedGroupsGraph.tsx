@@ -95,7 +95,7 @@ export default function NestedGroupsGraph({ indexes, filters, selectedId, onSele
         />
       </ReactFlow>
       {/* Hint */}
-      <div className="absolute bottom-3 left-3 text-[10px] uppercase tracking-wider text-[var(--text-faint)] bg-[var(--bg-surface)]/80 border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-2 py-1 backdrop-blur">
+      <div className="absolute bottom-3 left-3 text-2xs uppercase tracking-wider text-[var(--text-faint)] bg-[var(--bg-surface)]/80 border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-2 py-1 backdrop-blur">
         Double-click a DAG frame to collapse / expand
       </div>
     </div>

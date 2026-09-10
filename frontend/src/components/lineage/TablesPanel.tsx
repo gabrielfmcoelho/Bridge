@@ -100,7 +100,7 @@ export default function TablesPanel({ indexes, onOpenInGraph }: Props) {
           {visibleLayers.map(layer => (
             <div
               key={layer}
-              className={`text-[10px] uppercase tracking-widest font-semibold px-2 py-1.5 text-center rounded-[var(--radius-sm)] ${LAYER_COLORS[layer] ?? "text-[var(--text-muted)]"}`}
+              className={`text-2xs uppercase tracking-widest font-semibold px-2 py-1.5 text-center rounded-[var(--radius-sm)] ${LAYER_COLORS[layer] ?? "text-[var(--text-muted)]"}`}
               style={{ background: "var(--bg-surface)" }}
             >
               {layerLabel(layer, t)}
@@ -119,7 +119,7 @@ export default function TablesPanel({ indexes, onOpenInGraph }: Props) {
                   return (
                     <Cell key={layer} layer={layer} count={tables.length}>
                       {tables.length === 0 ? (
-                        <div className="text-[10px] text-[var(--text-faint)] italic text-center py-2">
+                        <div className="text-2xs text-[var(--text-faint)] italic text-center py-2">
                           —
                         </div>
                       ) : (
@@ -156,10 +156,10 @@ function Row({ ns, total, children }: { ns: string; total: number; children: Rea
   return (
     <>
       <div className="flex flex-col justify-start sticky left-0 z-10 px-2 py-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)]">
-        <div className="text-sm font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>
+        <div className="text-sm font-semibold text-[var(--text-primary)] font-display">
           {ns}
         </div>
-        <div className="text-[10px] text-[var(--text-muted)]">{total} tables</div>
+        <div className="text-2xs text-[var(--text-muted)]">{total} tables</div>
       </div>
       {children}
     </>
@@ -195,13 +195,13 @@ function TableCard({
         </span>
         {hasWarning && <StatusDot size="xs" className="bg-red-500" />}
         {colCount > 0 && (
-          <span className="text-[9px] px-1 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] shrink-0">
+          <span className="text-3xs px-1 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] shrink-0">
             {colCount}
           </span>
         )}
       </div>
       {fq !== "." && (
-        <div className="text-[9px] text-[var(--text-faint)] font-mono truncate">{fq}</div>
+        <div className="text-3xs text-[var(--text-faint)] font-mono truncate">{fq}</div>
       )}
     </button>
   );
@@ -215,7 +215,7 @@ function Select({ label, value, onChange, options }: {
 }) {
   return (
     <label className="flex items-center gap-1.5 text-[var(--text-muted)]">
-      <span className="text-[10px] uppercase tracking-wider">{label}</span>
+      <span className="text-2xs uppercase tracking-wider">{label}</span>
       <select
         value={value}
         onChange={e => onChange(e.target.value)}

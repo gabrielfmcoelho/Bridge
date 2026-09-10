@@ -33,13 +33,12 @@ function SwimlaneHeaderNodeImpl({ data }: NodeProps) {
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${s.dot}`} />
         <span
-          className={`text-sm font-bold uppercase tracking-[0.16em] ${s.text}`}
-          style={{ fontFamily: "var(--font-display)" }}
+          className={`text-sm font-bold uppercase tracking-[0.16em] ${s.text} font-display`}
         >
           {localized}
         </span>
       </div>
-      <span className="absolute right-3 top-1.5 text-[9px] uppercase tracking-wider text-[var(--text-faint)] font-mono">
+      <span className="absolute right-3 top-1.5 text-3xs uppercase tracking-wider text-[var(--text-faint)] font-mono">
         {d.lane}
       </span>
     </div>

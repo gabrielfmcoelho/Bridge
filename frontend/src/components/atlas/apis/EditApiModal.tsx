@@ -81,11 +81,11 @@ export default function EditApiModal({
         <Textarea label={t("atlas.apis.description")} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
         <div>
           <Input label={t("atlas.apis.baseUrl")} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.example.com" />
-          <p className="text-[10px] text-[var(--text-faint)] mt-1">{t("atlas.apis.baseUrlHint")}</p>
+          <p className="text-2xs text-[var(--text-faint)] mt-1">{t("atlas.apis.baseUrlHint")}</p>
         </div>
         <div>
           <Input label={t("atlas.apis.docsUrl")} value={docsUrl} onChange={(e) => setDocsUrl(e.target.value)} placeholder="https://api.example.com/docs" />
-          <p className="text-[10px] text-[var(--text-faint)] mt-1">{t("atlas.apis.docsUrlHint")}</p>
+          <p className="text-2xs text-[var(--text-faint)] mt-1">{t("atlas.apis.docsUrlHint")}</p>
         </div>
         {open && <EntidadeScopeFields value={grants} onChange={setGrants} compact loadFrom={{ type: "api_catalog", id: api.id }} />}
 

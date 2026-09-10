@@ -70,7 +70,7 @@ function LineagePageInner() {
         <div className={view === "graph" ? "p-4 pb-2 border-b border-[var(--border-subtle)]" : ""}>
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
+              <h1 className="text-2xl font-bold font-display">
                 {t("atlas.lineage.title")}
               </h1>
               {data?.generated_at && (

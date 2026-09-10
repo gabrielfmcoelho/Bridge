@@ -39,7 +39,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-full" style={{ fontFamily: "var(--font-body)" }}>
+      <body className="min-h-full font-sans">
         <Providers>{children}</Providers>
       </body>
     </html>

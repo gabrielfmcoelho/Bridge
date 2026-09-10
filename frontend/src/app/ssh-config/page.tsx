@@ -78,7 +78,7 @@ export default function SSHConfigPage() {
     <PageShell>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{t("sshConfig.title")}</h1>
+          <h1 className="text-2xl font-bold font-display">{t("sshConfig.title")}</h1>
           <p className="text-sm text-[var(--text-muted)] mt-1">{t("sshConfig.generateDescription")}</p>
         </div>
         <div className="flex gap-2">
@@ -108,7 +108,7 @@ export default function SSHConfigPage() {
                       {t("sshConfig.writeWarning")}
                     </p>
                     {serverInfo && (
-                      <code className="block mt-1.5 text-[10px] text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>
+                      <code className="block mt-1.5 text-2xs text-[var(--text-muted)] font-mono">
                         {serverInfo.hostname}:{serverInfo.config_path}
                       </code>
                     )}
@@ -147,14 +147,14 @@ export default function SSHConfigPage() {
             }>
               {serverInfo.is_local ? "localhost" : "remote"}
             </Badge>
-            <span className="text-xs opacity-70" style={{ fontFamily: "var(--font-mono)" }}>{serverInfo.config_path}</span>
+            <span className="text-xs opacity-70 font-mono">{serverInfo.config_path}</span>
           </div>
         </div>
       )}
 
       {!serverInfo?.is_local && serverInfo && (
         <div className="mb-4 rounded-[var(--radius-md)] border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-400/80 animate-fade-in">
-          <strong>Remote server detected.</strong> The &quot;Generate Config&quot; button writes to <code style={{ fontFamily: "var(--font-mono)" }}>{serverInfo.config_path}</code> on <strong>{serverInfo.hostname}</strong>.
+          <strong>Remote server detected.</strong> The &quot;Generate Config&quot; button writes to <code className="font-mono">{serverInfo.config_path}</code> on <strong>{serverInfo.hostname}</strong>.
           To use this config on your local machine, use the <strong>Download</strong> or <strong>Copy</strong> buttons instead.
         </div>
       )}
@@ -162,7 +162,7 @@ export default function SSHConfigPage() {
       {genResult && (
         <div className="mb-4 bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 rounded-[var(--radius-md)] p-3 text-sm animate-slide-down flex items-center gap-2">
           <Icon path={ICON_PATHS.checkCircle} className="w-4 h-4 shrink-0" />
-          Config generated with {genResult.host_count} hosts at <code style={{ fontFamily: "var(--font-mono)" }}>{genResult.path}</code>
+          Config generated with {genResult.host_count} hosts at <code className="font-mono">{genResult.path}</code>
         </div>
       )}
 
@@ -174,11 +174,11 @@ export default function SSHConfigPage() {
 
       <Card hover={false}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
+          <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
             {t("sshConfig.preview")}
           </h2>
           {preview?.content && (
-            <span className="text-xs text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>
+            <span className="text-xs text-[var(--text-muted)] font-mono">
               {preview.content.split("\n").filter((l) => l.startsWith("Host ")).length} hosts
             </span>
           )}
@@ -195,22 +195,21 @@ export default function SSHConfigPage() {
                 <StatusDot size="md" className="bg-red-500/60" />
                 <StatusDot size="md" className="bg-yellow-500/60" />
                 <StatusDot size="md" className="bg-emerald-500/60" />
-                <span className="ml-2 text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>~/.ssh/config</span>
+                <span className="ml-2 text-2xs text-[var(--text-faint)] font-mono">~/.ssh/config</span>
               </div>
               <div className="flex max-h-[70vh] overflow-auto">
                 {/* Line numbers */}
                 {preview?.content && (
                   <div className="py-4 pl-4 pr-3 text-right select-none border-r border-[var(--border-subtle)] bg-[var(--bg-base)]">
                     {preview.content.split("\n").map((_, i) => (
-                      <div key={i} className="text-xs leading-6 text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+                      <div key={i} className="text-xs leading-6 text-[var(--text-faint)] font-mono">
                         {i + 1}
                       </div>
                     ))}
                   </div>
                 )}
                 <pre
-                  className="flex-1 p-4 text-sm leading-6 overflow-x-auto whitespace-pre"
-                  style={{ fontFamily: "var(--font-mono)" }}
+                  className="flex-1 p-4 text-sm leading-6 overflow-x-auto whitespace-pre font-mono"
                   dangerouslySetInnerHTML={{
                     __html: preview?.content
                       ? highlightSSHConfig(preview.content)

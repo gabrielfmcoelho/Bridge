@@ -183,7 +183,7 @@ export default function ChamadosPage() {
             {" "}· {includeClosed ? "abertos e fechados" : "apenas abertos"}
           </p>
           {warnings.length > 0 && (
-            <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] px-3 py-2 space-y-1">
+            <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2 space-y-1">
               {warnings.map((w, i) => (
                 <p key={i}>{w}</p>
               ))}
@@ -228,12 +228,12 @@ export default function ChamadosPage() {
           <div key={g.project.id} className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-[var(--text-primary)]">{g.project.name}</p>
-              <p className="text-[10px] text-[var(--text-faint)]">
+              <p className="text-2xs text-[var(--text-faint)]">
                 {g.tickets.length} aberto{g.tickets.length === 1 ? "" : "s"}
               </p>
             </div>
             {g.warning && (
-              <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] px-3 py-2">
+              <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2">
                 {g.warning}
               </div>
             )}

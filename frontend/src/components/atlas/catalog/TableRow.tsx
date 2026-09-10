@@ -32,7 +32,7 @@ export default function TableRow({ table, selected, onClick }: Props) {
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <LayerBadge layer={table.layer} size="sm" />
         <span
-          className={`text-[12px] font-mono truncate ${
+          className={`text-xs font-mono truncate ${
             selected ? "text-[var(--accent)]" : "text-[var(--text-primary)]"
           }`}
           title={fq}
@@ -42,9 +42,9 @@ export default function TableRow({ table, selected, onClick }: Props) {
         {table.hasWarning && <StatusDot size="xs" className="bg-red-500" />}
       </div>
 
-      <span className="text-[10px] text-[var(--text-muted)] font-mono truncate min-w-0 hidden md:inline">{fq}</span>
+      <span className="text-2xs text-[var(--text-muted)] font-mono truncate min-w-0 hidden md:inline">{fq}</span>
 
-      <span className="text-[10px] text-[var(--text-muted)] tabular-nums shrink-0">
+      <span className="text-2xs text-[var(--text-muted)] tabular-nums shrink-0">
         <span className="text-[var(--text-secondary)] font-semibold">{table.columnCount}</span>{" "}
         {t("atlas.catalog.list.columnsLabel")}
       </span>

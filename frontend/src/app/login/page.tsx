@@ -122,7 +122,7 @@ export default function LoginPage() {
               </svg>
             )}
           </div>
-          <h1 className="text-3xl font-bold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>
+          <h1 className="text-3xl font-bold text-[var(--text-primary)] font-display">
             {appName}
           </h1>
           <p className="text-[var(--text-muted)] mt-2 text-sm">
@@ -170,7 +170,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowCredentials(!showCredentials)}
-                  className="flex items-center justify-center gap-2 w-full text-[11px] text-[var(--text-faint)] uppercase tracking-wider hover:text-[var(--text-muted)] transition-colors py-1"
+                  className="flex items-center justify-center gap-2 w-full text-xs text-[var(--text-faint)] uppercase tracking-wider hover:text-[var(--text-muted)] transition-colors py-1"
                 >
                   <div className="flex-1 h-px bg-[var(--border-subtle)]" />
                   <span className="flex items-center gap-1.5 px-2">
@@ -265,7 +265,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center mt-6 text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+        <p className="text-center mt-6 text-2xs text-[var(--text-faint)] font-mono">
           IT Asset Management
         </p>
       </div>

@@ -142,10 +142,10 @@ export default function HostDetail({ slug }: { slug: string }) {
         <div className="space-y-5">
           {/* ─── Header ─── */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-[var(--accent)]" style={{ fontFamily: "var(--font-display)" }}>
+            <h1 className="text-2xl font-bold text-[var(--accent)] font-display">
               {data.host.nickname}
             </h1>
-            <p className="text-[var(--text-muted)] text-sm" style={{ fontFamily: "var(--font-mono)" }}>
+            <p className="text-[var(--text-muted)] text-sm font-mono">
               {data.host.oficial_slug}
             </p>
             {data.host.description && (
@@ -178,17 +178,17 @@ export default function HostDetail({ slug }: { slug: string }) {
               {/* Alerts */}
               <span className={`inline-flex items-center gap-1 text-xs ${alertCount > 0 ? "text-amber-400" : "text-[var(--text-faint)]"}`} title={`${alertCount} alerts`}>
                 <Icon path={ICON_PATHS.alert} />
-                {alertCount > 0 && <span style={{ fontFamily: "var(--font-mono)" }}>{alertCount}</span>}
+                {alertCount > 0 && <span className="font-mono">{alertCount}</span>}
               </span>
               {/* Issues */}
               <span className={`inline-flex items-center gap-1 text-xs ${openIssuesCount > 0 ? "text-purple-400" : "text-[var(--text-faint)]"}`} title={`${openIssuesCount} open issues`}>
                 <Icon path={ICON_PATHS.clipboard} />
-                {openIssuesCount > 0 && <span style={{ fontFamily: "var(--font-mono)" }}>{openIssuesCount}</span>}
+                {openIssuesCount > 0 && <span className="font-mono">{openIssuesCount}</span>}
               </span>
               {/* Chamados */}
               <span className={`inline-flex items-center gap-1 text-xs ${(data.host.chamados_count || 0) > 0 ? "text-orange-400" : "text-[var(--text-faint)]"}`} title={`${data.host.chamados_count || 0} chamados`}>
                 <Icon path={ICON_PATHS.document} />
-                {(data.host.chamados_count || 0) > 0 && <span style={{ fontFamily: "var(--font-mono)" }}>{data.host.chamados_count}</span>}
+                {(data.host.chamados_count || 0) > 0 && <span className="font-mono">{data.host.chamados_count}</span>}
               </span>
             </div>
           </div>

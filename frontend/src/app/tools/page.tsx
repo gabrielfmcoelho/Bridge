@@ -147,7 +147,7 @@ export default function ToolsPage() {
               <Icon path={ICON_PATHS.back} />
               {t("common.back")}
             </button>
-            <h1 className="text-lg font-bold" style={{ fontFamily: "var(--font-display)" }}>{embedTool.name}</h1>
+            <h1 className="text-lg font-bold font-display">{embedTool.name}</h1>
             {embedTool.source === "service" && (
               <Badge color="cyan">{t("tool.synced")}</Badge>
             )}
@@ -261,7 +261,7 @@ export default function ToolsPage() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-[var(--text-primary)] text-sm">{tool.name}</h3>
                       {tool.source === "service" && (
-                        <Badge color="cyan" className="text-[10px]">{t("tool.synced")}</Badge>
+                        <Badge color="cyan" className="text-2xs">{t("tool.synced")}</Badge>
                       )}
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{tool.description || "-"}</p>

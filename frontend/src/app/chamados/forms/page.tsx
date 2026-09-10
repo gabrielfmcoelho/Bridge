@@ -135,7 +135,7 @@ export default function FormcreatorFormsPage() {
                   >
                     <p className="text-sm font-medium text-[var(--text-primary)]">{f.name}</p>
                     {f.description && (
-                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5 line-clamp-2">
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">
                         {f.description}
                       </p>
                     )}

@@ -207,20 +207,20 @@ function ServiceDashboardProvisionButton({ serviceId, onProvisioned }: { service
         type="button"
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending || !datasourceSet}
-        className="text-[11px] text-[var(--accent)] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+        className="text-xs text-[var(--accent)] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
       >
         {mutation.isPending ? "Provisioning…" : "Provision default dashboard in Grafana"}
       </button>
       {!datasourceSet && (
-        <p className="text-[10px] text-amber-400">
+        <p className="text-2xs text-amber-400">
           Set the Prometheus datasource UID in Settings → Integrations → Grafana first.
         </p>
       )}
       {mutation.isSuccess && !mutation.isPending && (
-        <p className="text-[10px] text-emerald-400">{mutation.data?.message}</p>
+        <p className="text-2xs text-emerald-400">{mutation.data?.message}</p>
       )}
       {mutation.isError && (
-        <p className="text-[10px] text-red-400">
+        <p className="text-2xs text-red-400">
           {mutation.error instanceof Error ? mutation.error.message : "Provision failed"}
         </p>
       )}

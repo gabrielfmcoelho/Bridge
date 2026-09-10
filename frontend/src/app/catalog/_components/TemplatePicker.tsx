@@ -64,7 +64,7 @@ export default function TemplatePicker({
                   {locale === "pt-BR" ? tpl.summary_pt : tpl.summary_en}
                 </span>
                 {spec && (
-                  <span className="mt-1.5 block text-[11px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+                  <span className="mt-1.5 block text-xs text-[var(--text-faint)] font-mono">
                     {spec}
                   </span>
                 )}

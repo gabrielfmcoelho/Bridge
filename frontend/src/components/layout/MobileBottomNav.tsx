@@ -44,7 +44,7 @@ export default function MobileBottomNav({ onOpenDrawer }: MobileBottomNavProps) 
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 </div>
-                <span className="text-[10px] font-medium mt-0.5" style={{ color: appColor }}>
+                <span className="text-2xs font-medium mt-0.5" style={{ color: appColor }}>
                   {item.label}
                 </span>
               </button>
@@ -70,7 +70,7 @@ export default function MobileBottomNav({ onOpenDrawer }: MobileBottomNavProps) 
                 <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
               </svg>
               <span
-                className="text-[10px] font-medium mt-0.5"
+                className="text-2xs font-medium mt-0.5"
                 style={{ color: isActive ? appColor : "var(--text-faint)" }}
               >
                 {item.label}

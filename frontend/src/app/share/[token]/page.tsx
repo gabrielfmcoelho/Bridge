@@ -249,7 +249,7 @@ function SecretPayloadViewer({
         return (
           <div key={idx} className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+              <span className="text-2xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
                 {f.label.startsWith("share.fields.") ? t(f.label) : f.label}
               </span>
               <div className="flex items-center gap-2">
@@ -291,7 +291,7 @@ function SecretPayloadViewer({
           <button
             type="button"
             onClick={() => onCopy(payload, `${copiedKeyPrefix}-raw-json`)}
-            className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:underline cursor-pointer"
+            className="text-2xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:underline cursor-pointer"
           >
             {copiedKey === `${copiedKeyPrefix}-raw-json` ? t("share.copiedRawJson") : t("share.copyRawJson")}
           </button>
@@ -320,7 +320,7 @@ function LocaleToggle() {
     <div className="flex h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] overflow-hidden">
       <button
         onClick={() => setLocale("en")}
-        className={`px-3 text-[11px] font-medium transition duration-150 cursor-pointer ${
+        className={`px-3 text-xs font-medium transition duration-150 cursor-pointer ${
           locale === "en"
             ? "bg-[var(--accent-muted)] text-[var(--accent)]"
             : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
@@ -330,7 +330,7 @@ function LocaleToggle() {
       </button>
       <button
         onClick={() => setLocale("pt-BR")}
-        className={`px-3 text-[11px] font-medium border-l border-[var(--border-default)] transition duration-150 cursor-pointer ${
+        className={`px-3 text-xs font-medium border-l border-[var(--border-default)] transition duration-150 cursor-pointer ${
           locale === "pt-BR"
             ? "bg-[var(--accent-muted)] text-[var(--accent)]"
             : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
@@ -466,7 +466,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                     </svg>
                   )}
                 </div>
-                <span className="text-sm font-bold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>
+                <span className="text-sm font-bold text-[var(--text-primary)] font-display">
                   {appName}
                 </span>
               </div>
@@ -488,7 +488,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                         {SECTOR_BRANDING.name}
                       </span>
                       {SECTOR_BRANDING.subName && (
-                        <span className="text-[9px] text-[var(--text-muted)] truncate leading-none mt-0.5">
+                        <span className="text-3xs text-[var(--text-muted)] truncate leading-none mt-0.5">
                           {SECTOR_BRANDING.subName}
                         </span>
                       )}
@@ -525,7 +525,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                       }`}
                     >
                       {tab.label}
-                      <span className="ml-1.5 text-[10px] opacity-60">{tab.count}</span>
+                      <span className="ml-1.5 text-2xs opacity-60">{tab.count}</span>
                     </button>
                   ))}
                 </div>
@@ -636,7 +636,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                   </svg>
                 )}
               </div>
-              <span className="text-base font-bold text-[var(--text-primary)] tracking-wide" style={{ fontFamily: "var(--font-display)" }}>
+              <span className="text-base font-bold text-[var(--text-primary)] tracking-wide font-display">
                 {appName}
               </span>
             </div>
@@ -658,7 +658,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                       {SECTOR_BRANDING.name}
                     </span>
                     {SECTOR_BRANDING.subName && (
-                      <span className="text-[9px] text-[var(--text-muted)] truncate leading-none mt-0.5">
+                      <span className="text-3xs text-[var(--text-muted)] truncate leading-none mt-0.5">
                         {SECTOR_BRANDING.subName}
                       </span>
                     )}
@@ -709,7 +709,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                 copiedKeyPrefix="secret"
                 copiedKey={copied}
               />
-              <div className={`flex gap-2.5 items-start p-3 rounded-[var(--radius-md)] border text-[11px] ${
+              <div className={`flex gap-2.5 items-start p-3 rounded-[var(--radius-md)] border text-xs ${
                 theme === "light"
                   ? "bg-sky-50/50 border-sky-100/80 text-sky-800"
                   : "bg-sky-950/10 border-sky-900/20 text-[var(--text-muted)]"

@@ -9,8 +9,7 @@ export default function OperationOutput({ data }: {
   const suffix = data.output ? "\n" + data.output : "";
   return (
     <pre
-      className="whitespace-pre-wrap text-[10px]"
-      style={{ fontFamily: "var(--font-mono)" }}
+      className="whitespace-pre-wrap text-2xs font-mono"
     >
       {text}{suffix}
     </pre>

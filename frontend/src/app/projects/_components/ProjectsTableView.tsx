@@ -55,7 +55,7 @@ export default function ProjectsTableView({ projects, total, tablePage, onPageCh
               <td className="px-4 py-2.5">
                 <div className="flex flex-wrap gap-1">
                   {project.tags?.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}
-                  {project.tags && project.tags.length > 3 && <span className="text-[10px] text-[var(--text-faint)]">+{project.tags.length - 3}</span>}
+                  {project.tags && project.tags.length > 3 && <span className="text-2xs text-[var(--text-faint)]">+{project.tags.length - 3}</span>}
                 </div>
               </td>
             </tr>

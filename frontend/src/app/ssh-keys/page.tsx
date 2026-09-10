@@ -109,11 +109,11 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
       <Card accent={isKey ? "cyan" : "purple"} className="h-full flex flex-col">
         <div className="flex items-start justify-between mb-2">
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-[var(--text-primary)] text-sm truncate" style={{ fontFamily: "var(--font-mono)" }}>
+            <h3 className="font-semibold text-[var(--text-primary)] text-sm truncate font-mono">
               {cred.name}
             </h3>
             {cred.username && (
-              <p className="text-[10px] text-[var(--text-faint)] truncate" style={{ fontFamily: "var(--font-mono)" }}>
+              <p className="text-2xs text-[var(--text-faint)] truncate font-mono">
                 {cred.username}
               </p>
             )}
@@ -140,20 +140,20 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
         {/* Consistent bottom section */}
         <div className="mt-auto pt-2 border-t border-[var(--border-subtle)]">
           {cred.fingerprint ? (
-            <p className="text-[10px] text-[var(--text-faint)] truncate" style={{ fontFamily: "var(--font-mono)" }}>
+            <p className="text-2xs text-[var(--text-faint)] truncate font-mono">
               {cred.fingerprint}
             </p>
           ) : (
-            <p className="text-[10px] text-[var(--text-faint)]">&nbsp;</p>
+            <p className="text-2xs text-[var(--text-faint)]">&nbsp;</p>
           )}
           <div className="flex items-center justify-between mt-1">
-            <p className="text-[10px] text-[var(--text-faint)]">
+            <p className="text-2xs text-[var(--text-faint)]">
               {new Date(cred.created_at).toLocaleDateString()}
             </p>
             {onDelete && (
               <button
                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                className="text-[10px] text-[var(--text-faint)] hover:text-red-400 transition-colors"
+                className="text-2xs text-[var(--text-faint)] hover:text-red-400 transition-colors"
               >
                 Delete
               </button>
@@ -220,7 +220,7 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
                   <Icon path={ICON_PATHS.key} className={`w-4 h-4 ${credType === "key" ? "text-[var(--accent)]" : "text-[var(--text-faint)]"}`} />
                   <span className={`text-sm font-medium ${credType === "key" ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}>SSH Key</span>
                 </div>
-                <p className="text-[10px] text-[var(--text-faint)]">Public/private key pair</p>
+                <p className="text-2xs text-[var(--text-faint)]">Public/private key pair</p>
               </button>
               <button
                 type="button"
@@ -235,14 +235,14 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
                   <Icon path={ICON_PATHS.lock} className={`w-4 h-4 ${credType === "password" ? "text-purple-400" : "text-[var(--text-faint)]"}`} />
                   <span className={`text-sm font-medium ${credType === "password" ? "text-purple-400" : "text-[var(--text-secondary)]"}`}>Password</span>
                 </div>
-                <p className="text-[10px] text-[var(--text-faint)]">Encrypted password storage</p>
+                <p className="text-2xs text-[var(--text-faint)]">Encrypted password storage</p>
               </button>
             </div>
           </div>
           <Input label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required placeholder="e.g. prod-server-key" />
           <Input label="Username" value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder="e.g. root, admin" />
           <Input label="Description" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
-          <p className="text-[10px] text-[var(--text-faint)]">
+          <p className="text-2xs text-[var(--text-faint)]">
             All credentials are encrypted with AES-256-GCM before storage.
           </p>
           <Button type="button" className="w-full" disabled={!form.name.trim()} onClick={() => setStep(2)}>
@@ -378,7 +378,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
           <div className="flex items-center gap-2 mb-1">
             <Badge color={isKey ? "cyan" : "purple"}>{isKey ? "SSH Key" : "Password"}</Badge>
           </div>
-          <p className="text-sm font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{data.name}</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] font-mono">{data.name}</p>
         </div>
         <Button size="sm" variant="secondary" onClick={startEditing}>{t("common.edit")}</Button>
       </div>
@@ -388,7 +388,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       {isKey && data.public_key && (
         <div>
           <span className="text-xs text-[var(--text-muted)]">Public Key</span>
-          <pre className="mt-1 p-3 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] overflow-x-auto whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
+          <pre className="mt-1 p-3 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] overflow-x-auto whitespace-pre-wrap break-all font-mono">
             {data.public_key}
           </pre>
         </div>
@@ -396,7 +396,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       {isKey && data.private_key && (
         <div>
           <span className="text-xs text-[var(--text-muted)]">Private Key</span>
-          <pre className="mt-1 p-3 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] overflow-x-auto whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
+          <pre className="mt-1 p-3 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] overflow-x-auto whitespace-pre-wrap break-all font-mono">
             {data.private_key}
           </pre>
         </div>
@@ -404,7 +404,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       {!isKey && data.password && (
         <div>
           <span className="text-xs text-[var(--text-muted)]">Password</span>
-          <pre className="mt-1 p-3 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>
+          <pre className="mt-1 p-3 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] font-mono">
             {"•".repeat(12)}
           </pre>
         </div>
@@ -417,19 +417,19 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
             <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5 text-violet-400 shrink-0" />
             <span className="text-xs font-medium text-[var(--text-primary)]">Coolify</span>
             {coolifyChecking ? (
-              <span className="text-[10px] text-[var(--text-faint)] ml-auto">{t("common.loading")}</span>
+              <span className="text-2xs text-[var(--text-faint)] ml-auto">{t("common.loading")}</span>
             ) : coolifyCheck?.found ? (
               <>
-                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-[10px] text-emerald-400 border border-emerald-500/20">
+                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-2xs text-emerald-400 border border-emerald-500/20">
                   {coolifyCheck.coolify_name}
                 </span>
-                <span className="text-[10px] text-[var(--text-faint)] ml-auto" style={{ fontFamily: "var(--font-mono)" }}>
+                <span className="text-2xs text-[var(--text-faint)] ml-auto font-mono">
                   {coolifyCheck.coolify_uuid}
                 </span>
               </>
             ) : (
               <>
-                <span className="text-[10px] text-[var(--text-faint)]">{t("operation.coolifyNotFound")}</span>
+                <span className="text-2xs text-[var(--text-faint)]">{t("operation.coolifyNotFound")}</span>
                 <Button size="sm" variant="secondary" className="ml-auto" onClick={() => syncMutation.mutate()} loading={syncMutation.isPending}>
                   {t("operation.coolifySync")}
                 </Button>
@@ -437,12 +437,12 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
             )}
           </div>
           {syncMutation.isSuccess && (
-            <p className="text-[10px] text-emerald-400 mt-1">
+            <p className="text-2xs text-emerald-400 mt-1">
               {syncMutation.data?.already_existed ? t("sshKey.coolifyAlreadyExists") : t("sshKey.coolifySynced")}
             </p>
           )}
           {syncMutation.isError && (
-            <p className="text-[10px] text-red-400 mt-1">{syncMutation.error instanceof Error ? syncMutation.error.message : "Failed"}</p>
+            <p className="text-2xs text-red-400 mt-1">{syncMutation.error instanceof Error ? syncMutation.error.message : "Failed"}</p>
           )}
         </div>
       )}

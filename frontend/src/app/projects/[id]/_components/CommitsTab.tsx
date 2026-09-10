@@ -183,7 +183,7 @@ function RepoGroup({ group }: { group: RepoCommitGroup }) {
             // path overflows, so the most specific (rightmost) segment stays visible.
             // The LRM (‎) keeps the path content itself LTR so slashes don't reorder.
             <span
-              className="text-[10px] text-[var(--text-faint)] font-mono block overflow-hidden whitespace-nowrap text-left"
+              className="text-2xs text-[var(--text-faint)] font-mono block overflow-hidden whitespace-nowrap text-left"
               style={{ direction: "rtl", textOverflow: "ellipsis" }}
             >
               {"‎" + group.projectPath}
@@ -223,8 +223,7 @@ function CommitRow({ commit }: { commit: ProjectGitLabCommit }) {
         {/* Top row: time + branch on the left, hash anchored top-right */}
         <div className="flex items-start justify-between gap-3">
           <div
-            className="flex items-center gap-2 text-[11px] text-[var(--text-faint)] min-w-0 flex-1"
-            style={{ fontFamily: "var(--font-mono)" }}
+            className="flex items-center gap-2 text-xs text-[var(--text-faint)] min-w-0 flex-1 font-mono"
             title={commit.branches?.join(", ")}
           >
             <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -244,8 +243,7 @@ function CommitRow({ commit }: { commit: ProjectGitLabCommit }) {
             )}
           </div>
           <code
-            className="shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[11px] text-[var(--text-faint)] border border-[var(--border-subtle)]"
-            style={{ fontFamily: "var(--font-mono)" }}
+            className="shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-xs text-[var(--text-faint)] border border-[var(--border-subtle)] font-mono"
             title={commit.id}
           >
             {commit.short_id}
@@ -258,9 +256,9 @@ function CommitRow({ commit }: { commit: ProjectGitLabCommit }) {
         </p>
 
         {/* Author — anchored to the bottom via mt-auto */}
-        <div className="flex items-center gap-2 mt-auto pt-2 text-[11px] text-[var(--text-muted)]">
+        <div className="flex items-center gap-2 mt-auto pt-2 text-xs text-[var(--text-muted)]">
           <span
-            className="w-5 h-5 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] text-[9px] font-bold flex items-center justify-center shrink-0"
+            className="w-5 h-5 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] text-3xs font-bold flex items-center justify-center shrink-0"
             title={commit.author_name}
           >
             {initials}

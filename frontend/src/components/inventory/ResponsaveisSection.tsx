@@ -95,7 +95,7 @@ export default function ResponsaveisSection({
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <span className="text-[var(--text-faint)] block mb-0.5">{t("host.phone")}</span>
-                  <span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{r.phone || "--"}</span>
+                  <span className="text-[var(--text-muted)] font-mono">{r.phone || "--"}</span>
                 </div>
                 <div>
                   <span className="text-[var(--text-faint)] block mb-0.5">{t("host.entity")}</span>
@@ -130,7 +130,7 @@ export default function ResponsaveisSection({
               <tr key={r.id ?? i} className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}>
                 <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
                   <span className="flex items-center gap-2">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[9px] font-bold ${r.is_main ? "bg-cyan-500/15 text-cyan-400" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-3xs font-bold ${r.is_main ? "bg-cyan-500/15 text-cyan-400" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
                       {getInitials(r.name)}
                     </span>
                     {r.is_main && (
@@ -141,7 +141,7 @@ export default function ResponsaveisSection({
                     {r.name}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{r.phone || "--"}</td>
+                <td className="px-4 py-2.5 text-[var(--text-muted)] font-mono">{r.phone || "--"}</td>
                 <td className="px-4 py-2.5 text-[var(--text-muted)]">{r.role || "--"}</td>
                 <td className="px-4 py-2.5 text-[var(--text-muted)]">{r.entity || "--"}</td>
                 <td className="px-4 py-2.5">

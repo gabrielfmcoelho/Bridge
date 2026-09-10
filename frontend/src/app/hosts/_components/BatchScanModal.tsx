@@ -149,7 +149,7 @@ export default function BatchScanModal({
           onChange={(e) => onConcurrencyChange(Number(e.target.value))}
           className="flex-1 accent-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         />
-        <span className="text-xs font-medium text-[var(--text-primary)] w-6 text-right" style={{ fontFamily: "var(--font-mono)" }}>
+        <span className="text-xs font-medium text-[var(--text-primary)] w-6 text-right font-mono">
           {concurrency}
         </span>
       </div>
@@ -158,7 +158,7 @@ export default function BatchScanModal({
         <div>
           <div className="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1.5">
             <span>{t("host.scanProgress")}</span>
-            <span style={{ fontFamily: "var(--font-mono)" }}>{scannedCount}/{scannableHosts.length}</span>
+            <span className="font-mono">{scannedCount}/{scannableHosts.length}</span>
           </div>
           <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
@@ -187,7 +187,7 @@ export default function BatchScanModal({
                 {s.status === "success" && <StatusDot className="bg-emerald-400" />}
                 {s.status === "failed" && <StatusDot className="bg-red-400" />}
                 {s.status === "skipped" && <StatusDot className="bg-slate-400" />}
-                <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{host.nickname}</span>
+                <span className="text-[var(--text-primary)] font-medium font-mono">{host.nickname}</span>
                 {s.status === "scanning" && <span className="text-[var(--accent)] ml-auto">{t("host.scanning")}{s.attempt && s.attempt > 1 ? ` (${s.attempt}/3)` : ""}</span>}
                 {s.status === "success" && <span className="text-emerald-400 ml-auto">OK</span>}
                 {s.status === "skipped" && <span className="text-slate-400 ml-auto">{t("host.scanSkipped")}</span>}

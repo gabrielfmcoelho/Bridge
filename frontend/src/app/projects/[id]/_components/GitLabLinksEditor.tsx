@@ -127,7 +127,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
             <h4 className="text-xs font-semibold text-[var(--text-primary)]">Linked GitLab sources</h4>
             <IntegrationStatusBadge enabled={integrationEnabled} configured={integrationConfigured} />
           </div>
-          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Paste a GitLab URL or path. Individual repos or entire subgroups (subgroups fan out to all their repos).
           </p>
         </div>
@@ -139,7 +139,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
       </div>
 
       {!integrationActive && (
-        <p className="mb-3 text-[11px] text-amber-400">
+        <p className="mb-3 text-xs text-amber-400">
           {!integrationEnabled
             ? "GitLab Code Management is disabled — ask an admin to enable it in Settings → Integrations → GitLab → Code Management."
             : "GitLab service token is not configured — ask an admin to set one in Settings → Integrations → GitLab → Code Management."}
@@ -211,7 +211,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <LinkHealthIcon link={link} integrationActive={integrationActive} />
-                <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
+                <span className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
                   link.kind === "group"
                     ? "bg-purple-500/10 text-purple-400"
                     : "bg-cyan-500/10 text-cyan-400"
@@ -222,7 +222,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
                   {baseHost}/{link.gitlab_path}
                 </span>
                 {link.ref_name && (
-                  <span className="text-[10px] text-[var(--text-muted)] shrink-0">@ {link.ref_name}</span>
+                  <span className="text-2xs text-[var(--text-muted)] shrink-0">@ {link.ref_name}</span>
                 )}
               </div>
               {canEdit && (
@@ -251,7 +251,7 @@ function IntegrationStatusBadge({ enabled, configured }: { enabled: boolean; con
     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
     : "bg-amber-500/10 text-amber-400 border-amber-500/30";
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded border ${classes}`}>
+    <span className={`inline-flex items-center gap-1 text-2xs font-medium uppercase tracking-wide px-1.5 py-0.5 rounded border ${classes}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-400" : "bg-amber-400"}`} />
       {label}
     </span>

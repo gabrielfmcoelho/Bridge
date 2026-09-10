@@ -12,8 +12,8 @@ export default function CardMetadataGrid({ items }: { items: MetadataItem[] }) {
         <div key={item.label}>
           <span className="text-xs text-[var(--text-faint)]">{item.label}</span>
           <p
-            className="text-xs text-[var(--text-secondary)] truncate"
-            style={item.mono ? { fontFamily: "var(--font-mono)" } : undefined}
+            className="text-xs text-[var(--text-secondary)] truncate font-mono"
+            style={item.mono ? { } : undefined}
           >
             {item.value || "-"}
           </p>

@@ -32,7 +32,7 @@ export default function CheckboxList({ label, items, selected, onChange }: Check
         <div className="flex items-center justify-between">
           <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">{label}</label>
           {selectedCount > 0 && (
-            <span className="text-[10px] text-[var(--accent)] font-semibold">{selectedCount} selected</span>
+            <span className="text-2xs text-[var(--accent)] font-semibold">{selectedCount} selected</span>
           )}
         </div>
       )}

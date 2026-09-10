@@ -83,7 +83,7 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, t }:
       )}
 
       {/* Timestamps */}
-      <div className="flex flex-wrap gap-4 text-[11px] text-[var(--text-faint)]">
+      <div className="flex flex-wrap gap-4 text-xs text-[var(--text-faint)]">
         {dns.created_at && <span>Created: {new Date(dns.created_at).toLocaleString()}</span>}
         {dns.updated_at && <span>Updated: {new Date(dns.updated_at).toLocaleString()}</span>}
       </div>

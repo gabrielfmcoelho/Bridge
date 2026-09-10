@@ -139,7 +139,7 @@ function ModelPanel({ node, indexes, onSelectNode }: { node: LineageNode; indexe
         <Section label={t("atlas.pipeline.detail.macros")}>
           <div className="flex flex-wrap gap-1">
             {macros.map(m => (
-              <span key={m} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">{m}</span>
+              <span key={m} className="text-2xs font-mono px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">{m}</span>
             ))}
           </div>
         </Section>
@@ -174,7 +174,7 @@ function GenericPanel({ node }: { node: LineageNode }) {
     <div className="flex flex-col gap-5">
       <SectionHeader type={node.type} label={node.label} namespace={node.namespace} />
       {node.data && (
-        <pre className="text-[10px] font-mono p-2 rounded bg-[var(--bg-base)] border border-[var(--border-subtle)] text-[var(--text-secondary)] whitespace-pre-wrap break-all">
+        <pre className="text-2xs font-mono p-2 rounded bg-[var(--bg-base)] border border-[var(--border-subtle)] text-[var(--text-secondary)] whitespace-pre-wrap break-all">
           {JSON.stringify(node.data, null, 2)}
         </pre>
       )}
@@ -188,13 +188,13 @@ function SectionHeader({ type, label, namespace, layer }: { type: string; label:
   return (
     <header className="flex flex-col gap-1 -mt-1">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">
+        <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">
           {NODE_TYPE_LABELS[type] ?? type}
         </span>
-        {namespace && <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)]">{namespace}</span>}
-        {layer && <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)]">{layer}</span>}
+        {namespace && <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)]">{namespace}</span>}
+        {layer && <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)]">{layer}</span>}
       </div>
-      <h2 className="text-lg font-bold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>{label}</h2>
+      <h2 className="text-lg font-bold text-[var(--text-primary)] font-display">{label}</h2>
     </header>
   );
 }
@@ -202,7 +202,7 @@ function SectionHeader({ type, label, namespace, layer }: { type: string; label:
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">{label}</span>
+      <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">{label}</span>
       {children}
     </section>
   );
@@ -222,8 +222,8 @@ function KV({ label, value }: { label: string; value: unknown }) {
   const display = value === null || value === undefined || value === "" ? "—" : String(value);
   return (
     <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] p-2.5 flex flex-col gap-0.5 min-w-0">
-      <span className="text-[9px] uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">{label}</span>
-      <span className="text-[12px] font-mono text-[var(--text-primary)] truncate" title={display}>{display}</span>
+      <span className="text-3xs uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">{label}</span>
+      <span className="text-xs font-mono text-[var(--text-primary)] truncate" title={display}>{display}</span>
     </div>
   );
 }
@@ -234,8 +234,8 @@ function NodeLink({ node, onSelect }: { node: LineageNode; onSelect: () => void 
       onClick={onSelect}
       className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)] transition-colors"
     >
-      <span className="text-[9px] uppercase tracking-wider text-[var(--text-faint)] font-mono shrink-0">{NODE_TYPE_LABELS[node.type] ?? node.type}</span>
-      <span className="text-[12px] font-mono text-[var(--text-primary)] truncate">{node.label}</span>
+      <span className="text-3xs uppercase tracking-wider text-[var(--text-faint)] font-mono shrink-0">{NODE_TYPE_LABELS[node.type] ?? node.type}</span>
+      <span className="text-xs font-mono text-[var(--text-primary)] truncate">{node.label}</span>
     </button>
   );
 }

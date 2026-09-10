@@ -13,7 +13,7 @@ export default function ServiceNode({ data }: NodeProps) {
           <span className="text-xs font-bold text-purple-400 truncate">{data.label as string}</span>
         </div>
         {(data.technology_stack as string) && (
-          <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>{data.technology_stack as string}</p>
+          <p className="text-2xs truncate" style={{ color: "var(--text-muted)" }}>{data.technology_stack as string}</p>
         )}
       </div>
       <Handle type="source" position={Position.Bottom} className="!bg-purple-500 !w-2 !h-2" />

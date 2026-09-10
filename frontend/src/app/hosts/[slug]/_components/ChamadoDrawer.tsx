@@ -107,7 +107,7 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
         <div className="space-y-4">
           <div>
             <p className="text-base font-semibold text-[var(--text-primary)]">{chamado.title || chamado.chamado_id || "--"}</p>
-            <p className="text-xs text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>{chamado.chamado_id || "--"}</p>
+            <p className="text-xs text-[var(--text-faint)] font-mono">{chamado.chamado_id || "--"}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -254,13 +254,13 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
         <div className="min-w-0">
           <p className="text-xs font-semibold text-[var(--text-primary)]">GLPI</p>
           {chamado.cached_title ? (
-            <p className="text-[11px] text-[var(--text-muted)] truncate">{chamado.cached_title}</p>
+            <p className="text-xs text-[var(--text-muted)] truncate">{chamado.cached_title}</p>
           ) : (
-            <p className="text-[11px] text-[var(--text-faint)] italic">No live data yet — click Refresh.</p>
+            <p className="text-xs text-[var(--text-faint)] italic">No live data yet — click Refresh.</p>
           )}
           {(chamado.cached_status || liveStatus) && (
             <div className="flex items-center gap-2 mt-1">
-              <Badge className="text-[10px] uppercase tracking-wide">
+              <Badge className="text-2xs uppercase tracking-wide">
                 {liveStatus?.label ?? chamado.cached_status}
               </Badge>
               {chamado.external_url && (
@@ -268,7 +268,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
                   href={chamado.external_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-[var(--accent)] hover:underline"
+                  className="text-xs text-[var(--accent)] hover:underline"
                 >
                   Open in GLPI ↗
                 </Link>
@@ -289,7 +289,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
 
       {(profiles?.length ?? 0) > 1 && (
         <div>
-          <label className="block text-[10px] text-[var(--text-muted)] mb-1">Using profile</label>
+          <label className="block text-2xs text-[var(--text-muted)] mb-1">Using profile</label>
           <select
             value={profileID ?? ""}
             onChange={(e) => setProfileID(e.target.value ? parseInt(e.target.value, 10) : null)}
@@ -303,7 +303,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
       )}
 
       {mutation.isError && (
-        <p className="text-[11px] text-red-400">
+        <p className="text-xs text-red-400">
           {mutation.error instanceof Error ? mutation.error.message : "Refresh failed"}
         </p>
       )}

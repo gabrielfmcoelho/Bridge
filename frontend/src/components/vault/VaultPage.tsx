@@ -234,7 +234,7 @@ function SecretRow({
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           {projectName && (
-            <p className="text-[10px] text-[var(--text-faint)] leading-tight">{projectName}</p>
+            <p className="text-2xs text-[var(--text-faint)] leading-tight">{projectName}</p>
           )}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-sm text-[var(--text-primary)]">{secret.name}</span>
@@ -242,7 +242,7 @@ function SecretRow({
             <Badge color={secret.visibility === "personal" ? "purple" : "amber"}>{secret.visibility}</Badge>
             <Badge>{secret.scope}</Badge>
             {secret.group_label && (
-              <span className="text-[10px] text-[var(--text-faint)]">env: {secret.group_label}</span>
+              <span className="text-2xs text-[var(--text-faint)]">env: {secret.group_label}</span>
             )}
           </div>
           {secret.description && <p className="text-xs text-[var(--text-muted)] mt-1">{secret.description}</p>}

@@ -45,19 +45,19 @@ export default function ColumnLineagePanel({ indexes, columnId, onBack, onSelect
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">
+            <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">
               {t("atlas.catalog.column.header")}
             </span>
             {tableRec && (
-              <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-faint)]">
+              <span className="text-2xs uppercase tracking-[0.12em] text-[var(--text-faint)]">
                 {tableRec.namespace} · {tableRec.layer}
               </span>
             )}
           </div>
-          <h2 className="font-mono text-lg text-[var(--text-primary)] break-all" style={{ fontFamily: "var(--font-display)" }}>
+          <h2 className="font-mono text-lg text-[var(--text-primary)] break-all font-display">
             {column.label}
           </h2>
-          <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
             {Boolean(dtype) && (
               <span>
                 <span className="text-[var(--text-faint)] uppercase tracking-wider mr-1">{t("atlas.catalog.column.dtype")}:</span>
@@ -71,7 +71,7 @@ export default function ColumnLineagePanel({ indexes, columnId, onBack, onSelect
               </span>
             )}
             {inferred && (
-              <span className="text-[10px] uppercase tracking-wider text-amber-400/80">
+              <span className="text-2xs uppercase tracking-wider text-amber-400/80">
                 {t("atlas.catalog.column.inferred")}
               </span>
             )}
@@ -118,9 +118,9 @@ function Trail({
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">{title}</span>
+        <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">{title}</span>
         {steps.length > 0 && (
-          <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{steps.length}</span>
+          <span className="text-2xs tabular-nums text-[var(--text-muted)]">{steps.length}</span>
         )}
       </div>
       {steps.length === 0 ? (
@@ -176,18 +176,18 @@ function TrailStep({
         className="group w-full text-left rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] hover:bg-[var(--bg-elevated)] hover:border-[var(--border-default)] transition p-2.5 flex flex-col gap-1.5"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono text-[12px] text-[var(--text-primary)]">{step.column.label}</span>
+          <span className="font-mono text-xs text-[var(--text-primary)]">{step.column.label}</span>
           {step.via && (
-            <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-muted)] text-[var(--accent)] font-semibold">
+            <span className="text-3xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-muted)] text-[var(--accent)] font-semibold">
               {t("atlas.catalog.column.via")} {step.via}
             </span>
           )}
-          <span className="ml-auto text-[10px] text-[var(--text-faint)] tabular-nums">
+          <span className="ml-auto text-2xs text-[var(--text-faint)] tabular-nums">
             {t("atlas.catalog.column.depth")} {step.depth}
           </span>
         </div>
         {(step.table || step.producer) && (
-          <div className="flex items-center gap-2 text-[10px] font-mono text-[var(--text-muted)] truncate">
+          <div className="flex items-center gap-2 text-2xs font-mono text-[var(--text-muted)] truncate">
             {step.table && (
               <span className="flex items-center gap-1">
                 {tableRec && (

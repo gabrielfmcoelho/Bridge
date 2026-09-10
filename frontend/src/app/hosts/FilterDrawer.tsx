@@ -154,7 +154,7 @@ export default function FilterDrawer({
         <FormField label={t("host.idle")}>
           <Select value={filters.idle} onChange={(e) => set("idle", e.target.value)} options={idleOptions} />
         </FormField>
-        <p className="mt-2 text-[10px] text-[var(--text-muted)] leading-relaxed">
+        <p className="mt-2 text-2xs text-[var(--text-muted)] leading-relaxed">
           {t("filters.idleHint")}
         </p>
       </DrawerSection>

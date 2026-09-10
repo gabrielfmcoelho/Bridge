@@ -35,21 +35,21 @@ export default function BaseNode({ node, emoji, badge, gapMarker }: BaseNodeProp
       )}
 
       <div className="flex items-center gap-1.5">
-        {emoji && <span className="text-[11px]">{emoji}</span>}
-        <span className={`text-[10px] font-semibold uppercase tracking-wider ${c.text}`}>
+        {emoji && <span className="text-xs">{emoji}</span>}
+        <span className={`text-2xs font-semibold uppercase tracking-wider ${c.text}`}>
           {NODE_TYPE_LABELS[node.type] ?? node.type}
         </span>
         {badge && (
-          <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-black/20 text-[var(--text-muted)]">
+          <span className="ml-auto text-3xs px-1.5 py-0.5 rounded-full bg-black/20 text-[var(--text-muted)]">
             {badge}
           </span>
         )}
       </div>
-      <div className="text-[12px] font-medium text-[var(--text-primary)] mt-0.5 truncate" style={{ fontFamily: "var(--font-mono)" }}>
+      <div className="text-xs font-medium text-[var(--text-primary)] mt-0.5 truncate font-mono">
         {node.label}
       </div>
       {layerCls && (
-        <div className={`text-[9px] uppercase tracking-wider mt-0.5 ${layerCls}`}>{node.layer}</div>
+        <div className={`text-3xs uppercase tracking-wider mt-0.5 ${layerCls}`}>{node.layer}</div>
       )}
     </div>
   );

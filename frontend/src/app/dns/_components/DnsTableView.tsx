@@ -50,7 +50,7 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
               className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
               onClick={() => router.push(`/dns/${dns.id}`)}
             >
-              <td className="px-4 py-2.5 text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{dns.domain}</td>
+              <td className="px-4 py-2.5 text-[var(--text-primary)] font-mono">{dns.domain}</td>
               <td className="px-4 py-2.5">
                 {dns.has_https ? (
                   <Badge color="emerald">HTTPS</Badge>

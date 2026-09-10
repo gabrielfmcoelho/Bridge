@@ -88,7 +88,7 @@ export default function LineageToolbar({ indexes, filters, onChange, onOpenSearc
         >
           <Icon path={ICON_PATHS.search} className="w-3.5 h-3.5" strokeWidth={1.5} />
           <span>{t("atlas.lineage.toolbar.search")}</span>
-          <kbd className="text-[9px] px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-faint)]">⌘K</kbd>
+          <kbd className="text-3xs px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-faint)]">⌘K</kbd>
         </button>
       </div>
     </div>
@@ -103,7 +103,7 @@ function Select({ label, value, onChange, options }: {
 }) {
   return (
     <label className="flex items-center gap-1.5 text-[var(--text-muted)]">
-      <span className="text-[10px] uppercase tracking-wider">{label}</span>
+      <span className="text-2xs uppercase tracking-wider">{label}</span>
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -119,7 +119,7 @@ function ToggleChip({ active, onClick, label }: { active: boolean; onClick: () =
   return (
     <button
       onClick={onClick}
-      className={`px-2.5 py-1 rounded-full text-[11px] border transition-colors ${
+      className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
         active
           ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300"
           : "bg-[var(--bg-base)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"

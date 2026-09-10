@@ -132,12 +132,12 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
           <Icon path={ICON_PATHS.serverStack} className="w-4 h-4 text-violet-400 shrink-0" />
           <span className="text-sm font-medium text-[var(--text-primary)]">Coolify</span>
           {linked && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-violet-500/15 text-[10px] text-violet-400 border border-violet-500/20">
+            <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-violet-500/15 text-2xs text-violet-400 border border-violet-500/20">
               {coolifyUUID}
             </span>
           )}
           {!available && (
-            <span className="text-[10px] text-[var(--text-faint)] ml-auto">{t("operation.coolifyDisabled")}</span>
+            <span className="text-2xs text-[var(--text-faint)] ml-auto">{t("operation.coolifyDisabled")}</span>
           )}
         </div>
 
@@ -150,17 +150,17 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
               <div className="flex items-center gap-2 text-xs flex-wrap">
                 <span className="text-[var(--text-muted)]">{sv.name} ({sv.ip}:{sv.port})</span>
                 <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_reachable ? "bg-emerald-400" : "bg-red-400"}`} title={sv.is_reachable ? "Reachable" : "Unreachable"} />
-                <span className={`text-[10px] ${sv.is_reachable ? "text-emerald-400" : "text-red-400"}`}>
+                <span className={`text-2xs ${sv.is_reachable ? "text-emerald-400" : "text-red-400"}`}>
                   {sv.is_reachable ? "reachable" : "unreachable"}
                 </span>
                 <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_usable ? "bg-emerald-400" : "bg-amber-400"}`} title={sv.is_usable ? "Usable" : "Not usable"} />
-                <span className={`text-[10px] ${sv.is_usable ? "text-emerald-400" : "text-amber-400"}`}>
+                <span className={`text-2xs ${sv.is_usable ? "text-emerald-400" : "text-amber-400"}`}>
                   {sv.is_usable ? "usable" : "not usable"}
                 </span>
               </div>
             )}
             {isAdmin && (eligibleKeys.length > 0 ? keyPicker : (
-              <p className="text-[11px] text-[var(--text-faint)]">{t("operation.coolifyKeyPickerEmpty")}</p>
+              <p className="text-xs text-[var(--text-faint)]">{t("operation.coolifyKeyPickerEmpty")}</p>
             ))}
             <div className="flex items-center gap-2 flex-wrap">
               <Button size="sm" variant="secondary" onClick={() => queryClient.invalidateQueries({ queryKey: ["coolify-server-status", slug] })} loading={statusQuery.isFetching} disabled={loading}>
@@ -189,7 +189,7 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
           <div className="space-y-2">
             <p className="text-xs text-[var(--text-muted)]">{t("operation.coolifyCheckDesc")}</p>
             {eligibleKeys.length > 0 ? keyPicker : (
-              <p className="text-[11px] text-[var(--text-faint)]">{t("operation.coolifyKeyPickerEmpty")}</p>
+              <p className="text-xs text-[var(--text-faint)]">{t("operation.coolifyKeyPickerEmpty")}</p>
             )}
             <div className="flex justify-end">
               <Button size="sm" variant="secondary" onClick={() => checkMutation.mutate()} loading={checkMutation.isPending} disabled={loading}>

@@ -177,7 +177,7 @@ export default function CollectionMultiSelect({
                             <span className="text-[var(--text-primary)] truncate">{c.name}</span>
                           </span>
                           {c.description && (
-                            <span className="block text-[11px] text-[var(--text-muted)] truncate">
+                            <span className="block text-xs text-[var(--text-muted)] truncate">
                               {c.description}
                             </span>
                           )}

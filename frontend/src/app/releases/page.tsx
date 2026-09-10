@@ -177,7 +177,7 @@ export default function ReleasesPage() {
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <h3 className="font-semibold text-[var(--text-primary)]">{rel.title}</h3>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium shrink-0 ${statusColors[rel.status]}`}>
+                    <span className={`text-2xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${statusColors[rel.status]}`}>
                       {t(`release.${rel.status}`)}
                     </span>
                   </div>

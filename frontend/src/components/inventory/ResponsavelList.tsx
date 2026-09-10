@@ -91,7 +91,7 @@ export default function ResponsavelList({ value, onChange, contacts, t }: Respon
               {item.phone && (
                 <div>
                   <span className="text-[var(--text-faint)] block">{t("responsavel.phone")}</span>
-                  <span style={{ fontFamily: "var(--font-mono)" }}>{formatPhone(item.phone)}</span>
+                  <span className="font-mono">{formatPhone(item.phone)}</span>
                 </div>
               )}
               {item.role && (

@@ -158,12 +158,12 @@ function MiniResource({ label, value, usage }: { label: string; value?: string; 
     <div>
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs text-[var(--text-faint)] uppercase tracking-wider">{label}</span>
-        {usage && <span className={`text-xs font-semibold ${color}`} style={{ fontFamily: "var(--font-mono)" }}>{usage.includes("%") ? usage : `${usage}%`}</span>}
+        {usage && <span className={`text-xs font-semibold ${color} font-mono`}>{usage.includes("%") ? usage : `${usage}%`}</span>}
       </div>
       <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
         <div className={`h-full rounded-full ${barColor} transition`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
-      <p className="text-xs text-[var(--text-muted)] mt-0.5 text-right" style={{ fontFamily: "var(--font-mono)" }}>{value}</p>
+      <p className="text-xs text-[var(--text-muted)] mt-0.5 text-right font-mono">{value}</p>
     </div>
   );
 }

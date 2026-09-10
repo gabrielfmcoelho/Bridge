@@ -212,7 +212,7 @@ function FleetAnalysisPanel({
         <Stat label={t("host.batchDockerLogsHostsScanned")} value={String(reports.size)} mono />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
         <RiskChip risk="critical" count={stats.byRisk.critical || 0} />
         <RiskChip risk="warning" count={stats.byRisk.warning || 0} />
         <RiskChip risk="ok" count={stats.byRisk.ok || 0} />
@@ -225,7 +225,7 @@ function FleetAnalysisPanel({
 
       {stats.rows.length > 0 && (
         <div className="max-h-72 overflow-y-auto border border-[var(--border-subtle)] rounded-[var(--radius-md)] divide-y divide-[var(--border-subtle)]/50">
-          <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-1.5 text-[10px] uppercase tracking-wider text-[var(--text-faint)] bg-[var(--bg-elevated)]/30">
+          <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-1.5 text-2xs uppercase tracking-wider text-[var(--text-faint)] bg-[var(--bg-elevated)]/30">
             <span>{t("host.title")}</span>
             <span className="text-right">{t("host.batchDockerLogsTotalSize")}</span>
             <span className="text-right">{t("host.batchDockerLogsUnbounded")}</span>
@@ -244,8 +244,8 @@ function FleetAnalysisPanel({
           </summary>
           <div className="mt-2 space-y-1">
             {errors.map((e) => (
-              <div key={e.slug} className="px-2 py-1 rounded text-[11px] bg-red-500/5 border border-red-500/20">
-                <span className="font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>
+              <div key={e.slug} className="px-2 py-1 rounded text-xs bg-red-500/5 border border-red-500/20">
+                <span className="font-medium text-[var(--text-primary)] font-mono">
                   {e.nickname}
                 </span>
                 <span className="ml-2 text-red-400">{e.error}</span>
@@ -267,20 +267,19 @@ function FleetRow({ host, report }: { host: Host; report: DockerLogsReport }) {
       : "bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border-emerald-500/40";
   return (
     <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-1.5 text-xs">
-      <span className="text-[var(--text-primary)] font-medium truncate" style={{ fontFamily: "var(--font-mono)" }} title={host.nickname}>
+      <span className="text-[var(--text-primary)] font-medium truncate font-mono" title={host.nickname}>
         {host.nickname}
       </span>
-      <span className="text-right text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>
+      <span className="text-right text-[var(--text-secondary)] font-mono">
         {humanizeBytes(report.total_log_bytes)}
       </span>
       <span
-        className={`text-right ${report.unbounded_containers > 0 ? "text-amber-400" : "text-[var(--text-faint)]"}`}
-        style={{ fontFamily: "var(--font-mono)" }}
+        className={`text-right ${report.unbounded_containers > 0 ? "text-amber-400" : "text-[var(--text-faint)]"} font-mono`}
         title={report.unbounded_containers > 0 ? "Containers without rotation" : "All containers have rotation"}
       >
         {report.unbounded_containers}
       </span>
-      <span className={`text-right inline-flex items-center justify-end px-1.5 py-0.5 rounded-full text-[10px] border ${riskClass}`}>
+      <span className={`text-right inline-flex items-center justify-end px-1.5 py-0.5 rounded-full text-2xs border ${riskClass}`}>
         {report.risk_level}
       </span>
     </div>
@@ -294,8 +293,8 @@ function Stat({ label, value, mono, tone }: { label: string; value: string; mono
       : "text-[var(--text-primary)]";
   return (
     <div>
-      <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider">{label}</span>
-      <span className={`font-medium ${valueClass}`} style={mono ? { fontFamily: "var(--font-mono)" } : undefined}>
+      <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">{label}</span>
+      <span className={`font-medium ${valueClass} font-mono`} style={mono ? { } : undefined}>
         {value}
       </span>
     </div>

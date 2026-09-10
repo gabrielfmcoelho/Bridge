@@ -244,7 +244,7 @@ function WikiPageInner() {
               {!collapsed && (
                 <>
                   {section.warning ? (
-                    <p className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-sm)] px-2 py-1">
+                    <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-[var(--radius-sm)] px-2 py-1">
                       {section.warning}
                     </p>
                   ) : (
@@ -283,8 +283,7 @@ function WikiPageInner() {
             {!isSearching && (
               <div className="text-center mb-6">
                 <h2
-                  className="text-3xl font-semibold text-[var(--text-primary)]"
-                  style={{ fontFamily: "var(--font-display)" }}
+                  className="text-3xl font-semibold text-[var(--text-primary)] font-display"
                 >
                   Search the wiki
                 </h2>
@@ -335,9 +334,9 @@ function WikiPageInner() {
                             )}
                           </div>
                           {hit.context && (
-                            <p className="text-[11px] text-[var(--text-muted)] mt-0.5 line-clamp-2">{hit.context}</p>
+                            <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{hit.context}</p>
                           )}
-                          <p className="text-[10px] text-[var(--text-faint)] mt-1" style={{ fontFamily: "var(--font-mono)" }}>
+                          <p className="text-2xs text-[var(--text-faint)] mt-1 font-mono">
                             {getTimeAgo(hit.updated_at, locale)}
                           </p>
                         </>
@@ -379,8 +378,7 @@ function WikiPageInner() {
             <div className="mb-3">
               <div className="flex items-start justify-between gap-3">
                 <h2
-                  className="text-3xl font-bold text-[var(--text-primary)] leading-tight flex items-start gap-2"
-                  style={{ fontFamily: "var(--font-display)" }}
+                  className="text-3xl font-bold text-[var(--text-primary)] leading-tight flex items-start gap-2 font-display"
                 >
                   {doc.emoji && <span className="shrink-0">{doc.emoji}</span>}
                   <span>{doc.title || "Untitled"}</span>
@@ -507,7 +505,7 @@ function WikiPageInner() {
               }
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full h-10 inline-flex items-center justify-center gap-1.5 bg-[var(--accent)] text-white text-[11px] font-medium hover:opacity-90 transition-opacity"
+              className="w-full h-10 inline-flex items-center justify-center gap-1.5 bg-[var(--accent)] text-white text-xs font-medium hover:opacity-90 transition-opacity"
             >
               Open in Outline
               <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />

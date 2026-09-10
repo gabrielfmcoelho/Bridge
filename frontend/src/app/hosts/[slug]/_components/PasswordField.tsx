@@ -45,7 +45,7 @@ export default function PasswordField({ slug }: { slug: string }) {
     <div>
       <span className="text-[var(--text-muted)] text-xs font-medium">{t("auth.password")}</span>
       <div className="flex items-center gap-1.5 mt-0.5">
-        <p className="text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-mono)" }}>
+        <p className="text-[var(--text-primary)] truncate font-mono">
           {visible && hasPassword ? password : "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"}
         </p>
         <button
@@ -83,7 +83,7 @@ export default function PasswordField({ slug }: { slug: string }) {
         )}
       </div>
       {error && (
-        <p className="mt-1 text-[10px] text-red-400" style={{ fontFamily: "var(--font-mono)" }}>{error}</p>
+        <p className="mt-1 text-2xs text-red-400 font-mono">{error}</p>
       )}
     </div>
   );

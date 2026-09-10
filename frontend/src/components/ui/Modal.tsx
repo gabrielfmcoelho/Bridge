@@ -43,7 +43,7 @@ export default function Modal({ open, onClose, title, subHeader, footer, childre
         {title && (
           <div className="border-b border-[var(--border-subtle)] shrink-0 glass">
             <div className="flex items-center justify-between p-4 md:p-5">
-              <h2 className="text-lg font-semibold" style={{ fontFamily: "var(--font-display)" }}>{title}</h2>
+              <h2 className="text-lg font-semibold font-display">{title}</h2>
               <button
                 onClick={onClose}
                 className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-overlay)] transition duration-150"

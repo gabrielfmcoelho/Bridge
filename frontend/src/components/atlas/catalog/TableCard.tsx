@@ -33,11 +33,11 @@ export default function TableCard({ table, selected, onClick }: Props) {
       <div className="flex flex-col gap-2 p-3">
         <div className="flex items-start gap-2 justify-between">
           <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-            <span className="text-[var(--text-primary)] font-mono text-[13px] truncate" title={fq}>
+            <span className="text-[var(--text-primary)] font-mono text-sm truncate" title={fq}>
               {table.node.label}
             </span>
             {fq && fq !== table.node.label && (
-              <span className="text-[10px] text-[var(--text-faint)] font-mono truncate" title={fq}>
+              <span className="text-2xs text-[var(--text-faint)] font-mono truncate" title={fq}>
                 {fq}
               </span>
             )}
@@ -54,14 +54,14 @@ export default function TableCard({ table, selected, onClick }: Props) {
         <div className="flex items-center gap-1.5 flex-wrap">
           <LayerBadge layer={table.layer} size="sm" />
           <RoleBadge role={table.role} size="sm" />
-          <span className="ml-auto text-[10px] text-[var(--text-muted)] tabular-nums">
+          <span className="ml-auto text-2xs text-[var(--text-muted)] tabular-nums">
             <span className="text-[var(--text-primary)] font-semibold">{table.columnCount}</span>{" "}
             {t("atlas.catalog.list.columnsLabel")}
           </span>
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[9px] uppercase tracking-[0.12em] text-[var(--text-faint)]">
+          <span className="text-3xs uppercase tracking-[0.12em] text-[var(--text-faint)]">
             {table.namespace}
           </span>
         </div>

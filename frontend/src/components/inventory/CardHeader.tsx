@@ -19,15 +19,13 @@ export default function CardHeader({
     <div className="flex items-start justify-between mb-3">
       <div className="min-w-0 flex-1">
         <h3
-          className="font-semibold text-[var(--text-primary)] text-sm truncate"
-          style={{ fontFamily: "var(--font-mono)" }}
+          className="font-semibold text-[var(--text-primary)] text-sm truncate font-mono"
         >
           {title}
         </h3>
         {subtitle && (
           <p
-            className="text-xs text-[var(--text-faint)] truncate mt-0.5"
-            style={{ fontFamily: "var(--font-mono)" }}
+            className="text-xs text-[var(--text-faint)] truncate mt-0.5 font-mono"
           >
             {subtitle}
           </p>

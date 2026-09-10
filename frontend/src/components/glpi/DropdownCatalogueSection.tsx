@@ -36,14 +36,14 @@ export default function DropdownCatalogueSection() {
     <details className="border-t border-[var(--border-default)] pt-4" open>
       <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--text-primary)] flex items-center justify-between gap-2">
         <span>Catálogo de dropdowns</span>
-        <span className="text-[11px] font-normal text-[var(--text-muted)]">
+        <span className="text-xs font-normal text-[var(--text-muted)]">
           {data?.catalogues?.length ?? 0} itemtype
           {(data?.catalogues?.length ?? 0) === 1 ? "" : "s"} configurado
           {(data?.catalogues?.length ?? 0) === 1 ? "" : "s"}
         </span>
       </summary>
 
-      <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+      <p className="mt-2 text-xs text-[var(--text-muted)]">
         Quando o perfil GLPI não tem permissão de leitura via REST para
         dropdowns (ex.: <code>/ITILCategory</code>), os pickers do Formcreator
         voltam vazios. Cole aqui manualmente a lista — uma vez por itemtype,
@@ -66,14 +66,14 @@ export default function DropdownCatalogueSection() {
                 <div className="min-w-0 flex-1">
                   <code className="font-mono text-[var(--text-primary)]">{it}</code>
                   {summary ? (
-                    <span className="ml-2 text-[11px] text-[var(--text-muted)]">
+                    <span className="ml-2 text-xs text-[var(--text-muted)]">
                       {summary.option_count} opção
                       {summary.option_count === 1 ? "" : "es"}
                       {" · atualizado "}
                       {new Date(summary.updated_at).toLocaleString()}
                     </span>
                   ) : (
-                    <span className="ml-2 text-[11px] text-[var(--text-faint)]">
+                    <span className="ml-2 text-xs text-[var(--text-faint)]">
                       vazio — usa REST
                     </span>
                   )}

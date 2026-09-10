@@ -40,14 +40,14 @@ export default function WikiDocumentList({ documents, emptyLabel, onSelect }: Pr
                 {doc.title || "Untitled"}
               </p>
               {doc.excerpt && (
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5 line-clamp-2">
+                <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">
                   {doc.excerpt}
                 </p>
               )}
-              <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-faint)]">
+              <div className="flex items-center gap-2 mt-1 text-2xs text-[var(--text-faint)]">
                 {doc.updated_by && <span>{doc.updated_by}</span>}
                 {doc.updated_by && <span>·</span>}
-                <span style={{ fontFamily: "var(--font-mono)" }}>
+                <span className="font-mono">
                   {getTimeAgo(doc.updated_at, locale)}
                 </span>
               </div>

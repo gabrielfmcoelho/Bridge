@@ -176,7 +176,7 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
             {initial?.id ? (
               <GitLabLinksEditor projectId={initial.id} canEdit={true} gitlabBaseURL={gitlabBaseURL} />
             ) : (
-              <p className="text-[11px] text-[var(--text-muted)] italic">
+              <p className="text-xs text-[var(--text-muted)] italic">
                 GitLab sources can be linked after the project is created.
               </p>
             )}
@@ -188,7 +188,7 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
                   onChange={(e) => set("outline_collection_id", e.target.value)}
                   placeholder="e.g. d3b71c7e-8f7e-4f9d-b5a2-xxxxxxxxxxxx"
                 />
-                <p className="text-[11px] text-[var(--text-muted)]">
+                <p className="text-xs text-[var(--text-muted)]">
                   Paste the UUID of the Outline collection that holds this project&apos;s documentation. The Wiki tab will list recent docs from it.
                 </p>
               </div>
@@ -222,7 +222,7 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
                     onChange={(e) => set("glpi_category_id", parseInt(e.target.value || "0", 10))}
                   />
                 </div>
-                <p className="text-[11px] text-[var(--text-muted)]">
+                <p className="text-xs text-[var(--text-muted)]">
                   Picks which GLPI account sshcm uses for this project&apos;s Chamados tab. Entity/category scope the listing.
                 </p>
               </div>

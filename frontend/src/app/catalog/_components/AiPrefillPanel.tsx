@@ -60,7 +60,7 @@ export default function AiPrefillPanel({ offeringId, onDraft }: { offeringId: nu
         <Icon path={ICON_PATHS.bolt} className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={2} />
         <p className="text-xs font-medium text-[var(--text-secondary)]">{t("catalog.ai.title")}</p>
         {status.model && (
-          <span className="ml-auto truncate text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+          <span className="ml-auto truncate text-2xs text-[var(--text-faint)] font-mono">
             {status.model}
           </span>
         )}
@@ -79,7 +79,7 @@ export default function AiPrefillPanel({ offeringId, onDraft }: { offeringId: nu
       {notice && <StatusAlert variant={notice.kind === "warning" ? "warning" : notice.kind}>{notice.text}</StatusAlert>}
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[10px] leading-snug text-[var(--text-faint)]">{t("catalog.ai.caution")}</p>
+        <p className="text-2xs leading-snug text-[var(--text-faint)]">{t("catalog.ai.caution")}</p>
         <Button
           type="button"
           size="sm"

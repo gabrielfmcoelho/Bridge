@@ -77,10 +77,10 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
     <Card accent="purple" hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-display)" }}>
+          <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
             {title}
           </h2>
-          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtitle}</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>
         </div>
         <Button
           type="button"
@@ -114,7 +114,7 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
             <MarkdownContent content={cached.content} />
           </div>
           {metaLine && (
-            <p className="mt-3 pt-3 border-t border-[var(--border-subtle)] text-[10px] text-[var(--text-faint)]">
+            <p className="mt-3 pt-3 border-t border-[var(--border-subtle)] text-2xs text-[var(--text-faint)]">
               {metaLine}
             </p>
           )}

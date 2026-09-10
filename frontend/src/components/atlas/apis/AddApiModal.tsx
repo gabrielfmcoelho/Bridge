@@ -150,7 +150,7 @@ export default function AddApiModal({
               onChange={(e) => setSourceUrl(e.target.value)}
               placeholder="https://api.example.com/openapi.json"
             />
-            <p className="text-[10px] text-[var(--text-faint)] mt-1">{t("atlas.apis.sourceUrlHint")}</p>
+            <p className="text-2xs text-[var(--text-faint)] mt-1">{t("atlas.apis.sourceUrlHint")}</p>
           </div>
         )}
 
@@ -162,7 +162,7 @@ export default function AddApiModal({
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="https://api.example.com"
           />
-          <p className="text-[10px] text-[var(--text-faint)] mt-1">{t("atlas.apis.baseUrlHint")}</p>
+          <p className="text-2xs text-[var(--text-faint)] mt-1">{t("atlas.apis.baseUrlHint")}</p>
         </div>
         <div>
           <Input
@@ -171,7 +171,7 @@ export default function AddApiModal({
             onChange={(e) => setDocsUrl(e.target.value)}
             placeholder="https://api.example.com/docs"
           />
-          <p className="text-[10px] text-[var(--text-faint)] mt-1">{t("atlas.apis.docsUrlHint")}</p>
+          <p className="text-2xs text-[var(--text-faint)] mt-1">{t("atlas.apis.docsUrlHint")}</p>
         </div>
 
         <Input

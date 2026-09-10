@@ -60,7 +60,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
               {rows.map(([label, value]) => (
                 <div key={label} className="flex justify-between py-1.5 border-b border-[var(--border-subtle)]/50 last:border-0">
                   <span className="text-xs text-[var(--text-muted)]">{label}</span>
-                  <span className="text-xs text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{value}</span>
+                  <span className="text-xs text-[var(--text-primary)] font-mono">{value}</span>
                 </div>
               ))}
             </div>
@@ -118,9 +118,9 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                           title={tooltip}
                         >
                           {portIcon(p)}
-                          <span style={{ fontFamily: "var(--font-mono)" }}>:{portStr}</span>
+                          <span className="font-mono">:{portStr}</span>
                           {displayName && (
-                            <span className="text-[10px] opacity-80 truncate max-w-[10rem]" style={{ fontFamily: "var(--font-mono)" }}>
+                            <span className="text-2xs opacity-80 truncate max-w-[10rem] font-mono">
                               {owner?.owner_type === "nginx" && owner.target ? `nginx → ${owner.target}` : displayName}
                             </span>
                           )}
@@ -140,18 +140,18 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
               const renderKey = (k: typeof info.ssh_keys[0], i: number) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
                   <Icon path={ICON_PATHS.key} className={`w-3.5 h-3.5 shrink-0 ${k.managed ? "text-emerald-400" : "text-[var(--text-faint)]"}`} />
-                  <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{k.name}</span>
+                  <span className="text-[var(--text-primary)] font-mono">{k.name}</span>
                   <span className="text-[var(--text-faint)]">{k.type}</span>
                   {k.managed ? (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-[10px] text-emerald-400 border border-emerald-500/20">
+                    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-2xs text-emerald-400 border border-emerald-500/20">
                       {k.managed_name || t("scan.managed")}
                     </span>
                   ) : (
-                    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-[10px] text-amber-400 border border-amber-500/20">
+                    <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-2xs text-amber-400 border border-amber-500/20">
                       {t("scan.unmanaged")}
                     </span>
                   )}
-                  <span className="text-[var(--text-muted)] truncate hidden sm:inline ml-auto" style={{ fontFamily: "var(--font-mono)" }}>{k.fingerprint}</span>
+                  <span className="text-[var(--text-muted)] truncate hidden sm:inline ml-auto font-mono">{k.fingerprint}</span>
                 </div>
               );
               return (
@@ -226,14 +226,13 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
             </svg>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span className="text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                <span className="text-[var(--text-primary)] truncate font-mono">
                   {k.name || "\u2014"}
                 </span>
-                <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider">{k.type}</span>
+                <span className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{k.type}</span>
               </div>
               <div
-                className="text-[10px] text-[var(--text-muted)] break-all leading-snug"
-                style={{ fontFamily: "var(--font-mono)" }}
+                className="text-2xs text-[var(--text-muted)] break-all leading-snug font-mono"
               >
                 {k.fingerprint}
               </div>
@@ -242,7 +241,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                   chip keeps the height but doesn't render text/border. */}
               <div className="mt-1 h-[18px]">
                 {k.managed && k.managed_name ? (
-                  <span className="inline-block px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-[10px] text-emerald-400 border border-emerald-500/20">
+                  <span className="inline-block px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-2xs text-emerald-400 border border-emerald-500/20">
                     {k.managed_name}
                   </span>
                 ) : (
@@ -278,36 +277,35 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                         <title>{u.is_current ? t("scan.userCurrent") : u.name}</title>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
-                      <span className="text-sm font-medium text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{u.name}</span>
+                      <span className="text-sm font-medium text-[var(--text-primary)] truncate font-mono">{u.name}</span>
                       {!u.has_login && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]">
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)]">
                           {t("scan.userNoLogin")}
                         </span>
                       )}
                       {u.password_status === "P" && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-[10px] text-amber-400 light:text-amber-700 border border-amber-500/30" title={t("scan.userPasswordSetTooltip")}>
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-2xs text-amber-400 light:text-amber-700 border border-amber-500/30" title={t("scan.userPasswordSetTooltip")}>
                           {t("scan.userPasswordSet")}
                         </span>
                       )}
                       {u.password_status === "L" && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]" title={t("scan.userPasswordLockedTooltip")}>
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)]" title={t("scan.userPasswordLockedTooltip")}>
                           {t("scan.userPasswordLocked")}
                         </span>
                       )}
                       {u.password_status === "NP" && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-[10px] text-emerald-400 light:text-emerald-800 border border-emerald-500/30" title={t("scan.userPasswordNoneTooltip")}>
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-2xs text-emerald-400 light:text-emerald-800 border border-emerald-500/30" title={t("scan.userPasswordNoneTooltip")}>
                           {t("scan.userPasswordNone")}
                         </span>
                       )}
                       <span
-                        className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]"
-                        style={{ fontFamily: "var(--font-mono)" }}
+                        className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)] font-mono"
                       >
                         uid {u.uid}
                       </span>
                     </div>
                     {u.home && (
-                      <p className="text-[10px] text-[var(--text-muted)] break-all leading-relaxed line-clamp-2" style={{ fontFamily: "var(--font-mono)" }}>
+                      <p className="text-2xs text-[var(--text-muted)] break-all leading-relaxed line-clamp-2 font-mono">
                         {u.home}
                       </p>
                     )}
@@ -317,14 +315,14 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                         how much key content follows. */}
                     <Divider className="-mx-3 mt-2 opacity-50" />
                     {userKeys.length === 0 ? (
-                      <p className="text-[10px] text-[var(--text-faint)] italic mt-auto pt-2">
+                      <p className="text-2xs text-[var(--text-faint)] italic mt-auto pt-2">
                         {t("scan.userNoKeys")}
                       </p>
                     ) : (
                       <div className="pt-2 space-y-2">
                         {authKeys.length > 0 && (
                           <div>
-                            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                            <span className="text-2xs text-[var(--text-muted)] uppercase tracking-wider block mb-1">
                               {t("scan.authorizedKeys")} <span className="text-[var(--text-faint)]">({authKeys.length})</span>
                             </span>
                             <div className="space-y-1">{authKeys.map(renderKey)}</div>
@@ -332,7 +330,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                         )}
                         {privKeys.length > 0 && (
                           <div>
-                            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                            <span className="text-2xs text-[var(--text-muted)] uppercase tracking-wider block mb-1">
                               {t("scan.sshKeys")} <span className="text-[var(--text-faint)]">({privKeys.length})</span>
                             </span>
                             <div className="space-y-1">{privKeys.map(renderKey)}</div>
@@ -342,15 +340,14 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                     )}
                     {userLogins.length > 0 && (
                       <div className="pt-2">
-                        <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                        <span className="text-2xs text-[var(--text-muted)] uppercase tracking-wider block mb-1">
                           {t("scan.userLastLogins")} <span className="text-[var(--text-faint)]">({userLogins.length})</span>
                         </span>
                         <div className="space-y-0.5">
                           {userLogins.map((l, i) => (
                             <div
                               key={i}
-                              className="flex items-baseline gap-2 text-[10px] text-[var(--text-secondary)] leading-snug"
-                              style={{ fontFamily: "var(--font-mono)" }}
+                              className="flex items-baseline gap-2 text-2xs text-[var(--text-secondary)] leading-snug font-mono"
                             >
                               <span className="truncate text-[var(--text-primary)]" title={l.from}>{l.from || "—"}</span>
                               <span className="ml-auto shrink-0 text-[var(--text-muted)]">{formatLoginDate(l.when, locale)}</span>
@@ -365,7 +362,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
               {orphanKeys.length > 0 && (
                 <Card hover={false} className="!p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-semibold text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{t("scan.userOrphanKeys")}</span>
+                    <span className="text-sm font-semibold text-[var(--text-muted)] font-mono">{t("scan.userOrphanKeys")}</span>
                   </div>
                   <div className="space-y-1">{orphanKeys.map(renderKey)}</div>
                 </Card>
@@ -415,7 +412,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
               {info.systemd_services.map((svc, i) => (
                 <span
                   key={i}
-                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] border ${
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-2xs border ${
                     svc.is_native
                       ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                       : "bg-sky-500/10 text-sky-400 border-sky-500/20"
@@ -441,7 +438,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
               {info.installed_packages.map((pkg, i) => (
                 <div key={i} className="flex items-center justify-between py-1 border-b border-[var(--border-subtle)]/50 last:border-0">
                   <span className="text-xs text-[var(--text-primary)]">{pkg.name}</span>
-                  <span className="text-xs text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{pkg.version}</span>
+                  <span className="text-xs text-[var(--text-muted)] font-mono">{pkg.version}</span>
                 </div>
               ))}
             </div>
@@ -460,7 +457,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
           <>
             <SectionHeading as="h3">{t("scan.cronJobs")}</SectionHeading>
             <Card hover={false}>
-              <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
+              <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all font-mono">
                 {info.cron_jobs.join("\n")}
               </pre>
             </Card>
@@ -473,7 +470,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
         <>
           <SectionHeading as="h3">{t("scan.firewallStatus")}</SectionHeading>
           <Card hover={false}>
-            <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>
+            <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all font-mono">
               {info.firewall_status}
             </pre>
           </Card>
@@ -540,7 +537,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
       key: "permitrootlogin",
       label: t("scan.policyPermitRoot"),
       value: (
-        <span className="text-xs text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>
+        <span className="text-xs text-[var(--text-primary)] font-mono">
           {policy.permit_root_login || "—"}
         </span>
       ),
@@ -551,7 +548,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
       key: "authenticationmethods",
       label: t("scan.policyAuthMethods"),
       value: (
-        <span className="text-xs text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>
+        <span className="text-xs text-[var(--text-primary)] font-mono">
           {policy.authentication_methods}
         </span>
       ),
@@ -566,8 +563,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
           {items.map((u) => (
             <span
               key={u}
-              className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[10px] text-[var(--text-secondary)] border border-[var(--border-subtle)]"
-              style={{ fontFamily: "var(--font-mono)" }}
+              className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-2xs text-[var(--text-secondary)] border border-[var(--border-subtle)] font-mono"
             >
               {u}
             </span>
@@ -591,7 +587,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
               : t("scan.policyPasswordUnknown")}
           </span>
           {policy.source && (
-            <span className="ml-auto text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+            <span className="ml-auto text-2xs text-[var(--text-faint)] font-mono">
               {policy.source}
             </span>
           )}
@@ -612,8 +608,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
                     {hits.map((h, i) => (
                       <div
                         key={i}
-                        className="text-[10px] text-[var(--text-faint)] truncate"
-                        style={{ fontFamily: "var(--font-mono)" }}
+                        className="text-2xs text-[var(--text-faint)] truncate font-mono"
                         title={h.value ? `${h.file}:${h.line} → ${h.value}` : `${h.file}:${h.line}`}
                       >
                         <span className="opacity-60">↳</span> {h.file}:{h.line}
@@ -645,7 +640,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
           <div className="border-t border-[var(--border-subtle)]/50 pt-3 mt-3">
             <span className="text-xs text-[var(--text-muted)] block mb-2">{t("scan.policyPasswordUsers")}</span>
             {passwordCapableUsers.length === 0 ? (
-              <p className="text-[10px] text-[var(--text-faint)] italic">
+              <p className="text-2xs text-[var(--text-faint)] italic">
                 {effectivePassword === "yes" ? t("scan.policyPasswordUsersNone") : t("scan.policyPasswordUsersUnknown")}
               </p>
             ) : (
@@ -653,8 +648,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
                 {passwordCapableUsers.map((u) => (
                   <span
                     key={u.name}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 light:text-amber-800 border border-amber-500/30 text-xs"
-                    style={{ fontFamily: "var(--font-mono)" }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 light:text-amber-800 border border-amber-500/30 text-xs font-mono"
                     title={`uid ${u.uid} · ${u.shell || ""}`}
                   >
                     {u.name}
@@ -672,20 +666,20 @@ function SSHAuthPolicyCard({ policy, users, t }: {
 function YesNoBadge({ value, t }: { value: "yes" | "no" | "unknown"; t: (k: string) => string }) {
   if (value === "yes") {
     return (
-      <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border border-emerald-500/30 text-[10px]">
+      <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 light:text-emerald-800 border border-emerald-500/30 text-2xs">
         {t("common.yes")}
       </span>
     );
   }
   if (value === "no") {
     return (
-      <span className="px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-300 light:text-rose-800 border border-rose-500/30 text-[10px]">
+      <span className="px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-300 light:text-rose-800 border border-rose-500/30 text-2xs">
         {t("common.no")}
       </span>
     );
   }
   return (
-    <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-faint)] border border-[var(--border-subtle)] text-[10px]">
+    <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-faint)] border border-[var(--border-subtle)] text-2xs">
       —
     </span>
   );
@@ -777,10 +771,10 @@ function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string) 
               <span className="text-base shrink-0" title={p.type}>{p.icon}</span>
               <span className={`text-sm font-medium truncate ${p.isSystem ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{p.type}</span>
               {p.isSystem && (
-                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]">OS</span>
+                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)]">OS</span>
               )}
               {p.pid && (
-                <span className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]" style={{ fontFamily: "var(--font-mono)" }}>
+                <span className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)] font-mono">
                   PID {p.pid}
                 </span>
               )}
@@ -788,17 +782,17 @@ function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string) 
 
             {/* Command line */}
             {p.command !== p.type && (
-              <p className="text-[10px] text-[var(--text-muted)] break-all leading-relaxed mb-2 line-clamp-2" style={{ fontFamily: "var(--font-mono)" }}>
+              <p className="text-2xs text-[var(--text-muted)] break-all leading-relaxed mb-2 line-clamp-2 font-mono">
                 {p.command}
               </p>
             )}
 
             {/* Metadata grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5 text-[10px]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5 text-2xs">
               {p.user && (
                 <div>
                   <span className="text-[var(--text-faint)] block">{t("vm.user")}</span>
-                  <span className="text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>{p.user}</span>
+                  <span className="text-[var(--text-secondary)] font-mono">{p.user}</span>
                 </div>
               )}
               {p.startedVia && (
@@ -811,29 +805,29 @@ function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string) 
               )}
               <div>
                 <span className="text-[var(--text-faint)] block">CPU / MEM</span>
-                <span className="text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>{p.cpu} / {p.mem}</span>
+                <span className="text-[var(--text-secondary)] font-mono">{p.cpu} / {p.mem}</span>
               </div>
               {p.ports && (
                 <div>
                   <span className="text-[var(--text-faint)] block">{t("scan.listeningPorts")}</span>
-                  <span className="text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>{p.ports}</span>
+                  <span className="text-[var(--text-secondary)] font-mono">{p.ports}</span>
                 </div>
               )}
             </div>
 
             {/* Bottom details: cwd / venv */}
             {(p.cwd || p.venv) && (
-              <div className="mt-auto pt-2 mt-2 border-t border-[var(--border-subtle)]/50 space-y-0.5 text-[10px]">
+              <div className="mt-auto pt-2 mt-2 border-t border-[var(--border-subtle)]/50 space-y-0.5 text-2xs">
                 {p.cwd && (
                   <div className="flex gap-1.5">
                     <span className="text-[var(--text-faint)] shrink-0">cwd</span>
-                    <span className="text-[var(--text-muted)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{p.cwd}</span>
+                    <span className="text-[var(--text-muted)] truncate font-mono">{p.cwd}</span>
                   </div>
                 )}
                 {p.venv && (
                   <div className="flex gap-1.5">
                     <span className="text-[var(--text-faint)] shrink-0">venv</span>
-                    <span className="text-[var(--text-muted)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{p.venv}</span>
+                    <span className="text-[var(--text-muted)] truncate font-mono">{p.venv}</span>
                   </div>
                 )}
               </div>
@@ -940,16 +934,16 @@ function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string) => string })
       <Card hover={false}>
         {/* Daemon state row */}
         <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
-          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] border ${daemonChip}`}>
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs border ${daemonChip}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${daemonState === "active" ? "bg-emerald-400" : daemonState === "inactive" ? "bg-amber-400" : "bg-slate-400"}`} />
             {(cron.daemon_name || "cron")}: {daemonLabel}
           </span>
           {cron.daemon_installed && (
-            <span className="text-[10px] text-[var(--text-muted)]">
+            <span className="text-2xs text-[var(--text-muted)]">
               {cron.daemon_enabled ? t("scan.cron.daemonEnabledAtBoot") : t("scan.cron.daemonNotEnabled")}
             </span>
           )}
-          <span className="ml-auto text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+          <span className="ml-auto text-2xs text-[var(--text-faint)] font-mono">
             {jobs.length} {jobs.length === 1 ? t("scan.cron.jobSingular") : t("scan.cron.jobPlural")}
           </span>
         </div>
@@ -970,7 +964,7 @@ function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string) => string })
 function CronJobGroup({ title, jobs, t }: { title: string; jobs: CronJob[]; t: (k: string) => string }) {
   return (
     <div>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
+      <span className="text-2xs font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
         {title} <span className="opacity-60">({jobs.length})</span>
       </span>
       <div className="space-y-1.5">
@@ -997,42 +991,38 @@ function CronJobRow({ job, t }: { job: CronJob; t: (k: string) => string }) {
       }`}
     >
       <span
-        className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[10px] text-[var(--text-secondary)] border border-[var(--border-default)]"
-        style={{ fontFamily: "var(--font-mono)" }}
+        className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-2xs text-[var(--text-secondary)] border border-[var(--border-default)] font-mono"
         title={isTimer ? t("scan.cron.timerUnit") : t("scan.cron.schedule")}
       >
         {job.schedule || "—"}
       </span>
       {job.user && (
         <span
-          className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30"
+          className="shrink-0 px-1.5 py-0.5 rounded-full text-2xs bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 font-mono"
           title={t("scan.cron.runAs")}
-          style={{ fontFamily: "var(--font-mono)" }}
         >
           {job.user}
         </span>
       )}
       <span
-        className="text-xs text-[var(--text-primary)] flex-1 min-w-0 truncate"
-        style={{ fontFamily: "var(--font-mono)" }}
+        className="text-xs text-[var(--text-primary)] flex-1 min-w-0 truncate font-mono"
         title={job.command}
       >
         {job.command || "—"}
       </span>
       {job.disabled && (
-        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-slate-500/15 text-[10px] text-slate-300 light:text-slate-700 border border-slate-500/30">
+        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-slate-500/15 text-2xs text-slate-300 light:text-slate-700 border border-slate-500/30">
           {t("scan.cron.disabled")}
         </span>
       )}
       {job.next_run && (
-        <span className="shrink-0 text-[10px] text-[var(--text-muted)]" title={t("scan.cron.nextRun")}>
+        <span className="shrink-0 text-2xs text-[var(--text-muted)]" title={t("scan.cron.nextRun")}>
           → {job.next_run}
         </span>
       )}
       <span
-        className="shrink-0 text-[10px] text-[var(--text-faint)]"
+        className="shrink-0 text-2xs text-[var(--text-faint)] font-mono"
         title={job.source}
-        style={{ fontFamily: "var(--font-mono)" }}
       >
         {sourceLabel}
       </span>
@@ -1111,10 +1101,10 @@ function AgentsCard({ agents, t }: { agents: Agent[]; t: (k: string) => string }
       </SectionHeading>
       <Card hover={false}>
         <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
-          <span className="text-[10px] text-[var(--text-muted)]">
+          <span className="text-2xs text-[var(--text-muted)]">
             {t("scan.agents.summary")}
           </span>
-          <span className="ml-auto text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+          <span className="ml-auto text-2xs text-[var(--text-faint)] font-mono">
             {activeCount}/{agents.length} {t("scan.agents.activeOfTotal")}
           </span>
         </div>
@@ -1139,7 +1129,7 @@ function AgentCategoryGroup({ category, agents, t }: { category: string; agents:
 
   return (
     <div>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
+      <span className="text-2xs font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
         <span className="mr-1">{icon}</span>
         {label} <span className="opacity-60">({agents.length})</span>
       </span>
@@ -1157,7 +1147,7 @@ function AgentRow({ agent, t }: { agent: Agent; t: (k: string) => string }) {
   const stateText = stateLabel.startsWith("scan.agents.state.") ? agent.state ?? "—" : stateLabel;
   return (
     <div className="flex flex-wrap items-center gap-2 px-2 py-1.5 rounded border border-[var(--border-subtle)]/50">
-      <span className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] border ${agentStateClasses(agent.state)}`}>
+      <span className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs border ${agentStateClasses(agent.state)}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${
           agent.state === "active" || agent.state === "running"
             ? "bg-emerald-400"
@@ -1171,12 +1161,11 @@ function AgentRow({ agent, t }: { agent: Agent; t: (k: string) => string }) {
       </span>
       <span className="text-xs text-[var(--text-primary)] font-medium">{agent.label}</span>
       {agent.vendor && (
-        <span className="text-[10px] text-[var(--text-faint)]">— {agent.vendor}</span>
+        <span className="text-2xs text-[var(--text-faint)]">— {agent.vendor}</span>
       )}
       {agent.version && (
         <span
-          className="text-[10px] text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] border border-[var(--border-default)]"
-          style={{ fontFamily: "var(--font-mono)" }}
+          className="text-2xs text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] border border-[var(--border-default)] font-mono"
           title={agent.package ? `${agent.package} ${agent.version}` : agent.version}
         >
           v{agent.version}
@@ -1184,7 +1173,7 @@ function AgentRow({ agent, t }: { agent: Agent; t: (k: string) => string }) {
       )}
       {agent.enabled && (
         <span
-          className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 text-[10px]"
+          className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 text-2xs"
           title={t("scan.agents.enabledAtBootTooltip")}
         >
           {t("scan.agents.enabledAtBoot")}
@@ -1192,8 +1181,7 @@ function AgentRow({ agent, t }: { agent: Agent; t: (k: string) => string }) {
       )}
       {agent.ports && agent.ports.length > 0 && (
         <span
-          className="shrink-0 text-[10px] text-[var(--text-muted)]"
-          style={{ fontFamily: "var(--font-mono)" }}
+          className="shrink-0 text-2xs text-[var(--text-muted)] font-mono"
           title={t("scan.agents.portsTooltip")}
         >
           :{agent.ports.join(", :")}
@@ -1203,8 +1191,7 @@ function AgentRow({ agent, t }: { agent: Agent; t: (k: string) => string }) {
         {(agent.sources ?? []).map((src) => (
           <span
             key={src}
-            className="text-[10px] text-[var(--text-faint)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]"
-            style={{ fontFamily: "var(--font-mono)" }}
+            className="text-2xs text-[var(--text-faint)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] font-mono"
             title={t(`scan.agents.source.${src}`)}
           >
             {src}
@@ -1290,8 +1277,8 @@ function ServiceInventoryCard({ services, t }: { services: DiscoveredService[]; 
       </SectionHeading>
       <Card hover={false}>
         <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-[var(--border-subtle)]/50">
-          <span className="text-[10px] text-[var(--text-muted)]">{t("scan.services.summary")}</span>
-          <span className="ml-auto text-[10px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
+          <span className="text-2xs text-[var(--text-muted)]">{t("scan.services.summary")}</span>
+          <span className="ml-auto text-2xs text-[var(--text-faint)] font-mono">
             {activeCount}/{services.length} {t("scan.services.activeOfTotal")}
           </span>
         </div>
@@ -1314,7 +1301,7 @@ function ServiceKindGroup({ kind, services, t }: { kind: string; services: Disco
   })();
   return (
     <div>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
+      <span className="text-2xs font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
         <span className="mr-1">{icon}</span>
         {label} <span className="opacity-60">({services.length})</span>
       </span>
@@ -1334,7 +1321,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-2 py-1.5 rounded border border-[var(--border-subtle)]/50">
-      <span className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] border ${serviceStateClasses(service.state)}`}>
+      <span className={`shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs border ${serviceStateClasses(service.state)}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${
           service.state === "active" || service.state === "running"
             ? "bg-emerald-400"
@@ -1348,12 +1335,11 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
       </span>
       <span className="text-xs text-[var(--text-primary)] font-medium">{service.label}</span>
       {service.vendor && (
-        <span className="text-[10px] text-[var(--text-faint)]">— {service.vendor}</span>
+        <span className="text-2xs text-[var(--text-faint)]">— {service.vendor}</span>
       )}
       {service.version && (
         <span
-          className="text-[10px] text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] border border-[var(--border-default)]"
-          style={{ fontFamily: "var(--font-mono)" }}
+          className="text-2xs text-[var(--text-muted)] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] border border-[var(--border-default)] font-mono"
           title={service.package ? `${service.package} ${service.version}` : service.version}
         >
           v{service.version}
@@ -1361,7 +1347,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
       )}
       {service.enabled && (
         <span
-          className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 text-[10px]"
+          className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-500/10 text-sky-300 light:text-sky-800 border border-sky-500/30 text-2xs"
           title={t("scan.services.enabledAtBootTooltip")}
         >
           {t("scan.services.enabledAtBoot")}
@@ -1369,7 +1355,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
       )}
       {service.host_running && (
         <span
-          className="shrink-0 text-[10px] text-purple-300 light:text-purple-800 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30"
+          className="shrink-0 text-2xs text-purple-300 light:text-purple-800 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/30"
           title={t("scan.services.hostInstanceTooltip")}
         >
           {t("scan.services.hostInstance")}
@@ -1377,8 +1363,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
       )}
       {service.container_image && (
         <span
-          className="shrink-0 text-[10px] text-cyan-300 light:text-cyan-800 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30"
-          style={{ fontFamily: "var(--font-mono)" }}
+          className="shrink-0 text-2xs text-cyan-300 light:text-cyan-800 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 font-mono"
           title={service.container_id ? `${service.container_image} (${service.container_id.slice(0, 12)})` : service.container_image}
         >
           {service.container_image}
@@ -1386,8 +1371,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
       )}
       {service.ports && service.ports.length > 0 && (
         <span
-          className="shrink-0 text-[10px] text-[var(--text-muted)]"
-          style={{ fontFamily: "var(--font-mono)" }}
+          className="shrink-0 text-2xs text-[var(--text-muted)] font-mono"
           title={t("scan.services.portsTooltip")}
         >
           :{service.ports.join(", :")}
@@ -1397,8 +1381,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string)
         {(service.sources ?? []).map((src) => (
           <span
             key={src}
-            className="text-[10px] text-[var(--text-faint)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)]"
-            style={{ fontFamily: "var(--font-mono)" }}
+            className="text-2xs text-[var(--text-faint)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] font-mono"
             title={t(`scan.services.source.${src}`)}
           >
             {src}
@@ -1469,7 +1452,7 @@ function ResourceTopList({
 }) {
   return (
     <div>
-      <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider mb-2">
+      <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider mb-2">
         {title}
       </span>
       <div className="space-y-1">
@@ -1479,21 +1462,19 @@ function ResourceTopList({
             className="flex items-baseline gap-2 px-1.5 py-1 rounded hover:bg-[var(--bg-elevated)]/40 text-xs"
             title={it.tooltip}
           >
-            <span className="shrink-0 text-[10px] text-[var(--text-faint)] w-4 tabular-nums">{i + 1}</span>
+            <span className="shrink-0 text-2xs text-[var(--text-faint)] w-4 tabular-nums">{i + 1}</span>
             <div className="flex-1 min-w-0">
               <div
-                className="text-[var(--text-primary)] truncate"
-                style={{ fontFamily: "var(--font-mono)" }}
+                className="text-[var(--text-primary)] truncate font-mono"
               >
                 {it.primary || "—"}
               </div>
               {it.secondary && (
-                <div className="text-[10px] text-[var(--text-muted)] truncate">{it.secondary}</div>
+                <div className="text-2xs text-[var(--text-muted)] truncate">{it.secondary}</div>
               )}
             </div>
             <span
-              className="shrink-0 text-[var(--text-secondary)] font-medium tabular-nums"
-              style={{ fontFamily: "var(--font-mono)" }}
+              className="shrink-0 text-[var(--text-secondary)] font-medium tabular-nums font-mono"
             >
               {it.value}
             </span>

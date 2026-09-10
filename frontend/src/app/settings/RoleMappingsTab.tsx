@@ -96,7 +96,7 @@ export default function RoleMappingsTab() {
                     {m.external_group}
                   </td>
                   <td className="py-2 px-2">
-                    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium border ${
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${
                       m.local_role === "admin"
                         ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/25"
                         : m.local_role === "editor"

@@ -24,8 +24,7 @@ export default function DrawerSection({ title, open, onToggle, active, children 
         onClick={onToggle}
         className={`w-full flex items-center justify-between py-3 text-sm font-medium transition-colors ${
           open ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-        }`}
-        style={{ fontFamily: "var(--font-display)" }}
+        } font-display`}
       >
         <span className="flex items-center gap-2">
           {title}

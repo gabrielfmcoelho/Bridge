@@ -120,7 +120,7 @@ export default function ShareIndexSidebar({
       aria-label={t("share.indexTitle")}
       className="lg:sticky lg:top-6 max-h-[calc(100vh-3rem)] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-3 text-xs"
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2 px-1">
+      <p className="text-2xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2 px-1">
         {t("share.indexTitle")}
       </p>
 
@@ -134,12 +134,12 @@ export default function ShareIndexSidebar({
       />
 
       {noResults && (
-        <p className="px-1 text-[11px] text-[var(--text-muted)]">{t("share.searchNoResults")}</p>
+        <p className="px-1 text-xs text-[var(--text-muted)]">{t("share.searchNoResults")}</p>
       )}
 
       {secretViews.length > 0 && (
         <div className="mb-3">
-          <p className="text-[11px] font-semibold text-[var(--text-secondary)] px-1 mb-1">
+          <p className="text-xs font-semibold text-[var(--text-secondary)] px-1 mb-1">
             {t("share.secrets")}
           </p>
           <ul className="space-y-0.5">
@@ -167,14 +167,14 @@ export default function ShareIndexSidebar({
             <button
               type="button"
               onClick={() => scrollToAnchor(`api-${i}`)}
-              className="w-full truncate text-left px-1 mb-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+              className="w-full truncate text-left px-1 mb-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
             >
               {doc.name}
             </button>
             {groups.map((group, g) => (
               <div key={`api-${i}-tag-${g}`} className="mb-1.5 last:mb-0">
                 {showTags && (
-                  <p className="px-2 pt-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">
+                  <p className="px-2 pt-0.5 text-3xs font-semibold uppercase tracking-wide text-[var(--text-faint)]">
                     {group.tag ?? t("share.indexOther")}
                   </p>
                 )}
@@ -188,7 +188,7 @@ export default function ShareIndexSidebar({
                         className="w-full flex items-start gap-1.5 text-left px-2 py-0.5 rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)] cursor-pointer"
                       >
                         <span
-                          className={`shrink-0 font-bold text-[9px] w-10 mt-0.5 ${METHOD_COLORS[op.method] || "text-[var(--text-muted)]"}`}
+                          className={`shrink-0 font-bold text-3xs w-10 mt-0.5 ${METHOD_COLORS[op.method] || "text-[var(--text-muted)]"}`}
                         >
                           {op.method}
                         </span>
@@ -207,7 +207,7 @@ export default function ShareIndexSidebar({
 
       {wikiViews.length > 0 && (
         <div className="mt-3">
-          <p className="text-[11px] font-semibold text-[var(--text-secondary)] px-1 mb-1">
+          <p className="text-xs font-semibold text-[var(--text-secondary)] px-1 mb-1">
             {t("share.wiki")}
           </p>
           {wikiViews.map(({ item, i, docs }) => (
@@ -215,7 +215,7 @@ export default function ShareIndexSidebar({
               <button
                 type="button"
                 onClick={() => scrollToAnchor(`wiki-${i}`)}
-                className="w-full truncate text-left px-1 mb-1 text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                className="w-full truncate text-left px-1 mb-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
               >
                 {item.title}
               </button>

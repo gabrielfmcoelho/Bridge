@@ -29,14 +29,14 @@ function WikiDocBlock({
             href={doc.browse_url}
             target="_blank"
             rel="noreferrer"
-            className="text-[10px] text-[var(--accent)] hover:underline"
+            className="text-2xs text-[var(--accent)] hover:underline"
           >
             {t("share.wikiOpen")} ↗
           </a>
         )}
       </div>
       {doc.updated_by && (
-        <p className="text-[10px] text-[var(--text-faint)]">
+        <p className="text-2xs text-[var(--text-faint)]">
           {t("share.wikiUpdatedBy", { name: doc.updated_by })}
         </p>
       )}
@@ -68,7 +68,7 @@ export default function ShareWikiSection({
     <div id={`wiki-${index}`} className="space-y-2 scroll-mt-6">
       <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{item.title}</h2>
-        <span className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--border-default)] bg-[var(--bg-overlay)] text-[var(--text-muted)]">
+        <span className="text-2xs px-1.5 py-0.5 rounded border border-[var(--border-default)] bg-[var(--bg-overlay)] text-[var(--text-muted)]">
           {item.kind === "collection" ? t("share.wikiCollection") : t("share.wikiDoc")}
         </span>
         {item.browse_url && (
@@ -76,7 +76,7 @@ export default function ShareWikiSection({
             href={item.browse_url}
             target="_blank"
             rel="noreferrer"
-            className="text-[10px] text-[var(--accent)] hover:underline"
+            className="text-2xs text-[var(--accent)] hover:underline"
           >
             {t("share.wikiOpen")} ↗
           </a>
@@ -89,7 +89,7 @@ export default function ShareWikiSection({
         />
       )}
       {item.truncated && (
-        <p className="text-[10px] text-amber-400">{t("share.wikiTruncated")}</p>
+        <p className="text-2xs text-amber-400">{t("share.wikiTruncated")}</p>
       )}
       <Card className="space-y-4">
         {item.documents.length === 0 ? (

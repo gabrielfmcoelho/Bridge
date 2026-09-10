@@ -138,7 +138,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   </div>
                 )}
                 <VMInfoDisplay info={data.vm_info!} locale={locale} compact />
-                <p className="text-[var(--text-faint)] text-[10px]">{t("operation.scanSaved")}</p>
+                <p className="text-[var(--text-faint)] text-2xs">{t("operation.scanSaved")}</p>
               </div>
             ),
           };
@@ -289,7 +289,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             {keys.map((k: RemoteKeyInfo, i: number) => (
               <div key={`${k.fingerprint}-${i}`} className="flex items-center gap-2 text-xs">
                 <Badge>{k.source === "authorized_keys" ? "authorized" : "private"}</Badge>
-                <span className="text-[var(--text-muted)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{k.fingerprint}</span>
+                <span className="text-[var(--text-muted)] truncate font-mono">{k.fingerprint}</span>
                 <span className="text-[var(--text-faint)]">{k.type}</span>
                 {k.name && <span className="text-[var(--text-secondary)] truncate">{k.name}</span>}
               </div>
@@ -314,9 +314,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
           <div className="space-y-2 text-xs">
             <p>{s.message}</p>
             {s.installed && (
-              <div className="grid grid-cols-3 gap-2 text-[10px]">
-                <div><span className="text-[var(--text-faint)] block">Docker</span><span style={{ fontFamily: "var(--font-mono)" }}>{s.docker_version?.replace("Docker version ", "").split(",")[0] || "-"}</span></div>
-                <div><span className="text-[var(--text-faint)] block">Compose</span><span style={{ fontFamily: "var(--font-mono)" }}>{s.compose_version?.replace(/.*version\s*/i, "").split(",")[0] || "-"}</span></div>
+              <div className="grid grid-cols-3 gap-2 text-2xs">
+                <div><span className="text-[var(--text-faint)] block">Docker</span><span className="font-mono">{s.docker_version?.replace("Docker version ", "").split(",")[0] || "-"}</span></div>
+                <div><span className="text-[var(--text-faint)] block">Compose</span><span className="font-mono">{s.compose_version?.replace(/.*version\s*/i, "").split(",")[0] || "-"}</span></div>
                 <div><span className="text-[var(--text-faint)] block">{t("operation.dockerGroup")}</span><span className={s.user_in_group ? "text-emerald-400" : "text-red-400"}>{s.user_in_group ? t("common.yes") : t("common.no")}</span></div>
               </div>
             )}
@@ -340,8 +340,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               <p>{data.error || "Install failed"}</p>
               {data.output && (
                 <pre
-                  className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-[10px] overflow-x-auto whitespace-pre-wrap break-all"
-                  style={{ fontFamily: "var(--font-mono)" }}
+                  className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-2xs overflow-x-auto whitespace-pre-wrap break-all font-mono"
                 >
                   {data.output}
                 </pre>
@@ -359,8 +358,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               <details>
                 <summary className="cursor-pointer text-[var(--text-muted)]">Output</summary>
                 <pre
-                  className="mt-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-[10px] overflow-x-auto whitespace-pre-wrap break-all"
-                  style={{ fontFamily: "var(--font-mono)" }}
+                  className="mt-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-2xs overflow-x-auto whitespace-pre-wrap break-all font-mono"
                 >
                   {data.output}
                 </pre>
@@ -387,13 +385,13 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         content: (
           <div className="space-y-2 text-xs">
             <p>{s.message}</p>
-            {s.backup_path && <p>Backup: <span style={{ fontFamily: "var(--font-mono)" }}>{s.backup_path}</span></p>}
+            {s.backup_path && <p>Backup: <span className="font-mono">{s.backup_path}</span></p>}
             <div className="space-y-1">
               {s.steps.map((step, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${step.status === "success" ? "bg-emerald-400" : step.status === "failed" ? "bg-red-400" : "bg-gray-400"}`} />
                   <span className="text-[var(--text-primary)]">{step.name}</span>
-                  {step.output && <span className="text-[var(--text-faint)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{step.output}</span>}
+                  {step.output && <span className="text-[var(--text-faint)] truncate font-mono">{step.output}</span>}
                 </div>
               ))}
             </div>
@@ -417,7 +415,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         <div className="flex items-center gap-2 text-xs">
           <span className={`w-2 h-2 rounded-full shrink-0 ${p.ok ? "bg-emerald-400" : "bg-red-400"}`} />
           <span className="text-[var(--text-primary)]">{label}</span>
-          <span className="text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>tcp/{p.port}</span>
+          <span className="text-[var(--text-faint)] font-mono">tcp/{p.port}</span>
           {p.ok
             ? <span className="text-[var(--text-muted)] tabular-nums">{p.latency_ms}ms</span>
             : <span className="text-red-400 truncate">{p.error || t("operation.networkTestFailed")}</span>}
@@ -432,7 +430,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             <div className="flex items-center gap-2 text-xs">
               <span className={`w-2 h-2 rounded-full shrink-0 ${pingDot}`} />
               <span className="text-[var(--text-primary)]">{t("operation.networkTestPing")}</span>
-              <span className="text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>{data.hostname}</span>
+              <span className="text-[var(--text-faint)] font-mono">{data.hostname}</span>
               {ping.skipped
                 ? <span className="text-[var(--text-faint)] truncate">{ping.error || t("operation.networkTestPingSkipped")}</span>
                 : ping.ok
@@ -442,9 +440,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             {renderPort(t("operation.networkTestSshPort"), data.ssh_port)}
             {data.custom_port && renderPort(t("operation.networkTestCustomPort"), data.custom_port)}
             {ping.output && (
-              <details className="text-[10px]">
+              <details className="text-2xs">
                 <summary className="cursor-pointer text-[var(--text-muted)]">{t("operation.networkTestPingDetails")}</summary>
-                <pre className="mt-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded p-2 overflow-x-auto whitespace-pre-wrap break-all" style={{ fontFamily: "var(--font-mono)" }}>{ping.output}</pre>
+                <pre className="mt-1 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded p-2 overflow-x-auto whitespace-pre-wrap break-all font-mono">{ping.output}</pre>
               </details>
             )}
           </div>
@@ -751,7 +749,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             </div>
             {expandedOp === op.id && (
               <div className="px-4 pb-3 pt-0">
-                <pre className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap" style={{ fontFamily: "var(--font-mono)" }}>
+                <pre className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">
                   {op.command}
                 </pre>
               </div>
@@ -769,7 +767,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="flex-1 min-w-0">
                 <span className="text-sm font-medium text-[var(--text-primary)]">{script.name}</span>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate" style={{ fontFamily: "var(--font-mono)" }}>{script.command}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate font-mono">{script.command}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button type="button" onClick={() => toggleOp(script.id)} className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors" title={t("operation.showCommand")}>
@@ -794,7 +792,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             </div>
             {expandedOp === script.id && (
               <div className="px-4 pb-3 pt-0">
-                <pre className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap" style={{ fontFamily: "var(--font-mono)" }}>{script.command}</pre>
+                <pre className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">{script.command}</pre>
               </div>
             )}
             {customResult?.id === script.id && (
@@ -822,7 +820,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         <div className="space-y-3 text-[var(--text-primary)]">
           <p className="text-xs text-[var(--text-muted)]">{t("operation.setupKeyDesc")}</p>
           <div>
-            <label className="block text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-1.5">
+            <label className="block text-2xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-1.5">
               {t("operation.chooseKeySource")}
             </label>
             <div className="flex gap-2">
@@ -942,17 +940,17 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                         <option key={k.id} value={k.id.toString()}>{k.name}{k.fingerprint ? ` (${k.fingerprint})` : ""}</option>
                       ))}
                     </select>
-                    <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+                    <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
                       {t("operation.createRemoteUserKeyHint")}
                     </p>
                     {selectedKey && (
-                      <div className="px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[10px]">
+                      <div className="px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-2xs">
                         <span className="text-[var(--text-faint)]">{t("operation.createRemoteUserKeyPreview")} </span>
-                        <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{selectedKey.name}</span>
+                        <span className="text-[var(--text-primary)] font-mono">{selectedKey.name}</span>
                         {selectedKey.fingerprint && (
                           <>
                             <span className="text-[var(--text-faint)]"> · </span>
-                            <span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{selectedKey.fingerprint}</span>
+                            <span className="text-[var(--text-muted)] font-mono">{selectedKey.fingerprint}</span>
                           </>
                         )}
                       </div>
@@ -1042,22 +1040,22 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                       ))}
                     </select>
                     {lastScan?.scanned_at && (
-                      <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+                      <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
                         {t("operation.deleteRemoteUserSourceScan").replace("{date}", new Date(lastScan.scanned_at).toLocaleString(locale === "pt-BR" ? "pt-BR" : "en-US"))}
                       </p>
                     )}
                     {selectedScannedUser && (
-                      <div className="px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[10px] space-y-0.5">
+                      <div className="px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-2xs space-y-0.5">
                         {selectedScannedUser.home && (
                           <div>
                             <span className="text-[var(--text-faint)]">{t("operation.deleteRemoteUserHomeLabel")} </span>
-                            <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{selectedScannedUser.home}</span>
+                            <span className="text-[var(--text-primary)] font-mono">{selectedScannedUser.home}</span>
                           </div>
                         )}
                         {selectedScannedUser.shell && (
                           <div>
                             <span className="text-[var(--text-faint)]">{t("operation.deleteRemoteUserShellLabel")} </span>
-                            <span className="text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{selectedScannedUser.shell}</span>
+                            <span className="text-[var(--text-primary)] font-mono">{selectedScannedUser.shell}</span>
                           </div>
                         )}
                       </div>
@@ -1073,7 +1071,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                       maxLength={32}
                       className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
                     />
-                    <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+                    <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
                       {t("operation.deleteRemoteUserNoScanHint")}
                     </p>
                   </div>
@@ -1100,7 +1098,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   />
                   <div>
                     <span className="text-[var(--text-primary)] font-medium">{t("operation.deleteRemoteUserRemoveHome")}</span>
-                    <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
+                    <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
                       {t("operation.deleteRemoteUserRemoveHomeHint")}
                     </p>
                   </div>
@@ -1112,7 +1110,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                 <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-2">
                   {t("operation.deleteRemoteUserWarningSection")}
                 </h3>
-                <div className="rounded-[var(--radius-sm)] bg-red-500/10 border border-red-500/25 px-2.5 py-2 text-[11px] leading-relaxed text-red-300">
+                <div className="rounded-[var(--radius-sm)] bg-red-500/10 border border-red-500/25 px-2.5 py-2 text-xs leading-relaxed text-red-300">
                   {t("operation.deleteRemoteUserWarning")}
                 </div>
               </section>
@@ -1174,7 +1172,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   onChange={(e) => setNetworkTestPort(e.target.value.replace(/[^0-9]/g, ""))}
                   className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm"
                 />
-                <p className="mt-2 text-[10px] text-[var(--text-faint)] leading-relaxed">
+                <p className="mt-2 text-2xs text-[var(--text-faint)] leading-relaxed">
                   {t("operation.networkTestPortHint")}
                 </p>
                 {!portValid && (
@@ -1208,21 +1206,21 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
                 >
                   <span className={`w-2 h-2 rounded-full shrink-0 ${log.status === "success" ? "bg-emerald-400" : "bg-red-400"}`} />
-                  <span className="text-xs font-medium text-[var(--text-primary)] min-w-0 truncate" style={{ fontFamily: "var(--font-mono)" }}>
+                  <span className="text-xs font-medium text-[var(--text-primary)] min-w-0 truncate font-mono">
                     {opTypeLabel(log.operation_type, t)}
                   </span>
                   {log.auth_method && <Badge>{log.auth_method}</Badge>}
-                  <span className="text-[10px] text-[var(--text-faint)] ml-auto shrink-0 tabular-nums">
+                  <span className="text-2xs text-[var(--text-faint)] ml-auto shrink-0 tabular-nums">
                     {formatLogTime(log.created_at, locale)}
                   </span>
-                  <span className="text-[10px] text-[var(--text-faint)] shrink-0">{log.user_name}</span>
+                  <span className="text-2xs text-[var(--text-faint)] shrink-0">{log.user_name}</span>
                   {log.output && (
                     <Icon path={ICON_PATHS.chevronDown} className={`w-3 h-3 text-[var(--text-faint)] shrink-0 transition-transform duration-150 ${expandedLogId === log.id ? "rotate-180" : ""}`} />
                   )}
                 </button>
                 {expandedLogId === log.id && log.output && (
                   <div className="px-4 pb-3 pt-0">
-                    <pre className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap" style={{ fontFamily: "var(--font-mono)" }}>{log.output}</pre>
+                    <pre className="text-2xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">{log.output}</pre>
                   </div>
                 )}
               </div>
@@ -1277,7 +1275,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                 <div className="flex items-center gap-2 text-sm">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass}`} />
                   <span className={`font-medium ${statusTextClass}`}>{statusLabel}</span>
-                  <span className="text-[10px] text-[var(--text-faint)] ml-auto tabular-nums">
+                  <span className="text-2xs text-[var(--text-faint)] ml-auto tabular-nums">
                     {new Date(consoleEntry.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
@@ -1343,7 +1341,7 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
   return (
     <div className="space-y-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] border ${riskClass}`}>
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs border ${riskClass}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${
             report.risk_level === "critical" ? "bg-red-400"
               : report.risk_level === "warning" ? "bg-amber-400"
@@ -1351,9 +1349,9 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
           }`} />
           {report.risk_level.toUpperCase()}
         </span>
-        <span className="text-[10px] text-[var(--text-muted)]">
-          driver: <span style={{ fontFamily: "var(--font-mono)" }}>{report.log_driver || "—"}</span>
-          {" · "}rotation: <span style={{ fontFamily: "var(--font-mono)" }}>{report.rotation_configured ? "configured" : "missing"}</span>
+        <span className="text-2xs text-[var(--text-muted)]">
+          driver: <span className="font-mono">{report.log_driver || "—"}</span>
+          {" · "}rotation: <span className="font-mono">{report.rotation_configured ? "configured" : "missing"}</span>
         </span>
       </div>
 
@@ -1365,24 +1363,24 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
 
       <div className="grid grid-cols-3 gap-3 text-xs">
         <div>
-          <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider">Total log size</span>
-          <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{totalHuman}</span>
+          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">Total log size</span>
+          <span className="text-[var(--text-primary)] font-medium font-mono">{totalHuman}</span>
         </div>
         <div>
-          <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider">Largest container</span>
-          <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{largestHuman}</span>
+          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">Largest container</span>
+          <span className="text-[var(--text-primary)] font-medium font-mono">{largestHuman}</span>
         </div>
         <div>
-          <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider">Unbounded containers</span>
-          <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{report.unbounded_containers}</span>
+          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">Unbounded containers</span>
+          <span className="text-[var(--text-primary)] font-medium font-mono">{report.unbounded_containers}</span>
         </div>
       </div>
 
       {report.daemon_json_exists && (
-        <div className="text-[10px] text-[var(--text-muted)] leading-snug">
-          <span className="block">/etc/docker/daemon.json log-driver: <span style={{ fontFamily: "var(--font-mono)" }}>{report.daemon_log_driver || "(not set)"}</span></span>
+        <div className="text-2xs text-[var(--text-muted)] leading-snug">
+          <span className="block">/etc/docker/daemon.json log-driver: <span className="font-mono">{report.daemon_log_driver || "(not set)"}</span></span>
           {report.daemon_log_opts && Object.keys(report.daemon_log_opts).length > 0 && (
-            <span className="block">log-opts: <span style={{ fontFamily: "var(--font-mono)" }}>{JSON.stringify(report.daemon_log_opts)}</span></span>
+            <span className="block">log-opts: <span className="font-mono">{JSON.stringify(report.daemon_log_opts)}</span></span>
           )}
           {report.daemon_json_unclean && (
             <span className="block text-amber-400">daemon.json failed to parse — fix the syntax before applying rotation.</span>
@@ -1392,19 +1390,19 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
 
       {report.containers && report.containers.length > 0 && (
         <div>
-          <span className="block text-[10px] text-[var(--text-faint)] uppercase tracking-wider mb-1.5">Containers (sorted by log size)</span>
+          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider mb-1.5">Containers (sorted by log size)</span>
           <div className="space-y-1">
             {report.containers.map((c) => (
               <div
                 key={c.id}
                 className="flex flex-wrap items-center gap-2 px-2 py-1 rounded border border-[var(--border-subtle)]/50 text-xs"
               >
-                <span className="font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>
+                <span className="font-medium text-[var(--text-primary)] font-mono">
                   {c.name}
                 </span>
-                <span className="text-[10px] text-[var(--text-faint)]">{c.image}</span>
+                <span className="text-2xs text-[var(--text-faint)]">{c.image}</span>
                 <span
-                  className={`ml-auto shrink-0 px-1.5 py-0.5 rounded text-[10px] ${
+                  className={`ml-auto shrink-0 px-1.5 py-0.5 rounded text-2xs ${
                     c.has_rotation
                       ? "bg-emerald-500/10 text-emerald-300 light:text-emerald-800 border border-emerald-500/30"
                       : "bg-amber-500/10 text-amber-300 light:text-amber-800 border border-amber-500/30"
@@ -1414,8 +1412,7 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
                   {c.has_rotation ? "rotated" : "unbounded"}
                 </span>
                 <span
-                  className="shrink-0 text-[var(--text-secondary)]"
-                  style={{ fontFamily: "var(--font-mono)" }}
+                  className="shrink-0 text-[var(--text-secondary)] font-mono"
                   title={c.log_path}
                 >
                   {c.human_size || humanizeBytesClient(c.size_bytes)}

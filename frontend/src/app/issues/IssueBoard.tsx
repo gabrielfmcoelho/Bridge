@@ -277,7 +277,7 @@ export default function IssueBoard() {
           <Icon path={ICON_PATHS.filter} />
           <span className="hidden sm:inline">Filters</span>
           {activeFilterCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[var(--accent)] text-[var(--bg-base)] text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[var(--accent)] text-[var(--bg-base)] text-2xs font-bold flex items-center justify-center">
               {activeFilterCount}
             </span>
           )}
@@ -508,12 +508,11 @@ function KanbanView({
             {/* Column header */}
             <div className="px-3 py-2.5 border-b border-[var(--border-subtle)] flex items-center justify-between">
               <span
-                className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"
-                style={{ fontFamily: "var(--font-display)" }}
+                className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] font-display"
               >
                 {statusLabels[status]}
               </span>
-              <span className="text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5 py-0.5">
+              <span className="text-2xs font-medium text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5 py-0.5">
                 {columnIssues.length}
               </span>
             </div>
@@ -578,7 +577,7 @@ function IssueCard({
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
             {issue.entity_type && (
               <span
-                className={`text-[10px] rounded px-1.5 py-0.5 ${
+                className={`text-2xs rounded px-1.5 py-0.5 ${
                   entityColors[issue.entity_type]
                     ? `text-${entityColors[issue.entity_type]}-400 bg-${entityColors[issue.entity_type]}-500/10`
                     : "text-[var(--text-faint)] bg-[var(--bg-overlay)]"
@@ -588,7 +587,7 @@ function IssueCard({
               </span>
             )}
             {issue.source === "alert" && (
-              <span className="text-[10px] text-red-400 bg-red-500/10 rounded px-1.5 py-0.5 font-medium">alert</span>
+              <span className="text-2xs text-red-400 bg-red-500/10 rounded px-1.5 py-0.5 font-medium">alert</span>
             )}
           </div>
         </div>
@@ -597,7 +596,7 @@ function IssueCard({
       {/* Meta row */}
       <div className="flex items-center gap-1.5 flex-wrap text-xs">
         {issue.expected_end_date && (
-          <span className="text-[var(--text-faint)] ml-auto" style={{ fontFamily: "var(--font-mono)" }}>
+          <span className="text-[var(--text-faint)] ml-auto font-mono">
             {issue.expected_end_date}
           </span>
         )}
@@ -607,13 +606,13 @@ function IssueCard({
               <span
                 key={name}
                 title={name}
-                className="w-5 h-5 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] text-[8px] font-bold flex items-center justify-center border border-[var(--bg-surface)]"
+                className="w-5 h-5 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] text-3xs font-bold flex items-center justify-center border border-[var(--bg-surface)]"
               >
                 {getInitials(name)}
               </span>
             ))}
             {assigneeNames.length > 3 && (
-              <span className="w-5 h-5 rounded-full bg-[var(--bg-overlay)] text-[var(--text-faint)] text-[8px] font-bold flex items-center justify-center border border-[var(--bg-surface)]">
+              <span className="w-5 h-5 rounded-full bg-[var(--bg-overlay)] text-[var(--text-faint)] text-3xs font-bold flex items-center justify-center border border-[var(--bg-surface)]">
                 +{assigneeNames.length - 3}
               </span>
             )}
@@ -629,7 +628,7 @@ function IssueCard({
         >
           <button
             onClick={() => setShowStatusMenu(v => !v)}
-            className="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors flex items-center gap-0.5"
+            className="text-2xs text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors flex items-center gap-0.5"
           >
             <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
@@ -684,7 +683,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
     <div className="border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-x-auto animate-fade-in">
       <table className="w-full text-sm min-w-[640px]">
         <thead>
-          <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
+          <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs uppercase tracking-wider">
             <th
               className="text-left px-4 py-3 font-semibold cursor-pointer select-none hover:text-[var(--text-secondary)] w-8"
               onClick={() => onSort("priority")}
@@ -734,7 +733,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] max-w-xs">
                   <span className="line-clamp-1">{issue.title}</span>
                   {issue.source === "alert" && (
-                    <span className="ml-1.5 text-[10px] text-red-400 bg-red-500/10 rounded px-1.5 py-0.5 font-medium">alert</span>
+                    <span className="ml-1.5 text-2xs text-red-400 bg-red-500/10 rounded px-1.5 py-0.5 font-medium">alert</span>
                   )}
                 </td>
 
@@ -774,13 +773,13 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                         <span
                           key={name}
                           title={name}
-                          className="w-6 h-6 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] text-[10px] font-bold flex items-center justify-center border-2 border-[var(--bg-base)]"
+                          className="w-6 h-6 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] text-2xs font-bold flex items-center justify-center border-2 border-[var(--bg-base)]"
                         >
                           {name.slice(0, 2).toUpperCase()}
                         </span>
                       ))}
                       {assignees.length > 4 && (
-                        <span className="w-6 h-6 rounded-full bg-[var(--bg-overlay)] text-[var(--text-faint)] text-[10px] font-bold flex items-center justify-center border-2 border-[var(--bg-base)]">
+                        <span className="w-6 h-6 rounded-full bg-[var(--bg-overlay)] text-[var(--text-faint)] text-2xs font-bold flex items-center justify-center border-2 border-[var(--bg-base)]">
                           +{assignees.length - 4}
                         </span>
                       )}

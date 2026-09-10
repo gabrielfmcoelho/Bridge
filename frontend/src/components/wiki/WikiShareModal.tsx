@@ -153,7 +153,7 @@ export default function WikiShareModal({
             {t("atlas.apis.neverExpires")}
           </label>
           {neverExpiry && (
-            <p className="-mt-2 text-[10px] text-amber-400">{t("atlas.apis.neverExpiresHint")}</p>
+            <p className="-mt-2 text-2xs text-amber-400">{t("atlas.apis.neverExpiresHint")}</p>
           )}
 
           {error && <FormError message={error} />}
@@ -204,28 +204,28 @@ export default function WikiShareModal({
                               {t("atlas.apis.views")}
                             </span>
                             {!dead ? (
-                              <span className="text-[10px] text-emerald-400">
+                              <span className="text-2xs text-emerald-400">
                                 {t("atlas.apis.statusLive")}
                               </span>
                             ) : revoked ? (
-                              <span className="text-[10px] text-red-400">
+                              <span className="text-2xs text-red-400">
                                 {t("atlas.apis.statusRevoked")}
                               </span>
                             ) : expired ? (
-                              <span className="text-[10px] text-red-400">
+                              <span className="text-2xs text-red-400">
                                 {t("atlas.apis.statusExpired")}
                               </span>
                             ) : exhausted ? (
-                              <span className="text-[10px] text-red-400">
+                              <span className="text-2xs text-red-400">
                                 {t("atlas.apis.statusExhausted")}
                               </span>
                             ) : (
-                              <span className="text-[10px] text-[var(--text-muted)]">
+                              <span className="text-2xs text-[var(--text-muted)]">
                                 {t("atlas.apis.statusArchived")}
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] text-[var(--text-faint)] mt-0.5">
+                          <div className="text-2xs text-[var(--text-faint)] mt-0.5">
                             {link.expires_at
                               ? `${t("atlas.apis.expiresLabel")} ${new Date(link.expires_at).toLocaleString()}`
                               : t("atlas.apis.expiryNever")}
@@ -238,7 +238,7 @@ export default function WikiShareModal({
                             onChange={(e) =>
                               setRenewChoice((m) => ({ ...m, [link.id]: Number(e.target.value) }))
                             }
-                            className="text-[10px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-1 py-0.5 text-[var(--text-secondary)]"
+                            className="text-2xs bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-1 py-0.5 text-[var(--text-secondary)]"
                           >
                             <option value={3600}>1h</option>
                             <option value={86400}>24h</option>

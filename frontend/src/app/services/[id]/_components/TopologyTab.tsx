@@ -51,8 +51,7 @@ export default function ServiceTopologyTab({
             className="overflow-hidden flex flex-col h-[50vh] lg:h-[calc(100vh-18rem)]"
           >
             <h2
-              className="text-sm font-semibold text-[var(--text-secondary)] mb-3 shrink-0"
-              style={{ fontFamily: "var(--font-display)" }}
+              className="text-sm font-semibold text-[var(--text-secondary)] mb-3 shrink-0 font-display"
             >
               Topology
             </h2>
@@ -120,7 +119,7 @@ export default function ServiceTopologyTab({
                     href={`/hosts/${host.oficial_slug}`}
                     className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-primary)] hover:text-[var(--accent)]"
                   >
-                    <span className="flex-1 truncate" style={{ fontFamily: "var(--font-mono)" }}>{host.oficial_slug}</span>
+                    <span className="flex-1 truncate font-mono">{host.oficial_slug}</span>
                   </Link>
                 ))}
               </div>
@@ -139,7 +138,7 @@ export default function ServiceTopologyTab({
                     href={`/dns/${dns.id}`}
                     className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-primary)] hover:text-[var(--accent)]"
                   >
-                    <span className="flex-1 truncate" style={{ fontFamily: "var(--font-mono)" }}>{dns.domain}</span>
+                    <span className="flex-1 truncate font-mono">{dns.domain}</span>
                     {dns.has_https && (
                       <Badge color="emerald">
                         <Icon path={ICON_PATHS.lock} className="w-3 h-3" />

@@ -55,7 +55,7 @@ export default function AtlasToolbar({ indexes, filters, onChange, showRoleFilte
         >
           <Icon path={ICON_PATHS.search} className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
           <span className="truncate flex-1">{t("atlas.catalog.toolbar.searchPlaceholder")}</span>
-          <kbd className="text-[9px] px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-faint)] font-mono">⌘K</kbd>
+          <kbd className="text-3xs px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-faint)] font-mono">⌘K</kbd>
         </button>
         {rightSlot}
       </div>

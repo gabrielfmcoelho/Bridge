@@ -121,7 +121,7 @@ export default function PermissionsTab() {
                 <tr>
                   <td
                     colSpan={ROLES.length + 1}
-                    className="pt-4 pb-1 px-2 text-[10px] font-bold text-[var(--text-faint)] uppercase tracking-widest"
+                    className="pt-4 pb-1 px-2 text-2xs font-bold text-[var(--text-faint)] uppercase tracking-widest"
                   >
                     {category}
                   </td>
@@ -133,7 +133,7 @@ export default function PermissionsTab() {
                   >
                     <td className="py-2 px-2">
                       <div className="text-[var(--text-secondary)]">{p.description}</div>
-                      <div className="text-[10px] text-[var(--text-faint)] font-mono">{p.code}</div>
+                      <div className="text-2xs text-[var(--text-faint)] font-mono">{p.code}</div>
                     </td>
                     {ROLES.map((role) => {
                       const checked = role === "admin" || (matrix[role]?.has(p.code) ?? false);
@@ -158,7 +158,7 @@ export default function PermissionsTab() {
         </table>
       </div>
 
-      <p className="mt-3 text-[11px] text-[var(--text-faint)]">
+      <p className="mt-3 text-xs text-[var(--text-faint)]">
         Admin role always has all permissions and cannot be modified.
       </p>
     </Card>

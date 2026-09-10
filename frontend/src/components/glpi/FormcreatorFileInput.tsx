@@ -96,12 +96,12 @@ export default function FormcreatorFileInput({
           {atLimit ? "Limite atingido" : "Adicionar arquivo"}
         </Button>
         {maxFiles != null && (
-          <span className="text-[11px] text-[var(--text-faint)]">
+          <span className="text-xs text-[var(--text-faint)]">
             {value.length} / {maxFiles}
           </span>
         )}
         {accept && (
-          <span className="text-[11px] text-[var(--text-faint)]" title={accept}>
+          <span className="text-xs text-[var(--text-faint)]" title={accept}>
             Tipos: {accept}
           </span>
         )}

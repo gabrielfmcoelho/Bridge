@@ -79,11 +79,11 @@ export default function PipelinePageInner() {
         <div className="px-4 md:px-6 pt-4 pb-3 border-b border-[var(--border-subtle)] flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
+              <h1 className="text-2xl font-bold tracking-tight font-display">
                 {t("atlas.pipeline.title")}
               </h1>
               {generatedAt && (
-                <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-faint)]">
+                <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)]">
                   {t("atlas.lineage.generatedAt")} · {new Date(generatedAt).toLocaleString()}
                 </span>
               )}

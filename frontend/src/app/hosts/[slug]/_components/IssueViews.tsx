@@ -93,7 +93,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
               <div className="grid grid-cols-3 gap-3 text-xs">
                 <div>
                   <span className="text-[var(--text-faint)] block mb-0.5">{t("alert.type")}</span>
-                  <span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{alert.type}</span>
+                  <span className="text-[var(--text-muted)] font-mono">{alert.type}</span>
                 </div>
                 <div>
                   <span className="text-[var(--text-faint)] block mb-0.5">{t("alert.level")}</span>
@@ -132,7 +132,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
             return sorted.map((alert, i) => (
               <tr key={i} className={`border-t border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`} onClick={() => onAlertClick(alert)}>
                 <td className="px-4 py-2.5"><span className="inline-flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${ALERT_DOT_COLOR[alert.level]}`} /><span className="capitalize text-[var(--text-secondary)]">{alert.level}</span></span></td>
-                <td className="px-4 py-2.5"><span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{alert.type}</span></td>
+                <td className="px-4 py-2.5"><span className="text-[var(--text-muted)] font-mono">{alert.type}</span></td>
                 <td className="px-4 py-2.5">
                   <span className={`inline-flex items-center gap-1.5 ${alert.status === "resolved" ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>
                     {alert.status === "resolved" && (
@@ -183,8 +183,8 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
             return (
               <div key={status} className="flex-1 min-w-[220px]">
                 <div className="flex items-center gap-1.5 mb-2 px-1">
-                  <span className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">{STATUS_LABELS[status]}</span>
-                  {items.length > 0 && <span className="text-[10px] text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5">{items.length}</span>}
+                  <span className="text-2xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{STATUS_LABELS[status]}</span>
+                  {items.length > 0 && <span className="text-2xs text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5">{items.length}</span>}
                 </div>
                 <Droppable droppableId={status}>
                   {(provided, snapshot) => (
@@ -235,11 +235,11 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
                                       {assignees.length > 0 ? (
                                         <div className="flex -space-x-1">
                                           {assignees.map((user) => (
-                                            <span key={user!.id} className="w-5 h-5 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] text-[8px] font-bold flex items-center justify-center border border-[var(--bg-surface)]" title={user!.display_name}>
+                                            <span key={user!.id} className="w-5 h-5 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] text-3xs font-bold flex items-center justify-center border border-[var(--bg-surface)]" title={user!.display_name}>
                                               {getInitials(user!.display_name)}
                                             </span>
                                           ))}
-                                          {(issue.assignee_ids?.length || 0) > 3 && <span className="w-5 h-5 rounded-full bg-[var(--bg-overlay)] text-[var(--text-faint)] text-[8px] font-bold flex items-center justify-center border border-[var(--bg-surface)]">+{issue.assignee_ids!.length - 3}</span>}
+                                          {(issue.assignee_ids?.length || 0) > 3 && <span className="w-5 h-5 rounded-full bg-[var(--bg-overlay)] text-[var(--text-faint)] text-3xs font-bold flex items-center justify-center border border-[var(--bg-surface)]">+{issue.assignee_ids!.length - 3}</span>}
                                         </div>
                                       ) : (
                                         <span className="text-[var(--text-faint)]">--</span>
@@ -247,7 +247,7 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
                                     </div>
                                     <div>
                                       <span className="text-[var(--text-faint)] block mb-0.5">{t("issue.due")}</span>
-                                      <span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>
+                                      <span className="text-[var(--text-muted)] font-mono">
                                         {issue.expected_end_date || "--"}
                                       </span>
                                     </div>

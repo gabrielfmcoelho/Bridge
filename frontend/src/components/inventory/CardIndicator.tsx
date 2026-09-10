@@ -29,8 +29,7 @@ export default function CardIndicator({
       </svg>
       {active && !hideCount && (
         <span
-          className={`text-xs font-semibold text-${color}-400`}
-          style={{ fontFamily: "var(--font-mono)" }}
+          className={`text-xs font-semibold text-${color}-400 font-mono`}
         >
           {count}
         </span>

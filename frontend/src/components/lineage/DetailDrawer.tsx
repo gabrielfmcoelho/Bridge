@@ -43,19 +43,19 @@ export default function DetailDrawer({ node, indexes, onClose, onSelect, onOpenI
       title={node.label}
       subHeader={
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-[10px] px-2 py-0.5 rounded-full ${c.bg} ${c.text} ${c.border} border font-semibold uppercase tracking-wider`}>
+          <span className={`text-2xs px-2 py-0.5 rounded-full ${c.bg} ${c.text} ${c.border} border font-semibold uppercase tracking-wider`}>
             {NODE_TYPE_LABELS[node.type] ?? node.type}
           </span>
           {node.layer && (
-            <span className={`text-[10px] uppercase tracking-wider font-semibold ${LAYER_COLORS[node.layer] ?? "text-[var(--text-muted)]"}`}>
+            <span className={`text-2xs uppercase tracking-wider font-semibold ${LAYER_COLORS[node.layer] ?? "text-[var(--text-muted)]"}`}>
               {node.layer}
             </span>
           )}
           {node.namespace && (
-            <span className="text-[10px] text-[var(--text-muted)]">📁 {node.namespace}</span>
+            <span className="text-2xs text-[var(--text-muted)]">📁 {node.namespace}</span>
           )}
           {node.file && (
-            <span className="text-[10px] text-[var(--text-muted)] font-mono">
+            <span className="text-2xs text-[var(--text-muted)] font-mono">
               {node.file}{node.lines?.[0] ? `:${node.lines[0]}` : ""}
             </span>
           )}
@@ -103,7 +103,7 @@ export default function DetailDrawer({ node, indexes, onClose, onSelect, onOpenI
                   ? "bg-red-500/10 border-red-500/30 text-red-300"
                   : "bg-amber-500/10 border-amber-500/30 text-amber-300"
               }`}>
-                <div className="font-mono text-[10px] uppercase opacity-80">{w.kind}</div>
+                <div className="font-mono text-2xs uppercase opacity-80">{w.kind}</div>
                 <div className="mt-0.5">{w.message}</div>
               </div>
             ))}
@@ -174,7 +174,7 @@ function ColumnRow({ column, indexes, onSelect, t }: {
     <div className="bg-[var(--bg-base)] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] p-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-mono text-[var(--text-primary)]">{column.label}</span>
-        <span className="text-[9px] text-[var(--text-muted)]">
+        <span className="text-3xs text-[var(--text-muted)]">
           ↑{upstream.length} ↓{downstream.length}
         </span>
       </div>
@@ -186,7 +186,7 @@ function ColumnRow({ column, indexes, onSelect, t }: {
               <button
                 key={i}
                 onClick={() => onSelect(e.source)}
-                className="block w-full text-left text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] truncate"
+                className="block w-full text-left text-2xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] truncate"
                 title={e.source}
               >
                 <ConfidenceDot c={e.confidence as string | undefined} />
@@ -196,7 +196,7 @@ function ColumnRow({ column, indexes, onSelect, t }: {
             );
           })}
           {upstream.length > 6 && (
-            <span className="text-[9px] text-[var(--text-muted)]">+{upstream.length - 6} {t("common.more")}</span>
+            <span className="text-3xs text-[var(--text-muted)]">+{upstream.length - 6} {t("common.more")}</span>
           )}
         </div>
       )}
@@ -226,16 +226,16 @@ function NeighborList({ title, edges, side, indexes, onSelect, t }: {
               onClick={() => onSelect(otherId)}
               className="w-full flex items-center gap-2 text-xs text-left hover:bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] px-2 py-1 transition-colors"
             >
-              <span className="text-[9px] uppercase tracking-wider text-[var(--text-faint)] font-mono w-20 shrink-0">{e.kind}</span>
+              <span className="text-3xs uppercase tracking-wider text-[var(--text-faint)] font-mono w-20 shrink-0">{e.kind}</span>
               <span className="text-[var(--text-primary)] font-mono truncate flex-1">{other?.label ?? otherId}</span>
               {other?.type && (
-                <span className="text-[9px] text-[var(--text-muted)] shrink-0">{NODE_TYPE_LABELS[other.type] ?? other.type}</span>
+                <span className="text-3xs text-[var(--text-muted)] shrink-0">{NODE_TYPE_LABELS[other.type] ?? other.type}</span>
               )}
             </button>
           );
         })}
         {edges.length > 30 && (
-          <span className="text-[10px] text-[var(--text-muted)] ml-2">+{edges.length - 30} {t("common.more")}</span>
+          <span className="text-2xs text-[var(--text-muted)] ml-2">+{edges.length - 30} {t("common.more")}</span>
         )}
       </div>
     </div>
@@ -251,7 +251,7 @@ function ConfidenceDot({ c }: { c?: string }) {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider font-semibold">{children}</div>;
+  return <div className="text-2xs text-[var(--text-faint)] uppercase tracking-wider font-semibold">{children}</div>;
 }
 
 function renderValue(v: unknown): string {

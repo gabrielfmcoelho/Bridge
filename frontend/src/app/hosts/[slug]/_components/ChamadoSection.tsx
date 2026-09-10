@@ -135,7 +135,7 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
                     <span className="text-sm font-medium text-[var(--text-primary)] truncate block">
                       {c.title || c.chamado_id || "--"}
                     </span>
-                    <span className="text-[10px] text-[var(--text-faint)] truncate block" style={{ fontFamily: "var(--font-mono)" }}>
+                    <span className="text-2xs text-[var(--text-faint)] truncate block font-mono">
                       {c.chamado_id || "--"}
                     </span>
                   </div>
@@ -157,7 +157,7 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
                   </div>
                   <div>
                     <span className="text-[var(--text-faint)] block mb-0.5">{t("host.chamadoDate") || "Date"}</span>
-                    <span className="text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{c.date || "--"}</span>
+                    <span className="text-[var(--text-muted)] font-mono">{c.date || "--"}</span>
                   </div>
                 </div>
               </Card>
@@ -186,7 +186,7 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
             });
             return sorted.map((c, i) => (
               <tr key={c.id ?? i} className={`border-t border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`} onClick={() => openDetail(c)}>
-                <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{c.chamado_id || "--"}</td>
+                <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] font-mono">{c.chamado_id || "--"}</td>
                 <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.title || "--"}</td>
                 <td className="px-4 py-2.5">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_BADGE[c.status] || STATUS_BADGE.in_execution}`}>
@@ -194,7 +194,7 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
                   </span>
                 </td>
                 <td className="px-4 py-2.5 text-[var(--text-muted)]">{c.user_display_name || "--"}</td>
-                <td className="px-4 py-2.5 text-[var(--text-muted)]" style={{ fontFamily: "var(--font-mono)" }}>{c.date || "--"}</td>
+                <td className="px-4 py-2.5 text-[var(--text-muted)] font-mono">{c.date || "--"}</td>
               </tr>
             ));
           }}

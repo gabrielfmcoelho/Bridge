@@ -97,7 +97,7 @@ export default function HostLiveKpis({ slug }: Props) {
     <div>
       <KpiGrid kpis={kpis} columns={5} />
       {data.warnings && data.warnings.length > 0 && (
-        <details className="-mt-3 mb-3 text-[10px] text-[var(--text-faint)]">
+        <details className="-mt-3 mb-3 text-2xs text-[var(--text-faint)]">
           <summary className="cursor-pointer hover:text-[var(--text-muted)]">
             {data.warnings.length} metric{data.warnings.length === 1 ? "" : "s"} failed to fetch
           </summary>
@@ -109,7 +109,7 @@ export default function HostLiveKpis({ slug }: Props) {
         </details>
       )}
       {data.host_up === false && (
-        <div className="-mt-2 mb-3 rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-300">
+        <div className="-mt-2 mb-3 rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
           Prometheus reports this host as <strong>down</strong> (up=0). The tiles above show the last values Prometheus scraped.
         </div>
       )}

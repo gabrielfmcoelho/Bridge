@@ -87,12 +87,12 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
                 #{data.computer.id} · {data.computer.name}
               </p>
             </div>
-            <span className="text-[10px] text-[var(--text-faint)]">
+            <span className="text-2xs text-[var(--text-faint)]">
               {data.tickets.length} ticket{data.tickets.length === 1 ? "" : "s"} aberto{data.tickets.length === 1 ? "" : "s"}
             </span>
           </Card>
           {data.warning && (
-            <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] px-3 py-2 mb-2">
+            <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2 mb-2">
               {data.warning}
             </div>
           )}

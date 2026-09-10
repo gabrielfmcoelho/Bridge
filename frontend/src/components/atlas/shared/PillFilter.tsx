@@ -38,7 +38,7 @@ export default function PillFilter<T extends string>({
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
       {!hideLabel && (
-        <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-faint)] font-semibold mr-1">
+        <span className="text-2xs uppercase tracking-[0.12em] text-[var(--text-faint)] font-semibold mr-1">
           {label}
         </span>
       )}

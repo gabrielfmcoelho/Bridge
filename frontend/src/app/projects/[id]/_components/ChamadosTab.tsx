@@ -62,7 +62,7 @@ export default function ChamadosTab({ projectId, projectName, profileID, canEdit
       </Card>
 
       {warning && warning !== "no_profile_linked" && (
-        <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] px-3 py-2">
+        <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2">
           {warning}
         </div>
       )}

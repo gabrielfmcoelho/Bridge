@@ -95,7 +95,7 @@ function SortableResourceList<T>({ title, rows, columns, getIcon, getName, defau
           <Card key={i} hover={false} className="!p-3 flex flex-col">
             <div className="flex items-center gap-2 mb-1">
               {getIcon(row)}
-              <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1 min-w-0" style={{ fontFamily: "var(--font-mono)" }}>{getName(row)}</span>
+              <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1 min-w-0 font-mono">{getName(row)}</span>
               {renderTitleExtra && renderTitleExtra(row)}
             </div>
             {renderCardMeta && renderCardMeta(row)}
@@ -103,7 +103,7 @@ function SortableResourceList<T>({ title, rows, columns, getIcon, getName, defau
               {columns.map((col) => (
                 <div key={col.key}>
                   <span className="text-[var(--text-faint)] block mb-0.5">{col.label}</span>
-                  <span className={`font-medium ${col.colorFn ? col.colorFn(row) : "text-[var(--text-secondary)]"}`} style={{ fontFamily: "var(--font-mono)" }}>{col.getValue(row)}</span>
+                  <span className={`font-medium ${col.colorFn ? col.colorFn(row) : "text-[var(--text-secondary)]"} font-mono`}>{col.getValue(row)}</span>
                 </div>
               ))}
             </div>
@@ -117,11 +117,11 @@ function SortableResourceList<T>({ title, rows, columns, getIcon, getName, defau
           const s = sortRows(sorted, sk, sd, comparators);
           return s.map((row, i) => (
             <tr key={i} className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}>
-              <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>
+              <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] font-mono">
                 <span className="flex items-center gap-1.5">{getIcon(row)} {getName(row)}</span>
               </td>
               {columns.map((col) => (
-                <td key={col.key} className={`px-4 py-2.5 text-right ${col.colorFn ? col.colorFn(row) : "text-[var(--text-secondary)]"}`} style={{ fontFamily: "var(--font-mono)" }}>{col.getValue(row)}</td>
+                <td key={col.key} className={`px-4 py-2.5 text-right ${col.colorFn ? col.colorFn(row) : "text-[var(--text-secondary)]"} font-mono`}>{col.getValue(row)}</td>
               ))}
             </tr>
           ));
@@ -188,7 +188,7 @@ export function ContainersList({ stats, parsedContainers = [], title }: { stats:
       title={title}
       rows={rows}
       columns={columns}
-      getIcon={() => <span className="text-base">{"\uD83D\uDC33"}</span>}
+      getIcon={() => <span className="text-base font-mono">{"\uD83D\uDC33"}</span>}
       getName={(row) => row.name}
       renderTitleExtra={(row) => {
         const c = containersByName.get(row.name);
@@ -198,8 +198,7 @@ export function ContainersList({ stats, parsedContainers = [], title }: { stats:
         if (!shortId) return null;
         return (
           <span
-            className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[10px] text-[var(--text-faint)] border border-[var(--border-subtle)]"
-            style={{ fontFamily: "var(--font-mono)" }}
+            className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)]"
             title={c?.id}
           >
             {shortId}
@@ -215,16 +214,15 @@ export function ContainersList({ stats, parsedContainers = [], title }: { stats:
           <div className="mb-2 space-y-1">
             {c.image && (
               <p
-                className="text-[10px] text-[var(--text-muted)] break-all leading-relaxed line-clamp-2"
-                style={{ fontFamily: "var(--font-mono)" }}
+                className="text-2xs text-[var(--text-muted)] break-all leading-relaxed line-clamp-2 font-mono"
               >
                 {c.image}
               </p>
             )}
             {c.status && (
-              <div className="flex items-center gap-1.5 text-[10px]">
+              <div className="flex items-center gap-1.5 text-2xs">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${up ? "bg-emerald-400" : "bg-[var(--text-faint)]"}`} />
-                <span className={up ? "text-emerald-400" : "text-[var(--text-muted)]"} style={{ fontFamily: "var(--font-mono)" }}>
+                <span className={`font-mono ${up ? "text-emerald-400" : "text-[var(--text-muted)]"}`}>
                   {uptime.display}
                 </span>
               </div>
@@ -241,8 +239,7 @@ export function ContainersList({ stats, parsedContainers = [], title }: { stats:
             {bindings.map((b, i) => (
               <span
                 key={i}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] bg-cyan-500/15 text-cyan-200 light:text-cyan-800 border-cyan-500/40"
-                style={{ fontFamily: "var(--font-mono)" }}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-2xs bg-cyan-500/15 text-cyan-200 light:text-cyan-800 border-cyan-500/40 font-mono"
                 title={`host :${b.hostPort} → container :${b.containerPort}/${b.proto}`}
               >
                 :{b.hostPort}

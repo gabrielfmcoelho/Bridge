@@ -34,7 +34,7 @@ export default function ViewModeToggle<T extends string>({ value, onChange, opti
             role="tab"
             aria-selected={active}
             onClick={() => onChange(opt.value)}
-            className={`inline-flex items-center gap-1.5 px-2.5 rounded-[calc(var(--radius-md)-2px)] text-[11px] font-medium transition ${
+            className={`inline-flex items-center gap-1.5 px-2.5 rounded-[calc(var(--radius-md)-2px)] text-xs font-medium transition ${
               active
                 ? "bg-[var(--accent-muted)] text-[var(--accent)] shadow-[inset_0_0_0_1px_var(--accent-muted-strong,transparent)]"
                 : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"

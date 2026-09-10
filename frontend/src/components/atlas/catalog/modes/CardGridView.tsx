@@ -42,12 +42,11 @@ export default function CardGridView({ tables, selectedId, onSelect }: Props) {
         <section key={ns} className="flex flex-col gap-3">
           <div className="flex items-baseline gap-3 px-1">
             <h2
-              className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-primary)]"
-              style={{ fontFamily: "var(--font-display)" }}
+              className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-primary)] font-display"
             >
               {ns}
             </h2>
-            <span className="text-[10px] tabular-nums text-[var(--text-faint)]">
+            <span className="text-2xs tabular-nums text-[var(--text-faint)]">
               {items.length} {t("atlas.catalog.list.tablesLabel")}
             </span>
             <span className="flex-1 h-px bg-[var(--border-subtle)]" />

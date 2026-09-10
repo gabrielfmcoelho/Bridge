@@ -64,18 +64,17 @@ export default function TicketList({
         const content = (
           <div className="flex items-center gap-3">
             <span className={`w-2 h-2 rounded-full shrink-0 ${priorityColor[t.priority] || "bg-[var(--text-faint)]"}`} />
-            <code className="text-[11px] text-[var(--text-muted)] shrink-0">#{t.id}</code>
+            <code className="text-xs text-[var(--text-muted)] shrink-0">#{t.id}</code>
             <span className="text-sm text-[var(--text-primary)] truncate flex-1">{t.name || "(sem título)"}</span>
             {t.date && (
               <span
-                className="shrink-0 text-[10px] text-[var(--text-faint)]"
+                className="shrink-0 text-2xs text-[var(--text-faint)] font-mono"
                 title={getTimeAgo(t.date.replace(" ", "T"), locale)}
-                style={{ fontFamily: "var(--font-mono)" }}
               >
                 {formatDate(t.date, locale)}
               </span>
             )}
-            <span className={`shrink-0 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${statusColor[t.status_slug] || statusColor.unknown}`}>
+            <span className={`shrink-0 text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${statusColor[t.status_slug] || statusColor.unknown}`}>
               {t.status_label}
             </span>
           </div>

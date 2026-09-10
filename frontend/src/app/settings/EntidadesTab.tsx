@@ -190,7 +190,7 @@ function UnassignedTriage() {
               onChange={(c) => setSelected(c ? rows.map((r) => r.id) : [])}
               disabled={rows.length === 0}
             />
-            <span className="text-[10px] text-[var(--text-faint)]">{selected.length} {t("entidades.selected")}</span>
+            <span className="text-2xs text-[var(--text-faint)]">{selected.length} {t("entidades.selected")}</span>
           </div>
           <div className={`max-h-80 overflow-y-auto border border-[var(--border-subtle)] rounded-[var(--radius-md)] ${isFetching ? "opacity-60" : ""}`}>
             {rows.length === 0 ? (
@@ -205,7 +205,7 @@ function UnassignedTriage() {
                     onChange={(e) => setSelected(e.target.checked ? [...selected, r.id] : selected.filter((id) => id !== r.id))}
                   />
                   <span className="truncate">{r.name || `#${r.id}`}</span>
-                  <span className="ml-auto text-[10px] text-[var(--text-faint)]">#{r.id}</span>
+                  <span className="ml-auto text-2xs text-[var(--text-faint)]">#{r.id}</span>
                 </label>
               ))
             )}

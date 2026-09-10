@@ -193,7 +193,7 @@ function EnumSection() {
     <div className="space-y-4">
       {Object.entries(mergedEnums).map(([category, options], i) => (
         <Card key={category} hover={false} className="stagger-in" style={{ "--i": i } as React.CSSProperties}>
-          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
+          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
             {category}
           </h3>
           <div className="flex flex-wrap gap-1.5 mb-3">
@@ -262,7 +262,7 @@ function EnumSection() {
       {/* Add new category */}
       {isAdmin && (
         <Card hover={false}>
-          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
+          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
             + New Category
           </h3>
           <form className="flex gap-2 flex-wrap" onSubmit={(e) => {
@@ -430,7 +430,7 @@ function UsersSection() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold" style={{ color: "var(--text-secondary)", fontFamily: "var(--font-display)" }}>
+        <h2 className="text-sm font-semibold font-display" style={{ color: "var(--text-secondary)" }}>
           {t("settings.users")}
         </h2>
         <div className="flex items-center gap-1.5">
@@ -454,7 +454,7 @@ function UsersSection() {
         <div className="border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-x-auto animate-fade-in">
           <table className="w-full text-sm min-w-[600px]">
             <thead>
-              <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-[11px] uppercase tracking-wider">
+              <tr className="bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs uppercase tracking-wider">
                 <th className="text-left px-4 py-3 font-semibold">{t("auth.username")}</th>
                 <th className="text-left px-4 py-3 font-semibold">{t("settings.role")}</th>
                 <th className="text-left px-4 py-3 font-semibold">{t("entidades.title")}</th>
@@ -474,19 +474,19 @@ function UsersSection() {
                       <Avatar name={u.display_name || u.username} size="sm" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-[var(--text-primary)] truncate">{u.display_name || u.username}</p>
-                        <p className="text-[11px] text-[var(--text-faint)]">@{u.username}</p>
+                        <p className="text-xs text-[var(--text-faint)]">@{u.username}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${roleColors[u.role] || roleColors.viewer}`}>
+                    <span className={`text-2xs px-1.5 py-0.5 rounded-full border font-medium ${roleColors[u.role] || roleColors.viewer}`}>
                       {u.role}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-xs">
                     <div className="flex flex-wrap gap-1">
                       {(u.entidades ?? []).map((e) => (
-                        <span key={e.id} className={`px-1.5 py-0.5 rounded border text-[10px] ${e.is_primary ? "border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent-muted)]" : "border-[var(--border-subtle)] text-[var(--text-muted)]"}`} title={e.is_primary ? t("entidades.primary") : undefined}>
+                        <span key={e.id} className={`px-1.5 py-0.5 rounded border text-2xs ${e.is_primary ? "border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent-muted)]" : "border-[var(--border-subtle)] text-[var(--text-muted)]"}`} title={e.is_primary ? t("entidades.primary") : undefined}>
                           {e.name}
                         </span>
                       ))}
@@ -521,7 +521,7 @@ function UsersSection() {
                   <Avatar name={u.display_name || u.username} size="md" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-[var(--text-primary)] truncate">{u.display_name || u.username}</p>
-                    <p className="text-[11px] text-[var(--text-faint)]">@{u.username}</p>
+                    <p className="text-xs text-[var(--text-faint)]">@{u.username}</p>
                   </div>
                 </div>
                 <UserActions u={u} onEdit={() => openEdit(u)} onDelete={() => confirmDelete(u)} />
@@ -529,25 +529,25 @@ function UsersSection() {
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
                 <div>
-                  <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider">{t("settings.role")}</p>
-                  <span className={`inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${roleColors[u.role] || roleColors.viewer}`}>
+                  <p className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("settings.role")}</p>
+                  <span className={`inline-block mt-0.5 text-2xs px-1.5 py-0.5 rounded-full border font-medium ${roleColors[u.role] || roleColors.viewer}`}>
                     {u.role}
                   </span>
                 </div>
                 <div>
-                  <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider">{t("settings.authProvider")}</p>
+                  <p className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("settings.authProvider")}</p>
                   <p className="text-xs text-[var(--text-secondary)] mt-0.5">{providerLabels[u.auth_provider] || u.auth_provider || "Local"}</p>
                 </div>
                 {u.email && (
                   <div className="col-span-2">
-                    <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider">Email</p>
+                    <p className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">Email</p>
                     <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{u.email}</p>
                   </div>
                 )}
               </div>
 
               <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-[var(--border-subtle)]">
-                <span className="text-[10px] text-[var(--text-faint)]">
+                <span className="text-2xs text-[var(--text-faint)]">
                   {u.created_at ? formatDate(u.created_at) : ""}
                 </span>
               </div>
@@ -733,7 +733,7 @@ function AppearanceSection() {
     <div className="space-y-6 max-w-2xl">
       {/* App Name */}
       <Card hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
+        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           {t("settings.appName")}
         </h3>
         <p className="text-xs mb-3" style={{ color: "var(--text-faint)" }}>
@@ -749,7 +749,7 @@ function AppearanceSection() {
 
       {/* Main Color */}
       <Card hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
+        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           {t("settings.mainColor")}
         </h3>
         <p className="text-xs mb-4" style={{ color: "var(--text-faint)" }}>
@@ -799,7 +799,7 @@ function AppearanceSection() {
 
       {/* Logo */}
       <Card hover={false} className="stagger-in" style={{ "--i": 2 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
+        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           {t("settings.logo")}
         </h3>
         <p className="text-xs mb-4" style={{ color: "var(--text-faint)" }}>
@@ -944,7 +944,7 @@ function ImportSection() {
     <div className="space-y-6 max-w-2xl">
       {/* Import type selector */}
       <Card hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
+        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           {t("settings.importType")}
         </h3>
         <div className="flex gap-2">
@@ -961,7 +961,7 @@ function ImportSection() {
 
       {/* File upload */}
       <Card hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
+        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           JSON File
         </h3>
         <p className="text-xs mb-3" style={{ color: "var(--text-faint)" }}>
@@ -973,10 +973,10 @@ function ImportSection() {
 
         {/* JSON example */}
         <details className="mb-4 group">
-          <summary className="text-[11px] text-[var(--accent)] cursor-pointer hover:underline font-medium">
+          <summary className="text-xs text-[var(--accent)] cursor-pointer hover:underline font-medium">
             Show JSON example
           </summary>
-          <pre className="mt-2 p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)] overflow-x-auto" style={{ fontFamily: "var(--font-mono)" }}>
+          <pre className="mt-2 p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] overflow-x-auto font-mono">
 {importType === "hosts" ? `[
   {
     "nickname": "My Server",
@@ -1033,7 +1033,7 @@ function ImportSection() {
             <div className="flex items-center justify-between p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-default)]">
               <div className="flex items-center gap-2 min-w-0">
                 <Icon path={ICON_PATHS.document} className="w-4 h-4 shrink-0 text-[var(--accent)]" />
-                <span className="text-sm text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{fileName}</span>
+                <span className="text-sm text-[var(--text-primary)] truncate font-mono">{fileName}</span>
               </div>
               <button onClick={reset} className="text-xs text-[var(--text-faint)] hover:text-red-400 transition-colors shrink-0 ml-2">
                 Remove
@@ -1043,25 +1043,25 @@ function ImportSection() {
             {/* Preview stats */}
             <div className="grid grid-cols-3 gap-3">
               <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-center">
-                <div className="text-lg font-bold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{fileData.length}</div>
-                <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Records</div>
+                <div className="text-lg font-bold text-[var(--text-primary)] font-mono">{fileData.length}</div>
+                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">Records</div>
               </div>
               <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-center">
-                <div className="text-lg font-bold text-[var(--accent)]" style={{ fontFamily: "var(--font-mono)" }}>
+                <div className="text-lg font-bold text-[var(--accent)] font-mono">
                   {importType === "hosts"
                     ? fileData.filter(d => d.user || d.password).length
                     : fileData.filter(d => d.responsavel).length
                   }
                 </div>
-                <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">
+                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">
                   {importType === "hosts" ? "With Creds" : "With Owner"}
                 </div>
               </div>
               <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-center">
-                <div className="text-lg font-bold text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>
+                <div className="text-lg font-bold text-[var(--text-secondary)] font-mono">
                   {new Set(fileData.flatMap(d => (d.tags as string[]) || [])).size}
                 </div>
-                <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)]">Tags</div>
+                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">Tags</div>
               </div>
             </div>
 
@@ -1090,21 +1090,21 @@ function ImportSection() {
 
       {result && (
         <Card hover={false} className="animate-slide-up" style={{ animationFillMode: "both" } as React.CSSProperties}>
-          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-muted)", fontFamily: "var(--font-display)" }}>
+          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
             Import Results
           </h3>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="p-3 rounded-[var(--radius-md)] bg-emerald-500/10 border border-emerald-500/25 text-center">
-              <div className="text-lg font-bold text-emerald-400" style={{ fontFamily: "var(--font-mono)" }}>{result.created}</div>
-              <div className="text-[10px] uppercase tracking-wider text-emerald-400/70">Created</div>
+              <div className="text-lg font-bold text-emerald-400 font-mono">{result.created}</div>
+              <div className="text-2xs uppercase tracking-wider text-emerald-400/70">Created</div>
             </div>
             <div className="p-3 rounded-[var(--radius-md)] bg-amber-500/10 border border-amber-500/25 text-center">
-              <div className="text-lg font-bold text-amber-400" style={{ fontFamily: "var(--font-mono)" }}>{result.skipped}</div>
-              <div className="text-[10px] uppercase tracking-wider text-amber-400/70">Skipped</div>
+              <div className="text-lg font-bold text-amber-400 font-mono">{result.skipped}</div>
+              <div className="text-2xs uppercase tracking-wider text-amber-400/70">Skipped</div>
             </div>
             <div className="p-3 rounded-[var(--radius-md)] bg-red-500/10 border border-red-500/25 text-center">
-              <div className="text-lg font-bold text-red-400" style={{ fontFamily: "var(--font-mono)" }}>{result.failed}</div>
-              <div className="text-[10px] uppercase tracking-wider text-red-400/70">Failed</div>
+              <div className="text-lg font-bold text-red-400 font-mono">{result.failed}</div>
+              <div className="text-2xs uppercase tracking-wider text-red-400/70">Failed</div>
             </div>
           </div>
 
@@ -1112,8 +1112,8 @@ function ImportSection() {
             <div className="max-h-48 overflow-y-auto space-y-1">
               {result.errors.map((err, i) => (
                 <div key={i} className="flex items-start gap-2 text-xs p-2 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)]">
-                  <span className="text-[var(--text-faint)] shrink-0 tabular-nums" style={{ fontFamily: "var(--font-mono)" }}>#{err.index}</span>
-                  <span className="text-[var(--text-secondary)] truncate" style={{ fontFamily: "var(--font-mono)" }}>{err.name}</span>
+                  <span className="text-[var(--text-faint)] shrink-0 tabular-nums font-mono">#{err.index}</span>
+                  <span className="text-[var(--text-secondary)] truncate font-mono">{err.name}</span>
                   <span className="text-[var(--text-faint)] shrink-0">{err.error}</span>
                 </div>
               ))}
@@ -1201,7 +1201,7 @@ function BackupSection() {
             <Icon path={ICON_PATHS.exportDoc} className="w-5 h-5 text-emerald-400" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] font-display">
               {t("settings.backupTitle")}
             </h3>
             <p className="text-xs text-[var(--text-faint)] mt-1 mb-3">
@@ -1222,7 +1222,7 @@ function BackupSection() {
             <Icon path={ICON_PATHS.upload} className="w-5 h-5 text-amber-400" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-display)" }}>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] font-display">
               {t("settings.restoreTitle")}
             </h3>
             <p className="text-xs text-[var(--text-faint)] mt-1 mb-1">

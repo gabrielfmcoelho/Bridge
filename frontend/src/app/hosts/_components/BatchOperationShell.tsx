@@ -93,7 +93,7 @@ export default function BatchOperationShell({
           onChange={(e) => onConcurrencyChange(Number(e.target.value))}
           className="flex-1 accent-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         />
-        <span className="text-xs font-medium text-[var(--text-primary)] w-6 text-right" style={{ fontFamily: "var(--font-mono)" }}>
+        <span className="text-xs font-medium text-[var(--text-primary)] w-6 text-right font-mono">
           {concurrency}
         </span>
       </div>
@@ -108,7 +108,7 @@ export default function BatchOperationShell({
         <div>
           <div className="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1.5">
             <span>{progressLabel}</span>
-            <span style={{ fontFamily: "var(--font-mono)" }}>{doneCount}/{targetHosts.length}</span>
+            <span className="font-mono">{doneCount}/{targetHosts.length}</span>
           </div>
           <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
@@ -136,7 +136,7 @@ export default function BatchOperationShell({
                 {s.status === "running" && <StatusDot color="accent" className="animate-pulse" />}
                 {s.status === "success" && <StatusDot className="bg-emerald-400" />}
                 {s.status === "failed" && <StatusDot className="bg-red-400" />}
-                <span className="text-[var(--text-primary)] font-medium" style={{ fontFamily: "var(--font-mono)" }}>{host.nickname}</span>
+                <span className="text-[var(--text-primary)] font-medium font-mono">{host.nickname}</span>
                 {s.status === "running" && <span className="text-[var(--accent)] ml-auto">{runningLabel}{s.attempt && s.attempt > 1 ? ` (${s.attempt})` : ""}</span>}
                 {s.status === "success" && <span className="text-emerald-400 ml-auto">OK</span>}
                 {s.error && <span className="text-red-400 ml-auto truncate max-w-[200px]" title={s.error}>{s.error}</span>}

@@ -114,7 +114,7 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
             {domains.map(([ns, s]) => (
               <Card key={ns} as="button" padding="sm" onClick={() => onNavigate("graph", { focus: `ns:${ns}` })}>
                 <div className="text-xs uppercase tracking-wider text-[var(--text-muted)]">{t("atlas.lineage.namespace")}</div>
-                <div className="text-lg font-bold mt-0.5" style={{ fontFamily: "var(--font-display)" }}>{ns}</div>
+                <div className="text-lg font-bold mt-0.5 font-display">{ns}</div>
                 <div className="text-xs text-[var(--text-secondary)] mt-1 flex gap-3">
                   <span>{s.dags} DAGs</span>
                   <span>{s.models} models</span>
@@ -137,8 +137,8 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
                 <div className={`text-xs uppercase tracking-wider font-semibold ${LAYER_COLORS[layer] ?? "text-[var(--text-muted)]"}`}>
                   {layer}
                 </div>
-                <div className="text-xl font-bold mt-1" style={{ fontFamily: "var(--font-display)" }}>{count}</div>
-                <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
+                <div className="text-xl font-bold mt-1 font-display">{count}</div>
+                <div className="text-2xs text-[var(--text-muted)] uppercase tracking-wider">
                   {NODE_TYPE_LABELS.dbt_model.toLowerCase()}s
                 </div>
               </Card>

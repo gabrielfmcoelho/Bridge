@@ -47,7 +47,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       {label && (
-        <label className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-1">
+        <label className="block text-2xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-1">
           {label}
         </label>
       )}
@@ -74,7 +74,7 @@ function SecretRow({ secret }: { secret: Secret }) {
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="min-w-0">
           <span className="text-sm font-medium text-[var(--text-primary)] truncate">{secret.name}</span>
-          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border-default)] bg-[var(--bg-overlay)] text-[var(--text-muted)]">
+          <span className="ml-2 text-2xs px-1.5 py-0.5 rounded border border-[var(--border-default)] bg-[var(--bg-overlay)] text-[var(--text-muted)]">
             {secret.type}
           </span>
         </div>

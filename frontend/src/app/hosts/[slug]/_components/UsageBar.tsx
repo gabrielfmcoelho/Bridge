@@ -8,7 +8,7 @@ export function UsageBar({ label, total, used, percent }: { label: string; total
     <div className="space-y-1.5">
       <div className="flex justify-between text-sm">
         <span className="text-[var(--text-muted)] font-medium">{label}</span>
-        <span className={textColor} style={{ fontFamily: "var(--font-mono)" }}>{used} / {total} ({percent})</span>
+        <span className={`${textColor} font-mono`}>{used} / {total} ({percent})</span>
       </div>
       <div className="w-full h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
         <div className={`h-full rounded-full ${color} transition`} style={{ width: `${Math.min(pctNum, 100)}%` }} />
@@ -26,7 +26,7 @@ export function ResourceCard({ label, value, icon }: { label: string; value: str
         </svg>
         <span className="text-xs text-[var(--text-muted)]">{label}</span>
       </div>
-      <p className="text-sm font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-mono)" }}>{value || "-"}</p>
+      <p className="text-sm font-semibold text-[var(--text-primary)] font-mono">{value || "-"}</p>
     </div>
   );
 }

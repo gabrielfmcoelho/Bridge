@@ -15,7 +15,7 @@ interface Props {
 export default function RoleBadge({ role, size = "sm", className = "" }: Props) {
   const { t } = useLocale();
   const s = STYLES[role];
-  const sizeCls = size === "md" ? "text-xs px-2.5 py-1" : "text-[10px] px-2 py-0.5";
+  const sizeCls = size === "md" ? "text-xs px-2.5 py-1" : "text-2xs px-2 py-0.5";
   const label = role === "source" ? t("atlas.catalog.role.source") : t("atlas.catalog.role.built");
   return (
     <span className={`inline-flex items-center rounded-full border font-medium tracking-wide ${s.bg} ${s.text} ${s.border} ${sizeCls} ${className}`}>

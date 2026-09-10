@@ -22,7 +22,7 @@ interface Props {
 
 export default function LayerBadge({ layer, label, dot = true, size = "sm", className = "" }: Props) {
   const s = LAYER_STYLES[layer] ?? LAYER_STYLES.other;
-  const sizeCls = size === "md" ? "text-xs px-2.5 py-1" : "text-[10px] px-2 py-0.5";
+  const sizeCls = size === "md" ? "text-xs px-2.5 py-1" : "text-2xs px-2 py-0.5";
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border font-semibold uppercase tracking-[0.08em] ${s.bg} ${s.text} ${s.border} ${sizeCls} ${className}`}

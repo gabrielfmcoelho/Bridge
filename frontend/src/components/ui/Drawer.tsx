@@ -57,7 +57,7 @@ export default function Drawer({ open, onClose, title, subHeader, headerAction, 
               <div className="border-b border-[var(--border-subtle)]">
                 <div className="flex items-center gap-2 p-4 md:p-5">
                   {BackButton}
-                  <VaulDrawer.Title className="text-lg font-semibold flex-1 min-w-0 truncate" style={{ fontFamily: "var(--font-display)" }}>
+                  <VaulDrawer.Title className="text-lg font-semibold flex-1 min-w-0 truncate font-display">
                     {title}
                   </VaulDrawer.Title>
                   {headerAction}
@@ -100,7 +100,7 @@ export default function Drawer({ open, onClose, title, subHeader, headerAction, 
             <div className="border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2 px-4 pb-3">
                 {BackButton}
-                <VaulDrawer.Title className="text-lg font-semibold flex-1 min-w-0 truncate" style={{ fontFamily: "var(--font-display)" }}>
+                <VaulDrawer.Title className="text-lg font-semibold flex-1 min-w-0 truncate font-display">
                   {title}
                 </VaulDrawer.Title>
                 {headerAction}

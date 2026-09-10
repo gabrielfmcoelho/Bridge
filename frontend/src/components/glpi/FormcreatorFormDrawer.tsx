@@ -274,7 +274,7 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
 
   const footer = !submitResult && (
     <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-[var(--border-subtle)]">
-      <span className="text-[11px] text-[var(--text-muted)]">
+      <span className="text-xs text-[var(--text-muted)]">
         {validationErrors.blockingUnsupported
           ? "Este formulário usa um tipo de campo obrigatório que não é suportado em sshcm. Abra no GLPI."
           : Object.keys(validationErrors.errors).length > 0
@@ -325,7 +325,7 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
         )}
 
         {bundle?.warnings?.length ? (
-          <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] px-3 py-2 space-y-1">
+          <div className="rounded-[var(--radius-md)] border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs px-3 py-2 space-y-1">
             {bundle.warnings.map((w, i) => (
               <p key={i}>{w}</p>
             ))}

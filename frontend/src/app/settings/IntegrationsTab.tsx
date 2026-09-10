@@ -83,7 +83,7 @@ function GeneralAuthSection() {
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
                 <span className="text-sm font-medium text-[var(--text-primary)]">{p.label}</span>
               </div>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{p.description}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">{p.description}</p>
             </div>
           </label>
         ))}
@@ -501,7 +501,7 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">GitLab Integration</h3>
-          <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Shared connection credentials used by every GitLab-backed feature below.
           </p>
         </div>
@@ -545,7 +545,7 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
         <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
           <div className="min-w-0">
             <span className="text-sm font-semibold text-[var(--text-primary)]">SSO / Authentication</span>
-            <span className="ml-2 text-[11px] text-[var(--text-muted)]">
+            <span className="ml-2 text-xs text-[var(--text-muted)]">
               {ssoEnabled
                 ? (ssoActive ? "Active — GitLab is the selected provider" : "Enabled — select GitLab above to make it active")
                 : "Disabled"}
@@ -575,7 +575,7 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
         <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
           <div className="min-w-0">
             <span className="text-sm font-semibold text-[var(--text-primary)]">Code Management</span>
-            <span className="ml-2 text-[11px] text-[var(--text-muted)]">
+            <span className="ml-2 text-xs text-[var(--text-muted)]">
               Track commits across linked GitLab repos and subgroups per project.
             </span>
           </div>
@@ -625,7 +625,7 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
       </details>
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
-        <span className="text-[11px] text-[var(--text-muted)]">
+        <span className="text-xs text-[var(--text-muted)]">
           {isView ? "Read-only — click Edit to change settings." : hasDirty ? "Unsaved changes." : "No changes."}
         </span>
         <div className="flex gap-2">
@@ -772,7 +772,7 @@ function OutlineIntegrationSection() {
             disabled={isView}
             ariaLabel="Enable Outline integration"
           />
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-muted)]">
             Per-project Wiki tab + site-wide common wiki at <code className="text-[var(--text-secondary)]">/wiki</code>.
           </p>
         </div>
@@ -800,7 +800,7 @@ function OutlineIntegrationSection() {
             canClear={isEdit && initialRef.current.outline_api_token === "••••••••"}
             onClear={() => handleClearSecret("outline_api_token", "API Token")}
           />
-          <p className="text-[11px] text-[var(--text-muted)] -mt-2">
+          <p className="text-xs text-[var(--text-muted)] -mt-2">
             Mint in Outline → Settings → API. The token inherits its creator&apos;s visibility — sshcm can only see what that user can see.
           </p>
 
@@ -813,7 +813,7 @@ function OutlineIntegrationSection() {
                 placeholder="uuid-1, uuid-2, uuid-3"
                 disabled={isView}
               />
-              <p className="text-[11px] text-[var(--text-muted)] -mt-2">
+              <p className="text-xs text-[var(--text-muted)] -mt-2">
                 {collectionsError
                   ? "Couldn't fetch the collection list from Outline — paste UUIDs manually. "
                   : "Manual input: "}
@@ -844,7 +844,7 @@ function OutlineIntegrationSection() {
                     : "Save base URL + API token first, then reload to pick collections"
                 }
               />
-              <p className="text-[11px] text-[var(--text-muted)] -mt-2">
+              <p className="text-xs text-[var(--text-muted)] -mt-2">
                 Feeds the sidebar <code className="text-[var(--text-secondary)]">/wiki</code> page — each selected collection becomes a section in the left nav.{" "}
                 {isEdit && (
                   <button
@@ -879,7 +879,7 @@ function OutlineIntegrationSection() {
       )}
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
-        <span className="text-[11px] text-[var(--text-muted)]">
+        <span className="text-xs text-[var(--text-muted)]">
           {isView ? "Read-only — click Edit to change settings." : hasDirty ? "Unsaved changes." : "No changes."}
         </span>
         <div className="flex gap-2">
@@ -981,7 +981,7 @@ function GLPIIntegrationSection() {
             disabled={isView}
             ariaLabel="Enable GLPI integration"
           />
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-muted)]">
             One App-Token + N named user profiles. Link a profile to each project.
           </p>
         </div>
@@ -1009,7 +1009,7 @@ function GLPIIntegrationSection() {
             canClear={isEdit && initialRef.current.glpi_app_token === "••••••••"}
             onClear={() => handleClearSecret("glpi_app_token", "App-Token")}
           />
-          <p className="text-[11px] text-[var(--text-muted)] -mt-2">
+          <p className="text-xs text-[var(--text-muted)] -mt-2">
             GLPI → Setup → General → API. <strong>Only required when your GLPI instance demands it</strong> — many deployments accept the per-user token on its own. Leave blank if you only have user tokens.
           </p>
           <Input
@@ -1034,7 +1034,7 @@ function GLPIIntegrationSection() {
       )}
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
-        <span className="text-[11px] text-[var(--text-muted)]">
+        <span className="text-xs text-[var(--text-muted)]">
           {isView ? "Read-only — click Edit to change." : hasDirty ? "Unsaved changes." : "No changes."}
         </span>
         <div className="flex gap-2">
@@ -1112,8 +1112,8 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="min-w-0">
               <p className="text-sm font-medium text-[var(--text-primary)]">{p.name}</p>
-              {p.description && <p className="text-[11px] text-[var(--text-muted)]">{p.description}</p>}
-              <p className="text-[10px] text-[var(--text-faint)] mt-0.5">
+              {p.description && <p className="text-xs text-[var(--text-muted)]">{p.description}</p>}
+              <p className="text-2xs text-[var(--text-faint)] mt-0.5">
                 {p.has_token ? "token stored" : "no token"} · entity #{p.default_entity_id}
               </p>
             </div>
@@ -1122,7 +1122,7 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
                 type="button"
                 disabled={disabled || testMutation.isPending}
                 onClick={() => testMutation.mutate(p.id)}
-                className="text-[11px] text-[var(--accent)] hover:underline disabled:opacity-40"
+                className="text-xs text-[var(--accent)] hover:underline disabled:opacity-40"
               >
                 Test
               </button>
@@ -1133,14 +1133,14 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
                   if (!confirm(`Delete profile "${p.name}"? Any project pointing at it will become unassigned.`)) return;
                   deleteMutation.mutate(p.id);
                 }}
-                className="text-[11px] text-red-400 hover:text-red-300 disabled:opacity-40"
+                className="text-xs text-red-400 hover:text-red-300 disabled:opacity-40"
               >
                 Delete
               </button>
             </div>
           </div>
           {testResults[p.id] && (
-            <p className={`text-[11px] mt-1 ${testResults[p.id].ok ? "text-green-400" : "text-red-400"}`}>
+            <p className={`text-xs mt-1 ${testResults[p.id].ok ? "text-green-400" : "text-red-400"}`}>
               {testResults[p.id].message}
             </p>
           )}
@@ -1204,7 +1204,7 @@ function SecretInputWithClear({
           <button
             type="button"
             onClick={onClear}
-            className="text-[11px] text-red-400 hover:text-red-300 transition-colors pb-2.5 whitespace-nowrap"
+            className="text-xs text-red-400 hover:text-red-300 transition-colors pb-2.5 whitespace-nowrap"
           >
             Clear stored
           </button>
@@ -1321,7 +1321,7 @@ function GrafanaIntegrationSection() {
             disabled={isView}
             ariaLabel="Enable Grafana integration"
           />
-          <p className="text-[11px] text-[var(--text-muted)]">
+          <p className="text-xs text-[var(--text-muted)]">
             Embedded dashboards, live metrics, alert ingestion, agent install.
           </p>
         </div>
@@ -1381,7 +1381,7 @@ function GrafanaIntegrationSection() {
                 disabled={isView}
               />
             </div>
-            <p className="text-[11px] text-[var(--text-muted)] mt-2">
+            <p className="text-xs text-[var(--text-muted)] mt-2">
               Per-host and per-service UIDs override these. Dashboard variable <code className="text-[var(--text-secondary)]">var-host</code> / <code className="text-[var(--text-secondary)]">var-service</code> receives the slug/nickname.
             </p>
           </details>
@@ -1416,7 +1416,7 @@ function GrafanaIntegrationSection() {
                   onClear={() => handleClearSecret("grafana_prom_remote_write_password", "remote_write password")}
                 />
               </div>
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-xs text-[var(--text-muted)]">
                 Used by the Grafana Agent installed on hosts. Leave blank if Prometheus accepts anonymous writes inside your network.
               </p>
             </div>
@@ -1452,7 +1452,7 @@ function GrafanaIntegrationSection() {
                         set("grafana_webhook_secret", hex);
                         setWebhookSecretCopied(false);
                       }}
-                      className="text-[11px] text-[var(--accent)] hover:underline"
+                      className="text-xs text-[var(--accent)] hover:underline"
                     >
                       Generate random secret
                     </button>
@@ -1469,18 +1469,18 @@ function GrafanaIntegrationSection() {
                           window.prompt("Copy the webhook secret below:", currentSecret);
                         }
                       }}
-                      className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]"
+                      className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]"
                       title={hasPlaintext ? "Copy to clipboard" : "Generate a secret first"}
                     >
                       {webhookSecretCopied ? "Copied ✓" : "Copy"}
                     </button>
-                    <span className="text-[10px] text-[var(--text-faint)]">
+                    <span className="text-2xs text-[var(--text-faint)]">
                       Copy it now — after saving, sshcm only shows the masked form.
                     </span>
                   </div>
                 );
               })()}
-              <p className="text-[11px] text-[var(--text-muted)]">
+              <p className="text-xs text-[var(--text-muted)]">
                 Configure a Grafana contact point posting JSON to <code className="text-[var(--text-secondary)]">/api/webhooks/grafana/alerts</code> with header <code className="text-[var(--text-secondary)]">X-Sshcm-Signature: sha256=&lt;hmac&gt;</code>.
               </p>
             </div>
@@ -1506,7 +1506,7 @@ function GrafanaIntegrationSection() {
       )}
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
-        <span className="text-[11px] text-[var(--text-muted)]">
+        <span className="text-xs text-[var(--text-muted)]">
           {isView ? "Read-only — click Edit to change settings." : hasDirty ? "Unsaved changes." : "No changes."}
         </span>
         <div className="flex gap-2">
@@ -1706,7 +1706,7 @@ function CoolifySection() {
               placeholder="root"
             />
           </div>
-          <p className="text-[10px] text-[var(--text-faint)]">
+          <p className="text-2xs text-[var(--text-faint)]">
             SSH User is used when registering servers in Coolify. Coolify does not accept dots in usernames. Defaults to &quot;root&quot;.
           </p>
 

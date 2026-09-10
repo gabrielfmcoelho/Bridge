@@ -65,7 +65,7 @@ export default function EntidadeScopeFields({
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs font-medium text-[var(--text-secondary)]">{t("entidades.global")}</div>
-          <div className="text-[11px] text-[var(--text-faint)]">{t("entidades.globalHint")}</div>
+          <div className="text-xs text-[var(--text-faint)]">{t("entidades.globalHint")}</div>
         </div>
         <Toggle checked={!!value.is_global} onChange={(v) => onChange({ ...value, is_global: v })} ariaLabel={t("entidades.global")} />
       </div>

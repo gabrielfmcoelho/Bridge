@@ -265,10 +265,10 @@ export default function HostForm({
             ]}
           />
           {isEdit && host?.has_key && selectedKeyId === null && (
-            <p className="text-[10px] text-[var(--text-faint)]">{t("host.sshKeyKeepCurrentHint")}</p>
+            <p className="text-2xs text-[var(--text-faint)]">{t("host.sshKeyKeepCurrentHint")}</p>
           )}
           {selectedKeyId === "__clear__" && (
-            <p className="text-[10px] text-amber-400">{t("host.sshKeyClearHint")}</p>
+            <p className="text-2xs text-amber-400">{t("host.sshKeyClearHint")}</p>
           )}
         </div>
       ) : isEdit && host?.has_key ? (
@@ -335,7 +335,7 @@ export default function HostForm({
           onChange={(e) => set("grafana_dashboard_uid", e.target.value)}
           placeholder="leave blank to use the default from Settings"
         />
-        <p className="text-[11px] text-[var(--text-muted)] mt-1">
+        <p className="text-xs text-[var(--text-muted)] mt-1">
           Shown in the Metrics tab. The host&apos;s <code className="text-[var(--text-secondary)]">oficial_slug</code> is passed as dashboard variable <code className="text-[var(--text-secondary)]">var-host</code>.
         </p>
         {isEdit && host?.oficial_slug && (
@@ -482,20 +482,20 @@ function HostDashboardProvisionButton({ slug, onProvisioned }: { slug: string; o
         type="button"
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending || !datasourceSet}
-        className="text-[11px] text-[var(--accent)] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+        className="text-xs text-[var(--accent)] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
       >
         {mutation.isPending ? "Provisioning…" : "Provision default dashboard in Grafana"}
       </button>
       {!datasourceSet && (
-        <p className="text-[10px] text-amber-400">
+        <p className="text-2xs text-amber-400">
           Set the Prometheus datasource UID in Settings → Integrations → Grafana first.
         </p>
       )}
       {mutation.isSuccess && !mutation.isPending && (
-        <p className="text-[10px] text-emerald-400">{mutation.data?.message}</p>
+        <p className="text-2xs text-emerald-400">{mutation.data?.message}</p>
       )}
       {mutation.isError && (
-        <p className="text-[10px] text-red-400">
+        <p className="text-2xs text-red-400">
           {mutation.error instanceof Error ? mutation.error.message : "Provision failed"}
         </p>
       )}

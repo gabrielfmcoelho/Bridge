@@ -39,8 +39,7 @@ export default function LinkedEntityList({ title, items, emptyMessage = "-" }: L
               {item.icon}
               <div className="min-w-0 flex-1">
                 <p
-                  className="text-sm text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors"
-                  style={{ fontFamily: "var(--font-mono)" }}
+                  className="text-sm text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] transition-colors font-mono"
                 >
                   {item.label}
                 </p>

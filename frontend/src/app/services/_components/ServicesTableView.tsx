@@ -86,7 +86,7 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
                   {svc.tags && svc.tags.length > 0
                     ? svc.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)
                     : <span className="text-[var(--text-faint)]">-</span>}
-                  {svc.tags && svc.tags.length > 3 && <span className="text-[10px] text-[var(--text-faint)]">+{svc.tags.length - 3}</span>}
+                  {svc.tags && svc.tags.length > 3 && <span className="text-2xs text-[var(--text-faint)]">+{svc.tags.length - 3}</span>}
                 </div>
               </td>
             </tr>

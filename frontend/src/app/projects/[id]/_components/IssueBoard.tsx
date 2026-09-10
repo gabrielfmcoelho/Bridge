@@ -115,10 +115,10 @@ export default function IssueBoard({ projectId, services, canEdit }: IssueBoardP
             >
               {/* Column header */}
               <div className="px-3 py-2.5 border-b border-[var(--border-subtle)] flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]" style={{ fontFamily: "var(--font-display)" }}>
+                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] font-display">
                   {t(statusLabels[status])}
                 </span>
-                <span className="text-[10px] font-medium text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5 py-0.5">
+                <span className="text-2xs font-medium text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5 py-0.5">
                   {columnIssues.length}
                 </span>
               </div>
@@ -141,10 +141,10 @@ export default function IssueBoard({ projectId, services, canEdit }: IssueBoardP
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {issue.assignee && (
-                        <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-overlay)] rounded px-1.5 py-0.5">{issue.assignee}</span>
+                        <span className="text-2xs text-[var(--text-muted)] bg-[var(--bg-overlay)] rounded px-1.5 py-0.5">{issue.assignee}</span>
                       )}
                       {issue.service_id && (
-                        <span className="text-[10px] text-purple-400 bg-purple-500/10 rounded px-1.5 py-0.5">
+                        <span className="text-2xs text-purple-400 bg-purple-500/10 rounded px-1.5 py-0.5">
                           {services.find((s) => s.id === issue.service_id)?.nickname || ""}
                         </span>
                       )}

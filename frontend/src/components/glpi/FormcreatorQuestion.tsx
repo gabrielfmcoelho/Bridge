@@ -670,7 +670,7 @@ function DropdownWithFallback({
           <button
             type="button"
             onClick={() => setManual(false)}
-            className="text-[11px] text-[var(--accent)] hover:underline"
+            className="text-xs text-[var(--accent)] hover:underline"
           >
             ← Voltar à busca
           </button>
@@ -709,7 +709,7 @@ function DropdownWithFallback({
       <button
         type="button"
         onClick={() => setManual(true)}
-        className="text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:underline"
+        className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] hover:underline"
       >
         Digitar ID manualmente
       </button>

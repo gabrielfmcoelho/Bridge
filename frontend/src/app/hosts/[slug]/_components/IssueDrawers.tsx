@@ -29,7 +29,7 @@ function getStatusLabels(t: (k: string) => string): Record<string, string> {
 function LinkReadRow({ label, items }: { label: string; items: string[] }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wider w-16 shrink-0 pt-0.5">{label}</span>
+      <span className="text-2xs text-[var(--text-faint)] uppercase tracking-wider w-16 shrink-0 pt-0.5">{label}</span>
       {items.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {items.map((name) => (
@@ -424,7 +424,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
                   const user = users.find((u) => u.id === uid);
                   return user ? (
                     <span key={uid} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20">
-                      <span className="w-4 h-4 rounded-full bg-[var(--accent)] text-white text-[8px] font-bold flex items-center justify-center">{getInitials(user.display_name)}</span>
+                      <span className="w-4 h-4 rounded-full bg-[var(--accent)] text-white text-3xs font-bold flex items-center justify-center">{getInitials(user.display_name)}</span>
                       {user.display_name}
                     </span>
                   ) : null;

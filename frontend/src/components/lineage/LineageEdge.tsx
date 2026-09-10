@@ -29,12 +29,12 @@ export default function LineageEdgeComponent(props: EdgeProps) {
         }}
       />
       {kind !== "contains" && kind !== "column_lineage" && (
-        <text
+        <text className="font-mono"
           x={labelX}
           y={labelY}
           textAnchor="middle"
           dominantBaseline="middle"
-          style={{ fill: "var(--text-muted)", fontSize: 9, fontFamily: "var(--font-mono)", pointerEvents: "none" }}
+          style={{ fill: "var(--text-muted)", fontSize: 9, pointerEvents: "none" }}
         >
           {EDGE_LABELS[kind] ?? kind}
         </text>

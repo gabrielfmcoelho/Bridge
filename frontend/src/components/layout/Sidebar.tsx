@@ -56,10 +56,10 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <h1 className="text-sm font-bold text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-display)" }}>
+              <h1 className="text-sm font-bold text-[var(--text-primary)] truncate font-display">
                 {appName}
               </h1>
-              <p className="text-[10px] text-[var(--text-muted)] leading-tight">{t("app.subtitle")}</p>
+              <p className="text-2xs text-[var(--text-muted)] leading-tight">{t("app.subtitle")}</p>
             </div>
           )}
         </div>
@@ -71,7 +71,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
           <div key={section.key}>
             {sIdx > 0 && <Divider className="my-3" />}
             {section.label && !collapsed && (
-              <p className="px-3 py-1 text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-widest">
+              <p className="px-3 py-1 text-2xs font-semibold text-[var(--text-faint)] uppercase tracking-widest">
                 {t(section.label)}
               </p>
             )}
@@ -82,7 +82,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
                     <span
                       key={item.label}
                       title={collapsed ? t(item.label) : "Coming soon"}
-                      className={`group flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-medium opacity-40 cursor-not-allowed ${
+                      className={`group flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium opacity-40 cursor-not-allowed ${
                         collapsed ? "justify-center" : ""
                       } text-[var(--text-muted)]`}
                     >
@@ -98,7 +98,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
                     href={item.href}
                     onClick={onCloseMobile}
                     title={collapsed ? t(item.label) : undefined}
-                    className={`group flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-medium transition duration-150 relative ${
+                    className={`group flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium transition duration-150 relative ${
                       collapsed ? "justify-center" : ""
                     } ${!isActive ? "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)]" : ""}`}
                     style={isActive ? { backgroundColor: `${appColor}18`, color: appColor } : undefined}
@@ -118,7 +118,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
 
       {!collapsed && (
         <div className="p-3 border-t border-[var(--border-subtle)]">
-          <p className="text-[10px] text-[var(--text-faint)] text-center" style={{ fontFamily: "var(--font-mono)" }}>
+          <p className="text-2xs text-[var(--text-faint)] text-center font-mono">
             v0.1.0
           </p>
         </div>
@@ -165,7 +165,7 @@ function MobileDrawer({
           {sections.map((section) => (
             <div key={section.key}>
               {section.label && (
-                <p className="px-1 pb-1.5 text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-widest">
+                <p className="px-1 pb-1.5 text-2xs font-semibold text-[var(--text-faint)] uppercase tracking-widest">
                   {t(section.label)}
                 </p>
               )}
@@ -175,7 +175,7 @@ function MobileDrawer({
                     return (
                       <span
                         key={item.label}
-                        className="flex flex-col items-center gap-1.5 p-3 rounded-[var(--radius-md)] text-[11px] font-medium opacity-40 text-[var(--text-muted)]"
+                        className="flex flex-col items-center gap-1.5 p-3 rounded-[var(--radius-md)] text-xs font-medium opacity-40 text-[var(--text-muted)]"
                       >
                         <Icon path={NAV_ICONS[item.icon] || NAV_ICONS.Server} className="w-[18px] h-[18px] shrink-0" strokeWidth={1.5} />
                         {t(item.label)}
@@ -188,7 +188,7 @@ function MobileDrawer({
                       key={item.href}
                       href={item.href}
                       onClick={onClose}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-[var(--radius-md)] text-[11px] font-medium transition ${
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-[var(--radius-md)] text-xs font-medium transition ${
                         isActive ? "text-white" : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]"
                       }`}
                       style={isActive ? { backgroundColor: appColor, color: "#fff" } : undefined}

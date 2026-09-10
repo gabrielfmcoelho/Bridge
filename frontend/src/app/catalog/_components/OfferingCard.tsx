@@ -56,7 +56,7 @@ export default function OfferingCard({ offering, onRequest, index }: OfferingCar
       {/* mt-auto pins the footer to the bottom so cards in a row share a
           baseline even when descriptions and use-case counts differ. */}
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-3.5">
-        <span className="truncate text-[11px] text-[var(--text-faint)]">{offering.category}</span>
+        <span className="truncate text-xs text-[var(--text-faint)]">{offering.category}</span>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors duration-200 group-hover/card:border-[var(--card-accent)] group-hover/card:bg-[var(--card-accent)]/10 group-hover/card:text-[var(--card-accent)]">
           {t("catalog.request")}
           <Icon

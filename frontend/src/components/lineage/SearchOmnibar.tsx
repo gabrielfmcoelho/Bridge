@@ -77,7 +77,7 @@ export default function SearchOmnibar({ open, indexes, onClose, onPick }: Props)
             placeholder={t("atlas.lineage.search.placeholder")}
             className="flex-1 bg-transparent text-sm text-[var(--text-primary)] focus:outline-none"
           />
-          <kbd className="text-[9px] px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-faint)]">esc</kbd>
+          <kbd className="text-3xs px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-faint)]">esc</kbd>
         </div>
         <div className="max-h-[50vh] overflow-y-auto">
           {results.length === 0 ? (
@@ -92,12 +92,12 @@ export default function SearchOmnibar({ open, indexes, onClose, onPick }: Props)
                   onMouseEnter={() => setActiveIdx(i)}
                   className={`w-full text-left px-3 py-2 flex items-center gap-2 text-xs ${i === activeIdx ? "bg-[var(--bg-elevated)]" : ""}`}
                 >
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${c.bg} ${c.text} font-semibold uppercase tracking-wider w-20 text-center shrink-0`}>
+                  <span className={`text-3xs px-1.5 py-0.5 rounded ${c.bg} ${c.text} font-semibold uppercase tracking-wider w-20 text-center shrink-0`}>
                     {NODE_TYPE_LABELS[n.type] ?? n.type}
                   </span>
                   <span className="font-mono text-[var(--text-primary)] truncate flex-1">{n.label}</span>
-                  {n.layer && <span className="text-[9px] text-[var(--text-muted)] shrink-0">{n.layer}</span>}
-                  {n.namespace && <span className="text-[9px] text-[var(--text-muted)] shrink-0">{n.namespace}</span>}
+                  {n.layer && <span className="text-3xs text-[var(--text-muted)] shrink-0">{n.layer}</span>}
+                  {n.namespace && <span className="text-3xs text-[var(--text-muted)] shrink-0">{n.namespace}</span>}
                 </button>
               );
             })
