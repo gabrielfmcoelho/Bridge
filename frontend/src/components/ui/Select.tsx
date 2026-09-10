@@ -2,9 +2,11 @@
 
 import { useState, useRef, type SelectHTMLAttributes } from "react";
 import * as Popover from "@radix-ui/react-popover";
+import FormField from "./FormField";
 
 interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "onChange"> {
   label?: string;
+  hint?: string;
   error?: string;
   options: { value: string; label: string }[];
   onChange?: (e: { target: { value: string } }) => void;
@@ -13,7 +15,9 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "onC
 
 export default function Select({
   label,
+  hint,
   error,
+  required,
   options,
   className = "",
   value,
@@ -38,19 +42,14 @@ export default function Select({
   };
 
   return (
-    <div className="space-y-1.5">
-      {label && (
-        <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
-          {label}
-        </label>
-      )}
+    <FormField label={label} required={required} hint={hint} error={error}>
       <Popover.Root open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setSearch(""); }}>
         <Popover.Trigger asChild disabled={disabled}>
           <button
             type="button"
             disabled={disabled}
             className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border rounded-[var(--radius-md)] px-3 py-2 text-sm text-left transition-all duration-200 flex items-center justify-between gap-2 disabled:opacity-40 ${
-              open ? "border-[var(--accent)] ring-2 ring-[var(--accent-muted)]" : error ? "border-red-500" : "border-[var(--border-default)]"
+              open ? "border-[var(--accent)] ring-2 ring-[var(--accent-muted)]" : error ? "border-[var(--danger)]" : "border-[var(--border-default)]"
             } ${className}`}
           >
             <span className={value ? "" : "text-[var(--text-faint)]"}>
@@ -118,7 +117,6 @@ export default function Select({
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
-      {error && <p className="text-xs text-red-400">{error}</p>}
-    </div>
+    </FormField>
   );
 }

@@ -6,6 +6,7 @@ import { roleMappingsAPI } from "@/lib/api";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import NativeSelect from "@/components/ui/NativeSelect";
 
 const PROVIDERS = ["ldap", "keycloak", "gitlab"];
 const ROLES = ["viewer", "editor", "admin"];
@@ -132,16 +133,14 @@ export default function RoleMappingsTab() {
         </p>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
           <div>
-            <label className="block text-xs text-[var(--text-muted)] mb-1">Provider</label>
-            <select
+            <NativeSelect label="Provider"
               value={newMapping.provider_name}
               onChange={(e) => setNewMapping((p) => ({ ...p, provider_name: e.target.value }))}
-              className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
               {PROVIDERS.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           <Input
             label="External Group / Role"
@@ -150,16 +149,14 @@ export default function RoleMappingsTab() {
             placeholder="e.g., admin-group"
           />
           <div>
-            <label className="block text-xs text-[var(--text-muted)] mb-1">Local Role</label>
-            <select
+            <NativeSelect label="Local Role"
               value={newMapping.local_role}
               onChange={(e) => setNewMapping((p) => ({ ...p, local_role: e.target.value }))}
-              className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)]"
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           <Button
             onClick={handleCreate}

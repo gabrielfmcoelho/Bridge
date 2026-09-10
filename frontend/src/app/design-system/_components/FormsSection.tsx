@@ -15,6 +15,8 @@ import AsyncPicker, { type AsyncPickerItem } from "@/components/ui/AsyncPicker";
 import ContactInput from "@/components/ui/ContactInput";
 import MarkdownEditor from "@/components/ui/MarkdownEditor";
 import FormError from "@/components/ui/FormError";
+import FormField from "@/components/ui/FormField";
+import NativeSelect from "@/components/ui/NativeSelect";
 import FormFooter from "@/components/ui/FormFooter";
 import Button from "@/components/ui/Button";
 import StepIndicator from "@/components/ui/StepIndicator";
@@ -71,6 +73,7 @@ const LABEL_CLASSES: [string, number][] = [
 ];
 
 export default function FormsSection() {
+  const [nativeSel, setNativeSel] = useState("ldap");
   const { user } = useAuth();
 
   const [select3, setSelect3] = useState("prod");
@@ -101,7 +104,45 @@ export default function FormsSection() {
           <Input label="Hostname" placeholder="web-01" />
           <Input label="Hostname" placeholder="web-01" error="Required" />
           <Input label="Hostname" placeholder="web-01" disabled />
+          <Input label="Slug" placeholder="meu-servico" required hint="Lowercase, digits and dashes." />
         </div>
+        <p className="text-xs text-[var(--text-muted)] mt-2">
+          <code>required</code> draws the asterisk, <code>hint</code> the helper line; both come from <code>FormField</code>.
+        </p>
+      </Specimen>
+
+      <Specimen title="FormField" source="components/ui/FormField.tsx" wide>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Any control" required hint="Wrap controls that have no label prop of their own.">
+            <div className="h-9 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)]" />
+          </FormField>
+          <FormField label="With error" error="Something is wrong here">
+            <div className="h-9 rounded-[var(--radius-md)] border border-dashed border-[var(--border-default)]" />
+          </FormField>
+        </div>
+        <p className="text-xs text-[var(--text-muted)] mt-2">
+          The one field anatomy (label, control, hint, error). <code>Input</code>, <code>Textarea</code>, <code>Select</code>,{" "}
+          <code>NativeSelect</code> and <code>DynamicField</code> render through it; <code>INPUT_CLASS</code> is the shared skin.
+        </p>
+      </Specimen>
+
+      <Specimen title="NativeSelect" source="components/ui/NativeSelect.tsx" wide>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <NativeSelect label="Provider" value={nativeSel} onChange={(e) => setNativeSel(e.target.value)}>
+            <option value="ldap">ldap</option>
+            <option value="keycloak">keycloak</option>
+            <option value="gitlab">gitlab</option>
+          </NativeSelect>
+          <NativeSelect label="Role" required hint="Real change event, no popover." defaultValue="editor">
+            <option value="viewer">viewer</option>
+            <option value="editor">editor</option>
+            <option value="admin">admin</option>
+          </NativeSelect>
+        </div>
+        <p className="text-xs text-[var(--text-muted)] mt-2">
+          Plain <code>&lt;select&gt;</code> in the Input skin, for short fixed lists. Replaced 8 hand-labelled native selects in
+          settings (IntegrationsTab, RoleMappingsTab); 6 more in SSHOperations have no adjacent label yet.
+        </p>
       </Specimen>
 
       <Specimen title="Textarea" source="components/ui/Textarea.tsx" wide>
@@ -345,8 +386,9 @@ export default function FormsSection() {
           ))}
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          Nine distinct strings for one element. Row 1 is what every <code>components/ui</code> input emits;
-          rows 3 and 8 differ from it only by class order or token.
+          Nine distinct strings for one element (counts as of 2026-09-09). Row 1 is what <code>FormField</code> emits and
+          therefore every <code>components/ui</code> input; rows 3 and 8 differ from it only by class order or token. The
+          settings selects on rows 2 and 3 now go through <code>NativeSelect</code>.
         </p>
       </Specimen>
 
@@ -389,8 +431,8 @@ export default function FormsSection() {
           </p>
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          The <code>space-y-1.5</code> wrapper is repeated inline inside every input primitive;{" "}
-          <code>DynamicField.wrap()</code> is the only place it was factored out.
+          Historical copy: this is what <code>DynamicField.wrap()</code> rendered by hand. It, and every input primitive, now
+          render <code>FormField</code> (see above).
         </p>
       </Specimen>
 

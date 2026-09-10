@@ -1,35 +1,17 @@
 import { type InputHTMLAttributes, forwardRef } from "react";
+import FormField, { INPUT_CLASS, INPUT_ERROR_CLASS } from "./FormField";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
+  hint?: string;
   error?: string;
 }
 
-const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, className = "", ...props }, ref) => {
-    return (
-      <div className="space-y-1.5">
-        {label && (
-          <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
-            {label}
-          </label>
-        )}
-        <input
-          ref={ref}
-          className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2.5 md:py-2 text-base md:text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)] disabled:opacity-40 ${
-            error ? "border-[var(--danger)] focus:border-[var(--danger)] focus:ring-[var(--danger)]/20" : ""
-          } ${className}`}
-          {...props}
-        />
-        {error && (
-          <p className="text-xs text-[var(--danger)]">
-            {error}
-          </p>
-        )}
-      </div>
-    );
-  }
-);
+const Input = forwardRef<HTMLInputElement, InputProps>(({ label, hint, error, required, className = "", ...props }, ref) => (
+  <FormField label={label} required={required} hint={hint} error={error}>
+    <input ref={ref} required={required} className={`${INPUT_CLASS} ${error ? INPUT_ERROR_CLASS : ""} ${className}`} {...props} />
+  </FormField>
+));
 
 Input.displayName = "Input";
 export default Input;

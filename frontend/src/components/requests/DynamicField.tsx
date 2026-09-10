@@ -9,6 +9,7 @@ import DateTimeInput from "@/components/ui/DateTimeInput";
 import TagInput from "@/components/ui/TagInput";
 import AsyncPicker from "@/components/ui/AsyncPicker";
 import FormError from "@/components/ui/FormError";
+import Field from "@/components/ui/FormField";
 import { useLocale } from "@/contexts/LocaleContext";
 import { hostsAPI, dnsAPI, servicesAPI, projectsAPI, toolsAPI, apiCatalogAPI } from "@/lib/api";
 import type { FormField } from "@/lib/types";
@@ -51,18 +52,23 @@ export default function DynamicField({ field, value, onChange, error }: DynamicF
   const [pickedLabel, setPickedLabel] = useState("");
 
   const wrap = (control: React.ReactNode, opts?: { skipLabel?: boolean }) => (
-    <div className="space-y-1.5">
-      {!opts?.skipLabel && (
-        <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
-          {label}
-          {field.required && <span className="text-[var(--danger)] ml-0.5">*</span>}
-        </label>
-      )}
+    <Field
+      label={opts?.skipLabel ? undefined : label}
+      required={!opts?.skipLabel && field.required}
+      hint={
+        (help || patternHint) && (
+          <>
+            {help}
+            {patternHint && (
+              <span className={`block text-[var(--text-faint)] font-mono ${help ? "mt-0.5" : ""}`}>{patternHint}</span>
+            )}
+          </>
+        )
+      }
+    >
       {control}
-      {help && <p className="text-xs text-[var(--text-muted)]">{help}</p>}
-      {patternHint && <p className="text-xs text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>{patternHint}</p>}
       {error && <FormError message={error} />}
-    </div>
+    </Field>
   );
 
   switch (field.type) {

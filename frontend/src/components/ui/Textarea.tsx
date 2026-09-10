@@ -1,31 +1,17 @@
 import { type TextareaHTMLAttributes, forwardRef } from "react";
+import FormField, { INPUT_CLASS, INPUT_ERROR_CLASS } from "./FormField";
 
 interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
+  hint?: string;
   error?: string;
 }
 
-const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, className = "", ...props }, ref) => {
-    return (
-      <div className="space-y-1.5">
-        {label && (
-          <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
-            {label}
-          </label>
-        )}
-        <textarea
-          ref={ref}
-          className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2.5 md:py-2 text-base md:text-sm transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)] disabled:opacity-40 resize-y ${
-            error ? "border-[var(--danger)] focus:border-[var(--danger)] focus:ring-[var(--danger)]/20" : ""
-          } ${className}`}
-          {...props}
-        />
-        {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
-      </div>
-    );
-  }
-);
+const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({ label, hint, error, required, className = "", ...props }, ref) => (
+  <FormField label={label} required={required} hint={hint} error={error}>
+    <textarea ref={ref} required={required} className={`${INPUT_CLASS} resize-y ${error ? INPUT_ERROR_CLASS : ""} ${className}`} {...props} />
+  </FormField>
+));
 
 Textarea.displayName = "Textarea";
 export default Textarea;

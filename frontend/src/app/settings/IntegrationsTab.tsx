@@ -9,6 +9,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Toggle from "@/components/ui/Toggle";
+import NativeSelect from "@/components/ui/NativeSelect";
 
 export default function IntegrationsTab() {
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
@@ -94,38 +95,32 @@ function GeneralAuthSection() {
           <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">External Auth Settings</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs text-[var(--text-muted)] mb-1">Auto-provision users</label>
-              <select
+              <NativeSelect label="Auto-provision users"
                 value={form.auth_auto_provision ?? "true"}
                 onChange={(e) => set("auth_auto_provision", e.target.value)}
-                className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
                 <option value="true">Enabled</option>
                 <option value="false">Disabled</option>
-              </select>
+              </NativeSelect>
             </div>
             <div>
-              <label className="block text-xs text-[var(--text-muted)] mb-1">Default role for new users</label>
-              <select
+              <NativeSelect label="Default role for new users"
                 value={form.auth_default_role ?? "viewer"}
                 onChange={(e) => set("auth_default_role", e.target.value)}
-                className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
                 <option value="viewer">Viewer</option>
                 <option value="editor">Editor</option>
                 <option value="admin">Admin</option>
-              </select>
+              </NativeSelect>
             </div>
             <div>
-              <label className="block text-xs text-[var(--text-muted)] mb-1">Sync roles from external groups</label>
-              <select
+              <NativeSelect label="Sync roles from external groups"
                 value={form.auth_role_sync_enabled ?? "false"}
                 onChange={(e) => set("auth_role_sync_enabled", e.target.value)}
-                className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
                 <option value="false">Disabled</option>
                 <option value="true">Enabled</option>
-              </select>
+              </NativeSelect>
             </div>
           </div>
         </div>
@@ -182,26 +177,22 @@ function LDAPSection() {
             />
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs text-[var(--text-muted)] mb-1">TLS</label>
-                <select
+                <NativeSelect label="TLS"
                   value={form.auth_ldap_use_tls ?? "true"}
                   onChange={(e) => set("auth_ldap_use_tls", e.target.value)}
-                  className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 >
                   <option value="true">Yes</option>
                   <option value="false">No</option>
-                </select>
+                </NativeSelect>
               </div>
               <div>
-                <label className="block text-xs text-[var(--text-muted)] mb-1">Skip Verify</label>
-                <select
+                <NativeSelect label="Skip Verify"
                   value={form.auth_ldap_skip_verify ?? "false"}
                   onChange={(e) => set("auth_ldap_skip_verify", e.target.value)}
-                  className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 >
                   <option value="false">No</option>
                   <option value="true">Yes</option>
-                </select>
+                </NativeSelect>
               </div>
             </div>
           </div>
@@ -237,15 +228,13 @@ function LDAPSection() {
               placeholder="(mail=%s)"
             />
             <div>
-              <label className="block text-xs text-[var(--text-muted)] mb-1">Fallback to local auth</label>
-              <select
+              <NativeSelect label="Fallback to local auth"
                 value={form.auth_ldap_fallback_to_local ?? "true"}
                 onChange={(e) => set("auth_ldap_fallback_to_local", e.target.value)}
-                className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)]"
               >
                 <option value="true">Enabled</option>
                 <option value="false">Disabled</option>
-              </select>
+              </NativeSelect>
             </div>
           </div>
 
