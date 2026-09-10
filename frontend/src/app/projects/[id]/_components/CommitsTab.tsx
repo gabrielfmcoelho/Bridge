@@ -226,15 +226,11 @@ function CommitRow({ commit }: { commit: ProjectGitLabCommit }) {
             className="flex items-center gap-2 text-xs text-[var(--text-faint)] min-w-0 flex-1 font-mono"
             title={commit.branches?.join(", ")}
           >
-            <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Icon path={ICON_PATHS.clock} className="w-3 h-3 shrink-0" />
             <span className="shrink-0">{when}</span>
             {primaryBranch && (
               <>
-                <svg className="w-3 h-3 shrink-0 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 3v12m0 0a3 3 0 106 0m-6 0a3 3 0 116 0m6-12a3 3 0 11-6 0 3 3 0 016 0zm0 6a9 9 0 01-9 9" />
-                </svg>
+                <Icon path={ICON_PATHS.branch} className="w-3 h-3 shrink-0 text-[var(--text-muted)]" />
                 <span className="text-[var(--text-muted)] truncate min-w-0">{primaryBranch}</span>
                 {extraBranches > 0 && (
                   <span className="shrink-0 text-[var(--text-faint)]">+{extraBranches}</span>

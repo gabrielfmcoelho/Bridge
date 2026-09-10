@@ -1,5 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { SITUACAO_DOT_COLORS } from "@/lib/constants";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 export default function HostNode({ data }: NodeProps) {
   const status = (data.status as string) || "active";
@@ -10,9 +12,7 @@ export default function HostNode({ data }: NodeProps) {
       <div className="h-1 bg-gradient-to-r from-[var(--cyan)] to-[var(--cyan)]" />
       <div className="px-3 py-2">
         <div className="flex items-center gap-2 mb-1">
-          <svg className="w-3.5 h-3.5 text-[var(--cyan)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 3h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm0 10h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2z" />
-          </svg>
+          <Icon path={ICON_PATHS.serverRack} className="w-3.5 h-3.5 text-[var(--cyan)] shrink-0" strokeWidth={1.5} />
           <span className="text-xs font-bold text-[var(--cyan)] truncate font-mono">{data.label as string}</span>
           <span className={`w-2 h-2 rounded-full shrink-0 ${SITUACAO_DOT_COLORS[status] || "bg-[var(--text-faint)]"}`} />
         </div>

@@ -630,9 +630,7 @@ function IssueCard({
             onClick={() => setShowStatusMenu(v => !v)}
             className="text-2xs text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors flex items-center gap-0.5"
           >
-            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-            </svg>
+            <Icon path={ICON_PATHS.arrowsUpDown} className="w-2.5 h-2.5" />
             Move
           </button>
           {showStatusMenu && (

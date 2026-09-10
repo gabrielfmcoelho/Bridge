@@ -327,9 +327,7 @@ function WikiPageInner() {
                                 title="Outside the configured common collections — opens in Outline only"
                                 className="shrink-0 text-[var(--text-faint)]"
                               >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V7a4.5 4.5 0 10-9 0v3.5M6 10.5h12a1.5 1.5 0 011.5 1.5v7a1.5 1.5 0 01-1.5 1.5H6A1.5 1.5 0 014.5 19v-7A1.5 1.5 0 016 10.5z" />
-                                </svg>
+                                <Icon path={ICON_PATHS.lockAlt} className="w-3.5 h-3.5" />
                               </span>
                             )}
                           </div>

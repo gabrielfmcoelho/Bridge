@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppearance } from "@/contexts/AppearanceContext";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface MobileBottomNavProps {
   onOpenDrawer: () => void;
@@ -40,9 +42,7 @@ export default function MobileBottomNav({ onOpenDrawer }: MobileBottomNavProps) 
                     boxShadow: `0 4px 14px ${appColor}40`,
                   }}
                 >
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
+                  <Icon path={ICON_PATHS.menu} className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-2xs font-medium mt-0.5" style={{ color: appColor }}>
                   {item.label}

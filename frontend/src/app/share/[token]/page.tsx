@@ -461,9 +461,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                   {appLogo ? (
                     <img src={appLogo} alt="" className="w-full h-full object-contain p-0.5" />
                   ) : (
-                    <svg className="w-3.5 h-3.5" style={{ color: appColor }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 17l6-6-6-6m8 14h8" />
-                    </svg>
+                    <Icon path={ICON_PATHS.prompt} className="w-3.5 h-3.5" style={{ color: appColor }} />
                   )}
                 </div>
                 <span className="text-sm font-bold text-[var(--text-primary)] font-display">
@@ -631,9 +629,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                 {appLogo ? (
                   <img src={appLogo} alt="" className="w-full h-full object-contain p-0.5" />
                 ) : (
-                  <svg className="w-4 h-4" style={{ color: appColor }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 17l6-6-6-6m8 14h8" />
-                  </svg>
+                  <Icon path={ICON_PATHS.prompt} style={{ color: appColor }} />
                 )}
               </div>
               <span className="text-base font-bold text-[var(--text-primary)] tracking-wide font-display">

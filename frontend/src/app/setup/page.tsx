@@ -55,9 +55,7 @@ export default function SetupPage() {
             {appLogo ? (
               <img src={appLogo} alt="" className="w-full h-full object-contain p-1.5" />
             ) : (
-              <svg className="w-7 h-7" style={{ color: appColor }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 17l6-6-6-6m8 14h8" />
-              </svg>
+              <Icon path={ICON_PATHS.prompt} className="w-7 h-7" style={{ color: appColor }} />
             )}
           </div>
           <h1 className="text-3xl font-bold text-[var(--text-primary)] font-display">

@@ -16,17 +16,15 @@ import SwimlanesGraph from "./modes/SwimlanesGraph";
 import NestedGroupsGraph from "./modes/NestedGroupsGraph";
 import PipelineNodeDetail from "./PipelineNodeDetail";
 import ColumnLineagePanel from "../catalog/ColumnLineagePanel";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 const MODE_ICONS: Record<PipelineViewMode, React.ReactNode> = {
   groups: (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h6v6H3V4zm0 10h6v6H3v-6zm10-10h8v6h-8V4zm0 10h8v6h-8v-6z" />
-    </svg>
+    <Icon path={ICON_PATHS.layoutGrid} className="w-3.5 h-3.5" strokeWidth={1.75} />
   ),
   lanes: (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v16M10 4v16M16 4v16M22 4v16" />
-    </svg>
+    <Icon path={ICON_PATHS.lanes} className="w-3.5 h-3.5" strokeWidth={1.75} />
   ),
 };
 

@@ -83,9 +83,7 @@ export default function SSHConfigPage() {
         </div>
         <div className="flex gap-2">
           <Button onClick={handleDownload} disabled={!preview?.content}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+            <Icon path={ICON_PATHS.download} />
             {t("sshConfig.download")}
           </Button>
           <CopyButton value={preview?.content ?? ""} icon label={t("sshConfig.copy")} copiedLabel={t("sshConfig.copied")} disabled={!preview?.content} />
@@ -93,18 +91,14 @@ export default function SSHConfigPage() {
             <DropdownMenu
               trigger={
                 <Button variant="secondary">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
-                </svg>
+                  <Icon path={ICON_PATHS.moreVertical} />
                 </Button>
               }
               className="w-72"
             >
               <div className="p-3 border-b border-[var(--border-subtle)]">
                     <p className="text-xs text-[var(--warning)] flex items-center gap-1.5">
-                      <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
-                      </svg>
+                      <Icon path={ICON_PATHS.alertOutline} className="w-3.5 h-3.5 shrink-0" />
                       {t("sshConfig.writeWarning")}
                     </p>
                     {serverInfo && (
@@ -135,9 +129,7 @@ export default function SSHConfigPage() {
             : "bg-[var(--warning)]/8 border-[var(--warning)]/20 text-[var(--warning)]"
         }`}>
           <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 3h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" />
-            </svg>
+            <Icon path={ICON_PATHS.rack} className="w-4 h-4 shrink-0" strokeWidth={1.5} />
             <span>{serverInfo.message}</span>
           </div>
           <div className="flex items-center gap-2">

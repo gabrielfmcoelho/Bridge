@@ -7,6 +7,8 @@ import type { LineageIndexes } from "@/lib/lineage/indexes";
 import { neighborsIn, neighborsOut } from "@/lib/lineage/indexes";
 import type { LineageNode, LineageEdge } from "@/lib/lineage/types";
 import { NODE_COLORS, NODE_TYPE_LABELS, LAYER_COLORS } from "@/lib/lineage/style";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
   node: LineageNode | null;
@@ -150,9 +152,7 @@ export default function DetailDrawer({ node, indexes, onClose, onSelect, onOpenI
             onClick={() => onOpenInGraph(node.id)}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--cyan)]/15 hover:bg-[var(--cyan)]/25 border border-[var(--cyan)]/40 text-[var(--cyan)] text-sm font-medium transition-colors"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
+            <Icon path={ICON_PATHS.arrowRightAlt} className="w-3.5 h-3.5" strokeWidth={1.5} />
             {t("atlas.lineage.drawer.openInGraph")}
           </button>
         </div>

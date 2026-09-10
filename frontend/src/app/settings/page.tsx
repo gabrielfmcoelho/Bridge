@@ -333,9 +333,7 @@ function UserActions({ u, onEdit, onDelete }: { u: import("@/lib/types").User; o
   return (
     <div className="flex items-center gap-1">
       <IconButton onClick={onEdit} title="Edit">
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-        </svg>
+        <Icon path={ICON_PATHS.pencil} className="w-3.5 h-3.5" />
       </IconButton>
       <IconButton variant="danger" onClick={onDelete} title="Delete">
         <Icon path={ICON_PATHS.trash} className="w-3.5 h-3.5" />
@@ -815,9 +813,7 @@ function AppearanceSection() {
             {appLogo ? (
               <img src={appLogo} alt="Logo" className="w-full h-full object-contain p-1" />
             ) : (
-              <svg className="w-7 h-7" style={{ color: "var(--text-faint)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 17l6-6-6-6m8 14h8" />
-              </svg>
+              <Icon path={ICON_PATHS.prompt} className="w-7 h-7" strokeWidth={1.5} style={{ color: "var(--text-faint)" }} />
             )}
           </div>
 
@@ -1020,9 +1016,7 @@ function ImportSection() {
             className="w-full py-8 border-2 border-dashed border-[var(--border-default)] rounded-[var(--radius-lg)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)]/5 transition group"
           >
             <div className="flex flex-col items-center gap-2">
-              <svg className="w-8 h-8 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
+              <Icon path={ICON_PATHS.cloudUpload} className="w-8 h-8 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors" strokeWidth={1.5} />
               <span className="text-sm text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]">
                 Click to select a .json file
               </span>

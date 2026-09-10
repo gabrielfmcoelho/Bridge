@@ -23,17 +23,13 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 
 const MODE_ICONS: Record<CatalogViewMode, React.ReactNode> = {
   tree: (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h8m-8 5h6m-6 5h7M14 7h6M14 11h6M14 15h6" />
-    </svg>
+    <Icon path={ICON_PATHS.splitView} className="w-3.5 h-3.5" strokeWidth={1.75} />
   ),
   cards: (
     <Icon path={ICON_PATHS.viewCards} className="w-3.5 h-3.5" strokeWidth={1.75} />
   ),
   split: (
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h16v16H4V4zm6 0v16M14 4v16" />
-    </svg>
+    <Icon path={ICON_PATHS.columns} className="w-3.5 h-3.5" strokeWidth={1.75} />
   ),
 };
 

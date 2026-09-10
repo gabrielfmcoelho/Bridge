@@ -8,14 +8,14 @@ const sizes = {
   lg: { box: "w-6 h-6", stroke: 1.5 },
 };
 
-interface IconProps {
+interface IconProps extends Omit<React.SVGProps<SVGSVGElement>, "path" | "strokeWidth"> {
   path: string;
   size?: keyof typeof sizes;
   className?: string;
   strokeWidth?: number;
 }
 
-export default function Icon({ path, size, className, strokeWidth }: IconProps) {
+export default function Icon({ path, size, className, strokeWidth, ...rest }: IconProps) {
   const preset = sizes[size ?? "sm"];
   return (
     <svg
@@ -25,6 +25,7 @@ export default function Icon({ path, size, className, strokeWidth }: IconProps) 
       stroke="currentColor"
       strokeWidth={strokeWidth ?? preset.stroke}
       aria-hidden
+      {...rest}
     >
       <path strokeLinecap="round" strokeLinejoin="round" d={path} />
     </svg>
