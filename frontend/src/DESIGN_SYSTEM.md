@@ -33,7 +33,9 @@ reprints them.
    recipes.
 5. **One field anatomy.** `FormField` = label, control, hint, error, required
    asterisk. `Input`, `Textarea`, `Select` (searchable), `NativeSelect` (plain)
-   render through it; wrap anything else in it. Actions sit in the Modal/Drawer
+   render through it and wire `useId` into `htmlFor`/`id` themselves, so the
+   label is really associated; a control with no `label` falls back to its
+   placeholder as `aria-label`. Wrap anything else in it. Actions sit in the Modal/Drawer
    `footer` slot: `FormFooter` for Cancel/Confirm, `useMultiStepForm` for wizards.
 6. **Buttons are `Button`, `IconButton`, `PillButton`** (chips: `shape`, `count`,
    `lead`), `ViewToggle`, `TabBar`, `ToolbarActionButton`, `CopyButton`. All press
@@ -62,12 +64,19 @@ reprints them.
     character-level diffs pop. Prose gets `font-display` (which is the body
     sans, not a third face). `CardHeader titleFont` and `DetailHeader
     titleFont` carry the choice per entity.
-14. **Elevation is `--elevate` / `--elevate-hi`**, never `--shadow-*` directly
+14. **Modals and drawers are dialogs**: `role="dialog"`, `aria-modal`,
+    labelled by their title, closable with Escape, and a named close button.
+    `Modal` and `Drawer` both do this — use them rather than a fixed overlay.
+15. **Motion is capped.** `.stagger-in` delays cap at 8 items (~240ms total);
+    surfaces and buttons transition at `duration-150`, colour-only changes at
+    `duration-100`. Cards do not lift on hover — they change surface. No
+    glows. `prefers-reduced-motion` collapses all of it and must stay.
+16. **Elevation is `--elevate` / `--elevate-hi`**, never `--shadow-*` directly
     on a surface. In dark they are a 1px inner top highlight (a drop shadow
     has nowhere to land on `#080c14`); in light they map to the real shadows.
-15. **State is never colour alone** (WCAG 1.4.1). A status dot carries shape
+17. **State is never colour alone** (WCAG 1.4.1). A status dot carries shape
     (filled vs ring) and an accessible name; prefer showing the label.
-16. **Render data that exists.** A metadata pair with no value, a zero count,
+18. **Render data that exists.** A metadata pair with no value, a zero count,
     a meter with no reading and a tag row with no tags are not rendered at
     all — `CardMetadataGrid`, `CardIndicator` and `CardTagsSection` return
     `null` rather than a `-`. Card grids use `items-start` so a card keeps its

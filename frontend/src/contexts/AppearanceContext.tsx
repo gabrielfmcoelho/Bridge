@@ -51,8 +51,6 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     doc.style.setProperty("--accent", color);
     doc.style.setProperty("--accent-hover", color);
     doc.style.setProperty("--accent-muted", hexToRgba(color, 0.15));
-    doc.style.setProperty("--accent-glow", hexToRgba(color, 0.08));
-    doc.style.setProperty("--shadow-glow", `0 0 40px ${hexToRgba(color, 0.08)}`);
   }, [settings.appColor]);
 
   return (

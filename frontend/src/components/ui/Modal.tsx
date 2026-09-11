@@ -2,7 +2,8 @@
 
 import Icon from "./Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useId, type ReactNode } from "react";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface ModalProps {
   open: boolean;
@@ -17,6 +18,9 @@ interface ModalProps {
 }
 
 export default function Modal({ open, onClose, title, subHeader, footer, children }: ModalProps) {
+  const { t } = useLocale();
+  const titleId = useId();
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
@@ -28,6 +32,18 @@ export default function Modal({ open, onClose, title, subHeader, footer, childre
     };
   }, [open]);
 
+  // Escape closes the dialog. The vaul half of ResponsiveModal has always had
+  // this; the desktop half did not, so the same modal behaved differently
+  // depending on viewport width.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
@@ -37,15 +53,21 @@ export default function Modal({ open, onClose, title, subHeader, footer, childre
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-label={title ? undefined : t("common.dialog")}
         className="relative glass border border-[var(--border-default)] md:rounded-[var(--radius-xl)] rounded-t-[var(--radius-xl)] max-w-2xl w-full md:mx-4 max-h-[95vh] md:max-h-[90vh] flex flex-col overflow-hidden shadow-[var(--shadow-lg)] animate-scale-in md:animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {title && (
           <div className="border-b border-[var(--border-subtle)] shrink-0 glass">
             <div className="flex items-center justify-between p-4 md:p-5">
-              <h2 className="text-lg font-semibold font-display">{title}</h2>
+              <h2 id={titleId} className="text-lg font-semibold font-display">{title}</h2>
               <button
+                type="button"
                 onClick={onClose}
+                aria-label={t("common.close")}
                 className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-overlay)] transition duration-150"
               >
                 <Icon path={ICON_PATHS.close} />

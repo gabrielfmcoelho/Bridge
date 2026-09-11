@@ -433,7 +433,8 @@
     "collapse": "Recolher",
     "expand": "Expandir",
     "filters": "Filtros",
-    "addTag": "Adicionar tag..."
+    "addTag": "Adicionar tag...",
+    "dialog": "Diálogo"
   },
   "filters": {
     "title": "Filtros e Ordenação",

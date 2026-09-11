@@ -10,7 +10,7 @@ const COLORS = [
   "--bg-base", "--bg-surface", "--bg-elevated", "--bg-overlay",
   "--border-subtle", "--border-default", "--border-strong",
   "--text-primary", "--text-secondary", "--text-muted", "--text-faint",
-  "--accent", "--accent-hover", "--accent-muted", "--accent-glow",
+  "--accent", "--accent-hover", "--accent-muted",
   "--success", "--success-muted", "--warning", "--warning-muted",
   "--danger", "--danger-muted", "--purple", "--purple-muted",
   "--amber", "--amber-muted", "--info", "--info-muted", "--cyan", "--rose", "--glass-bg", "--grid-line",

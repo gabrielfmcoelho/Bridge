@@ -61,7 +61,7 @@ export default function Badge({ children, variant = "default", color, situacao, 
       const label = typeof children === "string" ? children : situacao;
       return (
         <span
-          className={`group/badge inline-flex items-center gap-0 rounded-full transition duration-300 cursor-default ${className}`}
+          className={`group/badge inline-flex items-center gap-0 rounded-full transition duration-150 cursor-default ${className}`}
           title={label}
           aria-label={label}
           role="img"
@@ -72,7 +72,7 @@ export default function Badge({ children, variant = "default", color, situacao, 
           />
           <span
             aria-hidden
-            className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/badge:max-w-[120px] group-hover/badge:opacity-100 group-hover/badge:ml-1.5 group-hover/badge:pr-1 transition-[max-width,opacity,margin,padding] duration-300"
+            className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/badge:max-w-[120px] group-hover/badge:opacity-100 group-hover/badge:ml-1.5 group-hover/badge:pr-1 transition-[max-width,opacity,margin,padding] duration-150"
             style={{ color: dotColor }}
           >
             {children}

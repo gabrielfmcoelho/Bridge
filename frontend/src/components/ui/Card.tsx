@@ -84,10 +84,11 @@ export default function Card({
     none: "",
   }[deco];
 
-  // --elevate is a top highlight in dark and a drop shadow in light: a 2px
-  // hover lift with no visual cause reads as a glitch on a near-black ground.
+  // No lift: a grid of operational rows that bounces under the pointer is
+  // toy-like, and the shadow that was supposed to explain the movement is
+  // invisible on a near-black ground. Hover changes the surface instead.
   const hoverClass = hover
-    ? `hover:-translate-y-0.5 hover:shadow-[var(--elevate-hi)] ${deco === "tint" ? "" : "hover:border-[var(--border-default)]"}`
+    ? `hover:bg-[var(--bg-elevated)] ${deco === "tint" ? "" : "hover:border-[var(--border-strong)]"}`
     : "";
 
   const borderClass = selected
@@ -104,7 +105,7 @@ export default function Card({
         group/card relative
         bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border ${borderClass} ${paddings[padding]}
         shadow-[var(--elevate)]
-        transition duration-200 ease-out
+        transition duration-150 ease-out
         ${hoverClass}
         ${clickable ? "cursor-pointer active:scale-[0.99]" : ""}
         ${Tag === "button" ? "w-full text-left" : ""}
@@ -132,7 +133,7 @@ export default function Card({
 export function CardIcon({ path, className = "" }: { path: string; className?: string }) {
   return (
     <span
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] transition-colors duration-200 group-hover/card:border-[var(--card-accent)] group-hover/card:bg-[var(--card-accent)]/10 group-hover/card:text-[var(--card-accent)] ${className}`}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] transition-colors duration-150 group-hover/card:border-[var(--card-accent)] group-hover/card:bg-[var(--card-accent)]/10 group-hover/card:text-[var(--card-accent)] ${className}`}
     >
       <Icon path={path} className="h-5 w-5" strokeWidth={1.5} />
     </span>

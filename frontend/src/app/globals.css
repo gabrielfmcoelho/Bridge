@@ -27,7 +27,6 @@
   --accent: #06b6d4;
   --accent-hover: #22d3ee;
   --accent-muted: rgba(6, 182, 212, 0.15);
-  --accent-glow: rgba(6, 182, 212, 0.08);
 
   --success: #34d399;
   --success-muted: rgba(52, 211, 153, 0.15);
@@ -99,7 +98,6 @@
   --text-faint: #6b7a91;
 
   --accent-muted: rgba(6, 182, 212, 0.12);
-  --accent-glow: rgba(6, 182, 212, 0.06);
 
   /* Same defect --danger had below: the dark baselines (#34d399 / #fbbf24)
      were never overridden here, so every light-theme consumer of the base
@@ -270,8 +268,11 @@ body {
    holds the end state so nothing flashes back to opacity 0 after the run. */
 .stagger-in {
   opacity: 0;
-  animation: slide-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  animation-delay: calc(var(--i, 0) * 45ms);
+  animation: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* Capped: uncapped, a 20-card grid finished assembling at 855ms and the
+     dashboard's --i: 11 spent half a second on a page people open first.
+     Everything is in by ~240ms now. */
+  animation-delay: calc(min(var(--i, 0), 8) * 30ms);
 }
 
 /* ─── Skeleton ─── */

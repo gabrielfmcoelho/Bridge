@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, type SelectHTMLAttributes } from "react";
+import { useState, useRef, useId, type SelectHTMLAttributes } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import * as Popover from "@radix-ui/react-popover";
 import FormField from "./FormField";
@@ -29,6 +29,7 @@ export default function Select({
   searchPlaceholder,
 }: SelectProps) {
   const { t } = useLocale();
+  const id = useId();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,10 +47,11 @@ export default function Select({
   };
 
   return (
-    <FormField label={label} required={required} hint={hint} error={error}>
+    <FormField label={label} required={required} hint={hint} error={error} htmlFor={id}>
       <Popover.Root open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) setSearch(""); }}>
         <Popover.Trigger asChild disabled={disabled}>
           <button
+            id={id}
             type="button"
             disabled={disabled}
             className={`w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border rounded-[var(--radius-md)] px-3 py-2 text-sm text-left transition duration-200 flex items-center justify-between gap-2 disabled:opacity-40 ${

@@ -3,7 +3,7 @@ import Spinner from "./Spinner";
 
 const variants = {
   primary:
-    "bg-[var(--accent)] hover:brightness-110 text-white border-[var(--accent)]/50 shadow-[0_0_12px_var(--accent-glow)]",
+    "bg-[var(--accent)] hover:brightness-110 text-white border-[var(--accent)]/50",
   secondary:
     "bg-[var(--bg-elevated)] hover:bg-[var(--bg-overlay)] text-[var(--text-secondary)] border-[var(--border-default)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)]",
   // --danger is theme-tuned in globals.css, so no light/dark branch here.
@@ -37,7 +37,7 @@ export default function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-[var(--radius-md)] border font-medium transition duration-200 enabled:active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:transform-none ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-[var(--radius-md)] border font-medium transition duration-150 enabled:active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:transform-none ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >
