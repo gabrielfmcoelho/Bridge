@@ -139,9 +139,9 @@ export default function CatalogPageInner() {
         {indexes && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] px-1">
             <span className="tabular-nums text-[var(--text-secondary)] font-semibold">{filteredTables.length}</span>
-            <span>of</span>
+            <span>{t("atlas.catalog.list.of")}</span>
             <span className="tabular-nums">{indexes.tables.length}</span>
-            <span>tables</span>
+            <span>{t("atlas.catalog.list.tablesLabel")}</span>
             {filters.layers.length > 0 && (
               <span className="flex items-center gap-1 ml-2">
                 ·
@@ -156,7 +156,7 @@ export default function CatalogPageInner() {
           {isLoading ? (
             <Skeleton className="w-full h-[60vh] rounded-[var(--radius-lg)]" />
           ) : error ? (
-            <EmptyState icon="server" title="Error" description={error instanceof Error ? error.message : String(error)} />
+            <EmptyState icon="server" title={t("common.error")} description={error instanceof Error ? error.message : String(error)} />
           ) : !indexes ? (
             <EmptyState icon="server" title={t("common.noResults")} description={t("atlas.lineage.notGenerated")} />
           ) : view === "cards" ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import SortDropdown from "@/components/ui/SortDropdown";
 import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
@@ -166,6 +167,7 @@ export function ServicesList({ details, title }: { details: string[]; title: str
 /* ─── ContainersList convenience wrapper ─── */
 
 export function ContainersList({ stats, parsedContainers = [], title }: { stats: string[]; parsedContainers?: ParsedContainer[]; title: string }) {
+  const { t } = useLocale();
   const rows = useMemo(() => stats.map(parseContainerRow), [stats]);
 
   const columns: Column<ContainerRow>[] = [
@@ -240,7 +242,7 @@ export function ContainersList({ stats, parsedContainers = [], title }: { stats:
               <span
                 key={i}
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-2xs bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/40 font-mono"
-                title={`host :${b.hostPort} → container :${b.containerPort}/${b.proto}`}
+                title={t("host.ops.portBindingTooltip", { hostPort: b.hostPort, containerPort: b.containerPort, proto: b.proto })}
               >
                 :{b.hostPort}
                 <span className="opacity-70">→{b.containerPort}</span>

@@ -295,7 +295,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                       <span
                         className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)] font-mono"
                       >
-                        uid {u.uid}
+                        {t("vm.uidBadge", { uid: String(u.uid) })}
                       </span>
                     </div>
                     {u.home && (
@@ -482,7 +482,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
 function SSHAuthPolicyCard({ policy, users, t }: {
   policy: NonNullable<VMInfoType["ssh_auth_policy"]>;
   users: NonNullable<VMInfoType["remote_users"]>;
-  t: (k: string) => string;
+  t: (k: string, vars?: Record<string, string>) => string;
 }) {
   // Treat "yes" / "no" as boolean-ish; anything else (including "") is unknown.
   const yn = (v?: string): "yes" | "no" | "unknown" => {
@@ -657,7 +657,7 @@ function SSHAuthPolicyCard({ policy, users, t }: {
   );
 }
 
-function YesNoBadge({ value, t }: { value: "yes" | "no" | "unknown"; t: (k: string) => string }) {
+function YesNoBadge({ value, t }: { value: "yes" | "no" | "unknown"; t: (k: string, vars?: Record<string, string>) => string }) {
   if (value === "yes") {
     return (
       <span className="px-1.5 py-0.5 rounded-full bg-[var(--success)]/15 text-[var(--success)] border border-[var(--success)]/30 text-2xs">
@@ -698,7 +698,7 @@ type NormalizedProcess = {
   isSystem?: boolean;
 };
 
-function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string) => string; gridCols: string }) {
+function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string, vars?: Record<string, string>) => string; gridCols: string }) {
   const processes = useMemo(() => {
     // New scan format — full process details
     if (info.process_details && info.process_details.length > 0) {
@@ -765,11 +765,11 @@ function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string) 
               <span className="text-base shrink-0" title={p.type}>{p.icon}</span>
               <span className={`text-sm font-medium truncate ${p.isSystem ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{p.type}</span>
               {p.isSystem && (
-                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)]">OS</span>
+                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)]">{t("vm.os")}</span>
               )}
               {p.pid && (
                 <span className="ml-auto shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-2xs text-[var(--text-faint)] border border-[var(--border-subtle)] font-mono">
-                  PID {p.pid}
+                  {t("vm.pid", { pid: String(p.pid) })}
                 </span>
               )}
             </div>
@@ -798,7 +798,7 @@ function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string) 
                 </div>
               )}
               <div>
-                <span className="text-[var(--text-faint)] block">CPU / MEM</span>
+                <span className="text-[var(--text-faint)] block">{t("vm.cpuMemLabel")}</span>
                 <span className="text-[var(--text-secondary)] font-mono">{p.cpu} / {p.mem}</span>
               </div>
               {p.ports && (
@@ -814,13 +814,13 @@ function ProcessCards({ info, t, gridCols }: { info: VMInfoType; t: (k: string) 
               <div className="mt-auto pt-2 mt-2 border-t border-[var(--border-subtle)]/50 space-y-0.5 text-2xs">
                 {p.cwd && (
                   <div className="flex gap-1.5">
-                    <span className="text-[var(--text-faint)] shrink-0">cwd</span>
+                    <span className="text-[var(--text-faint)] shrink-0">{t("vm.cwd")}</span>
                     <span className="text-[var(--text-muted)] truncate font-mono">{p.cwd}</span>
                   </div>
                 )}
                 {p.venv && (
                   <div className="flex gap-1.5">
-                    <span className="text-[var(--text-faint)] shrink-0">venv</span>
+                    <span className="text-[var(--text-faint)] shrink-0">{t("vm.venv")}</span>
                     <span className="text-[var(--text-muted)] truncate font-mono">{p.venv}</span>
                   </div>
                 )}
@@ -903,7 +903,7 @@ function bucketCronJobs(jobs: CronJob[]): { system: CronJob[]; user: CronJob[] }
   return { system, user };
 }
 
-function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string) => string }) {
+function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string, vars?: Record<string, string>) => string }) {
   const jobs = cron.jobs ?? [];
   const { system, user } = bucketCronJobs(jobs);
 
@@ -955,7 +955,7 @@ function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string) => string })
   );
 }
 
-function CronJobGroup({ title, jobs, t }: { title: string; jobs: CronJob[]; t: (k: string) => string }) {
+function CronJobGroup({ title, jobs, t }: { title: string; jobs: CronJob[]; t: (k: string, vars?: Record<string, string>) => string }) {
   return (
     <div>
       <span className="text-2xs font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
@@ -970,7 +970,7 @@ function CronJobGroup({ title, jobs, t }: { title: string; jobs: CronJob[]; t: (
   );
 }
 
-function CronJobRow({ job, t }: { job: CronJob; t: (k: string) => string }) {
+function CronJobRow({ job, t }: { job: CronJob; t: (k: string, vars?: Record<string, string>) => string }) {
   const isTimer = job.kind === "timer";
   const sourceLabel = job.source.startsWith("user:")
     ? job.source.slice(5)
@@ -1065,7 +1065,7 @@ function agentStateClasses(state?: string): string {
   }
 }
 
-function AgentsCard({ agents, t }: { agents: Agent[]; t: (k: string) => string }) {
+function AgentsCard({ agents, t }: { agents: Agent[]; t: (k: string, vars?: Record<string, string>) => string }) {
   // Bucket by category in a stable display order; trailing categories (any
   // not in the canonical list) get appended alphabetically.
   const buckets = new Map<string, Agent[]>();
@@ -1112,7 +1112,7 @@ function AgentsCard({ agents, t }: { agents: Agent[]; t: (k: string) => string }
   );
 }
 
-function AgentCategoryGroup({ category, agents, t }: { category: string; agents: Agent[]; t: (k: string) => string }) {
+function AgentCategoryGroup({ category, agents, t }: { category: string; agents: Agent[]; t: (k: string, vars?: Record<string, string>) => string }) {
   const icon = AGENT_CATEGORY_ICON[category] ?? "⚙️";
   // i18n key falls back to the raw category id when no translation exists.
   const label = (() => {
@@ -1136,7 +1136,7 @@ function AgentCategoryGroup({ category, agents, t }: { category: string; agents:
   );
 }
 
-function AgentRow({ agent, t }: { agent: Agent; t: (k: string) => string }) {
+function AgentRow({ agent, t }: { agent: Agent; t: (k: string, vars?: Record<string, string>) => string }) {
   const stateLabel = agent.state ? t(`scan.agents.state.${agent.state}`) : t("scan.agents.state.unknown");
   const stateText = stateLabel.startsWith("scan.agents.state.") ? agent.state ?? "—" : stateLabel;
   return (
@@ -1243,7 +1243,7 @@ function serviceStateClasses(state?: string): string {
   }
 }
 
-function ServiceInventoryCard({ services, t }: { services: DiscoveredService[]; t: (k: string) => string }) {
+function ServiceInventoryCard({ services, t }: { services: DiscoveredService[]; t: (k: string, vars?: Record<string, string>) => string }) {
   const buckets = new Map<string, DiscoveredService[]>();
   for (const s of services) {
     const list = buckets.get(s.kind) ?? [];
@@ -1286,7 +1286,7 @@ function ServiceInventoryCard({ services, t }: { services: DiscoveredService[]; 
   );
 }
 
-function ServiceKindGroup({ kind, services, t }: { kind: string; services: DiscoveredService[]; t: (k: string) => string }) {
+function ServiceKindGroup({ kind, services, t }: { kind: string; services: DiscoveredService[]; t: (k: string, vars?: Record<string, string>) => string }) {
   const icon = SERVICE_KIND_ICON[kind] ?? "🔧";
   const label = (() => {
     const key = `scan.services.kind.${kind}`;
@@ -1308,7 +1308,7 @@ function ServiceKindGroup({ kind, services, t }: { kind: string; services: Disco
   );
 }
 
-function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string) => string }) {
+function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string, vars?: Record<string, string>) => string }) {
   const stateLabelKey = `scan.services.state.${service.state ?? "unknown"}`;
   const stateLabel = t(stateLabelKey);
   const stateText = stateLabel === stateLabelKey ? service.state ?? "—" : stateLabel;
@@ -1393,7 +1393,7 @@ function ResourceTopPanel({
   t,
 }: {
   snapshot: ResourceUsageSnapshot;
-  t: (k: string) => string;
+  t: (k: string, vars?: Record<string, string>) => string;
 }) {
   const cpu = snapshot.top_cpu ?? [];
   const mem = snapshot.top_mem ?? [];

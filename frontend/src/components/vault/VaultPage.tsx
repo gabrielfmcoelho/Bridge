@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { secretsAPI, projectsAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocale } from "@/contexts/LocaleContext";
 import type { Secret } from "@/lib/types";
 import { useSecretReveal } from "@/hooks/useSecretReveal";
 import PageShell from "@/components/layout/PageShell";
@@ -36,14 +37,16 @@ const VISIBILITIES: VisibilityFilter[] = ["all", "personal", "shared"];
 const TYPES: TypeFilter[] = ["all", "cred", "sshkey", "password", "app_login", "env_var"];
 
 export default function VaultPage() {
+  const { t } = useLocale();
   return (
-    <Suspense fallback={<PageShell><div className="text-sm text-[var(--text-muted)]">Loading...</div></PageShell>}>
+    <Suspense fallback={<PageShell><div className="text-sm text-[var(--text-muted)]">{t("common.loading")}</div></PageShell>}>
       <VaultPageInner />
     </Suspense>
   );
 }
 
 function VaultPageInner() {
+  const { t } = useLocale();
   const params = useSearchParams();
   const [scope, setScope] = useState<ScopeFilter>((params.get("scope") || "all") as ScopeFilter);
   const [visibility, setVisibility] = useState<VisibilityFilter>((params.get("visibility") || "all") as VisibilityFilter);
@@ -90,61 +93,61 @@ function VaultPageInner() {
       let key: string, title: string, order: number;
       if (s.scope === "projeto" && s.parent_id != null) {
         key = `p:${s.parent_id}`;
-        title = projectName.get(s.parent_id) ?? `Project #${s.parent_id}`;
+        title = projectName.get(s.parent_id) ?? t("vault.projectFallbackTitle", { id: String(s.parent_id) });
         order = 0;
       } else {
         key = "other";
-        title = "Other secrets";
+        title = t("vault.otherSecretsGroup");
         order = 1;
       }
       if (!byKey.has(key)) byKey.set(key, { title, order, items: [] });
       byKey.get(key)!.items.push(s);
     }
     return Array.from(byKey.values()).sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
-  }, [visible, projectName]);
+  }, [visible, projectName, t]);
 
   return (
     <PageShell>
-      <PageHeader title="Vault" />
+      <PageHeader title={t("nav.vault")} />
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <p className="text-sm text-[var(--text-muted)] flex-1 min-w-[200px]">
-          All secrets you can access. Personal secrets are owner-only; shared secrets follow role-based ACL.
+          {t("vault.subtitle")}
         </p>
         <div className="flex items-center gap-2">
           <Link href="/secrets/trash" className="text-xs text-[var(--accent)] hover:underline">
-            View trash →
+            {t("vault.viewTrash")}
           </Link>
           <Button size="sm" onClick={() => setNewOpen(true)}>
-            + New secret
+            {t("vault.newSecretButton")}
           </Button>
         </div>
       </div>
 
       <Card className="mb-4">
         <div className="px-1 pb-2">
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search secrets by name, description, project…" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("vault.searchPlaceholder")} />
         </div>
-        <FilterRow label="Scope">
+        <FilterRow label={t("common.scope")}>
           {SCOPES.map((s) => (
             <PillButton key={s} active={scope === s} onClick={() => setScope(s)}>{s}</PillButton>
           ))}
         </FilterRow>
-        <FilterRow label="Visibility">
+        <FilterRow label={t("vault.visibilityLabel")}>
           {VISIBILITIES.map((v) => (
             <PillButton key={v} active={visibility === v} onClick={() => setVisibility(v)}>{v}</PillButton>
           ))}
         </FilterRow>
-        <FilterRow label="Type">
-          {TYPES.map((t) => (
-            <PillButton key={t} active={typeF === t} onClick={() => setTypeF(t)}>{t.replace("_", " ")}</PillButton>
+        <FilterRow label={t("common.type")}>
+          {TYPES.map((tf) => (
+            <PillButton key={tf} active={typeF === tf} onClick={() => setTypeF(tf)}>{tf.replace("_", " ")}</PillButton>
           ))}
         </FilterRow>
       </Card>
 
       {isLoading ? (
-        <p className="text-sm text-[var(--text-muted)]">Loading...</p>
+        <p className="text-sm text-[var(--text-muted)]">{t("common.loading")}</p>
       ) : visible.length === 0 ? (
-        <EmptyState icon="key" title="No secrets match these filters" description="Try widening the chips above, adjusting your search, or create a new secret." />
+        <EmptyState icon="key" title={t("vault.emptyTitle")} description={t("vault.emptyDescription")} />
       ) : (
         <div className="space-y-6">
           {groups.map((g) => (
@@ -207,6 +210,7 @@ function SecretRow({
   onManageHosts: () => void;
   onDeleted: () => void;
 }) {
+  const { t } = useLocale();
   const { user } = useAuth();
   const reveal = useSecretReveal();
   const qc = useQueryClient();
@@ -242,7 +246,7 @@ function SecretRow({
             <Badge color={secret.visibility === "personal" ? "purple" : "amber"}>{secret.visibility}</Badge>
             <Badge>{secret.scope}</Badge>
             {secret.group_label && (
-              <span className="text-2xs text-[var(--text-faint)]">env: {secret.group_label}</span>
+              <span className="text-2xs text-[var(--text-faint)]">{t("vault.envLabel", { group: secret.group_label })}</span>
             )}
           </div>
           {secret.description && <p className="text-xs text-[var(--text-muted)] mt-1">{secret.description}</p>}
@@ -255,31 +259,35 @@ function SecretRow({
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <Button size="sm" variant="secondary" onClick={handleToggleReveal} disabled={reveal.loading}>
-            {reveal.loading ? "..." : reveal.revealed ? `Hide (${Math.ceil(reveal.remainingMs / 1000)}s)` : "Reveal"}
+            {reveal.loading
+              ? "..."
+              : reveal.revealed
+              ? `${t("serviceCredentials.hide")} (${Math.ceil(reveal.remainingMs / 1000)}s)`
+              : t("serviceCredentials.reveal")}
           </Button>
           {reveal.revealed && (
             <Button size="sm" variant="secondary" onClick={() => reveal.copy()}>
-              {reveal.copyState === "copied" ? "Copied" : reveal.copyState === "cleared" ? "Cleared" : "Copy"}
+              {reveal.copyState === "copied" ? t("vault.copiedLabel") : reveal.copyState === "cleared" ? t("vault.clearedLabel") : t("common.copy")}
             </Button>
           )}
           <Button size="sm" variant="secondary" onClick={onEdit}>
-            Edit
+            {t("common.edit")}
           </Button>
           {secret.type === "password" && secret.scope === "avulso" && (
             <Button size="sm" variant="secondary" onClick={onManageHosts}>
-              Hosts
+              {t("nav.hosts")}
             </Button>
           )}
           {canShare && (
             <Button size="sm" variant="secondary" onClick={onShare}>
-              Share
+              {t("common.share")}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={onHistory}>
-            History
+            {t("vault.historyButton")}
           </Button>
           <Button size="sm" variant="danger" onClick={() => del.mutate()} disabled={del.isPending}>
-            Delete
+            {t("common.delete")}
           </Button>
         </div>
       </div>

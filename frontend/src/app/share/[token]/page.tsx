@@ -344,11 +344,12 @@ function LocaleToggle() {
 
 function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
+  const { t } = useLocale();
   return (
     <button
       onClick={toggleTheme}
-      aria-label="Toggle theme"
-      title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      aria-label={t("header.toggleTheme")}
+      title={theme === "dark" ? t("share.switchToLight") : t("share.switchToDark")}
       className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer"
     >
       {theme === "dark" ? (

@@ -6,6 +6,7 @@ import { projectGitlabAPI, type ProjectGitLabLink } from "@/lib/api";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import StatusDot from "@/components/ui/StatusDot";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   projectId: number;
@@ -54,6 +55,7 @@ function parseGitLabInput(raw: string): { path: string; detectedKind: "group" | 
 }
 
 export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }: Props) {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState<"project" | "group">("project");
@@ -89,7 +91,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
       setError(null);
       invalidateLinked();
     },
-    onError: (err: Error) => setError(err.message || "Failed to add link"),
+    onError: (err: Error) => setError(err.message || t("project.addLinkFailed")),
   });
 
   // When the user pastes or types a URL, strip it down to the path and
@@ -124,16 +126,16 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
       <div className="flex items-center justify-between mb-3 gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="text-xs font-semibold text-[var(--text-primary)]">Linked GitLab sources</h4>
+            <h4 className="text-xs font-semibold text-[var(--text-primary)]">{t("project.linkedGitlabSourcesTitle")}</h4>
             <IntegrationStatusBadge enabled={integrationEnabled} configured={integrationConfigured} />
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Paste a GitLab URL or path. Individual repos or entire subgroups (subgroups fan out to all their repos).
+            {t("project.linkedGitlabSourcesHint")}
           </p>
         </div>
         {canEdit && !adding && (
           <Button type="button" size="sm" variant="secondary" onClick={() => { setAdding(true); setError(null); }}>
-            + Add link
+            + {t("project.addLink")}
           </Button>
         )}
       </div>
@@ -141,8 +143,8 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
       {!integrationActive && (
         <p className="mb-3 text-xs text-[var(--warning)]">
           {!integrationEnabled
-            ? "GitLab Code Management is disabled — ask an admin to enable it in Settings → Integrations → GitLab → Code Management."
-            : "GitLab service token is not configured — ask an admin to set one in Settings → Integrations → GitLab → Code Management."}
+            ? t("project.gitlabCodeMgmtDisabledWarn")
+            : t("project.gitlabTokenNotSetWarn")}
         </p>
       )}
 
@@ -151,15 +153,15 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
           <div className="flex gap-3">
             <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
               <input type="radio" name="gl-link-kind" checked={kind === "project"} onChange={() => setKind("project")} />
-              Repository
+              {t("project.repository")}
             </label>
             <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
               <input type="radio" name="gl-link-kind" checked={kind === "group"} onChange={() => setKind("group")} />
-              Subgroup
+              {t("project.subgroup")}
             </label>
           </div>
           <Input
-            label={kind === "group" ? "Group URL or path" : "Project URL or path"}
+            label={kind === "group" ? t("project.groupUrlOrPathLabel") : t("project.projectUrlOrPathLabel")}
             value={path}
             onChange={(e) => handlePathChange(e.target.value)}
             onKeyDown={(e) => {
@@ -170,10 +172,10 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
                 if (path.trim() && !addMutation.isPending) addMutation.mutate();
               }
             }}
-            placeholder={kind === "group" ? "https://gitlab.com/groups/org/subgroup or org/subgroup" : "https://gitlab.com/org/repo or org/repo"}
+            placeholder={kind === "group" ? t("project.groupUrlPlaceholder") : t("project.projectUrlPlaceholder")}
           />
           <Input
-            label="Branch (optional)"
+            label={t("project.branchOptionalLabel")}
             value={refName}
             onChange={(e) => setRefName(e.target.value)}
             onKeyDown={(e) => {
@@ -182,25 +184,25 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
                 if (path.trim() && !addMutation.isPending) addMutation.mutate();
               }
             }}
-            placeholder="leave blank for all branches"
+            placeholder={t("project.allBranchesPlaceholder")}
           />
           {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
           <div className="flex gap-2">
             <Button type="button" size="sm" onClick={() => addMutation.mutate()} loading={addMutation.isPending} disabled={!path.trim()}>
-              Add
+              {t("common.add")}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => { setAdding(false); setError(null); }}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </div>
       )}
 
       {isLoading ? (
-        <p className="text-xs text-[var(--text-muted)]">Loading...</p>
+        <p className="text-xs text-[var(--text-muted)]">{t("common.loading")}</p>
       ) : links.length === 0 ? (
         <p className="text-xs text-[var(--text-muted)]">
-          No GitLab sources linked yet.{canEdit ? " Click Add link above to start tracking commits." : ""}
+          {t("project.noGitlabLinksTitle")}{canEdit ? " " + t("project.noGitlabLinksClickHint") : ""}
         </p>
       ) : (
         <ul className="space-y-1.5">
@@ -216,7 +218,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
                     ? "bg-[var(--purple)]/10 text-[var(--purple)]"
                     : "bg-[var(--cyan)]/10 text-[var(--cyan)]"
                 }`}>
-                  {link.kind === "group" ? "group" : "repo"}
+                  {link.kind === "group" ? t("project.linkKindGroup") : t("project.linkKindRepo")}
                 </span>
                 <span className="text-xs text-[var(--text-secondary)] truncate font-mono">
                   {baseHost}/{link.gitlab_path}
@@ -230,7 +232,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
                   type="button"
                   onClick={() => deleteMutation.mutate(link.id)}
                   className="text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors text-sm"
-                  aria-label="Remove link"
+                  aria-label={t("project.removeLinkAria")}
                   disabled={deleteMutation.isPending}
                 >
                   &times;
@@ -245,8 +247,9 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
 }
 
 function IntegrationStatusBadge({ enabled, configured }: { enabled: boolean; configured: boolean }) {
+  const { t } = useLocale();
   const active = enabled && configured;
-  const label = active ? "code mgmt active" : !enabled ? "code mgmt disabled" : "no service token";
+  const label = active ? t("project.codeMgmtActiveBadge") : !enabled ? t("project.codeMgmtDisabledBadge") : t("project.noServiceTokenBadge");
   const classes = active
     ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30"
     : "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30";
@@ -259,21 +262,22 @@ function IntegrationStatusBadge({ enabled, configured }: { enabled: boolean; con
 }
 
 function LinkHealthIcon({ link, integrationActive }: { link: ProjectGitLabLink; integrationActive: boolean }) {
+  const { t } = useLocale();
   // When the integration isn't active we can't verify — show a neutral dot.
   if (!integrationActive || link.reachable === undefined) {
     return (
       <StatusDot color="muted"
-        title="Link not verified (GitLab integration inactive)" />
+        title={t("project.linkNotVerifiedTitle")} />
     );
   }
   if (link.reachable) {
     return (
       <StatusDot className="bg-[var(--success)]"
-        title="Resolved on GitLab" />
+        title={t("project.linkResolvedTitle")} />
     );
   }
   return (
     <StatusDot className="bg-[var(--danger)]"
-      title={link.health_error || "Not reachable on GitLab"} />
+      title={link.health_error || t("project.linkNotReachableTitle")} />
   );
 }

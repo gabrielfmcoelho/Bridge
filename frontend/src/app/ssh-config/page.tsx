@@ -137,7 +137,7 @@ export default function SSHConfigPage() {
               ? "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/30"
               : "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30"
             }>
-              {serverInfo.is_local ? "localhost" : "remote"}
+              {serverInfo.is_local ? "localhost" : t("sshConfig.remoteBadge")}
             </Badge>
             <span className="text-xs opacity-70 font-mono">{serverInfo.config_path}</span>
           </div>
@@ -146,21 +146,21 @@ export default function SSHConfigPage() {
 
       {!serverInfo?.is_local && serverInfo && (
         <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--warning)]/20 bg-[var(--warning)]/5 p-3 text-xs text-[var(--warning)]/80 animate-fade-in">
-          <strong>Remote server detected.</strong> The &quot;Generate Config&quot; button writes to <code className="font-mono">{serverInfo.config_path}</code> on <strong>{serverInfo.hostname}</strong>.
-          To use this config on your local machine, use the <strong>Download</strong> or <strong>Copy</strong> buttons instead.
+          {t("sshConfig.remoteDetected", { button: t("sshConfig.generate"), path: serverInfo.config_path, hostname: serverInfo.hostname })}{" "}
+          {t("sshConfig.remoteDetectedHint", { download: t("sshConfig.download"), copy: t("sshConfig.copy") })}
         </div>
       )}
 
       {genResult && (
         <div className="mb-4 bg-[var(--success)]/10 border border-[var(--success)]/25 text-[var(--success)] rounded-[var(--radius-md)] p-3 text-sm animate-slide-down flex items-center gap-2">
           <Icon path={ICON_PATHS.checkCircle} className="w-4 h-4 shrink-0" />
-          Config generated with {genResult.host_count} hosts at <code className="font-mono">{genResult.path}</code>
+          {t("sshConfig.configGenerated", { count: String(genResult.host_count), path: genResult.path })}
         </div>
       )}
 
       {generateMutation.isError && (
         <div className="mb-4 bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)] rounded-[var(--radius-md)] p-3 text-sm animate-slide-down">
-          {generateMutation.error instanceof Error ? generateMutation.error.message : "Generation failed"}
+          {generateMutation.error instanceof Error ? generateMutation.error.message : t("sshConfig.generationFailed")}
         </div>
       )}
 
@@ -171,7 +171,7 @@ export default function SSHConfigPage() {
           </h2>
           {preview?.content && (
             <span className="text-xs text-[var(--text-muted)] font-mono">
-              {preview.content.split("\n").filter((l) => l.startsWith("Host ")).length} hosts
+              {t("sshConfig.hostsCount", { count: String(preview.content.split("\n").filter((l) => l.startsWith("Host ")).length) })}
             </span>
           )}
         </div>
@@ -205,7 +205,7 @@ export default function SSHConfigPage() {
                   dangerouslySetInnerHTML={{
                     __html: preview?.content
                       ? highlightSSHConfig(preview.content)
-                      : '<span class="text-[var(--text-faint)]"># No active hosts configured</span>',
+                      : `<span class="text-[var(--text-faint)]"># ${t("sshConfig.noActiveHosts")}</span>`,
                   }}
                 />
               </div>

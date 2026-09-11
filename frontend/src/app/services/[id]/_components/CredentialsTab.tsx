@@ -44,7 +44,7 @@ export default function CredentialsTab({ serviceId, isAdmin, t }: CredentialsTab
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--text-faint)]">No credentials configured</p>
+          <p className="text-sm text-[var(--text-faint)]">{t("service.noCredentials")}</p>
         )}
         {isAdmin && (
           <div className="mt-4">
@@ -53,7 +53,7 @@ export default function CredentialsTab({ serviceId, isAdmin, t }: CredentialsTab
               variant="secondary"
               onClick={() => router.push(`/secrets?scope=service&parent_id=${serviceId}`)}
             >
-              Add Credential
+              {t("service.addCredential")}
             </Button>
           </div>
         )}

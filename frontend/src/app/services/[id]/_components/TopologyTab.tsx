@@ -36,7 +36,7 @@ export default function ServiceTopologyTab({
   if (!hasConnections) {
     return (
       <p className="text-sm text-[var(--text-faint)] text-center py-8">
-        No connections found for this service.
+        {t("service.noConnections")}
       </p>
     );
   }
@@ -53,7 +53,7 @@ export default function ServiceTopologyTab({
             <h2
               className="text-sm font-semibold text-[var(--text-secondary)] mb-3 shrink-0 font-display"
             >
-              Topology
+              {t("nav.topology")}
             </h2>
             <div className="flex-1 rounded-[var(--radius-md)] overflow-hidden border border-[var(--border-subtle)]">
               <TopologyGraph data={filteredGraph} className="w-full h-full" />
@@ -61,7 +61,7 @@ export default function ServiceTopologyTab({
           </Card>
         ) : (
           <div className="flex items-center justify-center text-sm text-[var(--text-faint)]">
-            No topology data yet
+            {t("service.noTopologyData")}
           </div>
         )}
 
@@ -110,7 +110,7 @@ export default function ServiceTopologyTab({
           {linkedHosts.length > 0 && (
             <Card hover={false}>
               <SectionHeading variant="section">
-                Linked Hosts
+                {t("service.linkedHosts")}
               </SectionHeading>
               <div className="space-y-1">
                 {linkedHosts.map((host) => (
@@ -129,7 +129,7 @@ export default function ServiceTopologyTab({
           {linkedDns.length > 0 && (
             <Card hover={false}>
               <SectionHeading variant="section">
-                Linked DNS
+                {t("service.linkedDns")}
               </SectionHeading>
               <div className="space-y-1">
                 {linkedDns.map((dns) => (

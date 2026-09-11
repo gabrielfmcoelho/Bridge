@@ -129,7 +129,7 @@ export default function ProjectsPage() {
       {!isLoading && allProjects.length > 0 && <KpiSection projects={allProjects} t={t} />}
 
       <SearchBadge search={search} onClear={() => setSearch("")} />
-      {!isLoading && allProjects.length > 0 && <SectionHeading>{t("project.listing") || "Projects"}</SectionHeading>}
+      {!isLoading && allProjects.length > 0 && <SectionHeading>{t("project.listing")}</SectionHeading>}
 
       <ListToolbar
         search={search}
@@ -150,7 +150,7 @@ export default function ProjectsPage() {
         viewMode={viewMode}
         emptyIcon="folder"
         emptyTitle={t("common.noResults")}
-        emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") || "Try adjusting your filters" : t("project.emptyStateAdd") || "Create your first project"}
+        emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") : t("project.emptyStateAdd")}
         emptyAction={canEdit && !search && !activeFilterCount ? (
           <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("project.addProject")}</Button>
         ) : undefined}

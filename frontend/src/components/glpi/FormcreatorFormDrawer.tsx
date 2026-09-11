@@ -20,6 +20,7 @@ import {
 import SectionHeading from "@/components/ui/SectionHeading";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   open: boolean;
@@ -158,6 +159,7 @@ function normalizeAnswer(fieldtype: string, value: unknown): unknown {
 }
 
 export default function FormcreatorFormDrawer({ open, onClose, formID, profileID }: Props) {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [submitResult, setSubmitResult] = useState<{
@@ -236,12 +238,12 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
         q.fieldtype !== "hidden"
       ) {
         if (isEmptyForType(q.fieldtype, answers[String(q.id)])) {
-          errors[String(q.id)] = "Obrigatório";
+          errors[String(q.id)] = t("glpi.fieldRequired");
         }
       }
     }
     return { errors, blockingUnsupported };
-  }, [bundle, answers, questionConds]);
+  }, [bundle, answers, questionConds, t]);
 
   const submitMutation = useMutation({
     mutationFn: () => {
@@ -270,20 +272,20 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
     submitMutation.mutate();
   };
 
-  const title = bundle?.form?.name ?? "Formulário";
+  const title = bundle?.form?.name ?? t("glpi.formDefaultTitle");
 
   const footer = !submitResult && (
     <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-[var(--border-subtle)]">
       <span className="text-xs text-[var(--text-muted)]">
         {validationErrors.blockingUnsupported
-          ? "Este formulário usa um tipo de campo obrigatório que não é suportado em sshcm. Abra no GLPI."
+          ? t("glpi.formUnsupportedRequiredField")
           : Object.keys(validationErrors.errors).length > 0
-          ? "Preencha os campos obrigatórios destacados."
-          : "Pronto para enviar."}
+          ? t("glpi.formFillRequiredFields")
+          : t("glpi.formReadyToSubmit")}
       </span>
       <div className="flex gap-2">
         <Button type="button" variant="secondary" onClick={onClose}>
-          Cancelar
+          {t("common.cancel")}
         </Button>
         <Button
           type="button"
@@ -294,7 +296,7 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
             Object.keys(validationErrors.errors).length > 0
           }
         >
-          Enviar
+          {t("glpi.submit")}
         </Button>
       </div>
     </div>
@@ -314,13 +316,13 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
 
         {error && (
           <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-3 py-2">
-            Falha ao carregar o formulário: {(error as Error).message}
+            {t("glpi.loadFormError", { message: (error as Error).message })}
           </div>
         )}
 
         {bundle && submitMutation.isError && !submitResult && (
           <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-3 py-2">
-            Falha ao enviar: {(submitMutation.error as Error).message}
+            {t("glpi.submitFormError", { message: (submitMutation.error as Error).message })}
           </div>
         )}
 
@@ -336,15 +338,15 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
         {submitResult && (
           <div className="space-y-4">
             <div className="rounded-[var(--radius-md)] border border-[var(--success)]/30 bg-[var(--success)]/10 text-[var(--success)] text-sm px-4 py-3">
-              <p className="font-semibold">Formulário enviado.</p>
+              <p className="font-semibold">{t("glpi.formSubmitted")}</p>
               <p className="text-xs mt-1">
-                ID da resposta: <code>#{submitResult.form_answer_id}</code>
+                {t("glpi.formAnswerId", { id: String(submitResult.form_answer_id) })}
               </p>
             </div>
             {submitResult.created_tickets?.length ? (
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">
-                  Chamados criados
+                  {t("glpi.ticketsCreated")}
                 </p>
                 {submitResult.created_tickets.map((t) => (
                   <Link
@@ -367,12 +369,12 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90"
                 >
-                  Abrir no GLPI
+                  {t("glpi.openInGlpi")}
                   <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
                 </Link>
               )}
               <Button type="button" variant="secondary" onClick={onClose}>
-                Fechar
+                {t("common.close")}
               </Button>
             </div>
           </div>

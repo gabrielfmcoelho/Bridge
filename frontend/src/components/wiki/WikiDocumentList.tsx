@@ -16,12 +16,12 @@ interface Props {
 }
 
 export default function WikiDocumentList({ documents, emptyLabel, onSelect }: Props) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
 
   if (documents.length === 0) {
     return (
       <p className="text-xs text-[var(--text-muted)] py-6 text-center">
-        {emptyLabel ?? "No documents yet."}
+        {emptyLabel ?? t("wiki.noDocumentsYet")}
       </p>
     );
   }
@@ -37,7 +37,7 @@ export default function WikiDocumentList({ documents, emptyLabel, onSelect }: Pr
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                 {doc.emoji && <span className="mr-1.5">{doc.emoji}</span>}
-                {doc.title || "Untitled"}
+                {doc.title || t("wiki.untitled")}
               </p>
               {doc.excerpt && (
                 <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { glpiAPI } from "@/lib/api";
 import Button from "@/components/ui/Button";
+import { useLocale } from "@/contexts/LocaleContext";
 
 // Each uploaded file becomes a GLPI Document with its own id. The answer value
 // for a Formcreator file question is an array of these ids.
@@ -34,6 +35,7 @@ export default function FormcreatorFileInput({
   maxFiles,
   disabled,
 }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export default function FormcreatorFileInput({
       }
       onChange([...value, ...uploaded]);
     } catch (err) {
-      setUploadErr(err instanceof Error ? err.message : "Falha no upload");
+      setUploadErr(err instanceof Error ? err.message : t("glpi.uploadFailed"));
     } finally {
       setUploading(false);
       // Reset so picking the same file twice still fires onChange.
@@ -93,7 +95,7 @@ export default function FormcreatorFileInput({
           loading={uploading}
           disabled={disabled || !profileID || atLimit}
         >
-          {atLimit ? "Limite atingido" : "Adicionar arquivo"}
+          {atLimit ? t("glpi.fileLimitReached") : t("glpi.addFile")}
         </Button>
         {maxFiles != null && (
           <span className="text-xs text-[var(--text-faint)]">
@@ -102,7 +104,7 @@ export default function FormcreatorFileInput({
         )}
         {accept && (
           <span className="text-xs text-[var(--text-faint)]" title={accept}>
-            Tipos: {accept}
+            {t("glpi.fileTypesLabel", { types: accept })}
           </span>
         )}
       </div>
@@ -122,7 +124,7 @@ export default function FormcreatorFileInput({
                   type="button"
                   onClick={() => remove(doc.id)}
                   className="text-[var(--text-faint)] hover:text-[var(--danger)]"
-                  aria-label={`Remover ${doc.filename}`}
+                  aria-label={t("glpi.removeFileAriaLabel", { filename: doc.filename })}
                 >
                   ×
                 </button>

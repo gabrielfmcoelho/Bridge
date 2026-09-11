@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { glpiAPI, type GlpiCatalogueOption } from "@/lib/api";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import Button from "@/components/ui/Button";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   itemtype: string | null;
@@ -27,6 +28,7 @@ const SCRAPER_SNIPPET = `copy(JSON.stringify(
 ));`;
 
 export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, onSaved }: Props) {
+  const { t } = useLocale();
   const [text, setText] = useState("");
   const [parseErr, setParseErr] = useState<string | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -63,24 +65,24 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
     try {
       const obj = JSON.parse(raw);
       if (!Array.isArray(obj)) {
-        setParseErr("Esperado um array JSON");
+        setParseErr(t("glpi.expectedJsonArray"));
         return null;
       }
       const out: GlpiCatalogueOption[] = [];
       for (let i = 0; i < obj.length; i++) {
         const row = obj[i];
         if (!row || typeof row !== "object") {
-          setParseErr(`Linha ${i + 1}: item inválido`);
+          setParseErr(t("glpi.lineInvalidItem", { n: String(i + 1) }));
           return null;
         }
         const id = typeof row.id === "number" ? row.id : parseInt(String(row.id ?? ""), 10);
         const name = typeof row.name === "string" ? row.name.trim() : "";
         if (!Number.isFinite(id) || id <= 0) {
-          setParseErr(`Linha ${i + 1}: id inválido`);
+          setParseErr(t("glpi.lineInvalidId", { n: String(i + 1) }));
           return null;
         }
         if (!name) {
-          setParseErr(`Linha ${i + 1}: name vazio`);
+          setParseErr(t("glpi.lineEmptyName", { n: String(i + 1) }));
           return null;
         }
         const clean: GlpiCatalogueOption = { id, name };
@@ -96,10 +98,10 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
       setParseErr(null);
       return out;
     } catch (e) {
-      setParseErr(e instanceof Error ? e.message : "JSON inválido");
+      setParseErr(e instanceof Error ? e.message : t("glpi.invalidJson"));
       return null;
     }
-  }, [text]);
+  }, [text, t]);
 
   const upsertMutation = useMutation({
     mutationFn: () => glpiAPI.upsertDropdownCatalogue(itemtype!, parsed ?? []),
@@ -121,14 +123,14 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
     <ResponsiveModal
       open={open}
       onClose={onClose}
-      title={itemtype ? `Catálogo: ${itemtype}` : "Catálogo"}
+      title={itemtype ? t("glpi.catalogueTitleFor", { itemtype }) : t("glpi.catalogueTitle")}
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-4">
           {/* Left: JSON textarea */}
           <div className="space-y-1.5">
             <label className="block text-xs font-medium text-[var(--text-secondary)]">
-              Opções (JSON)
+              {t("glpi.optionsJsonLabel")}
             </label>
             <textarea
               value={text}
@@ -143,9 +145,9 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
               {parseErr ? (
                 <span className="text-[var(--danger)]">⚠ {parseErr}</span>
               ) : parsed ? (
-                <>✓ {parsed.length} opção{parsed.length === 1 ? "" : "es"} prontas para salvar</>
+                <>✓ {t("glpi.optionsReadyToSave", { n: String(parsed.length) })}</>
               ) : (
-                <>Cole o JSON — lista de <code>{"{ id, name, completename?, parent_id? }"}</code></>
+                <>{t("glpi.jsonPasteHint")}</>
               )}
             </p>
           </div>
@@ -153,29 +155,30 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
           {/* Right: scraper snippet + help */}
           <aside className="space-y-3 text-xs text-[var(--text-muted)]">
             <div>
-              <p className="font-semibold text-[var(--text-primary)] mb-1">Como importar</p>
+              <p className="font-semibold text-[var(--text-primary)] mb-1">{t("glpi.howToImportTitle")}</p>
               <ol className="list-decimal list-inside space-y-1">
                 <li>
-                  Abra no GLPI qualquer página que mostre o dropdown de{" "}
-                  <code>{itemtype}</code> (ex.: Administração ›{" "}
-                  {itemtype === "ITILCategory" ? "Categorias ITIL" : itemtype}).
+                  {t("glpi.importStep1", {
+                    itemtype: itemtype ?? "",
+                    category: itemtype === "ITILCategory" ? t("glpi.itemtypeItilCategories") : (itemtype ?? ""),
+                  })}
                 </li>
-                <li>Abra o DevTools (F12), aba <strong>Console</strong>.</li>
-                <li>Cole o snippet abaixo e aperte Enter. Ele copia o JSON pronto.</li>
-                <li>Cole aqui no textarea à esquerda e clique Salvar.</li>
+                <li>{t("glpi.importStep2")}</li>
+                <li>{t("glpi.importStep3")}</li>
+                <li>{t("glpi.importStep4")}</li>
               </ol>
             </div>
             <div>
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">
-                  Snippet
+                  {t("glpi.snippetLabel")}
                 </span>
                 <button
                   type="button"
                   onClick={copySnippet}
                   className="text-xs text-[var(--accent)] hover:underline"
                 >
-                  {snippetCopied ? "Copiado ✓" : "Copiar"}
+                  {snippetCopied ? t("common.copied") : t("common.copy")}
                 </button>
               </div>
               <pre className="whitespace-pre-wrap break-all bg-[var(--bg-overlay)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] p-2 text-[10.5px] leading-tight font-mono">
@@ -183,9 +186,7 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
               </pre>
             </div>
             <p>
-              Alternativa: exporte o itemtype do GLPI como CSV (Administração ›
-              exportação) e converta para JSON — o formato esperado é array de{" "}
-              <code>{"{ id, name }"}</code>.
+              {t("glpi.importAlternative")}
             </p>
           </aside>
         </div>
@@ -198,7 +199,7 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
 
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-default)]">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -209,7 +210,7 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
             loading={upsertMutation.isPending}
             disabled={!parsed || parseErr != null}
           >
-            Salvar catálogo
+            {t("glpi.saveCatalogue")}
           </Button>
         </div>
       </div>

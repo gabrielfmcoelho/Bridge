@@ -98,11 +98,11 @@ export default function ChamadoList({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Select
-                label={t("common.status") || "Status"}
+                label={t("common.status")}
                 value={item.status || "in_execution"}
                 options={[
-                  { value: "in_execution", label: t("chamado.inExecution") || "In Execution" },
-                  { value: "solved", label: t("chamado.solved") || "Solved" },
+                  { value: "in_execution", label: t("chamado.inExecution") },
+                  { value: "solved", label: t("chamado.solved") },
                 ]}
                 onChange={(e) => update(idx, { status: e.target.value })}
               />
@@ -125,7 +125,7 @@ export default function ChamadoList({
                 onChange={(e) => update(idx, { date: applyDateMask(e.target.value) })}
                 placeholder="DD/MM/YYYY"
                 maxLength={10}
-                error={item.date.length === 10 && !isValidDate(item.date) ? "Data inv\u00e1lida" : undefined}
+                error={item.date.length === 10 && !isValidDate(item.date) ? t("chamado.invalidDate") : undefined}
               />
             </div>
           </div>

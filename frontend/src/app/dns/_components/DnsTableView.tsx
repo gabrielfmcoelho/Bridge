@@ -31,7 +31,7 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
       <SortableTable
         columns={[
           { key: "domain" as ColKey, label: t("dns.domain") },
-          { key: "https" as ColKey, label: "HTTPS", sortable: false },
+          { key: "https" as ColKey, label: t("topology.https"), sortable: false },
           { key: "situacao" as ColKey, label: t("common.status") },
           { key: "responsavel" as ColKey, label: t("dns.responsavel") },
           { key: "tags" as ColKey, label: t("common.tags"), sortable: false },
@@ -53,7 +53,7 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
               <td className="px-4 py-2.5 text-[var(--text-primary)] font-mono">{dns.domain}</td>
               <td className="px-4 py-2.5">
                 {dns.has_https ? (
-                  <Badge color="emerald">HTTPS</Badge>
+                  <Badge color="emerald">{t("topology.https")}</Badge>
                 ) : (
                   <span className="text-[var(--text-faint)]">-</span>
                 )}

@@ -103,9 +103,9 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
       {/* Step 1: Identity */}
       {step === 1 && (
         <div className="space-y-4 animate-fade-in">
-          <Input label={t("service.nickname")} value={form.nickname} onChange={(e) => set("nickname", e.target.value)} required placeholder="Service name" />
-          <Input label={t("common.description")} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Brief description" />
-          <Select label="Project" value={form.project_id?.toString() || ""} onChange={(e) => set("project_id", e.target.value ? parseInt(e.target.value) : null)} options={projects.map((p) => ({ value: p.id.toString(), label: p.name }))} />
+          <Input label={t("service.nickname")} value={form.nickname} onChange={(e) => set("nickname", e.target.value)} required placeholder={t("service.namePlaceholder")} />
+          <Input label={t("common.description")} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder={t("service.descriptionPlaceholder")} />
+          <Select label={t("service.projectLabel")} value={form.project_id?.toString() || ""} onChange={(e) => set("project_id", e.target.value ? parseInt(e.target.value) : null)} options={projects.map((p) => ({ value: p.id.toString(), label: p.name }))} />
           <div className="grid grid-cols-2 gap-3">
             <Select label={t("service.serviceType")} value={form.service_type} onChange={(e) => set("service_type", e.target.value)} options={enumOpts(serviceTypes)} />
             <Select label={t("service.serviceSubtype")} value={form.service_subtype} onChange={(e) => set("service_subtype", e.target.value)} options={enumOpts(serviceSubtypes)} />
@@ -129,18 +129,18 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
           </div>
           {form.is_external_dependency && (
             <div className="space-y-3 p-3 rounded-[var(--radius-md)] border border-[var(--warning)]/20 bg-[var(--warning)]/5">
-              <Input label={t("service.externalProvider")} value={form.external_provider} onChange={(e) => set("external_provider", e.target.value)} placeholder="AWS, Stripe, etc." />
+              <Input label={t("service.externalProvider")} value={form.external_provider} onChange={(e) => set("external_provider", e.target.value)} placeholder={t("service.externalProviderPlaceholder")} />
               <Input label={t("service.externalContact")} value={form.external_contact} onChange={(e) => set("external_contact", e.target.value)} />
               <Input label={t("service.externalUrl")} value={form.external_url} onChange={(e) => set("external_url", e.target.value)} type="url" />
             </div>
           )}
-          <Input label="Repository URL" value={form.repository_url} onChange={(e) => set("repository_url", e.target.value)} type="url" placeholder="https://gitlab.com/..." />
+          <Input label={t("service.repositoryUrlLabel")} value={form.repository_url} onChange={(e) => set("repository_url", e.target.value)} type="url" placeholder="https://gitlab.com/..." />
           <Input label={t("project.documentationUrl")} value={form.documentation_url} onChange={(e) => set("documentation_url", e.target.value)} type="url" placeholder="https://docs..." />
           <Input
-            label="Grafana dashboard UID"
+            label={t("service.grafanaDashboardUidLabel")}
             value={form.grafana_dashboard_uid}
             onChange={(e) => set("grafana_dashboard_uid", e.target.value)}
-            placeholder="leave blank to use the default from Settings"
+            placeholder={t("service.grafanaDashboardUidPlaceholder")}
           />
           {initial?.id && (
             <ServiceDashboardProvisionButton
@@ -171,8 +171,8 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
         <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4 animate-fade-in">
           <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <TagInput label={t("common.tags")} tags={tags} onChange={setTags} entityType="service" />
-          <CheckboxList label="Hosts" items={hosts.map((h) => ({ id: h.id, name: h.nickname }))} selected={form.host_ids} onChange={(ids) => set("host_ids", ids)} />
-          <CheckboxList label="DNS" items={dnsRecords.map((d) => ({ id: d.id, name: d.domain }))} selected={form.dns_ids} onChange={(ids) => set("dns_ids", ids)} />
+          <CheckboxList label={t("nav.hosts")} items={hosts.map((h) => ({ id: h.id, name: h.nickname }))} selected={form.host_ids} onChange={(ids) => set("host_ids", ids)} />
+          <CheckboxList label={t("nav.dns")} items={dnsRecords.map((d) => ({ id: d.id, name: d.domain }))} selected={form.dns_ids} onChange={(ids) => set("dns_ids", ids)} />
           <CheckboxList label={t("service.dependencies")} items={allServices.map((s) => ({ id: s.id, name: s.nickname }))} selected={form.depends_on_ids} onChange={(ids) => set("depends_on_ids", ids)} />
         </form>
       )}
@@ -183,6 +183,7 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
 // ServiceDashboardProvisionButton is the service-side counterpart to the
 // host provision button — keyed by numeric id since services can be renamed.
 function ServiceDashboardProvisionButton({ serviceId, onProvisioned }: { serviceId: number; onProvisioned: (uid: string) => void }) {
+  const { t } = useLocale();
   const { data: integrations } = useQuery({
     queryKey: ["integrations"],
     queryFn: integrationsAPI.get,
@@ -209,11 +210,11 @@ function ServiceDashboardProvisionButton({ serviceId, onProvisioned }: { service
         disabled={mutation.isPending || !datasourceSet}
         className="text-xs text-[var(--accent)] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
       >
-        {mutation.isPending ? "Provisioning…" : "Provision default dashboard in Grafana"}
+        {mutation.isPending ? t("service.provisioning") : t("service.provisionDashboard")}
       </button>
       {!datasourceSet && (
         <p className="text-2xs text-[var(--warning)]">
-          Set the Prometheus datasource UID in Settings → Integrations → Grafana first.
+          {t("service.provisionDatasourceHint")}
         </p>
       )}
       {mutation.isSuccess && !mutation.isPending && (
@@ -221,7 +222,7 @@ function ServiceDashboardProvisionButton({ serviceId, onProvisioned }: { service
       )}
       {mutation.isError && (
         <p className="text-2xs text-[var(--danger)]">
-          {mutation.error instanceof Error ? mutation.error.message : "Provision failed"}
+          {mutation.error instanceof Error ? mutation.error.message : t("service.provisionFailed")}
         </p>
       )}
     </div>

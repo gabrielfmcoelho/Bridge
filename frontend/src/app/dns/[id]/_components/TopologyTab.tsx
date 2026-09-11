@@ -8,6 +8,7 @@ import type { GraphData, Host, Service } from "@/lib/types";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface TopologyTabProps {
   filteredGraph: GraphData;
@@ -16,10 +17,11 @@ interface TopologyTabProps {
 }
 
 export default function DnsTopologyTab({ filteredGraph, linkedHosts, linkedServices }: TopologyTabProps) {
+  const { t } = useLocale();
   if (filteredGraph.nodes.length === 0 && linkedHosts.length === 0 && linkedServices.length === 0) {
     return (
       <p className="text-sm text-[var(--text-faint)] text-center py-8">
-        No connections found for this DNS record.
+        {t("dns.noConnections")}
       </p>
     );
   }
@@ -31,7 +33,7 @@ export default function DnsTopologyTab({ filteredGraph, linkedHosts, linkedServi
         {filteredGraph.nodes.length > 0 ? (
           <Card hover={false} className="overflow-hidden flex flex-col h-[50vh] lg:h-[calc(100vh-18rem)]">
             <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3 shrink-0 font-display">
-              Topology
+              {t("host.tabTopology")}
             </h2>
             <div className="flex-1 rounded-[var(--radius-md)] overflow-hidden border border-[var(--border-subtle)]">
               <TopologyGraph data={filteredGraph} className="w-full h-full" />
@@ -39,7 +41,7 @@ export default function DnsTopologyTab({ filteredGraph, linkedHosts, linkedServi
           </Card>
         ) : (
           <div className="flex items-center justify-center text-sm text-[var(--text-faint)] py-12">
-            No topology data
+            {t("dns.noTopologyData")}
           </div>
         )}
 
@@ -48,7 +50,7 @@ export default function DnsTopologyTab({ filteredGraph, linkedHosts, linkedServi
           {linkedHosts.length > 0 && (
             <Card hover={false}>
               <SectionHeading variant="section">
-                Linked Hosts
+                {t("dns.linkedHosts")}
               </SectionHeading>
               <div className="space-y-2">
                 {linkedHosts.map((h) => (
@@ -69,7 +71,7 @@ export default function DnsTopologyTab({ filteredGraph, linkedHosts, linkedServi
           {linkedServices.length > 0 && (
             <Card hover={false}>
               <SectionHeading variant="section">
-                Linked Services
+                {t("dns.linkedServices")}
               </SectionHeading>
               <div className="space-y-2">
                 {linkedServices.map((svc) => (

@@ -6,6 +6,7 @@ import Drawer from "@/components/ui/Drawer";
 import { MarkdownContent } from "@/components/ui/MarkdownEditor";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Message {
   role: "user" | "assistant";
@@ -19,6 +20,7 @@ interface AiChatDrawerProps {
 }
 
 export default function AiChatDrawer({ open, onClose }: AiChatDrawerProps) {
+  const { t } = useLocale();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,10 +42,10 @@ export default function AiChatDrawer({ open, onClose }: AiChatDrawerProps) {
       const res = await aiAPI.chat(userMsg);
       setMessages((prev) => [...prev, { role: "assistant", content: res.response }]);
     } catch (err) {
-      const detail = err instanceof Error ? err.message : "Unknown error";
+      const detail = err instanceof Error ? err.message : t("common.unknownError");
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: `Request failed: ${detail}`, error: true },
+        { role: "assistant", content: t("ui.aiChatDrawer.requestFailed", { detail }), error: true },
       ]);
     } finally {
       setLoading(false);
@@ -51,13 +53,13 @@ export default function AiChatDrawer({ open, onClose }: AiChatDrawerProps) {
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title="AI Assistant">
+    <Drawer open={open} onClose={onClose} title={t("ui.aiChatDrawer.title")}>
       <div className="flex flex-col h-full">
         {/* Messages */}
         <div className="flex-1 overflow-y-auto space-y-3 pb-4">
           {messages.length === 0 && (
             <p className="text-sm text-[var(--text-muted)] text-center py-8">
-              Ask me anything about your infrastructure.
+              {t("ui.aiChatDrawer.emptyHint")}
             </p>
           )}
           {messages.map((msg, i) => {
@@ -90,7 +92,7 @@ export default function AiChatDrawer({ open, onClose }: AiChatDrawerProps) {
           })}
           {loading && (
             <div className="mr-auto bg-[var(--bg-elevated)] text-[var(--text-muted)] rounded-[var(--radius-md)] px-3 py-2 text-sm">
-              <span className="animate-pulse">Thinking...</span>
+              <span className="animate-pulse">{t("ui.aiChatDrawer.thinking")}</span>
             </div>
           )}
           <div ref={endRef} />
@@ -109,7 +111,7 @@ export default function AiChatDrawer({ open, onClose }: AiChatDrawerProps) {
                   handleSend();
                 }
               }}
-              placeholder="Ask about your infrastructure... (Shift+Enter for newline)"
+              placeholder={t("ui.aiChatDrawer.placeholder")}
               rows={3}
               className="flex-1 bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] resize-y min-h-[72px] max-h-[240px] leading-snug"
               disabled={loading}
@@ -118,7 +120,7 @@ export default function AiChatDrawer({ open, onClose }: AiChatDrawerProps) {
               onClick={handleSend}
               disabled={loading || !input.trim()}
               className="shrink-0 h-[40px] px-3 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-sm font-medium disabled:opacity-40 transition hover:opacity-90 flex items-center justify-center"
-              aria-label="Send"
+              aria-label={t("common.send")}
             >
               <Icon path={ICON_PATHS.send} />
             </button>

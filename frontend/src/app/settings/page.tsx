@@ -67,9 +67,9 @@ export default function SettingsPage() {
     ...(isAdmin ? [{ key: "appearance" as Tab, label: t("settings.appearance") }] : []),
     ...(isAdmin ? [{ key: "import" as Tab, label: t("settings.import") }] : []),
     ...(isAdmin ? [{ key: "backup" as Tab, label: t("settings.backup") }] : []),
-    ...(isAdmin ? [{ key: "integrations" as Tab, label: "Integrations" }] : []),
-    ...(isAdmin ? [{ key: "permissions" as Tab, label: "Permissions" }] : []),
-    ...(isAdmin ? [{ key: "role-mappings" as Tab, label: "Role Mappings" }] : []),
+    ...(isAdmin ? [{ key: "integrations" as Tab, label: t("settings.integrationsTabLabel") }] : []),
+    ...(isAdmin ? [{ key: "permissions" as Tab, label: t("settings.permissions.tabLabel") }] : []),
+    ...(isAdmin ? [{ key: "role-mappings" as Tab, label: t("settings.roleMappings.tabLabel") }] : []),
   ];
 
   const activeLabel = tabs.find((t) => t.key === activeTab)?.label ?? "";
@@ -159,7 +159,7 @@ function EnumSection() {
 
   const updateMutation = useMutation({
     mutationFn: () => {
-      if (!editing) throw new Error("No item selected");
+      if (!editing) throw new Error(t("settings.enumsNoItemSelected"));
       return enumsAPI.update(editing.category, editing.value, editValue, editColor);
     },
     onSuccess: () => {
@@ -167,7 +167,7 @@ function EnumSection() {
       setEditing(null);
       setEditError("");
     },
-    onError: (err) => setEditError(err instanceof Error ? err.message : "Failed"),
+    onError: (err) => setEditError(err instanceof Error ? err.message : t("common.requestFailed")),
   });
 
   const openEdit = (category: string, value: string) => {
@@ -219,7 +219,7 @@ function EnumSection() {
               </span>
             ))}
             {options.length === 0 && (
-              <span className="text-xs text-[var(--text-faint)]">No values defined</span>
+              <span className="text-xs text-[var(--text-faint)]">{t("settings.enumsNoValues")}</span>
             )}
           </div>
           {isAdmin && (
@@ -238,7 +238,7 @@ function EnumSection() {
               <Input
                 value={newValue[category] || ""}
                 onChange={(e) => setNewValue((v) => ({ ...v, [category]: e.target.value }))}
-                placeholder={`New ${category} value`}
+                placeholder={t("settings.enumsNewValuePlaceholder", { category })}
                 className="max-w-xs"
               />
               <Button size="sm" type="submit">
@@ -251,7 +251,7 @@ function EnumSection() {
                     value={newColor[category] || "#06b6d4"}
                     onChange={(e) => setNewColor((v) => ({ ...v, [category]: e.target.value }))}
                     className="w-12 h-9 p-1"
-                    title="Status color"
+                    title={t("settings.enumsStatusColorTitle")}
                   />
                 </div>
               )}
@@ -264,7 +264,7 @@ function EnumSection() {
       {isAdmin && (
         <Card hover={false}>
           <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
-            + New Category
+            {t("settings.enumsNewCategory")}
           </h3>
           <form className="flex gap-2 flex-wrap" onSubmit={(e) => {
             e.preventDefault();
@@ -277,13 +277,13 @@ function EnumSection() {
             <Input
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
-              placeholder="Category name"
+              placeholder={t("settings.enumsCategoryNamePlaceholder")}
               className="max-w-[180px]"
             />
             <Input
               value={newCategoryValue}
               onChange={(e) => setNewCategoryValue(e.target.value)}
-              placeholder="First value"
+              placeholder={t("settings.enumsFirstValuePlaceholder")}
               className="max-w-[180px]"
             />
             <Button size="sm" type="submit">
@@ -301,14 +301,14 @@ function EnumSection() {
               <div className="bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)] text-sm rounded-[var(--radius-md)] p-3 animate-slide-down">{editError}</div>
             )}
             <Input
-              label="Value"
+              label={t("settings.enumsValueLabel")}
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
               required
             />
             {editing.category === "situacao" && (
               <Input
-                label="Color"
+                label={t("settings.enumsColorLabel")}
                 type="color"
                 value={editColor || "#06b6d4"}
                 onChange={(e) => setEditColor(e.target.value)}
@@ -331,12 +331,13 @@ function EnumSection() {
 }
 
 function UserActions({ u, onEdit, onDelete }: { u: import("@/lib/types").User; onEdit: () => void; onDelete: () => void }) {
+  const { t } = useLocale();
   return (
     <div className="flex items-center gap-1">
-      <IconButton onClick={onEdit} title="Edit">
+      <IconButton onClick={onEdit} title={t("common.edit")}>
         <Icon path={ICON_PATHS.pencil} className="w-3.5 h-3.5" />
       </IconButton>
-      <IconButton variant="danger" onClick={onDelete} title="Delete">
+      <IconButton variant="danger" onClick={onDelete} title={t("common.delete")}>
         <Icon path={ICON_PATHS.trash} className="w-3.5 h-3.5" />
       </IconButton>
     </div>

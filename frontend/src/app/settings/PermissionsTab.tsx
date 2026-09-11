@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState, useEffect, useMemo } from "react";
 import { permissionsAPI } from "@/lib/api";
+import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
@@ -10,6 +11,7 @@ import Button from "@/components/ui/Button";
 const ROLES = ["viewer", "editor", "admin"] as const;
 
 export default function PermissionsTab() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["permissions"], queryFn: permissionsAPI.get });
 
@@ -83,10 +85,10 @@ export default function PermissionsTab() {
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Role Permissions</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t("settings.permissions.title")}</h3>
         {dirty && (
           <Button size="sm" onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
-            Save Changes
+            {t("settings.permissions.saveChanges")}
           </Button>
         )}
       </div>
@@ -96,7 +98,7 @@ export default function PermissionsTab() {
           <thead>
             <tr className={tableClasses.compact.headRow}>
               <th className={`${tableClasses.compact.th} w-1/3`}>
-                Permission
+                {t("settings.permissions.permission")}
               </th>
               {ROLES.map((role) => (
                 <th
@@ -160,7 +162,7 @@ export default function PermissionsTab() {
       </div>
 
       <p className="mt-3 text-xs text-[var(--text-faint)]">
-        Admin role always has all permissions and cannot be modified.
+        {t("settings.permissions.adminNote")}
       </p>
     </Card>
   );

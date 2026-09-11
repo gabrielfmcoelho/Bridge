@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { roleMappingsAPI } from "@/lib/api";
+import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
@@ -15,6 +16,7 @@ const PROVIDERS = ["ldap", "keycloak", "gitlab"];
 const ROLES = ["viewer", "editor", "admin"];
 
 export default function RoleMappingsTab() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data: mappings = [], isLoading } = useQuery({
     queryKey: ["role-mappings"],
@@ -59,9 +61,9 @@ export default function RoleMappingsTab() {
 
   return (
     <Card>
-      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">External Role Mappings</h3>
+      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">{t("settings.roleMappings.title")}</h3>
       <p className="text-xs text-[var(--text-muted)] mb-4">
-        Map external groups/roles from auth providers to local roles. When a user logs in via an external provider, their groups are checked against these mappings to assign a local role.
+        {t("settings.roleMappings.intro")}
       </p>
 
       {/* Existing mappings */}
@@ -71,13 +73,13 @@ export default function RoleMappingsTab() {
             <thead>
               <tr className={tableClasses.compact.headRow}>
                 <th className={tableClasses.compact.th}>
-                  Provider
+                  {t("settings.roleMappings.provider")}
                 </th>
                 <th className={tableClasses.compact.th}>
-                  External Group
+                  {t("settings.roleMappings.externalGroupHeader")}
                 </th>
                 <th className={tableClasses.compact.th}>
-                  Local Role
+                  {t("settings.roleMappings.localRole")}
                 </th>
                 <th className="w-10" />
               </tr>
@@ -111,7 +113,7 @@ export default function RoleMappingsTab() {
                     <button
                       onClick={() => deleteMutation.mutate(m.id)}
                       className="text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors p-1"
-                      title="Delete mapping"
+                      title={t("settings.roleMappings.deleteMapping")}
                     >
                       <Icon path={ICON_PATHS.trashOutline} />
                     </button>
@@ -123,18 +125,18 @@ export default function RoleMappingsTab() {
         </div>
       ) : (
         <div className="text-center py-6 text-sm text-[var(--text-muted)] mb-4">
-          No role mappings configured yet.
+          {t("settings.roleMappings.empty")}
         </div>
       )}
 
       {/* Add new mapping */}
       <div className="border-t border-[var(--border-subtle)] pt-4">
         <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
-          Add Mapping
+          {t("settings.roleMappings.addMapping")}
         </p>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
           <div>
-            <NativeSelect label="Provider"
+            <NativeSelect label={t("settings.roleMappings.provider")}
               value={newMapping.provider_name}
               onChange={(e) => setNewMapping((p) => ({ ...p, provider_name: e.target.value }))}
             >
@@ -144,13 +146,13 @@ export default function RoleMappingsTab() {
             </NativeSelect>
           </div>
           <Input
-            label="External Group / Role"
+            label={t("settings.roleMappings.externalGroupLabel")}
             value={newMapping.external_group}
             onChange={(e) => setNewMapping((p) => ({ ...p, external_group: e.target.value }))}
-            placeholder="e.g., admin-group"
+            placeholder={t("settings.roleMappings.groupPlaceholder")}
           />
           <div>
-            <NativeSelect label="Local Role"
+            <NativeSelect label={t("settings.roleMappings.localRole")}
               value={newMapping.local_role}
               onChange={(e) => setNewMapping((p) => ({ ...p, local_role: e.target.value }))}
             >
@@ -164,7 +166,7 @@ export default function RoleMappingsTab() {
             loading={createMutation.isPending}
             disabled={!newMapping.external_group.trim()}
           >
-            Add
+            {t("common.add")}
           </Button>
         </div>
       </div>

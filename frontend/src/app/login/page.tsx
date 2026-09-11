@@ -262,7 +262,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center mt-6 text-2xs text-[var(--text-faint)] font-mono">
-          IT Asset Management
+          {t("auth.tagline")}
         </p>
       </div>
     </div>

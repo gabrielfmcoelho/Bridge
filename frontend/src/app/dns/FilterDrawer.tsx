@@ -82,7 +82,7 @@ export default function DnsFilterDrawer({
         <Select value={filters.responsavel} onChange={(e) => set("responsavel", e.target.value)} options={[{ value: "", label: "--" }, ...contactsToOptions(contacts)]} />
       </DrawerSection>
 
-      <DrawerSection title="HTTPS" open={openSection === "https"} onToggle={() => toggle("https")} active={!!filters.has_https}>
+      <DrawerSection title={t("topology.https")} open={openSection === "https"} onToggle={() => toggle("https")} active={!!filters.has_https}>
         <div className="flex flex-wrap gap-1.5">
           <PillButton active={!filters.has_https} onClick={() => set("has_https", "")}>{t("common.all")}</PillButton>
           <PillButton active={filters.has_https === "yes"} onClick={() => set("has_https", filters.has_https === "yes" ? "" : "yes")}>{t("common.yes") || "Yes"}</PillButton>

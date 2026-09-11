@@ -59,11 +59,11 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
-              Docs
+              {t("project.docsLinkLabel")}
             </a>
           )}
           {!project.gitlab_url && !project.documentation_url && (
-            <span className="text-xs text-[var(--text-faint)]">No links</span>
+            <span className="text-xs text-[var(--text-faint)]">{t("project.noLinks")}</span>
           )}
         </div>
       </Card>
@@ -87,7 +87,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
                 {svc.technology_stack && <Badge>{svc.technology_stack}</Badge>}
                 {svc.is_external_dependency && (
                   <Badge color="amber" className="text-2xs">
-                    {svc.external_provider || "External"}
+                    {svc.external_provider || t("service.external")}
                   </Badge>
                 )}
               </Link>
@@ -100,7 +100,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
       {linkedDns.length > 0 && (
         <Card hover={false} className="stagger-in" style={{ "--i": 3 } as React.CSSProperties}>
           <SectionHeading variant="section">
-            DNS Records
+            {t("topology.dnsRecords")}
           </SectionHeading>
           <div className="space-y-1">
             {linkedDns.map((dns) => (
@@ -122,7 +122,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
       {linkedHosts.length > 0 && (
         <Card hover={false} className="stagger-in" style={{ "--i": 4 } as React.CSSProperties}>
           <SectionHeading variant="section">
-            Hosts
+            {t("entidades.type.host")}
           </SectionHeading>
           <div className="space-y-1">
             {linkedHosts.map((host) => (

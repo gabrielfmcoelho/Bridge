@@ -2,6 +2,7 @@
 
 import { MarkdownContent } from "@/components/ui/MarkdownEditor";
 import type { OutlineFullDocument } from "@/lib/api";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   doc: OutlineFullDocument | undefined;
@@ -12,6 +13,7 @@ interface Props {
 // The viewer renders only the markdown body now — the doc's emoji/title/meta
 // live in the left nav (see /wiki/page.tsx) so the reading area is clutter-free.
 export default function WikiDocumentViewer({ doc, isLoading, error }: Props) {
+  const { t } = useLocale();
   if (isLoading) {
     return (
       <div className="space-y-3 animate-pulse">
@@ -26,7 +28,7 @@ export default function WikiDocumentViewer({ doc, isLoading, error }: Props) {
   if (error) {
     return (
       <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-4 py-3">
-        Failed to load document: {error.message}
+        {t("wiki.failedToLoadDocument", { message: error.message })}
       </div>
     );
   }

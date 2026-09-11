@@ -5,11 +5,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { glpiAPI, type GlpiDropdownCatalogueSummary } from "@/lib/api";
 import Button from "@/components/ui/Button";
 import DropdownCatalogueEditorModal from "./DropdownCatalogueEditorModal";
+import { useLocale } from "@/contexts/LocaleContext";
 
 // DropdownCatalogueSection is embedded inside GLPIIntegrationSection. Lists
 // the allow-listed itemtypes sshcm can serve picker data for, the current
 // option count and last-updated timestamp, and an Edit button per row.
 export default function DropdownCatalogueSection() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -35,25 +37,18 @@ export default function DropdownCatalogueSection() {
   return (
     <details className="border-t border-[var(--border-default)] pt-4" open>
       <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--text-primary)] flex items-center justify-between gap-2">
-        <span>Catálogo de dropdowns</span>
+        <span>{t("glpi.dropdownCatalogueTitle")}</span>
         <span className="text-xs font-normal text-[var(--text-muted)]">
-          {data?.catalogues?.length ?? 0} itemtype
-          {(data?.catalogues?.length ?? 0) === 1 ? "" : "s"} configurado
-          {(data?.catalogues?.length ?? 0) === 1 ? "" : "s"}
+          {t("glpi.itemtypesConfigured", { n: String(data?.catalogues?.length ?? 0) })}
         </span>
       </summary>
 
       <p className="mt-2 text-xs text-[var(--text-muted)]">
-        Quando o perfil GLPI não tem permissão de leitura via REST para
-        dropdowns (ex.: <code>/ITILCategory</code>), os pickers do Formcreator
-        voltam vazios. Cole aqui manualmente a lista — uma vez por itemtype,
-        como os formulários raramente mudam. O snippet abaixo do editor coleta
-        os <code>&lt;option&gt;</code> da página do GLPI já aberta no seu
-        navegador.
+        {t("glpi.dropdownCatalogueHint")}
       </p>
 
       {isLoading ? (
-        <p className="mt-3 text-xs text-[var(--text-muted)] animate-pulse">Carregando…</p>
+        <p className="mt-3 text-xs text-[var(--text-muted)] animate-pulse">{t("common.loading")}</p>
       ) : (
         <ul className="mt-3 space-y-1">
           {allowed.map((it) => {
@@ -67,20 +62,20 @@ export default function DropdownCatalogueSection() {
                   <code className="font-mono text-[var(--text-primary)]">{it}</code>
                   {summary ? (
                     <span className="ml-2 text-xs text-[var(--text-muted)]">
-                      {summary.option_count} opção
-                      {summary.option_count === 1 ? "" : "es"}
-                      {" · atualizado "}
-                      {new Date(summary.updated_at).toLocaleString()}
+                      {t("glpi.catalogueOptionCountUpdated", {
+                        n: String(summary.option_count),
+                        date: new Date(summary.updated_at).toLocaleString(),
+                      })}
                     </span>
                   ) : (
                     <span className="ml-2 text-xs text-[var(--text-faint)]">
-                      vazio — usa REST
+                      {t("glpi.catalogueEmptyUsesRest")}
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button type="button" size="sm" variant="secondary" onClick={() => setEditing(it)}>
-                    Editar
+                    {t("common.edit")}
                   </Button>
                   {summary && summary.option_count > 0 && (
                     <Button
@@ -88,13 +83,13 @@ export default function DropdownCatalogueSection() {
                       size="sm"
                       variant="secondary"
                       onClick={() => {
-                        if (confirm(`Apagar o catálogo de ${it}? Os pickers voltam a tentar o REST.`)) {
+                        if (confirm(t("glpi.catalogueDeleteConfirm", { itemtype: it }))) {
                           deleteMutation.mutate(it);
                         }
                       }}
                       loading={deleteMutation.isPending}
                     >
-                      Limpar
+                      {t("glpi.clearCatalogue")}
                     </Button>
                   )}
                 </div>

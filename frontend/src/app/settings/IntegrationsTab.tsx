@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
+import { useLocale } from "@/contexts/LocaleContext";
 import { integrationsAPI, coolifyAPI, glpiAPI, outlineAPI, type GlpiTokenProfile } from "@/lib/api";
 import CollectionMultiSelect from "@/components/wiki/CollectionMultiSelect";
 import DropdownCatalogueSection from "@/components/glpi/DropdownCatalogueSection";
@@ -31,13 +32,14 @@ export default function IntegrationsTab() {
 }
 
 const AUTH_PROVIDERS = [
-  { value: "local", label: "Local Only", description: "Username & password stored locally", color: "#06b6d4" },
-  { value: "ldap", label: "LDAP", description: "Authenticate against institutional LDAP directory", color: "#3b82f6" },
-  { value: "keycloak", label: "Keycloak SSO", description: "PI Login via OAuth 2.0 / OpenID Connect", color: "#22c55e" },
-  { value: "gitlab", label: "GitLab SSO", description: "Authenticate via GitLab OAuth", color: "#e24329" },
+  { value: "local", labelKey: "settings.integrations.auth.providerLocalLabel", descKey: "settings.integrations.auth.providerLocalDesc", color: "#06b6d4" },
+  { value: "ldap", labelKey: "settings.integrations.auth.providerLdapLabel", descKey: "settings.integrations.auth.providerLdapDesc", color: "#3b82f6" },
+  { value: "keycloak", labelKey: "settings.integrations.auth.providerKeycloakLabel", descKey: "settings.integrations.auth.providerKeycloakDesc", color: "#22c55e" },
+  { value: "gitlab", labelKey: "settings.integrations.auth.providerGitlabLabel", descKey: "settings.integrations.auth.providerGitlabDesc", color: "#e24329" },
 ];
 
 function GeneralAuthSection() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
   const [form, setForm] = useState<Record<string, string>>({});
@@ -56,8 +58,8 @@ function GeneralAuthSection() {
 
   return (
     <Card>
-      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Authentication Provider</h3>
-      <p className="text-xs text-[var(--text-muted)] mb-4">Only one external auth provider can be active at a time. Local login is always available as fallback.</p>
+      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">{t("settings.integrations.auth.title")}</h3>
+      <p className="text-xs text-[var(--text-muted)] mb-4">{t("settings.integrations.auth.hint")}</p>
 
       {/* Provider radio selector */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-5">
@@ -81,9 +83,9 @@ function GeneralAuthSection() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                <span className="text-sm font-medium text-[var(--text-primary)]">{p.label}</span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">{t(p.labelKey)}</span>
               </div>
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">{p.description}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">{t(p.descKey)}</p>
             </div>
           </label>
         ))}
@@ -92,34 +94,34 @@ function GeneralAuthSection() {
       {/* General auth settings (only shown when external provider is active) */}
       {activeProvider !== "local" && (
         <div className="border-t border-[var(--border-subtle)] pt-4 mt-4">
-          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">External Auth Settings</p>
+          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">{t("settings.integrations.auth.externalSettingsTitle")}</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <NativeSelect label="Auto-provision users"
+              <NativeSelect label={t("settings.integrations.auth.autoProvisionUsers")}
                 value={form.auth_auto_provision ?? "true"}
                 onChange={(e) => set("auth_auto_provision", e.target.value)}
               >
-                <option value="true">Enabled</option>
-                <option value="false">Disabled</option>
+                <option value="true">{t("settings.integrations.enabled")}</option>
+                <option value="false">{t("settings.integrations.disabled")}</option>
               </NativeSelect>
             </div>
             <div>
-              <NativeSelect label="Default role for new users"
+              <NativeSelect label={t("settings.integrations.auth.defaultRole")}
                 value={form.auth_default_role ?? "viewer"}
                 onChange={(e) => set("auth_default_role", e.target.value)}
               >
-                <option value="viewer">Viewer</option>
-                <option value="editor">Editor</option>
-                <option value="admin">Admin</option>
+                <option value="viewer">{t("settings.integrations.auth.roleViewer")}</option>
+                <option value="editor">{t("settings.integrations.auth.roleEditor")}</option>
+                <option value="admin">{t("settings.integrations.auth.roleAdmin")}</option>
               </NativeSelect>
             </div>
             <div>
-              <NativeSelect label="Sync roles from external groups"
+              <NativeSelect label={t("settings.integrations.auth.syncRoles")}
                 value={form.auth_role_sync_enabled ?? "false"}
                 onChange={(e) => set("auth_role_sync_enabled", e.target.value)}
               >
-                <option value="false">Disabled</option>
-                <option value="true">Enabled</option>
+                <option value="false">{t("settings.integrations.disabled")}</option>
+                <option value="true">{t("settings.integrations.enabled")}</option>
               </NativeSelect>
             </div>
           </div>
@@ -128,7 +130,7 @@ function GeneralAuthSection() {
 
       <div className="mt-4 flex justify-end">
         <Button onClick={() => mutation.mutate(form)} loading={mutation.isPending}>
-          Save
+          {t("common.save")}
         </Button>
       </div>
     </Card>
@@ -136,6 +138,7 @@ function GeneralAuthSection() {
 }
 
 function LDAPSection() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
   const [form, setForm] = useState<Record<string, string>>({});
@@ -153,24 +156,24 @@ function LDAPSection() {
   const testMutation = useMutation({
     mutationFn: integrationsAPI.testLDAP,
     onSuccess: (result) => setTestResult(result),
-    onError: () => setTestResult({ success: false, error: "Request failed" }),
+    onError: () => setTestResult({ success: false, error: t("settings.integrations.ldap.requestFailed") }),
   });
 
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
   return (
     <Card>
-      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">LDAP Configuration</h3>
+      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">{t("settings.integrations.ldap.title")}</h3>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
-              label="Host"
+              label={t("settings.integrations.ldap.host")}
               value={form.auth_ldap_host ?? ""}
               onChange={(e) => set("auth_ldap_host", e.target.value)}
               placeholder="ldaps://ldap.example.com"
             />
             <Input
-              label="Port"
+              label={t("settings.integrations.ldap.port")}
               value={form.auth_ldap_port ?? "636"}
               onChange={(e) => set("auth_ldap_port", e.target.value)}
               placeholder="636"
@@ -181,17 +184,17 @@ function LDAPSection() {
                   value={form.auth_ldap_use_tls ?? "true"}
                   onChange={(e) => set("auth_ldap_use_tls", e.target.value)}
                 >
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
+                  <option value="true">{t("common.yes")}</option>
+                  <option value="false">{t("common.no")}</option>
                 </NativeSelect>
               </div>
               <div>
-                <NativeSelect label="Skip Verify"
+                <NativeSelect label={t("settings.integrations.ldap.skipVerify")}
                   value={form.auth_ldap_skip_verify ?? "false"}
                   onChange={(e) => set("auth_ldap_skip_verify", e.target.value)}
                 >
-                  <option value="false">No</option>
-                  <option value="true">Yes</option>
+                  <option value="false">{t("common.no")}</option>
+                  <option value="true">{t("common.yes")}</option>
                 </NativeSelect>
               </div>
             </div>
@@ -213,7 +216,7 @@ function LDAPSection() {
           </div>
 
           <Input
-            label="Bind Password"
+            label={t("settings.integrations.ldap.bindPassword")}
             type="password"
             value={form.auth_ldap_bind_password ?? ""}
             onChange={(e) => set("auth_ldap_bind_password", e.target.value)}
@@ -222,37 +225,37 @@ function LDAPSection() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="User Filter"
+              label={t("settings.integrations.ldap.userFilter")}
               value={form.auth_ldap_user_filter ?? "(mail=%s)"}
               onChange={(e) => set("auth_ldap_user_filter", e.target.value)}
               placeholder="(mail=%s)"
             />
             <div>
-              <NativeSelect label="Fallback to local auth"
+              <NativeSelect label={t("settings.integrations.ldap.fallbackToLocal")}
                 value={form.auth_ldap_fallback_to_local ?? "true"}
                 onChange={(e) => set("auth_ldap_fallback_to_local", e.target.value)}
               >
-                <option value="true">Enabled</option>
-                <option value="false">Disabled</option>
+                <option value="true">{t("settings.integrations.enabled")}</option>
+                <option value="false">{t("settings.integrations.disabled")}</option>
               </NativeSelect>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
-              label="Username Attribute"
+              label={t("settings.integrations.ldap.usernameAttr")}
               value={form.auth_ldap_username_attr ?? "uid"}
               onChange={(e) => set("auth_ldap_username_attr", e.target.value)}
               placeholder="uid"
             />
             <Input
-              label="Display Name Attribute"
+              label={t("settings.integrations.ldap.displayNameAttr")}
               value={form.auth_ldap_display_name_attr ?? "cn"}
               onChange={(e) => set("auth_ldap_display_name_attr", e.target.value)}
               placeholder="cn"
             />
             <Input
-              label="Email Attribute"
+              label={t("settings.integrations.ldap.emailAttr")}
               value={form.auth_ldap_email_attr ?? "mail"}
               onChange={(e) => set("auth_ldap_email_attr", e.target.value)}
               placeholder="mail"
@@ -261,18 +264,18 @@ function LDAPSection() {
 
           <div className="flex items-center gap-3">
             <Button onClick={() => mutation.mutate(form)} loading={mutation.isPending}>
-              Save LDAP Settings
+              {t("settings.integrations.ldap.saveButton")}
             </Button>
             <Button
               variant="secondary"
               onClick={() => { setTestResult(null); testMutation.mutate(); }}
               loading={testMutation.isPending}
             >
-              Test Connection
+              {t("settings.integrations.testConnection")}
             </Button>
             {testResult && (
               <span className={`text-sm ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-                {testResult.success ? "Connection successful" : testResult.error}
+                {testResult.success ? t("settings.integrations.connectionSuccessful") : testResult.error}
               </span>
             )}
           </div>
@@ -282,6 +285,7 @@ function LDAPSection() {
 }
 
 function KeycloakSection() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
   const [form, setForm] = useState<Record<string, string>>({});
@@ -322,11 +326,11 @@ function KeycloakSection() {
 
   return (
     <Card>
-      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Keycloak SSO Configuration</h3>
+      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">{t("settings.integrations.keycloak.title")}</h3>
         <div className="space-y-4">
           {/* Environment presets */}
           <div>
-            <label className="block text-xs text-[var(--text-muted)] mb-1.5">Environment Presets</label>
+            <label className="block text-xs text-[var(--text-muted)] mb-1.5">{t("settings.integrations.keycloak.environmentPresets")}</label>
             <div className="flex gap-2">
               {Object.keys(presets).map((env) => (
                 <button
@@ -343,7 +347,7 @@ function KeycloakSection() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Base URL"
+              label={t("settings.integrations.baseUrl")}
               value={form.auth_keycloak_base_url ?? ""}
               onChange={(e) => set("auth_keycloak_base_url", e.target.value)}
               placeholder="https://login.pi.gov.br"
@@ -358,13 +362,13 @@ function KeycloakSection() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Client ID"
+              label={t("settings.integrations.keycloak.clientId")}
               value={form.auth_keycloak_client_id ?? ""}
               onChange={(e) => set("auth_keycloak_client_id", e.target.value)}
               placeholder="my-app-client"
             />
             <Input
-              label="Client Secret"
+              label={t("settings.integrations.clientSecret")}
               type="password"
               value={form.auth_keycloak_client_secret ?? ""}
               onChange={(e) => set("auth_keycloak_client_secret", e.target.value)}
@@ -374,7 +378,7 @@ function KeycloakSection() {
 
           {/* Callback URL (read-only) */}
           <div>
-            <label className="block text-xs text-[var(--text-muted)] mb-1">Redirect URI (add this to Keycloak client)</label>
+            <label className="block text-xs text-[var(--text-muted)] mb-1">{t("settings.integrations.keycloak.redirectUriHint")}</label>
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-xs text-[var(--text-secondary)] font-mono break-all">
                 {callbackURL}
@@ -384,7 +388,7 @@ function KeycloakSection() {
 
           <div className="flex justify-start">
             <Button onClick={() => mutation.mutate(form)} loading={mutation.isPending}>
-              Save Keycloak Settings
+              {t("settings.integrations.keycloak.saveButton")}
             </Button>
           </div>
         </div>
@@ -393,6 +397,7 @@ function KeycloakSection() {
 }
 
 function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
 
@@ -440,8 +445,8 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
       setTestResult({
         success: res.success,
         message: res.success
-          ? `Connected as ${res.username ?? "(unknown)"}`
-          : res.error || "Connection failed",
+          ? t("settings.integrations.gitlab.connectedAs", { username: res.username ?? t("settings.integrations.gitlab.unknownUser") })
+          : res.error || t("settings.integrations.connectionFailed"),
       });
     },
     onError: (err: Error) => setTestResult({ success: false, message: err.message }),
@@ -479,7 +484,7 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
   };
 
   const handleClearSecret = (key: string, label: string) => {
-    if (!confirm(`Clear the stored ${label}? This cannot be undone — you'll need to re-enter it.`)) return;
+    if (!confirm(t("settings.integrations.confirmClearSecret", { label }))) return;
     clearSecretMutation.mutate(key);
     // Also reset the in-form value so the placeholder reflects "no secret".
     setForm((f) => ({ ...f, [key]: "" }));
@@ -500,14 +505,14 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
     <Card>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">GitLab Integration</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t("settings.integrations.gitlab.title")}</h3>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Shared connection credentials used by every GitLab-backed feature below.
+            {t("settings.integrations.gitlab.hint")}
           </p>
         </div>
         {isView && (
           <Button size="sm" variant="secondary" onClick={() => setMode("edit")}>
-            Edit
+            {t("common.edit")}
           </Button>
         )}
       </div>
@@ -516,14 +521,14 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
-            label="GitLab Base URL"
+            label={t("settings.integrations.gitlab.baseUrl")}
             value={form.auth_gitlab_base_url ?? "https://gitlab.com"}
             onChange={(e) => set("auth_gitlab_base_url", e.target.value)}
             placeholder="https://gitlab.com"
             disabled={isView}
           />
           <Input
-            label="Application ID (Client ID)"
+            label={t("settings.integrations.gitlab.applicationId")}
             value={form.auth_gitlab_client_id ?? ""}
             onChange={(e) => set("auth_gitlab_client_id", e.target.value)}
             placeholder="your-app-id"
@@ -531,12 +536,12 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
           />
         </div>
         <SecretInputWithClear
-          label="Client Secret"
+          label={t("settings.integrations.clientSecret")}
           value={form.auth_gitlab_client_secret ?? ""}
           onChange={(v) => set("auth_gitlab_client_secret", v)}
           disabled={isView}
           canClear={isEdit && (initialRef.current.auth_gitlab_client_secret === "••••••••")}
-          onClear={() => handleClearSecret("auth_gitlab_client_secret", "Client Secret")}
+          onClear={() => handleClearSecret("auth_gitlab_client_secret", t("settings.integrations.clientSecret"))}
         />
       </div>
 
@@ -544,28 +549,27 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
       <details className="mt-5 border-t border-[var(--border-default)] pt-4" open={ssoActive || ssoEnabled}>
         <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <span className="text-sm font-semibold text-[var(--text-primary)]">SSO / Authentication</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">{t("settings.integrations.gitlab.ssoSectionTitle")}</span>
             <span className="ml-2 text-xs text-[var(--text-muted)]">
               {ssoEnabled
-                ? (ssoActive ? "Active — GitLab is the selected provider" : "Enabled — select GitLab above to make it active")
-                : "Disabled"}
+                ? (ssoActive ? t("settings.integrations.gitlab.ssoActiveHint") : t("settings.integrations.gitlab.ssoEnabledHint"))
+                : t("settings.integrations.disabled")}
             </span>
           </div>
           <Toggle
             checked={ssoEnabled}
             onChange={(v) => set("auth_gitlab_enabled", v ? "true" : "false")}
             disabled={isView}
-            ariaLabel="Enable GitLab SSO"
+            ariaLabel={t("settings.integrations.gitlab.ariaEnableSso")}
           />
         </summary>
         <div className="mt-4 space-y-3">
-          <label className="block text-xs text-[var(--text-muted)] mb-1">Redirect URI (add this to the GitLab application)</label>
+          <label className="block text-xs text-[var(--text-muted)] mb-1">{t("settings.integrations.gitlab.redirectUriHint")}</label>
           <code className="block bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-xs text-[var(--text-secondary)] font-mono break-all">
             {callbackURL}
           </code>
           <p className="text-xs text-[var(--text-muted)]">
-            Uses the shared Application ID and Client Secret above. Requires <code className="text-[var(--text-secondary)]">read_user</code> and <code className="text-[var(--text-secondary)]">api</code> scopes.
-            Login via GitLab is blocked unless both this switch is ON and GitLab is selected in the General Auth provider.
+            {t("settings.integrations.gitlab.scopesHint")}
           </p>
         </div>
       </details>
@@ -574,33 +578,33 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
       <details className="mt-4 border-t border-[var(--border-default)] pt-4" open={codeEnabled}>
         <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <span className="text-sm font-semibold text-[var(--text-primary)]">Code Management</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">{t("settings.integrations.gitlab.codeManagementTitle")}</span>
             <span className="ml-2 text-xs text-[var(--text-muted)]">
-              Track commits across linked GitLab repos and subgroups per project.
+              {t("settings.integrations.gitlab.codeManagementHint")}
             </span>
           </div>
           <Toggle
             checked={codeEnabled}
             onChange={(v) => set("gitlab_integration_enabled", v ? "true" : "false")}
             disabled={isView}
-            ariaLabel="Enable GitLab Code Management"
+            ariaLabel={t("settings.integrations.gitlab.ariaEnableCodeManagement")}
           />
         </summary>
         {codeEnabled && (
           <div className="mt-4 space-y-4">
             <SecretInputWithClear
-              label="Service Access Token"
+              label={t("settings.integrations.gitlab.serviceAccessToken")}
               value={form.gitlab_code_service_token ?? ""}
               onChange={(v) => set("gitlab_code_service_token", v)}
               disabled={isView}
               canClear={isEdit && (initialRef.current.gitlab_code_service_token === "••••••••")}
-              onClear={() => handleClearSecret("gitlab_code_service_token", "Service Access Token")}
+              onClear={() => handleClearSecret("gitlab_code_service_token", t("settings.integrations.gitlab.serviceAccessToken"))}
             />
             <p className="text-xs text-[var(--text-muted)] -mt-2">
-              A Personal / Group / Project Access Token with <code className="text-[var(--text-secondary)]">read_api</code> scope. Used for all REST calls — one token for every viewer.
+              {t("settings.integrations.gitlab.serviceTokenHint")}
             </p>
             <Input
-              label="Default Branch (optional)"
+              label={t("settings.integrations.gitlab.defaultBranch")}
               value={form.gitlab_code_default_ref ?? ""}
               onChange={(e) => set("gitlab_code_default_ref", e.target.value)}
               placeholder="main"
@@ -612,7 +616,7 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
                 onClick={() => { setTestResult(null); testMutation.mutate(); }}
                 loading={testMutation.isPending}
               >
-                Test connection
+                {t("settings.integrations.testConnection")}
               </Button>
               {testResult && (
                 <span className={`text-xs ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
@@ -626,14 +630,14 @@ function GitLabIntegrationSection({ ssoActive }: { ssoActive: boolean }) {
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
         <span className="text-xs text-[var(--text-muted)]">
-          {isView ? "Read-only — click Edit to change settings." : hasDirty ? "Unsaved changes." : "No changes."}
+          {isView ? t("settings.integrations.readOnlyHint") : hasDirty ? t("settings.integrations.unsavedChanges") : t("settings.integrations.noChanges")}
         </span>
         <div className="flex gap-2">
           {isEdit && (
             <>
-              <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
+              <Button variant="secondary" onClick={handleCancel}>{t("common.cancel")}</Button>
               <Button onClick={handleSave} loading={mutation.isPending} disabled={!hasDirty}>
-                Save changes
+                {t("settings.integrations.saveChanges")}
               </Button>
             </>
           )}
@@ -655,6 +659,7 @@ function parseCollectionCSV(raw: string): string[] {
 }
 
 function OutlineIntegrationSection() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
   const [form, setForm] = useState<Record<string, string>>({});
@@ -711,13 +716,13 @@ function OutlineIntegrationSection() {
     },
     onSuccess: (res) => {
       if (!res.success) {
-        setTestResult({ success: false, message: `Connection failed: ${res.error || "unknown error"}` });
+        setTestResult({ success: false, message: t("settings.integrations.stageFailedDetail", { stage: t("settings.integrations.connectionFailed"), error: res.error || t("settings.integrations.unknownError") }) });
         return;
       }
       const parts: string[] = [];
       if (res.workspace) parts.push(res.workspace);
-      if (res.user) parts.push(`as ${res.user}`);
-      setTestResult({ success: true, message: parts.join(" · ") || "Connected" });
+      if (res.user) parts.push(t("settings.integrations.asUser", { user: res.user }));
+      setTestResult({ success: true, message: parts.join(" · ") || t("settings.integrations.connected") });
     },
     onError: (err: Error) => setTestResult({ success: false, message: err.message }),
   });
@@ -751,7 +756,7 @@ function OutlineIntegrationSection() {
   };
 
   const handleClearSecret = (key: string, label: string) => {
-    if (!confirm(`Clear the stored ${label}? This cannot be undone — you'll need to re-enter it.`)) return;
+    if (!confirm(t("settings.integrations.confirmClearSecret", { label }))) return;
     clearSecretMutation.mutate(key);
     setForm((f) => ({ ...f, [key]: "" }));
   };
@@ -770,15 +775,15 @@ function OutlineIntegrationSection() {
             checked={enabled}
             onChange={(v) => set("outline_enabled", v ? "true" : "false")}
             disabled={isView}
-            ariaLabel="Enable Outline integration"
+            ariaLabel={t("settings.integrations.outline.ariaEnableIntegration")}
           />
           <p className="text-xs text-[var(--text-muted)]">
-            Per-project Wiki tab + site-wide common wiki at <code className="text-[var(--text-secondary)]">/wiki</code>.
+            {t("settings.integrations.outline.wikiTabHint")}
           </p>
         </div>
         {isView && (
           <Button type="button" size="sm" variant="secondary" onClick={() => setMode("edit")}>
-            Edit
+            {t("common.edit")}
           </Button>
         )}
       </div>
@@ -786,28 +791,28 @@ function OutlineIntegrationSection() {
       {enabled && (
         <div className="space-y-4">
           <Input
-            label="Base URL"
+            label={t("settings.integrations.baseUrl")}
             value={form.outline_base_url ?? ""}
             onChange={(e) => set("outline_base_url", e.target.value)}
             placeholder="https://wiki.example.org"
             disabled={isView}
           />
           <SecretInputWithClear
-            label="API Token"
+            label={t("settings.integrations.apiToken")}
             value={form.outline_api_token ?? ""}
             onChange={(v) => set("outline_api_token", v)}
             disabled={isView}
             canClear={isEdit && initialRef.current.outline_api_token === "••••••••"}
-            onClear={() => handleClearSecret("outline_api_token", "API Token")}
+            onClear={() => handleClearSecret("outline_api_token", t("settings.integrations.apiToken"))}
           />
           <p className="text-xs text-[var(--text-muted)] -mt-2">
-            Mint in Outline → Settings → API. The token inherits its creator&apos;s visibility — sshcm can only see what that user can see.
+            {t("settings.integrations.outline.tokenVisibilityHint")}
           </p>
 
           {collectionsError || fallbackToText ? (
             <>
               <Input
-                label="Common collection IDs (comma-separated)"
+                label={t("settings.integrations.outline.commonCollectionIds")}
                 value={form.outline_common_collection_id ?? ""}
                 onChange={(e) => set("outline_common_collection_id", e.target.value)}
                 placeholder="uuid-1, uuid-2, uuid-3"
@@ -815,16 +820,15 @@ function OutlineIntegrationSection() {
               />
               <p className="text-xs text-[var(--text-muted)] -mt-2">
                 {collectionsError
-                  ? "Couldn't fetch the collection list from Outline — paste UUIDs manually. "
-                  : "Manual input: "}
-                Feeds the sidebar <code className="text-[var(--text-secondary)]">/wiki</code> page.{" "}
+                  ? t("settings.integrations.outline.collectionsHintError")
+                  : t("settings.integrations.outline.collectionsHintManual")}{" "}
                 {!collectionsError && (
                   <button
                     type="button"
                     className="text-[var(--accent)] hover:underline"
                     onClick={() => setFallbackToText(false)}
                   >
-                    Switch back to picker
+                    {t("settings.integrations.outline.switchToPicker")}
                   </button>
                 )}
               </p>
@@ -832,7 +836,7 @@ function OutlineIntegrationSection() {
           ) : (
             <>
               <CollectionMultiSelect
-                label="Common collections"
+                label={t("settings.integrations.outline.collectionsLabel")}
                 collections={collectionsEnv?.collections ?? []}
                 value={parseCollectionCSV(form.outline_common_collection_id ?? "")}
                 onChange={(ids) => set("outline_common_collection_id", ids.join(", "))}
@@ -840,19 +844,19 @@ function OutlineIntegrationSection() {
                 disabled={isView}
                 emptyHint={
                   outlineReady
-                    ? "Click + to add collections to /wiki"
-                    : "Save base URL + API token first, then reload to pick collections"
+                    ? t("settings.integrations.outline.emptyHintReady")
+                    : t("settings.integrations.outline.emptyHintNotReady")
                 }
               />
               <p className="text-xs text-[var(--text-muted)] -mt-2">
-                Feeds the sidebar <code className="text-[var(--text-secondary)]">/wiki</code> page — each selected collection becomes a section in the left nav.{" "}
+                {t("settings.integrations.outline.feedsSidebarLong")}{" "}
                 {isEdit && (
                   <button
                     type="button"
                     className="text-[var(--accent)] hover:underline"
                     onClick={() => setFallbackToText(true)}
                   >
-                    Paste UUIDs instead
+                    {t("settings.integrations.outline.pasteUuidsInstead")}
                   </button>
                 )}
               </p>
@@ -867,7 +871,7 @@ function OutlineIntegrationSection() {
               loading={testMutation.isPending}
               disabled={isView}
             >
-              Test connection
+              {t("settings.integrations.testConnection")}
             </Button>
             {testResult && (
               <span className={`text-xs ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
@@ -880,14 +884,14 @@ function OutlineIntegrationSection() {
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
         <span className="text-xs text-[var(--text-muted)]">
-          {isView ? "Read-only — click Edit to change settings." : hasDirty ? "Unsaved changes." : "No changes."}
+          {isView ? t("settings.integrations.readOnlyHint") : hasDirty ? t("settings.integrations.unsavedChanges") : t("settings.integrations.noChanges")}
         </span>
         <div className="flex gap-2">
           {isEdit && (
             <>
-              <Button type="button" variant="secondary" onClick={handleCancel}>Cancel</Button>
+              <Button type="button" variant="secondary" onClick={handleCancel}>{t("common.cancel")}</Button>
               <Button type="button" onClick={handleSave} loading={mutation.isPending} disabled={!hasDirty}>
-                Save changes
+                {t("settings.integrations.saveChanges")}
               </Button>
             </>
           )}
@@ -898,6 +902,7 @@ function OutlineIntegrationSection() {
 }
 
 function GLPIIntegrationSection() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
   const { data: profiles } = useQuery({
@@ -960,7 +965,7 @@ function GLPIIntegrationSection() {
   };
 
   const handleClearSecret = (key: string, label: string) => {
-    if (!confirm(`Clear the stored ${label}? This cannot be undone.`)) return;
+    if (!confirm(t("settings.integrations.glpi.confirmClearSecret", { label }))) return;
     clearSecretMutation.mutate(key);
     setForm((f) => ({ ...f, [key]: "" }));
   };
@@ -974,20 +979,20 @@ function GLPIIntegrationSection() {
     <Card>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0 flex items-center gap-3 flex-wrap">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">GLPI (chamados)</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t("settings.integrations.glpi.title")}</h3>
           <Toggle
             checked={enabled}
             onChange={(v) => set("glpi_enabled", v ? "true" : "false")}
             disabled={isView}
-            ariaLabel="Enable GLPI integration"
+            ariaLabel={t("settings.integrations.glpi.ariaEnableIntegration")}
           />
           <p className="text-xs text-[var(--text-muted)]">
-            One App-Token + N named user profiles. Link a profile to each project.
+            {t("settings.integrations.glpi.hint")}
           </p>
         </div>
         {isView && (
           <Button type="button" size="sm" variant="secondary" onClick={() => setMode("edit")}>
-            Edit
+            {t("common.edit")}
           </Button>
         )}
       </div>
@@ -995,14 +1000,14 @@ function GLPIIntegrationSection() {
       {enabled && (
         <div className="space-y-4">
           <Input
-            label="Base URL"
+            label={t("settings.integrations.baseUrl")}
             value={form.glpi_base_url ?? ""}
             onChange={(e) => set("glpi_base_url", e.target.value)}
             placeholder="https://glpi.example.org"
             disabled={isView}
           />
           <SecretInputWithClear
-            label="App-Token (optional)"
+            label={t("settings.integrations.glpi.appToken")}
             value={form.glpi_app_token ?? ""}
             onChange={(v) => set("glpi_app_token", v)}
             disabled={isView}
@@ -1010,10 +1015,10 @@ function GLPIIntegrationSection() {
             onClear={() => handleClearSecret("glpi_app_token", "App-Token")}
           />
           <p className="text-xs text-[var(--text-muted)] -mt-2">
-            GLPI → Setup → General → API. <strong>Only required when your GLPI instance demands it</strong> — many deployments accept the per-user token on its own. Leave blank if you only have user tokens.
+            {t("settings.integrations.glpi.appTokenHint")}
           </p>
           <Input
-            label="Default entity ID (fallback when a profile/project has none)"
+            label={t("settings.integrations.glpi.defaultEntityIdFallback")}
             type="number"
             value={form.glpi_default_entity_id ?? "0"}
             onChange={(e) => set("glpi_default_entity_id", e.target.value)}
@@ -1024,7 +1029,7 @@ function GLPIIntegrationSection() {
 
           <details className="border-t border-[var(--border-default)] pt-4" open>
             <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--text-primary)]">
-              Token profiles ({profiles?.length ?? 0})
+              {t("settings.integrations.glpi.tokenProfilesHeading", { count: String(profiles?.length ?? 0) })}
             </summary>
             <div className="mt-3">
               <GlpiProfileList profiles={profiles ?? []} disabled={isView} />
@@ -1035,14 +1040,14 @@ function GLPIIntegrationSection() {
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
         <span className="text-xs text-[var(--text-muted)]">
-          {isView ? "Read-only — click Edit to change." : hasDirty ? "Unsaved changes." : "No changes."}
+          {isView ? t("settings.integrations.glpi.readOnlyHint") : hasDirty ? t("settings.integrations.unsavedChanges") : t("settings.integrations.noChanges")}
         </span>
         <div className="flex gap-2">
           {isEdit && (
             <>
-              <Button type="button" variant="secondary" onClick={handleCancel}>Cancel</Button>
+              <Button type="button" variant="secondary" onClick={handleCancel}>{t("common.cancel")}</Button>
               <Button type="button" onClick={handleSave} loading={mutation.isPending} disabled={!hasDirty}>
-                Save changes
+                {t("settings.integrations.saveChanges")}
               </Button>
             </>
           )}
@@ -1055,6 +1060,7 @@ function GLPIIntegrationSection() {
 // GlpiProfileList — inline CRUD for GLPI user-token profiles. Lives inside the
 // GLPI integration card. Each profile is one named GLPI account (user-token).
 function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[]; disabled: boolean }) {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -1094,8 +1100,8 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
         [id]: {
           ok: res.success,
           message: res.success
-            ? `Connected (${res.profiles?.slice(0, 3).join(", ") || "no profiles"})`
-            : (res.error || "Failed"),
+            ? t("settings.integrations.glpi.connectedProfiles", { profiles: res.profiles?.slice(0, 3).join(", ") || t("settings.integrations.glpi.noProfilesFallback") })
+            : (res.error || t("settings.integrations.testFailed")),
         },
       }));
     },
@@ -1104,7 +1110,7 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
   return (
     <div className="space-y-3">
       {profiles.length === 0 && !adding && (
-        <p className="text-xs text-[var(--text-muted)]">No profiles yet. Add one to enable per-project ticket access.</p>
+        <p className="text-xs text-[var(--text-muted)]">{t("settings.integrations.glpi.emptyProfiles")}</p>
       )}
 
       {profiles.map((p) => (
@@ -1114,7 +1120,10 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
               <p className="text-sm font-medium text-[var(--text-primary)]">{p.name}</p>
               {p.description && <p className="text-xs text-[var(--text-muted)]">{p.description}</p>}
               <p className="text-2xs text-[var(--text-faint)] mt-0.5">
-                {p.has_token ? "token stored" : "no token"} · entity #{p.default_entity_id}
+                {t("settings.integrations.glpi.tokenStatusLine", {
+                  status: p.has_token ? t("settings.integrations.glpi.tokenStored") : t("settings.integrations.glpi.noTokenStored"),
+                  id: String(p.default_entity_id),
+                })}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1124,18 +1133,18 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
                 onClick={() => testMutation.mutate(p.id)}
                 className="text-xs text-[var(--accent)] hover:underline disabled:opacity-40"
               >
-                Test
+                {t("settings.integrations.glpi.testButton")}
               </button>
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => {
-                  if (!confirm(`Delete profile "${p.name}"? Any project pointing at it will become unassigned.`)) return;
+                  if (!confirm(t("settings.integrations.glpi.confirmDeleteProfile", { name: p.name }))) return;
                   deleteMutation.mutate(p.id);
                 }}
                 className="text-xs text-[var(--danger)] hover:text-[var(--danger)] disabled:opacity-40"
               >
-                Delete
+                {t("common.delete")}
               </button>
             </div>
           </div>
@@ -1149,23 +1158,23 @@ function GlpiProfileList({ profiles, disabled }: { profiles: GlpiTokenProfile[];
 
       {adding ? (
         <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] p-3 space-y-3">
-          <Input label="Name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Infra team" />
-          <Input label="Description (optional)" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
-          <Input label="User token" type="password" value={newToken} onChange={(e) => setNewToken(e.target.value)} placeholder="GLPI personal API token" />
-          <Input label="Default entity ID" type="number" value={newEntity} onChange={(e) => setNewEntity(e.target.value)} />
+          <Input label={t("common.name")} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("settings.integrations.glpi.profileNamePlaceholder")} />
+          <Input label={t("settings.integrations.glpi.profileDescLabel")} value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
+          <Input label={t("settings.integrations.glpi.userTokenLabel")} type="password" value={newToken} onChange={(e) => setNewToken(e.target.value)} placeholder={t("settings.integrations.glpi.userTokenPlaceholder")} />
+          <Input label={t("settings.integrations.glpi.entityIdLabel")} type="number" value={newEntity} onChange={(e) => setNewEntity(e.target.value)} />
           {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
           <div className="flex gap-2">
             <Button type="button" size="sm" onClick={() => createMutation.mutate()} loading={createMutation.isPending} disabled={!newName.trim() || !newToken.trim()}>
-              Add
+              {t("common.add")}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => { setAdding(false); setError(null); }}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </div>
       ) : (
         <Button type="button" size="sm" variant="secondary" onClick={() => setAdding(true)} disabled={disabled}>
-          + Add profile
+          {t("settings.integrations.glpi.addProfileButton")}
         </Button>
       )}
     </div>
@@ -1187,6 +1196,7 @@ function SecretInputWithClear({
   canClear?: boolean;
   onClear: () => void;
 }) {
+  const { t } = useLocale();
   return (
     <div className="space-y-1">
       <div className="flex items-end justify-between gap-3">
@@ -1206,7 +1216,7 @@ function SecretInputWithClear({
             onClick={onClear}
             className="text-xs text-[var(--danger)] hover:text-[var(--danger)] transition-colors pb-2.5 whitespace-nowrap"
           >
-            Clear stored
+            {t("settings.integrations.clearStored")}
           </button>
         )}
       </div>
@@ -1216,6 +1226,7 @@ function SecretInputWithClear({
 
 
 function GrafanaIntegrationSection() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
   const [form, setForm] = useState<Record<string, string>>({});
@@ -1258,15 +1269,15 @@ function GrafanaIntegrationSection() {
     },
     onSuccess: (res) => {
       if (!res.success) {
-        const stage = res.stage === "auth" ? "Auth failed" : "Connection failed";
-        setTestResult({ success: false, message: `${stage}: ${res.error || "unknown error"}` });
+        const stage = res.stage === "auth" ? t("settings.integrations.authFailed") : t("settings.integrations.connectionFailed");
+        setTestResult({ success: false, message: t("settings.integrations.stageFailedDetail", { stage, error: res.error || t("settings.integrations.unknownError") }) });
         return;
       }
       const parts: string[] = [];
       if (res.version) parts.push(`Grafana ${res.version}`);
-      if (res.user) parts.push(`as ${res.user}${res.name ? ` (${res.name})` : ""}`);
-      if (res.org_id !== undefined) parts.push(`org ${res.org_id}`);
-      setTestResult({ success: true, message: parts.join(" · ") || "Connected" });
+      if (res.user) parts.push(`${t("settings.integrations.asUser", { user: res.user })}${res.name ? ` (${res.name})` : ""}`);
+      if (res.org_id !== undefined) parts.push(t("settings.integrations.grafana.orgLabel", { id: String(res.org_id) }));
+      setTestResult({ success: true, message: parts.join(" · ") || t("settings.integrations.connected") });
     },
     onError: (err: Error) => setTestResult({ success: false, message: err.message }),
   });
@@ -1300,7 +1311,7 @@ function GrafanaIntegrationSection() {
   };
 
   const handleClearSecret = (key: string, label: string) => {
-    if (!confirm(`Clear the stored ${label}? This cannot be undone — you'll need to re-enter it.`)) return;
+    if (!confirm(t("settings.integrations.confirmClearSecret", { label }))) return;
     clearSecretMutation.mutate(key);
     setForm((f) => ({ ...f, [key]: "" }));
   };
@@ -1319,15 +1330,15 @@ function GrafanaIntegrationSection() {
             checked={enabled}
             onChange={(v) => set("grafana_enabled", v ? "true" : "false")}
             disabled={isView}
-            ariaLabel="Enable Grafana integration"
+            ariaLabel={t("settings.integrations.grafana.ariaEnableIntegration")}
           />
           <p className="text-xs text-[var(--text-muted)]">
-            Embedded dashboards, live metrics, alert ingestion, agent install.
+            {t("settings.integrations.grafana.hint")}
           </p>
         </div>
         {isView && (
           <Button type="button" size="sm" variant="secondary" onClick={() => setMode("edit")}>
-            Edit
+            {t("common.edit")}
           </Button>
         )}
       </div>
@@ -1337,14 +1348,14 @@ function GrafanaIntegrationSection() {
           {/* Connection */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Base URL"
+              label={t("settings.integrations.baseUrl")}
               value={form.grafana_base_url ?? ""}
               onChange={(e) => set("grafana_base_url", e.target.value)}
               placeholder="https://grafana.example.org"
               disabled={isView}
             />
             <Input
-              label="Datasource UID (Prometheus, for live KPIs)"
+              label={t("settings.integrations.grafana.datasourceUid")}
               value={form.grafana_datasource_uid ?? ""}
               onChange={(e) => set("grafana_datasource_uid", e.target.value)}
               placeholder="prometheus"
@@ -1352,29 +1363,29 @@ function GrafanaIntegrationSection() {
             />
           </div>
           <SecretInputWithClear
-            label="API Token"
+            label={t("settings.integrations.apiToken")}
             value={form.grafana_api_token ?? ""}
             onChange={(v) => set("grafana_api_token", v)}
             disabled={isView}
             canClear={isEdit && initialRef.current.grafana_api_token === "••••••••"}
-            onClear={() => handleClearSecret("grafana_api_token", "API Token")}
+            onClear={() => handleClearSecret("grafana_api_token", t("settings.integrations.apiToken"))}
           />
 
           {/* Default dashboards */}
           <details className="border-t border-[var(--border-default)] pt-4" open>
             <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--text-primary)]">
-              Default dashboards
+              {t("settings.integrations.grafana.defaultDashboardsHeading")}
             </summary>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
               <Input
-                label="Default host dashboard UID"
+                label={t("settings.integrations.grafana.defaultHostDashboardUid")}
                 value={form.grafana_host_default_dashboard_uid ?? ""}
                 onChange={(e) => set("grafana_host_default_dashboard_uid", e.target.value)}
                 placeholder="node-exporter-full"
                 disabled={isView}
               />
               <Input
-                label="Default service dashboard UID"
+                label={t("settings.integrations.grafana.defaultServiceDashboardUid")}
                 value={form.grafana_service_default_dashboard_uid ?? ""}
                 onChange={(e) => set("grafana_service_default_dashboard_uid", e.target.value)}
                 placeholder="service-overview"
@@ -1382,7 +1393,7 @@ function GrafanaIntegrationSection() {
               />
             </div>
             <p className="text-xs text-[var(--text-muted)] mt-2">
-              Per-host and per-service UIDs override these. Dashboard variable <code className="text-[var(--text-secondary)]">var-host</code> / <code className="text-[var(--text-secondary)]">var-service</code> receives the slug/nickname.
+              {t("settings.integrations.grafana.dashboardVarHint")}
             </p>
           </details>
 
@@ -1393,7 +1404,7 @@ function GrafanaIntegrationSection() {
             </summary>
             <div className="space-y-3 mt-3">
               <Input
-                label="Remote write URL"
+                label={t("settings.integrations.grafana.remoteWriteUrl")}
                 value={form.grafana_prom_remote_write_url ?? ""}
                 onChange={(e) => set("grafana_prom_remote_write_url", e.target.value)}
                 placeholder="https://prometheus.example.org/api/v1/write"
@@ -1401,23 +1412,23 @@ function GrafanaIntegrationSection() {
               />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
-                  label="Remote write username"
+                  label={t("settings.integrations.grafana.remoteWriteUsername")}
                   value={form.grafana_prom_remote_write_username ?? ""}
                   onChange={(e) => set("grafana_prom_remote_write_username", e.target.value)}
                   placeholder="scrape-user"
                   disabled={isView}
                 />
                 <SecretInputWithClear
-                  label="Remote write password"
+                  label={t("settings.integrations.grafana.remoteWritePassword")}
                   value={form.grafana_prom_remote_write_password ?? ""}
                   onChange={(v) => set("grafana_prom_remote_write_password", v)}
                   disabled={isView}
                   canClear={isEdit && initialRef.current.grafana_prom_remote_write_password === "••••••••"}
-                  onClear={() => handleClearSecret("grafana_prom_remote_write_password", "remote_write password")}
+                  onClear={() => handleClearSecret("grafana_prom_remote_write_password", t("settings.integrations.grafana.remoteWritePasswordConfirmLabel"))}
                 />
               </div>
               <p className="text-xs text-[var(--text-muted)]">
-                Used by the Grafana Agent installed on hosts. Leave blank if Prometheus accepts anonymous writes inside your network.
+                {t("settings.integrations.grafana.remoteWriteHint")}
               </p>
             </div>
           </details>
@@ -1425,16 +1436,16 @@ function GrafanaIntegrationSection() {
           {/* Webhook secret (for alert ingestion) */}
           <details className="border-t border-[var(--border-default)] pt-4">
             <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--text-primary)]">
-              Alert webhook
+              {t("settings.integrations.grafana.alertWebhookHeading")}
             </summary>
             <div className="space-y-3 mt-3">
               <SecretInputWithClear
-                label="Webhook HMAC secret"
+                label={t("settings.integrations.grafana.webhookHmacSecret")}
                 value={form.grafana_webhook_secret ?? ""}
                 onChange={(v) => set("grafana_webhook_secret", v)}
                 disabled={isView}
                 canClear={isEdit && initialRef.current.grafana_webhook_secret === "••••••••"}
-                onClear={() => handleClearSecret("grafana_webhook_secret", "webhook secret")}
+                onClear={() => handleClearSecret("grafana_webhook_secret", t("settings.integrations.grafana.webhookSecretConfirmLabel"))}
               />
               {isEdit && (() => {
                 const currentSecret = form.grafana_webhook_secret ?? "";
@@ -1454,7 +1465,7 @@ function GrafanaIntegrationSection() {
                       }}
                       className="text-xs text-[var(--accent)] hover:underline"
                     >
-                      Generate random secret
+                      {t("settings.integrations.grafana.generateSecretButton")}
                     </button>
                     <button
                       type="button"
@@ -1466,22 +1477,22 @@ function GrafanaIntegrationSection() {
                           setTimeout(() => setWebhookSecretCopied(false), 1800);
                         } catch {
                           // Clipboard API may fail on non-secure contexts (http://). Fall back to prompt.
-                          window.prompt("Copy the webhook secret below:", currentSecret);
+                          window.prompt(t("settings.integrations.grafana.webhookPromptCopy"), currentSecret);
                         }
                       }}
                       className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]"
-                      title={hasPlaintext ? "Copy to clipboard" : "Generate a secret first"}
+                      title={hasPlaintext ? t("settings.integrations.grafana.copyToClipboardTitle") : t("settings.integrations.grafana.generateSecretFirstTitle")}
                     >
-                      {webhookSecretCopied ? "Copied ✓" : "Copy"}
+                      {webhookSecretCopied ? t("settings.integrations.grafana.copiedCheck") : t("common.copy")}
                     </button>
                     <span className="text-2xs text-[var(--text-faint)]">
-                      Copy it now — after saving, sshcm only shows the masked form.
+                      {t("settings.integrations.grafana.webhookCopyHint")}
                     </span>
                   </div>
                 );
               })()}
               <p className="text-xs text-[var(--text-muted)]">
-                Configure a Grafana contact point posting JSON to <code className="text-[var(--text-secondary)]">/api/webhooks/grafana/alerts</code> with header <code className="text-[var(--text-secondary)]">X-Sshcm-Signature: sha256=&lt;hmac&gt;</code>.
+                {t("settings.integrations.grafana.webhookConfigHint")}
               </p>
             </div>
           </details>
@@ -1494,7 +1505,7 @@ function GrafanaIntegrationSection() {
               loading={testMutation.isPending}
               disabled={isView}
             >
-              Test connection
+              {t("settings.integrations.testConnection")}
             </Button>
             {testResult && (
               <span className={`text-xs ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
@@ -1507,14 +1518,14 @@ function GrafanaIntegrationSection() {
 
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
         <span className="text-xs text-[var(--text-muted)]">
-          {isView ? "Read-only — click Edit to change settings." : hasDirty ? "Unsaved changes." : "No changes."}
+          {isView ? t("settings.integrations.readOnlyHint") : hasDirty ? t("settings.integrations.unsavedChanges") : t("settings.integrations.noChanges")}
         </span>
         <div className="flex gap-2">
           {isEdit && (
             <>
-              <Button type="button" variant="secondary" onClick={handleCancel}>Cancel</Button>
+              <Button type="button" variant="secondary" onClick={handleCancel}>{t("common.cancel")}</Button>
               <Button type="button" onClick={handleSave} loading={mutation.isPending} disabled={!hasDirty}>
-                Save changes
+                {t("settings.integrations.saveChanges")}
               </Button>
             </>
           )}
@@ -1525,6 +1536,7 @@ function GrafanaIntegrationSection() {
 }
 
 function LLMSection() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
   const [form, setForm] = useState<Record<string, string>>({});
@@ -1551,21 +1563,22 @@ function LLMSection() {
     },
     onSuccess: (res) => {
       if (!res.success) {
-        const stageLabel = res.stage === "chat" ? "Chat failed" : "Connection failed";
-        setTestResult({ success: false, message: `${stageLabel}: ${res.error || "unknown error"}` });
+        const stageLabel = res.stage === "chat" ? t("settings.integrations.chatFailed") : t("settings.integrations.connectionFailed");
+        setTestResult({ success: false, message: t("settings.integrations.stageFailedDetail", { stage: stageLabel, error: res.error || t("settings.integrations.unknownError") }) });
         return;
       }
       // Compose a friendly summary: endpoint → model catalog → chat round-trip.
       const parts: string[] = [];
-      parts.push(`Endpoint OK (${res.models_count ?? 0} models)`);
+      parts.push(t("settings.integrations.llm.endpointOk", { count: String(res.models_count ?? 0) }));
       if (res.model) {
         parts.push(res.model_available
-          ? `model "${res.model}" available`
-          : `model "${res.model}" NOT in list`);
+          ? t("settings.integrations.llm.modelAvailable", { model: res.model })
+          : t("settings.integrations.llm.modelNotInList", { model: res.model }));
       }
       if (res.chat_ok) {
-        const replyPreview = res.chat_reply ? ` — replied: "${res.chat_reply}"` : "";
-        parts.push(`chat OK${replyPreview}`);
+        parts.push(res.chat_reply
+          ? t("settings.integrations.llm.chatOkWithReply", { reply: res.chat_reply })
+          : t("settings.integrations.llm.chatOk"));
       } else if (res.warning) {
         parts.push(res.warning);
       }
@@ -1580,11 +1593,11 @@ function LLMSection() {
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">AI Assistant (LLM)</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t("settings.integrations.llm.title")}</h3>
         <Toggle
           checked={enabled}
           onChange={(v) => set("llm_enabled", v ? "true" : "false")}
-          ariaLabel="Enable LLM"
+          ariaLabel={t("settings.integrations.llm.ariaEnableLlm")}
         />
       </div>
 
@@ -1592,13 +1605,13 @@ function LLMSection() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="API Base URL"
+              label={t("settings.integrations.llm.apiBaseUrl")}
               value={form.llm_base_url ?? ""}
               onChange={(e) => set("llm_base_url", e.target.value)}
               placeholder="https://api.sobdemanda.mandu.piaui.pro/v1"
             />
             <Input
-              label="API Key"
+              label={t("settings.integrations.llm.apiKey")}
               type="password"
               value={form.llm_api_key ?? ""}
               onChange={(e) => set("llm_api_key", e.target.value)}
@@ -1608,19 +1621,19 @@ function LLMSection() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
-              label="Text Model"
+              label={t("settings.integrations.llm.textModel")}
               value={form.llm_model_text ?? "Qwen/Qwen3-30B-A3B"}
               onChange={(e) => set("llm_model_text", e.target.value)}
               placeholder="Qwen/Qwen3-30B-A3B"
             />
             <Input
-              label="Vision Model"
+              label={t("settings.integrations.llm.visionModel")}
               value={form.llm_model_vision ?? "Qwen/Qwen3-VL-30B-A3B-Thinking"}
               onChange={(e) => set("llm_model_vision", e.target.value)}
               placeholder="Qwen/Qwen3-VL-30B-A3B-Thinking"
             />
             <Input
-              label="Max Tokens"
+              label={t("settings.integrations.llm.maxTokens")}
               type="number"
               value={form.llm_max_tokens ?? "2000"}
               onChange={(e) => set("llm_max_tokens", e.target.value)}
@@ -1630,14 +1643,14 @@ function LLMSection() {
 
           <div className="flex items-center gap-3 flex-wrap">
             <Button onClick={() => mutation.mutate(form)} loading={mutation.isPending}>
-              Save LLM Settings
+              {t("settings.integrations.llm.saveButton")}
             </Button>
             <Button
               variant="secondary"
               onClick={() => { setTestResult(null); testMutation.mutate(); }}
               loading={testMutation.isPending}
             >
-              Test connection
+              {t("settings.integrations.testConnection")}
             </Button>
             {testResult && (
               <span className={`text-xs ${testResult.success ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
@@ -1652,6 +1665,7 @@ function LLMSection() {
 }
 
 function CoolifySection() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
   const [form, setForm] = useState<Record<string, string>>({});
@@ -1674,12 +1688,12 @@ function CoolifySection() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">Coolify</h3>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">Self-hosting platform — manage servers directly from SSHCM.</p>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">{t("settings.integrations.coolify.hint")}</p>
         </div>
         <Toggle
           checked={enabled}
           onChange={(v) => set("coolify_enabled", v ? "true" : "false")}
-          ariaLabel="Enable Coolify"
+          ariaLabel={t("settings.integrations.coolify.ariaEnableCoolify")}
         />
       </div>
 
@@ -1687,40 +1701,40 @@ function CoolifySection() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
-              label="Base URL"
+              label={t("settings.integrations.baseUrl")}
               value={form.coolify_base_url ?? ""}
               onChange={(e) => set("coolify_base_url", e.target.value)}
               placeholder="https://coolify.example.com"
             />
             <Input
-              label="API Token"
+              label={t("settings.integrations.apiToken")}
               type="password"
               value={form.coolify_api_token ?? ""}
               onChange={(e) => set("coolify_api_token", e.target.value)}
               placeholder="••••••••"
             />
             <Input
-              label="SSH User"
+              label={t("settings.integrations.coolify.sshUser")}
               value={form.coolify_default_user ?? ""}
               onChange={(e) => set("coolify_default_user", e.target.value)}
               placeholder="root"
             />
           </div>
           <p className="text-2xs text-[var(--text-faint)]">
-            SSH User is used when registering servers in Coolify. Coolify does not accept dots in usernames. Defaults to &quot;root&quot;.
+            {t("settings.integrations.coolify.sshUserHint")}
           </p>
 
           <div className="flex items-center gap-2">
             <Button onClick={() => mutation.mutate(form)} loading={mutation.isPending}>
-              Save Coolify Settings
+              {t("settings.integrations.coolify.saveButton")}
             </Button>
-            <Button variant="secondary" onClick={() => { setTestResult(null); coolifyAPI.testConnection().then(setTestResult).catch(err => setTestResult({ success: false, error: err instanceof Error ? err.message : "Failed" })); }} loading={false}>
-              Test Connection
+            <Button variant="secondary" onClick={() => { setTestResult(null); coolifyAPI.testConnection().then(setTestResult).catch(err => setTestResult({ success: false, error: err instanceof Error ? err.message : t("settings.integrations.testFailed") })); }} loading={false}>
+              {t("settings.integrations.testConnection")}
             </Button>
           </div>
           {testResult && (
             <div className={`rounded-[var(--radius-sm)] px-3 py-2 text-xs ${testResult.success ? "bg-[var(--success)]/10 border border-[var(--success)]/25 text-[var(--success)]" : "bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)]"}`}>
-              {testResult.success ? "Connection successful" : `Connection failed: ${testResult.error}`}
+              {testResult.success ? t("settings.integrations.connectionSuccessful") : t("settings.integrations.stageFailedDetail", { stage: t("settings.integrations.connectionFailed"), error: testResult.error ?? "" })}
             </div>
           )}
         </div>

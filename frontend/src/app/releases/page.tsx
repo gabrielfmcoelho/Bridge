@@ -128,7 +128,7 @@ export default function ReleasesPage() {
                 : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-secondary)]"
             }`}
           >
-            All
+            {t("common.all")}
           </button>
           {RELEASE_STATUSES.map((status) => (
             <button
@@ -154,7 +154,7 @@ export default function ReleasesPage() {
         <EmptyState
           icon="box"
           title={t("common.noResults")}
-          description={search || statusFilter ? "Try adjusting your filters" : t("release.noReleases")}
+          description={search || statusFilter ? t("host.emptyStateFilter") : t("release.noReleases")}
           action={canEdit && !search && !statusFilter ? (
             <Button size="sm" onClick={() => setShowForm(true)}>+ {t("release.create")}</Button>
           ) : undefined}
@@ -193,13 +193,13 @@ export default function ReleasesPage() {
                       <span className="bg-[var(--bg-elevated)] px-2 py-0.5 rounded">{projectMap[rel.project_id]}</span>
                     )}
                     {rel.target_date && (
-                      <span>Target: {rel.target_date}</span>
+                      <span>{t("release.targetLabel", { date: rel.target_date })}</span>
                     )}
                     {rel.live_date && (
-                      <span className="text-[var(--success)]">Live: {rel.live_date}</span>
+                      <span className="text-[var(--success)]">{t("release.liveLabel", { date: rel.live_date })}</span>
                     )}
                     {rel.issue_ids && rel.issue_ids.length > 0 && (
-                      <span>{rel.issue_ids.length} {rel.issue_ids.length === 1 ? "issue" : "issues"}</span>
+                      <span>{rel.issue_ids.length} {rel.issue_ids.length === 1 ? t("release.issueSingular") : t("release.issuePlural")}</span>
                     )}
                   </div>
                 </Card>
@@ -235,7 +235,7 @@ export default function ReleasesPage() {
                       : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)]"
                   }`}
                 >
-                  All
+                  {t("common.all")}
                 </button>
                 {RELEASE_STATUSES.map((status) => (
                   <button
@@ -258,7 +258,7 @@ export default function ReleasesPage() {
                 onClick={() => { setSearch(""); setStatusFilter(""); }}
                 className="w-full py-2 text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
               >
-                Clear all filters
+                {t("release.clearFilters")}
               </button>
             )}
           </div>

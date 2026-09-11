@@ -45,8 +45,8 @@ export default function TableCard({ table, selected, onClick }: Props) {
           {table.hasWarning && (
             <span
               className="w-1.5 h-1.5 rounded-full bg-[var(--danger)] shrink-0 mt-1.5"
-              aria-label="Has warnings"
-              title="Has warnings"
+              aria-label={t("atlas.catalog.hasWarnings")}
+              title={t("atlas.catalog.hasWarnings")}
             />
           )}
         </div>

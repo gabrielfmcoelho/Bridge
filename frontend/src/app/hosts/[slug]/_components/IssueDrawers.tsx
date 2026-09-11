@@ -118,7 +118,7 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
   createLoading?: boolean;
   concludeLoading?: boolean;
   updateLoading?: boolean;
-  t: (k: string) => string;
+  t: (k: string, vars?: Record<string, string>) => string;
 }) {
   const [editing, setEditing] = useState(false);
   const [escalateOpen, setEscalateOpen] = useState(false);
@@ -244,8 +244,8 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-2.5 border border-[var(--border-subtle)]">
             <Icon path={ICON_PATHS.clipboard} className="w-3.5 h-3.5 text-[var(--purple)] shrink-0" />
             {isResolved
-              ? `Issue #${alert.linked_issue_id} — resolved`
-              : `Issue #${alert.linked_issue_id} linked — resolve the issue to conclude this alert`
+              ? t("issue.alertLinkResolved", { id: String(alert.linked_issue_id) })
+              : t("issue.alertLinkPending", { id: String(alert.linked_issue_id) })
             }
           </div>
         )}

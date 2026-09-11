@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocale } from "@/contexts/LocaleContext";
 import { secretsAPI } from "@/lib/api";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import Card from "@/components/ui/Card";
@@ -16,6 +17,7 @@ import type { Secret } from "@/lib/types";
 // payload), so they're shown read-only. The current value is revealed on open
 // and pre-filled into the type-specific fields so the operator can rotate it.
 export default function VaultEntryEditor({ secret, onClose }: { secret: Secret | null; onClose: () => void }) {
+  const { t } = useLocale();
   const qc = useQueryClient();
   const open = !!secret;
 
@@ -97,21 +99,21 @@ export default function VaultEntryEditor({ secret, onClose }: { secret: Secret |
   }
 
   function validate(): string | null {
-    if (!secret) return "no secret";
-    if (!name.trim()) return "Name is required.";
+    if (!secret) return t("vault.errorNoSecret");
+    if (!name.trim()) return t("vault.errorNameRequired");
     switch (secret.type) {
       case "password":
       case "env_var":
-        if (!valueField) return "Value is required.";
+        if (!valueField) return t("vault.errorValueRequired");
         break;
       case "cred":
-        if (!credUsername || !credPassword) return "Username and password are required.";
+        if (!credUsername || !credPassword) return t("vault.errorUsernamePasswordRequired");
         break;
       case "sshkey":
-        if (!sshPrivKey) return "Private key is required.";
+        if (!sshPrivKey) return t("vault.errorPrivateKeyRequired");
         break;
       case "app_login":
-        if (!appName || !appUsername || !appPassword) return "App name, username, and password are required.";
+        if (!appName || !appUsername || !appPassword) return t("vault.errorAppLoginRequired");
         break;
     }
     return null;
@@ -139,7 +141,7 @@ export default function VaultEntryEditor({ secret, onClose }: { secret: Secret |
   if (!secret) return null;
 
   return (
-    <ResponsiveModal open={open} onClose={onClose} title="Edit secret">
+    <ResponsiveModal open={open} onClose={onClose} title={t("vault.editTitle")}>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -152,54 +154,54 @@ export default function VaultEntryEditor({ secret, onClose }: { secret: Secret |
           <Badge>{secret.type}</Badge>
           <Badge color={secret.visibility === "personal" ? "purple" : "amber"}>{secret.visibility}</Badge>
           <Badge>{secret.scope}</Badge>
-          <span className="text-2xs text-[var(--text-faint)]">type, scope &amp; visibility can&apos;t be changed</span>
+          <span className="text-2xs text-[var(--text-faint)]">{t("vault.immutableNotice")}</span>
         </div>
 
         <label className="text-xs font-medium text-[var(--text-muted)] block">
-          {secret.type === "env_var" ? "Variable name" : "Name"}
+          {secret.type === "env_var" ? t("vault.variableNameLabel") : t("common.name")}
           <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" />
         </label>
 
         {secret.type === "env_var" && (
           <label className="text-xs font-medium text-[var(--text-muted)] block">
-            Group (environment)
+            {t("vault.groupLabel")}
             <Input value={groupLabel} onChange={(e) => setGroupLabel(e.target.value)} className="mt-1" />
           </label>
         )}
 
         <label className="text-xs font-medium text-[var(--text-muted)] block">
-          Description
+          {t("common.description")}
           <Input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" />
         </label>
 
         <Card>
           {revealing ? (
-            <p className="text-xs text-[var(--text-muted)]">Revealing current value…</p>
+            <p className="text-xs text-[var(--text-muted)]">{t("vault.revealingValue")}</p>
           ) : (
             <div className="space-y-2">
               {(secret.type === "password" || secret.type === "env_var") && (
-                <ValueField label="Value" value={valueField} onChange={setValueField} />
+                <ValueField label={t("vault.fieldValueLabel")} value={valueField} onChange={setValueField} />
               )}
               {secret.type === "cred" && (
                 <>
-                  <ValueField label="Username" value={credUsername} onChange={setCredUsername} />
-                  <ValueField label="Password" value={credPassword} onChange={setCredPassword} />
+                  <ValueField label={t("share.fields.username")} value={credUsername} onChange={setCredUsername} />
+                  <ValueField label={t("share.fields.password")} value={credPassword} onChange={setCredPassword} />
                 </>
               )}
               {secret.type === "sshkey" && (
                 <>
-                  <ValueField label="Username" value={sshUsername} onChange={setSshUsername} />
-                  <ValueField label="Private key (PEM)" value={sshPrivKey} onChange={setSshPrivKey} textarea />
-                  <ValueField label="Public key" value={sshPubKey} onChange={setSshPubKey} textarea />
+                  <ValueField label={t("share.fields.username")} value={sshUsername} onChange={setSshUsername} />
+                  <ValueField label={t("vault.privateKeyPemLabel")} value={sshPrivKey} onChange={setSshPrivKey} textarea />
+                  <ValueField label={t("vault.publicKeyLabel")} value={sshPubKey} onChange={setSshPubKey} textarea />
                 </>
               )}
               {secret.type === "app_login" && (
                 <>
-                  <ValueField label="App name" value={appName} onChange={setAppName} />
-                  <ValueField label="URL" value={appURL} onChange={setAppURL} />
-                  <ValueField label="Username" value={appUsername} onChange={setAppUsername} />
-                  <ValueField label="Password" value={appPassword} onChange={setAppPassword} />
-                  <ValueField label="Notes" value={appNotes} onChange={setAppNotes} textarea />
+                  <ValueField label={t("vault.appNameLabel")} value={appName} onChange={setAppName} />
+                  <ValueField label={t("share.fields.url")} value={appURL} onChange={setAppURL} />
+                  <ValueField label={t("share.fields.username")} value={appUsername} onChange={setAppUsername} />
+                  <ValueField label={t("share.fields.password")} value={appPassword} onChange={setAppPassword} />
+                  <ValueField label={t("share.fields.notes")} value={appNotes} onChange={setAppNotes} textarea />
                 </>
               )}
             </div>
@@ -210,10 +212,10 @@ export default function VaultEntryEditor({ secret, onClose }: { secret: Secret |
 
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" type="button" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="submit" loading={save.isPending} disabled={revealing}>
-            Save changes
+            {t("common.saveChanges")}
           </Button>
         </div>
       </form>

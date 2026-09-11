@@ -29,7 +29,7 @@ export default function EntidadesTab() {
   const [error, setError] = useState("");
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["entidades"] });
-  const fail = (err: unknown) => setError(err instanceof Error ? err.message : "Failed");
+  const fail = (err: unknown) => setError(err instanceof Error ? err.message : t("common.requestFailed"));
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -63,7 +63,7 @@ export default function EntidadesTab() {
               <thead>
                 <tr className={tableClasses.compact.headRow}>
                   <th className={tableClasses.compact.th}>{t("common.name")}</th>
-                  <th className={tableClasses.compact.th}>Slug</th>
+                  <th className={tableClasses.compact.th}>{t("settings.offerings.slug")}</th>
                   <th className="w-24" />
                 </tr>
               </thead>
@@ -100,7 +100,7 @@ export default function EntidadesTab() {
             className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end"
           >
             <Input label={t("common.name")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            <Input label="Slug" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="auto" />
+            <Input label={t("settings.offerings.slug")} value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder={t("settings.offerings.slugAuto")} />
             <Select
               label={t("entidades.parent")}
               value={form.parent_id != null ? String(form.parent_id) : ""}
@@ -154,7 +154,7 @@ function UnassignedTriage() {
       setError("");
       queryClient.invalidateQueries({ queryKey: ["entidades-unassigned"] });
     },
-    onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
+    onError: (err) => setError(err instanceof Error ? err.message : t("common.requestFailed")),
   });
 
   const allChecked = rows.length > 0 && rows.every((r) => selected.includes(r.id));

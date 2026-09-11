@@ -9,6 +9,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import TicketList from "@/components/glpi/TicketList";
 import CreateTicketModal from "@/components/glpi/CreateTicketModal";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   projectId: number;
@@ -20,6 +21,7 @@ interface Props {
 // ChamadosTab shows all open GLPI tickets for the project (scoped by the
 // project's GLPI profile + entity + optional category).
 export default function ChamadosTab({ projectId, projectName, profileID, canEdit }: Props) {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -33,8 +35,8 @@ export default function ChamadosTab({ projectId, projectName, profileID, canEdit
     return (
       <EmptyState
         icon="folder"
-        title="No GLPI profile linked"
-        description="Link a GLPI token profile in the project edit drawer → Vínculos. Admins manage profiles in Settings → Integrations → GLPI."
+        title={t("chamado.tab.noProfileTitle")}
+        description={t("chamado.tab.noProfileDesc")}
         compact
       />
     );
@@ -51,12 +53,12 @@ export default function ChamadosTab({ projectId, projectName, profileID, canEdit
     <div className="space-y-4 animate-fade-in">
       <Card hover={false} className="!p-3 flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs text-[var(--text-muted)]">GLPI chamados abertos</p>
-          <p className="text-sm text-[var(--text-primary)]">{tickets.length} chamado{tickets.length === 1 ? "" : "s"}</p>
+          <p className="text-xs text-[var(--text-muted)]">{t("chamado.tab.openTicketsLabel")}</p>
+          <p className="text-sm text-[var(--text-primary)]">{t("chamado.count", { n: String(tickets.length) })}</p>
         </div>
         {canEdit && (
           <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            Novo chamado
+            {t("chamado.newAction")}
           </Button>
         )}
       </Card>
@@ -67,7 +69,7 @@ export default function ChamadosTab({ projectId, projectName, profileID, canEdit
         </div>
       )}
 
-      <TicketList tickets={tickets} emptyLabel="Nenhum chamado aberto para este projeto." />
+      <TicketList tickets={tickets} emptyLabel={t("chamado.tab.emptyOpen")} />
 
       <CreateTicketModal
         open={createOpen}

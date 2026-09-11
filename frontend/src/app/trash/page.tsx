@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { hostsAPI, servicesAPI, projectsAPI } from "@/lib/api";
 import type { Host, Service, Project } from "@/lib/types";
+import { useLocale } from "@/contexts/LocaleContext";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
@@ -16,6 +17,7 @@ import EmptyState from "@/components/ui/EmptyState";
 // the child secrets too. A host's slug stays reserved while it sits here, so
 // restoring is how you bring back a host whose slug you want to keep.
 export default function TrashPage() {
+  const { t } = useLocale();
   const qc = useQueryClient();
 
   const hosts = useQuery({ queryKey: ["hosts-trash"], queryFn: hostsAPI.trash });
@@ -50,24 +52,23 @@ export default function TrashPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Trash" />
+      <PageHeader title={t("nav.trash")} />
       <p className="text-sm text-[var(--text-muted)] mb-4">
-        Soft-deleted hosts, services and projects. Restoring one also brings back
-        the secrets that were cascade-deleted with it. Admin only.
+        {t("trash.description")}
       </p>
 
       {loading ? (
-        <p className="text-sm text-[var(--text-muted)]">Loading...</p>
+        <p className="text-sm text-[var(--text-muted)]">{t("common.loading")}</p>
       ) : total === 0 ? (
         <EmptyState
           icon="server"
-          title="Trash is empty"
-          description="Deleted hosts, services and projects you can restore appear here."
+          title={t("trash.emptyTitle")}
+          description={t("trash.emptyDescription")}
         />
       ) : (
         <div className="space-y-6">
           <TrashSection<Host>
-            title="Hosts"
+            title={t("host.title")}
             items={hosts.data ?? []}
             restoring={restoreHost.isPending}
             onRestore={(h) => restoreHost.mutate(h.id)}
@@ -75,7 +76,7 @@ export default function TrashPage() {
             meta={(h) => h.oficial_slug}
           />
           <TrashSection<Service>
-            title="Services"
+            title={t("service.title")}
             items={services.data ?? []}
             restoring={restoreService.isPending}
             onRestore={(s) => restoreService.mutate(s.id)}
@@ -83,7 +84,7 @@ export default function TrashPage() {
             meta={(s) => s.service_type}
           />
           <TrashSection<Project>
-            title="Projects"
+            title={t("project.title")}
             items={projects.data ?? []}
             restoring={restoreProject.isPending}
             onRestore={(p) => restoreProject.mutate(p.id)}
@@ -111,6 +112,7 @@ function TrashSection<T extends { id: number }>({
   label: (item: T) => string;
   meta: (item: T) => string;
 }) {
+  const { t } = useLocale();
   if (items.length === 0) return null;
   return (
     <div>
@@ -130,7 +132,7 @@ function TrashSection<T extends { id: number }>({
                 </div>
               </div>
               <Button size="sm" onClick={() => onRestore(item)} disabled={restoring}>
-                {restoring ? "..." : "Restore"}
+                {restoring ? "..." : t("trash.restore")}
               </Button>
             </div>
           </Card>

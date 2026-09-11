@@ -1,7 +1,10 @@
+"use client";
+
 import type { ReactNode, RefObject } from "react";
 import EmptyState from "@/components/ui/EmptyState";
 import Spinner from "@/components/ui/Spinner";
 import { SkeletonCard, SkeletonTable } from "@/components/ui/Skeleton";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface InventoryContentProps<T extends { id: number }> {
   isLoading: boolean;
@@ -41,6 +44,7 @@ export default function InventoryContent<T extends { id: number }>({
   loadingMoreLabel,
   loadMoreLabel,
 }: InventoryContentProps<T>) {
+  const { t } = useLocale();
   if (isLoading) {
     return viewMode === "cards" ? (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
@@ -90,7 +94,7 @@ export default function InventoryContent<T extends { id: number }>({
           <div className="inline-flex items-center gap-2">
             <Spinner />
             <span>
-              {loadingMoreLabel ?? "Loading more..."} ({visibleCount}/{items.length})
+              {loadingMoreLabel ?? t("common.loadingMore")} ({visibleCount}/{items.length})
             </span>
           </div>
           {onLoadMore && (
@@ -99,7 +103,7 @@ export default function InventoryContent<T extends { id: number }>({
               onClick={onLoadMore}
               className="px-3 py-1 rounded-[var(--radius-md)] border border-[var(--border-default)] text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors"
             >
-              {loadMoreLabel ?? "Load more"}
+              {loadMoreLabel ?? t("common.loadMore")}
             </button>
           )}
         </div>

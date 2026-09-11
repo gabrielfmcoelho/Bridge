@@ -115,7 +115,7 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
       </SectionHeading>
 
       {chamados.length === 0 ? (
-        <EmptyState icon="search" title={t("host.noChamados")} description={t("host.noChamadosDesc") || "No active tickets for this host."} compact />
+        <EmptyState icon="search" title={t("host.noChamados")} description={t("host.noChamadosDesc")} compact />
       ) : view === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
           {chamados.map((c, i) => {
@@ -152,11 +152,11 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-[var(--text-faint)] block mb-0.5">{t("host.chamadoUser") || "User"}</span>
+                    <span className="text-[var(--text-faint)] block mb-0.5">{t("host.chamadoUser")}</span>
                     <span className="text-[var(--text-muted)]">{c.user_display_name || "--"}</span>
                   </div>
                   <div>
-                    <span className="text-[var(--text-faint)] block mb-0.5">{t("host.chamadoDate") || "Date"}</span>
+                    <span className="text-[var(--text-faint)] block mb-0.5">{t("host.chamadoDate")}</span>
                     <span className="text-[var(--text-muted)] font-mono">{c.date || "--"}</span>
                   </div>
                 </div>
@@ -170,8 +170,8 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
             { key: "chamado_id" as const, label: "ID" },
             { key: "title" as const, label: t("common.title") },
             { key: "status" as const, label: t("common.status") },
-            { key: "user" as const, label: t("host.chamadoUser") || "User" },
-            { key: "date" as const, label: t("host.chamadoDate") || "Date" },
+            { key: "user" as const, label: t("host.chamadoUser") },
+            { key: "date" as const, label: t("host.chamadoDate") },
           ]}
           defaultSort="date"
           defaultDir="desc"
@@ -208,7 +208,7 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
         users={users}
         onCreate={(data) => createMutation.mutate(data)}
         onUpdate={(id, data) => updateMutation.mutate({ id, ...data })}
-        onDelete={(id) => { if (confirm("Delete this chamado?")) deleteMutation.mutate(id); }}
+        onDelete={(id) => { if (confirm(t("chamado.deleteConfirm"))) deleteMutation.mutate(id); }}
         loading={createMutation.isPending || updateMutation.isPending}
         t={t}
         slug={slug}

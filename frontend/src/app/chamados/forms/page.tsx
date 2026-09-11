@@ -11,8 +11,10 @@ import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import FormcreatorFormDrawer from "@/components/glpi/FormcreatorFormDrawer";
 import SectionHeading from "@/components/ui/SectionHeading";
+import { useLocale } from "@/contexts/LocaleContext";
 
 export default function FormcreatorFormsPage() {
+  const { t } = useLocale();
   const [profileID, setProfileID] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [openFormID, setOpenFormID] = useState<number | null>(null);
@@ -74,8 +76,8 @@ export default function FormcreatorFormsPage() {
       return (
         <EmptyState
           icon="box"
-          title="GLPI integração desabilitada"
-          description="Ativar em Settings → Integrations → GLPI."
+          title={t("chamado.glpiDisabledTitle")}
+          description={t("chamado.forms.disabledDesc")}
         />
       );
     }
@@ -83,8 +85,8 @@ export default function FormcreatorFormsPage() {
       return (
         <EmptyState
           icon="folder"
-          title="Nenhum perfil configurado"
-          description="Adicione um perfil GLPI em Settings → Integrations → GLPI → Token profiles."
+          title={t("chamado.noProfilesTitle")}
+          description={t("chamado.forms.noProfilesDesc")}
         />
       );
     }
@@ -100,7 +102,7 @@ export default function FormcreatorFormsPage() {
     if (error) {
       return (
         <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-4 py-3">
-          Falha: {(error as Error).message}
+          {t("chamado.loadFailed", { message: (error as Error).message })}
         </div>
       );
     }
@@ -108,11 +110,11 @@ export default function FormcreatorFormsPage() {
       return (
         <EmptyState
           icon="folder"
-          title="Nenhum formulário visível"
+          title={t("chamado.forms.noFormsTitle")}
           description={
             search
-              ? `Sem resultados para "${search}".`
-              : "O perfil selecionado não tem acesso a nenhum formulário Formcreator."
+              ? t("chamado.forms.noResultsFor", { search })
+              : t("chamado.forms.noFormsForProfile")
           }
         />
       );
@@ -123,7 +125,7 @@ export default function FormcreatorFormsPage() {
         {grouped.map(([categoryID, forms]) => (
           <section key={categoryID}>
             <SectionHeading as="h3">
-              {categoryID === 0 ? "Sem categoria" : `Categoria #${categoryID}`}
+              {categoryID === 0 ? t("chamado.forms.uncategorized") : t("chamado.forms.categoryNumber", { n: String(categoryID) })}
             </SectionHeading>
             <ul className="space-y-1.5">
               {forms.map((f) => (
@@ -151,11 +153,11 @@ export default function FormcreatorFormsPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Formulários GLPI" />
+      <PageHeader title={t("chamado.forms.pageTitle")} />
 
       <Card hover={false} className="!p-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-xs text-[var(--text-muted)]">Perfil</label>
+          <label className="text-xs text-[var(--text-muted)]">{t("chamado.profileLabel")}</label>
           <select
             value={profileID ?? ""}
             onChange={(e) => setProfileID(e.target.value ? parseInt(e.target.value, 10) : null)}
@@ -172,7 +174,7 @@ export default function FormcreatorFormsPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar formulário…"
+            placeholder={t("chamado.forms.searchPlaceholder")}
             className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-1 text-sm min-w-[220px]"
           />
         </div>
@@ -180,7 +182,7 @@ export default function FormcreatorFormsPage() {
           href="/chamados"
           className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] hover:underline"
         >
-          ← Voltar aos chamados
+          {t("chamado.forms.backLink")}
         </Link>
       </Card>
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { grafanaAPI } from "@/lib/api";
+import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function HostMetricsTab({ slug }: Props) {
+  const { t } = useLocale();
   const [iframeError, setIframeError] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
 
@@ -39,8 +41,8 @@ export default function HostMetricsTab({ slug }: Props) {
         <HostLiveKpis slug={slug} />
         <EmptyState
           icon="box"
-          title="Grafana not available"
-          description={error instanceof Error ? error.message : "Unknown error"}
+          title={t("host.metrics.grafanaUnavailableTitle")}
+          description={error instanceof Error ? error.message : t("host.metrics.unknownError")}
           compact
         />
       </div>
@@ -53,8 +55,8 @@ export default function HostMetricsTab({ slug }: Props) {
         <HostLiveKpis slug={slug} />
         <EmptyState
           icon="box"
-          title="No dashboard configured"
-          description="Set this host's Grafana dashboard UID in the edit drawer, or configure a default in Settings → Integrations → Grafana."
+          title={t("host.metrics.noDashboardTitle")}
+          description={t("host.metrics.noDashboardDesc")}
           compact
         />
       </div>
@@ -66,7 +68,7 @@ export default function HostMetricsTab({ slug }: Props) {
       <HostLiveKpis slug={slug} />
       <Card hover={false} className="!p-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs text-[var(--text-muted)]">Dashboard</p>
+          <p className="text-xs text-[var(--text-muted)]">{t("host.metrics.dashboardLabel")}</p>
           <p className="text-sm font-mono truncate text-[var(--text-primary)]">{data.dashboard_uid}</p>
         </div>
         <a
@@ -75,7 +77,7 @@ export default function HostMetricsTab({ slug }: Props) {
           rel="noopener noreferrer"
           className="text-xs text-[var(--accent)] hover:underline shrink-0 inline-flex items-center gap-1"
         >
-          Open in Grafana
+          {t("host.metrics.openInGrafana")}
           <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
         </a>
       </Card>
@@ -83,9 +85,9 @@ export default function HostMetricsTab({ slug }: Props) {
       {iframeError && (
         <Card accent="amber" hover={false}>
           <p className="text-sm text-[var(--warning)]">
-            The dashboard took too long to load or blocked the embed. Verify Grafana's
+            {t("host.metrics.embedBlockedBefore")}
             <code className="mx-1 text-[var(--text-secondary)]">allow_embedding</code>
-            setting and that the base URL is reachable from the browser.
+            {t("host.metrics.embedBlockedAfter")}
           </p>
         </Card>
       )}
@@ -93,7 +95,7 @@ export default function HostMetricsTab({ slug }: Props) {
       <div className="relative w-full" style={{ aspectRatio: "16 / 10", minHeight: "600px" }}>
         {!iframeLoaded && !iframeError && (
           <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-elevated)] rounded-[var(--radius-md)]">
-            <p className="text-xs text-[var(--text-muted)] animate-pulse">Loading dashboard…</p>
+            <p className="text-xs text-[var(--text-muted)] animate-pulse">{t("host.metrics.loadingDashboard")}</p>
           </div>
         )}
         <iframe
@@ -103,7 +105,7 @@ export default function HostMetricsTab({ slug }: Props) {
           sandbox="allow-scripts allow-same-origin allow-popups"
           onLoad={() => setIframeLoaded(true)}
           onError={() => setIframeError(true)}
-          title={`Grafana dashboard for ${slug}`}
+          title={t("host.metrics.dashboardIframeTitle", { slug })}
         />
       </div>
     </div>

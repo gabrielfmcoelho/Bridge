@@ -112,7 +112,7 @@ export default function PipelinePageInner() {
           {isLoading ? (
             <Skeleton className="w-full h-full rounded-[var(--radius-lg)]" />
           ) : error ? (
-            <EmptyState icon="server" title="Error" description={error instanceof Error ? error.message : String(error)} />
+            <EmptyState icon="server" title={t("common.error")} description={error instanceof Error ? error.message : String(error)} />
           ) : !indexes ? (
             <EmptyState icon="server" title={t("common.noResults")} description={t("atlas.lineage.notGenerated")} />
           ) : view === "lanes" ? (

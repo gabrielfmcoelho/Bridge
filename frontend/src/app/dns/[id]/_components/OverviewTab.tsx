@@ -21,20 +21,20 @@ interface OverviewTabProps {
 export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, t }: OverviewTabProps) {
   return (
     <div className="space-y-5 animate-fade-in">
-      <SectionHeading>DNS Info</SectionHeading>
+      <SectionHeading>{t("dns.info")}</SectionHeading>
       <Card hover={false}>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-          <Field label="Domain" value={dns.domain} mono />
+          <Field label={t("dns.domain")} value={dns.domain} mono />
           <div>
             <span className="text-[var(--text-muted)] text-xs font-medium block mb-0.5">{t("host.situacao")}</span>
             <Badge variant="situacao" situacao={dns.situacao} dot>{dns.situacao}</Badge>
           </div>
           <div>
-            <span className="text-[var(--text-muted)] text-xs font-medium block mb-0.5">HTTPS</span>
+            <span className="text-[var(--text-muted)] text-xs font-medium block mb-0.5">{t("topology.https")}</span>
             {dns.has_https ? (
               <Badge color="emerald">
                 <Icon path={ICON_PATHS.lock} className="w-3 h-3 mr-1" />
-                HTTPS enabled
+                {t("dns.httpsEnabled")}
               </Badge>
             ) : (
               <span className="text-[var(--text-faint)] text-sm">-</span>
@@ -64,7 +64,7 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, t }:
       {/* Linked Hosts */}
       {linkedHosts.length > 0 && (
         <>
-          <SectionHeading>Linked Hosts</SectionHeading>
+          <SectionHeading>{t("dns.linkedHosts")}</SectionHeading>
           <Card hover={false}>
             <div className="flex flex-wrap gap-2">
               {linkedHosts.map((h) => (
@@ -84,8 +84,8 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, t }:
 
       {/* Timestamps */}
       <div className="flex flex-wrap gap-4 text-xs text-[var(--text-faint)]">
-        {dns.created_at && <span>Created: {new Date(dns.created_at).toLocaleString()}</span>}
-        {dns.updated_at && <span>Updated: {new Date(dns.updated_at).toLocaleString()}</span>}
+        {dns.created_at && <span>{t("dns.createdAt")} {new Date(dns.created_at).toLocaleString()}</span>}
+        {dns.updated_at && <span>{t("dns.updatedAt")} {new Date(dns.updated_at).toLocaleString()}</span>}
       </div>
     </div>
   );

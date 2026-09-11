@@ -30,11 +30,11 @@ const priorityDot: Record<string, "danger" | "warning" | "cyan" | "muted"> = {
 };
 
 const statusLabels: Record<string, string> = {
-  backlog: "Backlog",
-  todo: "To Do",
-  in_progress: "In Progress",
-  review: "Review",
-  done: "Done",
+  backlog: "issue.backlog",
+  todo: "issue.todo",
+  in_progress: "issue.inProgress",
+  review: "issue.review",
+  done: "issue.done",
 };
 
 interface IssuesTabProps {
@@ -117,7 +117,7 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
                       )}
                       <div className="flex items-center gap-2 mt-1.5">
                         <Badge color={priorityColors[issue.priority]}>{issue.priority}</Badge>
-                        <Badge>{statusLabels[issue.status] || issue.status}</Badge>
+                        <Badge>{statusLabels[issue.status] ? t(statusLabels[issue.status]) : issue.status}</Badge>
                       </div>
                     </div>
                   </div>
@@ -137,7 +137,7 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[var(--text-primary)] truncate line-through">{issue.title}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge color="emerald">Done</Badge>
+                        <Badge color="emerald">{t("issue.done")}</Badge>
                       </div>
                     </div>
                   </div>
@@ -166,17 +166,17 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
       >
         <div className="space-y-4">
           <FormError message={error} />
-          <Input label={t("issue.issueTitle") || "Title"} value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Issue title..." />
-          <Input label={t("common.description")} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description..." />
+          <Input label={t("issue.issueTitle") || "Title"} value={title} onChange={(e) => setTitle(e.target.value)} required placeholder={t("issue.titlePlaceholder")} />
+          <Input label={t("common.description")} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("issue.descriptionPlaceholderShort")} />
           <Select
             label={t("issue.priority") || "Priority"}
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
             options={[
-              { value: "low", label: "Low" },
-              { value: "medium", label: "Medium" },
-              { value: "high", label: "High" },
-              { value: "critical", label: "Critical" },
+              { value: "low", label: t("issue.low") },
+              { value: "medium", label: t("issue.medium") },
+              { value: "high", label: t("issue.high") },
+              { value: "critical", label: t("issue.critical") },
             ]}
           />
         </div>

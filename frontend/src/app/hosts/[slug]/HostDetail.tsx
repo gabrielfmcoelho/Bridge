@@ -176,17 +176,17 @@ export default function HostDetail({ slug }: { slug: string }) {
                 </span>
               )}
               {/* Alerts */}
-              <span className={`inline-flex items-center gap-1 text-xs ${alertCount > 0 ? "text-[var(--warning)]" : "text-[var(--text-faint)]"}`} title={`${alertCount} alerts`}>
+              <span className={`inline-flex items-center gap-1 text-xs ${alertCount > 0 ? "text-[var(--warning)]" : "text-[var(--text-faint)]"}`} title={t("host.alertsTitle", { count: String(alertCount) })}>
                 <Icon path={ICON_PATHS.alert} />
                 {alertCount > 0 && <span className="font-mono">{alertCount}</span>}
               </span>
               {/* Issues */}
-              <span className={`inline-flex items-center gap-1 text-xs ${openIssuesCount > 0 ? "text-[var(--purple)]" : "text-[var(--text-faint)]"}`} title={`${openIssuesCount} open issues`}>
+              <span className={`inline-flex items-center gap-1 text-xs ${openIssuesCount > 0 ? "text-[var(--purple)]" : "text-[var(--text-faint)]"}`} title={t("host.openIssuesTitle", { count: String(openIssuesCount) })}>
                 <Icon path={ICON_PATHS.clipboard} />
                 {openIssuesCount > 0 && <span className="font-mono">{openIssuesCount}</span>}
               </span>
               {/* Chamados */}
-              <span className={`inline-flex items-center gap-1 text-xs ${(data.host.chamados_count || 0) > 0 ? "text-[var(--warning)]" : "text-[var(--text-faint)]"}`} title={`${data.host.chamados_count || 0} chamados`}>
+              <span className={`inline-flex items-center gap-1 text-xs ${(data.host.chamados_count || 0) > 0 ? "text-[var(--warning)]" : "text-[var(--text-faint)]"}`} title={t("host.chamadosTitle", { count: String(data.host.chamados_count || 0) })}>
                 <Icon path={ICON_PATHS.document} />
                 {(data.host.chamados_count || 0) > 0 && <span className="font-mono">{data.host.chamados_count}</span>}
               </span>

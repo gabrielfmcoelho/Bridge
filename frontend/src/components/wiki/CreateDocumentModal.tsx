@@ -4,6 +4,7 @@ import { useState } from "react";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import FormFooter from "@/components/ui/FormFooter";
 import Input from "@/components/ui/Input";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   open: boolean;
@@ -14,22 +15,23 @@ interface Props {
 }
 
 export default function CreateDocumentModal({ open, onClose, onSubmit, submitting, defaultTitle = "" }: Props) {
+  const { t } = useLocale();
   const [title, setTitle] = useState(defaultTitle);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
-    const t = title.trim();
-    if (!t) {
-      setError("Title is required");
+    const trimmed = title.trim();
+    if (!trimmed) {
+      setError(t("wiki.titleRequired"));
       return;
     }
     setError(null);
     try {
-      await onSubmit(t);
+      await onSubmit(trimmed);
       setTitle("");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create");
+      setError(err instanceof Error ? err.message : t("wiki.failedToCreate"));
     }
   };
 
@@ -37,17 +39,17 @@ export default function CreateDocumentModal({ open, onClose, onSubmit, submittin
     <ResponsiveModal
       open={open}
       onClose={onClose}
-      title="New page"
+      title={t("wiki.newPageTitle")}
       footer={
-        <FormFooter onCancel={onClose} cancelLabel="Cancel" submitLabel="Create" onSubmit={handleSubmit} loading={submitting} disabled={!title.trim()} />
+        <FormFooter onCancel={onClose} cancelLabel={t("common.cancel")} submitLabel={t("common.create")} onSubmit={handleSubmit} loading={submitting} disabled={!title.trim()} />
       }
     >
       <div className="space-y-4">
         <Input
-          label="Title"
+          label={t("common.title")}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Runbook: Database failover"
+          placeholder={t("wiki.titlePlaceholderExample")}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
@@ -57,7 +59,7 @@ export default function CreateDocumentModal({ open, onClose, onSubmit, submittin
           autoFocus
         />
         <p className="text-xs text-[var(--text-muted)]">
-          The page will be created in Outline and opened in a new tab so you can fill in the content there.
+          {t("wiki.createPageHint")}
         </p>
         {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
       </div>

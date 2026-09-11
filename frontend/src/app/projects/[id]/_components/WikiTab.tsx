@@ -13,6 +13,7 @@ import CreateDocumentModal from "@/components/wiki/CreateDocumentModal";
 import WikiSearchBar from "@/components/wiki/WikiSearchBar";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   projectId: number;
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export default function WikiTab({ projectId, canEdit }: Props) {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -62,8 +64,8 @@ export default function WikiTab({ projectId, canEdit }: Props) {
     return (
       <EmptyState
         icon="folder"
-        title="Outline integration is disabled"
-        description="Ask an admin to enable it in Settings → Integrations → Outline."
+        title={t("project.outlineDisabledTitle")}
+        description={t("project.outlineDisabledDesc")}
         compact
       />
     );
@@ -72,8 +74,8 @@ export default function WikiTab({ projectId, canEdit }: Props) {
     return (
       <EmptyState
         icon="key"
-        title="Outline is not configured"
-        description="Ask an admin to set the Base URL and API token in Settings → Integrations → Outline."
+        title={t("project.outlineNotConfiguredTitle")}
+        description={t("project.outlineNotConfiguredDesc")}
         compact
       />
     );
@@ -82,8 +84,8 @@ export default function WikiTab({ projectId, canEdit }: Props) {
     return (
       <EmptyState
         icon="folder"
-        title="No wiki collection linked to this project"
-        description="Open the project edit drawer (Vínculos) and paste the Outline collection id, or create a collection in Outline first."
+        title={t("project.noWikiCollectionTitle")}
+        description={t("project.noWikiCollectionDesc")}
         compact
       />
     );
@@ -108,9 +110,9 @@ export default function WikiTab({ projectId, canEdit }: Props) {
       <Card hover={false} className="!p-3">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="min-w-0">
-            <p className="text-xs text-[var(--text-muted)]">Collection</p>
+            <p className="text-xs text-[var(--text-muted)]">{t("project.collectionLabel")}</p>
             <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
-              {data.collection?.name ?? "(loading)"}
+              {data.collection?.name ?? t("project.loadingPlaceholder")}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -121,13 +123,13 @@ export default function WikiTab({ projectId, canEdit }: Props) {
                 rel="noopener noreferrer"
                 className="text-xs text-[var(--accent)] hover:underline inline-flex items-center gap-1"
               >
-                Open in Outline
+                {t("project.openInOutline")}
                 <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
               </Link>
             )}
             {canEdit && (
               <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-                New page
+                {t("project.newPage")}
               </Button>
             )}
           </div>
@@ -143,17 +145,17 @@ export default function WikiTab({ projectId, canEdit }: Props) {
 
       {isSearching ? (
         searchFetching && searchHits.length === 0 ? (
-          <p className="text-xs text-[var(--text-muted)] text-center py-4 animate-pulse">Searching…</p>
+          <p className="text-xs text-[var(--text-muted)] text-center py-4 animate-pulse">{t("project.searchingEllipsis")}</p>
         ) : (
           <WikiDocumentList
             documents={searchDocs}
-            emptyLabel={`No results for “${searchQuery}”.`}
+            emptyLabel={t("project.noSearchResults", { query: searchQuery })}
           />
         )
       ) : (
         <WikiDocumentList
           documents={data.documents}
-          emptyLabel={canEdit ? "No pages yet. Click New page to create the first one." : "No pages yet."}
+          emptyLabel={canEdit ? t("project.noPagesEditableHint") : t("project.noPagesHint")}
         />
       )}
 

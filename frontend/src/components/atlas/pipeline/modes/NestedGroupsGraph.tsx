@@ -12,6 +12,7 @@ import {
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useLocale } from "@/contexts/LocaleContext";
 import type { AtlasIndexes, AtlasFilters } from "@/lib/atlas/types";
 import { groupNodesForNested } from "@/lib/atlas/groupNodesForNested";
 import EntityNode from "../nodes/EntityNode";
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export default function NestedGroupsGraph({ indexes, filters, selectedId, onSelect }: Props) {
+  const { t } = useLocale();
   const [collapsedDags, setCollapsedDags] = useState<Set<string>>(new Set());
 
   const layout = useMemo(
@@ -96,7 +98,7 @@ export default function NestedGroupsGraph({ indexes, filters, selectedId, onSele
       </ReactFlow>
       {/* Hint */}
       <div className="absolute bottom-3 left-3 text-2xs uppercase tracking-wider text-[var(--text-faint)] bg-[var(--bg-surface)]/80 border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-2 py-1 backdrop-blur">
-        Double-click a DAG frame to collapse / expand
+        {t("atlas.pipeline.group.collapseHint")}
       </div>
     </div>
   );

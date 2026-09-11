@@ -65,7 +65,7 @@ export default function IssueForm({ projectId, services, issue, onSuccess, onDel
         value={form.description}
         onChange={(v) => set("description", v)}
         rows={5}
-        placeholder="Supports **markdown** formatting..."
+        placeholder={t("issue.markdownHint")}
       />
       <div className="grid grid-cols-2 gap-4">
         <Select
@@ -99,7 +99,7 @@ export default function IssueForm({ projectId, services, issue, onSuccess, onDel
         {onDelete ? (
           <button
             type="button"
-            onClick={() => { if (confirm("Delete this issue?")) onDelete(); }}
+            onClick={() => { if (confirm(t("issue.deleteConfirm"))) onDelete(); }}
             className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
           >
             {t("common.delete")}

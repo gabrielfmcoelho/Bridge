@@ -30,6 +30,7 @@ export default function BatchOperationShell({
   cancelLabel,
   progressLabel,
   runningLabel,
+  failedLabel = "failed",
   emptyHint,
   onStart,
   onStop,
@@ -55,6 +56,7 @@ export default function BatchOperationShell({
   cancelLabel: string;
   progressLabel: string;
   runningLabel: string;
+  failedLabel?: string;
   emptyHint?: string;
   onStart: () => void;
   onStop: () => void;
@@ -119,7 +121,7 @@ export default function BatchOperationShell({
           {(successCount > 0 || failedCount > 0) && (
             <div className="flex gap-3 mt-1.5 text-xs">
               <span className="text-[var(--success)]">{successCount} OK</span>
-              {failedCount > 0 && <span className="text-[var(--danger)]">{failedCount} failed</span>}
+              {failedCount > 0 && <span className="text-[var(--danger)]">{failedCount} {failedLabel}</span>}
             </div>
           )}
         </div>

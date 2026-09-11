@@ -86,7 +86,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
                     <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0 text-[var(--success)]" />
                   </span>
                 )}
-                <span title={alert.linked_issue_id ? `Issue #${alert.linked_issue_id}` : t("alert.noIssueLinked")}>
+                <span title={alert.linked_issue_id ? t("issue.number", { id: String(alert.linked_issue_id) }) : t("alert.noIssueLinked")}>
                   <Icon path={ICON_PATHS.clipboard} className={`w-3.5 h-3.5 shrink-0 ${alert.linked_issue_id ? "text-[var(--purple)]" : "text-[var(--text-faint)]/30"}`} />
                 </span>
               </div>
@@ -258,19 +258,19 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
                                   </div>
                                   {/* Entity link icons */}
                                   <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[var(--border-subtle)]">
-                                    <span className={`${issue.entity_type === "host" ? "text-[var(--success)]" : "text-[var(--text-faint)]/30"}`} title="Host">
+                                    <span className={`${issue.entity_type === "host" ? "text-[var(--success)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityHost")}>
                                       <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5" />
                                     </span>
                                     <span className={`${issue.entity_type === "dns" ? "text-[var(--cyan)]" : "text-[var(--text-faint)]/30"}`} title="DNS">
                                       <Icon path={ICON_PATHS.globeMeridian} className="w-3.5 h-3.5" />
                                     </span>
-                                    <span className={`${issue.entity_type === "service" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title="Service">
+                                    <span className={`${issue.entity_type === "service" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityService")}>
                                       <Icon path={ICON_PATHS.cube} className="w-3.5 h-3.5" />
                                     </span>
-                                    <span className={`${issue.entity_type === "project" ? "text-[var(--purple)]" : "text-[var(--text-faint)]/30"}`} title="Project">
+                                    <span className={`${issue.entity_type === "project" ? "text-[var(--purple)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityProject")}>
                                       <Icon path={ICON_PATHS.folder} className="w-3.5 h-3.5" />
                                     </span>
-                                    <span className={`${(issue.alert_ids?.length || 0) > 0 || issue.source === "alert" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title="Alert">
+                                    <span className={`${(issue.alert_ids?.length || 0) > 0 || issue.source === "alert" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityAlert")}>
                                       <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5" />
                                     </span>
                                   </div>

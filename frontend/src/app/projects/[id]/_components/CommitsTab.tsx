@@ -17,6 +17,7 @@ interface Props {
 }
 
 export default function CommitsTab({ projectId }: Props) {
+  const { t } = useLocale();
   const { data: integrations } = useQuery({
     queryKey: ["integrations"],
     queryFn: integrationsAPI.get,
@@ -41,8 +42,8 @@ export default function CommitsTab({ projectId }: Props) {
     return (
       <EmptyState
         icon="box"
-        title="GitLab Code Management is disabled"
-        description="Ask an admin to enable it in Settings → Integrations → GitLab."
+        title={t("project.gitlabDisabledTitle")}
+        description={t("project.gitlabDisabledDesc")}
         compact
       />
     );
@@ -52,8 +53,8 @@ export default function CommitsTab({ projectId }: Props) {
     return (
       <EmptyState
         icon="box"
-        title="GitLab Code Management is disabled"
-        description="Ask an admin to enable it in Settings → Integrations → GitLab."
+        title={t("project.gitlabDisabledTitle")}
+        description={t("project.gitlabDisabledDesc")}
         compact
       />
     );
@@ -63,8 +64,8 @@ export default function CommitsTab({ projectId }: Props) {
     return (
       <EmptyState
         icon="key"
-        title="Service token not configured"
-        description="Ask an admin to add a GitLab service access token in Settings → Integrations → GitLab."
+        title={t("project.gitlabTokenMissingTitle")}
+        description={t("project.gitlabTokenMissingDesc")}
         compact
       />
     );
@@ -75,7 +76,7 @@ export default function CommitsTab({ projectId }: Props) {
       {authError && (
         <Card accent="red" hover={false}>
           <p className="text-sm text-[var(--danger)]">
-            GitLab rejected the service access token. Ask an admin to refresh it in Settings.
+            {t("project.gitlabTokenRejected")}
           </p>
         </Card>
       )}
@@ -92,11 +93,11 @@ export default function CommitsTab({ projectId }: Props) {
       ) : allCommits.length === 0 ? (
         <EmptyState
           icon="search"
-          title="No commits yet"
+          title={t("project.noCommitsTitle")}
           description={
             response && response.commits.length === 0 && !response.warnings?.length
-              ? "Linked sources are up to date — or have no commits."
-              : "Edit this project to link a GitLab repository or subgroup."
+              ? t("project.noCommitsUpToDate")
+              : t("project.noCommitsEditHint")
           }
           compact
         />
@@ -114,7 +115,7 @@ export default function CommitsTab({ projectId }: Props) {
       {warnings.length > 0 && (
         <details className="text-xs text-[var(--text-muted)]">
           <summary className="cursor-pointer hover:text-[var(--text-secondary)]">
-            {warnings.length} warning{warnings.length === 1 ? "" : "s"}
+            {t(warnings.length === 1 ? "project.warningCountSingular" : "project.warningCountPlural", { count: String(warnings.length) })}
           </summary>
           <ul className="mt-2 space-y-1 pl-4 list-disc">
             {warnings.map((w, i) => (

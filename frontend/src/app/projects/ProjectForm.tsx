@@ -101,7 +101,7 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
       return initial ? projectsAPI.update(initial.id, payload) : projectsAPI.create(payload);
     },
     onSuccess: () => onSuccess(),
-    onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
+    onError: (err) => setError(err instanceof Error ? err.message : t("filters.failed")),
   });
 
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
@@ -110,7 +110,7 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
     step,
     setStep,
     totalSteps: 2,
-    stepLabels: [t("common.basicInfo"), t("project.responsaveis") + " & " + t("common.tags")],
+    stepLabels: [t("common.basicInfo"), t("project.stepResponsaveisTags")],
     onSubmit: () => mutation.mutate(),
     canProceed: step === 1 ? !!form.name.trim() : true,
     isPending: mutation.isPending,
@@ -126,15 +126,15 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
 
       {step === 1 && (
         <div className="space-y-4 animate-fade-in">
-          <Input label={t("project.name")} value={form.name} onChange={(e) => set("name", e.target.value)} required placeholder="Project name" />
-          <Input label={t("common.description")} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Brief description" />
+          <Input label={t("project.name")} value={form.name} onChange={(e) => set("name", e.target.value)} required placeholder={t("project.namePlaceholder")} />
+          <Input label={t("common.description")} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder={t("project.descriptionPlaceholder")} />
           <Select
             label={t("host.situacao")}
             value={form.situacao}
             onChange={(e) => set("situacao", e.target.value)}
             options={situacoes.map((e) => ({ value: e.value, label: e.value }))}
           />
-          <Input label={t("project.setorResponsavel")} value={form.setor_responsavel} onChange={(e) => set("setor_responsavel", e.target.value)} placeholder="e.g. TI" />
+          <Input label={t("project.setorResponsavel")} value={form.setor_responsavel} onChange={(e) => set("setor_responsavel", e.target.value)} placeholder={t("project.setorResponsavelPlaceholder")} />
           <div className="flex flex-wrap gap-4">
             <Checkbox label={t("project.isDirectlyManaged")} checked={form.is_directly_managed} onChange={(v) => set("is_directly_managed", v)} />
             <Checkbox label={t("project.isResponsible")} checked={form.is_responsible} onChange={(v) => set("is_responsible", v)} />
@@ -142,7 +142,7 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
           </div>
           {form.tem_empresa_externa_responsavel && (
             <div className="p-3 rounded-[var(--radius-md)] border border-[var(--warning)]/20 bg-[var(--warning)]/5">
-              <Input label={t("project.temEmpresaExterna") + " - Contato"} value={form.contato_empresa_responsavel} onChange={(e) => set("contato_empresa_responsavel", e.target.value)} placeholder="Contact info" />
+              <Input label={t("project.externalCompanyContactLabel")} value={form.contato_empresa_responsavel} onChange={(e) => set("contato_empresa_responsavel", e.target.value)} placeholder={t("project.contactInfoPlaceholder")} />
             </div>
           )}
           <Input label={t("project.documentationUrl")} value={form.documentation_url} onChange={(e) => set("documentation_url", e.target.value)} type="url" placeholder="https://docs..." />
@@ -171,38 +171,38 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
 
           <section className="pt-2">
             <h3 className="text-xs font-semibold text-[var(--text-secondary)] tracking-wide uppercase mb-2">
-              Vínculos
+              {t("common.links")}
             </h3>
             {initial?.id ? (
               <GitLabLinksEditor projectId={initial.id} canEdit={true} gitlabBaseURL={gitlabBaseURL} />
             ) : (
               <p className="text-xs text-[var(--text-muted)] italic">
-                GitLab sources can be linked after the project is created.
+                {t("project.gitlabLinkHint")}
               </p>
             )}
             {outlineEnabled && (
               <div className="mt-3 space-y-1">
                 <Input
-                  label="Outline collection ID"
+                  label={t("project.outlineCollectionIdLabel")}
                   value={form.outline_collection_id}
                   onChange={(e) => set("outline_collection_id", e.target.value)}
-                  placeholder="e.g. d3b71c7e-8f7e-4f9d-b5a2-xxxxxxxxxxxx"
+                  placeholder={t("project.outlineCollectionIdPlaceholder")}
                 />
                 <p className="text-xs text-[var(--text-muted)]">
-                  Paste the UUID of the Outline collection that holds this project&apos;s documentation. The Wiki tab will list recent docs from it.
+                  {t("project.outlineCollectionIdHint")}
                 </p>
               </div>
             )}
             {glpiEnabled && (
               <div className="mt-3 space-y-2">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">GLPI token profile</label>
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">{t("project.glpiTokenProfileLabel")}</label>
                   <select
                     value={form.glpi_token_id == null ? "" : String(form.glpi_token_id)}
                     onChange={(e) => set("glpi_token_id", e.target.value ? parseInt(e.target.value, 10) : null)}
                     className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]"
                   >
-                    <option value="">(none)</option>
+                    <option value="">{t("entidades.none")}</option>
                     {(glpiProfiles ?? []).map((p) => (
                       <option key={p.id} value={p.id}>{p.name}{p.description ? ` — ${p.description}` : ""}</option>
                     ))}
@@ -210,20 +210,20 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Input
-                    label="Entity ID (0 = profile default)"
+                    label={t("project.glpiEntityIdLabel")}
                     type="number"
                     value={String(form.glpi_entity_id ?? 0)}
                     onChange={(e) => set("glpi_entity_id", parseInt(e.target.value || "0", 10))}
                   />
                   <Input
-                    label="Category ID (optional filter)"
+                    label={t("project.glpiCategoryIdLabel")}
                     type="number"
                     value={String(form.glpi_category_id ?? 0)}
                     onChange={(e) => set("glpi_category_id", parseInt(e.target.value || "0", 10))}
                   />
                 </div>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Picks which GLPI account sshcm uses for this project&apos;s Chamados tab. Entity/category scope the listing.
+                  {t("project.glpiScopeHint")}
                 </p>
               </div>
             )}

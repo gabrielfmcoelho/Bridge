@@ -3,6 +3,7 @@
 import type { OutlineDocumentNode } from "@/lib/api";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   nodes: OutlineDocumentNode[];
@@ -13,8 +14,9 @@ interface Props {
 }
 
 export default function WikiTree({ nodes, selectedId, expandedIds, onSelect, onToggle }: Props) {
+  const { t } = useLocale();
   if (nodes.length === 0) {
-    return <p className="text-xs text-[var(--text-faint)] px-2 py-1">No documents</p>;
+    return <p className="text-xs text-[var(--text-faint)] px-2 py-1">{t("wiki.noDocuments")}</p>;
   }
   return (
     <ul className="space-y-0.5" role="tree">

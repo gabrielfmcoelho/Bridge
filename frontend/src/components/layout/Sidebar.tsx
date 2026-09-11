@@ -81,7 +81,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
                   return (
                     <span
                       key={item.label}
-                      title={collapsed ? t(item.label) : "Coming soon"}
+                      title={collapsed ? t(item.label) : t("common.comingSoon")}
                       className={`group flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium opacity-40 cursor-not-allowed ${
                         collapsed ? "justify-center" : ""
                       } text-[var(--text-muted)]`}
@@ -157,7 +157,7 @@ function MobileDrawer({
         title={t("nav.modules")}
         footer={
           <Button size="sm" className="w-full" onClick={onClose}>
-            Fechar
+            {t("common.close")}
           </Button>
         }
       >

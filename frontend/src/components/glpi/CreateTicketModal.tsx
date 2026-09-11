@@ -7,6 +7,7 @@ import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import FormFooter from "@/components/ui/FormFooter";
 import Input from "@/components/ui/Input";
 import MarkdownEditor from "@/components/ui/MarkdownEditor";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   open: boolean;
@@ -35,6 +36,7 @@ export default function CreateTicketModal({
   alertID,
   onCreated,
 }: Props) {
+  const { t } = useLocale();
   const [profileID, setProfileID] = useState<number | null>(defaultProfileID ?? null);
   const [title, setTitle] = useState(defaultTitle ?? "");
   const [description, setDescription] = useState(defaultDescription ?? "");
@@ -87,12 +89,12 @@ export default function CreateTicketModal({
     <ResponsiveModal
       open={open}
       onClose={onClose}
-      title="Abrir chamado no GLPI"
+      title={t("glpi.createTicketTitle")}
       footer={
         <FormFooter
           onCancel={onClose}
-          cancelLabel="Cancelar"
-          submitLabel="Abrir chamado"
+          cancelLabel={t("common.cancel")}
+          submitLabel={t("glpi.createTicketSubmit")}
           onSubmit={() => mutation.mutate()}
           loading={mutation.isPending}
           disabled={!hasProfiles || !profileID || !title.trim()}
@@ -102,40 +104,40 @@ export default function CreateTicketModal({
       <div className="space-y-4">
         {!hasProfiles && (
           <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)] text-xs px-3 py-2">
-            No GLPI profiles configured. Ask an admin to add one in Settings → Integrations → GLPI.
+            {t("glpi.noProfilesConfigured")}
           </div>
         )}
         <div>
-          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Profile</label>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">{t("glpi.profileLabel")}</label>
           <select
             value={profileID ?? ""}
             onChange={(e) => setProfileID(e.target.value ? parseInt(e.target.value, 10) : null)}
             disabled={!hasProfiles}
             className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
           >
-            <option value="">Select a profile…</option>
+            <option value="">{t("glpi.selectProfilePlaceholder")}</option>
             {(profiles ?? []).map((p) => (
               <option key={p.id} value={p.id}>{p.name}{p.description ? ` — ${p.description}` : ""}</option>
             ))}
           </select>
         </div>
         <Input
-          label="Título"
+          label={t("common.title")}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Short summary"
+          placeholder={t("glpi.shortSummaryPlaceholder")}
         />
         <div>
-          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Descrição</label>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">{t("common.description")}</label>
           <MarkdownEditor
             value={description}
             onChange={setDescription}
             rows={6}
-            placeholder="Descreva o problema ou a solicitação (markdown)..."
+            placeholder={t("glpi.describeIssuePlaceholder")}
           />
         </div>
         <Input
-          label="Entity ID (0 = use profile default)"
+          label={t("glpi.entityIdLabel")}
           type="number"
           value={String(entityID)}
           onChange={(e) => setEntityID(parseInt(e.target.value || "0", 10))}
@@ -148,7 +150,7 @@ export default function CreateTicketModal({
               onChange={(e) => setLinkComputer(e.target.checked)}
               className="w-4 h-4 accent-[var(--accent)]"
             />
-            Try to link to the matching GLPI Computer asset ({hostSlug})
+            {t("glpi.linkComputerCheckbox", { host: hostSlug })}
           </label>
         )}
         {error && (

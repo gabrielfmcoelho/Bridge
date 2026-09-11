@@ -62,13 +62,13 @@ export default function ServiceCard({ svc }: { svc: Service }) {
 
         {/* Bottom indicators */}
         <div className="flex items-center gap-3 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4">
-          <CardIndicator icon={ICON_PATHS.alert} count={svc.is_external_dependency ? 1 : 0} color="red" title={svc.is_external_dependency ? t("service.isExternalDependency") : "Not external dependency"} />
-          <CardIndicator icon={ICON_PATHS.gear} count={svc.orchestrator_managed ? 1 : 0} color="purple" title={svc.orchestrator_managed ? "Orchestrator managed" : "Not orchestrated"} />
-          <CardIndicator icon={ICON_PATHS.server} count={linkedHostsCount} color="cyan" title={`${linkedHostsCount} host(s)`} />
-          <CardIndicator icon={ICON_PATHS.globe} count={linkedDnsCount} color="emerald" title={`${linkedDnsCount} DNS`} />
+          <CardIndicator icon={ICON_PATHS.alert} count={svc.is_external_dependency ? 1 : 0} color="red" title={svc.is_external_dependency ? t("service.isExternalDependency") : t("service.notExternalDependency")} />
+          <CardIndicator icon={ICON_PATHS.gear} count={svc.orchestrator_managed ? 1 : 0} color="purple" title={svc.orchestrator_managed ? t("service.orchestratorManaged") : t("service.notOrchestrated")} />
+          <CardIndicator icon={ICON_PATHS.server} count={linkedHostsCount} color="cyan" title={t("service.hostsCount", { count: String(linkedHostsCount) })} />
+          <CardIndicator icon={ICON_PATHS.globe} count={linkedDnsCount} color="emerald" title={t("service.dnsCount", { count: String(linkedDnsCount) })} />
           <CardIndicatorSeparator />
           <CardIndicator icon={ICON_PATHS.link} count={depsCount} color="amber" title={`${depsCount} dependencies`} />
-          <CardIndicator icon={ICON_PATHS.terminal} count={svc.port ? 1 : 0} color="sky" title={svc.port ? `Port ${svc.port}` : "No port"} />
+          <CardIndicator icon={ICON_PATHS.terminal} count={svc.port ? 1 : 0} color="sky" title={svc.port ? t("service.portWithValue", { port: String(svc.port) }) : t("service.noPort")} />
         </div>
       </Card>
     </Link>

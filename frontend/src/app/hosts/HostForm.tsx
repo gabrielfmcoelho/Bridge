@@ -176,7 +176,7 @@ export default function HostForm({
       return hostsAPI.create(payload);
     },
     onSuccess: () => onSuccess(),
-    onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
+    onError: (err) => setError(err instanceof Error ? err.message : t("filters.failed")),
   });
 
   /* ── SSH key selection is driven entirely by the picker; the backend
@@ -284,14 +284,14 @@ export default function HostForm({
         type="password"
         value={form.password}
         onChange={(e) => set("password", e.target.value)}
-        placeholder={isEdit ? "Leave empty to keep current" : undefined}
+        placeholder={isEdit ? t("host.passwordKeepCurrentPlaceholder") : undefined}
       />
       <Select
         label={t("host.defaultAuth")}
         value={form.preferred_auth as string}
         onChange={(e) => set("preferred_auth", e.target.value)}
         options={[
-          { value: "", label: "Auto" },
+          { value: "", label: t("host.scanAuthMethodAuto") },
           { value: "password", label: t("auth.password") },
           { value: "key", label: t("host.sshKey") },
         ]}
@@ -330,13 +330,13 @@ export default function HostForm({
       </DrawerSection>
       <DrawerSection title="Grafana" open={openStepSection === "grafana"} onToggle={() => toggleStepSection("grafana")} active={!!form.grafana_dashboard_uid}>
         <Input
-          label="Grafana dashboard UID"
+          label={t("host.grafanaDashboardUidLabel")}
           value={form.grafana_dashboard_uid as string}
           onChange={(e) => set("grafana_dashboard_uid", e.target.value)}
-          placeholder="leave blank to use the default from Settings"
+          placeholder={t("host.grafanaDashboardUidPlaceholder")}
         />
         <p className="text-xs text-[var(--text-muted)] mt-1">
-          Shown in the Metrics tab. The host&apos;s <code className="text-[var(--text-secondary)]">oficial_slug</code> is passed as dashboard variable <code className="text-[var(--text-secondary)]">var-host</code>.
+          {t("host.grafanaDashboardHint")}
         </p>
         {isEdit && host?.oficial_slug && (
           <HostDashboardProvisionButton
@@ -458,6 +458,7 @@ function resolvePreferredAuth(hasPassword: boolean, hasKey: boolean, preferredAu
 // and populates the UID field with the returned deterministic UID on success.
 // Only rendered for existing hosts (slug must be persisted).
 function HostDashboardProvisionButton({ slug, onProvisioned }: { slug: string; onProvisioned: (uid: string) => void }) {
+  const { t } = useLocale();
   const { data: integrations } = useQuery({
     queryKey: ["integrations"],
     queryFn: integrationsAPI.get,
@@ -484,11 +485,11 @@ function HostDashboardProvisionButton({ slug, onProvisioned }: { slug: string; o
         disabled={mutation.isPending || !datasourceSet}
         className="text-xs text-[var(--accent)] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
       >
-        {mutation.isPending ? "Provisioning…" : "Provision default dashboard in Grafana"}
+        {mutation.isPending ? t("host.grafanaProvisioning") : t("host.grafanaProvisionButton")}
       </button>
       {!datasourceSet && (
         <p className="text-2xs text-[var(--warning)]">
-          Set the Prometheus datasource UID in Settings → Integrations → Grafana first.
+          {t("host.grafanaDatasourceRequired")}
         </p>
       )}
       {mutation.isSuccess && !mutation.isPending && (
@@ -496,7 +497,7 @@ function HostDashboardProvisionButton({ slug, onProvisioned }: { slug: string; o
       )}
       {mutation.isError && (
         <p className="text-2xs text-[var(--danger)]">
-          {mutation.error instanceof Error ? mutation.error.message : "Provision failed"}
+          {mutation.error instanceof Error ? mutation.error.message : t("host.grafanaProvisionFailed")}
         </p>
       )}
     </div>

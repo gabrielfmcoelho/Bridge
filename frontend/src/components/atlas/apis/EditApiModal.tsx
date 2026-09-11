@@ -93,7 +93,7 @@ export default function EditApiModal({
 
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" type="button" onClick={onClose}>
-            {t("common.cancel") || "Cancel"}
+            {t("common.cancel")}
           </Button>
           <Button type="submit" loading={save.isPending}>
             {t("atlas.apis.save")}

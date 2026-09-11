@@ -56,7 +56,7 @@ export default function TopologyPage() {
         <EmptyState
           icon="server"
           title={t("common.noResults")}
-          description="Add hosts and services to see the topology"
+          description={t("topology.emptyDescription")}
         />
       )}
     </PageShell>

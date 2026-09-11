@@ -3,6 +3,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { memo } from "react";
 import type { LineageNode } from "@/lib/lineage/types";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Data {
   node: LineageNode;
@@ -11,6 +12,7 @@ interface Data {
 }
 
 function DagFrameNodeImpl({ data, selected }: NodeProps) {
+  const { t } = useLocale();
   const { node, collapsed, childCount } = data as unknown as Data;
   const schedule = (node.data as Record<string, unknown> | undefined)?.schedule;
 
@@ -40,7 +42,7 @@ function DagFrameNodeImpl({ data, selected }: NodeProps) {
       {collapsed && (
         <div className="absolute inset-0 top-7 flex items-center justify-center text-xs text-[var(--text-muted)]">
           <span className="px-2 py-1 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
-            {childCount} nodes (collapsed)
+            {t("atlas.pipeline.group.nodesCollapsed", { count: String(childCount) })}
           </span>
         </div>
       )}

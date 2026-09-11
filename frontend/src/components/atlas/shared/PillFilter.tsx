@@ -1,6 +1,7 @@
 "use client";
 
 import PillButton from "@/components/ui/PillButton";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface PillFilterProps<T extends string> {
   label: string;
@@ -26,6 +27,7 @@ export default function PillFilter<T extends string>({
   renderLead,
   hideLabel,
 }: PillFilterProps<T>) {
+  const { t } = useLocale();
   const isAll = value.length === 0;
 
   function toggle(v: T) {
@@ -43,7 +45,7 @@ export default function PillFilter<T extends string>({
         </span>
       )}
       <PillButton shape="pill" size="sm" active={isAll} onClick={() => onChange([])}>
-        All
+        {t("common.all")}
       </PillButton>
       {options.map(opt => {
         const active = value.includes(opt.value);

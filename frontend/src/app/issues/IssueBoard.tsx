@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { globalIssuesAPI, usersAPI, hostsAPI, dnsAPI, servicesAPI, projectsAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocale } from "@/contexts/LocaleContext";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import { tableClasses } from "@/components/ui/Table";
@@ -29,11 +30,11 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 const STATUSES = ["backlog", "todo", "in_progress", "review", "done"] as const;
 
 const statusLabels: Record<string, string> = {
-  backlog: "Backlog",
-  todo: "To Do",
-  in_progress: "In Progress",
-  review: "Review",
-  done: "Done",
+  backlog: "issue.backlog",
+  todo: "issue.todo",
+  in_progress: "issue.inProgress",
+  review: "issue.review",
+  done: "issue.done",
 };
 
 const priorityColors: Record<string, string> = {
@@ -78,6 +79,7 @@ const emptyFilters: Filters = {
 
 export default function IssueBoard() {
   const { user } = useAuth();
+  const { t } = useLocale();
   const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -249,15 +251,15 @@ export default function IssueBoard() {
   return (
     <PageShell>
       {/* ── Header ── */}
-      <PageHeader title="Issues" addLabel={canEdit ? "Add Issue" : undefined} onAdd={canEdit ? () => setShowCreate(true) : undefined} />
+      <PageHeader title={t("issue.title")} addLabel={canEdit ? t("host.addIssue") : undefined} onAdd={canEdit ? () => setShowCreate(true) : undefined} />
 
       {/* ── KPI row ── */}
       {!isLoading && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <StatCard label="Total Open" value={kpis.totalOpen} color="cyan" icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          <StatCard label="Critical" value={kpis.critical} color="red" icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          <StatCard label="Assigned to Me" value={kpis.assignedToMe} color="purple" icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          <StatCard label="Unassigned" value={kpis.unassigned} color="amber" icon="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <StatCard label={t("issue.statTotalOpen")} value={kpis.totalOpen} color="cyan" icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          <StatCard label={t("issue.critical")} value={kpis.critical} color="red" icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <StatCard label={t("issue.statAssignedToMe")} value={kpis.assignedToMe} color="purple" icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          <StatCard label={t("issue.statUnassigned")} value={kpis.unassigned} color="amber" icon="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </div>
       )}
 
@@ -267,7 +269,7 @@ export default function IssueBoard() {
         <div className="relative flex-1 max-w-sm min-w-[200px]">
           <Icon path={ICON_PATHS.search} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)] pointer-events-none" />
           <input
-            placeholder="Search issues..."
+            placeholder={t("issue.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-9 pr-3 py-1.5 text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none placeholder:text-[var(--text-faint)]"
@@ -284,7 +286,7 @@ export default function IssueBoard() {
           }`}
         >
           <Icon path={ICON_PATHS.filter} />
-          <span className="hidden sm:inline">Filters</span>
+          <span className="hidden sm:inline">{t("issue.filters")}</span>
           {activeFilterCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[var(--accent)] text-[var(--bg-base)] text-2xs font-bold flex items-center justify-center">
               {activeFilterCount}
@@ -297,14 +299,14 @@ export default function IssueBoard() {
           <button
             onClick={() => setViewMode("kanban")}
             className={`px-2.5 py-1.5 transition-colors ${viewMode === "kanban" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
-            title="Kanban view"
+            title={t("issue.kanbanView")}
           >
             <Icon path={ICON_PATHS.viewKanban} />
           </button>
           <button
             onClick={() => setViewMode("list")}
             className={`px-2.5 py-1.5 transition-colors ${viewMode === "list" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
-            title="List view"
+            title={t("issue.listView")}
           >
             <Icon path={ICON_PATHS.viewTable} />
           </button>
@@ -317,7 +319,7 @@ export default function IssueBoard() {
         {canEdit && (
           <div className="hidden sm:block">
             <Button size="sm" variant="secondary" onClick={() => setShowCreate(true)}>
-              <span className="mr-1">+</span> Add Issue
+              <span className="mr-1">+</span> {t("host.addIssue")}
             </Button>
           </div>
         )}
@@ -326,7 +328,7 @@ export default function IssueBoard() {
           <button
             onClick={() => setShowCreate(true)}
             className="sm:hidden flex items-center justify-center w-8 h-8 rounded-[var(--radius-md)] bg-[var(--accent)] text-[var(--bg-base)] hover:opacity-90 transition-opacity"
-            title="Add Issue"
+            title={t("host.addIssue")}
           >
             <Icon path={ICON_PATHS.plus} strokeWidth={2.5} />
           </button>
@@ -341,14 +343,14 @@ export default function IssueBoard() {
       ) : issues.length === 0 ? (
         <EmptyState
           icon="folder"
-          title="No issues found"
+          title={t("issue.emptyTitle")}
           description={
             search || activeFilterCount
-              ? "Try adjusting your search or filters"
-              : "Create your first issue to start tracking work"
+              ? t("issue.emptyFilterHint")
+              : t("issue.emptyCreateHint")
           }
           action={canEdit && !search && !activeFilterCount ? (
-            <Button size="sm" onClick={() => setShowCreate(true)}>+ Add Issue</Button>
+            <Button size="sm" onClick={() => setShowCreate(true)}>+ {t("host.addIssue")}</Button>
           ) : undefined}
         />
       ) : viewMode === "kanban" || isMobile ? (
@@ -378,67 +380,67 @@ export default function IssueBoard() {
       <Drawer
         open={showFilters}
         onClose={() => setShowFilters(false)}
-        title="Filters"
+        title={t("issue.filters")}
         footer={
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" className="flex-1" onClick={clearFilters}>Clear</Button>
-            <Button size="sm" className="flex-1" onClick={applyFilters}>Apply</Button>
+            <Button variant="secondary" size="sm" className="flex-1" onClick={clearFilters}>{t("issue.clear")}</Button>
+            <Button size="sm" className="flex-1" onClick={applyFilters}>{t("issue.apply")}</Button>
           </div>
         }
       >
         <div className="space-y-4">
           <Select
-            label="Entity type"
+            label={t("issue.entityType")}
             value={pendingFilters.entity_type}
             onChange={(e) => setPendingFilters(f => ({ ...f, entity_type: e.target.value }))}
             options={[
-              { value: "", label: "Any" },
-              { value: "host", label: "Host" },
+              { value: "", label: t("issue.any") },
+              { value: "host", label: t("issue.entityHost") },
               { value: "dns", label: "DNS" },
-              { value: "service", label: "Service" },
-              { value: "project", label: "Project" },
+              { value: "service", label: t("issue.entityService") },
+              { value: "project", label: t("issue.entityProject") },
             ]}
           />
           <Select
-            label="Status"
+            label={t("common.status")}
             value={pendingFilters.status}
             onChange={(e) => setPendingFilters(f => ({ ...f, status: e.target.value }))}
             options={[
-              { value: "", label: "Any" },
-              { value: "backlog", label: "Backlog" },
-              { value: "todo", label: "To Do" },
-              { value: "in_progress", label: "In Progress" },
-              { value: "review", label: "Review" },
-              { value: "done", label: "Done" },
+              { value: "", label: t("issue.any") },
+              { value: "backlog", label: t("issue.backlog") },
+              { value: "todo", label: t("issue.todo") },
+              { value: "in_progress", label: t("issue.inProgress") },
+              { value: "review", label: t("issue.review") },
+              { value: "done", label: t("issue.done") },
             ]}
           />
           <Select
-            label="Priority"
+            label={t("common.priority")}
             value={pendingFilters.priority}
             onChange={(e) => setPendingFilters(f => ({ ...f, priority: e.target.value }))}
             options={[
-              { value: "", label: "Any" },
-              { value: "low", label: "Low" },
-              { value: "medium", label: "Medium" },
-              { value: "high", label: "High" },
-              { value: "critical", label: "Critical" },
+              { value: "", label: t("issue.any") },
+              { value: "low", label: t("issue.low") },
+              { value: "medium", label: t("issue.medium") },
+              { value: "high", label: t("issue.high") },
+              { value: "critical", label: t("issue.critical") },
             ]}
           />
           <Select
-            label="Source"
+            label={t("issue.source")}
             value={pendingFilters.source}
             onChange={(e) => setPendingFilters(f => ({ ...f, source: e.target.value }))}
             options={[
-              { value: "", label: "Any" },
-              { value: "manual", label: "Manual" },
-              { value: "alert", label: "Alert" },
+              { value: "", label: t("issue.any") },
+              { value: "manual", label: t("alert.manual") },
+              { value: "alert", label: t("issue.entityAlert") },
             ]}
           />
         </div>
       </Drawer>
 
       {/* ── Create modal ── */}
-      <ResponsiveModal open={showCreate} onClose={() => setShowCreate(false)} title="New Issue">
+      <ResponsiveModal open={showCreate} onClose={() => setShowCreate(false)} title={t("issue.create")}>
         <IssueForm
           users={users}
           allHosts={allHosts}
@@ -456,7 +458,7 @@ export default function IssueBoard() {
       <ResponsiveModal
         open={!!editIssue}
         onClose={() => setEditIssue(null)}
-        title="Edit Issue"
+        title={t("issue.editIssue")}
       >
         {editIssue && (
           <IssueForm
@@ -505,6 +507,7 @@ function KanbanView({
   onEdit,
   canEdit,
 }: KanbanViewProps) {
+  const { t } = useLocale();
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3" style={{ minHeight: "420px" }}>
       {STATUSES.map((status) => {
@@ -519,7 +522,7 @@ function KanbanView({
               <span
                 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] font-display"
               >
-                {statusLabels[status]}
+                {t(statusLabels[status])}
               </span>
               <span className="text-2xs font-medium text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5 py-0.5">
                 {columnIssues.length}
@@ -529,7 +532,7 @@ function KanbanView({
             {/* Cards */}
             <div className="flex-1 p-2 space-y-2 overflow-y-auto">
               {columnIssues.length === 0 && (
-                <div className="text-center py-6 text-xs text-[var(--text-faint)]">No issues</div>
+                <div className="text-center py-6 text-xs text-[var(--text-faint)]">{t("issue.columnEmpty")}</div>
               )}
               {columnIssues.map((issue) => (
                 <IssueCard
@@ -572,6 +575,7 @@ function IssueCard({
   onStatusChange,
   canEdit,
 }: IssueCardProps) {
+  const { t } = useLocale();
   const [showStatusMenu, setShowStatusMenu] = useState(false);
 
   return (
@@ -594,7 +598,7 @@ function IssueCard({
               </span>
             )}
             {issue.source === "alert" && (
-              <span className="text-2xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">alert</span>
+              <span className="text-2xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">{t("issue.sourceAlertBadge")}</span>
             )}
           </div>
         </div>
@@ -638,7 +642,7 @@ function IssueCard({
             className="text-2xs text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors flex items-center gap-0.5"
           >
             <Icon path={ICON_PATHS.arrowsUpDown} className="w-2.5 h-2.5" />
-            Move
+            {t("issue.move")}
           </button>
           {showStatusMenu && (
             <div className="absolute bottom-full left-0 mb-1 z-20 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-[var(--radius-md)] shadow-lg py-1 min-w-[120px]">
@@ -648,7 +652,7 @@ function IssueCard({
                   onClick={() => { onStatusChange(s); setShowStatusMenu(false); }}
                   className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors"
                 >
-                  {statusLabels[s]}
+                  {t(statusLabels[s])}
                 </button>
               ))}
             </div>
@@ -672,6 +676,7 @@ interface ListViewProps {
 }
 
 function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir, onSort, onEdit }: ListViewProps) {
+  const { t } = useLocale();
   const SortIcon = ({ field }: { field: string }) => (
     <svg
       className={`w-3 h-3 ml-1 inline-block transition-colors ${sortField === field ? "text-[var(--accent)]" : "text-[var(--text-faint)]"}`}
@@ -699,21 +704,21 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
               className="text-left px-4 py-3 font-semibold cursor-pointer select-none hover:text-[var(--text-secondary)]"
               onClick={() => onSort("title")}
             >
-              <span className="flex items-center">Title<SortIcon field="title" /></span>
+              <span className="flex items-center">{t("common.title")}<SortIcon field="title" /></span>
             </th>
-            <th className={tableClasses.th}>Entity</th>
+            <th className={tableClasses.th}>{t("issue.entity")}</th>
             <th
               className="text-left px-4 py-3 font-semibold cursor-pointer select-none hover:text-[var(--text-secondary)]"
               onClick={() => onSort("status")}
             >
-              <span className="flex items-center">Status<SortIcon field="status" /></span>
+              <span className="flex items-center">{t("common.status")}<SortIcon field="status" /></span>
             </th>
-            <th className={tableClasses.th}>Assignees</th>
+            <th className={tableClasses.th}>{t("common.assignees")}</th>
             <th
               className="text-left px-4 py-3 font-semibold cursor-pointer select-none hover:text-[var(--text-secondary)] hidden sm:table-cell"
               onClick={() => onSort("created_at")}
             >
-              <span className="flex items-center">Created<SortIcon field="created_at" /></span>
+              <span className="flex items-center">{t("issue.created")}<SortIcon field="created_at" /></span>
             </th>
           </tr>
         </thead>
@@ -738,7 +743,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                 <td className={`${tableClasses.td} font-medium text-[var(--text-primary)] max-w-xs`}>
                   <span className="line-clamp-1">{issue.title}</span>
                   {issue.source === "alert" && (
-                    <span className="ml-1.5 text-2xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">alert</span>
+                    <span className="ml-1.5 text-2xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">{t("issue.sourceAlertBadge")}</span>
                   )}
                 </td>
 
@@ -766,7 +771,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                         : "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]"
                     }`}
                   >
-                    {statusLabels[issue.status] || issue.status}
+                    {statusLabels[issue.status] ? t(statusLabels[issue.status]) : issue.status}
                   </span>
                 </td>
 
@@ -830,6 +835,7 @@ function IssueForm({
   onSuccess,
   onDelete,
 }: IssueFormProps) {
+  const { t } = useLocale();
   const [form, setForm] = useState({
     title: issue?.title || "",
     description: issue?.description || "",
@@ -877,7 +883,7 @@ function IssueForm({
       return globalIssuesAPI.create(payload);
     },
     onSuccess: () => onSuccess(),
-    onError: (err) => setError(err instanceof Error ? err.message : "Failed to save issue"),
+    onError: (err) => setError(err instanceof Error ? err.message : t("issue.saveFailed")),
   });
 
   return (
@@ -890,71 +896,71 @@ function IssueForm({
       }}
     >
       <Input
-        label="Title"
+        label={t("common.title")}
         value={form.title}
         onChange={(e) => set("title", e.target.value)}
-        placeholder="Issue title..."
+        placeholder={t("issue.titlePlaceholder")}
         required
       />
 
       <MarkdownEditor
-        label="Description"
+        label={t("common.description")}
         value={form.description}
         onChange={(v) => set("description", v)}
-        placeholder="Describe the issue..."
+        placeholder={t("issue.descriptionPlaceholder")}
         rows={3}
       />
 
       <div className="grid grid-cols-2 gap-3">
         <Select
-          label="Entity type"
+          label={t("issue.entityType")}
           value={form.entity_type}
           onChange={(e) => handleEntityTypeChange(e.target.value)}
           options={[
-            { value: "", label: "None" },
-            { value: "host", label: "Host" },
+            { value: "", label: t("issue.none") },
+            { value: "host", label: t("issue.entityHost") },
             { value: "dns", label: "DNS" },
-            { value: "service", label: "Service" },
-            { value: "project", label: "Project" },
+            { value: "service", label: t("issue.entityService") },
+            { value: "project", label: t("issue.entityProject") },
           ]}
         />
         <Select
-          label="Entity"
+          label={t("issue.entity")}
           value={form.entity_id}
           onChange={(e) => set("entity_id", e.target.value)}
-          options={[{ value: "", label: "Select..." }, ...entityOptions]}
+          options={[{ value: "", label: t("issue.selectEllipsis") }, ...entityOptions]}
           disabled={!form.entity_type || entityOptions.length === 0}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Select
-          label="Status"
+          label={t("common.status")}
           value={form.status}
           onChange={(e) => set("status", e.target.value)}
           options={[
-            { value: "backlog", label: "Backlog" },
-            { value: "todo", label: "To Do" },
-            { value: "in_progress", label: "In Progress" },
-            { value: "review", label: "Review" },
-            { value: "done", label: "Done" },
+            { value: "backlog", label: t("issue.backlog") },
+            { value: "todo", label: t("issue.todo") },
+            { value: "in_progress", label: t("issue.inProgress") },
+            { value: "review", label: t("issue.review") },
+            { value: "done", label: t("issue.done") },
           ]}
         />
         <Select
-          label="Priority"
+          label={t("common.priority")}
           value={form.priority}
           onChange={(e) => set("priority", e.target.value)}
           options={[
-            { value: "low", label: "Low" },
-            { value: "medium", label: "Medium" },
-            { value: "high", label: "High" },
-            { value: "critical", label: "Critical" },
+            { value: "low", label: t("issue.low") },
+            { value: "medium", label: t("issue.medium") },
+            { value: "high", label: t("issue.high") },
+            { value: "critical", label: t("issue.critical") },
           ]}
         />
       </div>
 
       <Input
-        label="Expected End Date"
+        label={t("issue.expectedEndDate")}
         type="date"
         value={form.expected_end_date}
         onChange={(e) => set("expected_end_date", e.target.value)}
@@ -962,7 +968,7 @@ function IssueForm({
 
       {userItems.length > 0 && (
         <CheckboxList
-          label="Assignees"
+          label={t("common.assignees")}
           items={userItems}
           selected={form.assignee_ids}
           onChange={(ids) => set("assignee_ids", ids)}
@@ -972,7 +978,7 @@ function IssueForm({
       {/* Read-only source info for alert-sourced issues */}
       {issue && issue.source && issue.source !== "manual" && (
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-3 space-y-1.5">
-          <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">Source</p>
+          <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">{t("issue.source")}</p>
           <div className="flex items-center gap-2">
             <span className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">{issue.source}</span>
             {issue.source_ref && (
@@ -986,7 +992,7 @@ function IssueForm({
 
       <div className="flex gap-2 pt-1">
         <Button type="submit" className="flex-1" disabled={mutation.isPending}>
-          {mutation.isPending ? "Saving..." : issue ? "Save changes" : "Create issue"}
+          {mutation.isPending ? t("issue.saving") : issue ? t("issue.saveChanges") : t("common.createIssue")}
         </Button>
         {onDelete && (
           <Button
@@ -995,7 +1001,7 @@ function IssueForm({
             onClick={onDelete}
             className="text-[var(--danger)] border-[var(--danger)]/20 hover:bg-[var(--danger)]/10"
           >
-            Delete
+            {t("common.delete")}
           </Button>
         )}
       </div>

@@ -10,6 +10,7 @@ import DateTimeInput from "@/components/ui/DateTimeInput";
 import AsyncPicker, { type AsyncPickerItem } from "@/components/ui/AsyncPicker";
 import FormcreatorFileInput, { type UploadedDoc } from "@/components/glpi/FormcreatorFileInput";
 import { glpiAPI, type FormcreatorQuestion as Question } from "@/lib/api";
+import { useLocale } from "@/contexts/LocaleContext";
 
 // Local copies of the helpers in TicketDetailDrawer.tsx so this component
 // doesn't depend on the drawer module. They're kept tiny on purpose — moving
@@ -234,13 +235,15 @@ function isValidIP(v: string): boolean {
   return IPV6_RE.test(v) && v.includes(":");
 }
 
-const URGENCY_OPTIONS = [
-  { value: "1", label: "1 – Muito baixa" },
-  { value: "2", label: "2 – Baixa" },
-  { value: "3", label: "3 – Média" },
-  { value: "4", label: "4 – Alta" },
-  { value: "5", label: "5 – Muito alta" },
-];
+// Rendered via t() at usage time — module scope can't call the hook (see i18n contract rule 6).
+const URGENCY_LABEL_KEYS: Record<string, string> = {
+  "1": "glpi.urgencyVeryLow",
+  "2": "glpi.urgencyLow",
+  "3": "glpi.urgencyMedium",
+  "4": "glpi.urgencyHigh",
+  "5": "glpi.urgencyVeryHigh",
+};
+const URGENCY_VALUES = ["1", "2", "3", "4", "5"];
 
 export default function FormcreatorQuestion({
   question,
@@ -252,6 +255,7 @@ export default function FormcreatorQuestion({
   profileID,
   error,
 }: Props) {
+  const { t } = useLocale();
   if (!visible) return null;
 
   const required = question.required === 1;
@@ -285,7 +289,7 @@ export default function FormcreatorQuestion({
         </label>
         <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)]">
           <span>
-            Tipo <code className="font-mono">{question.fieldtype}</code> ainda não é suportado em sshcm.
+            {t("glpi.fieldTypeUnsupported", { fieldtype: question.fieldtype })}
           </span>
           <a
             href={fallbackHref}
@@ -293,7 +297,7 @@ export default function FormcreatorQuestion({
             rel="noopener noreferrer"
             className="text-[var(--warning)] hover:underline shrink-0"
           >
-            Abrir no GLPI ↗
+            {t("glpi.openInGlpiArrow")}
           </a>
         </div>
       </div>
@@ -311,7 +315,7 @@ export default function FormcreatorQuestion({
       if (!localError && stringValue && question.regex) {
         try {
           if (!new RegExp(question.regex).test(stringValue)) {
-            localError = "Formato inválido";
+            localError = t("glpi.invalidFormat");
           }
         } catch {
           // invalid regex in the form definition — ignore silently
@@ -344,11 +348,11 @@ export default function FormcreatorQuestion({
       if (!localError && stringValue) {
         const n = Number(stringValue);
         if (!Number.isFinite(n)) {
-          localError = "Número inválido";
+          localError = t("glpi.invalidNumber");
         } else if (range.min != null && n < range.min) {
-          localError = `Mínimo: ${range.min}`;
+          localError = t("glpi.minValue", { min: String(range.min) });
         } else if (range.max != null && n > range.max) {
-          localError = `Máximo: ${range.max}`;
+          localError = t("glpi.maxValue", { max: String(range.max) });
         }
       }
       return (
@@ -448,20 +452,20 @@ export default function FormcreatorQuestion({
       return (
         <Select
           label={labelText}
-          options={URGENCY_OPTIONS}
+          options={URGENCY_VALUES.map((v) => ({ value: v, label: t(URGENCY_LABEL_KEYS[v]) }))}
           value={stringValue}
           onChange={(e) => onChange(e.target.value)}
           error={error}
         />
       );
     case "ip": {
-      const ipError = error ?? (stringValue && !isValidIP(stringValue) ? "IP inválido" : undefined);
+      const ipError = error ?? (stringValue && !isValidIP(stringValue) ? t("glpi.invalidIp") : undefined);
       return (
         <Input
           label={labelText}
           value={stringValue}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="e.g. 10.0.0.1 or ::1"
+          placeholder={t("glpi.ipPlaceholder")}
           error={ipError}
         />
       );
@@ -502,7 +506,7 @@ export default function FormcreatorQuestion({
               onChange(items.map((it) => `${it.id}|${it.label}`))
             }
             error={error}
-            placeholder="Buscar usuários…"
+            placeholder={t("glpi.searchUsersPlaceholder")}
             disabled={!profileID}
           />
         );
@@ -516,7 +520,7 @@ export default function FormcreatorQuestion({
           fetcher={userFetcher}
           onChange={(item) => onChange(item ? `${item.id}|${item.label}` : "")}
           error={error}
-          placeholder="Buscar usuário…"
+          placeholder={t("glpi.searchUserPlaceholder")}
           disabled={!profileID}
         />
       );
@@ -550,7 +554,7 @@ export default function FormcreatorQuestion({
             )
           }
           error={error}
-          placeholder="Buscar tags…"
+          placeholder={t("glpi.searchTagsPlaceholder")}
           disabled={!profileID}
         />
       );
@@ -647,6 +651,7 @@ function DropdownWithFallback({
   profileID: number | null;
   error?: string;
 }) {
+  const { t } = useLocale();
   const hasItemtype = itemtype.length > 0;
   const [manual, setManual] = useState(!hasItemtype);
   const [id, labelFromValue] = splitLabeledInt(value);
@@ -663,7 +668,7 @@ function DropdownWithFallback({
             const n = parseInt(e.target.value, 10);
             onChange(Number.isFinite(n) && n > 0 ? `${n}|#${n}` : "");
           }}
-          placeholder="ID numérico no GLPI"
+          placeholder={t("glpi.numericIdPlaceholder")}
           error={error}
         />
         {hasItemtype && (
@@ -672,7 +677,7 @@ function DropdownWithFallback({
             onClick={() => setManual(false)}
             className="text-xs text-[var(--accent)] hover:underline"
           >
-            ← Voltar à busca
+            {t("glpi.backToSearch")}
           </button>
         )}
       </div>
@@ -703,7 +708,7 @@ function DropdownWithFallback({
         }}
         onChange={(item) => onChange(item ? `${item.id}|${item.label}` : "")}
         error={error}
-        placeholder={`Buscar ${itemtype}…`}
+        placeholder={t("glpi.searchItemtypePlaceholder", { itemtype })}
         disabled={!profileID}
       />
       <button
@@ -711,7 +716,7 @@ function DropdownWithFallback({
         onClick={() => setManual(true)}
         className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] hover:underline"
       >
-        Digitar ID manualmente
+        {t("glpi.enterIdManually")}
       </button>
     </div>
   );

@@ -106,10 +106,11 @@ interface Props {
   profileID: number | null;
 }
 
+// Values are catalogue keys, translated at usage time (module scope can't call the hook).
 const eventLabel: Record<GlpiTicketEvent["type"], string> = {
-  followup: "Follow-up",
-  task: "Tarefa",
-  solution: "Solução",
+  followup: "glpi.eventFollowup",
+  task: "glpi.eventTask",
+  solution: "glpi.eventSolution",
 };
 
 const eventAccent: Record<GlpiTicketEvent["type"], string> = {
@@ -119,19 +120,19 @@ const eventAccent: Record<GlpiTicketEvent["type"], string> = {
 };
 
 const taskStateLabel: Record<number, string> = {
-  0: "Informação",
-  1: "A fazer",
-  2: "Concluída",
+  0: "glpi.taskStateInfo",
+  1: "glpi.taskStateTodo",
+  2: "glpi.taskStateDone",
 };
 
 const solutionStatusLabel: Record<number, string> = {
-  1: "Proposta",
-  2: "Aceita",
-  3: "Recusada",
+  1: "glpi.solutionStatusProposed",
+  2: "glpi.solutionStatusAccepted",
+  3: "glpi.solutionStatusRejected",
 };
 
 export default function TicketDetailDrawer({ open, onClose, ticketID, profileID }: Props) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["glpi-ticket-details", ticketID, profileID],
@@ -141,10 +142,10 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
   });
 
   const title = data?.ticket
-    ? `#${data.ticket.id} · ${data.ticket.name || "(sem título)"}`
+    ? `#${data.ticket.id} · ${data.ticket.name || t("glpi.untitled")}`
     : ticketID
     ? `#${ticketID}`
-    : "Chamado";
+    : t("glpi.ticketFallbackTitle");
 
   return (
     <Drawer
@@ -160,7 +161,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
             rel="noopener noreferrer"
             className="text-xs text-[var(--accent)] hover:underline inline-flex items-center gap-1"
           >
-            Abrir no GLPI
+            {t("glpi.openInGlpi")}
             <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
           </Link>
         ) : undefined
@@ -178,7 +179,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
 
         {error && (
           <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-3 py-2">
-            Falha: {(error as Error).message}
+            {t("glpi.ticketLoadError", { message: (error as Error).message })}
           </div>
         )}
 
@@ -191,13 +192,17 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
               </span>
               {data.ticket.date && (
                 <span title={getTimeAgo(data.ticket.date.replace(" ", "T"), locale)}>
-                  Aberto {getTimeAgo(data.ticket.date.replace(" ", "T"), locale)}
+                  {t("glpi.openedTimeAgo", { time: getTimeAgo(data.ticket.date.replace(" ", "T"), locale) })}
                 </span>
               )}
-              {data.requester?.name && <span>· por {data.requester.name}</span>}
+              {data.requester?.name && <span>{t("glpi.byRequester", { name: data.requester.name })}</span>}
               <span>·</span>
               <span>
-                {data.event_counts.followup} follow-ups · {data.event_counts.task} tarefas · {data.event_counts.solution} soluções
+                {t("glpi.eventCounts", {
+                  followups: String(data.event_counts.followup),
+                  tasks: String(data.event_counts.task),
+                  solutions: String(data.event_counts.solution),
+                })}
               </span>
             </div>
 
@@ -213,7 +218,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
             {data.ticket.content && (
               <section>
                 <SectionHeading as="h3">
-                  Descrição
+                  {t("common.description")}
                 </SectionHeading>
                 <div
                   className="text-sm text-[var(--text-primary)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2.5 glpi-content"
@@ -229,10 +234,10 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
             {/* Timeline */}
             <section>
               <SectionHeading as="h3">
-                Timeline
+                {t("glpi.timelineHeading")}
               </SectionHeading>
               {data.events.length === 0 ? (
-                <p className="text-xs text-[var(--text-muted)]">Sem follow-ups, tarefas ou soluções.</p>
+                <p className="text-xs text-[var(--text-muted)]">{t("glpi.noEvents")}</p>
               ) : (
                 <ul className="space-y-2">
                   {data.events.map((ev) => (
@@ -243,22 +248,22 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
                       <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                         <div className="flex items-center gap-2 text-xs">
                           <span className="font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
-                            {eventLabel[ev.type]}
+                            {t(eventLabel[ev.type])}
                           </span>
                           {ev.user_name && <span className="text-[var(--text-primary)]">{ev.user_name}</span>}
                           {ev.is_private && (
                             <span className="text-2xs px-1 py-0 rounded border border-[var(--warning)]/30 text-[var(--warning)]">
-                              privado
+                              {t("glpi.privateBadge")}
                             </span>
                           )}
                           {ev.type === "task" && ev.state !== undefined && (
                             <span className="text-2xs px-1 py-0 rounded border border-[var(--purple)]/30 text-[var(--purple)]">
-                              {taskStateLabel[ev.state] ?? `state ${ev.state}`}
+                              {t(taskStateLabel[ev.state] ?? "glpi.unknownStateFallback", { state: String(ev.state) })}
                             </span>
                           )}
                           {ev.type === "solution" && ev.status !== undefined && (
                             <span className="text-2xs px-1 py-0 rounded border border-[var(--success)]/30 text-[var(--success)]">
-                              {solutionStatusLabel[ev.status] ?? `status ${ev.status}`}
+                              {t(solutionStatusLabel[ev.status] ?? "glpi.unknownStatusFallback", { status: String(ev.status) })}
                             </span>
                           )}
                         </div>
@@ -274,7 +279,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
                         dangerouslySetInnerHTML={{
                           __html: ev.content
                             ? prepareContent(ev.content, data.glpi_base_url, profileID)
-                            : "<em>(vazio)</em>",
+                            : `<em>${t("glpi.emptyContent")}</em>`,
                         }}
                       />
                     </li>

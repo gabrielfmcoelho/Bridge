@@ -14,11 +14,13 @@ import Link from "next/link";
 import TicketList from "@/components/glpi/TicketList";
 import CreateTicketModal from "@/components/glpi/CreateTicketModal";
 import TicketDetailDrawer from "@/components/glpi/TicketDetailDrawer";
+import { useLocale } from "@/contexts/LocaleContext";
 
 // Global /chamados — lists GLPI tickets across every project the profile covers.
 // The page iterates known projects with a glpi_token_id and aggregates their
 // tickets; a profile filter lets the operator scope to one account at a time.
 export default function ChamadosPage() {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canEdit = user?.role === "admin" || user?.role === "editor";
@@ -137,8 +139,8 @@ export default function ChamadosPage() {
       return (
         <EmptyState
           icon="box"
-          title="GLPI integration is disabled"
-          description="Ask an admin to enable it in Settings → Integrations → GLPI."
+          title={t("chamado.glpiDisabledTitle")}
+          description={t("chamado.list.disabledDesc")}
         />
       );
     }
@@ -148,8 +150,8 @@ export default function ChamadosPage() {
         return (
           <EmptyState
             icon="folder"
-            title="No profiles configured"
-            description="Add a GLPI profile in Settings → Integrations → GLPI → Token profiles to use this view."
+            title={t("chamado.noProfilesTitle")}
+            description={t("chamado.list.noProfilesDesc")}
           />
         );
       }
@@ -165,7 +167,7 @@ export default function ChamadosPage() {
       if (profileTickets.isError) {
         return (
           <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-sm px-4 py-3">
-            Falha: {(profileTickets.error as Error).message}
+            {t("chamado.loadFailed", { message: (profileTickets.error as Error).message })}
           </div>
         );
       }
@@ -173,14 +175,14 @@ export default function ChamadosPage() {
       const warnings = profileTickets.data?.warnings ?? [];
       const scopeLabel =
         profileFilter === "all"
-          ? `${(profiles ?? []).length} perfis`
-          : (profiles ?? []).find((p) => p.id === profileFilter)?.name ?? "perfil";
+          ? t("chamado.list.profilesCount", { n: String((profiles ?? []).length) })
+          : (profiles ?? []).find((p) => p.id === profileFilter)?.name ?? t("chamado.profileLabel");
       return (
         <div className="space-y-3">
           <p className="text-xs text-[var(--text-muted)]">
-            {tickets.length} chamado{tickets.length === 1 ? "" : "s"}
+            {t("chamado.count", { n: String(tickets.length) })}
             {" "}· {scopeLabel}
-            {" "}· {includeClosed ? "abertos e fechados" : "apenas abertos"}
+            {" "}· {includeClosed ? t("chamado.list.filterAllStates") : t("chamado.list.filterOpenOnly")}
           </p>
           {warnings.length > 0 && (
             <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)] text-xs px-3 py-2 space-y-1">
@@ -191,7 +193,7 @@ export default function ChamadosPage() {
           )}
           <TicketList
             tickets={tickets}
-            emptyLabel="Sem chamados para este perfil."
+            emptyLabel={t("chamado.list.emptyProfile")}
             onOpenDetails={(id) => setDetailTicketID(id)}
           />
         </div>
@@ -212,8 +214,8 @@ export default function ChamadosPage() {
       return (
         <EmptyState
           icon="folder"
-          title="No projects linked to GLPI"
-          description="Edit any project and link a GLPI profile in the Vínculos section."
+          title={t("chamado.list.noProjectsTitle")}
+          description={t("chamado.list.noProjectsDesc")}
         />
       );
     }
@@ -222,14 +224,14 @@ export default function ChamadosPage() {
     return (
       <div className="space-y-5">
         <p className="text-xs text-[var(--text-muted)]">
-          {totalOpen} chamado{totalOpen === 1 ? "" : "s"} aberto{totalOpen === 1 ? "" : "s"} · {groups.length} projeto{groups.length === 1 ? "" : "s"}
+          {t("chamado.list.openTicketsCount", { n: String(totalOpen) })} · {t("chamado.list.projectsCount", { n: String(groups.length) })}
         </p>
         {groups.map((g) => (
           <div key={g.project.id} className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-[var(--text-primary)]">{g.project.name}</p>
               <p className="text-2xs text-[var(--text-faint)]">
-                {g.tickets.length} aberto{g.tickets.length === 1 ? "" : "s"}
+                {t("chamado.list.openOnlyCount", { n: String(g.tickets.length) })}
               </p>
             </div>
             {g.warning && (
@@ -239,7 +241,7 @@ export default function ChamadosPage() {
             )}
             <TicketList
               tickets={g.tickets}
-              emptyLabel="Sem chamados."
+              emptyLabel={t("chamado.list.emptyProject")}
               onOpenDetails={(id) => setDetailTicketID(id)}
             />
           </div>
@@ -250,7 +252,7 @@ export default function ChamadosPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Chamados" />
+      <PageHeader title={t("host.chamados")} />
       <Card hover={false} className="!p-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
           {/* View mode toggle */}
@@ -264,7 +266,7 @@ export default function ChamadosPage() {
                   : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]"
               }`}
             >
-              By project
+              {t("chamado.list.byProjectTab")}
             </button>
             <button
               type="button"
@@ -275,17 +277,17 @@ export default function ChamadosPage() {
                   : "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]"
               }`}
             >
-              All tickets (profile)
+              {t("chamado.list.allTicketsProfileTab")}
             </button>
           </div>
-          <label className="text-xs text-[var(--text-muted)]">Profile</label>
+          <label className="text-xs text-[var(--text-muted)]">{t("chamado.profileLabel")}</label>
           <select
             value={profileFilter === "all" ? "all" : String(profileFilter)}
             onChange={(e) => setProfileFilter(e.target.value === "all" ? "all" : parseInt(e.target.value, 10))}
             className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-2 py-1 text-sm"
             disabled={!glpiEnabled}
           >
-            <option value="all">All profiles</option>
+            <option value="all">{t("chamado.list.allProfilesOption")}</option>
             {(profiles ?? []).map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
@@ -297,7 +299,7 @@ export default function ChamadosPage() {
                 checked={includeClosed}
                 onChange={(e) => setIncludeClosed(e.target.checked)}
               />
-              Incluir fechados
+              {t("chamado.list.includeClosed")}
             </label>
           )}
         </div>
@@ -307,12 +309,12 @@ export default function ChamadosPage() {
               href="/chamados/forms"
               className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 transition-colors"
             >
-              Formulários
+              {t("chamado.list.formsLink")}
             </Link>
           )}
           {canEdit && glpiEnabled && (
             <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-              Novo chamado
+              {t("chamado.newAction")}
             </Button>
           )}
         </div>

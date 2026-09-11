@@ -242,7 +242,7 @@ export default function DashboardPage() {
                         {alertCount}
                       </span>
                       {criticalCount > 0 && (
-                        <span className="text-xs text-[var(--danger)] font-semibold mb-1">{criticalCount} critical</span>
+                        <span className="text-xs text-[var(--danger)] font-semibold mb-1">{t("dashboard.criticalCount", { count: String(criticalCount) })}</span>
                       )}
                     </div>
                     <p className="text-xs text-[var(--text-faint)]">
@@ -281,7 +281,7 @@ export default function DashboardPage() {
                     );
                   })}
                   {hospedagemEntries.length > 4 && (
-                    <p className="text-2xs text-[var(--text-faint)]">+{hospedagemEntries.length - 4} more</p>
+                    <p className="text-2xs text-[var(--text-faint)]">+{hospedagemEntries.length - 4} {t("common.more")}</p>
                   )}
                 </div>
               ) : (
@@ -324,7 +324,7 @@ export default function DashboardPage() {
             {Object.keys(stats.hosts.by_situacao).length > 0 && (
               <Card hover={false} className="stagger-in" style={{ "--i": 9 } as React.CSSProperties}>
                 <SectionHeading variant="section">
-                  {t("host.title")} by {t("common.status")}
+                  {t("dashboard.hostsByStatus", { hosts: t("host.title"), status: t("common.status") })}
                 </SectionHeading>
                 <div className="space-y-5">
                   {Object.entries(stats.hosts.by_situacao).map(([situacao, count]) => {
@@ -369,13 +369,13 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs text-[var(--text-primary)] font-medium">{entry.name}</span>
                         <span className="text-2xs text-[var(--text-faint)] font-mono">
-                          {entry.count} {entry.count === 1 ? "host" : "hosts"}
+                          {entry.count} {entry.count === 1 ? t("dashboard.hostSingular") : t("dashboard.hostPlural")}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <ResourceMiniBar label="CPU" value={entry.cpu} total={entry.totalCpu} />
                         <ResourceMiniBar label="RAM" value={entry.ram} total={entry.totalRam} />
-                        <ResourceMiniBar label="Disk" value={entry.disk} total={entry.totalDisk} />
+                        <ResourceMiniBar label={t("dashboard.diskLabel")} value={entry.disk} total={entry.totalDisk} />
                       </div>
                     </div>
                   ))}
@@ -396,13 +396,13 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between mb-2">
                         <Badge variant="situacao" situacao={entry.name} dot>{entry.name}</Badge>
                         <span className="text-2xs text-[var(--text-faint)] font-mono">
-                          {entry.count} {entry.count === 1 ? "host" : "hosts"}
+                          {entry.count} {entry.count === 1 ? t("dashboard.hostSingular") : t("dashboard.hostPlural")}
                         </span>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <ResourceMiniBar label="CPU" value={entry.cpu} total={entry.totalCpu} />
                         <ResourceMiniBar label="RAM" value={entry.ram} total={entry.totalRam} />
-                        <ResourceMiniBar label="Disk" value={entry.disk} total={entry.totalDisk} />
+                        <ResourceMiniBar label={t("dashboard.diskLabel")} value={entry.disk} total={entry.totalDisk} />
                       </div>
                     </div>
                   ))}

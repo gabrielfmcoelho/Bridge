@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { glpiAPI, integrationsAPI } from "@/lib/api";
+import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import TicketList from "@/components/glpi/TicketList";
 
@@ -15,6 +16,7 @@ interface Props {
 // list. A profile picker appears when more than one is configured; otherwise
 // the first profile is used automatically.
 export default function GlpiHostTicketsBlock({ slug }: Props) {
+  const { t } = useLocale();
   const [profileID, setProfileID] = useState<number | null>(null);
 
   const { data: integrations } = useQuery({
@@ -52,7 +54,7 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
     <div className="mt-6">
       <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
         <h3 className="text-sm font-semibold text-[var(--text-secondary)] tracking-wide uppercase">
-          Tickets GLPI (asset)
+          {t("host.glpiTicketsTitle")}
         </h3>
         {(profiles?.length ?? 0) > 1 && (
           <select
@@ -69,13 +71,13 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
 
       {isLoading ? (
         <Card hover={false} className="!p-3">
-          <p className="text-xs text-[var(--text-muted)] animate-pulse">Querying GLPI…</p>
+          <p className="text-xs text-[var(--text-muted)] animate-pulse">{t("host.glpiQuerying")}</p>
         </Card>
       ) : data?.computer == null ? (
         <Card hover={false} className="!p-3">
           <p className="text-xs text-[var(--text-muted)]">
-            No GLPI Computer asset matched host slug <code className="font-mono text-[var(--text-secondary)]">{slug}</code>.
-            Create one in GLPI with the same name to pull its tickets here.
+            {t("host.glpiNoComputerBefore")} <code className="font-mono text-[var(--text-secondary)]">{slug}</code>
+            {t("host.glpiNoComputerAfter")}
           </p>
         </Card>
       ) : (
@@ -88,7 +90,7 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
               </p>
             </div>
             <span className="text-2xs text-[var(--text-faint)]">
-              {data.tickets.length} ticket{data.tickets.length === 1 ? "" : "s"} aberto{data.tickets.length === 1 ? "" : "s"}
+              {t("host.glpiOpenTicketsCount", { n: String(data.tickets.length) })}
             </span>
           </Card>
           {data.warning && (
@@ -96,7 +98,7 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
               {data.warning}
             </div>
           )}
-          <TicketList tickets={data.tickets} emptyLabel="Nenhum ticket GLPI aberto para este asset." />
+          <TicketList tickets={data.tickets} emptyLabel={t("host.glpiNoOpenTickets")} />
         </>
       )}
     </div>

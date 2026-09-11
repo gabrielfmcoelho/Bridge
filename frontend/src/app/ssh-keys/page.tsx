@@ -74,8 +74,8 @@ export default function HostCredentialsPage() {
       ) : keys.length === 0 ? (
         <EmptyState
           icon="key"
-          title="No credentials stored"
-          description="Add SSH keys or passwords to manage them centrally and associate with hosts."
+          title={t("sshKey.emptyTitle")}
+          description={t("sshKey.emptyDescription")}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -94,7 +94,7 @@ export default function HostCredentialsPage() {
         }} />
       </ResponsiveModal>
 
-      <ResponsiveModal open={viewingKey !== null} onClose={() => setViewingKey(null)} title="Details">
+      <ResponsiveModal open={viewingKey !== null} onClose={() => setViewingKey(null)} title={t("sshKey.detailsTitle")}>
         {viewingKey !== null && <KeyView id={viewingKey} />}
       </ResponsiveModal>
     </PageShell>
@@ -102,6 +102,7 @@ export default function HostCredentialsPage() {
 }
 
 function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onClick: () => void; onDelete?: () => void }) {
+  const { t } = useLocale();
   const isKey = cred.credential_type === "key";
 
   return (
@@ -119,7 +120,7 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
             )}
           </div>
           <Badge color={isKey ? "cyan" : "purple"}>
-            {isKey ? "SSH Key" : "Password"}
+            {isKey ? t("sshKey.sshKeyLabel") : t("sshKey.password")}
           </Badge>
         </div>
 
@@ -130,11 +131,11 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
         <div className="flex gap-1 mb-2">
           {isKey && (
             <>
-              {cred.has_public_key && <Badge color="emerald">pub</Badge>}
-              {cred.has_private_key && <Badge color="cyan">priv</Badge>}
+              {cred.has_public_key && <Badge color="emerald">{t("sshKey.pubBadge")}</Badge>}
+              {cred.has_private_key && <Badge color="cyan">{t("sshKey.privBadge")}</Badge>}
             </>
           )}
-          {!isKey && cred.has_password && <Badge color="purple">encrypted</Badge>}
+          {!isKey && cred.has_password && <Badge color="purple">{t("sshKey.encryptedBadge")}</Badge>}
         </div>
 
         {/* Consistent bottom section */}
@@ -155,7 +156,7 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
                 className="text-2xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
               >
-                Delete
+                {t("common.delete")}
               </button>
             )}
           </div>
@@ -193,19 +194,19 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
       ...grants,
     }),
     onSuccess: () => onSuccess(),
-    onError: (err) => setError(err instanceof Error ? err.message : "Failed"),
+    onError: (err) => setError(err instanceof Error ? err.message : t("sshKey.genericFailed")),
   });
 
   return (
     <div className="space-y-4">
-      <StepIndicator steps={["Type", credType === "key" ? "Keys" : "Password"]} current={step} />
+      <StepIndicator steps={[t("common.type"), credType === "key" ? t("sshKey.stepKeys") : t("sshKey.password")]} current={step} />
       <FormError message={error} />
 
       {step === 1 && (
         <div className="space-y-4 animate-fade-in">
           {/* Credential type selector */}
           <div>
-            <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide mb-2">Type</label>
+            <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide mb-2">{t("common.type")}</label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -218,9 +219,9 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
               >
                 <div className="flex items-center gap-2 mb-1">
                   <Icon path={ICON_PATHS.key} className={`w-4 h-4 ${credType === "key" ? "text-[var(--accent)]" : "text-[var(--text-faint)]"}`} />
-                  <span className={`text-sm font-medium ${credType === "key" ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}>SSH Key</span>
+                  <span className={`text-sm font-medium ${credType === "key" ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}>{t("sshKey.sshKeyLabel")}</span>
                 </div>
-                <p className="text-2xs text-[var(--text-faint)]">Public/private key pair</p>
+                <p className="text-2xs text-[var(--text-faint)]">{t("sshKey.keyPairHint")}</p>
               </button>
               <button
                 type="button"
@@ -233,17 +234,17 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
               >
                 <div className="flex items-center gap-2 mb-1">
                   <Icon path={ICON_PATHS.lock} className={`w-4 h-4 ${credType === "password" ? "text-[var(--purple)]" : "text-[var(--text-faint)]"}`} />
-                  <span className={`text-sm font-medium ${credType === "password" ? "text-[var(--purple)]" : "text-[var(--text-secondary)]"}`}>Password</span>
+                  <span className={`text-sm font-medium ${credType === "password" ? "text-[var(--purple)]" : "text-[var(--text-secondary)]"}`}>{t("sshKey.password")}</span>
                 </div>
-                <p className="text-2xs text-[var(--text-faint)]">Encrypted password storage</p>
+                <p className="text-2xs text-[var(--text-faint)]">{t("sshKey.passwordStorageHint")}</p>
               </button>
             </div>
           </div>
-          <Input label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required placeholder="e.g. prod-server-key" />
-          <Input label="Username" value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder="e.g. root, admin" />
-          <Input label="Description" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
+          <Input label={t("common.name")} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required placeholder={t("sshKey.namePlaceholder")} />
+          <Input label={t("sshKey.usernameLabel")} value={form.username} onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))} placeholder={t("sshKey.usernamePlaceholder")} />
+          <Input label={t("common.description")} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder={t("sshKey.descriptionPlaceholder")} />
           <p className="text-2xs text-[var(--text-faint)]">
-            All credentials are encrypted with AES-256-GCM before storage.
+            {t("sshKey.encryptionNotice")}
           </p>
           <Button type="button" className="w-full" disabled={!form.name.trim()} onClick={() => setStep(2)}>
             {t("host.nextStep")}
@@ -253,8 +254,8 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
 
       {step === 2 && credType === "key" && (
         <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4 animate-fade-in">
-          <Textarea label="Public Key" value={form.public_key} onChange={(e) => setForm((f) => ({ ...f, public_key: e.target.value }))} rows={3} placeholder="ssh-ed25519 AAAA..." className="font-mono" />
-          <Textarea label="Private Key" value={form.private_key} onChange={(e) => setForm((f) => ({ ...f, private_key: e.target.value }))} rows={4} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" className="font-mono" />
+          <Textarea label={t("sshKey.publicKeyLabel")} value={form.public_key} onChange={(e) => setForm((f) => ({ ...f, public_key: e.target.value }))} rows={3} placeholder="ssh-ed25519 AAAA..." className="font-mono" />
+          <Textarea label={t("sshKey.privateKeyLabel")} value={form.private_key} onChange={(e) => setForm((f) => ({ ...f, private_key: e.target.value }))} rows={4} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" className="font-mono" />
           <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>{t("common.back")}</Button>
@@ -265,7 +266,7 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
 
       {step === 2 && credType === "password" && (
         <form onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }} className="space-y-4 animate-fade-in">
-          <Input label="Password" type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} required placeholder="Enter password" />
+          <Input label={t("sshKey.password")} type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} required placeholder={t("sshKey.passwordPlaceholder")} />
           <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>{t("common.back")}</Button>
@@ -324,7 +325,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       setEditError("");
       onUpdated?.();
     },
-    onError: (err) => setEditError(err instanceof Error ? err.message : "Failed"),
+    onError: (err) => setEditError(err instanceof Error ? err.message : t("sshKey.genericFailed")),
   });
 
   const startEditing = () => {
@@ -341,24 +342,24 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
     setIsEditing(true);
   };
 
-  if (isLoading) return <div className="text-sm text-[var(--text-muted)]">Loading...</div>;
-  if (!data) return <div className="text-sm text-[var(--danger)]">Credential not found</div>;
+  if (isLoading) return <div className="text-sm text-[var(--text-muted)]">{t("common.loading")}</div>;
+  if (!data) return <div className="text-sm text-[var(--danger)]">{t("sshKey.notFound")}</div>;
 
   if (isEditing) {
     return (
       <form onSubmit={(e) => { e.preventDefault(); updateMutation.mutate(); }} className="space-y-4">
         {editError && <div className="bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-[var(--danger)] text-sm rounded-[var(--radius-md)] p-3">{editError}</div>}
-        <Input label="Name" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required />
-        <Input label="Username" value={editForm.username} onChange={(e) => setEditForm((f) => ({ ...f, username: e.target.value }))} />
-        <Input label="Description" value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} />
+        <Input label={t("common.name")} value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required />
+        <Input label={t("sshKey.usernameLabel")} value={editForm.username} onChange={(e) => setEditForm((f) => ({ ...f, username: e.target.value }))} />
+        <Input label={t("common.description")} value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} />
         {data.credential_type === "key" && (
           <>
-            <Textarea label="Public Key" value={editForm.public_key} onChange={(e) => setEditForm((f) => ({ ...f, public_key: e.target.value }))} rows={3} placeholder="Leave empty to keep current" className="font-mono" />
-            <Textarea label="Private Key" value={editForm.private_key} onChange={(e) => setEditForm((f) => ({ ...f, private_key: e.target.value }))} rows={4} placeholder="Leave empty to keep current" className="font-mono" />
+            <Textarea label={t("sshKey.publicKeyLabel")} value={editForm.public_key} onChange={(e) => setEditForm((f) => ({ ...f, public_key: e.target.value }))} rows={3} placeholder={t("sshKey.keepCurrentPlaceholder")} className="font-mono" />
+            <Textarea label={t("sshKey.privateKeyLabel")} value={editForm.private_key} onChange={(e) => setEditForm((f) => ({ ...f, private_key: e.target.value }))} rows={4} placeholder={t("sshKey.keepCurrentPlaceholder")} className="font-mono" />
           </>
         )}
         {data.credential_type === "password" && (
-          <Input label="Password" type="password" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} placeholder="Leave empty to keep current" />
+          <Input label={t("sshKey.password")} type="password" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} placeholder={t("sshKey.keepCurrentPlaceholder")} />
         )}
         <EntidadeScopeFields value={editGrants} onChange={setEditGrants} compact loadFrom={{ type: "ssh_key", id }} />
         <div className="flex justify-end gap-2">
@@ -376,18 +377,18 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Badge color={isKey ? "cyan" : "purple"}>{isKey ? "SSH Key" : "Password"}</Badge>
+            <Badge color={isKey ? "cyan" : "purple"}>{isKey ? t("sshKey.sshKeyLabel") : t("sshKey.password")}</Badge>
           </div>
           <p className="text-sm font-semibold text-[var(--text-primary)] font-mono">{data.name}</p>
         </div>
         <Button size="sm" variant="secondary" onClick={startEditing}>{t("common.edit")}</Button>
       </div>
-      {data.username && <Field label="Username" value={data.username} />}
-      {data.description && <Field label="Description" value={data.description} />}
-      {data.fingerprint && <Field label="Fingerprint" value={data.fingerprint} mono />}
+      {data.username && <Field label={t("sshKey.usernameLabel")} value={data.username} />}
+      {data.description && <Field label={t("common.description")} value={data.description} />}
+      {data.fingerprint && <Field label={t("sshKey.fingerprintLabel")} value={data.fingerprint} mono />}
       {isKey && data.public_key && (
         <div>
-          <span className="text-xs text-[var(--text-muted)]">Public Key</span>
+          <span className="text-xs text-[var(--text-muted)]">{t("sshKey.publicKeyLabel")}</span>
           <pre className="mt-1 p-3 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] overflow-x-auto whitespace-pre-wrap break-all font-mono">
             {data.public_key}
           </pre>
@@ -395,7 +396,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       )}
       {isKey && data.private_key && (
         <div>
-          <span className="text-xs text-[var(--text-muted)]">Private Key</span>
+          <span className="text-xs text-[var(--text-muted)]">{t("sshKey.privateKeyLabel")}</span>
           <pre className="mt-1 p-3 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] overflow-x-auto whitespace-pre-wrap break-all font-mono">
             {data.private_key}
           </pre>
@@ -403,7 +404,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       )}
       {!isKey && data.password && (
         <div>
-          <span className="text-xs text-[var(--text-muted)]">Password</span>
+          <span className="text-xs text-[var(--text-muted)]">{t("sshKey.password")}</span>
           <pre className="mt-1 p-3 bg-[var(--bg-elevated)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] font-mono">
             {"•".repeat(12)}
           </pre>
@@ -442,7 +443,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
             </p>
           )}
           {syncMutation.isError && (
-            <p className="text-2xs text-[var(--danger)] mt-1">{syncMutation.error instanceof Error ? syncMutation.error.message : "Failed"}</p>
+            <p className="text-2xs text-[var(--danger)] mt-1">{syncMutation.error instanceof Error ? syncMutation.error.message : t("sshKey.genericFailed")}</p>
           )}
         </div>
       )}

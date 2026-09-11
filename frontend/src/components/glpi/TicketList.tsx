@@ -51,42 +51,42 @@ export default function TicketList({
   // behaviour just omit this prop.
   onOpenDetails?: (ticketID: number) => void;
 }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   if (tickets.length === 0) {
-    return <p className="text-xs text-[var(--text-muted)] py-6 text-center">{emptyLabel ?? "No tickets."}</p>;
+    return <p className="text-xs text-[var(--text-muted)] py-6 text-center">{emptyLabel ?? t("glpi.noTickets")}</p>;
   }
   const sorted = [...tickets].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   const rowClass =
     "block w-full text-left rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-2 hover:border-[var(--border-strong)] hover:bg-[var(--bg-overlay)] transition-colors";
   return (
     <ul className="space-y-1.5">
-      {sorted.map((t) => {
+      {sorted.map((tk) => {
         const content = (
           <div className="flex items-center gap-3">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${priorityColor[t.priority] || "bg-[var(--text-faint)]"}`} />
-            <code className="text-xs text-[var(--text-muted)] shrink-0">#{t.id}</code>
-            <span className="text-sm text-[var(--text-primary)] truncate flex-1">{t.name || "(sem título)"}</span>
-            {t.date && (
+            <span className={`w-2 h-2 rounded-full shrink-0 ${priorityColor[tk.priority] || "bg-[var(--text-faint)]"}`} />
+            <code className="text-xs text-[var(--text-muted)] shrink-0">#{tk.id}</code>
+            <span className="text-sm text-[var(--text-primary)] truncate flex-1">{tk.name || t("glpi.untitled")}</span>
+            {tk.date && (
               <span
                 className="shrink-0 text-2xs text-[var(--text-faint)] font-mono"
-                title={getTimeAgo(t.date.replace(" ", "T"), locale)}
+                title={getTimeAgo(tk.date.replace(" ", "T"), locale)}
               >
-                {formatDate(t.date, locale)}
+                {formatDate(tk.date, locale)}
               </span>
             )}
-            <span className={`shrink-0 text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${statusColor[t.status_slug] || statusColor.unknown}`}>
-              {t.status_label}
+            <span className={`shrink-0 text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${statusColor[tk.status_slug] || statusColor.unknown}`}>
+              {tk.status_label}
             </span>
           </div>
         );
         return (
-          <li key={t.id}>
+          <li key={tk.id}>
             {onOpenDetails ? (
-              <button type="button" className={rowClass} onClick={() => onOpenDetails(t.id)}>
+              <button type="button" className={rowClass} onClick={() => onOpenDetails(tk.id)}>
                 {content}
               </button>
             ) : (
-              <Link href={t.url} target="_blank" rel="noopener noreferrer" className={rowClass}>
+              <Link href={tk.url} target="_blank" rel="noopener noreferrer" className={rowClass}>
                 {content}
               </Link>
             )}

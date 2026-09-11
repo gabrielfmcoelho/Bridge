@@ -149,13 +149,13 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
             {sv && (
               <div className="flex items-center gap-2 text-xs flex-wrap">
                 <span className="text-[var(--text-muted)]">{sv.name} ({sv.ip}:{sv.port})</span>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_reachable ? "bg-[var(--success)]" : "bg-[var(--danger)]"}`} title={sv.is_reachable ? "Reachable" : "Unreachable"} />
+                <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_reachable ? "bg-[var(--success)]" : "bg-[var(--danger)]"}`} title={sv.is_reachable ? t("operation.coolifyReachable") : t("operation.coolifyUnreachable")} />
                 <span className={`text-2xs ${sv.is_reachable ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-                  {sv.is_reachable ? "reachable" : "unreachable"}
+                  {(sv.is_reachable ? t("operation.coolifyReachable") : t("operation.coolifyUnreachable")).toLowerCase()}
                 </span>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_usable ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`} title={sv.is_usable ? "Usable" : "Not usable"} />
+                <span className={`w-2 h-2 rounded-full shrink-0 ${sv.is_usable ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`} title={sv.is_usable ? t("operation.coolifyUsable") : t("operation.coolifyNotUsable")} />
                 <span className={`text-2xs ${sv.is_usable ? "text-[var(--success)]" : "text-[var(--warning)]"}`}>
-                  {sv.is_usable ? "usable" : "not usable"}
+                  {(sv.is_usable ? t("operation.coolifyUsable") : t("operation.coolifyNotUsable")).toLowerCase()}
                 </span>
               </div>
             )}

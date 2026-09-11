@@ -118,7 +118,7 @@ export default function DomainTree({ indexes, tables, selectedId, onSelect, filt
                           <button
                             onClick={() => setLayerFilter(layer)}
                             className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
-                            title={`Filter by ${layer}`}
+                            title={t("atlas.catalog.filterByLayer", { layer })}
                           >
                             <span className={`w-1.5 h-1.5 rounded-full ${s.dot} shrink-0`} />
                             <span className={`text-xs font-mono ${filterActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"} group-hover:text-[var(--text-primary)]`}>

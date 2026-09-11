@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { grafanaAPI, alertSettingsAPI } from "@/lib/api";
+import { useLocale } from "@/contexts/LocaleContext";
 import KpiGrid from "@/components/inventory/KpiGrid";
 
 interface Props {
@@ -15,6 +16,7 @@ const DEFAULT_CRITICAL = 80;
 const DEFAULT_WARNING = 60;
 
 export default function HostLiveKpis({ slug }: Props) {
+  const { t } = useLocale();
   const { data, isLoading } = useQuery({
     queryKey: ["host-live-metrics", slug],
     queryFn: () => grafanaAPI.hostLiveMetrics(slug),
@@ -37,37 +39,37 @@ export default function HostLiveKpis({ slug }: Props) {
     if (!data) return [];
     return [
       {
-        label: "CPU",
+        label: t("vm.cpu"),
         value: formatPct(data.cpu_pct),
         color: pickColor(data.cpu_pct, warning, critical),
         icon: "M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z",
       },
       {
-        label: "RAM",
+        label: t("vm.ram"),
         value: formatPct(data.ram_pct),
         color: pickColor(data.ram_pct, warning, critical),
         icon: "M4 6h16M4 12h16M4 18h16",
       },
       {
-        label: "Disk",
+        label: t("vm.disk"),
         value: formatPct(data.disk_pct),
         color: pickColor(data.disk_pct, warning, critical),
         icon: "M5 12V7a2 2 0 012-2h10a2 2 0 012 2v5m-14 0v5a2 2 0 002 2h10a2 2 0 002-2v-5M5 12h14",
       },
       {
-        label: "Load 1m",
+        label: t("host.metrics.load1m"),
         value: data.load_1m === null || data.load_1m === undefined ? "—" : data.load_1m.toFixed(2),
         color: "cyan",
         icon: "M13 10V3L4 14h7v7l9-11h-7z",
       },
       {
-        label: "Uptime",
+        label: t("vm.uptime"),
         value: formatUptime(data.uptime_seconds),
         color: data.host_up === false ? "red" : "emerald",
         icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
       },
     ];
-  }, [data, warning, critical]);
+  }, [data, warning, critical, t]);
 
   if (!isLoading && data && !data.enabled) {
     return null; // integration off — don't render anything
@@ -76,7 +78,7 @@ export default function HostLiveKpis({ slug }: Props) {
   if (!isLoading && data && !data.configured) {
     return (
       <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-4 py-3 text-xs text-[var(--text-muted)]">
-        Live KPIs are unavailable — set the Prometheus datasource UID in Settings → Integrations → Grafana, and ensure an API token is stored.
+        {t("host.metrics.liveKpisUnavailable")}
       </div>
     );
   }
@@ -99,7 +101,7 @@ export default function HostLiveKpis({ slug }: Props) {
       {data.warnings && data.warnings.length > 0 && (
         <details className="-mt-3 mb-3 text-2xs text-[var(--text-faint)]">
           <summary className="cursor-pointer hover:text-[var(--text-muted)]">
-            {data.warnings.length} metric{data.warnings.length === 1 ? "" : "s"} failed to fetch
+            {t("host.metrics.warningsFailedToFetch", { n: String(data.warnings.length) })}
           </summary>
           <ul className="mt-1 space-y-0.5 pl-4 list-disc">
             {data.warnings.map((w, i) => (
@@ -110,7 +112,7 @@ export default function HostLiveKpis({ slug }: Props) {
       )}
       {data.host_up === false && (
         <div className="-mt-2 mb-3 rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2 text-xs text-[var(--danger)]">
-          Prometheus reports this host as <strong>down</strong> (up=0). The tiles above show the last values Prometheus scraped.
+          {t("host.metrics.hostDownNotice")}
         </div>
       )}
     </div>

@@ -210,7 +210,7 @@ export default function AddApiModal({
 
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={close} type="button">
-            {t("common.cancel") || "Cancel"}
+            {t("common.cancel")}
           </Button>
           <Button onClick={submit} loading={submitting} type="button">
             {submitting ? t("atlas.apis.importing") : t("atlas.apis.import")}

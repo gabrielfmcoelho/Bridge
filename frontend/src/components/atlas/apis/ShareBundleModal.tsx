@@ -349,7 +349,7 @@ export default function ShareBundleModal({
           <p className="text-xs text-[var(--warning)]">⚠ {t("atlas.apis.tokenOnce")}</p>
           <div className="flex justify-end pt-2">
             <Button variant="secondary" type="button" onClick={close}>
-              {t("common.close") || "Close"}
+              {t("common.close")}
             </Button>
           </div>
         </div>
@@ -503,7 +503,7 @@ export default function ShareBundleModal({
               </Button>
             ) : (
               <Button variant="ghost" type="button" onClick={close}>
-                {t("common.cancel") || "Cancel"}
+                {t("common.cancel")}
               </Button>
             )}
             <Button type="button" onClick={submit} loading={submitting}>

@@ -118,7 +118,7 @@ function ModelPanel({ node, indexes, onSelectNode }: { node: LineageNode; indexe
       <KeyValueGrid items={[
         ["materialized", t("atlas.pipeline.detail.materialized"), d?.materialized],
         ["schema", t("atlas.pipeline.detail.schema"), d?.schema],
-        ["unique_key", "Unique key", d?.unique_key],
+        ["unique_key", t("atlas.pipeline.detail.uniqueKey"), d?.unique_key],
       ]} />
       {refs.length > 0 && (
         <Section label={t("atlas.pipeline.detail.refs")}>
@@ -151,17 +151,18 @@ function ModelPanel({ node, indexes, onSelectNode }: { node: LineageNode; indexe
 // -- dbt Source ---------------------------------------------------------------
 
 function SourcePanel({ node, indexes, onSelectNode }: { node: LineageNode; indexes: AtlasIndexes; onSelectNode: (id: string) => void }) {
+  const { t } = useLocale();
   const d = node.data as Record<string, unknown> | undefined;
   const consumers = (indexes.inEdges.get(node.id) ?? []).filter(e => e.kind === "uses_source").map(e => indexes.nodesById.get(e.source)).filter(Boolean) as LineageNode[];
   return (
     <div className="flex flex-col gap-5">
       <SectionHeader type={node.type} label={node.label} namespace={node.namespace} />
       <KeyValueGrid items={[
-        ["catalog", "Catalog", d?.catalog],
-        ["schema", "Schema", d?.schema],
+        ["catalog", t("atlas.pipeline.detail.catalog"), d?.catalog],
+        ["schema", t("atlas.pipeline.detail.schema"), d?.schema],
       ]} />
       {consumers.length > 0 && (
-        <Section label="Used by">
+        <Section label={t("atlas.pipeline.detail.usedBy")}>
           {consumers.map(n => <NodeLink key={n.id} node={n} onSelect={() => onSelectNode(n.id)} />)}
         </Section>
       )}

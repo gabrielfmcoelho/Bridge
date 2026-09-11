@@ -89,9 +89,9 @@ export default function BatchDockerLogsModal({
         try {
           const res = await sshAPI.dockerLogsInspect(host.oficial_slug);
           if (!res.success) {
-            collectedErrors.push({ slug: host.oficial_slug, nickname: host.nickname, error: res.error || "Failed" });
+            collectedErrors.push({ slug: host.oficial_slug, nickname: host.nickname, error: res.error || t("filters.failed") });
             setErrors([...collectedErrors]);
-            return { success: false, error: res.error || "Failed" };
+            return { success: false, error: res.error || t("filters.failed") };
           }
           if (res.report) {
             collected.set(host.oficial_slug, res.report);
@@ -100,7 +100,7 @@ export default function BatchDockerLogsModal({
           }
           return { success: true };
         } catch (err) {
-          const msg = err instanceof Error ? err.message : "Failed";
+          const msg = err instanceof Error ? err.message : t("filters.failed");
           collectedErrors.push({ slug: host.oficial_slug, nickname: host.nickname, error: msg });
           setErrors([...collectedErrors]);
           return { success: false, error: msg };
@@ -109,7 +109,7 @@ export default function BatchDockerLogsModal({
     }).then(() => {
       queryClient.invalidateQueries({ queryKey: ["hosts"] });
     });
-  }, [targets, concurrency, runner, queryClient]);
+  }, [targets, concurrency, runner, queryClient, t]);
 
   const showAnalysis = reports.size > 0 && !runner.running;
 
@@ -136,6 +136,7 @@ export default function BatchDockerLogsModal({
         cancelLabel={t("common.cancel")}
         progressLabel={t("host.scanProgress")}
         runningLabel={t("host.batchRunning")}
+        failedLabel={t("filters.failed").toLowerCase()}
         emptyHint={targets.length === 0 ? t("host.batchDockerLogsEmpty") : undefined}
         onStart={handleStart}
         onStop={runner.stop}
@@ -229,10 +230,10 @@ function FleetAnalysisPanel({
             <span>{t("host.title")}</span>
             <span className="text-right">{t("host.batchDockerLogsTotalSize")}</span>
             <span className="text-right">{t("host.batchDockerLogsUnbounded")}</span>
-            <span className="text-right">Risk</span>
+            <span className="text-right">{t("host.batchDockerLogsRisk")}</span>
           </div>
           {stats.rows.map(({ host, report }) => (
-            <FleetRow key={host.oficial_slug} host={host} report={report} />
+            <FleetRow key={host.oficial_slug} host={host} report={report} t={t} />
           ))}
         </div>
       )}
@@ -258,7 +259,7 @@ function FleetAnalysisPanel({
   );
 }
 
-function FleetRow({ host, report }: { host: Host; report: DockerLogsReport }) {
+function FleetRow({ host, report, t }: { host: Host; report: DockerLogsReport; t: (key: string) => string }) {
   const riskClass =
     report.risk_level === "critical"
       ? "bg-[var(--danger)]/15 text-[var(--danger)] border-[var(--danger)]/40"
@@ -275,7 +276,7 @@ function FleetRow({ host, report }: { host: Host; report: DockerLogsReport }) {
       </span>
       <span
         className={`text-right ${report.unbounded_containers > 0 ? "text-[var(--warning)]" : "text-[var(--text-faint)]"} font-mono`}
-        title={report.unbounded_containers > 0 ? "Containers without rotation" : "All containers have rotation"}
+        title={report.unbounded_containers > 0 ? t("host.batchDockerLogsUnboundedTooltip") : t("host.batchDockerLogsBoundedTooltip")}
       >
         {report.unbounded_containers}
       </span>

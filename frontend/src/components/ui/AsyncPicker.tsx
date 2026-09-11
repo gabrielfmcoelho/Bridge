@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { useLocale } from "@/contexts/LocaleContext";
 
 export interface AsyncPickerItem {
   id: number;
@@ -43,6 +44,7 @@ type Props = (SingleProps | MultiProps) & {
 };
 
 export default function AsyncPicker(props: Props) {
+  const { t } = useLocale();
   const {
     label,
     error,
@@ -74,7 +76,7 @@ export default function AsyncPicker(props: Props) {
         })
         .catch((err) => {
           if (reqTokenRef.current !== token) return;
-          setFetchErr(err instanceof Error ? err.message : "fetch failed");
+          setFetchErr(err instanceof Error ? err.message : t("common.fetchFailed"));
           setItems([]);
         })
         .finally(() => {
@@ -82,7 +84,7 @@ export default function AsyncPicker(props: Props) {
         });
     }, 200);
     return () => clearTimeout(timer);
-  }, [query, open, fetcher]);
+  }, [query, open, fetcher, t]);
 
   const selectedItems = multi ? props.selectedItems : [];
   const selectedIDs = new Set(selectedItems.map((i) => i.id));
@@ -142,7 +144,7 @@ export default function AsyncPicker(props: Props) {
               <span className="flex-1 flex flex-wrap gap-1 min-w-0">
                 {selectedItems.length === 0 ? (
                   <span className="text-[var(--text-faint)]">
-                    {placeholder || "Selecione…"}
+                    {placeholder || t("common.selectPlaceholder")}
                   </span>
                 ) : (
                   selectedItems.map((s) => (
@@ -165,7 +167,7 @@ export default function AsyncPicker(props: Props) {
                             removeMulti(s.id);
                           }}
                           className="w-4 h-4 inline-flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
-                          aria-label={`Remover ${s.label}`}
+                          aria-label={t("common.removeItem", { label: s.label })}
                         >
                           ×
                         </button>
@@ -176,7 +178,7 @@ export default function AsyncPicker(props: Props) {
               </span>
             ) : (
               <span className={props.value != null ? "" : "text-[var(--text-faint)]"}>
-                {singleLabel || placeholder || "Selecione…"}
+                {singleLabel || placeholder || t("common.selectPlaceholder")}
               </span>
             )}
             <Icon path={ICON_PATHS.chevronDown} className={`w-3.5 h-3.5 text-[var(--text-faint)] shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -200,7 +202,7 @@ export default function AsyncPicker(props: Props) {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={placeholder || "Buscar…"}
+                placeholder={placeholder || t("common.search")}
                 className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
@@ -211,18 +213,18 @@ export default function AsyncPicker(props: Props) {
                   onClick={() => pickSingle(null)}
                   className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-elevated)]"
                 >
-                  — limpar seleção —
+                  {t("ui.asyncPicker.clearSelection")}
                 </button>
               )}
               {loading && (
-                <div className="px-3 py-2 text-xs text-[var(--text-muted)] animate-pulse">Carregando…</div>
+                <div className="px-3 py-2 text-xs text-[var(--text-muted)] animate-pulse">{t("common.loading")}</div>
               )}
               {fetchErr && (
                 <div className="px-3 py-2 text-xs text-[var(--danger)]">{fetchErr}</div>
               )}
               {!loading && !fetchErr && items.length === 0 && (
                 <div className="px-3 py-2 text-xs text-[var(--text-faint)]">
-                  {emptyLabel ?? "Nenhum resultado"}
+                  {emptyLabel ?? t("common.noResultsShort")}
                 </div>
               )}
               {!loading && items.map((item) => {

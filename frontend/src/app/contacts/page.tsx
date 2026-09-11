@@ -56,7 +56,7 @@ export default function ContactsPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Contacts" addLabel={canEdit ? t("common.add") : undefined} onAdd={canEdit ? () => { setEditing(null); setShowForm(true); } : undefined} />
+      <PageHeader title={t("nav.contacts")} addLabel={canEdit ? t("common.add") : undefined} onAdd={canEdit ? () => { setEditing(null); setShowForm(true); } : undefined} />
 
       <div className="mb-5 max-w-xs">
         <Input
@@ -73,8 +73,8 @@ export default function ContactsPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon="folder"
-          title="No contacts"
-          description={search ? "Try adjusting your search" : "Add contacts to reuse across hosts, projects, and services."}
+          title={t("contact.emptyTitle")}
+          description={search ? t("contact.searchEmptyHint") : t("contact.emptyHint")}
           action={canEdit && !search ? <Button size="sm" onClick={() => setShowForm(true)}>+ {t("common.add")}</Button> : undefined}
         />
       ) : (
@@ -87,7 +87,7 @@ export default function ContactsPage() {
                 <th className={tableClasses.th}>{t("responsavel.role")}</th>
                 <th className={tableClasses.th}>{t("responsavel.entity")}</th>
                 <th className={`${tableClasses.th} w-24`}>{t("responsavel.external")}</th>
-                {canEdit && <th className={`${tableClasses.th} text-right w-24`}>Actions</th>}
+                {canEdit && <th className={`${tableClasses.th} text-right w-24`}>{t("common.actions")}</th>}
               </tr>
             </thead>
             <tbody>
@@ -121,7 +121,7 @@ export default function ContactsPage() {
         </div>
       )}
 
-      <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={editing ? "Edit Contact" : "Add Contact"}>
+      <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={editing ? t("contact.editTitle") : t("contact.addTitle")}>
         <ContactForm
           initial={editing}
           onSuccess={() => {

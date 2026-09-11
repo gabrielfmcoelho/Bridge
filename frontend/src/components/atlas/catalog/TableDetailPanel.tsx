@@ -37,7 +37,7 @@ export default function TableDetailPanel({ indexes, tableId, onSelectTable, onSe
   }, [indexes, tableId]);
 
   if (!rec) {
-    return <div className="text-sm text-[var(--text-muted)]">Table not found in the index.</div>;
+    return <div className="text-sm text-[var(--text-muted)]">{t("atlas.catalog.tableNotFoundInIndex")}</div>;
   }
 
   const downstreamCount = neighbors.downstream.length;
@@ -116,7 +116,7 @@ export default function TableDetailPanel({ indexes, tableId, onSelectTable, onSe
         </SectionLabel>
         <div className="flex flex-col gap-1 rounded-[var(--radius-md)] border border-[var(--border-subtle)] overflow-hidden bg-[var(--bg-base)]">
           {columns.length === 0 ? (
-            <p className="text-xs text-[var(--text-muted)] italic p-3">No columns indexed.</p>
+            <p className="text-xs text-[var(--text-muted)] italic p-3">{t("atlas.catalog.noColumnsIndexed")}</p>
           ) : (
             columns.map((col, i) => (
               <ColumnRow
@@ -192,6 +192,7 @@ function ColumnRow({
   isLast: boolean;
   onClick: () => void;
 }) {
+  const { t } = useLocale();
   const upstreamCount = neighborsIn(indexes, col.id, ["column_lineage"]).length;
   const downstreamCount = neighborsOut(indexes, col.id, ["column_lineage"]).length;
   const dtype = (col.data as Record<string, unknown> | undefined)?.data_type;
@@ -211,11 +212,11 @@ function ColumnRow({
         <span className="text-2xs font-mono text-[var(--text-muted)] truncate">{String(dtype)}</span>
       )}
       {inferred && (
-        <span className="text-3xs uppercase tracking-wider text-[var(--text-faint)]">inferred</span>
+        <span className="text-3xs uppercase tracking-wider text-[var(--text-faint)]">{t("atlas.catalog.column.inferred")}</span>
       )}
       <span className="text-3xs tabular-nums text-[var(--text-muted)] shrink-0 inline-flex items-center gap-2">
-        <span title="upstream column edges">↑ {upstreamCount}</span>
-        <span title="downstream column edges">↓ {downstreamCount}</span>
+        <span title={t("atlas.catalog.upstreamColumnEdges")}>↑ {upstreamCount}</span>
+        <span title={t("atlas.catalog.downstreamColumnEdges")}>↓ {downstreamCount}</span>
       </span>
       <Icon path={ICON_PATHS.chevronRight} className="w-3 h-3 text-[var(--text-faint)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </button>

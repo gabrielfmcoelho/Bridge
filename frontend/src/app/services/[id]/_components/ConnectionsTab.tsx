@@ -42,7 +42,7 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--text-faint)]">No dependencies</p>
+          <p className="text-sm text-[var(--text-faint)]">{t("service.noDependencies")}</p>
         )}
       </Card>
 
@@ -66,14 +66,14 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--text-faint)]">No dependents</p>
+          <p className="text-sm text-[var(--text-faint)]">{t("service.noDependents")}</p>
         )}
       </Card>
 
       {/* Linked Hosts */}
       <Card hover={false}>
         <SectionHeading variant="section">
-          Linked Hosts
+          {t("service.linkedHosts")}
         </SectionHeading>
         {linkedHosts.length > 0 ? (
           <div className="space-y-1">
@@ -92,14 +92,14 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--text-faint)]">No linked hosts</p>
+          <p className="text-sm text-[var(--text-faint)]">{t("service.noLinkedHosts")}</p>
         )}
       </Card>
 
       {/* Linked DNS */}
       <Card hover={false}>
         <SectionHeading variant="section">
-          Linked DNS
+          {t("service.linkedDns")}
         </SectionHeading>
         {linkedDns.length > 0 ? (
           <div className="space-y-1">
@@ -120,7 +120,7 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--text-faint)]">No linked DNS records</p>
+          <p className="text-sm text-[var(--text-faint)]">{t("service.noLinkedDns")}</p>
         )}
       </Card>
     </div>

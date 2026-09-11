@@ -104,7 +104,7 @@ export default function OfferingFormModal({ offering, categories, onClose }: {
       return offering ? offeringsAPI.update(offering.id, payload) : offeringsAPI.create(payload);
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["offerings"] }); onClose(); },
-    onError: (err: unknown) => setSubmitError(err instanceof Error ? err.message : "Failed"),
+    onError: (err: unknown) => setSubmitError(err instanceof Error ? err.message : t("common.requestFailed")),
   });
 
   const submit = (e: FormEvent) => {

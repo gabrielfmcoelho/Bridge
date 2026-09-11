@@ -72,7 +72,7 @@ export default function DnsDetail({ id }: { id: number }) {
   const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
     {
       key: "overview",
-      label: "Overview",
+      label: t("host.tabOverview"),
       icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
     },
     {
@@ -83,7 +83,7 @@ export default function DnsDetail({ id }: { id: number }) {
     },
     {
       key: "topology",
-      label: "Topology",
+      label: t("host.tabTopology"),
       icon: "M13 10V3L4 14h7v7l9-11h-7z",
     },
   ];
@@ -115,14 +115,14 @@ export default function DnsDetail({ id }: { id: number }) {
             title={dns.domain}
             titleFont="mono"
             titleColor="var(--accent)"
-            subtitle="DNS Record"
+            subtitle={t("dns.record")}
             badges={
               <>
                 <Badge variant="situacao" situacao={dns.situacao} dot>{dns.situacao}</Badge>
                 {dns.has_https && (
                   <Badge color="emerald">
                     <Icon path={ICON_PATHS.lock} className="w-3 h-3 mr-1" />
-                    HTTPS
+                    {t("topology.https")}
                   </Badge>
                 )}
               </>
@@ -141,7 +141,7 @@ export default function DnsDetail({ id }: { id: number }) {
               isAdmin={isAdmin}
               onEdit={() => setShowEditDrawer(true)}
               onDelete={() => deleteMutation.mutate()}
-              deleteConfirmMessage={`Delete "${dns.domain}"? This cannot be undone.`}
+              deleteConfirmMessage={t("dns.deleteConfirm", { name: dns.domain })}
             />
           </DetailHeader>
 

@@ -505,7 +505,7 @@ function SyncForm({ onSuccess }: { onSuccess: () => void }) {
       )}
       {serviceId && dnsOptions.length === 0 && serviceDetail && (
         <p className="text-xs text-[var(--text-faint)]">
-          This service has no linked DNS records. Link a DNS record to the service first.
+          {t("tool.noLinkedDns")}
         </p>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -604,7 +604,7 @@ function CredentialRow({ secret }: { secret: Secret }) {
               onClick={r.copy}
               className="text-xs text-[var(--accent)] hover:underline"
             >
-              {r.copyState === "copied" ? "Copied" : r.copyState === "cleared" ? "Cleared" : "Copy"}
+              {r.copyState === "copied" ? t("serviceCredentials.copied") : r.copyState === "cleared" ? t("serviceCredentials.cleared") : t("common.copy")}
             </button>
           )}
           <button

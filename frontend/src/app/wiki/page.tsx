@@ -177,7 +177,7 @@ function WikiPageInner() {
       }`}
     >
       <Icon path={ICON_PATHS.magnifier} />
-      Search
+      {t("wiki.search")}
     </button>
   );
 
@@ -190,12 +190,12 @@ function WikiPageInner() {
           ))}
         </div>
       ) : !tree?.enabled ? (
-        <p className="text-xs text-[var(--text-faint)]">Outline integration disabled.</p>
+        <p className="text-xs text-[var(--text-faint)]">{t("wiki.outlineDisabled")}</p>
       ) : !tree?.configured ? (
-        <p className="text-xs text-[var(--text-faint)]">Outline not configured.</p>
+        <p className="text-xs text-[var(--text-faint)]">{t("wiki.outlineNotConfigured")}</p>
       ) : (tree.sections?.length ?? 0) === 0 ? (
         <p className="text-xs text-[var(--text-faint)]">
-          No common collections configured. Ask an admin to pick some in Settings → Integrations → Outline.
+          {t("wiki.noCommonCollections")}
         </p>
       ) : (
         tree.sections.map((section) => {
@@ -235,7 +235,7 @@ function WikiPageInner() {
                     type="button"
                     onClick={() => setCreateForCollection(section.collection_id)}
                     className="text-[var(--text-faint)] hover:text-[var(--accent)] text-xs px-1"
-                    title="New page in this collection"
+                    title={t("wiki.newPageInCollection")}
                   >
                     +
                   </button>
@@ -285,25 +285,25 @@ function WikiPageInner() {
                 <h2
                   className="text-3xl font-semibold text-[var(--text-primary)] font-display"
                 >
-                  Search the wiki
+                  {t("wiki.searchTheWiki")}
                 </h2>
                 <p className="mt-2 text-sm text-[var(--text-muted)]">
-                  Looks across every collection the integration can see.
+                  {t("wiki.searchHint")}
                 </p>
               </div>
             )}
             <WikiSearchBar
               value={searchQuery}
               onChange={setSearchQuery}
-              placeholder="Type to search…"
+              placeholder={t("wiki.searchPlaceholder")}
             />
             {isSearching && (
               <div className="mt-5">
                 {searchFetching && searchHits.length === 0 ? (
-                  <p className="text-sm text-[var(--text-muted)] text-center py-6 animate-pulse">Searching…</p>
+                  <p className="text-sm text-[var(--text-muted)] text-center py-6 animate-pulse">{t("wiki.searching")}</p>
                 ) : searchHits.length === 0 ? (
                   <p className="text-sm text-[var(--text-muted)] text-center py-6">
-                    No results for “{searchQuery}”.
+                    {t("wiki.noResultsFor", { query: searchQuery })}
                   </p>
                 ) : (
                   <ul className="space-y-2">
@@ -320,11 +320,11 @@ function WikiPageInner() {
                         <>
                           <div className="flex items-start justify-between gap-3">
                             <p className="text-sm font-medium text-[var(--text-primary)] flex-1 min-w-0 truncate">
-                              {hit.title || "Untitled"}
+                              {hit.title || t("wiki.untitled")}
                             </p>
                             {!canOpen && (
                               <span
-                                title="Outside the configured common collections — opens in Outline only"
+                                title={t("wiki.outsideCommonCollections")}
                                 className="shrink-0 text-[var(--text-faint)]"
                               >
                                 <Icon path={ICON_PATHS.lockAlt} className="w-3.5 h-3.5" />
@@ -379,12 +379,12 @@ function WikiPageInner() {
                   className="text-3xl font-bold text-[var(--text-primary)] leading-tight flex items-start gap-2 font-display"
                 >
                   {doc.emoji && <span className="shrink-0">{doc.emoji}</span>}
-                  <span>{doc.title || "Untitled"}</span>
+                  <span>{doc.title || t("wiki.untitled")}</span>
                 </h2>
                 <button
                   type="button"
                   onClick={() =>
-                    setShareTarget({ kind: "wiki_doc", refKey: doc.id, title: doc.title || "Untitled" })
+                    setShareTarget({ kind: "wiki_doc", refKey: doc.id, title: doc.title || t("wiki.untitled") })
                   }
                   className="shrink-0 inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-overlay)] hover:text-[var(--text-primary)]"
                   title={t("atlas.apis.shareWikiPage")}
@@ -394,8 +394,9 @@ function WikiPageInner() {
                 </button>
               </div>
               <p className="mt-1.5 text-xs text-[var(--text-muted)]">
-                Updated {getTimeAgo(doc.updated_at, locale)}
-                {doc.updated_by ? ` by ${doc.updated_by}` : ""}
+                {doc.updated_by
+                  ? t("wiki.updatedAtBy", { time: getTimeAgo(doc.updated_at, locale), name: doc.updated_by })
+                  : t("wiki.updatedAt", { time: getTimeAgo(doc.updated_at, locale) })}
               </p>
             </div>
           )}
@@ -406,8 +407,8 @@ function WikiPageInner() {
     return (
       <EmptyState
         icon="folder"
-        title="Pick a document"
-        description="Choose a page from the left nav, or use Search to query the workspace."
+        title={t("wiki.pickDocumentTitle")}
+        description={t("wiki.pickDocumentDescription")}
       />
     );
   })();
@@ -421,7 +422,7 @@ function WikiPageInner() {
             <button
               type="button"
               onClick={() => setSidebarCollapsed(false)}
-              title="Expand nav"
+              title={t("wiki.expandNav")}
               className="w-8 h-8 inline-flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
             >
               <Icon path={ICON_PATHS.chevronRight} />
@@ -430,7 +431,7 @@ function WikiPageInner() {
             <button
               type="button"
               onClick={enterSearchMode}
-              title="Search"
+              title={t("wiki.search")}
               className={`w-8 h-8 inline-flex items-center justify-center rounded-[var(--radius-sm)] transition-colors ${
                 viewMode === "search"
                   ? "bg-[var(--accent-muted)] text-[var(--accent)]"
@@ -466,7 +467,7 @@ function WikiPageInner() {
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                title="Open in Outline"
+                title={t("wiki.openInOutline")}
                 className="w-full h-10 inline-flex items-center justify-center bg-[var(--accent)] text-white hover:opacity-90 transition-opacity"
               >
                 <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
@@ -485,7 +486,7 @@ function WikiPageInner() {
                 <button
                   type="button"
                   onClick={() => setSidebarCollapsed(true)}
-                  title="Collapse nav"
+                  title={t("wiki.collapseNav")}
                   className="hidden md:inline-flex w-8 h-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] shrink-0"
                 >
                   <Icon path={ICON_PATHS.back} className="w-3.5 h-3.5" />
@@ -505,7 +506,7 @@ function WikiPageInner() {
               rel="noopener noreferrer"
               className="w-full h-10 inline-flex items-center justify-center gap-1.5 bg-[var(--accent)] text-white text-xs font-medium hover:opacity-90 transition-opacity"
             >
-              Open in Outline
+              {t("wiki.openInOutline")}
               <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
             </Link>
           </div>
@@ -520,7 +521,7 @@ function WikiPageInner() {
               onClick={() => setMobileNavOpen((v) => !v)}
               className="text-xs px-2 py-1 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-elevated)]"
             >
-              {mobileNavOpen ? "Close nav" : "Browse"}
+              {mobileNavOpen ? t("wiki.closeNav") : t("wiki.browse")}
             </button>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 flex flex-col">

@@ -41,7 +41,7 @@ export default function IssuesTab({ issues, t }: IssuesTabProps) {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--text-faint)]">No issues reported</p>
+          <p className="text-sm text-[var(--text-faint)]">{t("issue.noneReported")}</p>
         )}
       </Card>
     </div>

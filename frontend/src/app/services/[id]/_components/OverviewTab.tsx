@@ -29,7 +29,7 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
       {/* Main info grid */}
       <Card accent="purple" hover={false}>
         <SectionHeading variant="section">
-          Service Info
+          {t("service.serviceInfo")}
         </SectionHeading>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Field label={t("service.serviceType")} value={[service.service_type, service.service_subtype].filter(Boolean).join(" / ")} />
@@ -90,7 +90,7 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
       {service.is_external_dependency && (
         <Card accent="amber" hover={false}>
           <SectionHeading variant="section">
-            External Dependency
+            {t("service.isExternalDependency")}
           </SectionHeading>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Field label={t("service.externalProvider")} value={service.external_provider} />

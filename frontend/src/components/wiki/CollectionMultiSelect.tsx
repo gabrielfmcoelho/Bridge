@@ -5,6 +5,7 @@ import * as Popover from "@radix-ui/react-popover";
 import type { OutlineWorkspaceCollection } from "@/lib/api";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   label?: string;
@@ -25,6 +26,7 @@ export default function CollectionMultiSelect({
   disabled,
   emptyHint,
 }: Props) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -70,7 +72,7 @@ export default function CollectionMultiSelect({
       >
         {selected.length === 0 && (
           <span className="text-[var(--text-faint)] px-1">
-            {loading ? "Loading collections…" : emptyHint ?? "No collections selected"}
+            {loading ? t("wiki.loadingCollections") : emptyHint ?? t("wiki.noCollectionsSelected")}
           </span>
         )}
         {selected.map((c) => (
@@ -90,7 +92,7 @@ export default function CollectionMultiSelect({
                 type="button"
                 onClick={() => remove(c.id)}
                 className="w-4 h-4 inline-flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
-                aria-label={`Remove ${c.name}`}
+                aria-label={t("wiki.removeCollection", { name: c.name })}
               >
                 ×
               </button>
@@ -111,7 +113,7 @@ export default function CollectionMultiSelect({
               disabled={disabled}
               className="inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline px-2 py-0.5 disabled:cursor-not-allowed"
             >
-              + Add collection
+              + {t("wiki.addCollection")}
             </button>
           </Popover.Trigger>
           <Popover.Portal>
@@ -131,14 +133,14 @@ export default function CollectionMultiSelect({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search collections…"
+                  placeholder={t("wiki.searchCollectionsPlaceholder")}
                   className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
               <div className="max-h-72 overflow-y-auto">
                 {filtered.length === 0 ? (
                   <div className="px-3 py-3 text-xs text-[var(--text-faint)]">
-                    {loading ? "Loading…" : "No collections found"}
+                    {loading ? t("wiki.loadingOptions") : t("wiki.noCollectionsFound")}
                   </div>
                 ) : (
                   filtered.map((c) => {

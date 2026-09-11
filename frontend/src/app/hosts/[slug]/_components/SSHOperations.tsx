@@ -210,7 +210,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         return { status: "error", content: <OperationOutput data={{ error: data.error }} /> };
       }
       const r = data.report;
-      if (!r) return { status: "warning", content: "No report returned." };
+      if (!r) return { status: "warning", content: t("host.ops.noReportReturned") };
       return {
         status: r.risk_level === "critical" ? "error" : r.risk_level === "warning" ? "warning" : "success",
         content: <DockerLogsReportView report={r} />,
@@ -337,7 +337,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
           status: "error" as const,
           content: (
             <div className="space-y-2 text-xs">
-              <p>{data.error || "Install failed"}</p>
+              <p>{data.error || t("host.ops.installFailed")}</p>
               {data.output && (
                 <pre
                   className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-2xs overflow-x-auto whitespace-pre-wrap break-all font-mono"
@@ -353,10 +353,10 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         status: "success" as const,
         content: (
           <div className="space-y-2 text-xs">
-            <p>{data.message || "grafana-agent installed"}</p>
+            <p>{data.message || t("host.ops.grafanaAgentInstalled")}</p>
             {data.output && (
               <details>
-                <summary className="cursor-pointer text-[var(--text-muted)]">Output</summary>
+                <summary className="cursor-pointer text-[var(--text-muted)]">{t("operation.consoleOutput")}</summary>
                 <pre
                   className="mt-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-2xs overflow-x-auto whitespace-pre-wrap break-all font-mono"
                 >
@@ -385,7 +385,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         content: (
           <div className="space-y-2 text-xs">
             <p>{s.message}</p>
-            {s.backup_path && <p>Backup: <span className="font-mono">{s.backup_path}</span></p>}
+            {s.backup_path && <p>{t("host.ops.backupLabel")} <span className="font-mono">{s.backup_path}</span></p>}
             <div className="space-y-1">
               {s.steps.map((step, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -690,7 +690,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   return (
     <div className="space-y-4">
       {serverInfo && !serverInfo.is_local && (
-        <p className="text-xs text-[var(--text-faint)]">Server — <span className="text-[var(--text-muted)]">{serverInfo.hostname}</span></p>
+        <p className="text-xs text-[var(--text-faint)]">{t("host.ops.serverLabel")} <span className="text-[var(--text-muted)]">{serverInfo.hostname}</span></p>
       )}
 
       {!hasPassword && !hasKey && (
@@ -1035,7 +1035,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                       <option value="">{t("operation.deleteRemoteUserPickPlaceholder")}</option>
                       {pickerUsers.map((u) => (
                         <option key={u.name} value={u.name}>
-                          {u.name} (uid {u.uid}){u.has_login ? "" : ` · ${t("operation.deleteRemoteUserNoLogin")}`}
+                          {u.name} {t("host.ops.uidSuffix").replace("{uid}", String(u.uid))}{u.has_login ? "" : ` · ${t("operation.deleteRemoteUserNoLogin")}`}
                         </option>
                       ))}
                     </select>

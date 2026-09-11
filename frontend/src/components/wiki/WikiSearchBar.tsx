@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
   value: string;
@@ -14,6 +15,7 @@ interface Props {
 // WikiSearchBar is a debounced input whose value is pushed up only after the
 // user stops typing. Keeps the query endpoint from being hit on every keystroke.
 export default function WikiSearchBar({ value, onChange, placeholder, debounceMs = 300 }: Props) {
+  const { t } = useLocale();
   const [local, setLocal] = useState(value);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -46,7 +48,7 @@ export default function WikiSearchBar({ value, onChange, placeholder, debounceMs
             onChange("");
           }
         }}
-        placeholder={placeholder ?? "Search the wiki…"}
+        placeholder={placeholder ?? t("wiki.searchWikiPlaceholder")}
         className="w-full bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] pl-8 pr-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)]"
       />
       {local && (
@@ -54,7 +56,7 @@ export default function WikiSearchBar({ value, onChange, placeholder, debounceMs
           type="button"
           onClick={() => { setLocal(""); onChange(""); }}
           className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm"
-          aria-label="Clear search"
+          aria-label={t("wiki.clearSearch")}
         >
           ×
         </button>

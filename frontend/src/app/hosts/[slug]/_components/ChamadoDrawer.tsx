@@ -11,6 +11,7 @@ import Field from "@/components/ui/Field";
 import Badge from "@/components/ui/Badge";
 import { glpiAPI, integrationsAPI } from "@/lib/api";
 import type { HostChamado } from "@/lib/types";
+import { useLocale } from "@/contexts/LocaleContext";
 
 function applyDateMask(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 8);
@@ -117,10 +118,10 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
                 {chamado.status === "in_execution" ? t("chamado.inExecution") : chamado.status === "solved" ? t("chamado.solved") : chamado.status}
               </span>
             </div>
-            <Field label={t("host.chamadoUser") || "User"} value={chamado.user_display_name || "--"} />
+            <Field label={t("host.chamadoUser")} value={chamado.user_display_name || "--"} />
           </div>
 
-          <Field label={t("host.chamadoDate") || "Date"} value={chamado.date || "--"} />
+          <Field label={t("host.chamadoDate")} value={chamado.date || "--"} />
 
           {slug && <GlpiRefreshBlock slug={slug} chamado={chamado} />}
         </div>
@@ -146,22 +147,22 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
         }
       >
         <div className="space-y-4">
-          <Input label={t("host.chamadoId") || "Chamado ID"} value={chamadoId} onChange={(e) => setChamadoId(e.target.value)} placeholder="GLPI #..." required />
+          <Input label={t("host.chamadoId")} value={chamadoId} onChange={(e) => setChamadoId(e.target.value)} placeholder="GLPI #..." required />
           <Input label={t("common.title")} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("chamado.titlePlaceholder")} />
           <div className="grid grid-cols-2 gap-3">
             <Select label={t("common.status")} value={status} onChange={(e) => setStatus(e.target.value)} options={[
-              { value: "in_execution", label: t("chamado.inExecution") || "In Execution" },
-              { value: "solved", label: t("chamado.solved") || "Solved" },
+              { value: "in_execution", label: t("chamado.inExecution") },
+              { value: "solved", label: t("chamado.solved") },
             ]} />
-            <Select label={t("host.chamadoUser") || "User"} value={String(userId)} options={userOptions} onChange={(e) => setUserId(Number(e.target.value))} />
+            <Select label={t("host.chamadoUser")} value={String(userId)} options={userOptions} onChange={(e) => setUserId(Number(e.target.value))} />
           </div>
           <Input
-            label={t("host.chamadoDate") || "Date"}
+            label={t("host.chamadoDate")}
             value={date}
             onChange={(e) => setDate(applyDateMask(e.target.value))}
             placeholder="DD/MM/YYYY"
             maxLength={10}
-            error={date.length === 10 && !isValidDate(date) ? "Data inválida" : undefined}
+            error={date.length === 10 && !isValidDate(date) ? t("chamado.invalidDate") : undefined}
           />
         </div>
       </Drawer>
@@ -173,7 +174,7 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
     <Drawer
       open={open}
       onClose={onClose}
-      title={t("host.addChamado") || "+ Add Chamado"}
+      title={t("host.addChamado")}
       footer={
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" className="flex-1" onClick={onClose}>{t("common.cancel")}</Button>
@@ -182,22 +183,22 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
       }
     >
       <div className="space-y-4">
-        <Input label={t("host.chamadoId") || "Chamado ID"} value={chamadoId} onChange={(e) => setChamadoId(e.target.value)} placeholder="GLPI #..." required />
+        <Input label={t("host.chamadoId")} value={chamadoId} onChange={(e) => setChamadoId(e.target.value)} placeholder="GLPI #..." required />
         <Input label={t("common.title")} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("chamado.titlePlaceholder")} />
         <div className="grid grid-cols-2 gap-3">
           <Select label={t("common.status")} value={status} onChange={(e) => setStatus(e.target.value)} options={[
-            { value: "in_execution", label: t("chamado.inExecution") || "In Execution" },
-            { value: "solved", label: t("chamado.solved") || "Solved" },
+            { value: "in_execution", label: t("chamado.inExecution") },
+            { value: "solved", label: t("chamado.solved") },
           ]} />
-          <Select label={t("host.chamadoUser") || "User"} value={String(userId)} options={userOptions} onChange={(e) => setUserId(Number(e.target.value))} />
+          <Select label={t("host.chamadoUser")} value={String(userId)} options={userOptions} onChange={(e) => setUserId(Number(e.target.value))} />
         </div>
         <Input
-          label={t("host.chamadoDate") || "Date"}
+          label={t("host.chamadoDate")}
           value={date}
           onChange={(e) => setDate(applyDateMask(e.target.value))}
           placeholder="DD/MM/YYYY"
           maxLength={10}
-          error={date.length === 10 && !isValidDate(date) ? "Data inválida" : undefined}
+          error={date.length === 10 && !isValidDate(date) ? t("chamado.invalidDate") : undefined}
         />
       </div>
     </Drawer>
@@ -209,6 +210,7 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
 // cached title/status from the last refresh plus a button to re-query GLPI.
 // A profile picker appears inline when more than one profile is configured.
 function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamado }) {
+  const { t } = useLocale();
   const queryClient = useQueryClient();
   const [profileID, setProfileID] = useState<number | null>(null);
   const [liveStatus, setLiveStatus] = useState<{ label: string; slug: string } | null>(null);
@@ -256,7 +258,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
           {chamado.cached_title ? (
             <p className="text-xs text-[var(--text-muted)] truncate">{chamado.cached_title}</p>
           ) : (
-            <p className="text-xs text-[var(--text-faint)] italic">No live data yet — click Refresh.</p>
+            <p className="text-xs text-[var(--text-faint)] italic">{t("chamado.drawer.noLiveData")}</p>
           )}
           {(chamado.cached_status || liveStatus) && (
             <div className="flex items-center gap-2 mt-1">
@@ -270,7 +272,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
                   rel="noopener noreferrer"
                   className="text-xs text-[var(--accent)] hover:underline"
                 >
-                  Open in GLPI ↗
+                  {t("chamado.drawer.openInGlpi")}
                 </Link>
               )}
             </div>
@@ -283,13 +285,13 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
           loading={mutation.isPending}
           disabled={!profileID}
         >
-          Refresh
+          {t("common.refresh")}
         </Button>
       </div>
 
       {(profiles?.length ?? 0) > 1 && (
         <div>
-          <label className="block text-2xs text-[var(--text-muted)] mb-1">Using profile</label>
+          <label className="block text-2xs text-[var(--text-muted)] mb-1">{t("chamado.drawer.usingProfile")}</label>
           <select
             value={profileID ?? ""}
             onChange={(e) => setProfileID(e.target.value ? parseInt(e.target.value, 10) : null)}
@@ -304,7 +306,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
 
       {mutation.isError && (
         <p className="text-xs text-[var(--danger)]">
-          {mutation.error instanceof Error ? mutation.error.message : "Refresh failed"}
+          {mutation.error instanceof Error ? mutation.error.message : t("chamado.drawer.refreshFailed")}
         </p>
       )}
     </div>

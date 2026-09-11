@@ -79,7 +79,7 @@ export default function SetupPage() {
             label={t("auth.displayName")}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Administrator"
+            placeholder={t("auth.displayNamePlaceholder")}
           />
           <Input
             label={t("auth.username")}
@@ -102,7 +102,7 @@ export default function SetupPage() {
         </form>
 
         <p className="text-center mt-6 text-2xs text-[var(--text-faint)] font-mono">
-          Initial setup - create the master administrator account
+          {t("auth.setupFooter")}
         </p>
       </div>
     </div>

@@ -77,7 +77,7 @@ export default function DnsForm({
     step,
     setStep,
     totalSteps: 3,
-    stepLabels: ["DNS Info", t("host.responsaveis") || "Responsaveis", "Links & Tags"],
+    stepLabels: [t("dns.info"), t("host.responsaveis") || "Responsaveis", t("dns.stepLinksTags")],
     onSubmit: () => mutation.mutate(),
     canProceed: step === 1 ? !!form.domain.trim() : true,
     isPending: mutation.isPending,
@@ -96,10 +96,10 @@ export default function DnsForm({
 
       {step === 1 && (
         <div className="space-y-4 animate-fade-in">
-          <Input label={t("dns.domain")} value={form.domain} onChange={(e) => set("domain", e.target.value)} required placeholder="e.g. example.com" />
+          <Input label={t("dns.domain")} value={form.domain} onChange={(e) => set("domain", e.target.value)} required placeholder={t("dns.domainPlaceholder")} />
           <Select label={t("host.situacao")} value={form.situacao} onChange={(e) => set("situacao", e.target.value)} options={situacoes.map((e) => ({ value: e.value, label: e.value }))} />
           <Checkbox label={t("dns.hasHttps")} checked={form.has_https} onChange={(v) => set("has_https", v)} />
-          <Input label={t("common.observacoes")} value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} placeholder="Notes about this DNS record..." />
+          <Input label={t("common.observacoes")} value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} placeholder={t("dns.notesPlaceholder")} />
         </div>
       )}
 
@@ -118,7 +118,7 @@ export default function DnsForm({
         <div className="space-y-4 animate-fade-in">
           <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <TagInput label={t("common.tags")} tags={tags} onChange={setTags} entityType="dns" />
-          <CheckboxList label="Linked Hosts" items={hosts.map((h) => ({ id: h.id, name: h.nickname }))} selected={form.host_ids} onChange={(ids) => set("host_ids", ids)} />
+          <CheckboxList label={t("dns.linkedHosts")} items={hosts.map((h) => ({ id: h.id, name: h.nickname }))} selected={form.host_ids} onChange={(ids) => set("host_ids", ids)} />
         </div>
       )}
     </div>

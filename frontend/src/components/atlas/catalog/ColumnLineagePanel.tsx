@@ -24,7 +24,7 @@ export default function ColumnLineagePanel({ indexes, columnId, onBack, onSelect
   const downstream = useMemo(() => buildColumnLineagePath(indexes, columnId, "downstream"), [indexes, columnId]);
 
   if (!column) {
-    return <div className="text-sm text-[var(--text-muted)]">Column not found.</div>;
+    return <div className="text-sm text-[var(--text-muted)]">{t("atlas.catalog.column.notFound")}</div>;
   }
 
   const dtype = (column.data as Record<string, unknown> | undefined)?.data_type;
