@@ -57,7 +57,17 @@ reprints them.
     letterspaced 10-12px text is the slowest text on the page to read, so
     nothing else earns it: differentiate labels by weight and colour at the
     same size. Swept 2026-09-11, 149 → 2.
-13. **Render data that exists.** A metadata pair with no value, a zero count,
+13. **Mono is for machine identifiers** — hostname, domain, IP, ID, path,
+    token, version, count, timestamp — where fixed advance width makes
+    character-level diffs pop. Prose gets `font-display` (which is the body
+    sans, not a third face). `CardHeader titleFont` and `DetailHeader
+    titleFont` carry the choice per entity.
+14. **Elevation is `--elevate` / `--elevate-hi`**, never `--shadow-*` directly
+    on a surface. In dark they are a 1px inner top highlight (a drop shadow
+    has nowhere to land on `#080c14`); in light they map to the real shadows.
+15. **State is never colour alone** (WCAG 1.4.1). A status dot carries shape
+    (filled vs ring) and an accessible name; prefer showing the label.
+16. **Render data that exists.** A metadata pair with no value, a zero count,
     a meter with no reading and a tag row with no tags are not rendered at
     all — `CardMetadataGrid`, `CardIndicator` and `CardTagsSection` return
     `null` rather than a `-`. Card grids use `items-start` so a card keeps its

@@ -1,25 +1,29 @@
 import type { ReactNode } from "react";
 
 /**
- * 3-line card header: title (mono), subtitle (mono/faint), description (muted) + badge.
- * Establishes a consistent visual hierarchy across all inventory cards.
+ * 3-line card header: title, subtitle (always mono — it is a slug or domain),
+ * description + badge. `titleFont` follows the rule: mono when the title is a
+ * machine identifier (hostname, domain), display when it is prose (a project
+ * name).
  */
 export default function CardHeader({
   title,
   subtitle,
   description,
   badge,
+  titleFont = "mono",
 }: {
   title: string;
   subtitle?: string;
   description?: string;
   badge: ReactNode;
+  titleFont?: "mono" | "display";
 }) {
   return (
     <div className="flex items-start justify-between mb-3">
       <div className="min-w-0 flex-1">
         <h3
-          className="font-semibold text-[var(--text-primary)] text-sm truncate font-mono"
+          className={`font-semibold text-[var(--text-primary)] text-sm truncate ${titleFont === "mono" ? "font-mono" : "font-display"}`}
         >
           {title}
         </h3>

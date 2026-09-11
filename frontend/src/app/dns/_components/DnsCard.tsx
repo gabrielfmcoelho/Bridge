@@ -28,7 +28,7 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
           title={dns.domain}
           description={dns.observacoes || t("common.noDescription")}
           badge={
-            <Badge variant="situacao" situacao={dns.situacao} compact>
+            <Badge variant="situacao" situacao={dns.situacao} dot>
               {dns.situacao}
             </Badge>
           }

@@ -7,7 +7,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import { situacaoAccent } from "@/lib/constants";
 import Badge from "@/components/ui/Badge";
-import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
+import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import ScanIndicator from "./ScanIndicator";
 import { hasPermissionDeniedMessage } from "@/lib/utils";
@@ -45,7 +45,7 @@ export default function HostCard({ host }: { host: Host }) {
           description={host.description || t("common.noDescription")}
           badge={
             <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge variant="situacao" situacao={host.situacao} compact>
+              <Badge variant="situacao" situacao={host.situacao} dot>
                 {host.situacao}
               </Badge>
               {/* Idle-VM indicator — a single moon icon takes the chip slot

@@ -8,7 +8,7 @@
   color-scheme: dark;
 
   --bg-base: #080c14;
-  --bg-surface: #0d1220;
+  --bg-surface: #101728;
   --bg-elevated: #131a2b;
   --bg-overlay: #1a2338;
 
@@ -48,7 +48,12 @@
   --cyan: #22d3ee;
   --rose: #fb7185;
 
-  --font-display: 'JetBrains Mono', monospace;
+  /* Mono is for machine identifiers — hostnames, domains, IPs, IDs, paths,
+     tokens, versions — where fixed advance width makes character-level diffs
+     pop. It is not a display face: --font-display used to be a byte-identical
+     copy of --font-mono, so every title in the app was monospaced and
+     Portuguese sentences wrapped that would have fit on one line. */
+  --font-display: var(--font-body);
   --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
@@ -60,6 +65,13 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* Elevation, which is not the same thing in the two themes. On a #080c14
+     ground a drop shadow is invisible, so a raised surface is drawn with a
+     1px top highlight instead — light from above. Light mode maps these back
+     onto the real shadows. Use --elevate for rest, --elevate-hi for hover. */
+  --elevate: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  --elevate-hi: inset 0 1px 0 rgb(255 255 255 / 0.09);
 
   /* Translucent glass fill used by .glass — recoloured per theme so the
      floating panels (drawers, modals, popovers) read correctly in both. */
@@ -119,6 +131,9 @@
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.14);
+
+  --elevate: var(--shadow-sm);
+  --elevate-hi: var(--shadow-md);
 
   --glass-bg: rgba(255, 255, 255, 0.82);
   --grid-line: rgba(15, 23, 42, 0.07);

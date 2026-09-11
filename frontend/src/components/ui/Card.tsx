@@ -78,12 +78,16 @@ export default function Card({
   const decoClass = {
     "stripe-left": "border-l-[3px] border-l-[var(--card-accent)]",
     "stripe-top": "border-t-[3px] border-t-[var(--card-accent)]",
-    tint: "overflow-hidden border-[var(--card-accent)]/20",
+    // dark: a tinted wash. light: the same gradient turns into a pastel
+    // rectangle, so the accent becomes a top rule over a flat surface instead.
+    tint: "overflow-hidden border-[var(--card-accent)]/20 light:border-t-[3px] light:border-t-[var(--card-accent)] light:border-[var(--border-subtle)]",
     none: "",
   }[deco];
 
+  // --elevate is a top highlight in dark and a drop shadow in light: a 2px
+  // hover lift with no visual cause reads as a glitch on a near-black ground.
   const hoverClass = hover
-    ? `hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)] ${deco === "tint" ? "" : "hover:border-[var(--border-default)]"}`
+    ? `hover:-translate-y-0.5 hover:shadow-[var(--elevate-hi)] ${deco === "tint" ? "" : "hover:border-[var(--border-default)]"}`
     : "";
 
   const borderClass = selected
@@ -99,6 +103,7 @@ export default function Card({
       className={`
         group/card relative
         bg-[var(--bg-surface)] rounded-[var(--radius-lg)] border ${borderClass} ${paddings[padding]}
+        shadow-[var(--elevate)]
         transition duration-200 ease-out
         ${hoverClass}
         ${clickable ? "cursor-pointer active:scale-[0.99]" : ""}
@@ -110,7 +115,7 @@ export default function Card({
       onClick={onClick}
     >
       {deco === "tint" && (
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--card-accent)]/10 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--card-accent)]/10 to-transparent pointer-events-none light:hidden" />
       )}
       {clickIndicator && (
         <Icon

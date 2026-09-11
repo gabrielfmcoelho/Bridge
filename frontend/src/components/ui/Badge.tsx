@@ -55,10 +55,23 @@ export default function Badge({ children, variant = "default", color, situacao, 
       situacaoColor || (situacao === "active" ? "var(--success)" : situacao === "maintenance" ? "var(--warning)" : "var(--text-faint)");
 
     if (compact) {
+      // The label expands on hover, so colour must not be the only carrier of
+      // the state (WCAG 1.4.1): the dot is filled when active and a ring
+      // otherwise, and the label is always in the accessible name.
+      const label = typeof children === "string" ? children : situacao;
       return (
-        <span className={`group/badge inline-flex items-center gap-0 rounded-full transition duration-300 cursor-default ${className}`}>
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
+        <span
+          className={`group/badge inline-flex items-center gap-0 rounded-full transition duration-300 cursor-default ${className}`}
+          title={label}
+          aria-label={label}
+          role="img"
+        >
           <span
+            className={`w-2 h-2 rounded-full shrink-0 ${situacao === "active" ? "" : "border-2 bg-transparent"}`}
+            style={situacao === "active" ? { backgroundColor: dotColor } : { borderColor: dotColor }}
+          />
+          <span
+            aria-hidden
             className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/badge:max-w-[120px] group-hover/badge:opacity-100 group-hover/badge:ml-1.5 group-hover/badge:pr-1 transition-[max-width,opacity,margin,padding] duration-300"
             style={{ color: dotColor }}
           >

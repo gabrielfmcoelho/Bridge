@@ -23,11 +23,12 @@ export default function ProjectCard({ project }: { project: Project }) {
     <Link href={`/projects/${project.id}`}>
       <Card accent={situacaoAccent(project.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
         <CardHeader
+          titleFont="display"
           title={project.name}
           subtitle={project.setor_responsavel || undefined}
           description={project.description || t("common.noDescription")}
           badge={
-            <Badge variant="situacao" situacao={project.situacao} compact>
+            <Badge variant="situacao" situacao={project.situacao} dot>
               {project.situacao}
             </Badge>
           }
