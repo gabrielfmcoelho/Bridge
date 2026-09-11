@@ -118,9 +118,11 @@ export default function TypographySection() {
           </SectionHeading>
           <p className="text-xs text-[var(--text-muted)]">
             The three heading recipes in one component. Replaced <code>ListingLabel</code>, the catalog&apos;s{" "}
-            <code>SectionLabel</code> and <code>StepHeading</code>, and <code>KpiGrid</code>&apos;s h2. The same class
-            strings are still hand-written in ~70 places (<code>text-sm font-semibold text-secondary</code> 29&times;,{" "}
-            <code>text-xs … uppercase tracking-wider</code> 37&times;); the sweep is the next pass.
+            <code>SectionLabel</code> and <code>StepHeading</code>, and <code>KpiGrid</code>&apos;s h2. None of them is
+            uppercase any more: uppercase letterspaced 10-12px text is the slowest text on a page to read, so it is
+            reserved for table column headers (<code>tableClasses.th</code>), where the row below it is data. Everything
+            else separates by weight and colour at the same size — <code>uppercase tracking-*</code> went from 149 uses
+            to 2.
           </p>
         </div>
       </Specimen>

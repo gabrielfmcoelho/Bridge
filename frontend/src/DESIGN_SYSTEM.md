@@ -48,6 +48,21 @@ reprints them.
 10. **Small parts have a home**: `StatusDot`, `Avatar`, `Spinner`, `Divider`,
     `DropdownMenu`, `Field` (read-only key/value), `tableClasses` (table skin),
     `useCopy`, `useDebounce`, `formatPhone` in `lib/utils`.
+11. **`--text-faint` is for non-text**: icons at rest, hairlines, disabled
+    glyphs, empty-cell dashes. If it is a word a human has to read, it gets
+    `--text-muted` or above. The three text tiers are contrast-tuned per theme
+    (measured in-browser, not eyeballed) and none of them is decorative.
+12. **Uppercase is for table column headers only** (`tableClasses.th`), where
+    it is a real convention and the row below it is data. Uppercase
+    letterspaced 10-12px text is the slowest text on the page to read, so
+    nothing else earns it: differentiate labels by weight and colour at the
+    same size. Swept 2026-09-11, 149 → 2.
+13. **Render data that exists.** A metadata pair with no value, a zero count,
+    a meter with no reading and a tag row with no tags are not rendered at
+    all — `CardMetadataGrid`, `CardIndicator` and `CardTagsSection` return
+    `null` rather than a `-`. Card grids use `items-start` so a card keeps its
+    own height and height becomes information. A boolean flag is the
+    exception: pass `hideCount` and the off state stays visible.
 
 ---
 
