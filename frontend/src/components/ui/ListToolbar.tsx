@@ -1,4 +1,5 @@
 import Icon from "@/components/ui/Icon";
+import { useLocale } from "@/contexts/LocaleContext";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface ListToolbarProps {
@@ -21,6 +22,7 @@ export default function ListToolbar({
   actions,
   searchAdornment,
 }: ListToolbarProps) {
+  const { t } = useLocale();
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-5">
       <div className="flex items-center gap-2 flex-1">
@@ -50,7 +52,7 @@ export default function ListToolbar({
           }`}
         >
           <Icon path={ICON_PATHS.filter} />
-          <span className="hidden sm:inline">Filters</span>
+          <span className="hidden sm:inline">{t("common.filters")}</span>
           {activeFilterCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[var(--accent)] text-[var(--bg-base)] text-2xs font-bold flex items-center justify-center">
               {activeFilterCount}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, type SelectHTMLAttributes } from "react";
+import { useLocale } from "@/contexts/LocaleContext";
 import * as Popover from "@radix-ui/react-popover";
 import FormField from "./FormField";
 import Icon from "@/components/ui/Icon";
@@ -27,6 +28,7 @@ export default function Select({
   disabled,
   searchPlaceholder,
 }: SelectProps) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -81,7 +83,7 @@ export default function Select({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder={searchPlaceholder || "Search..."}
+                  placeholder={searchPlaceholder || t("common.searchPlaceholder")}
                   className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
@@ -111,7 +113,7 @@ export default function Select({
                 </button>
               ))}
               {filtered.length === 0 && (
-                <div className="px-3 py-2 text-xs text-[var(--text-faint)]">No results</div>
+                <div className="px-3 py-2 text-xs text-[var(--text-faint)]">{t("common.noResults")}</div>
               )}
             </div>
           </Popover.Content>

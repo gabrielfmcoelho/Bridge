@@ -27,8 +27,8 @@ export default function TopologyTab({ data, filteredGraph, t }: {
     return (
       <EmptyState
         icon="topology"
-        title={t("host.noTopology") || "No connections yet"}
-        description={t("host.noTopologyDesc") || "Link this host to DNS records, services, or projects to see its topology."}
+        title={t("host.noTopology")}
+        description={t("host.noTopologyDesc")}
       />
     );
   }
@@ -40,8 +40,8 @@ export default function TopologyTab({ data, filteredGraph, t }: {
       {!hasListItems && (
         <EmptyState
           icon="topology"
-          title={t("host.noTopology") || "No connections yet"}
-          description={t("host.noTopologyDesc") || "Link this host to DNS records, services, or projects to see its topology."}
+          title={t("host.noTopology")}
+          description={t("host.noTopologyDesc")}
           compact
         />
       )}
@@ -115,7 +115,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
       {/* Projects */}
       {data.projects && data.projects.length > 0 && (
         <>
-          <SectionHeading>{t("topology.projects") || "Projects"}</SectionHeading>
+          <SectionHeading>{t("topology.projects")}</SectionHeading>
           <div className="grid grid-cols-1 gap-2">
             {data.projects.map((proj) => (
               <Link key={proj.id} href={`/projects/${proj.id}`} className="block">
@@ -151,7 +151,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
                   : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
               }`}
             >
-              {v === "list" ? t("common.list") || "List" : t("common.graph") || "Graph"}
+              {v === "list" ? t("common.list") : t("common.graph")}
             </button>
           ))}
         </div>
@@ -161,7 +161,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
               <TopologyGraph data={filteredGraph} className="w-full h-full" />
             </div>
           ) : (
-            <EmptyState icon="topology" title={t("host.noTopology") || "No connections yet"} description={t("host.noTopologyDesc") || "Link this host to DNS records, services, or projects to see its topology."} />
+            <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} />
           )
         )}
       </div>
@@ -176,7 +176,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
             <TopologyGraph data={filteredGraph} className="w-full h-full" />
           </div>
         ) : (
-          <EmptyState icon="topology" title={t("host.noTopology") || "No connections yet"} compact />
+          <EmptyState icon="topology" title={t("host.noTopology")} compact />
         )}
         <div className="overflow-y-auto pr-1 max-h-[40vh] lg:max-h-none">
           {connectionList}

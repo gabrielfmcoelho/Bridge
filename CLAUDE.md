@@ -25,6 +25,7 @@ and contacts. Access is scoped by a hierarchical org-unit tree called
 | Run both halves | `make dev` (or `make dev-api` / `make dev-frontend` individually, `make build`) |
 | Frontend typecheck | `cd frontend && npx tsc --noEmit` — no `typecheck` script exists |
 | Frontend lint | `cd frontend && npm run lint` |
+| Frontend i18n check | `cd frontend && node scripts/i18n-check.mjs` — every literal `t("…")` key exists in both catalogues, en/pt-BR parity, probable untranslated values |
 | Frontend build | `cd frontend && npm run build` |
 | Frontend dev | `cd frontend && npm run dev` |
 | Frontend dev, no Go backend | `cd frontend && npm run dev:mock` — sets `NEXT_PUBLIC_USE_MOCK_API=1`, which repoints `API_BASE` at the in-app mock (`src/app/mock/api/[...path]/route.ts` + `src/mocks/`). **Required for `/catalog` and `/requests`**: those routes have no Go backend yet, so plain `npm run dev` proxies them to Go and gets 404. `POST /mock/api/__user {role, entidade_slug}` switches persona, `POST /mock/api/__reset` re-seeds. |
@@ -97,7 +98,14 @@ per element, currently at **v83**. Use idempotent idioms:
   "helpfully" translate them.
 - Every new user-facing string ships in **both**
   `frontend/src/messages/en.json` and `pt-BR.json`. Parity is currently
-  exact — keep it that way. Default locale is pt-BR.
+  exact — keep it that way. Default locale is pt-BR. Components hold no
+  copy: reach for `const { t } = useLocale()` and a key, never a literal.
+  `node scripts/i18n-check.mjs` enforces it — every literal `t("…")` must
+  exist in both files, and it flags pt values still identical to en. A
+  missing key is otherwise invisible: `t()` falls back to the key, so the
+  UI silently renders `dns.listing`. Brand and protocol names (GLPI,
+  HTTPS, `ssh-ed25519 AAAA…`) stay hardcoded — same text in both
+  languages.
 - Frontend forms are hand-rolled: `useState` per field, manual validation,
   `useMutation`, `<FormError>`. `react-hook-form` and `next-intl` are in
   `package.json` but **100% unused** in `frontend/src` — do not start using

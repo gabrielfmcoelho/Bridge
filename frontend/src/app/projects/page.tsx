@@ -139,7 +139,7 @@ export default function ProjectsPage() {
         searchPlaceholder={t("common.search")}
         actions={
           allProjects.length > 0 ? (
-            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export") || "Export"} onClick={exportCSV} />
+            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />
           ) : undefined
         }
       />

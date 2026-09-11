@@ -336,11 +336,11 @@ function ReleaseForm({ release, projects, onSuccess, onDelete }: {
 
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
 
-  const stepLabels = [t("release.basicInfo") || "Basic Info", t("release.linkedIssues") || "Linked Issues"];
+  const stepLabels = [t("release.basicInfo"), t("release.linkedIssues")];
 
   const handleNext = () => {
     if (!form.title.trim()) {
-      setError(t("release.titleRequired") || "Title is required");
+      setError(t("release.titleRequired"));
       return;
     }
     setError("");
@@ -397,7 +397,7 @@ function ReleaseForm({ release, projects, onSuccess, onDelete }: {
             />
           ) : (
             <p className="text-sm text-[var(--text-muted)] py-4 text-center">
-              {t("release.selectProjectFirst") || "Select a project in Step 1 to link issues."}
+              {t("release.selectProjectFirst")}
             </p>
           )}
         </>
@@ -416,13 +416,13 @@ function ReleaseForm({ release, projects, onSuccess, onDelete }: {
           ) : <div />
         ) : (
           <Button type="button" variant="secondary" size="sm" onClick={() => setStep(1)}>
-            {t("common.back") || "Back"}
+            {t("common.back")}
           </Button>
         )}
         <div className="flex items-center gap-2">
           {step === 1 ? (
             <Button type="button" onClick={handleNext}>
-              {t("common.next") || "Next"}
+              {t("common.next")}
             </Button>
           ) : (
             <Button type="submit" loading={mutation.isPending}>

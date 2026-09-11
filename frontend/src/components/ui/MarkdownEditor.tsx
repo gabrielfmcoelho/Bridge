@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "@/contexts/LocaleContext";
 import { marked } from "marked";
 import DOMPurify from "isomorphic-dompurify";
 
@@ -23,6 +24,7 @@ interface MarkdownEditorProps {
 }
 
 export default function MarkdownEditor({ value, onChange, label, rows = 5, placeholder }: MarkdownEditorProps) {
+  const { t } = useLocale();
   const [mode, setMode] = useState<"write" | "preview">("write");
 
   return (
@@ -42,7 +44,7 @@ export default function MarkdownEditor({ value, onChange, label, rows = 5, place
                 : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
-            Write
+            {t("common.write")}
           </button>
           <button
             type="button"
@@ -53,7 +55,7 @@ export default function MarkdownEditor({ value, onChange, label, rows = 5, place
                 : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             }`}
           >
-            Preview
+            {t("common.preview")}
           </button>
         </div>
 

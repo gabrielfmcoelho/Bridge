@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "@/contexts/LocaleContext";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -12,6 +13,7 @@ interface CheckboxListProps {
 }
 
 export default function CheckboxList({ label, items, selected, onChange }: CheckboxListProps) {
+  const { t } = useLocale();
   const [search, setSearch] = useState("");
 
   if (items.length === 0) return null;
@@ -43,7 +45,7 @@ export default function CheckboxList({ label, items, selected, onChange }: Check
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={`Search ${label.toLowerCase()}...`}
+            placeholder={t("common.searchIn", { what: label.toLowerCase() })}
             className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-[var(--radius-sm)] pl-8 pr-2 py-1.5 text-xs focus:outline-none focus:border-[var(--accent)] placeholder:text-[var(--text-faint)]"
           />
         </div>
@@ -65,7 +67,7 @@ export default function CheckboxList({ label, items, selected, onChange }: Check
           </label>
         ))}
         {filtered.length === 0 && (
-          <span className="text-xs text-[var(--text-faint)] py-2">No results</span>
+          <span className="text-xs text-[var(--text-faint)] py-2">{t("common.noResults")}</span>
         )}
       </div>
     </div>

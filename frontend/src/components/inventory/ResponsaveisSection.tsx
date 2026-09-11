@@ -65,7 +65,7 @@ export default function ResponsaveisSection({
         <EmptyState
           icon="search"
           title={emptyTitle || t("host.noResponsaveis")}
-          description={emptyDescription || t("host.noResponsaveisDesc") || "No responsible people registered."}
+          description={emptyDescription || t("host.noResponsaveisDesc")}
           compact
         />
       ) : respView === "cards" ? (

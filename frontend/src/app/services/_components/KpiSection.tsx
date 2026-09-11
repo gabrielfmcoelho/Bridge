@@ -9,5 +9,5 @@ export default function KpiSection({ services, t }: { services: Service[]; t: (k
     { label: t("service.internal"), value: services.filter(s => !s.is_external_dependency && s.developed_by === "internal").length, color: "emerald", icon: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" },
   ];
 
-  return <KpiGrid kpis={kpis} heading={t("common.indicators") || "Indicators"} columns={4} />;
+  return <KpiGrid kpis={kpis} heading={t("common.indicators")} columns={4} />;
 }

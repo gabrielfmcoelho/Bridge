@@ -155,10 +155,10 @@ export default function ServiceDetail({ id }: { id: number }) {
                   </Badge>
                 )}
                 {data.service.is_external_dependency ? (
-                  <Badge color="red" compact>{t("service.isExternalDependency") || "External Dep"}</Badge>
+                  <Badge color="red" compact>{t("service.isExternalDependency")}</Badge>
                 ) : (
                   <Badge color={data.service.developed_by === "internal" ? "cyan" : "amber"} compact>
-                    {data.service.developed_by === "internal" ? t("service.internal") || "Internal" : t("service.external") || "External"}
+                    {data.service.developed_by === "internal" ? t("service.internal") : t("service.external")}
                   </Badge>
                 )}
                 {data.service.environment && <Badge>{data.service.environment}</Badge>}

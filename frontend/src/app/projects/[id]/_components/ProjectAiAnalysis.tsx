@@ -14,7 +14,7 @@ interface Props {
 }
 
 export default function ProjectAiAnalysis({ projectId }: Props) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
@@ -35,19 +35,12 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
     onError: (err: Error) => setError(err.message),
   });
 
-  const isPt = locale.toLowerCase().startsWith("pt");
-  const title = isPt ? "Análise de IA" : "AI Analysis";
-  const subtitle = isPt
-    ? "Resumo do que está sendo trabalhado com base nos últimos commits."
-    : "Summary of current work based on the most recent commits.";
-  const generateLabel = cached?.content
-    ? (isPt ? "Regenerar" : "Regenerate")
-    : (isPt ? "Gerar análise" : "Generate analysis");
-  const hint = isPt
-    ? "Lê os commits mais recentes dos repositórios vinculados ao projeto e pede ao modelo um resumo curto."
-    : "Reads the most recent commits from linked repos and asks the model for a short summary.";
-  const emptyLabel = isPt ? "Nenhuma análise gerada ainda." : "No analysis generated yet.";
-  const loadingLabel = isPt ? "Analisando commits…" : "Analyzing commits…";
+  const title = t("project.ai.title");
+  const subtitle = t("project.ai.subtitle");
+  const generateLabel = cached?.content ? t("project.ai.regenerate") : t("project.ai.generate");
+  const hint = t("project.ai.hint");
+  const emptyLabel = t("project.ai.empty");
+  const loadingLabel = t("project.ai.loading");
 
   // generated_at fallback to relative-time + absolute.
   const timestampDisplay = useMemo(() => {
@@ -59,19 +52,16 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
       day: "2-digit", month: "2-digit", year: "numeric",
       hour: "2-digit", minute: "2-digit",
     });
-    const prefix = isPt ? "Gerado" : "Generated";
-    return `${prefix} ${relative} · ${absolute}`;
-  }, [cached?.generated_at, locale, isPt]);
+    return t("project.ai.generatedAt", { relative, absolute });
+  }, [cached, locale, t]);
 
   const metaLine = useMemo(() => {
     if (!cached) return null;
     const parts: string[] = [];
     if (timestampDisplay) parts.push(timestampDisplay);
-    parts.push(isPt
-      ? `${cached.commits_used} commits de ${cached.repos_used} repos`
-      : `${cached.commits_used} commits across ${cached.repos_used} repos`);
+    parts.push(t("project.ai.commitsAcrossRepos", { commits: String(cached.commits_used), repos: String(cached.repos_used) }));
     return parts.join(" · ");
-  }, [cached, timestampDisplay, isPt]);
+  }, [cached, timestampDisplay, t]);
 
   return (
     <Card accent="purple" hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>

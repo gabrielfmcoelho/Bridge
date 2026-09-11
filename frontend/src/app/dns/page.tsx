@@ -128,7 +128,7 @@ export default function DNSPage() {
       {!isLoading && allRecords.length > 0 && <KpiSection records={allRecords} t={t} />}
 
       <SearchBadge search={search} onClear={() => setSearch("")} />
-      {!isLoading && allRecords.length > 0 && <SectionHeading>{t("dns.listing") || "DNS Records"}</SectionHeading>}
+      {!isLoading && allRecords.length > 0 && <SectionHeading>{t("dns.listing")}</SectionHeading>}
 
       <ListToolbar
         search={search}
@@ -138,7 +138,7 @@ export default function DNSPage() {
         searchPlaceholder={t("common.search")}
         actions={
           allRecords.length > 0 ? (
-            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export") || "Export"} onClick={exportCSV} />
+            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />
           ) : undefined
         }
       />
@@ -149,7 +149,7 @@ export default function DNSPage() {
         viewMode={viewMode}
         emptyIcon="globe"
         emptyTitle={t("common.noResults")}
-        emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") || "Try adjusting your filters" : t("dns.emptyStateAdd") || "Add your first DNS record"}
+        emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") : t("dns.emptyStateAdd")}
         emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={openCreate}>+ {t("dns.addDns")}</Button> : undefined}
         renderCard={(dns) => <DnsCard dns={dns} />}
         renderTable={(items) => <DnsTableView records={items} total={tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}

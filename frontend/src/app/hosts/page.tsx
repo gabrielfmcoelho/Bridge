@@ -395,7 +395,7 @@ export default function HostsPage() {
         actions={
           <div className="flex items-center gap-1.5">
             {hosts.length > 0 && (
-              <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export") || "Export"} onClick={exportCSV} hideLabel="md" />
+              <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
             )}
             {canEdit && scannableHosts.length > 0 && (
               <ToolbarActionButton icon={ICON_PATHS.scan} label={t("host.scanAll")} onClick={() => setShowScanModal(true)} hideLabel="md" />

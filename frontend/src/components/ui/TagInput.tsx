@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useLocale } from "@/contexts/LocaleContext";
 import * as Popover from "@radix-ui/react-popover";
 import { useQuery } from "@tanstack/react-query";
 import { tagsAPI } from "@/lib/api";
@@ -15,6 +16,7 @@ interface TagInputProps {
 }
 
 export default function TagInput({ label, tags, onChange, suggestions: externalSuggestions, entityType, placeholder }: TagInputProps) {
+  const { t } = useLocale();
   const [input, setInput] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -67,7 +69,7 @@ export default function TagInput({ label, tags, onChange, suggestions: externalS
                   if (e.key === "Enter") { e.preventDefault(); addTag(); }
                   if (e.key === "Escape") setShowSuggestions(false);
                 }}
-                placeholder={placeholder || "Add tag..."}
+                placeholder={placeholder || t("common.addTag")}
                 className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2.5 md:py-2 text-base md:text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none"
               />
             </Popover.Anchor>

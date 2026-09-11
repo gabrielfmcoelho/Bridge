@@ -137,7 +137,7 @@ export default function ServicesPage() {
       {!isLoading && allServices.length > 0 && <KpiSection services={allServices} t={t} />}
 
       <SearchBadge search={search} onClear={() => setSearch("")} />
-      {!isLoading && allServices.length > 0 && <SectionHeading>{t("service.listing") || "Services"}</SectionHeading>}
+      {!isLoading && allServices.length > 0 && <SectionHeading>{t("service.listing")}</SectionHeading>}
 
       {/* Toolbar */}
       <ListToolbar
@@ -148,7 +148,7 @@ export default function ServicesPage() {
         searchPlaceholder={t("common.search")}
         actions={
           allServices.length > 0 ? (
-            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export") || "Export"} onClick={exportCSV} />
+            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />
           ) : undefined
         }
       />
@@ -159,7 +159,7 @@ export default function ServicesPage() {
         viewMode={viewMode}
         emptyIcon="box"
         emptyTitle={t("common.noResults")}
-        emptyDescription={search || activeFilterCount > 0 ? t("host.emptyStateFilter") || "Try adjusting your filters" : t("service.emptyStateAdd") || "Add your first service"}
+        emptyDescription={search || activeFilterCount > 0 ? t("host.emptyStateFilter") : t("service.emptyStateAdd")}
         emptyAction={canEdit && !search && activeFilterCount === 0 ? (
           <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("service.addService")}</Button>
         ) : undefined}

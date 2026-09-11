@@ -117,7 +117,7 @@ export default function SituacaoCell({
           })}
           {mutation.isError && (
             <div className="px-2 py-1.5 text-2xs text-[var(--danger)]">
-              {(mutation.error instanceof Error ? mutation.error.message : null) ?? "Update failed"}
+              {(mutation.error instanceof Error ? mutation.error.message : null) ?? t("host.situacaoUpdateFailed")}
             </div>
           )}
         </Popover.Content>

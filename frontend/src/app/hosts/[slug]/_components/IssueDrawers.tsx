@@ -161,7 +161,7 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
       )}
       {canConclude && onConclude && (
         <Button variant="secondary" size="sm" className="flex-1" onClick={() => onConclude(alert)} loading={concludeLoading}>
-          {t("common.conclude") || "Conclude"}
+          {t("common.conclude")}
         </Button>
       )}
       {canEdit && !hasLinkedIssue && !isResolved && (
@@ -236,7 +236,7 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
         {isResolved && (
           <div className="flex items-center gap-2 text-xs text-[var(--success)] bg-[var(--success)]/10 rounded-[var(--radius-md)] p-2.5 border border-[var(--success)]/20">
             <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0" />
-            {t("common.resolved") || "Resolved"}
+            {t("common.resolved")}
           </div>
         )}
 
@@ -346,7 +346,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
   }, [open, issue, hostId]);
 
   const canProceedStep1 = title.trim().length > 0;
-  const stepLabels = [t("common.basicInfo"), t("common.links") || "Links"];
+  const stepLabels = [t("common.basicInfo"), t("common.links")];
 
   const handleSubmit = () => {
     const data = {

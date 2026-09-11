@@ -77,7 +77,7 @@ export default function DnsForm({
     step,
     setStep,
     totalSteps: 3,
-    stepLabels: [t("dns.info"), t("host.responsaveis") || "Responsaveis", t("dns.stepLinksTags")],
+    stepLabels: [t("dns.info"), t("host.responsaveis"), t("dns.stepLinksTags")],
     onSubmit: () => mutation.mutate(),
     canProceed: step === 1 ? !!form.domain.trim() : true,
     isPending: mutation.isPending,

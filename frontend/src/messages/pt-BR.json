@@ -423,7 +423,17 @@
     "noResultsShort": "Nenhum resultado",
     "scope": "Escopo",
     "share": "Compartilhar",
-    "saveChanges": "Salvar alterações"
+    "saveChanges": "Salvar alterações",
+    "email": "E-mail",
+    "menu": "Menu",
+    "searchIn": "Buscar {what}...",
+    "searchPlaceholder": "Buscar...",
+    "write": "Escrever",
+    "preview": "Prévia",
+    "collapse": "Recolher",
+    "expand": "Expandir",
+    "filters": "Filtros",
+    "addTag": "Adicionar tag..."
   },
   "filters": {
     "title": "Filtros e Ordenação",
@@ -644,11 +654,32 @@
       "backupLabel": "Backup:",
       "serverLabel": "Servidor",
       "uidSuffix": "(uid {uid})",
-      "portBindingTooltip": "host :{hostPort} → contêiner :{containerPort}/{proto}"
+      "portBindingTooltip": "host :{hostPort} → contêiner :{containerPort}/{proto}",
+      "dockerLogsDriver": "driver:",
+      "dockerLogsRotation": "rotação:",
+      "dockerLogsConfigured": "configurada",
+      "dockerLogsMissing": "ausente",
+      "dockerLogsTotalSize": "Tamanho total dos logs",
+      "dockerLogsLargest": "Maior contêiner",
+      "dockerLogsUnbounded": "Contêineres sem limite",
+      "dockerLogsDaemonDriver": "/etc/docker/daemon.json log-driver:",
+      "dockerLogsNotSet": "(não definido)",
+      "dockerLogsOpts": "log-opts:",
+      "dockerLogsDaemonUnclean": "não foi possível interpretar o daemon.json — corrija a sintaxe antes de aplicar a rotação.",
+      "dockerLogsContainers": "Contêineres (ordenados por tamanho de log)",
+      "dockerLogsRotatedTitle": "max-size definido no contêiner ou no daemon",
+      "dockerLogsUnboundedTitle": "Sem rotação — o log pode crescer sem limite",
+      "dockerLogsRotated": "com rotação",
+      "dockerLogsUnboundedShort": "sem limite"
     },
     "batchDockerLogsRisk": "Risco",
     "batchDockerLogsUnboundedTooltip": "Contêineres sem rotação",
-    "batchDockerLogsBoundedTooltip": "Todos os contêineres têm rotação"
+    "batchDockerLogsBoundedTooltip": "Todos os contêineres têm rotação",
+    "cardPasswordLabel": "Senha:",
+    "cardKeyLabel": "Chave:",
+    "untested": "não testada",
+    "none": "nenhuma",
+    "situacaoUpdateFailed": "Falha ao atualizar"
   },
   "dns": {
     "title": "Registros DNS",
@@ -771,7 +802,18 @@
     "hasDocumentationTitle": "Documentação",
     "noDocumentationTitle": "Sem documentação",
     "listing": "Listagem",
-    "emptyStateAdd": "Crie seu primeiro projeto"
+    "emptyStateAdd": "Crie seu primeiro projeto",
+    "ai": {
+      "title": "Análise de IA",
+      "subtitle": "Resumo do que está sendo trabalhado com base nos últimos commits.",
+      "regenerate": "Regenerar",
+      "generate": "Gerar análise",
+      "hint": "Lê os commits mais recentes dos repositórios vinculados ao projeto e pede ao modelo um resumo curto.",
+      "empty": "Nenhuma análise gerada ainda.",
+      "loading": "Analisando commits…",
+      "generatedAt": "Gerado {relative} · {absolute}",
+      "commitsAcrossRepos": "{commits} commits de {repos} repos"
+    }
   },
   "service": {
     "title": "Serviços",
@@ -1430,7 +1472,29 @@
     "backupFailedMsg": "Falha no backup",
     "restoreFailedMsg": "Falha na restauração",
     "backupRowsRestored": "{count} linhas restauradas.",
-    "backupCrossDialect": "Multi-dialeto: {source} → {target}."
+    "backupCrossDialect": "Multi-dialeto: {source} → {target}.",
+    "logoAlt": "Logotipo",
+    "userPasswordOptional": "Senha (opcional)",
+    "userPasswordKeepCurrent": "Deixe em branco para manter a atual",
+    "importer": {
+      "jsonFile": "Arquivo JSON",
+      "hostsHint": "Envie um array JSON de objetos de host. Campos obrigatórios: nickname, oficial_slug. Opcionais: hostname, user, password, tags, situacao, etc.",
+      "dnsHint": "Envie um array JSON de objetos de DNS. Campo obrigatório: domain. Opcionais: has_https, situacao, responsavel, tags, host_ids.",
+      "showExample": "Ver exemplo de JSON",
+      "selectFile": "Clique para escolher um arquivo .json",
+      "records": "Registros",
+      "withCreds": "Com Credenciais",
+      "withOwner": "Com Responsável",
+      "typeMismatch": "O arquivo parece conter dados de {detected}, mas o tipo de importação está definido como {current}.",
+      "switchTo": "Mudar para {type}?",
+      "importButton": "Importar {count} {type}",
+      "dnsRecords": "Registros DNS",
+      "results": "Resultado da Importação",
+      "created": "Criados",
+      "skipped": "Ignorados",
+      "failed": "Com Falha",
+      "another": "Importar Outro Arquivo"
+    }
   },
   "operation": {
     "builtIn": "Integradas",
@@ -1754,7 +1818,9 @@
     "userPasswordLocked": "senha bloqueada",
     "userPasswordLockedTooltip": "Senha existe mas está bloqueada (passwd -S = L).",
     "userPasswordNone": "sem senha",
-    "userPasswordNoneTooltip": "Nenhuma senha definida (passwd -S = NP) — login por senha impossível."
+    "userPasswordNoneTooltip": "Nenhuma senha definida (passwd -S = NP) — login por senha impossível.",
+    "lastScanLabel": "Último scan:",
+    "noScanData": "Sem dados de scan"
   },
   "sshKey": {
     "coolifyAlreadyExists": "Chave já existe no Coolify.",

@@ -62,7 +62,7 @@ export default function ServiceFilterDrawer({
     >
       <DrawerSection title={t("common.tags")} open={openSection === "tags"} onToggle={() => toggle("tags")} active={!!filters.tag}>
         <div className="flex flex-wrap gap-1.5">
-          <PillButton active={!filters.tag} onClick={() => set("tag", "")}>{t("common.all") || "All"}</PillButton>
+          <PillButton active={!filters.tag} onClick={() => set("tag", "")}>{t("common.all")}</PillButton>
           {tags.map((tag) => (
             <PillButton key={tag} active={tag === filters.tag} onClick={() => set("tag", tag === filters.tag ? "" : tag)}>{tag}</PillButton>
           ))}
@@ -75,17 +75,17 @@ export default function ServiceFilterDrawer({
 
       <DrawerSection title={t("service.isExternalDependency")} open={openSection === "external"} onToggle={() => toggle("external")} active={!!filters.is_external_dependency}>
         <div className="flex flex-wrap gap-1.5">
-          <PillButton active={!filters.is_external_dependency} onClick={() => set("is_external_dependency", "")}>{t("common.all") || "All"}</PillButton>
-          <PillButton active={filters.is_external_dependency === "yes"} onClick={() => set("is_external_dependency", filters.is_external_dependency === "yes" ? "" : "yes")}>{t("common.yes") || "Yes"}</PillButton>
-          <PillButton active={filters.is_external_dependency === "no"} onClick={() => set("is_external_dependency", filters.is_external_dependency === "no" ? "" : "no")}>{t("common.no") || "No"}</PillButton>
+          <PillButton active={!filters.is_external_dependency} onClick={() => set("is_external_dependency", "")}>{t("common.all")}</PillButton>
+          <PillButton active={filters.is_external_dependency === "yes"} onClick={() => set("is_external_dependency", filters.is_external_dependency === "yes" ? "" : "yes")}>{t("common.yes")}</PillButton>
+          <PillButton active={filters.is_external_dependency === "no"} onClick={() => set("is_external_dependency", filters.is_external_dependency === "no" ? "" : "no")}>{t("common.no")}</PillButton>
         </div>
       </DrawerSection>
 
       <DrawerSection title={t("service.orchestratorManaged")} open={openSection === "orchestrated"} onToggle={() => toggle("orchestrated")} active={!!filters.orchestrator_managed}>
         <div className="flex flex-wrap gap-1.5">
-          <PillButton active={!filters.orchestrator_managed} onClick={() => set("orchestrator_managed", "")}>{t("common.all") || "All"}</PillButton>
-          <PillButton active={filters.orchestrator_managed === "yes"} onClick={() => set("orchestrator_managed", filters.orchestrator_managed === "yes" ? "" : "yes")}>{t("common.yes") || "Yes"}</PillButton>
-          <PillButton active={filters.orchestrator_managed === "no"} onClick={() => set("orchestrator_managed", filters.orchestrator_managed === "no" ? "" : "no")}>{t("common.no") || "No"}</PillButton>
+          <PillButton active={!filters.orchestrator_managed} onClick={() => set("orchestrator_managed", "")}>{t("common.all")}</PillButton>
+          <PillButton active={filters.orchestrator_managed === "yes"} onClick={() => set("orchestrator_managed", filters.orchestrator_managed === "yes" ? "" : "yes")}>{t("common.yes")}</PillButton>
+          <PillButton active={filters.orchestrator_managed === "no"} onClick={() => set("orchestrator_managed", filters.orchestrator_managed === "no" ? "" : "no")}>{t("common.no")}</PillButton>
         </div>
       </DrawerSection>
     </InventoryFilterDrawer>

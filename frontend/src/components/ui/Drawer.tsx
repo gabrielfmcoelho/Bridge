@@ -1,6 +1,7 @@
 "use client";
 
 import { Drawer as VaulDrawer } from "vaul";
+import { useLocale } from "@/contexts/LocaleContext";
 import type { ReactNode } from "react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import Icon from "@/components/ui/Icon";
@@ -25,13 +26,14 @@ interface DrawerProps {
 }
 
 export default function Drawer({ open, onClose, title, subHeader, headerAction, onBack, children, footer, side, wide }: DrawerProps) {
+  const { t } = useLocale();
   const BackButton = onBack ? (
     <button
       type="button"
       onClick={onBack}
       className="w-7 h-7 -ml-1 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors shrink-0"
-      aria-label="Back"
-      title="Back"
+      aria-label={t("common.back")}
+      title={t("common.back")}
     >
       <Icon path={ICON_PATHS.back} />
     </button>
@@ -65,7 +67,7 @@ export default function Drawer({ open, onClose, title, subHeader, headerAction, 
                 {subHeader && <div className="px-4 md:px-5 pb-3">{subHeader}</div>}
               </div>
             ) : (
-              <VaulDrawer.Title className="sr-only">Menu</VaulDrawer.Title>
+              <VaulDrawer.Title className="sr-only">{t("common.menu")}</VaulDrawer.Title>
             )}
             <div className="flex-1 overflow-y-auto p-4 md:p-5">{children}</div>
             {footer && (
@@ -108,7 +110,7 @@ export default function Drawer({ open, onClose, title, subHeader, headerAction, 
               {subHeader && <div className="px-4 md:px-5 pb-3">{subHeader}</div>}
             </div>
           ) : (
-            <VaulDrawer.Title className="sr-only">Menu</VaulDrawer.Title>
+            <VaulDrawer.Title className="sr-only">{t("common.menu")}</VaulDrawer.Title>
           )}
           <div className="flex-1 overflow-y-auto p-4 md:p-5">{children}</div>
           {footer && (

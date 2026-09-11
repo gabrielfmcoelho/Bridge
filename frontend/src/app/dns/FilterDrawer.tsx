@@ -59,9 +59,9 @@ export default function DnsFilterDrawer({
       search={search}
       onSearchChange={onSearchChange}
       sortFields={[
-        { field: "domain", label: t("dns.domain") || "Domain" },
-        { field: "situacao", label: t("host.situacao") || "Situacao" },
-        { field: "responsavel", label: t("dns.responsavel") || "Responsavel" },
+        { field: "domain", label: t("dns.domain") },
+        { field: "situacao", label: t("host.situacao") },
+        { field: "responsavel", label: t("dns.responsavel") },
       ]}
       defaultSortField="domain"
     >
@@ -85,8 +85,8 @@ export default function DnsFilterDrawer({
       <DrawerSection title={t("topology.https")} open={openSection === "https"} onToggle={() => toggle("https")} active={!!filters.has_https}>
         <div className="flex flex-wrap gap-1.5">
           <PillButton active={!filters.has_https} onClick={() => set("has_https", "")}>{t("common.all")}</PillButton>
-          <PillButton active={filters.has_https === "yes"} onClick={() => set("has_https", filters.has_https === "yes" ? "" : "yes")}>{t("common.yes") || "Yes"}</PillButton>
-          <PillButton active={filters.has_https === "no"} onClick={() => set("has_https", filters.has_https === "no" ? "" : "no")}>{t("common.no") || "No"}</PillButton>
+          <PillButton active={filters.has_https === "yes"} onClick={() => set("has_https", filters.has_https === "yes" ? "" : "yes")}>{t("common.yes")}</PillButton>
+          <PillButton active={filters.has_https === "no"} onClick={() => set("has_https", filters.has_https === "no" ? "" : "no")}>{t("common.no")}</PillButton>
         </div>
       </DrawerSection>
     </InventoryFilterDrawer>

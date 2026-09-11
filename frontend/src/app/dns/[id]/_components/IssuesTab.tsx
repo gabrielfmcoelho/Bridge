@@ -84,11 +84,11 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">
-          {t("issue.title") || "Issues"} ({issues.length})
+          {t("issue.title")} ({issues.length})
         </h2>
         {canEdit && (
           <Button size="sm" onClick={() => setShowCreate(true)}>
-            + {t("common.add") || "Add"}
+            + {t("common.add")}
           </Button>
         )}
       </div>
@@ -96,8 +96,8 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
       {issues.length === 0 ? (
         <EmptyState
           icon="search"
-          title={t("issue.noIssues") || "No issues"}
-          description={t("issue.noIssuesDesc") || "No issues have been created for this record."}
+          title={t("issue.noIssues")}
+          description={t("issue.noIssuesDesc")}
           compact
         />
       ) : (
@@ -105,7 +105,7 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
           {/* Open issues */}
           {openIssues.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs text-[var(--text-muted)] font-medium">{t("issue.open") || "Open"} ({openIssues.length})</h3>
+              <h3 className="text-xs text-[var(--text-muted)] font-medium">{t("issue.open")} ({openIssues.length})</h3>
               {openIssues.map((issue) => (
                 <Card key={issue.id} hover={false} className="!p-3">
                   <div className="flex items-start gap-3">
@@ -129,7 +129,7 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
           {/* Closed issues */}
           {closedIssues.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs text-[var(--text-muted)] font-medium">{t("issue.closed") || "Closed"} ({closedIssues.length})</h3>
+              <h3 className="text-xs text-[var(--text-muted)] font-medium">{t("issue.closed")} ({closedIssues.length})</h3>
               {closedIssues.map((issue) => (
                 <Card key={issue.id} hover={false} className="!p-3 opacity-60">
                   <div className="flex items-start gap-3">
@@ -152,7 +152,7 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
       <Drawer
         open={showCreate}
         onClose={() => setShowCreate(false)}
-        title={t("issue.create") || "Create Issue"}
+        title={t("issue.create")}
         footer={
           <div className="flex gap-2">
             <Button variant="secondary" size="sm" className="flex-1" onClick={() => setShowCreate(false)}>
@@ -166,10 +166,10 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
       >
         <div className="space-y-4">
           <FormError message={error} />
-          <Input label={t("issue.issueTitle") || "Title"} value={title} onChange={(e) => setTitle(e.target.value)} required placeholder={t("issue.titlePlaceholder")} />
+          <Input label={t("issue.issueTitle")} value={title} onChange={(e) => setTitle(e.target.value)} required placeholder={t("issue.titlePlaceholder")} />
           <Input label={t("common.description")} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t("issue.descriptionPlaceholderShort")} />
           <Select
-            label={t("issue.priority") || "Priority"}
+            label={t("issue.priority")}
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
             options={[

@@ -1,4 +1,5 @@
 import IconButton from "./IconButton";
+import { useLocale } from "@/contexts/LocaleContext";
 import Icon from "./Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -17,10 +18,11 @@ export default function DetailActions({
   onDelete,
   deleteConfirmMessage,
 }: DetailActionsProps) {
+  const { t } = useLocale();
   return (
     <div className="hidden md:flex items-center gap-1.5">
       {canEdit && (
-        <IconButton variant="outline" size="sm" onClick={onEdit} title="Edit">
+        <IconButton variant="outline" size="sm" onClick={onEdit} title={t("common.edit")}>
           <Icon path={ICON_PATHS.edit} />
         </IconButton>
       )}
@@ -31,7 +33,7 @@ export default function DetailActions({
           onClick={() => {
             if (confirm(deleteConfirmMessage)) onDelete();
           }}
-          title="Delete"
+          title={t("common.delete")}
         >
           <Icon path={ICON_PATHS.trash} />
         </IconButton>

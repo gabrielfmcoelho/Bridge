@@ -50,6 +50,7 @@ function TreeNode({
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
 }) {
+  const { t } = useLocale();
   const hasChildren = !!node.children && node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
   const isSelected = node.id === selectedId;
@@ -72,7 +73,7 @@ function TreeNode({
               onToggle(node.id);
             }}
             className="w-5 h-5 inline-flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-primary)] shrink-0"
-            aria-label={isExpanded ? "Collapse" : "Expand"}
+            aria-label={isExpanded ? t("common.collapse") : t("common.expand")}
           >
             <Icon path={ICON_PATHS.chevronRight} className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
           </button>
@@ -85,7 +86,7 @@ function TreeNode({
           className="flex-1 min-w-0 text-left py-1 pr-2 truncate"
         >
           {node.emoji && <span className="mr-1">{node.emoji}</span>}
-          {node.title || "Untitled"}
+          {node.title || t("wiki.untitled")}
         </button>
       </div>
       {hasChildren && isExpanded && (

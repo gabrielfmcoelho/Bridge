@@ -540,7 +540,7 @@ function UsersSection() {
                 </div>
                 {u.email && (
                   <div className="col-span-2">
-                    <p className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">Email</p>
+                    <p className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("common.email")}</p>
                     <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{u.email}</p>
                   </div>
                 )}
@@ -610,7 +610,7 @@ function UsersSection() {
                   { value: "admin", label: "Admin" },
                 ]}
               />
-              <Input label={`${t("auth.password")} (optional)`} type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} placeholder="Leave blank to keep current" />
+              <Input label={t("settings.userPasswordOptional")} type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} placeholder={t("settings.userPasswordKeepCurrent")} />
             </div>
             <UserEntidadeFields
               nodes={entidadeNodes}
@@ -813,7 +813,7 @@ function AppearanceSection() {
             style={{ backgroundColor: "var(--bg-elevated)" }}
           >
             {appLogo ? (
-              <img src={appLogo} alt="Logo" className="w-full h-full object-contain p-1" />
+              <img src={appLogo} alt={t("settings.logoAlt")} className="w-full h-full object-contain p-1" />
             ) : (
               <Icon path={ICON_PATHS.prompt} className="w-7 h-7" strokeWidth={1.5} style={{ color: "var(--text-faint)" }} />
             )}
@@ -948,11 +948,11 @@ function ImportSection() {
         <div className="flex gap-2">
           <PillButton size="lg" active={importType === "hosts"} onClick={() => setImportType("hosts")}>
             <Icon path={ICON_PATHS.serverStack} />
-            Hosts
+            {t("nav.hosts")}
           </PillButton>
           <PillButton size="lg" active={importType === "dns"} onClick={() => setImportType("dns")}>
             <Icon path={ICON_PATHS.globeMeridian} />
-            DNS
+            {t("nav.dns")}
           </PillButton>
         </div>
       </Card>
@@ -960,19 +960,19 @@ function ImportSection() {
       {/* File upload */}
       <Card hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
         <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
-          JSON File
+          {t("settings.importer.jsonFile")}
         </h3>
         <p className="text-xs mb-3" style={{ color: "var(--text-faint)" }}>
           {importType === "hosts"
-            ? "Upload a JSON array of host objects. Required fields: nickname, oficial_slug. Optional: hostname, user, password, tags, situacao, etc."
-            : "Upload a JSON array of DNS objects. Required fields: domain. Optional: has_https, situacao, responsavel, tags, host_ids."
+            ? t("settings.importer.hostsHint")
+            : t("settings.importer.dnsHint")
           }
         </p>
 
         {/* JSON example */}
         <details className="mb-4 group">
           <summary className="text-xs text-[var(--accent)] cursor-pointer hover:underline font-medium">
-            Show JSON example
+            {t("settings.importer.showExample")}
           </summary>
           <pre className="mt-2 p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] overflow-x-auto font-mono">
 {importType === "hosts" ? `[
@@ -1020,7 +1020,7 @@ function ImportSection() {
             <div className="flex flex-col items-center gap-2">
               <Icon path={ICON_PATHS.cloudUpload} className="w-8 h-8 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors" strokeWidth={1.5} />
               <span className="text-sm text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]">
-                Click to select a .json file
+                {t("settings.importer.selectFile")}
               </span>
             </div>
           </button>
@@ -1032,7 +1032,7 @@ function ImportSection() {
                 <span className="text-sm text-[var(--text-primary)] truncate font-mono">{fileName}</span>
               </div>
               <button onClick={reset} className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors shrink-0 ml-2">
-                Remove
+                {t("common.remove")}
               </button>
             </div>
 
@@ -1040,7 +1040,7 @@ function ImportSection() {
             <div className="grid grid-cols-3 gap-3">
               <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-center">
                 <div className="text-lg font-bold text-[var(--text-primary)] font-mono">{fileData.length}</div>
-                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">Records</div>
+                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">{t("settings.importer.records")}</div>
               </div>
               <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-center">
                 <div className="text-lg font-bold text-[var(--accent)] font-mono">
@@ -1050,22 +1050,22 @@ function ImportSection() {
                   }
                 </div>
                 <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">
-                  {importType === "hosts" ? "With Creds" : "With Owner"}
+                  {importType === "hosts" ? t("settings.importer.withCreds") : t("settings.importer.withOwner")}
                 </div>
               </div>
               <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-center">
                 <div className="text-lg font-bold text-[var(--text-secondary)] font-mono">
                   {new Set(fileData.flatMap(d => (d.tags as string[]) || [])).size}
                 </div>
-                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">Tags</div>
+                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">{t("common.tags")}</div>
               </div>
             </div>
 
             {detectedType && detectedType !== importType && (
               <div className="p-2.5 rounded-[var(--radius-md)] bg-[var(--warning)]/10 border border-[var(--warning)]/25 text-[var(--warning)] text-xs">
-                File looks like <strong>{detectedType}</strong> data but import type is set to <strong>{importType}</strong>.
+                {t("settings.importer.typeMismatch", { detected: detectedType, current: importType })}
                 <button onClick={() => setImportType(detectedType as "hosts" | "dns")} className="ml-1 underline hover:text-[var(--warning)]">
-                  Switch to {detectedType}?
+                  {t("settings.importer.switchTo", { type: detectedType })}
                 </button>
               </div>
             )}
@@ -1079,7 +1079,7 @@ function ImportSection() {
       {fileData && !result && (
         <div className="animate-slide-up" style={{ animationFillMode: "both" }}>
           <Button onClick={handleImport} loading={importing} className="w-full">
-            Import {fileData.length} {importType === "hosts" ? "Hosts" : "DNS Records"}
+            {t("settings.importer.importButton", { count: String(fileData.length), type: importType === "hosts" ? t("nav.hosts") : t("settings.importer.dnsRecords") })}
           </Button>
         </div>
       )}
@@ -1087,20 +1087,20 @@ function ImportSection() {
       {result && (
         <Card hover={false} className="animate-slide-up" style={{ animationFillMode: "both" } as React.CSSProperties}>
           <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
-            Import Results
+            {t("settings.importer.results")}
           </h3>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="p-3 rounded-[var(--radius-md)] bg-[var(--success)]/10 border border-[var(--success)]/25 text-center">
               <div className="text-lg font-bold text-[var(--success)] font-mono">{result.created}</div>
-              <div className="text-2xs uppercase tracking-wider text-[var(--success)]/70">Created</div>
+              <div className="text-2xs uppercase tracking-wider text-[var(--success)]/70">{t("settings.importer.created")}</div>
             </div>
             <div className="p-3 rounded-[var(--radius-md)] bg-[var(--warning)]/10 border border-[var(--warning)]/25 text-center">
               <div className="text-lg font-bold text-[var(--warning)] font-mono">{result.skipped}</div>
-              <div className="text-2xs uppercase tracking-wider text-[var(--warning)]/70">Skipped</div>
+              <div className="text-2xs uppercase tracking-wider text-[var(--warning)]/70">{t("settings.importer.skipped")}</div>
             </div>
             <div className="p-3 rounded-[var(--radius-md)] bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-center">
               <div className="text-lg font-bold text-[var(--danger)] font-mono">{result.failed}</div>
-              <div className="text-2xs uppercase tracking-wider text-[var(--danger)]/70">Failed</div>
+              <div className="text-2xs uppercase tracking-wider text-[var(--danger)]/70">{t("settings.importer.failed")}</div>
             </div>
           </div>
 
@@ -1117,7 +1117,7 @@ function ImportSection() {
           )}
 
           <div className="mt-4">
-            <Button size="sm" variant="secondary" onClick={reset}>Import Another File</Button>
+            <Button size="sm" variant="secondary" onClick={reset}>{t("settings.importer.another")}</Button>
           </div>
         </Card>
       )}

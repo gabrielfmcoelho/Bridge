@@ -107,7 +107,7 @@ export default function WikiShareModal({
           <p className="text-xs text-[var(--warning)]">⚠ {t("atlas.apis.tokenOnce")}</p>
           <div className="flex justify-end pt-2">
             <Button variant="secondary" type="button" onClick={close}>
-              {t("common.close") || "Close"}
+              {t("common.close")}
             </Button>
           </div>
         </div>
@@ -160,7 +160,7 @@ export default function WikiShareModal({
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" type="button" onClick={close}>
-              {t("common.cancel") || "Cancel"}
+              {t("common.cancel")}
             </Button>
             <Button type="button" onClick={submit} loading={submitting} disabled={!target}>
               {submitting ? t("atlas.apis.creating") : t("atlas.apis.createLink")}

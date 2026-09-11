@@ -22,7 +22,7 @@ export default function ServiceCard({ svc }: { svc: Service }) {
         <CardHeader
           title={svc.nickname}
           subtitle={svc.service_type ? `${svc.service_type}${svc.service_subtype ? ` / ${svc.service_subtype}` : ""}` : undefined}
-          description={svc.description || t("common.noDescription") || "-"}
+          description={svc.description || t("common.noDescription")}
           badge={
             <div className="flex items-center gap-1.5">
               {svc.source !== "manual" && (
@@ -39,10 +39,10 @@ export default function ServiceCard({ svc }: { svc: Service }) {
                 <span className={`inline-block w-2 h-2 rounded-full ${svc.container_status === "online" ? "bg-[var(--success)]" : "bg-[var(--text-faint)]"}`} title={svc.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")} />
               )}
               {svc.is_external_dependency ? (
-                <Badge color="red" compact>{t("service.isExternalDependency") || "External Dep"}</Badge>
+                <Badge color="red" compact>{t("service.isExternalDependency")}</Badge>
               ) : (
                 <Badge color={svc.developed_by === "internal" ? "cyan" : "amber"} compact>
-                  {svc.developed_by === "internal" ? t("service.internal") || "Internal" : t("service.external") || "External"}
+                  {svc.developed_by === "internal" ? t("service.internal") : t("service.external")}
                 </Badge>
               )}
             </div>
@@ -51,10 +51,10 @@ export default function ServiceCard({ svc }: { svc: Service }) {
 
         <CardMetadataGrid
           items={[
-            { label: t("service.technologyStack") || "Tech Stack", value: svc.technology_stack || "-", mono: true },
-            { label: t("service.environment") || "Environment", value: svc.environment || "-" },
-            { label: t("service.deployApproach") || "Deploy", value: svc.deploy_approach || "-" },
-            { label: t("service.version") || "Version", value: svc.version || "-", mono: true },
+            { label: t("service.technologyStack"), value: svc.technology_stack || "-", mono: true },
+            { label: t("service.environment"), value: svc.environment || "-" },
+            { label: t("service.deployApproach"), value: svc.deploy_approach || "-" },
+            { label: t("service.version"), value: svc.version || "-", mono: true },
           ]}
         />
 

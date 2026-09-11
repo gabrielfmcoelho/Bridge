@@ -27,11 +27,6 @@ function isValidDate(value: string): boolean {
   return d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  in_execution: "Em Execução",
-  solved: "Resolvido",
-};
-
 const STATUS_COLORS: Record<string, string> = {
   in_execution: "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30",
   solved: "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30",

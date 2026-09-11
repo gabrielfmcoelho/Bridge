@@ -37,7 +37,7 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
         <CardMetadataGrid
           items={[
             { label: t("dns.responsavel"), value: mainResp },
-            { label: t("host.entity") || "Entidade", value: "-" },
+            { label: t("host.entity"), value: "-" },
           ]}
         />
 
@@ -54,7 +54,7 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
           <CardIndicatorSeparator />
           <CardIndicator icon={ICON_PATHS.alert} count={0} color="amber" title={`0 ${t("host.alerts").toLowerCase()}`} />
           <CardIndicator icon={ICON_PATHS.clipboard} count={0} color="purple" title={`0 ${t("issue.title").toLowerCase()}`} />
-          <CardIndicator icon={ICON_PATHS.document} count={0} color="orange" title="0 chamados" />
+          <CardIndicator icon={ICON_PATHS.document} count={0} color="orange" title={`0 ${t("nav.chamados").toLowerCase()}`} />
         </div>
       </Card>
     </Link>

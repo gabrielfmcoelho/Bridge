@@ -6,6 +6,7 @@ import { sshAPI, hostsAPI, sshKeysAPI, integrationsAPI } from "@/lib/api";
 import { resolveAuthMethod } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSSHMutation } from "@/hooks/useSSHMutation";
+import { useLocale } from "@/contexts/LocaleContext";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import IconButton from "@/components/ui/IconButton";
@@ -35,7 +36,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   coolifyServerUUID?: string | null;
   serverInfo?: { hostname: string; is_local: boolean; message: string } | null;
   lastScan?: { data: string; scanned_at: string };
-  t: (key: string) => string;
+  t: (key: string, vars?: Record<string, string>) => string;
   locale: string;
   isAdmin: boolean;
 }) {
@@ -144,7 +145,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
           };
         }
         if (data.success) return { status: "success" as const, content: t("operation.connectionSuccessful") };
-        return { status: "error" as const, content: data.error || "Failed" };
+        return { status: "error" as const, content: data.error || t("filters.failed") };
       },
     }),
     [slug, t, locale, pushConsole],
@@ -1035,7 +1036,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                       <option value="">{t("operation.deleteRemoteUserPickPlaceholder")}</option>
                       {pickerUsers.map((u) => (
                         <option key={u.name} value={u.name}>
-                          {u.name} {t("host.ops.uidSuffix").replace("{uid}", String(u.uid))}{u.has_login ? "" : ` · ${t("operation.deleteRemoteUserNoLogin")}`}
+                          {u.name} {t("host.ops.uidSuffix", { uid: String(u.uid) })}{u.has_login ? "" : ` · ${t("operation.deleteRemoteUserNoLogin")}`}
                         </option>
                       ))}
                     </select>
@@ -1302,7 +1303,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
 function opTypeLabel(type_: string, t: (k: string) => string): string {
   switch (type_) {
-    case "test": return t("operation.testConnection") || "Test Connection";
+    case "test": return t("operation.testConnection");
     case "network-test": return t("operation.networkTest");
     case "setup-key": return t("operation.setupKey");
     case "fix-dev-null": return t("operation.repairDevNull");
@@ -1329,6 +1330,7 @@ function formatLogTime(dateStr: string, locale: string): string {
 /* ─── Docker logs report view ─── */
 
 function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLogsReport }) {
+  const { t } = useLocale();
   const riskClass =
     report.risk_level === "critical"
       ? "bg-[var(--danger)]/15 text-[var(--danger)] border-[var(--danger)]/40"
@@ -1350,8 +1352,8 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
           {report.risk_level.toUpperCase()}
         </span>
         <span className="text-2xs text-[var(--text-muted)]">
-          driver: <span className="font-mono">{report.log_driver || "—"}</span>
-          {" · "}rotation: <span className="font-mono">{report.rotation_configured ? "configured" : "missing"}</span>
+          {t("host.ops.dockerLogsDriver")} <span className="font-mono">{report.log_driver || "—"}</span>
+          {" · "}{t("host.ops.dockerLogsRotation")} <span className="font-mono">{report.rotation_configured ? t("host.ops.dockerLogsConfigured") : t("host.ops.dockerLogsMissing")}</span>
         </span>
       </div>
 
@@ -1363,34 +1365,34 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
 
       <div className="grid grid-cols-3 gap-3 text-xs">
         <div>
-          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">Total log size</span>
+          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("host.ops.dockerLogsTotalSize")}</span>
           <span className="text-[var(--text-primary)] font-medium font-mono">{totalHuman}</span>
         </div>
         <div>
-          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">Largest container</span>
+          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("host.ops.dockerLogsLargest")}</span>
           <span className="text-[var(--text-primary)] font-medium font-mono">{largestHuman}</span>
         </div>
         <div>
-          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">Unbounded containers</span>
+          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("host.ops.dockerLogsUnbounded")}</span>
           <span className="text-[var(--text-primary)] font-medium font-mono">{report.unbounded_containers}</span>
         </div>
       </div>
 
       {report.daemon_json_exists && (
         <div className="text-2xs text-[var(--text-muted)] leading-snug">
-          <span className="block">/etc/docker/daemon.json log-driver: <span className="font-mono">{report.daemon_log_driver || "(not set)"}</span></span>
+          <span className="block">{t("host.ops.dockerLogsDaemonDriver")} <span className="font-mono">{report.daemon_log_driver || t("host.ops.dockerLogsNotSet")}</span></span>
           {report.daemon_log_opts && Object.keys(report.daemon_log_opts).length > 0 && (
-            <span className="block">log-opts: <span className="font-mono">{JSON.stringify(report.daemon_log_opts)}</span></span>
+            <span className="block">{t("host.ops.dockerLogsOpts")} <span className="font-mono">{JSON.stringify(report.daemon_log_opts)}</span></span>
           )}
           {report.daemon_json_unclean && (
-            <span className="block text-[var(--warning)]">daemon.json failed to parse — fix the syntax before applying rotation.</span>
+            <span className="block text-[var(--warning)]">{t("host.ops.dockerLogsDaemonUnclean")}</span>
           )}
         </div>
       )}
 
       {report.containers && report.containers.length > 0 && (
         <div>
-          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider mb-1.5">Containers (sorted by log size)</span>
+          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider mb-1.5">{t("host.ops.dockerLogsContainers")}</span>
           <div className="space-y-1">
             {report.containers.map((c) => (
               <div
@@ -1407,9 +1409,9 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
                       ? "bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/30"
                       : "bg-[var(--warning)]/10 text-[var(--warning)] border border-[var(--warning)]/30"
                   }`}
-                  title={c.has_rotation ? "Container or daemon-level max-size set" : "No rotation — log can grow unboundedly"}
+                  title={c.has_rotation ? t("host.ops.dockerLogsRotatedTitle") : t("host.ops.dockerLogsUnboundedTitle")}
                 >
-                  {c.has_rotation ? "rotated" : "unbounded"}
+                  {c.has_rotation ? t("host.ops.dockerLogsRotated") : t("host.ops.dockerLogsUnboundedShort")}
                 </span>
                 <span
                   className="shrink-0 text-[var(--text-secondary)] font-mono"

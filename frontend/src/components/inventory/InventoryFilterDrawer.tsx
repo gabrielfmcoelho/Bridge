@@ -65,7 +65,7 @@ export default function InventoryFilterDrawer<F>({
       footer={
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" className="flex-1" onClick={onClose}>
-            {t("common.close") || "Close"}
+            {t("common.close")}
           </Button>
           <Button size="sm" className="flex-1" onClick={onClose}>
             {t("filters.apply")}
@@ -87,7 +87,7 @@ export default function InventoryFilterDrawer<F>({
         {children}
 
         <DrawerSection
-          title={t("filters.sortBy") || "Sort by"}
+          title={t("filters.sortBy")}
           open={sortOpen}
           onToggle={() => setSortOpen((o) => !o)}
           active={sort.field !== defaultSortField}

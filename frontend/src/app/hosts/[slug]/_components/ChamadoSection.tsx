@@ -15,11 +15,6 @@ import ChamadoDrawer from "./ChamadoDrawer";
 import GlpiHostTicketsBlock from "./GlpiHostTicketsBlock";
 import type { HostChamado } from "@/lib/types";
 
-const STATUS_LABELS: Record<string, string> = {
-  in_execution: "Em Execução",
-  solved: "Resolvido",
-};
-
 const STATUS_DOT: Record<string, string> = {
   in_execution: "bg-[var(--warning)]",
   solved: "bg-[var(--success)]",

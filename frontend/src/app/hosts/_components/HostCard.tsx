@@ -94,7 +94,7 @@ export default function HostCard({ host }: { host: Host }) {
             <div className="grid grid-cols-3 gap-3">
               <MiniResource label="CPU" value={sr.cpu} usage={sr.cpu_usage} />
               <MiniResource label="RAM" value={sr.ram} usage={sr.ram_percent} />
-              <MiniResource label="Disk" value={sr.storage} usage={sr.disk_percent} />
+              <MiniResource label={t("vm.disk")} value={sr.storage} usage={sr.disk_percent} />
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-3">
@@ -126,12 +126,12 @@ export default function HostCard({ host }: { host: Host }) {
 
           {/* Row 2: auth (pwd, key), chamados, alerts, issues */}
           <div className="grid grid-cols-[repeat(6,2.25rem)] justify-start gap-x-2">
-            <div className="flex items-center" title={`Password: ${host.has_password ? (host.password_test_status || "untested") : "none"}`}>
+            <div className="flex items-center" title={`${t("host.cardPasswordLabel")} ${host.has_password ? (host.password_test_status || t("host.untested")) : t("host.none")}`}>
               <svg className={`w-3.5 h-3.5 ${authIconColor(host.has_password, host.password_test_status)}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d={ICON_PATHS.lock} />
               </svg>
             </div>
-            <div className="flex items-center" title={`Key: ${host.has_key ? (host.key_test_status || "untested") : "none"}`}>
+            <div className="flex items-center" title={`${t("host.cardKeyLabel")} ${host.has_key ? (host.key_test_status || t("host.untested")) : t("host.none")}`}>
               <svg className={`w-3.5 h-3.5 ${authIconColor(host.has_key, host.key_test_status)}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d={ICON_PATHS.key} />
               </svg>

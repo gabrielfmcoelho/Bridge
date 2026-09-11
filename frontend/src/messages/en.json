@@ -423,7 +423,17 @@
     "noResultsShort": "No results",
     "scope": "Scope",
     "share": "Share",
-    "saveChanges": "Save changes"
+    "saveChanges": "Save changes",
+    "email": "Email",
+    "menu": "Menu",
+    "searchIn": "Search {what}...",
+    "searchPlaceholder": "Search...",
+    "write": "Write",
+    "preview": "Preview",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "filters": "Filters",
+    "addTag": "Add tag..."
   },
   "filters": {
     "title": "Filters & Sort",
@@ -644,11 +654,32 @@
       "backupLabel": "Backup:",
       "serverLabel": "Server",
       "uidSuffix": "(uid {uid})",
-      "portBindingTooltip": "host :{hostPort} → container :{containerPort}/{proto}"
+      "portBindingTooltip": "host :{hostPort} → container :{containerPort}/{proto}",
+      "dockerLogsDriver": "driver:",
+      "dockerLogsRotation": "rotation:",
+      "dockerLogsConfigured": "configured",
+      "dockerLogsMissing": "missing",
+      "dockerLogsTotalSize": "Total log size",
+      "dockerLogsLargest": "Largest container",
+      "dockerLogsUnbounded": "Unbounded containers",
+      "dockerLogsDaemonDriver": "/etc/docker/daemon.json log-driver:",
+      "dockerLogsNotSet": "(not set)",
+      "dockerLogsOpts": "log-opts:",
+      "dockerLogsDaemonUnclean": "daemon.json failed to parse — fix the syntax before applying rotation.",
+      "dockerLogsContainers": "Containers (sorted by log size)",
+      "dockerLogsRotatedTitle": "Container or daemon-level max-size set",
+      "dockerLogsUnboundedTitle": "No rotation — the log can grow unboundedly",
+      "dockerLogsRotated": "rotated",
+      "dockerLogsUnboundedShort": "unbounded"
     },
     "batchDockerLogsRisk": "Risk",
     "batchDockerLogsUnboundedTooltip": "Containers without rotation",
-    "batchDockerLogsBoundedTooltip": "All containers have rotation"
+    "batchDockerLogsBoundedTooltip": "All containers have rotation",
+    "cardPasswordLabel": "Password:",
+    "cardKeyLabel": "Key:",
+    "untested": "untested",
+    "none": "none",
+    "situacaoUpdateFailed": "Update failed"
   },
   "dns": {
     "title": "DNS Records",
@@ -771,7 +802,18 @@
     "hasDocumentationTitle": "Documentation",
     "noDocumentationTitle": "No documentation",
     "listing": "Listing",
-    "emptyStateAdd": "Create your first project"
+    "emptyStateAdd": "Create your first project",
+    "ai": {
+      "title": "AI Analysis",
+      "subtitle": "Summary of current work based on the most recent commits.",
+      "regenerate": "Regenerate",
+      "generate": "Generate analysis",
+      "hint": "Reads the most recent commits from linked repos and asks the model for a short summary.",
+      "empty": "No analysis generated yet.",
+      "loading": "Analyzing commits…",
+      "generatedAt": "Generated {relative} · {absolute}",
+      "commitsAcrossRepos": "{commits} commits across {repos} repos"
+    }
   },
   "service": {
     "title": "Services",
@@ -1430,7 +1472,29 @@
     "backupFailedMsg": "Backup failed",
     "restoreFailedMsg": "Restore failed",
     "backupRowsRestored": "{count} rows restored.",
-    "backupCrossDialect": "Cross-dialect: {source} → {target}."
+    "backupCrossDialect": "Cross-dialect: {source} → {target}.",
+    "logoAlt": "Logo",
+    "userPasswordOptional": "Password (optional)",
+    "userPasswordKeepCurrent": "Leave blank to keep current",
+    "importer": {
+      "jsonFile": "JSON file",
+      "hostsHint": "Upload a JSON array of host objects. Required fields: nickname, oficial_slug. Optional: hostname, user, password, tags, situacao, etc.",
+      "dnsHint": "Upload a JSON array of DNS objects. Required fields: domain. Optional: has_https, situacao, responsavel, tags, host_ids.",
+      "showExample": "Show JSON example",
+      "selectFile": "Click to select a .json file",
+      "records": "Records",
+      "withCreds": "With Creds",
+      "withOwner": "With Owner",
+      "typeMismatch": "File looks like {detected} data but the import type is set to {current}.",
+      "switchTo": "Switch to {type}?",
+      "importButton": "Import {count} {type}",
+      "dnsRecords": "DNS Records",
+      "results": "Import Results",
+      "created": "Created",
+      "skipped": "Skipped",
+      "failed": "Failed",
+      "another": "Import Another File"
+    }
   },
   "operation": {
     "builtIn": "Built-in",
@@ -1754,7 +1818,9 @@
     "userPasswordLocked": "password locked",
     "userPasswordLockedTooltip": "Password exists but is locked (passwd -S = L).",
     "userPasswordNone": "no password",
-    "userPasswordNoneTooltip": "No password set (passwd -S = NP) — password login impossible."
+    "userPasswordNoneTooltip": "No password set (passwd -S = NP) — password login impossible.",
+    "lastScanLabel": "Last scan:",
+    "noScanData": "No scan data"
   },
   "sshKey": {
     "coolifyAlreadyExists": "Key already exists in Coolify.",

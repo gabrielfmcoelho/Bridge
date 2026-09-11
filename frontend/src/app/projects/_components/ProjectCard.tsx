@@ -25,7 +25,7 @@ export default function ProjectCard({ project }: { project: Project }) {
         <CardHeader
           title={project.name}
           subtitle={project.setor_responsavel || undefined}
-          description={project.description || t("common.noDescription") || "-"}
+          description={project.description || t("common.noDescription")}
           badge={
             <Badge variant="situacao" situacao={project.situacao} compact>
               {project.situacao}

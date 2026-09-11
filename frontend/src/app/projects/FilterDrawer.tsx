@@ -54,9 +54,9 @@ export default function ProjectFilterDrawer({
       search={search}
       onSearchChange={onSearchChange}
       sortFields={[
-        { field: "name", label: t("project.name") || "Name" },
-        { field: "situacao", label: t("host.situacao") || "Situacao" },
-        { field: "setor", label: t("project.setorResponsavel") || "Setor" },
+        { field: "name", label: t("project.name") },
+        { field: "situacao", label: t("host.situacao") },
+        { field: "setor", label: t("project.setorResponsavel") },
       ]}
       defaultSortField="name"
     >
@@ -69,7 +69,7 @@ export default function ProjectFilterDrawer({
         </div>
       </DrawerSection>
 
-      <DrawerSection title={t("host.situacao") || "Status"} open={openSection === "situacao"} onToggle={() => toggle("situacao")} active={!!filters.situacao}>
+      <DrawerSection title={t("host.situacao")} open={openSection === "situacao"} onToggle={() => toggle("situacao")} active={!!filters.situacao}>
         <div className="flex flex-wrap gap-1.5">
           <PillButton active={!filters.situacao} onClick={() => set("situacao", "")}>{t("common.all")}</PillButton>
           {situacaoOptions.map((s) => (
