@@ -107,7 +107,7 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
 
   return (
     <div onClick={onClick} className="cursor-pointer h-full">
-      <Card accent={isKey ? "cyan" : "purple"} className="h-full flex flex-col">
+      <Card accent={isKey ? "cyan" : "accent"} className="h-full flex flex-col">
         <div className="flex items-start justify-between mb-2">
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold text-[var(--text-primary)] text-sm truncate font-mono">
@@ -119,7 +119,7 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
               </p>
             )}
           </div>
-          <Badge color={isKey ? "cyan" : "purple"}>
+          <Badge color={isKey ? "cyan" : "accent"}>
             {isKey ? t("sshKey.sshKeyLabel") : t("sshKey.password")}
           </Badge>
         </div>
@@ -135,7 +135,7 @@ function CredentialCard({ cred, onClick, onDelete }: { cred: SSHKeyRecord; onCli
               {cred.has_private_key && <Badge color="cyan">{t("sshKey.privBadge")}</Badge>}
             </>
           )}
-          {!isKey && cred.has_password && <Badge color="purple">{t("sshKey.encryptedBadge")}</Badge>}
+          {!isKey && cred.has_password && <Badge color="accent">{t("sshKey.encryptedBadge")}</Badge>}
         </div>
 
         {/* Consistent bottom section */}
@@ -228,13 +228,13 @@ function CredentialForm({ onSuccess }: { onSuccess: () => void }) {
                 onClick={() => setCredType("password")}
                 className={`p-3 rounded-[var(--radius-md)] border text-left transition ${
                   credType === "password"
-                    ? "border-[var(--purple)]/30 bg-[var(--purple)]/10"
+                    ? "border-[var(--accent)]/30 bg-[var(--accent)]/10"
                     : "border-[var(--border-default)] bg-[var(--bg-elevated)] hover:border-[var(--border-default)]"
                 }`}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Icon path={ICON_PATHS.lock} className={`w-4 h-4 ${credType === "password" ? "text-[var(--purple)]" : "text-[var(--text-faint)]"}`} />
-                  <span className={`text-sm font-medium ${credType === "password" ? "text-[var(--purple)]" : "text-[var(--text-secondary)]"}`}>{t("sshKey.password")}</span>
+                  <Icon path={ICON_PATHS.lock} className={`w-4 h-4 ${credType === "password" ? "text-[var(--accent)]" : "text-[var(--text-faint)]"}`} />
+                  <span className={`text-sm font-medium ${credType === "password" ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"}`}>{t("sshKey.password")}</span>
                 </div>
                 <p className="text-2xs text-[var(--text-faint)]">{t("sshKey.passwordStorageHint")}</p>
               </button>
@@ -377,7 +377,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Badge color={isKey ? "cyan" : "purple"}>{isKey ? t("sshKey.sshKeyLabel") : t("sshKey.password")}</Badge>
+            <Badge color={isKey ? "cyan" : "accent"}>{isKey ? t("sshKey.sshKeyLabel") : t("sshKey.password")}</Badge>
           </div>
           <p className="text-sm font-semibold text-[var(--text-primary)] font-mono">{data.name}</p>
         </div>
@@ -415,7 +415,7 @@ function KeyView({ id, onUpdated }: { id: number; onUpdated?: () => void }) {
       {coolifyStatus?.enabled && isKey && data.fingerprint && (
         <div className="pt-3 mt-3 border-t border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5 text-[var(--purple)] shrink-0" />
+            <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
             <span className="text-xs font-medium text-[var(--text-primary)]">Coolify</span>
             {coolifyChecking ? (
               <span className="text-2xs text-[var(--text-faint)] ml-auto">{t("common.loading")}</span>

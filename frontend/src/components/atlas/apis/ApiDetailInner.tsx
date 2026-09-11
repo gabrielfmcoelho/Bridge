@@ -117,7 +117,7 @@ export default function ApiDetailInner({ id }: { id: number }) {
             <h1 className="text-2xl font-bold truncate font-display">
               {api.name}
             </h1>
-            <Badge color={api.scope === "projeto" ? "purple" : "gray"}>{scopeLabel}</Badge>
+            <Badge color={api.scope === "projeto" ? "accent" : "gray"}>{scopeLabel}</Badge>
             <Badge color="cyan">{api.spec_version}</Badge>
             {api.version_label && <Badge color="default">v{api.version_label}</Badge>}
           </div>

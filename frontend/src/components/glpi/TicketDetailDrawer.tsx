@@ -115,7 +115,7 @@ const eventLabel: Record<GlpiTicketEvent["type"], string> = {
 
 const eventAccent: Record<GlpiTicketEvent["type"], string> = {
   followup: "border-[var(--border-subtle)]",
-  task: "border-[var(--purple)]/30",
+  task: "border-[var(--accent)]/30",
   solution: "border-[var(--success)]/30",
 };
 
@@ -257,7 +257,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
                             </span>
                           )}
                           {ev.type === "task" && ev.state !== undefined && (
-                            <span className="text-2xs px-1 py-0 rounded border border-[var(--purple)]/30 text-[var(--purple)]">
+                            <span className="text-2xs px-1 py-0 rounded border border-[var(--accent)]/30 text-[var(--accent)]">
                               {t(taskStateLabel[ev.state] ?? "glpi.unknownStateFallback", { state: String(ev.state) })}
                             </span>
                           )}

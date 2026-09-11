@@ -21,7 +21,7 @@ function formatDate(d?: string, locale: string = "pt-BR") {
 const statusColor: Record<string, string> = {
   new: "bg-[var(--cyan)]/10 text-[var(--cyan)] border-[var(--cyan)]/30",
   assigned: "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30",
-  planned: "bg-[var(--purple)]/10 text-[var(--purple)] border-[var(--purple)]/30",
+  planned: "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30",
   waiting: "bg-[var(--text-faint)]/10 text-[var(--text-muted)] border-[var(--border-default)]",
   solved: "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30",
   closed: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-subtle)]",

@@ -181,7 +181,7 @@ export default function HostDetail({ slug }: { slug: string }) {
                 {alertCount > 0 && <span className="font-mono">{alertCount}</span>}
               </span>
               {/* Issues */}
-              <span className={`inline-flex items-center gap-1 text-xs ${openIssuesCount > 0 ? "text-[var(--purple)]" : "text-[var(--text-faint)]"}`} title={t("host.openIssuesTitle", { count: String(openIssuesCount) })}>
+              <span className={`inline-flex items-center gap-1 text-xs ${openIssuesCount > 0 ? "text-[var(--accent)]" : "text-[var(--text-faint)]"}`} title={t("host.openIssuesTitle", { count: String(openIssuesCount) })}>
                 <Icon path={ICON_PATHS.clipboard} />
                 {openIssuesCount > 0 && <span className="font-mono">{openIssuesCount}</span>}
               </span>

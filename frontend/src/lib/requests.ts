@@ -12,7 +12,7 @@ import type { RequestStatus, RequestAbilities, FormField } from "./types";
  *  sites pass values outside this set and silently fall through to no color
  *  class. This narrower alias keeps statusColor honest about what actually
  *  renders. */
-export type BadgeColor = "default" | "emerald" | "cyan" | "amber" | "purple" | "red" | "rose" | "gray";
+export type BadgeColor = "default" | "emerald" | "cyan" | "amber" | "accent" | "red" | "rose" | "gray";
 
 const STATUS_COLORS: Record<RequestStatus, BadgeColor> = {
   submitted: "default",

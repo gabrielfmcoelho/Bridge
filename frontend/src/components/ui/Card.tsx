@@ -12,7 +12,7 @@ const ACCENTS: Record<string, string> = {
   danger: "var(--danger)",
   info: "var(--info)",
   cyan: "var(--cyan)",
-  purple: "var(--purple)",
+  purple: "var(--accent)", // alias: --purple was removed
   rose: "var(--rose)",
   muted: "var(--text-faint)",
   emerald: "var(--success)",

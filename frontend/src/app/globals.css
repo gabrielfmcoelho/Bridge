@@ -35,14 +35,14 @@
   --warning-muted: rgba(251, 191, 36, 0.15);
   --danger: #f87171;
   --danger-muted: rgba(248, 113, 113, 0.15);
-  --purple: #a78bfa;
-  --purple-muted: rgba(167, 139, 250, 0.15);
   --info: #38bdf8;
   --info-muted: rgba(56, 189, 248, 0.15);
 
-  /* Categorical hues for entity identity (hosts=cyan, ...). Kept apart from
-     --accent, which the backend overrides with app_color. Derive tints with
-     Tailwind opacity modifiers: bg-[var(--cyan)]/15, border-[var(--cyan)]/30. */
+  /* Categorical hues for entity identity (hosts=cyan, ...). Derive tints with
+     Tailwind opacity modifiers: bg-[var(--cyan)]/15, border-[var(--cyan)]/30.
+     There is no --purple: it sat in the same indigo/violet arc as --accent
+     (runtime app_color), so entity identity and "this is interactive" read as
+     the same family. Everything that was purple is now --accent. */
   --cyan: #22d3ee;
   --rose: #fb7185;
 
@@ -117,8 +117,6 @@
   --danger-muted: rgba(239, 68, 68, 0.13);
   /* -600/-700 tiers: the dark baselines (#a78bfa, #fbbf24, #38bdf8, #22d3ee,
      #fb7185) all sit under 3:1 on white. */
-  --purple: #7c3aed;
-  --purple-muted: rgba(139, 92, 246, 0.14);
   --info: #0369a1;
   --info-muted: rgba(14, 165, 233, 0.14);
   --cyan: #0e7490;

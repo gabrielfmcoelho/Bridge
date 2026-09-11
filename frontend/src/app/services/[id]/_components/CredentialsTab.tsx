@@ -38,7 +38,7 @@ export default function CredentialsTab({ serviceId, isAdmin, t }: CredentialsTab
                 key={s.id}
                 className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] bg-[var(--bg-elevated)]"
               >
-                <Icon path={ICON_PATHS.keyOutline} className="w-4 h-4 text-[var(--purple)] shrink-0" strokeWidth={1.5} />
+                <Icon path={ICON_PATHS.keyOutline} className="w-4 h-4 text-[var(--accent)] shrink-0" strokeWidth={1.5} />
                 <Badge>{s.name}</Badge>
               </div>
             ))}

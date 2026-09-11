@@ -8,14 +8,14 @@ const colors: Record<string, string> = {
   danger: "text-[var(--danger)]",
   info: "text-[var(--info)]",
   cyan: "text-[var(--cyan)]",
-  purple: "text-[var(--purple)]",
+  purple: "text-[var(--accent)]",
   rose: "text-[var(--rose)]",
   emerald: "text-[var(--success)]",
   amber: "text-[var(--warning)]",
   orange: "text-[var(--warning)]",
   red: "text-[var(--danger)]",
   sky: "text-[var(--info)]",
-  violet: "text-[var(--purple)]",
+  violet: "text-[var(--accent)]",
 };
 
 /** Atomic icon + count indicator for inventory card bottom rows. */

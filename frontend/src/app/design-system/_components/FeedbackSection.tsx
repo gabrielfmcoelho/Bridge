@@ -18,7 +18,7 @@ import { TABLE_LAYERS } from "@/lib/lineage/indexes";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 const STATUS_VARIANTS = ["success", "error", "warning", "info", "loading"] as const;
-const BADGE_COLORS = ["emerald", "cyan", "amber", "purple", "red", "rose", "gray"] as const;
+const BADGE_COLORS = ["emerald", "cyan", "amber", "accent", "red", "rose", "gray"] as const;
 const EMPTY_STATE_ICONS = ["server", "globe", "folder", "box", "search", "key", "topology"] as const;
 const ROLES = ["admin", "editor", "viewer"] as const;
 
@@ -126,7 +126,7 @@ export default function FeedbackSection() {
       </Specimen>
 
       <Specimen title="StatusDot" source="components/ui/StatusDot.tsx">
-        {(["success", "warning", "danger", "info", "accent", "cyan", "purple", "rose", "muted"] as const).map((c) => (
+        {(["success", "warning", "danger", "info", "accent", "cyan", "accent", "rose", "muted"] as const).map((c) => (
           <span key={c} className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
             <StatusDot color={c} />
             {c}

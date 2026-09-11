@@ -99,7 +99,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
               <Link key={svc.id} href={`/services/${svc.id}`} className="block">
                 <Card clickIndicator="link" className="!p-3 !pb-7">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--purple)]/15 text-[var(--purple)]">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--accent)]/15 text-[var(--accent)]">
                       <Icon path={ICON_PATHS.serverStack} />
                     </div>
                     <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">{svc.nickname}</span>

@@ -38,7 +38,7 @@ type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "impor
 
 const roleColors: Record<string, string> = {
   admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
-  editor: "bg-[var(--purple)]/10 text-[var(--purple)]/70 border-[var(--purple)]/15",
+  editor: "bg-[var(--accent)]/10 text-[var(--accent)]/70 border-[var(--accent)]/15",
   viewer: "bg-[var(--bg-overlay)] text-[var(--text-faint)] border-[var(--border-subtle)]",
 };
 
@@ -429,7 +429,7 @@ function UsersSection() {
 
   const roleAccentColor: Record<string, string> = {
     admin: "accent",
-    editor: "purple",
+    editor: "accent",
     viewer: "muted",
   };
 

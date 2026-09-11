@@ -19,7 +19,7 @@ import StatusDot from "@/components/ui/StatusDot";
 const statConfig = [
   { key: "hosts", color: "cyan", icon: "M5 3h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm0 10h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2z" },
   { key: "dns", color: "emerald", icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93z" },
-  { key: "projects", color: "purple", icon: "M2 6a2 2 0 012-2h5l2 2h9a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" },
+  { key: "projects", color: "accent", icon: "M2 6a2 2 0 012-2h5l2 2h9a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" },
   { key: "services", color: "amber", icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" },
   { key: "issues", color: "rose", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
 ];
@@ -259,7 +259,7 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                   {t("dashboard.infrastructure")}
                 </h2>
-                <Icon path={ICON_PATHS.archiveBox} className="w-4 h-4 text-[var(--purple)]" />
+                <Icon path={ICON_PATHS.archiveBox} className="w-4 h-4 text-[var(--accent)]" />
               </div>
               {hospedagemEntries.length > 0 ? (
                 <div className="space-y-2">
@@ -273,7 +273,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-[var(--purple)]/60 transition duration-500"
+                            className="h-full rounded-full bg-[var(--accent)]/60 transition duration-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>

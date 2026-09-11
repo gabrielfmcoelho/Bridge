@@ -5,7 +5,7 @@ interface StatCardProps {
   label: string;
   value: string | number;
   icon: string;
-  /** Card accent: `cyan`, `emerald`, `purple`, `amber`, `red`, `sky`, `rose` or any token/colour. */
+  /** Card accent: `accent`, `cyan`, `rose` or a semantic name (`success`, `warning`, `danger`, `info`). */
   color: CardAccent;
   className?: string;
   style?: CSSProperties;

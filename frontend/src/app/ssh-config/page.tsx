@@ -29,7 +29,7 @@ function highlightSSHConfig(content: string): string {
       }
       const match = line.match(/^(\s+)(\S+)\s+(.*)/);
       if (match) {
-        return `${match[1]}<span class="text-[var(--purple)]">${match[2]}</span> <span class="text-[var(--text-primary)]">${match[3]}</span>`;
+        return `${match[1]}<span class="text-[var(--accent)]">${match[2]}</span> <span class="text-[var(--text-primary)]">${match[3]}</span>`;
       }
       return `<span class="text-[var(--text-secondary)]">${line}</span>`;
     })

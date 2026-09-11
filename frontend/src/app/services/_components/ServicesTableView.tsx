@@ -65,7 +65,7 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
                     {svc.source === "auto" ? t("service.sourceAuto") : svc.source === "fixed" ? t("service.sourceFixed") : t("service.sourceManual")}
                   </Badge>
                   {svc.discovery_kind && (
-                    <Badge color={svc.discovery_kind === "container" ? "cyan" : "purple"}>
+                    <Badge color={svc.discovery_kind === "container" ? "cyan" : "accent"}>
                       {svc.discovery_kind === "container" ? t("service.kindContainer") : t("service.kindHost")}
                     </Badge>
                   )}

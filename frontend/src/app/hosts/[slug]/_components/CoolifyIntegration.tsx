@@ -129,10 +129,10 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
       <div className="px-4 py-3 space-y-3">
         {/* Header */}
         <div className="flex items-center gap-2">
-          <Icon path={ICON_PATHS.serverStack} className="w-4 h-4 text-[var(--purple)] shrink-0" />
+          <Icon path={ICON_PATHS.serverStack} className="w-4 h-4 text-[var(--accent)] shrink-0" />
           <span className="text-sm font-medium text-[var(--text-primary)]">Coolify</span>
           {linked && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--purple)]/15 text-2xs text-[var(--purple)] border border-[var(--purple)]/20">
+            <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--accent)]/15 text-2xs text-[var(--accent)] border border-[var(--accent)]/20">
               {coolifyUUID}
             </span>
           )}

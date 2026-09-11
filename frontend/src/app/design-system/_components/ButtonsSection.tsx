@@ -99,7 +99,7 @@ export default function ButtonsSection() {
           actions={[
             { label: "New host", icon: ICON_PATHS.plus, onClick: noop },
             // ponytail: FAB color prop is a plain string; a CSS var works, no hex needed.
-            { label: "Scan", icon: ICON_PATHS.scan, onClick: noop, color: "var(--purple)" },
+            { label: "Scan", icon: ICON_PATHS.scan, onClick: noop, color: "var(--accent)" },
           ]}
         />
         <p className="text-xs text-[var(--text-muted)] w-full mt-1">

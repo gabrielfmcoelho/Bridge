@@ -17,7 +17,7 @@ reprints them.
 1. **Colour comes from tokens.** `--bg-*`, `--border-*`, `--text-*` for surfaces;
    `--success` `--warning` `--danger` `--info` for meaning; `--accent` for the
    one interactive colour (runtime-overridden by `app_color`); `--cyan`
-   `--purple` `--rose` for categorical identity. Tints are opacity modifiers:
+   `--rose` for categorical identity (see §3 — there is no `--purple`). Tints are opacity modifiers:
    `bg-[var(--success)]/15 border-[var(--success)]/30`. No raw palette classes
    (`text-emerald-400`) and no hex in tsx: the light theme only works through
    the tokens. Swept app-wide on 2026-09-10; what is left is `Header.tsx`, `app/secrets`
@@ -94,10 +94,10 @@ Every inventory card has five vertical sections inside `<Card accent={situacaoAc
 +------------------------------------------+
 ```
 
-- Title: mono, sm, semibold. Subtitle: mono, xs, faint. Description: body, xs, muted, truncate.
-- Metadata grid `grid-cols-2 gap-x-4 gap-y-3`; labels faint xs, values secondary xs (mono for IDs, hosts, tech).
-- Tags: `mt-3 pt-3 border-t border-subtle`, max 4 + `+N`, `min-h-[28px]`.
-- Indicators: `mt-auto pt-4 border-t`; icons always visible (faint at count 0), counts only when > 0.
+- Title: sm, semibold, mono when it is an identifier (`titleFont`). Subtitle: mono, xs. Description: body, xs, muted, truncate.
+- Metadata grid `grid-cols-2 gap-x-4 gap-y-3`; labels muted xs, values secondary xs. Valueless pairs are not rendered (§1.16).
+- Tags: `mt-3 pt-3 border-t border-subtle`, max 4 + `+N`; absent when there are no tags.
+- Indicators: `mt-auto pt-4 border-t`; a zero count renders nothing, a flag (`hideCount`) keeps its off state.
 - Card accent: entity cards pass `situacaoAccent(situacao, enumColor)`; services pass
   `danger | cyan | warning` for external-dependency / in-house / vendor.
 
@@ -126,11 +126,18 @@ Each piece of data should appear in **exactly one** card section:
 | Hosts | `--cyan` |
 | DNS | `--success` |
 | Services | `--warning` |
-| Projects, Issues | `--purple` |
+| Projects, Issues | `--accent` |
 | Containers | `--info` |
 | Chamados | `--warning` |
 
 `lib/constants.ts` `ENTITY_INDICATOR_COLORS` is on tokens as of the 2026-09-10 sweep.
+
+**There is no `--purple`.** It sat in the same indigo/violet arc as `--accent`
+(which the backend overrides at runtime with `app_color`), so entity identity
+and "this is interactive" read as the same family. Everything that was purple
+is `--accent`. The `purple`/`violet` keys survive in `Badge`, `Card`,
+`StatusDot` and `CardIndicator` only as aliases for `app/secrets`, which a
+tooling guardrail prevents editing — do not use them in new code.
 
 ---
 

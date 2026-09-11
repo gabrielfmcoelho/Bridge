@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 
 const legendItems = [
   { type: "host", color: "bg-[var(--cyan)]", label: "Hosts" },
-  { type: "service", color: "bg-[var(--purple)]", label: "Services" },
+  { type: "service", color: "bg-[var(--accent)]", label: "Services" },
   { type: "dns", color: "bg-[var(--success)]", label: "DNS" },
   { type: "project", color: "bg-[var(--warning)]", label: "Projects" },
 ];

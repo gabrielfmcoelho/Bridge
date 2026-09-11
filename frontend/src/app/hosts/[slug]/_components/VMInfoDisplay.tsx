@@ -77,7 +77,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
               const ownerClasses = (ownerType?: string): string => {
                 switch (ownerType) {
                   case "container": return "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/40";
-                  case "nginx": return "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/40";
+                  case "nginx": return "bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/40";
                   case "docker": return "bg-[var(--info)]/15 text-[var(--info)] border-[var(--info)]/40";
                   // "agent" and "service" are back-filled from the
                   // catalogs when ss couldn't read the owning process
@@ -86,7 +86,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                   // Violet for agents, emerald for application services
                   // so the operator can distinguish "what's monitoring
                   // me" from "what am I actually running" at a glance.
-                  case "agent": return "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/40";
+                  case "agent": return "bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/40";
                   case "service": return "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/40";
                   case "process": return "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-default)]";
                   default: return "bg-[var(--bg-elevated)] text-[var(--text-secondary)] border-[var(--border-default)]";
@@ -1349,7 +1349,7 @@ function ServiceRow({ service, t }: { service: DiscoveredService; t: (k: string,
       )}
       {service.host_running && (
         <span
-          className="shrink-0 text-2xs text-[var(--purple)] px-1.5 py-0.5 rounded bg-[var(--purple)]/10 border border-[var(--purple)]/30"
+          className="shrink-0 text-2xs text-[var(--accent)] px-1.5 py-0.5 rounded bg-[var(--accent)]/10 border border-[var(--accent)]/30"
           title={t("scan.services.hostInstanceTooltip")}
         >
           {t("scan.services.hostInstance")}

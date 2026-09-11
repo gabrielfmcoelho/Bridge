@@ -27,7 +27,7 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
       )}
 
       {/* Main info grid */}
-      <Card accent="purple" hover={false}>
+      <Card accent="accent" hover={false}>
         <SectionHeading variant="section">
           {t("service.serviceInfo")}
         </SectionHeading>

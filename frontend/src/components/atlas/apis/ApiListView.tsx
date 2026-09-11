@@ -112,7 +112,7 @@ export default function ApiListView() {
                 <Card className="h-full p-4 hover:border-[var(--border-strong)] transition-colors">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="font-semibold text-[var(--text-primary)] truncate">{api.name}</h3>
-                    <Badge color={api.scope === "projeto" ? "purple" : "gray"}>{scopeLabel(api.scope)}</Badge>
+                    <Badge color={api.scope === "projeto" ? "accent" : "gray"}>{scopeLabel(api.scope)}</Badge>
                   </div>
                   {api.description && <p className="text-xs text-[var(--text-muted)] line-clamp-2 mb-3">{api.description}</p>}
                   <div className="flex items-center gap-2 text-2xs text-[var(--text-muted)]">
@@ -156,7 +156,7 @@ export default function ApiListView() {
                 )}
               </div>
               <span className="shrink-0 text-xs text-[var(--text-muted)] flex items-center gap-1.5">
-                <Badge color={op.scope === "projeto" ? "purple" : "gray"}>{op.api_name}</Badge>
+                <Badge color={op.scope === "projeto" ? "accent" : "gray"}>{op.api_name}</Badge>
               </span>
             </Link>
           ))}

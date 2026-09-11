@@ -152,7 +152,7 @@ export default function VaultEntryEditor({ secret, onClose }: { secret: Secret |
       >
         <div className="flex items-center gap-2 flex-wrap">
           <Badge>{secret.type}</Badge>
-          <Badge color={secret.visibility === "personal" ? "purple" : "amber"}>{secret.visibility}</Badge>
+          <Badge color={secret.visibility === "personal" ? "accent" : "amber"}>{secret.visibility}</Badge>
           <Badge>{secret.scope}</Badge>
           <span className="text-2xs text-[var(--text-faint)]">{t("vault.immutableNotice")}</span>
         </div>

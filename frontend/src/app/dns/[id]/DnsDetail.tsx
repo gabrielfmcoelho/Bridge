@@ -129,7 +129,7 @@ export default function DnsDetail({ id }: { id: number }) {
             }
             counters={
               dnsIssues.length > 0 ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--purple)]">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)]">
                   <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5" />
                   {dnsIssues.length}
                 </span>

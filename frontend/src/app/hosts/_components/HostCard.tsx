@@ -108,9 +108,9 @@ export default function HostCard({ host }: { host: Host }) {
             <ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} />
             <CardIndicator icon={ICON_PATHS.globe} count={host.dns_count || 0} color="cyan" title={`${host.dns_count || 0} DNS`} />
             <CardIndicator icon={ICON_PATHS.container} count={host.containers_count || 0} color="sky" title={`${host.containers_count || 0} ${t("host.containers").toLowerCase()}`} />
-            <CardIndicator icon={ICON_PATHS.terminal} count={host.processes_count || 0} color="violet" title={`${host.processes_count || 0} ${t("host.processes").toLowerCase()}`} />
+            <CardIndicator icon={ICON_PATHS.terminal} count={host.processes_count || 0} color="accent" title={`${host.processes_count || 0} ${t("host.processes").toLowerCase()}`} />
             <CardIndicator icon={ICON_PATHS.gear} count={host.services_count || 0} color="amber" title={`${host.services_count || 0} ${t("host.services").toLowerCase()}`} />
-            <CardIndicator icon={ICON_PATHS.folder} count={host.projects_count || 0} color="violet" title={`${host.projects_count || 0} projetos`} />
+            <CardIndicator icon={ICON_PATHS.folder} count={host.projects_count || 0} color="accent" title={`${host.projects_count || 0} projetos`} />
           </div>
 
           {/* Row 2: auth (pwd, key), chamados, alerts, issues */}
@@ -127,7 +127,7 @@ export default function HostCard({ host }: { host: Host }) {
             </div>
             <CardIndicator icon={ICON_PATHS.document} count={host.chamados_count || 0} color="orange" title={`${host.chamados_count || 0} chamados`} />
             <CardIndicator icon={ICON_PATHS.alert} count={host.alerts?.length || 0} color="amber" title={`${host.alerts?.length || 0} alerts`} />
-            <CardIndicator icon={ICON_PATHS.clipboard} count={host.issues_count || 0} color="purple" title={`${host.issues_count || 0} issues`} />
+            <CardIndicator icon={ICON_PATHS.clipboard} count={host.issues_count || 0} color="accent" title={`${host.issues_count || 0} issues`} />
           </div>
         </div>
       </Card>

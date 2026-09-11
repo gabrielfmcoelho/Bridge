@@ -242,7 +242,7 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
 
         {hasLinkedIssue && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-2.5 border border-[var(--border-subtle)]">
-            <Icon path={ICON_PATHS.clipboard} className="w-3.5 h-3.5 text-[var(--purple)] shrink-0" />
+            <Icon path={ICON_PATHS.clipboard} className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
             {isResolved
               ? t("issue.alertLinkResolved", { id: String(alert.linked_issue_id) })
               : t("issue.alertLinkPending", { id: String(alert.linked_issue_id) })

@@ -145,7 +145,7 @@ export default function ServiceDetail({ id }: { id: number }) {
                   </Badge>
                 )}
                 {data.service.discovery_kind && (
-                  <Badge color={data.service.discovery_kind === "container" ? "cyan" : "purple"} compact>
+                  <Badge color={data.service.discovery_kind === "container" ? "cyan" : "accent"} compact>
                     {data.service.discovery_kind === "container" ? t("service.kindContainer") : t("service.kindHost")}
                   </Badge>
                 )}

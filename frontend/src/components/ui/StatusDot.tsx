@@ -1,5 +1,5 @@
 // Coloured dot for state. `color` takes a token name (success, warning, danger,
-// info, accent, cyan, purple, rose, muted) or any class via `className`.
+// info, accent, cyan, rose, muted) or any class via `className`.
 const colors: Record<string, string> = {
   success: "bg-[var(--success)]",
   warning: "bg-[var(--warning)]",
@@ -7,7 +7,7 @@ const colors: Record<string, string> = {
   info: "bg-[var(--info)]",
   accent: "bg-[var(--accent)]",
   cyan: "bg-[var(--cyan)]",
-  purple: "bg-[var(--purple)]",
+  purple: "bg-[var(--accent)]",
   rose: "bg-[var(--rose)]",
   muted: "bg-[var(--text-faint)]",
 };

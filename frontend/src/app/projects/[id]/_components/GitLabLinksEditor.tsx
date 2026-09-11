@@ -215,7 +215,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
                 <LinkHealthIcon link={link} integrationActive={integrationActive} />
                 <span className={`text-2xs px-1.5 py-0.5 rounded shrink-0 ${
                   link.kind === "group"
-                    ? "bg-[var(--purple)]/10 text-[var(--purple)]"
+                    ? "bg-[var(--accent)]/10 text-[var(--accent)]"
                     : "bg-[var(--cyan)]/10 text-[var(--cyan)]"
                 }`}>
                   {link.kind === "group" ? t("project.linkKindGroup") : t("project.linkKindRepo")}

@@ -15,8 +15,8 @@ import type { TableRecord } from "@/lib/atlas/types";
 
 const noop = () => {};
 
-const CARD_ACCENTS = ["success", "warning", "danger", "info", "cyan", "purple", "rose", "accent", "muted"] as const;
-const STAT_CARD_COLORS = ["cyan", "emerald", "purple", "amber", "red", "sky", "rose"] as const;
+const CARD_ACCENTS = ["success", "warning", "danger", "info", "cyan", "accent", "rose", "accent", "muted"] as const;
+const STAT_CARD_COLORS = ["cyan", "emerald", "accent", "amber", "red", "sky", "rose"] as const;
 
 const OFFERING_1: Offering = {
   id: 1,
@@ -79,7 +79,7 @@ export default function CardsSection() {
             <p className="text-sm font-semibold font-mono">decorator=&quot;stripe-top&quot;</p>
             <p className="text-xs text-[var(--text-muted)] mt-1">Atlas TableCard stripe.</p>
           </Card>
-          <Card accent="purple" decorator="tint" padding="sm">
+          <Card accent="accent" decorator="tint" padding="sm">
             <p className="text-sm font-semibold font-mono relative">decorator=&quot;tint&quot;</p>
             <p className="text-xs text-[var(--text-muted)] mt-1 relative">Border and wash from the accent (StatCard).</p>
           </Card>
@@ -130,7 +130,7 @@ export default function CardsSection() {
             { label: "Hosts", value: 128, color: "cyan", icon: ICON_PATHS.server },
             { label: "DNS records", value: 342, color: "emerald", icon: ICON_PATHS.globe },
             { label: "Services", value: 57, color: "amber", icon: ICON_PATHS.container },
-            { label: "Projects", value: 19, color: "purple", icon: ICON_PATHS.folder },
+            { label: "Projects", value: 19, color: "accent", icon: ICON_PATHS.folder },
           ]}
         />
       </Specimen>

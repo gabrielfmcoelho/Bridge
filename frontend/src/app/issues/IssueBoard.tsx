@@ -46,16 +46,16 @@ const priorityColors: Record<string, string> = {
 
 // Badge colour key per entity, and the chip classes as full literals
 // (Tailwind only generates classes it can read from source).
-const entityColors: Record<string, "cyan" | "success" | "purple" | "warning"> = {
+const entityColors: Record<string, "cyan" | "success" | "accent" | "warning"> = {
   host: "cyan",
   dns: "success",
-  service: "purple",
+  service: "accent",
   project: "warning",
 };
 const entityChip: Record<string, string> = {
   host: "text-[var(--cyan)] bg-[var(--cyan)]/10",
   dns: "text-[var(--success)] bg-[var(--success)]/10",
-  service: "text-[var(--purple)] bg-[var(--purple)]/10",
+  service: "text-[var(--accent)] bg-[var(--accent)]/10",
   project: "text-[var(--warning)] bg-[var(--warning)]/10",
 };
 
@@ -258,7 +258,7 @@ export default function IssueBoard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <StatCard label={t("issue.statTotalOpen")} value={kpis.totalOpen} color="cyan" icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           <StatCard label={t("issue.critical")} value={kpis.critical} color="red" icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          <StatCard label={t("issue.statAssignedToMe")} value={kpis.assignedToMe} color="purple" icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          <StatCard label={t("issue.statAssignedToMe")} value={kpis.assignedToMe} color="accent" icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           <StatCard label={t("issue.statUnassigned")} value={kpis.unassigned} color="amber" icon="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </div>
       )}
@@ -767,7 +767,7 @@ function ListView({ issues, getEntityLabel, getAssigneeNames, sortField, sortDir
                         : issue.status === "in_progress"
                         ? "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/30"
                         : issue.status === "review"
-                        ? "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/30"
+                        ? "bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30"
                         : "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]"
                     }`}
                   >

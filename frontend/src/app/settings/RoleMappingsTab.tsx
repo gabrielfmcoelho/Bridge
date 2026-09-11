@@ -103,7 +103,7 @@ export default function RoleMappingsTab() {
                       m.local_role === "admin"
                         ? "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/25"
                         : m.local_role === "editor"
-                        ? "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/25"
+                        ? "bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/25"
                         : "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]"
                     }`}>
                       {m.local_role}

@@ -87,7 +87,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
                   </span>
                 )}
                 <span title={alert.linked_issue_id ? t("issue.number", { id: String(alert.linked_issue_id) }) : t("alert.noIssueLinked")}>
-                  <Icon path={ICON_PATHS.clipboard} className={`w-3.5 h-3.5 shrink-0 ${alert.linked_issue_id ? "text-[var(--purple)]" : "text-[var(--text-faint)]/30"}`} />
+                  <Icon path={ICON_PATHS.clipboard} className={`w-3.5 h-3.5 shrink-0 ${alert.linked_issue_id ? "text-[var(--accent)]" : "text-[var(--text-faint)]/30"}`} />
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-3 text-xs">
@@ -102,7 +102,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
                 <div>
                   <span className="text-[var(--text-faint)] block mb-0.5">{t("alert.source")}</span>
                   {alert.source === "grafana" ? (
-                    <span className="inline-flex items-center gap-1 text-[var(--purple)]">
+                    <span className="inline-flex items-center gap-1 text-[var(--accent)]">
                       <Icon path={ICON_PATHS.bolt} className="w-3 h-3" />
                       Grafana
                     </span>
@@ -267,7 +267,7 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
                                     <span className={`${issue.entity_type === "service" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityService")}>
                                       <Icon path={ICON_PATHS.cube} className="w-3.5 h-3.5" />
                                     </span>
-                                    <span className={`${issue.entity_type === "project" ? "text-[var(--purple)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityProject")}>
+                                    <span className={`${issue.entity_type === "project" ? "text-[var(--accent)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityProject")}>
                                       <Icon path={ICON_PATHS.folder} className="w-3.5 h-3.5" />
                                     </span>
                                     <span className={`${(issue.alert_ids?.length || 0) > 0 || issue.source === "alert" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityAlert")}>

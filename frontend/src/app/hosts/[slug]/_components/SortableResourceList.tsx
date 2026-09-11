@@ -158,7 +158,7 @@ export function ServicesList({ details, title }: { details: string[]; title: str
       title={title}
       rows={rows}
       columns={columns}
-      getIcon={(row) => <span className="text-[var(--purple)]">{portIcon(row.name)}</span>}
+      getIcon={(row) => <span className="text-[var(--accent)]">{portIcon(row.name)}</span>}
       getName={(row) => row.name}
     />
   );

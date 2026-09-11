@@ -25,7 +25,7 @@ const colorVariants: Record<string, string> = {
   red: danger,
   sky: info,
   cyan: "bg-[var(--cyan)]/15 text-[var(--cyan)] border-[var(--cyan)]/30",
-  purple: "bg-[var(--purple)]/15 text-[var(--purple)] border-[var(--purple)]/30",
+  purple: "bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30",
   rose: "bg-[var(--rose)]/15 text-[var(--rose)] border-[var(--rose)]/30",
   gray: neutral,
 };

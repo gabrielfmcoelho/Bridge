@@ -157,7 +157,7 @@ function NodeChip({ node }: { node: LineageNode }) {
   const isTask = node.type === "task";
   const isModel = node.type === "dbt_model";
   const color = isModel ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30"
-              : isTask ? "bg-[var(--purple)]/10 text-[var(--purple)] border-[var(--purple)]/30"
+              : isTask ? "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30"
               : "bg-[var(--bg-base)] text-[var(--text-muted)] border-[var(--border-subtle)]";
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-mono px-2 py-1 rounded-[var(--radius-sm)] border ${color}`}>

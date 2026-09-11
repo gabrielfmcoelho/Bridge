@@ -243,7 +243,7 @@ function SecretRow({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-sm text-[var(--text-primary)]">{secret.name}</span>
             <Badge>{secret.type}</Badge>
-            <Badge color={secret.visibility === "personal" ? "purple" : "amber"}>{secret.visibility}</Badge>
+            <Badge color={secret.visibility === "personal" ? "accent" : "amber"}>{secret.visibility}</Badge>
             <Badge>{secret.scope}</Badge>
             {secret.group_label && (
               <span className="text-2xs text-[var(--text-faint)]">{t("vault.envLabel", { group: secret.group_label })}</span>

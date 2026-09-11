@@ -144,7 +144,7 @@ export default function IssueBoard({ projectId, services, canEdit }: IssueBoardP
                         <span className="text-2xs text-[var(--text-muted)] bg-[var(--bg-overlay)] rounded px-1.5 py-0.5">{issue.assignee}</span>
                       )}
                       {issue.service_id && (
-                        <span className="text-2xs text-[var(--purple)] bg-[var(--purple)]/10 rounded px-1.5 py-0.5">
+                        <span className="text-2xs text-[var(--accent)] bg-[var(--accent)]/10 rounded px-1.5 py-0.5">
                           {services.find((s) => s.id === issue.service_id)?.nickname || ""}
                         </span>
                       )}

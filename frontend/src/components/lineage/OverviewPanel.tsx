@@ -99,7 +99,7 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
             <StatCard label={t("atlas.lineage.cards.unusedSources")} value={stats.unusedSources} icon={ICONS.source} color="sky" />
           </button>
           <button onClick={() => onNavigate("issues", { kind: "unused_macros" })} className="text-left">
-            <StatCard label={t("atlas.lineage.cards.unusedMacros")} value={stats.unusedMacros} icon={ICONS.macro} color="purple" />
+            <StatCard label={t("atlas.lineage.cards.unusedMacros")} value={stats.unusedMacros} icon={ICONS.macro} color="accent" />
           </button>
         </div>
       </div>

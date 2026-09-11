@@ -31,7 +31,7 @@ export default function ServiceCard({ svc }: { svc: Service }) {
                 </Badge>
               )}
               {svc.discovery_kind && (
-                <Badge color={svc.discovery_kind === "container" ? "cyan" : "purple"} compact>
+                <Badge color={svc.discovery_kind === "container" ? "cyan" : "accent"} compact>
                   {svc.discovery_kind === "container" ? t("service.kindContainer") : t("service.kindHost")}
                 </Badge>
               )}
@@ -63,7 +63,7 @@ export default function ServiceCard({ svc }: { svc: Service }) {
         {/* Bottom indicators */}
         <div className="flex items-center gap-3 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4">
           <CardIndicator icon={ICON_PATHS.alert} count={svc.is_external_dependency ? 1 : 0} color="red" title={svc.is_external_dependency ? t("service.isExternalDependency") : t("service.notExternalDependency")} hideCount />
-          <CardIndicator icon={ICON_PATHS.gear} count={svc.orchestrator_managed ? 1 : 0} color="purple" title={svc.orchestrator_managed ? t("service.orchestratorManaged") : t("service.notOrchestrated")} hideCount />
+          <CardIndicator icon={ICON_PATHS.gear} count={svc.orchestrator_managed ? 1 : 0} color="accent" title={svc.orchestrator_managed ? t("service.orchestratorManaged") : t("service.notOrchestrated")} hideCount />
           <CardIndicator icon={ICON_PATHS.server} count={linkedHostsCount} color="cyan" title={t("service.hostsCount", { count: String(linkedHostsCount) })} />
           <CardIndicator icon={ICON_PATHS.globe} count={linkedDnsCount} color="emerald" title={t("service.dnsCount", { count: String(linkedDnsCount) })} />
           <CardIndicatorSeparator />
