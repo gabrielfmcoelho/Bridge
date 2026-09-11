@@ -16,10 +16,13 @@
   --border-default: #293548;
   --border-strong: #374a60;
 
+  /* Contrast-tuned: --secondary ~8:1, --muted ~5.3:1 on --bg-elevated.
+     --faint is ~3.6:1 — non-text only (icons at rest, hairlines, empty-cell
+     dashes). A word a human has to read gets --muted or above. */
   --text-primary: #e8ecf2;
-  --text-secondary: #8b97ad;
-  --text-muted: #5a6a80;
-  --text-faint: #3d4e63;
+  --text-secondary: #a3b0c4;
+  --text-muted: #8593a8;
+  --text-faint: #6b7b93;
 
   --accent: #06b6d4;
   --accent-hover: #22d3ee;
@@ -82,8 +85,8 @@
 
   --text-primary: #0f172a;
   --text-secondary: #334155;
-  --text-muted: #64748b;
-  --text-faint: #94a3b8;
+  --text-muted: #5a6b82;
+  --text-faint: #6b7a91;
 
   --accent-muted: rgba(6, 182, 212, 0.12);
   --accent-glow: rgba(6, 182, 212, 0.06);
@@ -152,6 +155,8 @@ body {
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-body);
+  /* This app is wall-to-wall numbers; digits must line up in columns. */
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -162,10 +167,12 @@ body {
 }
 
 /* ─── Focus ─── */
+/* No border-radius here: it is a shape override, not a focus style — it made
+   every rounded-full element square off while keyboard-focused. Browsers
+   already follow the element's own radius when drawing the outline. */
 *:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
 }
 
 /* ─── Scrollbar ─── */
