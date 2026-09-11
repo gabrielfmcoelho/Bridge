@@ -192,12 +192,16 @@ function EnumSection() {
 
   return (
     <div className="space-y-4">
+      {/* One list, not one card per enum: these categories are peers, and a
+          card per peer spent a full screen on five one-input rows. */}
+      <Card padding="none" hover={false}>
+        <ul className="divide-y divide-[var(--border-subtle)]">
       {Object.entries(mergedEnums).map(([category, options], i) => (
-        <Card key={category} hover={false} className="stagger-in" style={{ "--i": i } as React.CSSProperties}>
-          <h3 className="text-xs font-semibold mb-3 font-display" style={{ color: "var(--text-muted)" }}>
+        <li key={category} className="px-4 py-3 stagger-in" style={{ "--i": i } as React.CSSProperties}>
+          <h3 className="text-xs font-semibold mb-2 font-mono text-[var(--text-secondary)]">
             {category}
           </h3>
-          <div className="flex flex-wrap gap-1.5 mb-3">
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {options.map((opt) => (
               <span key={opt.value} className="group inline-flex items-center gap-1">
                 <button type="button" onClick={() => isAdmin && openEdit(category, opt.value)} className={isAdmin ? "cursor-pointer" : ""}>
@@ -257,8 +261,10 @@ function EnumSection() {
               )}
             </form>
           )}
-        </Card>
+        </li>
       ))}
+        </ul>
+      </Card>
 
       {/* Add new category */}
       {isAdmin && (

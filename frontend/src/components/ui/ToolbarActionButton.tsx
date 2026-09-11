@@ -1,3 +1,5 @@
+import Icon from "./Icon";
+
 interface ToolbarActionButtonProps {
   icon: string;
   label?: string;
@@ -20,10 +22,11 @@ export default function ToolbarActionButton({
       onClick={onClick}
       className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-[var(--radius-md)] border bg-[var(--bg-elevated)] text-[var(--text-muted)] border-[var(--border-default)] hover:text-[var(--text-secondary)] transition"
       title={title || label}
+      // The label is display:none below the breakpoint, so it is not in the
+      // accessible name there — and a touch user gets no tooltip either.
+      aria-label={label || title}
     >
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
-      </svg>
+      <Icon path={icon} />
       {label && <span className={hiddenClass}>{label}</span>}
     </button>
   );

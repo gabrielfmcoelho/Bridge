@@ -37,8 +37,6 @@
   --danger-muted: rgba(248, 113, 113, 0.15);
   --purple: #a78bfa;
   --purple-muted: rgba(167, 139, 250, 0.15);
-  --amber: #fbbf24;
-  --amber-muted: rgba(251, 191, 36, 0.15);
   --info: #38bdf8;
   --info-muted: rgba(56, 189, 248, 0.15);
 
@@ -121,8 +119,6 @@
      #fb7185) all sit under 3:1 on white. */
   --purple: #7c3aed;
   --purple-muted: rgba(139, 92, 246, 0.14);
-  --amber: #b45309;
-  --amber-muted: rgba(245, 158, 11, 0.14);
   --info: #0369a1;
   --info-muted: rgba(14, 165, 233, 0.14);
   --cyan: #0e7490;

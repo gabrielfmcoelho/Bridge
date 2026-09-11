@@ -69,7 +69,7 @@ export default function SortableTable<K extends string>({
                 <th
                   key={col.key}
                   onClick={sortable ? () => toggleSort(col.key) : undefined}
-                  className={`${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} px-4 py-3 font-semibold select-none transition-colors ${sortable ? "cursor-pointer hover:text-[var(--text-secondary)]" : ""}`}
+                  className={`${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} px-3 py-2 font-semibold whitespace-nowrap select-none transition-colors ${sortable ? "cursor-pointer hover:text-[var(--text-secondary)]" : ""}`}
                 >
                   <span className="inline-flex items-center gap-1">
                     {col.label}

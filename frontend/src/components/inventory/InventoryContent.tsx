@@ -47,7 +47,7 @@ export default function InventoryContent<T extends { id: number }>({
   const { t } = useLocale();
   if (isLoading) {
     return viewMode === "cards" ? (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start max-md:pb-24">
         {Array.from({ length: skeletonCount }).map((_, i) => <SkeletonCard key={i} />)}
       </div>
     ) : (
@@ -74,7 +74,7 @@ export default function InventoryContent<T extends { id: number }>({
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start max-md:pb-24">
         {displayItems.map((item, i) => (
           <div key={item.id} className="stagger-in" style={{ "--i": i } as React.CSSProperties}>
             {renderCard(item, i)}

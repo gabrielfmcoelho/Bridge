@@ -82,16 +82,19 @@ export default function Badge({ children, variant = "default", color, situacao, 
     }
 
     if (situacaoColor) {
+      // The enum hex is the backend's identity colour and it knows nothing
+      // about the theme: as label text it measured 2.15:1 on light. It stays
+      // on the dot and the fill, where a graphic only needs 3:1, and the
+      // label takes its contrast from the theme.
       return (
         <span
-          className={`${base} ${className}`}
+          className={`${base} text-[var(--text-secondary)] ${className}`}
           style={{
             backgroundColor: `${situacaoColor}26`,
-            color: situacaoColor,
             borderColor: `${situacaoColor}4d`,
           }}
         >
-          {dot && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: situacaoColor }} />}
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: situacaoColor }} />
           {children}
         </span>
       );

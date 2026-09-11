@@ -4,10 +4,13 @@ export const tableClasses = {
   wrapper: "border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-x-auto",
   table: "w-full text-sm",
   headRow: "bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs uppercase tracking-wider",
-  th: "text-left px-4 py-3 font-semibold",
-  row: "border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors",
-  rowAlt: "bg-[var(--bg-surface)]",
-  td: "px-4 py-2.5",
+  // whitespace-nowrap on the head: a two-line header wrap was what made rows
+  // 61px tall and pushed the sort chevron out of alignment.
+  th: "text-left px-3 py-2 font-semibold whitespace-nowrap",
+  // Zebra OR rules, not both — two separators doing one job.
+  row: "hover:bg-[var(--bg-elevated)] transition-colors",
+  rowAlt: "bg-[var(--bg-elevated)]/40",
+  td: "px-3 py-2 leading-5",
   // Inline variant for tables inside a Card: hairline head, tight cells, no wrapper.
   compact: {
     table: "w-full text-sm",

@@ -9,6 +9,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import TabBar, { type Tab } from "@/components/ui/TabBar";
 import SortableTable, { sortRows, type SortableColumn } from "@/components/ui/SortableTable";
+import { tableClasses } from "@/components/ui/Table";
 import Pagination from "@/components/ui/Pagination";
 import Badge from "@/components/ui/Badge";
 import ListToolbar from "@/components/ui/ListToolbar";
@@ -182,21 +183,32 @@ export default function RequestList() {
               sortRows(filteredRows, sortKey, sortDir, comparators).map((r, i) => (
                 <tr
                   key={r.id}
-                  className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
+                  className={`${tableClasses.row} cursor-pointer ${i % 2 === 1 ? tableClasses.rowAlt : ""}`}
                   onClick={() => router.push(`/requests/${r.id}`)}
                 >
-                  <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
-                    <Link href={`/requests/${r.id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                  {/* One line per row: a wrapping title was what made these
+                      rows 61px tall. The full text is on hover. */}
+                  <td className={`${tableClasses.td} font-medium text-[var(--text-primary)] max-w-0 w-[38%]`}>
+                    <Link
+                      href={`/requests/${r.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="hover:underline block truncate"
+                      title={r.title}
+                    >
                       {r.title}
                     </Link>
                   </td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{r.offering_name ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{r.requester_name ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{t(`requests.priorityLevels.${r.priority}`)}</td>
-                  <td className="px-4 py-2.5">
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)] max-w-0 w-[20%]`}>
+                    <span className="block truncate" title={r.offering_name ?? undefined}>{r.offering_name ?? "—"}</span>
+                  </td>
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)] max-w-0 w-[16%]`}>
+                    <span className="block truncate" title={r.requester_name ?? undefined}>{r.requester_name ?? "—"}</span>
+                  </td>
+                  <td className={`${tableClasses.td} text-[var(--text-secondary)]`}>{t(`requests.priorityLevels.${r.priority}`)}</td>
+                  <td className={tableClasses.td}>
                     <Badge color={statusColor(r.status)}>{t(statusLabelKey(r.status))}</Badge>
                   </td>
-                  <td className="px-4 py-2.5 text-[var(--text-muted)]">{formatDate(r.created_at)}</td>
+                  <td className={`${tableClasses.td} text-[var(--text-muted)] whitespace-nowrap`}>{formatDate(r.created_at)}</td>
                 </tr>
               ))
             }
