@@ -70,11 +70,6 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
         {sections.map((section, sIdx) => (
           <div key={section.key}>
             {sIdx > 0 && <Divider className="my-3" />}
-            {section.label && !collapsed && (
-              <p className="px-3 py-1 text-2xs font-semibold text-[var(--text-faint)] uppercase tracking-widest">
-                {t(section.label)}
-              </p>
-            )}
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 if (item.href === "#") {
@@ -165,7 +160,7 @@ function MobileDrawer({
           {sections.map((section) => (
             <div key={section.key}>
               {section.label && (
-                <p className="px-1 pb-1.5 text-2xs font-semibold text-[var(--text-faint)] uppercase tracking-widest">
+                <p className="px-1 pb-1.5 text-2xs font-semibold text-[var(--text-muted)]">
                   {t(section.label)}
                 </p>
               )}

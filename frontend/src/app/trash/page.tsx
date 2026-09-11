@@ -116,7 +116,7 @@ function TrashSection<T extends { id: number }>({
   if (items.length === 0) return null;
   return (
     <div>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-2">
+      <h2 className="text-xs font-semibold text-[var(--text-muted)] mb-2">
         {title} <span className="text-[var(--text-faint)]">({items.length})</span>
       </h2>
       <div className="space-y-2">

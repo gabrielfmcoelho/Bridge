@@ -100,7 +100,7 @@ export default function TablesPanel({ indexes, onOpenInGraph }: Props) {
           {visibleLayers.map(layer => (
             <div
               key={layer}
-              className={`text-2xs uppercase tracking-widest font-semibold px-2 py-1.5 text-center rounded-[var(--radius-sm)] ${LAYER_COLORS[layer] ?? "text-[var(--text-muted)]"}`}
+              className={`text-2xs font-semibold px-2 py-1.5 text-center rounded-[var(--radius-sm)] ${LAYER_COLORS[layer] ?? "text-[var(--text-muted)]"}`}
               style={{ background: "var(--bg-surface)" }}
             >
               {layerLabel(layer, t)}
@@ -215,7 +215,7 @@ function Select({ label, value, onChange, options }: {
 }) {
   return (
     <label className="flex items-center gap-1.5 text-[var(--text-muted)]">
-      <span className="text-2xs uppercase tracking-wider">{label}</span>
+      <span className="text-2xs">{label}</span>
       <select
         value={value}
         onChange={e => onChange(e.target.value)}

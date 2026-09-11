@@ -210,7 +210,7 @@ function WikiPageInner() {
                 >
                   <Icon path={ICON_PATHS.chevronRight} className={`w-3 h-3 text-[var(--text-faint)] shrink-0 transition-transform ${collapsed ? "" : "rotate-90"}`} />
                   <CollectionIconPip icon={section.collection?.icon} color={section.collection?.color} size={14} />
-                  <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider truncate">
+                  <span className="text-xs font-semibold text-[var(--text-secondary)] truncate">
                     {section.collection?.name ?? section.collection_id}
                   </span>
                 </button>

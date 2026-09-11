@@ -25,7 +25,7 @@ export default function LayerBadge({ layer, label, dot = true, size = "sm", clas
   const sizeCls = size === "md" ? "text-xs px-2.5 py-1" : "text-2xs px-2 py-0.5";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border font-semibold uppercase tracking-[0.08em] ${s.bg} ${s.text} ${s.border} ${sizeCls} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border font-semibold ${s.bg} ${s.text} ${s.border} ${sizeCls} ${className}`}
     >
       {dot && <span className={`w-1.5 h-1.5 rounded-full ${s.dot} shrink-0`} />}
       {label ?? layer}

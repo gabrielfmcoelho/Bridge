@@ -223,7 +223,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                 <span className="text-[var(--text-primary)] truncate font-mono">
                   {k.name || "\u2014"}
                 </span>
-                <span className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{k.type}</span>
+                <span className="text-2xs text-[var(--text-faint)]">{k.type}</span>
               </div>
               <div
                 className="text-2xs text-[var(--text-muted)] break-all leading-snug font-mono"
@@ -316,7 +316,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                       <div className="pt-2 space-y-2">
                         {authKeys.length > 0 && (
                           <div>
-                            <span className="text-2xs text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                            <span className="text-2xs text-[var(--text-muted)] block mb-1">
                               {t("scan.authorizedKeys")} <span className="text-[var(--text-faint)]">({authKeys.length})</span>
                             </span>
                             <div className="space-y-1">{authKeys.map(renderKey)}</div>
@@ -324,7 +324,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                         )}
                         {privKeys.length > 0 && (
                           <div>
-                            <span className="text-2xs text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                            <span className="text-2xs text-[var(--text-muted)] block mb-1">
                               {t("scan.sshKeys")} <span className="text-[var(--text-faint)]">({privKeys.length})</span>
                             </span>
                             <div className="space-y-1">{privKeys.map(renderKey)}</div>
@@ -334,7 +334,7 @@ export default function VMInfoDisplay({ info, locale, compact }: { info: VMInfoT
                     )}
                     {userLogins.length > 0 && (
                       <div className="pt-2">
-                        <span className="text-2xs text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                        <span className="text-2xs text-[var(--text-muted)] block mb-1">
                           {t("scan.userLastLogins")} <span className="text-[var(--text-faint)]">({userLogins.length})</span>
                         </span>
                         <div className="space-y-0.5">
@@ -958,7 +958,7 @@ function CronInfoCard({ cron, t }: { cron: CronInfo; t: (k: string, vars?: Recor
 function CronJobGroup({ title, jobs, t }: { title: string; jobs: CronJob[]; t: (k: string, vars?: Record<string, string>) => string }) {
   return (
     <div>
-      <span className="text-2xs font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
+      <span className="text-2xs font-semibold text-[var(--text-faint)] block mb-2">
         {title} <span className="opacity-60">({jobs.length})</span>
       </span>
       <div className="space-y-1.5">
@@ -1123,7 +1123,7 @@ function AgentCategoryGroup({ category, agents, t }: { category: string; agents:
 
   return (
     <div>
-      <span className="text-2xs font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
+      <span className="text-2xs font-semibold text-[var(--text-faint)] block mb-2">
         <span className="mr-1">{icon}</span>
         {label} <span className="opacity-60">({agents.length})</span>
       </span>
@@ -1295,7 +1295,7 @@ function ServiceKindGroup({ kind, services, t }: { kind: string; services: Disco
   })();
   return (
     <div>
-      <span className="text-2xs font-semibold uppercase tracking-wider text-[var(--text-faint)] block mb-2">
+      <span className="text-2xs font-semibold text-[var(--text-faint)] block mb-2">
         <span className="mr-1">{icon}</span>
         {label} <span className="opacity-60">({services.length})</span>
       </span>
@@ -1446,7 +1446,7 @@ function ResourceTopList({
 }) {
   return (
     <div>
-      <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider mb-2">
+      <span className="block text-2xs text-[var(--text-faint)] mb-2">
         {title}
       </span>
       <div className="space-y-1">

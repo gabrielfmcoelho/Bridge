@@ -361,7 +361,7 @@ export default function DashboardPage() {
                   <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                     {t("dashboard.resourcesByInfra")}
                   </h2>
-                  <span className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("dashboard.avgUsage")}</span>
+                  <span className="text-2xs text-[var(--text-faint)]">{t("dashboard.avgUsage")}</span>
                 </div>
                 <div className="space-y-4">
                   {resourceAnalysis.byHospedagem.map((entry) => (
@@ -388,7 +388,7 @@ export default function DashboardPage() {
                   <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
                     {t("dashboard.resourcesBySituacao")}
                   </h2>
-                  <span className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("dashboard.avgUsage")}</span>
+                  <span className="text-2xs text-[var(--text-faint)]">{t("dashboard.avgUsage")}</span>
                 </div>
                 <div className="space-y-4">
                   {resourceAnalysis.bySituacao.map((entry) => (

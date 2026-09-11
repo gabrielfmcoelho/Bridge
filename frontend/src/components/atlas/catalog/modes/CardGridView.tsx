@@ -42,7 +42,7 @@ export default function CardGridView({ tables, selectedId, onSelect }: Props) {
         <section key={ns} className="flex flex-col gap-3">
           <div className="flex items-baseline gap-3 px-1">
             <h2
-              className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-primary)] font-display"
+              className="text-sm font-semibold text-[var(--text-primary)] font-display"
             >
               {ns}
             </h2>

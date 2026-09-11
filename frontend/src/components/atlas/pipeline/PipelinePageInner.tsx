@@ -81,7 +81,7 @@ export default function PipelinePageInner() {
                 {t("atlas.pipeline.title")}
               </h1>
               {generatedAt && (
-                <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)]">
+                <span className="text-2xs text-[var(--text-faint)]">
                   {t("atlas.lineage.generatedAt")} · {new Date(generatedAt).toLocaleString()}
                 </span>
               )}

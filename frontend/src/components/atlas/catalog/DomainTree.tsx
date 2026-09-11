@@ -92,7 +92,7 @@ export default function DomainTree({ indexes, tables, selectedId, onSelect, filt
                 className="group flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-elevated)] transition-colors"
               >
                 <Chevron open={nsOpen} />
-                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-primary)]">
+                <span className="text-xs font-semibold text-[var(--text-primary)]">
                   {bucket.ns}
                 </span>
                 <span className="ml-auto text-2xs tabular-nums text-[var(--text-faint)]">{bucket.total}</span>

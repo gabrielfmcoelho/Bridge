@@ -213,7 +213,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <LinkHealthIcon link={link} integrationActive={integrationActive} />
-                <span className={`text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${
+                <span className={`text-2xs px-1.5 py-0.5 rounded shrink-0 ${
                   link.kind === "group"
                     ? "bg-[var(--purple)]/10 text-[var(--purple)]"
                     : "bg-[var(--cyan)]/10 text-[var(--cyan)]"
@@ -254,7 +254,7 @@ function IntegrationStatusBadge({ enabled, configured }: { enabled: boolean; con
     ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30"
     : "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/30";
   return (
-    <span className={`inline-flex items-center gap-1 text-2xs font-medium uppercase tracking-wide px-1.5 py-0.5 rounded border ${classes}`}>
+    <span className={`inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded border ${classes}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`} />
       {label}
     </span>

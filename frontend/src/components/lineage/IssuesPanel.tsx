@@ -41,7 +41,7 @@ export default function IssuesPanel({ indexes, filterKind, onNavigate }: Props) 
       {/* Errors */}
       {errors.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-[var(--danger)] uppercase tracking-wider mb-2">
+          <h2 className="text-sm font-semibold text-[var(--danger)] mb-2">
             {t("atlas.lineage.issues.errors")} ({errors.length})
           </h2>
           <div className="space-y-2">
@@ -53,7 +53,7 @@ export default function IssuesPanel({ indexes, filterKind, onNavigate }: Props) 
       {/* Other warnings */}
       {otherWarnings.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
             {t("atlas.lineage.issues.warnings")} ({otherWarnings.length})
           </h2>
           <div className="space-y-2">
@@ -64,7 +64,7 @@ export default function IssuesPanel({ indexes, filterKind, onNavigate }: Props) 
 
       {/* Coverage gaps */}
       <section>
-        <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+        <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
           {t("atlas.lineage.issues.coverageGaps")}
         </h2>
         <div className="space-y-2">
@@ -127,7 +127,7 @@ function WarningRow({ w, onNavigate, indexes, severity }: {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xs font-mono uppercase tracking-wider text-[var(--text-muted)]">{w.kind}</span>
+            <span className="text-2xs font-mono text-[var(--text-muted)]">{w.kind}</span>
             {w.file && <span className="text-2xs font-mono text-[var(--text-faint)]">{w.file}{w.line ? `:${w.line}` : ""}</span>}
           </div>
           <p className="text-xs text-[var(--text-primary)]">{w.message}</p>

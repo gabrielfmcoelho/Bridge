@@ -43,7 +43,7 @@ export default function LineageChain({ steps, focalTableId, onSelectTable }: Pro
           />
         ))}
       </div>
-      <p className="text-2xs text-[var(--text-faint)] mt-2 px-1 uppercase tracking-wider">
+      <p className="text-2xs text-[var(--text-faint)] mt-2 px-1">
         {t("atlas.catalog.detail.lineageChainHint")}
       </p>
     </div>

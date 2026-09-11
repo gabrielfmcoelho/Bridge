@@ -103,7 +103,7 @@ export default function PermissionsTab() {
               {ROLES.map((role) => (
                 <th
                   key={role}
-                  className="text-center py-2 px-2 text-xs font-semibold uppercase tracking-wider"
+                  className="text-center py-2 px-2 text-xs font-semibold"
                   style={{
                     color:
                       role === "admin"
@@ -124,7 +124,7 @@ export default function PermissionsTab() {
                 <tr>
                   <td
                     colSpan={ROLES.length + 1}
-                    className="pt-4 pb-1 px-2 text-2xs font-bold text-[var(--text-faint)] uppercase tracking-widest"
+                    className="pt-4 pb-1 px-2 text-2xs font-bold text-[var(--text-faint)]"
                   >
                     {category}
                   </td>

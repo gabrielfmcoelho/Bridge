@@ -47,7 +47,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       {label && (
-        <label className="block text-2xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-1">
+        <label className="block text-2xs font-semibold text-[var(--text-muted)] mb-1">
           {label}
         </label>
       )}

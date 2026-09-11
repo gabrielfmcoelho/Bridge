@@ -4,19 +4,19 @@ export interface MetadataItem {
   mono?: boolean;
 }
 
-/** 2x2 label+value metadata grid for inventory cards. */
+/** Label+value metadata grid for inventory cards. Pairs with no value are not
+ *  rendered at all: a column of "-" is noise, and letting the card collapse to
+ *  its real height makes height itself readable when scanning a grid. */
 export default function CardMetadataGrid({ items }: { items: MetadataItem[] }) {
+  const shown = items.filter((i) => i.value && i.value.trim() && i.value.trim() !== "-");
+  if (!shown.length) return null;
+
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-3 min-h-[60px]">
-      {items.map((item) => (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+      {shown.map((item) => (
         <div key={item.label}>
-          <span className="text-xs text-[var(--text-faint)]">{item.label}</span>
-          <p
-            className="text-xs text-[var(--text-secondary)] truncate font-mono"
-            style={item.mono ? { } : undefined}
-          >
-            {item.value || "-"}
-          </p>
+          <span className="text-xs text-[var(--text-muted)]">{item.label}</span>
+          <p className="text-xs text-[var(--text-secondary)] truncate font-mono">{item.value}</p>
         </div>
       ))}
     </div>

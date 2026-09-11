@@ -168,7 +168,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowCredentials(!showCredentials)}
-                  className="flex items-center justify-center gap-2 w-full text-xs text-[var(--text-faint)] uppercase tracking-wider hover:text-[var(--text-muted)] transition-colors py-1"
+                  className="flex items-center justify-center gap-2 w-full text-xs text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors py-1"
                 >
                   <div className="flex-1 h-px bg-[var(--border-subtle)]" />
                   <span className="flex items-center gap-1.5 px-2">

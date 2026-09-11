@@ -45,11 +45,11 @@ export default function ColumnLineagePanel({ indexes, columnId, onBack, onSelect
 
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">
+            <span className="text-2xs text-[var(--text-faint)] font-semibold">
               {t("atlas.catalog.column.header")}
             </span>
             {tableRec && (
-              <span className="text-2xs uppercase tracking-[0.12em] text-[var(--text-faint)]">
+              <span className="text-2xs text-[var(--text-faint)]">
                 {tableRec.namespace} · {tableRec.layer}
               </span>
             )}
@@ -60,18 +60,18 @@ export default function ColumnLineagePanel({ indexes, columnId, onBack, onSelect
           <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
             {Boolean(dtype) && (
               <span>
-                <span className="text-[var(--text-faint)] uppercase tracking-wider mr-1">{t("atlas.catalog.column.dtype")}:</span>
+                <span className="text-[var(--text-faint)] mr-1">{t("atlas.catalog.column.dtype")}:</span>
                 <span className="font-mono text-[var(--text-secondary)]">{String(dtype)}</span>
               </span>
             )}
             {testCount > 0 && (
               <span>
-                <span className="text-[var(--text-faint)] uppercase tracking-wider mr-1">{t("atlas.catalog.column.tests")}:</span>
+                <span className="text-[var(--text-faint)] mr-1">{t("atlas.catalog.column.tests")}:</span>
                 <span className="tabular-nums">{testCount}</span>
               </span>
             )}
             {inferred && (
-              <span className="text-2xs uppercase tracking-wider text-[var(--warning)]/80">
+              <span className="text-2xs text-[var(--warning)]/80">
                 {t("atlas.catalog.column.inferred")}
               </span>
             )}
@@ -118,7 +118,7 @@ function Trail({
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <span className="text-2xs uppercase tracking-[0.14em] text-[var(--text-faint)] font-semibold">{title}</span>
+        <span className="text-2xs text-[var(--text-faint)] font-semibold">{title}</span>
         {steps.length > 0 && (
           <span className="text-2xs tabular-nums text-[var(--text-muted)]">{steps.length}</span>
         )}
@@ -178,7 +178,7 @@ function TrailStep({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-xs text-[var(--text-primary)]">{step.column.label}</span>
           {step.via && (
-            <span className="text-3xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-muted)] text-[var(--accent)] font-semibold">
+            <span className="text-3xs px-1.5 py-0.5 rounded bg-[var(--accent-muted)] text-[var(--accent)] font-semibold">
               {t("atlas.catalog.column.via")} {step.via}
             </span>
           )}

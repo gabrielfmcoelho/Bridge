@@ -196,7 +196,7 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
       {/* ══════ ISSUES SECTION ══════ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("issue.title")}</h3>
+          <h3 className="text-xs font-semibold text-[var(--text-faint)]">{t("issue.title")}</h3>
           <div className="flex items-center gap-1.5">
             {hostIssues.some(i => i.archived) && (
               <button

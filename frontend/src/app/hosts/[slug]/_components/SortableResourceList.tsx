@@ -77,7 +77,7 @@ function SortableResourceList<T>({ title, rows, columns, getIcon, getName, defau
   return (
     <>
     <div className="flex items-center justify-between mb-3">
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{title}</h3>
+      <h3 className="text-xs font-semibold text-[var(--text-faint)]">{title}</h3>
       <div className="flex items-center gap-2">
         {viewMode === "cards" && <SortDropdown options={sortOptions} value={sortKey} direction={sortDir} onChange={(k, d) => { setSortKey(k); setSortDir(d); }} />}
         <ViewToggle

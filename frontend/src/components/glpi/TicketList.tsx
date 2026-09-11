@@ -74,7 +74,7 @@ export default function TicketList({
                 {formatDate(tk.date, locale)}
               </span>
             )}
-            <span className={`shrink-0 text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded border ${statusColor[tk.status_slug] || statusColor.unknown}`}>
+            <span className={`shrink-0 text-2xs px-1.5 py-0.5 rounded border ${statusColor[tk.status_slug] || statusColor.unknown}`}>
               {tk.status_label}
             </span>
           </div>

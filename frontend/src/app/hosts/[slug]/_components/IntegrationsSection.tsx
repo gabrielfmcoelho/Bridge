@@ -26,7 +26,7 @@ export default function IntegrationsSection({ slug, keyTestStatus, coolifyServer
 
   return (
     <div className="space-y-2 pt-2">
-      <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+      <h3 className="text-xs font-semibold text-[var(--text-faint)]">
         {t("operation.integrations")}
       </h3>
       <CoolifyIntegration

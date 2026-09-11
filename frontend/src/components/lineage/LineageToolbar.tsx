@@ -103,7 +103,7 @@ function Select({ label, value, onChange, options }: {
 }) {
   return (
     <label className="flex items-center gap-1.5 text-[var(--text-muted)]">
-      <span className="text-2xs uppercase tracking-wider">{label}</span>
+      <span className="text-2xs">{label}</span>
       <select
         value={value}
         onChange={e => onChange(e.target.value)}

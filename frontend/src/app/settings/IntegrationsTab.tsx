@@ -94,7 +94,7 @@ function GeneralAuthSection() {
       {/* General auth settings (only shown when external provider is active) */}
       {activeProvider !== "local" && (
         <div className="border-t border-[var(--border-subtle)] pt-4 mt-4">
-          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">{t("settings.integrations.auth.externalSettingsTitle")}</p>
+          <p className="text-xs font-semibold text-[var(--text-muted)] mb-3">{t("settings.integrations.auth.externalSettingsTitle")}</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <NativeSelect label={t("settings.integrations.auth.autoProvisionUsers")}

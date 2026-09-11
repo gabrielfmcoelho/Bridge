@@ -47,7 +47,7 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
 
         {/* Bottom indicators — all icons always visible (faint when 0), like hosts */}
         <div className="flex items-center gap-3 pt-3 border-t border-[var(--border-subtle)]">
-          <CardIndicator icon={ICON_PATHS.lock} count={dns.has_https ? 1 : 0} color="emerald" title={dns.has_https ? t("topology.https") : t("topology.noHttps")} hideCount />
+          <CardIndicator icon={ICON_PATHS.lock} count={dns.has_https ? 1 : 0} color="success" title={dns.has_https ? t("topology.https") : t("topology.noHttps")} hideCount />
           <CardIndicator icon={ICON_PATHS.server} count={linkedHostsCount} color="cyan" title={t("dns.hostCount", { count: String(linkedHostsCount) })} />
           <CardIndicator icon={ICON_PATHS.gear} count={0} color="amber" title={`0 ${t("host.services").toLowerCase()}`} />
           <CardIndicator icon={ICON_PATHS.folder} count={0} color="violet" title={`0 ${t("host.linkedProjects").toLowerCase()}`} />

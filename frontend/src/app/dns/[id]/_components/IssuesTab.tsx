@@ -83,7 +83,7 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
     <div className="space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+        <h2 className="text-xs font-semibold text-[var(--text-faint)]">
           {t("issue.title")} ({issues.length})
         </h2>
         {canEdit && (

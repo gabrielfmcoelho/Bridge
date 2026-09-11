@@ -45,11 +45,11 @@ export default function DetailDrawer({ node, indexes, onClose, onSelect, onOpenI
       title={node.label}
       subHeader={
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-2xs px-2 py-0.5 rounded-full ${c.bg} ${c.text} ${c.border} border font-semibold uppercase tracking-wider`}>
+          <span className={`text-2xs px-2 py-0.5 rounded-full ${c.bg} ${c.text} ${c.border} border font-semibold `}>
             {NODE_TYPE_LABELS[node.type] ?? node.type}
           </span>
           {node.layer && (
-            <span className={`text-2xs uppercase tracking-wider font-semibold ${LAYER_COLORS[node.layer] ?? "text-[var(--text-muted)]"}`}>
+            <span className={`text-2xs font-semibold ${LAYER_COLORS[node.layer] ?? "text-[var(--text-muted)]"}`}>
               {node.layer}
             </span>
           )}
@@ -226,7 +226,7 @@ function NeighborList({ title, edges, side, indexes, onSelect, t }: {
               onClick={() => onSelect(otherId)}
               className="w-full flex items-center gap-2 text-xs text-left hover:bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] px-2 py-1 transition-colors"
             >
-              <span className="text-3xs uppercase tracking-wider text-[var(--text-faint)] font-mono w-20 shrink-0">{e.kind}</span>
+              <span className="text-3xs text-[var(--text-faint)] font-mono w-20 shrink-0">{e.kind}</span>
               <span className="text-[var(--text-primary)] font-mono truncate flex-1">{other?.label ?? otherId}</span>
               {other?.type && (
                 <span className="text-3xs text-[var(--text-muted)] shrink-0">{NODE_TYPE_LABELS[other.type] ?? other.type}</span>
@@ -251,7 +251,7 @@ function ConfidenceDot({ c }: { c?: string }) {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="text-2xs text-[var(--text-faint)] uppercase tracking-wider font-semibold">{children}</div>;
+  return <div className="text-2xs text-[var(--text-faint)] font-semibold">{children}</div>;
 }
 
 function renderValue(v: unknown): string {

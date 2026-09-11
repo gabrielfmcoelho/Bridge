@@ -92,7 +92,7 @@ export default function EntidadesTab() {
         )}
 
         <div className="border-t border-[var(--border-subtle)] pt-4">
-          <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+          <p className="text-xs font-semibold text-[var(--text-muted)] mb-3">
             {form.id ? t("entidades.edit") : t("entidades.add")}
           </p>
           <form

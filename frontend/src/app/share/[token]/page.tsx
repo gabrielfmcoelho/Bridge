@@ -249,7 +249,7 @@ function SecretPayloadViewer({
         return (
           <div key={idx} className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-2xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+              <span className="text-2xs font-semibold text-[var(--text-secondary)]">
                 {f.label.startsWith("share.fields.") ? t(f.label) : f.label}
               </span>
               <div className="flex items-center gap-2">

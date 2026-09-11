@@ -152,7 +152,7 @@ function VaultPageInner() {
         <div className="space-y-6">
           {groups.map((g) => (
             <div key={g.title}>
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)] mb-2 px-1">
+              <h2 className="text-xs font-semibold text-[var(--text-muted)] mb-2 px-1">
                 {g.title} <span className="text-[var(--text-faint)]">· {g.items.length}</span>
               </h2>
               <div className="space-y-2">

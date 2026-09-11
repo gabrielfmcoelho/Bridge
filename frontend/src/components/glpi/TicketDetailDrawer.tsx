@@ -247,7 +247,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
                     >
                       <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                         <div className="flex items-center gap-2 text-xs">
-                          <span className="font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
+                          <span className="font-semibold text-[var(--text-secondary)]">
                             {t(eventLabel[ev.type])}
                           </span>
                           {ev.user_name && <span className="text-[var(--text-primary)]">{ev.user_name}</span>}

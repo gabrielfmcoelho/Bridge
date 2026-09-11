@@ -23,7 +23,7 @@ function DomainFrameNodeImpl({ data }: NodeProps) {
       style={{ borderColor: tint.ring, background: tint.bg }}
     >
       <span
-        className={`absolute top-2 left-3 text-xs font-semibold uppercase tracking-[0.16em] ${tint.label} font-display`}
+        className={`absolute top-2 left-3 text-xs font-semibold ${tint.label} font-display`}
       >
         {d.ns}
       </span>

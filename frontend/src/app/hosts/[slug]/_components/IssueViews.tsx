@@ -39,7 +39,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("alert.title")}</h3>
+        <h3 className="text-xs font-semibold text-[var(--text-faint)]">{t("alert.title")}</h3>
         <div className="flex items-center gap-2">
           {hasResolved && onToggleResolved && (
             <button
@@ -183,7 +183,7 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
             return (
               <div key={status} className="flex-1 min-w-[220px]">
                 <div className="flex items-center gap-1.5 mb-2 px-1">
-                  <span className="text-2xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{STATUS_LABELS[status]}</span>
+                  <span className="text-2xs font-semibold text-[var(--text-faint)]">{STATUS_LABELS[status]}</span>
                   {items.length > 0 && <span className="text-2xs text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5">{items.length}</span>}
                 </div>
                 <Droppable droppableId={status}>

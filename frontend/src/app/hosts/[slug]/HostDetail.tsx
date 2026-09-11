@@ -124,7 +124,7 @@ export default function HostDetail({ slug }: { slug: string }) {
     <PageShell>
       {/* Back link */}
       <div className="mb-5">
-        <Link href="/hosts" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider hover:text-[var(--accent)] transition-colors">
+        <Link href="/hosts" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-faint)] hover:text-[var(--accent)] transition-colors">
           <Icon path={ICON_PATHS.back} className="w-3.5 h-3.5" />
           {t("common.back")}
         </Link>

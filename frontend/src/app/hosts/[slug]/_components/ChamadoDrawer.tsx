@@ -257,7 +257,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
           )}
           {(chamado.cached_status || liveStatus) && (
             <div className="flex items-center gap-2 mt-1">
-              <Badge className="text-2xs uppercase tracking-wide">
+              <Badge className="text-2xs">
                 {liveStatus?.label ?? chamado.cached_status}
               </Badge>
               {chamado.external_url && (

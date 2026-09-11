@@ -520,7 +520,7 @@ function KanbanView({
             {/* Column header */}
             <div className="px-3 py-2.5 border-b border-[var(--border-subtle)] flex items-center justify-between">
               <span
-                className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] font-display"
+                className="text-xs font-semibold text-[var(--text-muted)] font-display"
               >
                 {t(statusLabels[status])}
               </span>
@@ -978,7 +978,7 @@ function IssueForm({
       {/* Read-only source info for alert-sourced issues */}
       {issue && issue.source && issue.source !== "manual" && (
         <div className="bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-3 space-y-1.5">
-          <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wide">{t("issue.source")}</p>
+          <p className="text-xs font-medium text-[var(--text-muted)]">{t("issue.source")}</p>
           <div className="flex items-center gap-2">
             <span className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 rounded px-1.5 py-0.5 font-medium">{issue.source}</span>
             {issue.source_ref && (

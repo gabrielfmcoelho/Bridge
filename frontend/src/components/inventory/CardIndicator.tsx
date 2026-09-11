@@ -30,10 +30,14 @@ export default function CardIndicator({
   count?: number;
   color: string;
   title: string;
-  /** Show icon only (colored when active, faint when not) without the numeric count. */
+  /** Flag, not a count: render the icon either way (coloured when on, faint
+   *  when off) and never print a number. */
   hideCount?: boolean;
 }) {
   const active = (count ?? 0) > 0;
+  // A row of faint zeroes is the loudest thing on an inventory card and says
+  // nothing. Counts disappear at zero; flags keep their off state.
+  if (!active && !hideCount) return null;
   const colorClass = active ? colors[color] ?? "text-[var(--accent)]" : "text-[var(--text-faint)]";
 
   return (

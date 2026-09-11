@@ -61,7 +61,7 @@ export default function TableCard({ table, selected, onClick }: Props) {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-3xs uppercase tracking-[0.12em] text-[var(--text-faint)]">
+          <span className="text-3xs text-[var(--text-faint)]">
             {table.namespace}
           </span>
         </div>

@@ -194,7 +194,7 @@ function EnumSection() {
     <div className="space-y-4">
       {Object.entries(mergedEnums).map(([category, options], i) => (
         <Card key={category} hover={false} className="stagger-in" style={{ "--i": i } as React.CSSProperties}>
-          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
+          <h3 className="text-xs font-semibold mb-3 font-display" style={{ color: "var(--text-muted)" }}>
             {category}
           </h3>
           <div className="flex flex-wrap gap-1.5 mb-3">
@@ -263,7 +263,7 @@ function EnumSection() {
       {/* Add new category */}
       {isAdmin && (
         <Card hover={false}>
-          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
+          <h3 className="text-xs font-semibold mb-3 font-display" style={{ color: "var(--text-muted)" }}>
             {t("settings.enumsNewCategory")}
           </h3>
           <form className="flex gap-2 flex-wrap" onSubmit={(e) => {
@@ -529,18 +529,18 @@ function UsersSection() {
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3 pt-3 border-t border-[var(--border-subtle)]">
                 <div>
-                  <p className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("settings.role")}</p>
+                  <p className="text-2xs text-[var(--text-faint)]">{t("settings.role")}</p>
                   <span className={`inline-block mt-0.5 text-2xs px-1.5 py-0.5 rounded-full border font-medium ${roleColors[u.role] || roleColors.viewer}`}>
                     {u.role}
                   </span>
                 </div>
                 <div>
-                  <p className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("settings.authProvider")}</p>
+                  <p className="text-2xs text-[var(--text-faint)]">{t("settings.authProvider")}</p>
                   <p className="text-xs text-[var(--text-secondary)] mt-0.5">{providerLabels[u.auth_provider] || u.auth_provider || "Local"}</p>
                 </div>
                 {u.email && (
                   <div className="col-span-2">
-                    <p className="text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("common.email")}</p>
+                    <p className="text-2xs text-[var(--text-faint)]">{t("common.email")}</p>
                     <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{u.email}</p>
                   </div>
                 )}
@@ -733,7 +733,7 @@ function AppearanceSection() {
     <div className="space-y-6 max-w-2xl">
       {/* App Name */}
       <Card hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
+        <h3 className="text-xs font-semibold mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           {t("settings.appName")}
         </h3>
         <p className="text-xs mb-3" style={{ color: "var(--text-faint)" }}>
@@ -749,7 +749,7 @@ function AppearanceSection() {
 
       {/* Main Color */}
       <Card hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
+        <h3 className="text-xs font-semibold mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           {t("settings.mainColor")}
         </h3>
         <p className="text-xs mb-4" style={{ color: "var(--text-faint)" }}>
@@ -799,7 +799,7 @@ function AppearanceSection() {
 
       {/* Logo */}
       <Card hover={false} className="stagger-in" style={{ "--i": 2 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
+        <h3 className="text-xs font-semibold mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           {t("settings.logo")}
         </h3>
         <p className="text-xs mb-4" style={{ color: "var(--text-faint)" }}>
@@ -942,7 +942,7 @@ function ImportSection() {
     <div className="space-y-6 max-w-2xl">
       {/* Import type selector */}
       <Card hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
+        <h3 className="text-xs font-semibold mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           {t("settings.importType")}
         </h3>
         <div className="flex gap-2">
@@ -959,7 +959,7 @@ function ImportSection() {
 
       {/* File upload */}
       <Card hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
+        <h3 className="text-xs font-semibold mb-3 font-display" style={{ color: "var(--text-muted)" }}>
           {t("settings.importer.jsonFile")}
         </h3>
         <p className="text-xs mb-3" style={{ color: "var(--text-faint)" }}>
@@ -1040,7 +1040,7 @@ function ImportSection() {
             <div className="grid grid-cols-3 gap-3">
               <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-center">
                 <div className="text-lg font-bold text-[var(--text-primary)] font-mono">{fileData.length}</div>
-                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">{t("settings.importer.records")}</div>
+                <div className="text-2xs text-[var(--text-faint)]">{t("settings.importer.records")}</div>
               </div>
               <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-center">
                 <div className="text-lg font-bold text-[var(--accent)] font-mono">
@@ -1049,7 +1049,7 @@ function ImportSection() {
                     : fileData.filter(d => d.responsavel).length
                   }
                 </div>
-                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">
+                <div className="text-2xs text-[var(--text-faint)]">
                   {importType === "hosts" ? t("settings.importer.withCreds") : t("settings.importer.withOwner")}
                 </div>
               </div>
@@ -1057,7 +1057,7 @@ function ImportSection() {
                 <div className="text-lg font-bold text-[var(--text-secondary)] font-mono">
                   {new Set(fileData.flatMap(d => (d.tags as string[]) || [])).size}
                 </div>
-                <div className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">{t("common.tags")}</div>
+                <div className="text-2xs text-[var(--text-faint)]">{t("common.tags")}</div>
               </div>
             </div>
 
@@ -1086,21 +1086,21 @@ function ImportSection() {
 
       {result && (
         <Card hover={false} className="animate-slide-up" style={{ animationFillMode: "both" } as React.CSSProperties}>
-          <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 font-display" style={{ color: "var(--text-muted)" }}>
+          <h3 className="text-xs font-semibold mb-3 font-display" style={{ color: "var(--text-muted)" }}>
             {t("settings.importer.results")}
           </h3>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="p-3 rounded-[var(--radius-md)] bg-[var(--success)]/10 border border-[var(--success)]/25 text-center">
               <div className="text-lg font-bold text-[var(--success)] font-mono">{result.created}</div>
-              <div className="text-2xs uppercase tracking-wider text-[var(--success)]/70">{t("settings.importer.created")}</div>
+              <div className="text-2xs text-[var(--success)]/70">{t("settings.importer.created")}</div>
             </div>
             <div className="p-3 rounded-[var(--radius-md)] bg-[var(--warning)]/10 border border-[var(--warning)]/25 text-center">
               <div className="text-lg font-bold text-[var(--warning)] font-mono">{result.skipped}</div>
-              <div className="text-2xs uppercase tracking-wider text-[var(--warning)]/70">{t("settings.importer.skipped")}</div>
+              <div className="text-2xs text-[var(--warning)]/70">{t("settings.importer.skipped")}</div>
             </div>
             <div className="p-3 rounded-[var(--radius-md)] bg-[var(--danger)]/10 border border-[var(--danger)]/25 text-center">
               <div className="text-lg font-bold text-[var(--danger)] font-mono">{result.failed}</div>
-              <div className="text-2xs uppercase tracking-wider text-[var(--danger)]/70">{t("settings.importer.failed")}</div>
+              <div className="text-2xs text-[var(--danger)]/70">{t("settings.importer.failed")}</div>
             </div>
           </div>
 

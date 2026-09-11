@@ -702,7 +702,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
       {/* Built-in operations header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("operation.builtIn")}</h3>
+        <h3 className="text-xs font-semibold text-[var(--text-faint)]">{t("operation.builtIn")}</h3>
         <IconButton
           variant={consoleEntry ? "active" : "default"}
           onClick={() => setConsoleOpen(true)}
@@ -821,7 +821,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         <div className="space-y-3 text-[var(--text-primary)]">
           <p className="text-xs text-[var(--text-muted)]">{t("operation.setupKeyDesc")}</p>
           <div>
-            <label className="block text-2xs font-semibold text-[var(--text-faint)] uppercase tracking-wider mb-1.5">
+            <label className="block text-2xs font-semibold text-[var(--text-faint)] mb-1.5">
               {t("operation.chooseKeySource")}
             </label>
             <div className="flex gap-2">
@@ -1108,7 +1108,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
               {/* ── Warning section ── */}
               <section>
-                <h3 className="text-xs font-semibold text-[var(--danger)] uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-semibold text-[var(--danger)] mb-2">
                   {t("operation.deleteRemoteUserWarningSection")}
                 </h3>
                 <div className="rounded-[var(--radius-sm)] bg-[var(--danger)]/10 border border-[var(--danger)]/25 px-2.5 py-2 text-xs leading-relaxed text-[var(--danger)]">
@@ -1197,7 +1197,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       {/* Operation Logs */}
       {operationLogs.length > 0 && (
         <div className="space-y-2 pt-2">
-          <h3 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">{t("operation.logs")}</h3>
+          <h3 className="text-xs font-semibold text-[var(--text-faint)]">{t("operation.logs")}</h3>
           <div className="border border-[var(--border-subtle)] rounded-[var(--radius-md)] overflow-hidden divide-y divide-[var(--border-subtle)]">
             {operationLogs.map((log) => (
               <div key={log.id}>
@@ -1365,15 +1365,15 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
 
       <div className="grid grid-cols-3 gap-3 text-xs">
         <div>
-          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("host.ops.dockerLogsTotalSize")}</span>
+          <span className="block text-2xs text-[var(--text-faint)]">{t("host.ops.dockerLogsTotalSize")}</span>
           <span className="text-[var(--text-primary)] font-medium font-mono">{totalHuman}</span>
         </div>
         <div>
-          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("host.ops.dockerLogsLargest")}</span>
+          <span className="block text-2xs text-[var(--text-faint)]">{t("host.ops.dockerLogsLargest")}</span>
           <span className="text-[var(--text-primary)] font-medium font-mono">{largestHuman}</span>
         </div>
         <div>
-          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">{t("host.ops.dockerLogsUnbounded")}</span>
+          <span className="block text-2xs text-[var(--text-faint)]">{t("host.ops.dockerLogsUnbounded")}</span>
           <span className="text-[var(--text-primary)] font-medium font-mono">{report.unbounded_containers}</span>
         </div>
       </div>
@@ -1392,7 +1392,7 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
 
       {report.containers && report.containers.length > 0 && (
         <div>
-          <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider mb-1.5">{t("host.ops.dockerLogsContainers")}</span>
+          <span className="block text-2xs text-[var(--text-faint)] mb-1.5">{t("host.ops.dockerLogsContainers")}</span>
           <div className="space-y-1">
             {report.containers.map((c) => (
               <div

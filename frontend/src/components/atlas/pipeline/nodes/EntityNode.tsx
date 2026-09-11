@@ -35,11 +35,11 @@ function EntityNodeImpl({ data, selected }: NodeProps) {
 
       <div className="flex flex-col gap-1 px-2.5 py-1.5 flex-1 min-h-0">
         <div className="flex items-center gap-1.5">
-          <span className={`text-3xs uppercase tracking-[0.12em] px-1.5 py-0.5 rounded ${color.bg} ${color.text} font-semibold shrink-0`}>
+          <span className={`text-3xs px-1.5 py-0.5 rounded ${color.bg} ${color.text} font-semibold shrink-0`}>
             {NODE_TYPE_LABELS[node.type] ?? node.type}
           </span>
           {node.layer && (
-            <span className="text-3xs uppercase tracking-wider text-[var(--text-faint)] shrink-0">
+            <span className="text-3xs text-[var(--text-faint)] shrink-0">
               {node.layer}
             </span>
           )}

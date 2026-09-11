@@ -170,7 +170,7 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
             </div>
             <div>
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">
+                <span className="text-2xs text-[var(--text-faint)]">
                   {t("glpi.snippetLabel")}
                 </span>
                 <button

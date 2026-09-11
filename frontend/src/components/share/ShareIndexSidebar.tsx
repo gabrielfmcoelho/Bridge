@@ -120,7 +120,7 @@ export default function ShareIndexSidebar({
       aria-label={t("share.indexTitle")}
       className="lg:sticky lg:top-6 max-h-[calc(100vh-3rem)] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 p-3 text-xs"
     >
-      <p className="text-2xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-2 px-1">
+      <p className="text-2xs font-semibold text-[var(--text-muted)] mb-2 px-1">
         {t("share.indexTitle")}
       </p>
 
@@ -174,7 +174,7 @@ export default function ShareIndexSidebar({
             {groups.map((group, g) => (
               <div key={`api-${i}-tag-${g}`} className="mb-1.5 last:mb-0">
                 {showTags && (
-                  <p className="px-2 pt-0.5 text-3xs font-semibold uppercase tracking-wide text-[var(--text-faint)]">
+                  <p className="px-2 pt-0.5 text-3xs font-semibold text-[var(--text-faint)]">
                     {group.tag ?? t("share.indexOther")}
                   </p>
                 )}

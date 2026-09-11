@@ -82,7 +82,7 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
 
       {/* Issue cards */}
       <div>
-        <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wider">
+        <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
           {t("atlas.lineage.issuesHeader")}
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -107,13 +107,13 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
       {/* Domains */}
       {domains.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wider">
+          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
             {t("atlas.lineage.domainsHeader")}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {domains.map(([ns, s]) => (
               <Card key={ns} as="button" padding="sm" onClick={() => onNavigate("graph", { focus: `ns:${ns}` })}>
-                <div className="text-xs uppercase tracking-wider text-[var(--text-muted)]">{t("atlas.lineage.namespace")}</div>
+                <div className="text-xs text-[var(--text-muted)]">{t("atlas.lineage.namespace")}</div>
                 <div className="text-lg font-bold mt-0.5 font-display">{ns}</div>
                 <div className="text-xs text-[var(--text-secondary)] mt-1 flex gap-3">
                   <span>{s.dags} DAGs</span>
@@ -128,17 +128,17 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
       {/* Layers */}
       {layers.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2 uppercase tracking-wider">
+          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
             {t("atlas.lineage.layersHeader")}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {layers.map(([layer, count]) => (
               <Card key={layer} padding="sm" hover={false}>
-                <div className={`text-xs uppercase tracking-wider font-semibold ${LAYER_COLORS[layer] ?? "text-[var(--text-muted)]"}`}>
+                <div className={`text-xs font-semibold ${LAYER_COLORS[layer] ?? "text-[var(--text-muted)]"}`}>
                   {layer}
                 </div>
                 <div className="text-xl font-bold mt-1 font-display">{count}</div>
-                <div className="text-2xs text-[var(--text-muted)] uppercase tracking-wider">
+                <div className="text-2xs text-[var(--text-muted)]">
                   {NODE_TYPE_LABELS.dbt_model.toLowerCase()}s
                 </div>
               </Card>
@@ -153,7 +153,7 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
 function CountCard({ label, value }: { label: string; value: string | number }) {
   return (
     <Card padding="sm" hover={false}>
-      <p className="text-2xs text-[var(--text-muted)] uppercase tracking-wider font-medium">{label}</p>
+      <p className="text-2xs text-[var(--text-muted)] font-medium">{label}</p>
       <p className="text-2xl font-bold mt-0.5 font-display">{value}</p>
     </Card>
   );

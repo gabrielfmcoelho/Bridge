@@ -25,7 +25,7 @@ export default function StatCard({ label, value, icon, color, className = "", st
         <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
       </svg>
       <div className="relative">
-        <p className="text-2xs text-[var(--text-muted)] uppercase tracking-wider font-medium">{label}</p>
+        <p className="text-2xs text-[var(--text-muted)] font-medium">{label}</p>
         <p className="text-2xl font-bold mt-0.5 text-[var(--card-accent)] font-display">{value}</p>
       </div>
     </Card>

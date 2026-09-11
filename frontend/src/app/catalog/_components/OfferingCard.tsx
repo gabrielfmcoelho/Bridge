@@ -26,7 +26,7 @@ export default function OfferingCard({ offering, onRequest, index }: OfferingCar
     >
       <div className="flex items-start justify-between gap-3">
         <CardIcon path={REQUEST_TYPE_ICON[offering.request_type]} />
-        <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-2xs uppercase tracking-wider text-[var(--text-muted)]">
+        <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-2xs text-[var(--text-muted)]">
           {t(`catalog.requestType.${offering.request_type}`)}
         </span>
       </div>
@@ -38,7 +38,7 @@ export default function OfferingCard({ offering, onRequest, index }: OfferingCar
 
       {useCases.length > 0 && (
         <div className="space-y-2">
-          <p className="text-2xs uppercase tracking-wider text-[var(--text-faint)]">{t("catalog.useCases")}</p>
+          <p className="text-2xs text-[var(--text-faint)]">{t("catalog.useCases")}</p>
           <ul className="space-y-1.5">
             {useCases.slice(0, 3).map((uc) => (
               <li key={uc} className="flex gap-2 text-xs leading-snug text-[var(--text-secondary)]">

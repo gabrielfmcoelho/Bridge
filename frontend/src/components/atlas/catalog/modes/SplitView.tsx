@@ -57,7 +57,7 @@ export default function SplitView({ indexes, tables, selectedId, onSelect, filte
               <section key={ns} className="flex flex-col gap-2">
                 <div className="flex items-baseline gap-2 px-1">
                   <h3
-                    className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-primary)] font-display"
+                    className="text-xs font-semibold text-[var(--text-primary)] font-display"
                   >
                     {ns}
                   </h3>

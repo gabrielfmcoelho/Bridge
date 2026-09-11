@@ -29,7 +29,7 @@ function getStatusLabels(t: (k: string) => string): Record<string, string> {
 function LinkReadRow({ label, items }: { label: string; items: string[] }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="text-2xs text-[var(--text-faint)] uppercase tracking-wider w-16 shrink-0 pt-0.5">{label}</span>
+      <span className="text-2xs text-[var(--text-faint)] w-16 shrink-0 pt-0.5">{label}</span>
       {items.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {items.map((name) => (

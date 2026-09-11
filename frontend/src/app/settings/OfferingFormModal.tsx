@@ -187,7 +187,7 @@ export default function OfferingFormModal({ offering, categories, onClose }: {
 
         {/* ── Scope ──────────────────────────────────────────────────────── */}
         <section>
-          <h4 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">{t("settings.offerings.scope")}</h4>
+          <h4 className="text-xs font-semibold text-[var(--text-muted)] mb-2">{t("settings.offerings.scope")}</h4>
           <EntidadeScopeFields value={grants} onChange={setGrants} compact />
         </section>
 
@@ -220,7 +220,7 @@ export default function OfferingFormModal({ offering, categories, onClose }: {
           </div>
 
           <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-default)] p-4 space-y-4 min-h-40">
-            <h4 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">{t("settings.offerings.schemaPreview")}</h4>
+            <h4 className="text-xs font-semibold text-[var(--text-muted)]">{t("settings.offerings.schemaPreview")}</h4>
             {fields.length === 0 ? (
               <p className="text-sm text-[var(--text-faint)]">{t("settings.offerings.schemaPreviewEmpty")}</p>
             ) : (

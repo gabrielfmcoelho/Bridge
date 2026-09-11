@@ -88,29 +88,18 @@ export default function HostCard({ host }: { host: Host }) {
 
         <CardTagsSection tags={host.tags} />
 
-        {/* Resources — unique to hosts */}
-        <div className="mt-3 pt-3 pb-1 border-t border-[var(--border-subtle)]">
-          {hasCleanResources && sr ? (
+        {/* Resources — unique to hosts, and only once a scan has produced them.
+            An unscanned host used to render three empty meter tracks under
+            "CPU -- RAM -- DISK --", which is four rows saying "no data". */}
+        {hasCleanResources && sr && (
+          <div className="mt-3 pt-3 pb-1 border-t border-[var(--border-subtle)]">
             <div className="grid grid-cols-3 gap-3">
               <MiniResource label="CPU" value={sr.cpu} usage={sr.cpu_usage} />
               <MiniResource label="RAM" value={sr.ram} usage={sr.ram_percent} />
               <MiniResource label={t("vm.disk")} value={sr.storage} usage={sr.disk_percent} />
             </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3">
-              {["CPU", "RAM", "Disk"].map((label) => (
-                <div key={label}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-[var(--text-faint)] uppercase tracking-wider">{label}</span>
-                    <span className="text-xs text-[var(--text-faint)]">--</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-[var(--bg-elevated)]" />
-                  <p className="text-xs text-[var(--text-faint)] mt-0.5 text-right">&nbsp;</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Bottom indicators */}
         <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4">
@@ -157,7 +146,7 @@ function MiniResource({ label, value, usage }: { label: string; value?: string; 
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-[var(--text-faint)] uppercase tracking-wider">{label}</span>
+        <span className="text-xs text-[var(--text-faint)]">{label}</span>
         {usage && <span className={`text-xs font-semibold ${color} font-mono`}>{usage.includes("%") ? usage : `${usage}%`}</span>}
       </div>
       <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">

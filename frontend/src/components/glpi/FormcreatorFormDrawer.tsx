@@ -345,7 +345,7 @@ export default function FormcreatorFormDrawer({ open, onClose, formID, profileID
             </div>
             {submitResult.created_tickets?.length ? (
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+                <p className="text-xs font-semibold text-[var(--text-faint)]">
                   {t("glpi.ticketsCreated")}
                 </p>
                 {submitResult.created_tickets.map((t) => (

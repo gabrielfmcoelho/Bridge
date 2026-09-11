@@ -193,13 +193,13 @@ export default function TablesSection() {
         {/* specimen: app/ssh-keys/page.tsx:469-478 */}
         <div>
           <span className="text-xs text-[var(--text-muted)]">Key type</span>
-          <p className="text-sm text-[var(--text-secondary)] " style={{ fontFamily: "var(--font-mono)" }}>
+          <p className="text-sm text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>
             ed25519
           </p>
         </div>
         <div>
           <span className="text-xs text-[var(--text-muted)]">Comment</span>
-          <p className="text-sm text-[var(--text-secondary)] ">admin@bridge</p>
+          <p className="text-sm text-[var(--text-secondary)]">admin@bridge</p>
         </div>
       </Specimen>
 

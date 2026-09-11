@@ -201,7 +201,7 @@ function FleetAnalysisPanel({
 
   return (
     <div className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
-      <h4 className="text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider">
+      <h4 className="text-xs font-semibold text-[var(--text-faint)]">
         {t("host.batchDockerLogsAnalysis")}
       </h4>
 
@@ -226,7 +226,7 @@ function FleetAnalysisPanel({
 
       {stats.rows.length > 0 && (
         <div className="max-h-72 overflow-y-auto border border-[var(--border-subtle)] rounded-[var(--radius-md)] divide-y divide-[var(--border-subtle)]/50">
-          <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-1.5 text-2xs uppercase tracking-wider text-[var(--text-faint)] bg-[var(--bg-elevated)]/30">
+          <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-3 py-1.5 text-2xs text-[var(--text-faint)] bg-[var(--bg-elevated)]/30">
             <span>{t("host.title")}</span>
             <span className="text-right">{t("host.batchDockerLogsTotalSize")}</span>
             <span className="text-right">{t("host.batchDockerLogsUnbounded")}</span>
@@ -294,7 +294,7 @@ function Stat({ label, value, mono, tone }: { label: string; value: string; mono
       : "text-[var(--text-primary)]";
   return (
     <div>
-      <span className="block text-2xs text-[var(--text-faint)] uppercase tracking-wider">{label}</span>
+      <span className="block text-2xs text-[var(--text-faint)]">{label}</span>
       <span className={`font-medium ${valueClass} font-mono`} style={mono ? { } : undefined}>
         {value}
       </span>

@@ -115,7 +115,7 @@ export default function IssueBoard({ projectId, services, canEdit }: IssueBoardP
             >
               {/* Column header */}
               <div className="px-3 py-2.5 border-b border-[var(--border-subtle)] flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] font-display">
+                <span className="text-xs font-semibold text-[var(--text-muted)] font-display">
                   {t(statusLabels[status])}
                 </span>
                 <span className="text-2xs font-medium text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5 py-0.5">

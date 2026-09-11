@@ -131,7 +131,7 @@ export default function RoleMappingsTab() {
 
       {/* Add new mapping */}
       <div className="border-t border-[var(--border-subtle)] pt-4">
-        <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+        <p className="text-xs font-semibold text-[var(--text-muted)] mb-3">
           {t("settings.roleMappings.addMapping")}
         </p>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
