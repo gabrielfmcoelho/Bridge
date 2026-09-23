@@ -26,7 +26,7 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
   const scanned = cert !== "none" && cert !== "unscanned";
 
   return (
-    <Link href={`/dns/${dns.id}`}>
+    <Link href={`/dns/${dns.id}`} className="block h-full">
       <Card accent={situacaoAccent(dns.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
         <CardHeader
           title={dns.domain}

@@ -256,6 +256,56 @@ func (r *DNSRepo) SetLinksForHost(ctx context.Context, hostID int64, dnsIDs []in
 	return tx.Commit()
 }
 
+// AddHostLink links a host to a DNS record without touching its other links.
+// Reports whether a new row was added.
+func (r *DNSRepo) AddHostLink(ctx context.Context, dnsID, hostID int64) (bool, error) {
+	res, err := r.db.ExecContext(ctx, `INSERT INTO dns_host_links (dns_id, host_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, dnsID, hostID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// IDByDomain finds a record by domain, case-insensitively and unscoped (the
+// Coolify sync must see every row to avoid duplicates).
+func (r *DNSRepo) IDByDomain(ctx context.Context, domain string) (int64, bool, error) {
+	var id int64
+	err := r.db.QueryRowContext(ctx, `SELECT id FROM dns_records WHERE lower(domain) = lower(?) ORDER BY id LIMIT 1`, domain).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, false, nil
+	}
+	return id, err == nil, err
+}
+
+// SetServiceLinks replaces all service links for a DNS record (one tx).
+func (r *DNSRepo) SetServiceLinks(ctx context.Context, dnsID int64, serviceIDs []int64) error {
+	return replaceLinks(ctx, r.db, `service_dns_links`, `dns_id`, `service_id`, dnsID, serviceIDs)
+}
+
+// ServiceIDs returns all service ids linked to a DNS record.
+func (r *DNSRepo) ServiceIDs(ctx context.Context, dnsID int64) ([]int64, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT service_id FROM service_dns_links WHERE dns_id = ? ORDER BY service_id`, dnsID)
+	if err != nil {
+		return nil, err
+	}
+	return scanInt64s(rows)
+}
+
+// SetProjectLinks replaces all direct project links for a DNS record (one tx).
+func (r *DNSRepo) SetProjectLinks(ctx context.Context, dnsID int64, projectIDs []int64) error {
+	return replaceLinks(ctx, r.db, `project_dns_links`, `dns_id`, `project_id`, dnsID, projectIDs)
+}
+
+// ProjectIDs returns all project ids directly linked to a DNS record.
+func (r *DNSRepo) ProjectIDs(ctx context.Context, dnsID int64) ([]int64, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT project_id FROM project_dns_links WHERE dns_id = ? ORDER BY project_id`, dnsID)
+	if err != nil {
+		return nil, err
+	}
+	return scanInt64s(rows)
+}
+
 // HostIDs returns all host ids linked to a DNS record.
 func (r *DNSRepo) HostIDs(ctx context.Context, dnsID int64) ([]int64, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT host_id FROM dns_host_links WHERE dns_id = ?`, dnsID)

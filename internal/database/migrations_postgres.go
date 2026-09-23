@@ -1368,4 +1368,13 @@ var migrationsPostgres = []string{
 	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_sans TEXT NOT NULL DEFAULT '';
 	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_error TEXT NOT NULL DEFAULT '';
 	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_checked_at TIMESTAMPTZ;`,
+
+	// Version 85: direct project ↔ DNS links (a project's DNS list is these
+	// plus the DNS of its services). Same shape as v44 project_host_links.
+	`CREATE TABLE IF NOT EXISTS project_dns_links (
+		project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		dns_id     BIGINT NOT NULL REFERENCES dns_records(id) ON DELETE CASCADE,
+		PRIMARY KEY (project_id, dns_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_project_dns_links_dns ON project_dns_links(dns_id);`,
 }

@@ -337,7 +337,7 @@ func (r *ServiceRepo) ProjectCountsByHost(ctx context.Context) (map[int64]int, e
 
 // SetHostLinks replaces all host links for a service (one tx).
 func (r *ServiceRepo) SetHostLinks(ctx context.Context, serviceID int64, hostIDs []int64) error {
-	return r.replaceLinks(ctx, `service_host_links`, `service_id`, `host_id`, serviceID, hostIDs)
+	return replaceLinks(ctx, r.db, `service_host_links`, `service_id`, `host_id`, serviceID, hostIDs)
 }
 
 // HostIDs returns host ids linked to a service.
@@ -351,12 +351,12 @@ func (r *ServiceRepo) HostIDs(ctx context.Context, serviceID int64) ([]int64, er
 
 // SetServicesForHost replaces all service links for a host (one tx).
 func (r *ServiceRepo) SetServicesForHost(ctx context.Context, hostID int64, serviceIDs []int64) error {
-	return r.replaceLinks(ctx, `service_host_links`, `host_id`, `service_id`, hostID, serviceIDs)
+	return replaceLinks(ctx, r.db, `service_host_links`, `host_id`, `service_id`, hostID, serviceIDs)
 }
 
 // SetDNSLinks replaces all dns links for a service (one tx).
 func (r *ServiceRepo) SetDNSLinks(ctx context.Context, serviceID int64, dnsIDs []int64) error {
-	return r.replaceLinks(ctx, `service_dns_links`, `service_id`, `dns_id`, serviceID, dnsIDs)
+	return replaceLinks(ctx, r.db, `service_dns_links`, `service_id`, `dns_id`, serviceID, dnsIDs)
 }
 
 // DNSIDs returns dns ids linked to a service.
@@ -370,7 +370,7 @@ func (r *ServiceRepo) DNSIDs(ctx context.Context, serviceID int64) ([]int64, err
 
 // SetDependencies replaces all dependency edges for a service (one tx).
 func (r *ServiceRepo) SetDependencies(ctx context.Context, serviceID int64, dependsOnIDs []int64) error {
-	return r.replaceLinks(ctx, `service_dependencies`, `service_id`, `depends_on_id`, serviceID, dependsOnIDs)
+	return replaceLinks(ctx, r.db, `service_dependencies`, `service_id`, `depends_on_id`, serviceID, dependsOnIDs)
 }
 
 // DependencyIDs returns the ids a service depends on.
@@ -393,8 +393,8 @@ func (r *ServiceRepo) DependentIDs(ctx context.Context, serviceID int64) ([]int6
 
 // replaceLinks deletes all rows in a two-column junction matching keyCol=keyID,
 // then inserts (keyID, v) for each v in vals — atomically.
-func (r *ServiceRepo) replaceLinks(ctx context.Context, table, keyCol, valCol string, keyID int64, vals []int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
+func replaceLinks(ctx context.Context, db *sql.DB, table, keyCol, valCol string, keyID int64, vals []int64) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}

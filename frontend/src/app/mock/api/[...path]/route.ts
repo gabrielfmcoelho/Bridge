@@ -194,6 +194,11 @@ function slugify(name: string): string {
   return name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+function pickDNS(body: Partial<DNSRecord>): Partial<DNSRecord> {
+  const keys = ["domain", "has_https", "situacao", "observacoes", "tags", "host_ids", "service_ids", "project_ids"] as const;
+  return Object.fromEntries(keys.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
+}
+
 function pickOffering(body: OfferingBody): Partial<Offering> {
   const out: Partial<Offering> = {};
   for (const k of ["slug", "name", "category", "description", "request_type", "templates", "use_cases",
@@ -317,7 +322,53 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   }
   if (method === "GET" && segs[0] === "dns" && segs.length === 2) {
     const record = db.dns.find((d) => d.id === Number(segs[1]));
-    return record ? json({ dns_record: record, tags: [], host_ids: [], responsaveis: [] }) : notFound("DNS record not found");
+    return record
+      ? json({ dns_record: record, tags: record.tags ?? [], host_ids: record.host_ids ?? [], service_ids: record.service_ids ?? [], project_ids: record.project_ids ?? [], responsaveis: [] })
+      : notFound("DNS record not found");
+  }
+  // ponytail: links live on the row itself; grants/responsaveis are ignored by the mock.
+  if (method === "POST" && p === "dns") {
+    if (currentUser().role === "viewer") return json({ error: "forbidden" }, 403);
+    const body = await readJSON<Partial<DNSRecord>>(request);
+    const now = new Date().toISOString();
+    const record: DNSRecord = {
+      id: Math.max(0, ...db.dns.map((d) => d.id)) + 1,
+      domain: "", has_https: false, situacao: "active", responsavel: "", observacoes: "",
+      created_at: now, updated_at: now,
+      ...pickDNS(body),
+    };
+    db.dns.push(record);
+    return json(record, 201);
+  }
+  if (method === "PUT" && segs[0] === "dns" && segs.length === 2) {
+    if (currentUser().role === "viewer") return json({ error: "forbidden" }, 403);
+    const record = db.dns.find((d) => d.id === Number(segs[1]));
+    if (!record) return notFound("DNS record not found");
+    Object.assign(record, pickDNS(await readJSON<Partial<DNSRecord>>(request)), { updated_at: new Date().toISOString() });
+    return json(record);
+  }
+  // Mirrors POST /api/coolify/dns-sync: idempotent — a second run creates nothing.
+  if (method === "POST" && p === "coolify/dns-sync") {
+    if (currentUser().role !== "admin") return json({ error: "forbidden" }, 403);
+    const found = [
+      { domain: "bridge.sead.pi.gov.br", has_https: true, host: 1 },
+      { domain: "grafana.10.0.0.12.sslip.io", has_https: false, host: 0 },
+    ];
+    let created = 0, linksAdded = 0, noHost = 0;
+    for (const f of found) {
+      if (!f.host) noHost++;
+      if (db.dns.some((d) => d.domain === f.domain)) continue;
+      const now = new Date().toISOString();
+      db.dns.push({
+        id: Math.max(0, ...db.dns.map((d) => d.id)) + 1,
+        domain: f.domain, has_https: f.has_https, situacao: "active", responsavel: "",
+        observacoes: "Coolify: mock", created_at: now, updated_at: now,
+        host_ids: f.host ? [f.host] : [],
+      });
+      created++;
+      if (f.host) linksAdded++;
+    }
+    return json({ found: found.length, created, existing: found.length - created, links_added: linksAdded, no_host: noHost });
   }
   if (method === "POST" && segs[0] === "dns" && segs.length === 3 && segs[2] === "cert-scan") {
     const record = db.dns.find((d) => d.id === Number(segs[1]));

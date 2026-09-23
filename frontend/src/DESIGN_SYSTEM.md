@@ -79,8 +79,9 @@ reprints them.
 18. **Render data that exists.** A metadata pair with no value, a zero count,
     a meter with no reading and a tag row with no tags are not rendered at
     all — `CardMetadataGrid`, `CardIndicator` and `CardTagsSection` return
-    `null` rather than a `-`. Card grids use `items-start` so a card keeps its
-    own height and height becomes information. A boolean flag is the
+    `null` rather than a `-`. Cards in a grid row stretch to the tallest
+    (`InventoryContent` stretches its cells; a card's `<Link>` is
+    `block h-full`), so footers align. A boolean flag is the
     exception: pass `hideCount` and the off state stays visible.
 
 ---

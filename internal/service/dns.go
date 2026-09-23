@@ -60,6 +60,8 @@ type DNSDetail struct {
 	Record       *models.DNSRecord    `json:"dns_record"`
 	Tags         []string             `json:"tags"`
 	HostIDs      []int64              `json:"host_ids"`
+	ServiceIDs   []int64              `json:"service_ids"`
+	ProjectIDs   []int64              `json:"project_ids"`
 	Responsaveis []models.Responsavel `json:"responsaveis"`
 	Entidades    models.AssetGrants   `json:"entidades"`
 }
@@ -72,6 +74,8 @@ type DNSWrite struct {
 	Record       models.DNSRecord
 	Tags         *[]string
 	HostIDs      *[]int64
+	ServiceIDs   *[]int64
+	ProjectIDs   *[]int64
 	Responsaveis *[]models.ResponsavelInput
 	Grants       *models.AssetGrants
 }
@@ -129,12 +133,30 @@ func (s *DNSService) Get(ctx context.Context, id int64) (*DNSDetail, error) {
 	if err != nil {
 		return nil, err
 	}
+	serviceIDs, err := s.dns.ServiceIDs(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	projectIDs, err := s.dns.ProjectIDs(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := s.responsaveis.List(ctx, "dns", id)
 	if err != nil {
 		return nil, err
 	}
 	ents, _ := s.grants.Get(ctx, store.AssetDNS, id) // best effort: zero value on error
-	return &DNSDetail{Record: rec, Tags: tags, HostIDs: hostIDs, Responsaveis: resp, Entidades: ents}, nil
+	return &DNSDetail{Record: rec, Tags: tags, HostIDs: hostIDs,
+		ServiceIDs: nonNil(serviceIDs), ProjectIDs: nonNil(projectIDs),
+		Responsaveis: resp, Entidades: ents}, nil
+}
+
+// nonNil turns a nil slice into [] so it encodes as a JSON array.
+func nonNil(ids []int64) []int64 {
+	if ids == nil {
+		return []int64{}
+	}
+	return ids
 }
 
 // Grants returns the record's current entidade grants (zero value when none).
@@ -160,6 +182,16 @@ func (s *DNSService) Create(ctx context.Context, w *DNSWrite) error {
 	}
 	if w.HostIDs != nil && len(*w.HostIDs) > 0 {
 		if err := s.dns.SetHostLinks(ctx, w.Record.ID, *w.HostIDs); err != nil {
+			return err
+		}
+	}
+	if w.ServiceIDs != nil && len(*w.ServiceIDs) > 0 {
+		if err := s.dns.SetServiceLinks(ctx, w.Record.ID, *w.ServiceIDs); err != nil {
+			return err
+		}
+	}
+	if w.ProjectIDs != nil && len(*w.ProjectIDs) > 0 {
+		if err := s.dns.SetProjectLinks(ctx, w.Record.ID, *w.ProjectIDs); err != nil {
 			return err
 		}
 	}
@@ -194,6 +226,16 @@ func (s *DNSService) Update(ctx context.Context, id int64, w *DNSWrite) (bool, e
 	}
 	if w.HostIDs != nil {
 		if err := s.dns.SetHostLinks(ctx, id, *w.HostIDs); err != nil {
+			return true, err
+		}
+	}
+	if w.ServiceIDs != nil {
+		if err := s.dns.SetServiceLinks(ctx, id, *w.ServiceIDs); err != nil {
+			return true, err
+		}
+	}
+	if w.ProjectIDs != nil {
+		if err := s.dns.SetProjectLinks(ctx, id, *w.ProjectIDs); err != nil {
 			return true, err
 		}
 	}

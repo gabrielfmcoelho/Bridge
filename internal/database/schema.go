@@ -44,6 +44,7 @@ var TableCopyOrder = []string{
 	// link/dependent
 	"dns_host_links",
 	"project_host_links",
+	"project_dns_links",
 	"service_host_links",
 	"service_dns_links",
 	"service_credentials",

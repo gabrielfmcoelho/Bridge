@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { dnsAPI } from "@/lib/api";
+import { dnsAPI, coolifyAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useExportCSV } from "@/hooks/useExportCSV";
@@ -43,6 +43,7 @@ export default function DNSPage() {
   const [tablePage, setTablePage] = useState(1);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  const isAdmin = user?.role === "admin";
 
   const { data: allRecords = [], isLoading } = useQuery({
     queryKey: ["dns"],
@@ -50,7 +51,7 @@ export default function DNSPage() {
   });
 
   // Table view drives REAL server-side filtering+sort+pagination (one page at a
-  // time). Enabled only in table mode; KPIs/export/cards keep using allRecords.
+  // time). Enabled only in table mode; KPIs use allRecords; cards/export use filteredAndSorted.
   const tableQuery = useQuery({
     queryKey: ["dns-table", search, filters, sort, tablePage],
     enabled: viewMode === "table",
@@ -113,8 +114,16 @@ export default function DNSPage() {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: coolifyAPI.syncDNS,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dns"] });
+      queryClient.invalidateQueries({ queryKey: ["dns-table"] });
+    },
+  });
+
   const exportCSV = useExportCSV(
-    allRecords,
+    filteredAndSorted,
     [
       { key: "domain", header: "domain" },
       { key: "has_https", header: "has_https", transform: (d) => d.has_https ? "yes" : "no" },
@@ -151,12 +160,15 @@ export default function DNSPage() {
         activeFilterCount={activeFilterCount}
         searchPlaceholder={t("common.search")}
         actions={
-          allRecords.length > 0 ? (
+          allRecords.length > 0 || isAdmin ? (
             <>
-              {canEdit && (
+              {canEdit && allRecords.length > 0 && (
                 <ToolbarActionButton icon={ICON_PATHS.scan} label={t("dns.scanCerts")} onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending} />
               )}
-              <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />
+              {isAdmin && (
+                <ToolbarActionButton icon={ICON_PATHS.refresh} label={t("dns.syncCoolify")} onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} />
+              )}
+              {allRecords.length > 0 && <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />}
             </>
           ) : undefined
         }
@@ -169,6 +181,13 @@ export default function DNSPage() {
         </StatusAlert>
       )}
       {scanMutation.isError && <StatusAlert variant="error" className="mb-4">{scanMutation.error.message}</StatusAlert>}
+      {syncMutation.isPending && <StatusAlert variant="loading" className="mb-4">{t("dns.syncCoolifyRunning")}</StatusAlert>}
+      {syncMutation.isSuccess && (
+        <StatusAlert variant="success" className="mb-4">
+          {t("dns.coolifySyncDone", { found: String(syncMutation.data.found), created: String(syncMutation.data.created), links_added: String(syncMutation.data.links_added), no_host: String(syncMutation.data.no_host) })}
+        </StatusAlert>
+      )}
+      {syncMutation.isError && <StatusAlert variant="error" className="mb-4">{syncMutation.error.message}</StatusAlert>}
 
       <InventoryContent
         isLoading={viewMode === "table" ? tableQuery.isLoading : isLoading}

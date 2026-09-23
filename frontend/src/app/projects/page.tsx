@@ -100,7 +100,7 @@ export default function ProjectsPage() {
   }, [allProjects, search, filters, sort]);
 
   const exportCSV = useExportCSV(
-    allProjects,
+    filteredAndSorted,
     [
       { key: "name", header: "name" },
       { key: "description", header: "description" },

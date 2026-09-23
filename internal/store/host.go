@@ -359,6 +359,31 @@ func (r *HostRepo) SetCoolifyUUID(ctx context.Context, hostID int64, uuid *strin
 	return err
 }
 
+// CoolifyIndex maps non-deleted hosts by coolify_server_uuid and by hostname
+// (where the IP lives), unscoped — the Coolify sync resolves servers globally.
+func (r *HostRepo) CoolifyIndex(ctx context.Context) (byUUID, byHostname map[string]int64, err error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT id, COALESCE(coolify_server_uuid, ''), hostname FROM hosts WHERE deleted_at IS NULL ORDER BY id`)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	byUUID, byHostname = map[string]int64{}, map[string]int64{}
+	for rows.Next() {
+		var id int64
+		var uuid, hostname string
+		if err := rows.Scan(&id, &uuid, &hostname); err != nil {
+			return nil, nil, err
+		}
+		if _, ok := byUUID[uuid]; uuid != "" && !ok {
+			byUUID[uuid] = id
+		}
+		if _, ok := byHostname[hostname]; hostname != "" && !ok {
+			byHostname[hostname] = id
+		}
+	}
+	return byUUID, byHostname, rows.Err()
+}
+
 // Delete removes a host row by id. (Vault cascade is handled separately via the
 // cascade registry in the delete path.)
 func (r *HostRepo) Delete(ctx context.Context, id int64) error {

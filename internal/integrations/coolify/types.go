@@ -47,3 +47,34 @@ type CreateKeyRequest struct {
 	Description string `json:"description,omitempty"`
 	PrivateKey  string `json:"private_key"`
 }
+
+// Application is the subset of a Coolify application the DNS sync reads.
+// FQDN is nullable and comma-separated ("https://a.x,http://b.x:8080/api").
+type Application struct {
+	UUID        string `json:"uuid"`
+	Name        string `json:"name"`
+	FQDN        string `json:"fqdn"`
+	Destination struct {
+		Server ServerRef `json:"server"`
+	} `json:"destination"`
+}
+
+// Service is the subset of a Coolify service (compose stack) the DNS sync
+// reads: its server and each sub-application's fqdn.
+type Service struct {
+	UUID         string    `json:"uuid"`
+	Name         string    `json:"name"`
+	Server       ServerRef `json:"server"`
+	Applications []struct {
+		Name string `json:"name"`
+		FQDN string `json:"fqdn"`
+	} `json:"applications"`
+}
+
+// ServerRef is the server embedded in an application/service. Kept to the
+// fields the sync reads so an unexpected type elsewhere can't fail the decode.
+type ServerRef struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+	IP   string `json:"ip"`
+}

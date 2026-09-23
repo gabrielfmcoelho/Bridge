@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -73,6 +74,36 @@ func (c *Client) ListServers() ([]Server, error) {
 	}
 	var servers []Server
 	return servers, json.Unmarshal(data, &servers)
+}
+
+// ListApplications returns all applications.
+func (c *Client) ListApplications() ([]Application, error) {
+	data, _, err := c.do("GET", "/applications", nil)
+	if err != nil {
+		return nil, err
+	}
+	var apps []Application
+	return apps, json.Unmarshal(data, &apps)
+}
+
+// ListServices returns all services.
+func (c *Client) ListServices() ([]Service, error) {
+	data, _, err := c.do("GET", "/services", nil)
+	if err != nil {
+		return nil, err
+	}
+	var svcs []Service
+	return svcs, json.Unmarshal(data, &svcs)
+}
+
+// BaseHost is the hostname of the configured base URL — the master server's
+// address, which Coolify itself reports as host.docker.internal.
+func (c *Client) BaseHost() string {
+	u, err := url.Parse(c.baseURL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }
 
 // GetServer returns a server by UUID.

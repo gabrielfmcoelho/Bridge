@@ -3,7 +3,7 @@
 import { useState, useMemo, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { dnsAPI, hostsAPI, servicesAPI, graphAPI, globalIssuesAPI } from "@/lib/api";
+import { dnsAPI, hostsAPI, servicesAPI, projectsAPI, graphAPI, globalIssuesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilteredGraph } from "@/hooks/useFilteredGraph";
@@ -19,7 +19,6 @@ import DnsForm from "../DnsForm";
 import OverviewTab from "./_components/OverviewTab";
 import TopologyTab from "./_components/TopologyTab";
 import IssuesTab from "./_components/IssuesTab";
-import type { Service } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { certState } from "@/lib/dnsCert";
@@ -44,6 +43,7 @@ export default function DnsDetail({ id }: { id: number }) {
   const { data, isLoading } = useQuery({ queryKey: ["dns", id], queryFn: () => dnsAPI.get(id) });
   const { data: allHosts = [] } = useQuery({ queryKey: ["hosts"], queryFn: () => hostsAPI.list() });
   const { data: allServices = [] } = useQuery({ queryKey: ["services"], queryFn: servicesAPI.list });
+  const { data: allProjects = [] } = useQuery({ queryKey: ["projects"], queryFn: projectsAPI.list });
   const { data: graphData } = useQuery({ queryKey: ["graph"], queryFn: graphAPI.get, enabled: activeTab === "topology" });
   const { data: dnsIssues = [] } = useQuery({
     queryKey: ["issues", "dns", id],
@@ -62,8 +62,14 @@ export default function DnsDetail({ id }: { id: number }) {
   }, [data, allHosts]);
 
   const linkedServices = useMemo(() => {
-    return allServices.filter((s) => (s as unknown as { dns_ids?: number[] }).dns_ids?.includes(id));
-  }, [allServices, id]);
+    const ids = data?.service_ids ?? [];
+    return allServices.filter((s) => ids.includes(s.id));
+  }, [data, allServices]);
+
+  const linkedProjects = useMemo(() => {
+    const ids = data?.project_ids ?? [];
+    return allProjects.filter((p) => ids.includes(p.id));
+  }, [data, allProjects]);
 
   // ── Mutations ──
   const deleteMutation = useMutation({
@@ -155,7 +161,7 @@ export default function DnsDetail({ id }: { id: number }) {
           />
 
           {activeTab === "overview" && (
-            <OverviewTab dns={dns} tags={data.tags || []} responsaveis={responsaveis} linkedHosts={linkedHosts} canEdit={canEdit} t={t} />
+            <OverviewTab dns={dns} tags={data.tags || []} responsaveis={responsaveis} linkedHosts={linkedHosts} linkedServices={linkedServices} linkedProjects={linkedProjects} canEdit={canEdit} t={t} />
           )}
 
           {activeTab === "issues" && (
@@ -163,7 +169,7 @@ export default function DnsDetail({ id }: { id: number }) {
           )}
 
           {activeTab === "topology" && (
-            <TopologyTab filteredGraph={filteredGraph} linkedHosts={linkedHosts} linkedServices={linkedServices as Service[]} />
+            <TopologyTab filteredGraph={filteredGraph} linkedHosts={linkedHosts} linkedServices={linkedServices} />
           )}
 
           {/* Edit Drawer — now uses DnsForm component */}
@@ -178,6 +184,8 @@ export default function DnsDetail({ id }: { id: number }) {
               initial={dns}
               initialTags={data.tags}
               initialHostIds={data.host_ids}
+              initialServiceIds={data.service_ids}
+              initialProjectIds={data.project_ids}
               initialResponsaveis={responsaveis}
               initialGrants={data.entidades}
               onSuccess={() => {

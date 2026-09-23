@@ -260,6 +260,15 @@ func (r *ProjectRepo) HostIDs(ctx context.Context, projectID int64) ([]int64, er
 	return scanInt64s(rows)
 }
 
+// DirectDNSIDs returns DNS ids linked directly to a project (not via services).
+func (r *ProjectRepo) DirectDNSIDs(ctx context.Context, projectID int64) ([]int64, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT dns_id FROM project_dns_links WHERE project_id = ?`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	return scanInt64s(rows)
+}
+
 // ListTrash returns soft-deleted projects (deleted_at set).
 func (r *ProjectRepo) ListTrash(ctx context.Context) ([]models.Project, error) {
 	vis, vargs := VisibleExpr(ctx, AssetProject, "projects.id")

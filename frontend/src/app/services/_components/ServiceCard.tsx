@@ -17,7 +17,7 @@ export default function ServiceCard({ svc }: { svc: Service }) {
   const depsCount = svc.depends_on_ids?.length || 0;
 
   return (
-    <Link href={`/services/${svc.id}`}>
+    <Link href={`/services/${svc.id}`} className="block h-full">
       <Card accent={accent} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
         <CardHeader
           title={svc.nickname}

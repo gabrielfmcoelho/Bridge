@@ -37,7 +37,7 @@ export default function HostCard({ host }: { host: Host }) {
   };
 
   return (
-    <Link href={`/hosts/${host.oficial_slug}`}>
+    <Link href={`/hosts/${host.oficial_slug}`} className="block h-full">
       <Card accent={situacaoAccent(host.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
         <CardHeader
           title={host.nickname}

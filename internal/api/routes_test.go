@@ -32,6 +32,7 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"POST", "/api/dns"},
 		{"POST", "/api/dns/cert-scan"},
 		{"POST", "/api/dns/1/cert-scan"},
+		{"POST", "/api/coolify/dns-sync"},
 		{"GET", "/api/projects"},
 		{"GET", "/api/services"},
 		{"POST", "/api/services/1/fixate"},

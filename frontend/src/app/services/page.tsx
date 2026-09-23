@@ -107,7 +107,7 @@ export default function ServicesPage() {
   }, [allServices, search, filters, sort]);
 
   const exportCSV = useExportCSV(
-    allServices,
+    services,
     [
       { key: "nickname", header: "nickname" },
       { key: "description", header: "description" },

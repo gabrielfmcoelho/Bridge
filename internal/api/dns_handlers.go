@@ -72,11 +72,14 @@ type dnsWriteRequest struct {
 	models.AssetGrantsInput
 	Tags         *[]string                  `json:"tags"`
 	HostIDs      *[]int64                   `json:"host_ids"`
+	ServiceIDs   *[]int64                   `json:"service_ids"`
+	ProjectIDs   *[]int64                   `json:"project_ids"`
 	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 }
 
 func (req *dnsWriteRequest) toWrite() *service.DNSWrite {
-	return &service.DNSWrite{Record: req.DNSRecord, Tags: req.Tags, HostIDs: req.HostIDs, Responsaveis: req.Responsaveis}
+	return &service.DNSWrite{Record: req.DNSRecord, Tags: req.Tags, HostIDs: req.HostIDs,
+		ServiceIDs: req.ServiceIDs, ProjectIDs: req.ProjectIDs, Responsaveis: req.Responsaveis}
 }
 
 func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {

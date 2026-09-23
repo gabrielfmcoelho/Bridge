@@ -7,7 +7,7 @@ import Badge from "@/components/ui/Badge";
 import Field from "@/components/ui/Field";
 import ResponsaveisSection from "@/components/inventory/ResponsaveisSection";
 import CertificateCard from "./CertificateCard";
-import type { DNSRecord, Host, EntityResponsavel } from "@/lib/types";
+import type { DNSRecord, Host, Service, Project, EntityResponsavel } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -16,11 +16,13 @@ interface OverviewTabProps {
   tags: string[];
   responsaveis: EntityResponsavel[];
   linkedHosts: Host[];
+  linkedServices: Service[];
+  linkedProjects: Project[];
   canEdit: boolean;
   t: (key: string) => string;
 }
 
-export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, canEdit, t }: OverviewTabProps) {
+export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, linkedServices, linkedProjects, canEdit, t }: OverviewTabProps) {
   return (
     <div className="space-y-5 animate-fade-in">
       <SectionHeading>{t("dns.info")}</SectionHeading>
@@ -79,6 +81,38 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, canE
                 >
                   <Icon path={ICON_PATHS.server} className="w-3.5 h-3.5" />
                   {h.nickname || h.oficial_slug}
+                </Link>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
+
+      {linkedServices.length > 0 && (
+        <>
+          <SectionHeading>{t("dns.linkedServices")}</SectionHeading>
+          <Card hover={false}>
+            <div className="flex flex-wrap gap-2">
+              {linkedServices.map((x) => (
+                <Link key={x.id} href={`/services/${x.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-colors">
+                  <Icon path={ICON_PATHS.gear} className="w-3.5 h-3.5" />
+                  {x.nickname}
+                </Link>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
+
+      {linkedProjects.length > 0 && (
+        <>
+          <SectionHeading>{t("dns.linkedProjects")}</SectionHeading>
+          <Card hover={false}>
+            <div className="flex flex-wrap gap-2">
+              {linkedProjects.map((x) => (
+                <Link key={x.id} href={`/projects/${x.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-colors">
+                  <Icon path={ICON_PATHS.folder} className="w-3.5 h-3.5" />
+                  {x.name}
                 </Link>
               ))}
             </div>

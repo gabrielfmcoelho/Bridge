@@ -98,7 +98,7 @@ func newApp(db *database.DB, configPath string) *App {
 		gitlab:              &gitlabHandlers{db: db},
 		projectGitlab:       &projectGitLabHandlers{db: db},
 		ai:                  &aiHandlers{db: db},
-		coolify:             &coolifyHandlers{db: db},
+		coolify:             &coolifyHandlers{db: db, dns: deps.DNS},
 		grafana:             &grafanaHandlers{db: db},
 		grafanaWebhook:      &grafanaWebhookHandlers{db: db},
 		outline:             &outlineHandlers{db: db},

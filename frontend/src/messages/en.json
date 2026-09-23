@@ -727,7 +727,11 @@
     "certRescan": "Rescan",
     "scanCerts": "Scan certificates",
     "scanCertsRunning": "Scanning certificates…",
-    "certScanDone": "{scanned} scanned: {ok} OK, {failed} with errors"
+    "certScanDone": "{scanned} scanned: {ok} OK, {failed} with errors",
+    "linkedProjects": "Linked Projects",
+    "syncCoolify": "Sync from Coolify",
+    "syncCoolifyRunning": "Syncing domains from Coolify…",
+    "coolifySyncDone": "{found} found: {created} new, {links_added} links added, {no_host} without a host"
   },
   "project": {
     "title": "Projects",

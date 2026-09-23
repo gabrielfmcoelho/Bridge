@@ -192,6 +192,8 @@ export interface DNSRecord {
   updated_at: string;
   tags?: string[];
   host_ids?: number[];
+  service_ids?: number[];
+  project_ids?: number[];
   main_responsavel_name?: string;
   responsaveis?: EntityResponsavel[];
   // TLS certificate from the latest scan. cert_checked_at null = never scanned;

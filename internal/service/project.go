@@ -120,6 +120,17 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	if err != nil {
 		return nil, err
 	}
+	directDNS, err := s.projects.DirectDNSIDs(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(directDNS) > 0 {
+		set := map[int64]struct{}{}
+		for _, did := range append(dnsIDs, directDNS...) {
+			set[did] = struct{}{}
+		}
+		dnsIDs = sortedKeys(set)
+	}
 	grants, _ := s.grants.Get(ctx, store.AssetProject, id) // best effort
 	return &ProjectDetail{
 		Project:      p,

@@ -727,7 +727,11 @@
     "certRescan": "Verificar novamente",
     "scanCerts": "Verificar certificados",
     "scanCertsRunning": "Verificando certificados…",
-    "certScanDone": "{scanned} verificados: {ok} OK, {failed} com erro"
+    "certScanDone": "{scanned} verificados: {ok} OK, {failed} com erro",
+    "linkedProjects": "Projetos vinculados",
+    "syncCoolify": "Sincronizar do Coolify",
+    "syncCoolifyRunning": "Sincronizando domínios do Coolify…",
+    "coolifySyncDone": "{found} encontrados: {created} novos, {links_added} vínculos adicionados, {no_host} sem host"
   },
   "project": {
     "title": "Projetos",

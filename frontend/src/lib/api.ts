@@ -482,10 +482,10 @@ export const hostChamadosAPI = {
 export const dnsAPI = {
   list: () => api.getList<import("./types").DNSRecord>("/api/dns"),
   listPaginated: (params: Record<string, string>) => api.getListPaginated<import("./types").DNSRecord>(`/api/dns?${new URLSearchParams(params).toString()}`),
-  get: (id: number) => api.get<{ dns_record: import("./types").DNSRecord; tags: string[]; host_ids: number[]; responsaveis: import("./types").EntityResponsavel[]; entidades?: import("./types").AssetGrants }>(`/api/dns/${id}`),
-  create: (data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>
+  get: (id: number) => api.get<{ dns_record: import("./types").DNSRecord; tags: string[]; host_ids: number[]; service_ids?: number[]; project_ids?: number[]; responsaveis: import("./types").EntityResponsavel[]; entidades?: import("./types").AssetGrants }>(`/api/dns/${id}`),
+  create: (data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; service_ids?: number[]; project_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>
     api.post<import("./types").DNSRecord>("/api/dns", data),
-  update: (id: number, data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>
+  update: (id: number, data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; service_ids?: number[]; project_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>
     api.put<import("./types").DNSRecord>(`/api/dns/${id}`, data),
   delete: (id: number) => api.delete(`/api/dns/${id}`),
   // Probes every visible https record synchronously — can outlive the 120s default.
@@ -1697,6 +1697,8 @@ export const coolifyAPI = {
     api.get<{ found: boolean; coolify_uuid?: string; coolify_name?: string }>(`/api/coolify/keys/${id}/check`),
   syncKey: (id: number) =>
     api.post<{ uuid: string; name: string; already_existed: boolean }>(`/api/coolify/keys/${id}/sync`),
+  // Pulls every Coolify app/service FQDN into dns_records synchronously — can outlive the 120s default.
+  syncDNS: () => request<{ found: number; created: number; existing: number; links_added: number; no_host: number }>("/api/coolify/dns-sync", { method: "POST" }, 10 * 60_000),
 };
 
 // Users (admin)

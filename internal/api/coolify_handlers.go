@@ -12,12 +12,14 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/coolify"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 type coolifyHandlers struct {
-	db *database.DB
+	db  *database.DB
+	dns *service.DNSService
 }
 
 func (h *coolifyHandlers) getClient() (*coolify.Client, error) {
@@ -537,11 +539,38 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, map[string]any{"uuid": uuid, "name": keyName, "already_existed": false})
 }
 
+// handleDNSSync pulls every application/service domain from Coolify into
+// dns_records, linked to the Bridge host running it.
+func (h *coolifyHandlers) handleDNSSync(w http.ResponseWriter, r *http.Request) {
+	client, err := h.getClient()
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	apps, err := client.ListApplications()
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to list coolify applications: "+err.Error())
+		return
+	}
+	svcs, err := client.ListServices()
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to list coolify services: "+err.Error())
+		return
+	}
+	sum, err := h.dns.SyncFromCoolify(r.Context(), coolify.DomainRefs(apps, svcs, client.BaseHost()))
+	if err != nil {
+		jsonServerError(w, r, "failed to sync DNS from coolify", err)
+		return
+	}
+	jsonOK(w, sum)
+}
+
 // registerRoutes binds the Coolify integration: status/test plus the per-host
 // and per-key check/register/sync operations.
 func (h *coolifyHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/coolify/status", h.handleStatus)
 	rr.role("admin", "POST /api/coolify/test", h.handleTestConnection)
+	rr.role("admin", "POST /api/coolify/dns-sync", h.handleDNSSync)
 	rr.role("editor", "GET /api/coolify/server-status/{slug}", h.handleGetServerStatus)
 	rr.role("editor", "POST /api/coolify/check/{slug}", h.handleCheckHost)
 	rr.role("admin", "POST /api/coolify/register/{slug}", h.handleRegisterHost)

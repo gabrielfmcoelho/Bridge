@@ -20,7 +20,7 @@ export default function ProjectCard({ project }: { project: Project }) {
   const situacaoColor = situacoes.find((s) => s.value === project.situacao)?.color;
 
   return (
-    <Link href={`/projects/${project.id}`}>
+    <Link href={`/projects/${project.id}`} className="block h-full">
       <Card accent={situacaoAccent(project.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
         <CardHeader
           titleFont="display"

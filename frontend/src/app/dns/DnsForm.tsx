@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { dnsAPI, hostsAPI, enumsAPI, contactsAPI } from "@/lib/api";
+import { dnsAPI, hostsAPI, servicesAPI, projectsAPI, enumsAPI, contactsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
 import Button from "@/components/ui/Button";
@@ -21,6 +21,8 @@ interface DnsFormProps {
   initial?: DNSRecord | null;
   initialTags?: string[];
   initialHostIds?: number[];
+  initialServiceIds?: number[];
+  initialProjectIds?: number[];
   initialResponsaveis?: EntityResponsavel[];
   initialGrants?: AssetGrants | null;
   onSuccess: () => void;
@@ -32,6 +34,8 @@ export default function DnsForm({
   initial,
   initialTags,
   initialHostIds,
+  initialServiceIds,
+  initialProjectIds,
   initialResponsaveis,
   initialGrants,
   onSuccess,
@@ -46,6 +50,8 @@ export default function DnsForm({
     situacao: initial?.situacao || "active",
     observacoes: initial?.observacoes || "",
     host_ids: initialHostIds || initial?.host_ids || ([] as number[]),
+    service_ids: initialServiceIds || ([] as number[]),
+    project_ids: initialProjectIds || ([] as number[]),
   });
   const [tags, setTags] = useState<string[]>(initialTags || initial?.tags || []);
   const [responsaveis, setResponsaveis] = useState<EntityResponsavel[]>(initialResponsaveis || []);
@@ -54,6 +60,8 @@ export default function DnsForm({
   const [error, setError] = useState("");
 
   const { data: hosts = [] } = useQuery({ queryKey: ["hosts"], queryFn: () => hostsAPI.list() });
+  const { data: services = [] } = useQuery({ queryKey: ["services"], queryFn: servicesAPI.list });
+  const { data: projects = [] } = useQuery({ queryKey: ["projects"], queryFn: projectsAPI.list });
   const { data: situacoes = [] } = useQuery({ queryKey: ["enums", "situacao"], queryFn: () => enumsAPI.list("situacao") });
   const { data: rawContacts } = useQuery({ queryKey: ["contacts"], queryFn: contactsAPI.list });
   const contacts = Array.isArray(rawContacts) ? rawContacts : [];
@@ -119,6 +127,8 @@ export default function DnsForm({
           <EntidadeScopeFields value={grants} onChange={setGrants} compact />
           <TagInput label={t("common.tags")} tags={tags} onChange={setTags} entityType="dns" />
           <CheckboxList label={t("dns.linkedHosts")} items={hosts.map((h) => ({ id: h.id, name: h.nickname }))} selected={form.host_ids} onChange={(ids) => set("host_ids", ids)} />
+          <CheckboxList label={t("dns.linkedServices")} items={services.map((s) => ({ id: s.id, name: s.nickname }))} selected={form.service_ids} onChange={(ids) => set("service_ids", ids)} />
+          <CheckboxList label={t("dns.linkedProjects")} items={projects.map((p) => ({ id: p.id, name: p.name }))} selected={form.project_ids} onChange={(ids) => set("project_ids", ids)} />
         </div>
       )}
     </div>
