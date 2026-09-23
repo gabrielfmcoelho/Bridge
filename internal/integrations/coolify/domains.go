@@ -19,7 +19,9 @@ const masterIP = "host.docker.internal"
 
 // DomainRefs flattens every fqdn of apps and services into one ref per
 // lowercased hostname (scheme, port and path dropped). A domain seen more than
-// once keeps its first server/source; HTTPS is true if any occurrence is https.
+// once keeps its first server/source. HTTPS is true for every real domain:
+// Coolify's fqdn scheme is often plain http even when the proxy serves TLS, so
+// only the auto-generated *.sslip.io names follow the scheme.
 // The master server's IP is replaced by masterHost (the coolify_base_url host).
 func DomainRefs(apps []Application, svcs []Service, masterHost string) []DomainRef {
 	var out []DomainRef
@@ -42,7 +44,7 @@ func DomainRefs(apps []Application, svcs []Service, masterHost string) []DomainR
 				continue
 			}
 			host := strings.ToLower(u.Hostname())
-			https := u.Scheme == "https"
+			https := u.Scheme == "https" || !strings.HasSuffix(host, ".sslip.io")
 			if i, ok := idx[host]; ok {
 				out[i].HTTPS = out[i].HTTPS || https
 				continue

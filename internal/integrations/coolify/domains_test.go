@@ -25,7 +25,7 @@ func TestDomainRefs(t *testing.T) {
 	got := DomainRefs(apps, svcs, "coolify.x.gov.br")
 	want := []DomainRef{
 		{Domain: "bridge.x.gov.br", HTTPS: true, ServerUUID: "m", ServerIP: "coolify.x.gov.br", Source: "bridge"},
-		{Domain: "api.x.gov.br", ServerUUID: "s1", ServerIP: "10.0.0.2", Source: "api"},
+		{Domain: "api.x.gov.br", HTTPS: true, ServerUUID: "s1", ServerIP: "10.0.0.2", Source: "api"},
 		{Domain: "abc.10.0.0.2.sslip.io", ServerUUID: "s1", ServerIP: "10.0.0.2", Source: "sslip"},
 		{Domain: "wiki.x.gov.br", HTTPS: true, ServerUUID: "s2", ServerIP: "10.0.0.3", Source: "wiki"},
 	}
