@@ -5,9 +5,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Drawer from "@/components/ui/Drawer";
 import AiChatDrawer from "@/components/ai/AiChatDrawer";
+import Breadcrumbs from "./Breadcrumbs";
 
 const roleColors: Record<string, string> = {
   admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
@@ -26,11 +27,6 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
   const { appName, appColor, appLogo } = useAppearance();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
-  const pathname = usePathname();
-  // Route → title mapping for the global header. Extend as other pages want
-  // to surface their name next to the collapse button.
-  const headerTitle =
-    pathname === "/wiki" || pathname?.startsWith("/wiki/") ? "Wiki" : "";
   const [userDrawer, setUserDrawer] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
   const [aiChat, setAiChat] = useState(false);
@@ -59,7 +55,7 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
   return (
     <header className="h-13 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] flex items-center justify-between px-3 md:px-5 gap-2">
       {/* Left side */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 min-w-0">
         {/* Mobile app branding */}
         <div className="md:hidden flex items-center gap-2">
           <div className="w-7 h-7 rounded-[var(--radius-sm)] flex items-center justify-center overflow-hidden shrink-0"
@@ -86,14 +82,7 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
           </svg>
         </button>
-        {headerTitle && (
-          <h1
-            className="hidden md:block ml-2 text-sm font-semibold text-[var(--text-primary)] truncate"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
-            {headerTitle}
-          </h1>
-        )}
+        <Breadcrumbs />
       </div>
 
       {/* AI Chat Drawer */}
