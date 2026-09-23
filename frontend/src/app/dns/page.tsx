@@ -13,6 +13,7 @@ import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
 import ListToolbar from "@/components/ui/ListToolbar";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
+import StatusAlert from "@/components/ui/StatusAlert";
 import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
 import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
@@ -23,6 +24,7 @@ import KpiSection from "./_components/KpiSection";
 import InventoryFAB from "@/components/inventory/InventoryFAB";
 import DnsForm from "./DnsForm";
 import DnsFilterDrawer, { emptyFilters, type DNSFilters } from "./FilterDrawer";
+import { matchesCertFilter, compareCertExpiry } from "@/lib/dnsCert";
 import type { DNSRecord } from "@/lib/types";
 
 export default function DNSPage() {
@@ -59,6 +61,7 @@ export default function DNSPage() {
       if (filters.tag) params.tag = filters.tag;
       if (filters.responsavel) params.responsavel = filters.responsavel;
       if (filters.has_https) params.has_https = filters.has_https;
+      if (filters.cert) params.cert = filters.cert;
       params.sort_by = sort.field;
       params.sort_dir = sort.direction;
       params.page = String(tablePage);
@@ -82,12 +85,14 @@ export default function DNSPage() {
     if (filters.responsavel) result = result.filter(d => d.responsavel === filters.responsavel);
     if (filters.has_https === "yes") result = result.filter(d => d.has_https);
     else if (filters.has_https === "no") result = result.filter(d => !d.has_https);
+    if (filters.cert) result = result.filter(d => matchesCertFilter(d, filters.cert));
 
     result.sort((a, b) => {
       let cmp = 0;
       switch (sort.field) {
         case "situacao": cmp = a.situacao.localeCompare(b.situacao); break;
         case "responsavel": cmp = (a.responsavel || "").localeCompare(b.responsavel || ""); break;
+        case "cert_expires_at": return compareCertExpiry(a, b, sort.direction); // nulls last both ways
         default: cmp = a.domain.localeCompare(b.domain);
       }
       return sort.direction === "desc" ? -cmp : cmp;
@@ -100,11 +105,20 @@ export default function DNSPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dns"] }),
   });
 
+  const scanMutation = useMutation({
+    mutationFn: dnsAPI.scanCerts,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dns"] });
+      queryClient.invalidateQueries({ queryKey: ["dns-table"] });
+    },
+  });
+
   const exportCSV = useExportCSV(
     allRecords,
     [
       { key: "domain", header: "domain" },
       { key: "has_https", header: "has_https", transform: (d) => d.has_https ? "yes" : "no" },
+      { key: "cert_expires_at", header: "cert_expires_at" },
       { key: "situacao", header: "situacao" },
       { key: "responsavel", header: "responsavel" },
       { key: "observacoes", header: "observacoes" },
@@ -138,10 +152,23 @@ export default function DNSPage() {
         searchPlaceholder={t("common.search")}
         actions={
           allRecords.length > 0 ? (
-            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />
+            <>
+              {canEdit && (
+                <ToolbarActionButton icon={ICON_PATHS.scan} label={t("dns.scanCerts")} onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending} />
+              )}
+              <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />
+            </>
           ) : undefined
         }
       />
+
+      {scanMutation.isPending && <StatusAlert variant="loading" className="mb-4">{t("dns.scanCertsRunning")}</StatusAlert>}
+      {scanMutation.isSuccess && (
+        <StatusAlert variant="success" className="mb-4">
+          {t("dns.certScanDone", { scanned: String(scanMutation.data.scanned), ok: String(scanMutation.data.ok), failed: String(scanMutation.data.failed) })}
+        </StatusAlert>
+      )}
+      {scanMutation.isError && <StatusAlert variant="error" className="mb-4">{scanMutation.error.message}</StatusAlert>}
 
       <InventoryContent
         isLoading={viewMode === "table" ? tableQuery.isLoading : isLoading}

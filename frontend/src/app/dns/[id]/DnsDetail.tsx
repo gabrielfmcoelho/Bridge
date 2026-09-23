@@ -22,6 +22,8 @@ import IssuesTab from "./_components/IssuesTab";
 import type { Service } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { certState } from "@/lib/dnsCert";
+import CertBadge from "../_components/CertBadge";
 
 type TabKey = "overview" | "topology" | "issues";
 
@@ -125,6 +127,7 @@ export default function DnsDetail({ id }: { id: number }) {
                     {t("topology.https")}
                   </Badge>
                 )}
+                {certState(dns) !== "none" && <CertBadge dns={dns} />}
               </>
             }
             counters={
@@ -152,7 +155,7 @@ export default function DnsDetail({ id }: { id: number }) {
           />
 
           {activeTab === "overview" && (
-            <OverviewTab dns={dns} tags={data.tags || []} responsaveis={responsaveis} linkedHosts={linkedHosts} t={t} />
+            <OverviewTab dns={dns} tags={data.tags || []} responsaveis={responsaveis} linkedHosts={linkedHosts} canEdit={canEdit} t={t} />
           )}
 
           {activeTab === "issues" && (

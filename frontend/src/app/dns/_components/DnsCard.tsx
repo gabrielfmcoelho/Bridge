@@ -9,6 +9,8 @@ import { situacaoAccent } from "@/lib/constants";
 import Badge from "@/components/ui/Badge";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import { certState, certTone } from "@/lib/dnsCert";
+import { certLabel } from "./CertBadge";
 import type { DNSRecord } from "@/lib/types";
 
 export default function DnsCard({ dns }: { dns: DNSRecord }) {
@@ -20,6 +22,8 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
   const situacaoColor = situacoes.find((s) => s.value === dns.situacao)?.color;
   const linkedHostsCount = dns.host_ids?.length || 0;
   const mainResp = dns.main_responsavel_name || dns.responsavel || "-";
+  const cert = certState(dns);
+  const scanned = cert !== "none" && cert !== "unscanned";
 
   return (
     <Link href={`/dns/${dns.id}`}>
@@ -38,6 +42,7 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
           items={[
             { label: t("dns.responsavel"), value: mainResp },
             { label: t("host.entity"), value: "-" },
+            { label: t("dns.certificate"), value: certLabel(dns, t) },
           ]}
         />
 
@@ -47,7 +52,13 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
 
         {/* Bottom indicators — all icons always visible (faint when 0), like hosts */}
         <div className="flex items-center gap-3 pt-3 border-t border-[var(--border-subtle)]">
-          <CardIndicator icon={ICON_PATHS.lock} count={dns.has_https ? 1 : 0} color="success" title={dns.has_https ? t("topology.https") : t("topology.noHttps")} hideCount />
+          <CardIndicator
+            icon={ICON_PATHS.lock}
+            count={dns.has_https || scanned ? 1 : 0}
+            color={scanned ? certTone(cert) : "success"}
+            title={scanned ? certLabel(dns, t) : dns.has_https ? t("topology.https") : t("topology.noHttps")}
+            hideCount
+          />
           <CardIndicator icon={ICON_PATHS.server} count={linkedHostsCount} color="cyan" title={t("dns.hostCount", { count: String(linkedHostsCount) })} />
           <CardIndicator icon={ICON_PATHS.gear} count={0} color="amber" title={`0 ${t("host.services").toLowerCase()}`} />
           <CardIndicator icon={ICON_PATHS.folder} count={0} color="accent" title={`0 ${t("host.linkedProjects").toLowerCase()}`} />

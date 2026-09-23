@@ -19,10 +19,12 @@ type DNSRepo struct {
 // NewDNSRepo constructs a DNSRepo over the given DB handle.
 func NewDNSRepo(db *sql.DB) *DNSRepo { return &DNSRepo{db: db} }
 
-const dnsCols = `id, domain, has_https, situacao, responsavel, observacoes, created_at, updated_at`
+const dnsCols = `id, domain, has_https, situacao, responsavel, observacoes, created_at, updated_at,
+	cert_not_before, cert_expires_at, cert_issuer, cert_subject, cert_sans, cert_error, cert_checked_at`
 
 func scanDNS(scanner interface{ Scan(...any) error }, d *models.DNSRecord) error {
-	return scanner.Scan(&d.ID, &d.Domain, &d.HasHTTPS, &d.Situacao, &d.Responsavel, &d.Observacoes, &d.CreatedAt, &d.UpdatedAt)
+	return scanner.Scan(&d.ID, &d.Domain, &d.HasHTTPS, &d.Situacao, &d.Responsavel, &d.Observacoes, &d.CreatedAt, &d.UpdatedAt,
+		&d.CertNotBefore, &d.CertExpiresAt, &d.CertIssuer, &d.CertSubject, &d.CertSANs, &d.CertError, &d.CertCheckedAt)
 }
 
 // Create inserts a DNS record and sets d.ID.
@@ -103,6 +105,20 @@ func dnsWhere(ctx context.Context, f models.DNSFilter) ([]string, []any) {
 	case "no":
 		where = append(where, "has_https = false")
 	}
+	// Cert buckets: literal SQL only. "30" includes the "7" rows; both exclude
+	// already-expired certs. The frontend's matchesCertFilter mirrors these.
+	switch f.Cert {
+	case "expired":
+		where = append(where, "cert_expires_at < NOW()")
+	case "7":
+		where = append(where, "cert_expires_at >= NOW() AND cert_expires_at < NOW() + INTERVAL '7 days'")
+	case "30":
+		where = append(where, "cert_expires_at >= NOW() AND cert_expires_at < NOW() + INTERVAL '30 days'")
+	case "error":
+		where = append(where, "cert_error <> ''")
+	case "unscanned":
+		where = append(where, "has_https = true AND cert_checked_at IS NULL")
+	}
 	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
 	where = append(where, vis)
 	args = append(args, vargs...)
@@ -120,9 +136,10 @@ func (r *DNSRepo) ListFiltered(ctx context.Context, f models.DNSFilter) ([]model
 	}
 
 	allowedSorts := map[string]string{
-		"domain":      "domain",
-		"situacao":    "situacao",
-		"responsavel": "responsavel",
+		"domain":          "domain",
+		"situacao":        "situacao",
+		"responsavel":     "responsavel",
+		"cert_expires_at": "cert_expires_at",
 	}
 	sortCol := "domain"
 	if col, ok := allowedSorts[f.SortBy]; ok {
@@ -133,6 +150,9 @@ func (r *DNSRepo) ListFiltered(ctx context.Context, f models.DNSFilter) ([]model
 		sortDir = "DESC"
 	}
 	query += " ORDER BY " + sortCol + " " + sortDir
+	if sortCol == "cert_expires_at" { // never-scanned rows sink in both directions
+		query += " NULLS LAST"
+	}
 
 	if f.PerPage > 0 {
 		offset := 0
@@ -178,6 +198,17 @@ func (r *DNSRepo) Update(ctx context.Context, d *models.DNSRecord) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE dns_records SET domain = ?, has_https = ?, situacao = ?, responsavel = ?, observacoes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND `+vis,
 		append([]any{d.Domain, d.HasHTTPS, d.Situacao, d.Responsavel, d.Observacoes, d.ID}, vargs...)...,
+	)
+	return err
+}
+
+// SetCert stores the latest cert scan result for a DNS record. Invisible rows
+// are untouched. updated_at is left alone: it tracks edits, not scans.
+func (r *DNSRepo) SetCert(ctx context.Context, id int64, c models.DNSCert) error {
+	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE dns_records SET cert_not_before = ?, cert_expires_at = ?, cert_issuer = ?, cert_subject = ?, cert_sans = ?, cert_error = ?, cert_checked_at = ? WHERE id = ? AND `+vis,
+		append([]any{c.CertNotBefore, c.CertExpiresAt, c.CertIssuer, c.CertSubject, c.CertSANs, c.CertError, c.CertCheckedAt, id}, vargs...)...,
 	)
 	return err
 }
@@ -236,11 +267,11 @@ func (r *DNSRepo) HostIDs(ctx context.Context, dnsID int64) ([]int64, error) {
 
 // RecordsByHost returns all DNS records linked to a host, ordered by domain.
 func (r *DNSRepo) RecordsByHost(ctx context.Context, hostID int64) ([]models.DNSRecord, error) {
-	vis, vargs := VisibleExpr(ctx, AssetDNS, "d.id")
+	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
+	// dns_host_links has only (dns_id, host_id), so dnsCols stays unambiguous.
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT d.id, d.domain, d.has_https, d.situacao, d.responsavel, d.observacoes, d.created_at, d.updated_at
-		 FROM dns_records d JOIN dns_host_links l ON d.id = l.dns_id
-		 WHERE l.host_id = ? AND `+vis+` ORDER BY d.domain`, append([]any{hostID}, vargs...)...)
+		`SELECT `+dnsCols+` FROM dns_records JOIN dns_host_links l ON l.dns_id = dns_records.id
+		 WHERE l.host_id = ? AND `+vis+` ORDER BY domain`, append([]any{hostID}, vargs...)...)
 	if err != nil {
 		return nil, err
 	}

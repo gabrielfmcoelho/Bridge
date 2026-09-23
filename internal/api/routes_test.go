@@ -30,6 +30,8 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/hosts/x/chamados"},
 		{"GET", "/api/dns"},
 		{"POST", "/api/dns"},
+		{"POST", "/api/dns/cert-scan"},
+		{"POST", "/api/dns/1/cert-scan"},
 		{"GET", "/api/projects"},
 		{"GET", "/api/services"},
 		{"POST", "/api/services/1/fixate"},

@@ -1357,4 +1357,15 @@ var migrationsPostgres = []string{
 	// every host as created by ETIPI; the legacy free-text labels don't map onto
 	// the entidade tree and are dropped with the table).
 	`DROP TABLE IF EXISTS host_entidades;`,
+
+	// Version 84: TLS certificate of each DNS record's domain, as last read by
+	// the on-demand cert scan (latest only, no history). cert_checked_at NULL
+	// = never scanned; cert_error set with cert_expires_at NULL = unreachable.
+	`ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_not_before TIMESTAMPTZ;
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_expires_at TIMESTAMPTZ;
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_issuer TEXT NOT NULL DEFAULT '';
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_subject TEXT NOT NULL DEFAULT '';
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_sans TEXT NOT NULL DEFAULT '';
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_error TEXT NOT NULL DEFAULT '';
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS cert_checked_at TIMESTAMPTZ;`,
 }

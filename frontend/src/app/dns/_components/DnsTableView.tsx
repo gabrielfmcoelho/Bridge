@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
 import SortableTable from "@/components/ui/SortableTable";
 import Pagination from "@/components/ui/Pagination";
+import CertBadge from "./CertBadge";
 import type { DNSRecord } from "@/lib/types";
 
 // Server-driven table (inventory pagination). `records` is ONE server page
@@ -12,7 +13,7 @@ import type { DNSRecord } from "@/lib/types";
 // via onSortChange (→ server refetch). https/tags aren't server-sortable.
 const PER_PAGE = 20;
 type Sort = { field: string; direction: "asc" | "desc" };
-type ColKey = "domain" | "https" | "situacao" | "responsavel" | "tags";
+type ColKey = "domain" | "https" | "cert_expires_at" | "situacao" | "responsavel" | "tags";
 
 interface DnsTableViewProps {
   records: DNSRecord[];
@@ -32,6 +33,7 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
         columns={[
           { key: "domain" as ColKey, label: t("dns.domain") },
           { key: "https" as ColKey, label: t("topology.https"), sortable: false },
+          { key: "cert_expires_at" as ColKey, label: t("dns.certificate") },
           { key: "situacao" as ColKey, label: t("common.status") },
           { key: "responsavel" as ColKey, label: t("dns.responsavel") },
           { key: "tags" as ColKey, label: t("common.tags"), sortable: false },
@@ -58,6 +60,7 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
                   <span className="text-[var(--text-faint)]">-</span>
                 )}
               </td>
+              <td className="px-4 py-2.5"><CertBadge dns={dns} /></td>
               <td className="px-4 py-2.5">
                 <Badge variant="situacao" situacao={dns.situacao} dot>{dns.situacao}</Badge>
               </td>

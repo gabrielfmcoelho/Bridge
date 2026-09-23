@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  // The bulk DNS cert scan is synchronous and can outlast Next's 30s default;
+  // match the 10-minute client timeout in dnsAPI.scanCerts.
+  experimental: {
+    proxyTimeout: 10 * 60_000,
+  },
   allowedDevOrigins: ['127.0.0.1', 'localhost', '192.168.15.90', '100.78.26.92', '100.74.185.3'],
   async rewrites() {
     return [

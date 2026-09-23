@@ -210,6 +210,26 @@ function pickOffering(body: OfferingBody): Partial<Offering> {
   return out;
 }
 
+// ── DNS certificate scan ──────────────────────────────────────────────────
+// Fakes a probe, varied by id so one scan shows every tier: id%3 → 1 valid
+// (90d), 2 expiring in 5d, 0 expired. Dates are relative to now; the seed stays
+// unscanned so the "Not scanned" state is what a fresh mock shows.
+function mockCertScan(d: DNSRecord): DNSRecord {
+  const DAY = 86_400_000;
+  const now = Date.now();
+  const left = [-3, 90, 5][d.id % 3];
+  const iso = (ms: number) => new Date(now + ms).toISOString();
+  return Object.assign(d, {
+    cert_not_before: iso((left - 90) * DAY),
+    cert_expires_at: iso(left * DAY),
+    cert_issuer: "R11",
+    cert_subject: d.domain,
+    cert_sans: `${d.domain}, www.${d.domain}`,
+    cert_error: left < 0 ? "x509: certificate has expired or is not yet valid" : "",
+    cert_checked_at: iso(0),
+  });
+}
+
 function validateOffering(o: Offering): Response | null {
   if (!o.name.trim()) return json({ error: "name is required" }, 400);
   if (!REQUEST_TYPES.includes(o.request_type)) return json({ error: `invalid request_type: ${o.request_type}` }, 400);
@@ -289,6 +309,20 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   if (method === "GET" && p === "hosts") return json(paginate(db.hosts, qs.get("page"), qs.get("per_page")));
   if (method === "GET" && p === "services") return json(paginate(db.services, qs.get("page"), qs.get("per_page")));
   if (method === "GET" && p === "dns") return json(paginate(db.dns, qs.get("page"), qs.get("per_page")));
+  // Literal route first: "cert-scan" must not be read as a dns id.
+  if (method === "POST" && p === "dns/cert-scan") {
+    const scanned = db.dns.filter((d) => d.has_https).map(mockCertScan);
+    const failed = scanned.filter((d) => d.cert_error).length;
+    return json({ scanned: scanned.length, ok: scanned.length - failed, failed });
+  }
+  if (method === "GET" && segs[0] === "dns" && segs.length === 2) {
+    const record = db.dns.find((d) => d.id === Number(segs[1]));
+    return record ? json({ dns_record: record, tags: [], host_ids: [], responsaveis: [] }) : notFound("DNS record not found");
+  }
+  if (method === "POST" && segs[0] === "dns" && segs.length === 3 && segs[2] === "cert-scan") {
+    const record = db.dns.find((d) => d.id === Number(segs[1]));
+    return record ? json(mockCertScan(record)) : notFound("DNS record not found");
+  }
   if (method === "GET" && p === "projects") return json(paginate(db.projects, qs.get("page"), qs.get("per_page")));
   if (method === "GET" && p === "api-catalog") return json(paginate(db.apiCatalogs, qs.get("page"), qs.get("per_page")));
   if (method === "GET" && p === "tools") return json(paginate(db.tools, qs.get("page"), qs.get("per_page")));

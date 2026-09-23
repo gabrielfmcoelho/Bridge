@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -134,5 +135,92 @@ func TestDNSRepo_ListFiltered(t *testing.T) {
 	// CountFiltered ignores the window: full match count.
 	if n, err := repo.CountFiltered(ctx, models.DNSFilter{SortBy: "domain", PerPage: 2, Page: 2}); err != nil || n != 4 {
 		t.Fatalf("CountFiltered(page2) = %d, %v; want 4", n, err)
+	}
+}
+
+// Cert buckets and the expiry sort. Expiries sit an hour either side of each
+// bucket edge (NOW() at query time is later than at seed time, so an exact
+// edge would be racy).
+func TestDNSRepo_CertFilter(t *testing.T) {
+	ctx := context.Background()
+	repo, d := newDNSRepo(t)
+
+	seeds := []struct {
+		domain, expires, checked, certErr string // expires/checked are SQL expressions
+		hasHTTPS                          bool
+	}{
+		{"a-expired.com", "NOW() - INTERVAL '1 hour'", "NOW()", "x509: certificate has expired", true},
+		{"b-soon.com", "NOW() + INTERVAL '1 hour'", "NOW()", "", true},
+		{"c-week-edge.com", "NOW() + INTERVAL '7 days' - INTERVAL '1 hour'", "NOW()", "", true},
+		{"d-past-week.com", "NOW() + INTERVAL '7 days' + INTERVAL '1 hour'", "NOW()", "", true},
+		{"e-month-edge.com", "NOW() + INTERVAL '30 days' - INTERVAL '1 hour'", "NOW()", "", true},
+		{"f-far.com", "NOW() + INTERVAL '30 days' + INTERVAL '1 hour'", "NOW()", "", true},
+		{"g-unreachable.com", "NULL", "NOW()", "dial tcp: i/o timeout", true},
+		{"h-unscanned.com", "NULL", "NULL", "", true},
+		{"i-http-only.com", "NULL", "NULL", "", false},
+	}
+	for _, s := range seeds {
+		if _, err := d.SQL.Exec(
+			`INSERT INTO dns_records (domain, has_https, cert_error, cert_expires_at, cert_checked_at) VALUES (?, ?, ?, `+s.expires+`, `+s.checked+`)`,
+			s.domain, s.hasHTTPS, s.certErr,
+		); err != nil {
+			t.Fatalf("seed %s: %v", s.domain, err)
+		}
+	}
+
+	domains := func(rs []models.DNSRecord) string {
+		out := make([]string, len(rs))
+		for i, r := range rs {
+			out[i] = r.Domain
+		}
+		return strings.Join(out, " ")
+	}
+
+	for cert, want := range map[string]string{
+		"expired":   "a-expired.com",
+		"7":         "b-soon.com c-week-edge.com",
+		"30":        "b-soon.com c-week-edge.com d-past-week.com e-month-edge.com",
+		"error":     "a-expired.com g-unreachable.com",
+		"unscanned": "h-unscanned.com",
+		"":          "a-expired.com b-soon.com c-week-edge.com d-past-week.com e-month-edge.com f-far.com g-unreachable.com h-unscanned.com i-http-only.com",
+	} {
+		got, err := repo.ListFiltered(ctx, models.DNSFilter{Cert: cert, SortBy: "domain"})
+		if err != nil {
+			t.Fatalf("ListFiltered(cert=%q): %v", cert, err)
+		}
+		if g := domains(got); g != want {
+			t.Errorf("cert=%q = [%s], want [%s]", cert, g, want)
+		}
+		if n, err := repo.CountFiltered(ctx, models.DNSFilter{Cert: cert}); err != nil || n != len(got) {
+			t.Errorf("CountFiltered(cert=%q) = %d, %v; want %d", cert, n, err, len(got))
+		}
+	}
+
+	// The cert columns round-trip through scanDNS.
+	got, err := repo.ListFiltered(ctx, models.DNSFilter{Cert: "expired"})
+	if err != nil || len(got) != 1 {
+		t.Fatalf("ListFiltered(expired) = %v, %v", got, err)
+	}
+	if c := got[0].DNSCert; c.CertExpiresAt == nil || c.CertCheckedAt == nil || c.CertError != "x509: certificate has expired" {
+		t.Fatalf("scanned cert = %+v", c)
+	}
+
+	// Expiry sort: NULLs last in both directions.
+	for dir, want := range map[string]string{
+		"asc":  "a-expired.com b-soon.com c-week-edge.com d-past-week.com e-month-edge.com f-far.com",
+		"desc": "f-far.com e-month-edge.com d-past-week.com c-week-edge.com b-soon.com a-expired.com",
+	} {
+		got, err := repo.ListFiltered(ctx, models.DNSFilter{SortBy: "cert_expires_at", SortDir: dir})
+		if err != nil || len(got) != len(seeds) {
+			t.Fatalf("ListFiltered(sort %s) = %d rows, %v", dir, len(got), err)
+		}
+		if g := domains(got[:6]); g != want {
+			t.Errorf("sort cert_expires_at %s = [%s], want [%s] first", dir, g, want)
+		}
+		for _, r := range got[6:] {
+			if r.CertExpiresAt != nil {
+				t.Errorf("sort %s: %s (non-NULL expiry) after the NULLs", dir, r.Domain)
+			}
+		}
 	}
 }

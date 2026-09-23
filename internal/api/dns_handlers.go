@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
@@ -23,6 +25,7 @@ func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		Tag:         r.URL.Query().Get("tag"),
 		Responsavel: r.URL.Query().Get("responsavel"),
 		HasHTTPS:    r.URL.Query().Get("has_https"),
+		Cert:        r.URL.Query().Get("cert"),
 		SortBy:      r.URL.Query().Get("sort_by"),
 		SortDir:     r.URL.Query().Get("sort_dir"),
 		Page:        pp.Page,
@@ -147,6 +150,40 @@ func (h *dnsHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
+// handleCertScanAll probes the certificate of every visible has_https record.
+// Synchronous: the response is the scan summary.
+func (h *dnsHandlers) handleCertScanAll(w http.ResponseWriter, r *http.Request) {
+	// Detached from the request: if the client or proxy gives up mid-scan,
+	// the probes already under way still finish and get saved. The deadline
+	// matches the frontend's request timeout.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Minute)
+	defer cancel()
+	sum, err := h.dns.ScanCerts(ctx)
+	if err != nil {
+		jsonServerError(w, r, "failed to scan certificates", err)
+		return
+	}
+	jsonOK(w, sum)
+}
+
+// handleCertScan probes one record's certificate and returns the updated record.
+func (h *dnsHandlers) handleCertScan(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	rec, err := h.dns.ScanCert(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to scan certificate", err)
+		return
+	}
+	if rec == nil {
+		jsonError(w, http.StatusNotFound, "DNS record not found")
+		return
+	}
+	jsonOK(w, rec)
+}
+
 // registerRoutes wires this group's routes (self-registration, R2).
 func (h *dnsHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/dns", h.handleList)
@@ -154,4 +191,6 @@ func (h *dnsHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/dns/{id}", h.handleGet)
 	rr.role("editor", "PUT /api/dns/{id}", h.handleUpdate)
 	rr.role("admin", "DELETE /api/dns/{id}", h.handleDelete)
+	rr.role("editor", "POST /api/dns/cert-scan", h.handleCertScanAll)
+	rr.role("editor", "POST /api/dns/{id}/cert-scan", h.handleCertScan)
 }

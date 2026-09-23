@@ -15,9 +15,10 @@ export type DNSFilters = {
   tag: string;
   responsavel: string;
   has_https: string;
+  cert: string;
 };
 
-export const emptyFilters: DNSFilters = { situacao: "", tag: "", responsavel: "", has_https: "" };
+export const emptyFilters: DNSFilters = { situacao: "", tag: "", responsavel: "", has_https: "", cert: "" };
 
 interface SortConfig { field: string; direction: "asc" | "desc" }
 
@@ -62,6 +63,7 @@ export default function DnsFilterDrawer({
         { field: "domain", label: t("dns.domain") },
         { field: "situacao", label: t("host.situacao") },
         { field: "responsavel", label: t("dns.responsavel") },
+        { field: "cert_expires_at", label: t("dns.certExpires") },
       ]}
       defaultSortField="domain"
     >
@@ -87,6 +89,21 @@ export default function DnsFilterDrawer({
           <PillButton active={!filters.has_https} onClick={() => set("has_https", "")}>{t("common.all")}</PillButton>
           <PillButton active={filters.has_https === "yes"} onClick={() => set("has_https", filters.has_https === "yes" ? "" : "yes")}>{t("common.yes")}</PillButton>
           <PillButton active={filters.has_https === "no"} onClick={() => set("has_https", filters.has_https === "no" ? "" : "no")}>{t("common.no")}</PillButton>
+        </div>
+      </DrawerSection>
+
+      <DrawerSection title={t("dns.certificate")} open={openSection === "cert"} onToggle={() => toggle("cert")} active={!!filters.cert}>
+        <div className="flex flex-wrap gap-1.5">
+          <PillButton active={!filters.cert} onClick={() => set("cert", "")}>{t("common.all")}</PillButton>
+          {[
+            { value: "expired", label: t("dns.certExpired") },
+            { value: "7", label: t("dns.certWithin7") },
+            { value: "30", label: t("dns.certWithin30") },
+            { value: "error", label: t("dns.certWithError") },
+            { value: "unscanned", label: t("dns.certUnscanned") },
+          ].map((o) => (
+            <PillButton key={o.value} active={filters.cert === o.value} onClick={() => set("cert", filters.cert === o.value ? "" : o.value)}>{o.label}</PillButton>
+          ))}
         </div>
       </DrawerSection>
     </InventoryFilterDrawer>

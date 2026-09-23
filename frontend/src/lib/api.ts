@@ -488,6 +488,9 @@ export const dnsAPI = {
   update: (id: number, data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>
     api.put<import("./types").DNSRecord>(`/api/dns/${id}`, data),
   delete: (id: number) => api.delete(`/api/dns/${id}`),
+  // Probes every visible https record synchronously — can outlive the 120s default.
+  scanCerts: () => request<{ scanned: number; ok: number; failed: number }>("/api/dns/cert-scan", { method: "POST" }, 10 * 60_000),
+  scanCert: (id: number) => api.post<import("./types").DNSRecord>(`/api/dns/${id}/cert-scan`),
 };
 
 // Bulk Import

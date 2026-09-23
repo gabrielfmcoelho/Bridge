@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Field from "@/components/ui/Field";
 import ResponsaveisSection from "@/components/inventory/ResponsaveisSection";
+import CertificateCard from "./CertificateCard";
 import type { DNSRecord, Host, EntityResponsavel } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -15,10 +16,11 @@ interface OverviewTabProps {
   tags: string[];
   responsaveis: EntityResponsavel[];
   linkedHosts: Host[];
+  canEdit: boolean;
   t: (key: string) => string;
 }
 
-export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, t }: OverviewTabProps) {
+export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, canEdit, t }: OverviewTabProps) {
   return (
     <div className="space-y-5 animate-fade-in">
       <SectionHeading>{t("dns.info")}</SectionHeading>
@@ -47,6 +49,8 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, t }:
           </div>
         )}
       </Card>
+
+      <CertificateCard dns={dns} canEdit={canEdit} />
 
       {/* Observations */}
       {dns.observacoes && (

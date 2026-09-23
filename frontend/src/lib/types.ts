@@ -194,6 +194,15 @@ export interface DNSRecord {
   host_ids?: number[];
   main_responsavel_name?: string;
   responsaveis?: EntityResponsavel[];
+  // TLS certificate from the latest scan. cert_checked_at null = never scanned;
+  // cert_expires_at null after a scan = the handshake failed (see cert_error).
+  cert_not_before?: string | null;
+  cert_expires_at?: string | null;
+  cert_issuer?: string;
+  cert_subject?: string;
+  cert_sans?: string;
+  cert_error?: string;
+  cert_checked_at?: string | null;
 }
 
 export interface Project {
