@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import TopologyGraph from "@/components/graph/TopologyGraph";
 import type { GraphData, Service, Host, DNSRecord } from "@/lib/types";
-import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -46,19 +45,11 @@ export default function ServiceTopologyTab({
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
         {/* Graph -- left */}
         {filteredGraph.nodes.length > 0 ? (
-          <Card
-            hover={false}
-            className="overflow-hidden flex flex-col h-[50vh] lg:h-[calc(100vh-18rem)]"
-          >
-            <h2
-              className="text-sm font-semibold text-[var(--text-secondary)] mb-3 shrink-0 font-display"
-            >
-              {t("nav.topology")}
-            </h2>
-            <div className="flex-1 rounded-[var(--radius-md)] overflow-hidden border border-[var(--border-subtle)]">
+          <SectionCard title={t("nav.topology")} body="flush">
+            <div className="h-[calc(50vh-3.5rem)] lg:h-[calc(100vh-21.5rem)]">
               <TopologyGraph data={filteredGraph} className="w-full h-full" />
             </div>
-          </Card>
+          </SectionCard>
         ) : (
           <div className="flex items-center justify-center text-sm text-[var(--text-faint)]">
             {t("service.noTopologyData")}
@@ -68,10 +59,7 @@ export default function ServiceTopologyTab({
         {/* Connection lists -- right */}
         <div className="space-y-4">
           {dependsOnServices.length > 0 && (
-            <Card hover={false}>
-              <SectionHeading variant="section">
-                {t("service.dependencies")}
-              </SectionHeading>
+            <SectionCard title={t("service.dependencies")}>
               <div className="space-y-1">
                 {dependsOnServices.map((dep) => (
                   <Link
@@ -84,14 +72,11 @@ export default function ServiceTopologyTab({
                   </Link>
                 ))}
               </div>
-            </Card>
+            </SectionCard>
           )}
 
           {dependentServices.length > 0 && (
-            <Card hover={false}>
-              <SectionHeading variant="section">
-                {t("service.dependents")}
-              </SectionHeading>
+            <SectionCard title={t("service.dependents")}>
               <div className="space-y-1">
                 {dependentServices.map((dep) => (
                   <Link
@@ -104,14 +89,11 @@ export default function ServiceTopologyTab({
                   </Link>
                 ))}
               </div>
-            </Card>
+            </SectionCard>
           )}
 
           {linkedHosts.length > 0 && (
-            <Card hover={false}>
-              <SectionHeading variant="section">
-                {t("service.linkedHosts")}
-              </SectionHeading>
+            <SectionCard title={t("service.linkedHosts")}>
               <div className="space-y-1">
                 {linkedHosts.map((host) => (
                   <Link
@@ -123,14 +105,11 @@ export default function ServiceTopologyTab({
                   </Link>
                 ))}
               </div>
-            </Card>
+            </SectionCard>
           )}
 
           {linkedDns.length > 0 && (
-            <Card hover={false}>
-              <SectionHeading variant="section">
-                {t("service.linkedDns")}
-              </SectionHeading>
+            <SectionCard title={t("service.linkedDns")}>
               <div className="space-y-1">
                 {linkedDns.map((dns) => (
                   <Link
@@ -147,7 +126,7 @@ export default function ServiceTopologyTab({
                   </Link>
                 ))}
               </div>
-            </Card>
+            </SectionCard>
           )}
         </div>
       </div>

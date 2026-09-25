@@ -141,7 +141,7 @@ export default function FormsSection() {
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
           Plain <code>&lt;select&gt;</code> in the Input skin, for short fixed lists. Replaced 8 hand-labelled native selects in
-          settings (IntegrationsTab, RoleMappingsTab); 6 more in SSHOperations have no adjacent label yet.
+          settings (integrations/*, RoleMappingsTab); 6 more in SSHOperations have no adjacent label yet.
         </p>
       </Specimen>
 
@@ -442,8 +442,8 @@ export default function FormsSection() {
           <li>
             No shared file upload; 5 raw <code>type=&quot;file&quot;</code>:{" "}
             <code>components/atlas/apis/AddApiModal.tsx:139</code>,{" "}
-            <code>components/glpi/FormcreatorFileInput.tsx:80</code>, <code>app/settings/page.tsx:862</code>,{" "}
-            <code>:1068</code>, <code>:1301</code>.
+            <code>components/glpi/FormcreatorFileInput.tsx:80</code>, <code>app/settings/AppearanceTab.tsx:174</code>,{" "}
+            <code>ImportTab.tsx:158</code>, <code>BackupTab.tsx:117</code>.
           </li>
           <li>
             No shared search box beyond <code>ListToolbar</code>: <code>components/wiki/WikiSearchBar.tsx</code>,{" "}
@@ -468,7 +468,7 @@ export default function FormsSection() {
           <li>
             Raw controls bypassing <code>ui/</code>: 55 <code>&lt;input&gt;</code> (13 of them inside{" "}
             <code>ui/</code>), 12 <code>&lt;textarea&gt;</code>, 22 <code>&lt;select&gt;</code>. Heaviest:{" "}
-            <code>components/atlas/apis/ShareBundleModal.tsx</code> (6), <code>app/settings/page.tsx</code> (4),{" "}
+            <code>components/atlas/apis/ShareBundleModal.tsx</code> (6), <code>app/settings/ImportTab.tsx</code> (1),{" "}
             <code>app/hosts/[slug]/_components/SSHOperations.tsx</code> (4).
           </li>
           <li>

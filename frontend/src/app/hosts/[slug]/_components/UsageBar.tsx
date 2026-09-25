@@ -1,4 +1,4 @@
-import { pctTextColor, pctBarColor } from "@/lib/utils";
+import { pctBarColor } from "@/lib/utils";
 
 export function UsageBar({ label, total, used, percent }: { label: string; total: string; used: string; percent: string }) {
   const pctNum = parseInt(percent) || 0;
@@ -26,7 +26,7 @@ export function ResourceCard({ label, value, icon }: { label: string; value: str
         </svg>
         <span className="text-xs text-[var(--text-muted)]">{label}</span>
       </div>
-      <p className="text-sm font-semibold text-[var(--text-primary)] font-mono">{value || "-"}</p>
+      <p className="text-sm font-semibold text-[var(--text-primary)] font-mono">{value || "–"}</p>
     </div>
   );
 }

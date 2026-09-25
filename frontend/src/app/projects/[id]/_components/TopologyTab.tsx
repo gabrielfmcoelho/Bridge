@@ -1,6 +1,6 @@
 "use client";
 
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import TopologyGraph from "@/components/graph/TopologyGraph";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { GraphData } from "@/lib/types";
@@ -14,12 +14,11 @@ export default function TopologyTab({ filteredGraph }: TopologyTabProps) {
   return (
     <div className="animate-fade-in">
       {filteredGraph.nodes.length > 0 ? (
-        <Card hover={false} className="overflow-hidden flex flex-col h-[50vh] lg:h-[calc(100vh-18rem)]">
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-3 shrink-0 font-display">{t("project.topologyHeading")}</h2>
-          <div className="flex-1 rounded-[var(--radius-md)] overflow-hidden border border-[var(--border-subtle)]">
+        <SectionCard title={t("project.topologyHeading")} body="flush">
+          <div className="h-[calc(50vh-3.5rem)] lg:h-[calc(100vh-21.5rem)]">
             <TopologyGraph data={filteredGraph} className="w-full h-full" />
           </div>
-        </Card>
+        </SectionCard>
       ) : (
         <p className="text-sm text-[var(--text-faint)] text-center py-8">{t("project.noTopologyData")}</p>
       )}

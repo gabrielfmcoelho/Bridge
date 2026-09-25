@@ -15,7 +15,7 @@ export default function ViewToggle({
   options: { key: string; label: string; icon: string }[];
 }) {
   return (
-    <div className="flex border border-[var(--border-default)] rounded-[var(--radius-md)] overflow-hidden h-[30px]">
+    <div className="flex border border-[var(--border-default)] rounded-[var(--radius-md)] overflow-hidden h-8">
       {options.map((opt) => (
         <button
           key={opt.key}

@@ -1,10 +1,14 @@
 "use client";
 
+import RowActions from "@/components/ui/RowActions";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { contactsAPI, enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOpenOnParam } from "@/hooks/useOpenOnParam";
 import PageShell from "@/components/layout/PageShell";
 import { formatPhone } from "@/lib/utils";
 import Button from "@/components/ui/Button";
@@ -26,6 +30,7 @@ function toRawDigits(val: string): string {
 }
 
 export default function ContactsPage() {
+  const confirm = useConfirm();
   const { t } = useLocale();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -33,6 +38,7 @@ export default function ContactsPage() {
   const [editing, setEditing] = useState<Contact | null>(null);
   const [search, setSearch] = useState("");
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  useOpenOnParam("new", () => { setEditing(null); setShowForm(true); }, canEdit);
 
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["contacts"],
@@ -100,17 +106,14 @@ export default function ContactsPage() {
                   <td className={tableClasses.td}>{c.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}</td>
                   {canEdit && (
                     <td className={`${tableClasses.td} text-right`}>
-                      <div className="flex justify-end gap-1">
-                        <Button size="sm" variant="secondary" onClick={() => { setEditing(c); setShowForm(true); }}>
-                          {t("common.edit")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteMutation.mutate(c.id); }}
-                        >
-                          {t("common.delete")}
-                        </Button>
+                      <div className="flex justify-end">
+                        <RowActions
+                          name={c.name}
+                          actions={[
+                            { label: t("common.edit"), icon: ICON_PATHS.pencil, onClick: () => { setEditing(c); setShowForm(true); } },
+                            { label: t("common.delete"), icon: ICON_PATHS.trash, danger: true, onClick: async () => { if (await confirm({ title: t("confirm.deleteTitle", { name: `"${c.name}"` }), danger: true, confirmLabel: t("common.delete") })) deleteMutation.mutate(c.id); } },
+                          ]}
+                        />
                       </div>
                     </td>
                   )}

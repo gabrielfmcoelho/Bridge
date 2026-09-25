@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Badge from "@/components/ui/Badge";
+import SituacaoText from "@/components/ui/SituacaoText";
 import SortableTable from "@/components/ui/SortableTable";
 import Pagination from "@/components/ui/Pagination";
 import CertBadge from "./CertBadge";
@@ -17,7 +18,8 @@ type ColKey = "domain" | "https" | "cert_expires_at" | "situacao" | "responsavel
 
 interface DnsTableViewProps {
   records: DNSRecord[];
-  total: number;
+  /** Omitted when grouped: the rows are the whole group, so no pager. */
+  total?: number;
   tablePage: number;
   onPageChange: (page: number) => void;
   sort: Sort;
@@ -62,7 +64,7 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
               </td>
               <td className="px-4 py-2.5"><CertBadge dns={dns} /></td>
               <td className="px-4 py-2.5">
-                <Badge variant="situacao" situacao={dns.situacao} dot>{dns.situacao}</Badge>
+                <SituacaoText situacao={dns.situacao} />
               </td>
               <td className="px-4 py-2.5 text-[var(--text-secondary)]">{dns.main_responsavel_name || dns.responsavel || "-"}</td>
               <td className="px-4 py-2.5">
@@ -75,7 +77,9 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
           ))
         }
       </SortableTable>
-      <Pagination page={tablePage} totalPages={Math.max(1, Math.ceil(total / PER_PAGE))} total={total} perPage={PER_PAGE} onChange={onPageChange} />
+      {total != null && (
+        <Pagination page={tablePage} totalPages={Math.max(1, Math.ceil(total / PER_PAGE))} total={total} perPage={PER_PAGE} onChange={onPageChange} />
+      )}
     </div>
   );
 }

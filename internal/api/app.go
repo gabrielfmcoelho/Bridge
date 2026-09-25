@@ -35,6 +35,7 @@ type App struct {
 	release             *releaseHandlers
 	tool                *toolHandlers
 	contact             *contactHandlers
+	relation            *relationHandlers
 	sshKey              *sshKeyHandlers
 	importH             *importHandlers
 	backup              *backupHandlers
@@ -47,6 +48,7 @@ type App struct {
 	projectGitlab       *projectGitLabHandlers
 	ai                  *aiHandlers
 	coolify             *coolifyHandlers
+	proxmox             *proxmoxHandlers
 	grafana             *grafanaHandlers
 	grafanaWebhook      *grafanaWebhookHandlers
 	outline             *outlineHandlers
@@ -87,6 +89,7 @@ func newApp(db *database.DB, configPath string) *App {
 		release:             &releaseHandlers{db: db},
 		tool:                &toolHandlers{db: db},
 		contact:             &contactHandlers{contacts: store.NewContactRepo(db.SQL)},
+		relation:            &relationHandlers{relations: store.NewRelationRepo(db.SQL)},
 		sshKey:              &sshKeyHandlers{db: db},
 		importH:             &importHandlers{db: db},
 		backup:              &backupHandlers{db: db},
@@ -99,6 +102,7 @@ func newApp(db *database.DB, configPath string) *App {
 		projectGitlab:       &projectGitLabHandlers{db: db},
 		ai:                  &aiHandlers{db: db},
 		coolify:             &coolifyHandlers{db: db, dns: deps.DNS},
+		proxmox:             &proxmoxHandlers{db: db, hosts: deps.Host},
 		grafana:             &grafanaHandlers{db: db},
 		grafanaWebhook:      &grafanaWebhookHandlers{db: db},
 		outline:             &outlineHandlers{db: db},

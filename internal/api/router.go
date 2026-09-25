@@ -56,13 +56,14 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	ah.registerRoutes(rr)  // /api/auth/*, /api/users/*
 	oah.registerRoutes(rr) // /api/auth/oauth/*
 	eth := app.entidade
-	eth.registerRoutes(rr) // /api/entidades/*, /api/assets/*
-	hh.registerRoutes(rr)  // /api/hosts/*
-	hah.registerRoutes(rr) // /api/hosts/{slug}/alerts/*
-	hch.registerRoutes(rr) // /api/hosts/{slug}/chamados/*
-	dh.registerRoutes(rr)  // /api/dns/*
-	ph.registerRoutes(rr)  // /api/projects/*
-	sh.registerRoutes(rr)  // /api/services/*
+	eth.registerRoutes(rr)         // /api/entidades/*, /api/assets/*
+	hh.registerRoutes(rr)          // /api/hosts/*
+	hah.registerRoutes(rr)         // /api/hosts/{slug}/alerts/*
+	hch.registerRoutes(rr)         // /api/hosts/{slug}/chamados/*
+	dh.registerRoutes(rr)          // /api/dns/*
+	ph.registerRoutes(rr)          // /api/projects/*
+	sh.registerRoutes(rr)          // /api/services/*
+	app.proxmox.registerRoutes(rr) // /api/proxmox/*
 
 	// (Legacy /api/services/{id}/credentials and /api/services/credentials/all
 	// were removed in Phase 1 cutover — callers use /api/secrets directly.)
@@ -163,7 +164,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	clh.registerRoutes(rr) // /api/coolify/*
 
 	// Contacts
-	ch.registerRoutes(rr) // /api/contacts/*
+	ch.registerRoutes(rr)           // /api/contacts/*
+	app.relation.registerRoutes(rr) // /api/relations
 
 	// SSH Keys (managed in DB)
 	skh.registerRoutes(rr) // /api/ssh-keys/*

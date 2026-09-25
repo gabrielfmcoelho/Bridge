@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { hostsAPI, dnsAPI } from "@/lib/api";
-import SectionHeading from "@/components/ui/SectionHeading";
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import Badge from "@/components/ui/Badge";
+import SituacaoText from "@/components/ui/SituacaoText";
 import ResponsaveisSection from "@/components/inventory/ResponsaveisSection";
 import ProjectAiAnalysis from "./ProjectAiAnalysis";
 import type { Project, ProjectResponsavel, Service } from "@/lib/types";
@@ -31,7 +31,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
   return (
     <div className="space-y-5">
       {/* Project info */}
-      <Card accent="amber" hover={false} className="stagger-in" style={{ "--i": 0 } as React.CSSProperties}>
+      <SectionCard accent="amber" title={t("common.basicInfo")} className="stagger-in [--i:0]">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
             <span className="text-[var(--text-muted)] text-xs font-medium">{t("project.setorResponsavel")}</span>
@@ -66,7 +66,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
             <span className="text-xs text-[var(--text-faint)]">{t("project.noLinks")}</span>
           )}
         </div>
-      </Card>
+      </SectionCard>
 
       {/* AI analysis of recent work (based on commits from linked GitLab repos) */}
       <ProjectAiAnalysis projectId={project.id} />
@@ -76,10 +76,7 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
 
       {/* Services */}
       {services && services.length > 0 && (
-        <Card hover={false} className="stagger-in" style={{ "--i": 2 } as React.CSSProperties}>
-          <SectionHeading variant="section">
-            {t("service.title")}
-          </SectionHeading>
+        <SectionCard title={t("service.title")} className="stagger-in [--i:2]">
           <div className="space-y-1">
             {services.map((svc) => (
               <Link key={svc.id} href={`/services/${svc.id}`} className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-primary)] hover:text-[var(--accent)]">
@@ -93,15 +90,12 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
               </Link>
             ))}
           </div>
-        </Card>
+        </SectionCard>
       )}
 
       {/* Linked DNS records */}
       {linkedDns.length > 0 && (
-        <Card hover={false} className="stagger-in" style={{ "--i": 3 } as React.CSSProperties}>
-          <SectionHeading variant="section">
-            {t("topology.dnsRecords")}
-          </SectionHeading>
+        <SectionCard title={t("topology.dnsRecords")} className="stagger-in [--i:3]">
           <div className="space-y-1">
             {linkedDns.map((dns) => (
               <div key={dns.id} className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors">
@@ -111,29 +105,26 @@ export default function OverviewTab({ project, responsaveis, services, hostIds, 
                     <Icon path={ICON_PATHS.lock} className="w-3 h-3" />
                   </Badge>
                 )}
-                <Badge variant="situacao" situacao={dns.situacao} dot>{dns.situacao}</Badge>
+                <SituacaoText situacao={dns.situacao} />
               </div>
             ))}
           </div>
-        </Card>
+        </SectionCard>
       )}
 
       {/* Linked Hosts */}
       {linkedHosts.length > 0 && (
-        <Card hover={false} className="stagger-in" style={{ "--i": 4 } as React.CSSProperties}>
-          <SectionHeading variant="section">
-            {t("entidades.type.host")}
-          </SectionHeading>
+        <SectionCard title={t("entidades.type.host")} className="stagger-in [--i:4]">
           <div className="space-y-1">
             {linkedHosts.map((host) => (
               <Link key={host.id} href={`/hosts/${host.oficial_slug}`} className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors text-[var(--text-primary)] hover:text-[var(--accent)]">
                 <span className="font-mono">{host.nickname}</span>
                 <span className="text-[var(--text-faint)] text-xs">{host.hostname}</span>
-                <Badge variant="situacao" situacao={host.situacao} dot>{host.situacao}</Badge>
+                <SituacaoText situacao={host.situacao} />
               </Link>
             ))}
           </div>
-        </Card>
+        </SectionCard>
       )}
     </div>
   );

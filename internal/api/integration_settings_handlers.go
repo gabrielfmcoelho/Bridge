@@ -85,6 +85,13 @@ var integrationGroups = map[string][]string{
 		"outline_api_token",
 		"outline_common_collection_id",
 	},
+	"proxmox": {
+		"proxmox_enabled",
+		"proxmox_base_url",
+		"proxmox_token_id",
+		"proxmox_token_secret",
+		"proxmox_skip_verify",
+	},
 	"glpi": {
 		"glpi_enabled",
 		"glpi_base_url",
@@ -112,6 +119,7 @@ var secretKeys = map[string]bool{
 	"grafana_prom_remote_write_password": true,
 	"outline_api_token":                  true,
 	"glpi_app_token":                     true,
+	"proxmox_token_secret":               true,
 }
 
 // handleGetIntegrations returns all integration settings grouped by provider.

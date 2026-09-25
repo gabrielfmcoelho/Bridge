@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { globalIssuesAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import StatusDot from "@/components/ui/StatusDot";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -81,72 +82,71 @@ export default function IssuesTab({ issues, entityType, entityId, t, canEdit }: 
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-[var(--text-faint)]">
-          {t("issue.title")} ({issues.length})
-        </h2>
-        {canEdit && (
-          <Button size="sm" onClick={() => setShowCreate(true)}>
+      <SectionCard
+        variant="plain"
+        title={t("issue.title")}
+        count={issues.length}
+        controls={canEdit && (
+          <Button size="sm" variant="secondary" onClick={() => setShowCreate(true)}>
             + {t("common.add")}
           </Button>
         )}
-      </div>
-
-      {issues.length === 0 ? (
-        <EmptyState
-          icon="search"
-          title={t("issue.noIssues")}
-          description={t("issue.noIssuesDesc")}
-          compact
-        />
-      ) : (
-        <div className="space-y-4">
-          {/* Open issues */}
-          {openIssues.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs text-[var(--text-muted)] font-medium">{t("issue.open")} ({openIssues.length})</h3>
-              {openIssues.map((issue) => (
-                <Card key={issue.id} hover={false} className="!p-3">
-                  <div className="flex items-start gap-3">
-                    <StatusDot color={priorityDot[issue.priority] ?? "muted"} className="mt-1.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">{issue.title}</p>
-                      {issue.description && (
-                        <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{issue.description}</p>
-                      )}
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <Badge color={priorityColors[issue.priority]}>{issue.priority}</Badge>
-                        <Badge>{statusLabels[issue.status] ? t(statusLabels[issue.status]) : issue.status}</Badge>
+      >
+        {issues.length === 0 ? (
+          <EmptyState
+            icon="search"
+            title={t("issue.noIssues")}
+            description={t("issue.noIssuesDesc")}
+            compact
+          />
+        ) : (
+          <div className="space-y-4">
+            {/* Open issues */}
+            {openIssues.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs text-[var(--text-muted)] font-medium">{t("issue.open")} ({openIssues.length})</h3>
+                {openIssues.map((issue) => (
+                  <Card key={issue.id} hover={false} className="!p-3">
+                    <div className="flex items-start gap-3">
+                      <StatusDot color={priorityDot[issue.priority] ?? "muted"} className="mt-1.5" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">{issue.title}</p>
+                        {issue.description && (
+                          <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{issue.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <Badge color={priorityColors[issue.priority]}>{issue.priority}</Badge>
+                          <Badge>{statusLabels[issue.status] ? t(statusLabels[issue.status]) : issue.status}</Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+                  </Card>
+                ))}
+              </div>
+            )}
 
-          {/* Closed issues */}
-          {closedIssues.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-xs text-[var(--text-muted)] font-medium">{t("issue.closed")} ({closedIssues.length})</h3>
-              {closedIssues.map((issue) => (
-                <Card key={issue.id} hover={false} className="!p-3 opacity-60">
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-[var(--success)]" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate line-through">{issue.title}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge color="emerald">{t("issue.done")}</Badge>
+            {/* Closed issues */}
+            {closedIssues.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-xs text-[var(--text-muted)] font-medium">{t("issue.closed")} ({closedIssues.length})</h3>
+                {closedIssues.map((issue) => (
+                  <Card key={issue.id} hover={false} className="!p-3 opacity-60">
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-[var(--success)]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[var(--text-primary)] truncate line-through">{issue.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge color="emerald">{t("issue.done")}</Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </SectionCard>
 
       {/* Create Issue Drawer */}
       <Drawer

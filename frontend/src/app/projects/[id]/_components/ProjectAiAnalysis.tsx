@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { aiAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { getTimeAgo } from "@/lib/utils";
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import Button from "@/components/ui/Button";
 import { MarkdownContent } from "@/components/ui/MarkdownEditor";
 
@@ -64,14 +64,12 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
   }, [cached, timestampDisplay, t]);
 
   return (
-    <Card accent="accent" hover={false} className="stagger-in" style={{ "--i": 1 } as React.CSSProperties}>
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
-            {title}
-          </h2>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>
-        </div>
+    <SectionCard
+      accent="accent"
+      title={title}
+      description={subtitle}
+      className="stagger-in [--i:1]"
+      controls={
         <Button
           type="button"
           size="sm"
@@ -82,8 +80,9 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
         >
           {generateLabel}
         </Button>
-      </div>
-
+      }
+      footer={!isLoading && cached?.content && metaLine ? <p className="text-2xs text-[var(--text-faint)]">{metaLine}</p> : undefined}
+    >
       {error && (
         <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-xs px-3 py-2 mb-3">
           {error}
@@ -99,22 +98,15 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
       {isLoading ? (
         <p className="text-xs text-[var(--text-muted)]">…</p>
       ) : cached?.content ? (
-        <>
-          <div className="text-[var(--text-primary)]">
-            <MarkdownContent content={cached.content} />
-          </div>
-          {metaLine && (
-            <p className="mt-3 pt-3 border-t border-[var(--border-subtle)] text-2xs text-[var(--text-faint)]">
-              {metaLine}
-            </p>
-          )}
-        </>
+        <div className="text-[var(--text-primary)]">
+          <MarkdownContent content={cached.content} />
+        </div>
       ) : !mutation.isPending && !error ? (
         <p className="text-xs text-[var(--text-muted)]">
           {emptyLabel} <span className="text-[var(--text-faint)]">{hint}</span>
         </p>
       ) : null}
-    </Card>
+    </SectionCard>
   );
 }
 

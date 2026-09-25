@@ -53,6 +53,7 @@ type DNSListItem struct {
 	Tags                []string `json:"tags"`
 	HostIDs             []int64  `json:"host_ids"`
 	MainResponsavelName string   `json:"main_responsavel_name"`
+	MainEntidade        string   `json:"main_entidade"` // creator entidade name, as on hosts
 }
 
 // DNSDetail is the full single-record view (record + relations).
@@ -97,6 +98,10 @@ func (s *DNSService) List(ctx context.Context, f models.DNSFilter) ([]DNSListIte
 	if err != nil {
 		return nil, err
 	}
+	entidades, err := s.grants.CreatorNamesBulk(ctx, store.AssetDNS)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]DNSListItem, len(records))
 	for i, rec := range records {
 		hostIDs, err := s.dns.HostIDs(ctx, rec.ID)
@@ -108,6 +113,7 @@ func (s *DNSService) List(ctx context.Context, f models.DNSFilter) ([]DNSListIte
 			Tags:                tagMap[rec.ID],
 			HostIDs:             hostIDs,
 			MainResponsavelName: mainNames[rec.ID],
+			MainEntidade:        entidades[rec.ID],
 		}
 	}
 	return out, nil

@@ -220,7 +220,7 @@ function CommitRow({ commit }: { commit: ProjectGitLabCommit }) {
       rel="noopener noreferrer"
       title={commit.id}
     >
-      <Card hover clickIndicator="link" className="!p-3 h-[124px] flex flex-col">
+      <Card hover className="!p-3 h-[124px] flex flex-col">
         {/* Top row: time + branch on the left, hash anchored top-right */}
         <div className="flex items-start justify-between gap-3">
           <div

@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { coolifyAPI } from "@/lib/api";
+import SectionCard from "@/components/ui/SectionCard";
 import CoolifyIntegration from "./CoolifyIntegration";
 
 type Props = {
@@ -25,10 +26,7 @@ export default function IntegrationsSection({ slug, keyTestStatus, coolifyServer
   const keyReady = keyTestStatus === "success";
 
   return (
-    <div className="space-y-2 pt-2">
-      <h3 className="text-xs font-semibold text-[var(--text-faint)]">
-        {t("operation.integrations")}
-      </h3>
+    <SectionCard as="h3" title={t("operation.integrations")} body="flush">
       <CoolifyIntegration
         slug={slug}
         coolifyUUID={coolifyServerUUID}
@@ -36,6 +34,6 @@ export default function IntegrationsSection({ slug, keyTestStatus, coolifyServer
         t={t}
         isAdmin={isAdmin}
       />
-    </div>
+    </SectionCard>
   );
 }

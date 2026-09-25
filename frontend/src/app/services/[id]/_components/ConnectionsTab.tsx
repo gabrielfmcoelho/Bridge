@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import type { Service, Host, DNSRecord } from "@/lib/types";
-import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -20,10 +19,7 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Dependencies */}
-      <Card hover={false}>
-        <SectionHeading variant="section">
-          {t("service.dependencies")}
-        </SectionHeading>
+      <SectionCard title={t("service.dependencies")}>
         {dependsOnServices.length > 0 ? (
           <div className="space-y-1">
             {dependsOnServices.map((dep) => (
@@ -44,13 +40,10 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
         ) : (
           <p className="text-sm text-[var(--text-faint)]">{t("service.noDependencies")}</p>
         )}
-      </Card>
+      </SectionCard>
 
       {/* Dependents */}
-      <Card hover={false}>
-        <SectionHeading variant="section">
-          {t("service.dependents")}
-        </SectionHeading>
+      <SectionCard title={t("service.dependents")}>
         {dependentServices.length > 0 ? (
           <div className="space-y-1">
             {dependentServices.map((dep) => (
@@ -68,13 +61,10 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
         ) : (
           <p className="text-sm text-[var(--text-faint)]">{t("service.noDependents")}</p>
         )}
-      </Card>
+      </SectionCard>
 
       {/* Linked Hosts */}
-      <Card hover={false}>
-        <SectionHeading variant="section">
-          {t("service.linkedHosts")}
-        </SectionHeading>
+      <SectionCard title={t("service.linkedHosts")}>
         {linkedHosts.length > 0 ? (
           <div className="space-y-1">
             {linkedHosts.map((host) => (
@@ -94,13 +84,10 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
         ) : (
           <p className="text-sm text-[var(--text-faint)]">{t("service.noLinkedHosts")}</p>
         )}
-      </Card>
+      </SectionCard>
 
       {/* Linked DNS */}
-      <Card hover={false}>
-        <SectionHeading variant="section">
-          {t("service.linkedDns")}
-        </SectionHeading>
+      <SectionCard title={t("service.linkedDns")}>
         {linkedDns.length > 0 ? (
           <div className="space-y-1">
             {linkedDns.map((dns) => (
@@ -122,7 +109,7 @@ export default function ConnectionsTab({ dependsOnServices, dependentServices, l
         ) : (
           <p className="text-sm text-[var(--text-faint)]">{t("service.noLinkedDns")}</p>
         )}
-      </Card>
+      </SectionCard>
     </div>
   );
 }

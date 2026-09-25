@@ -2,11 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { secretsAPI } from "@/lib/api";
-import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -27,10 +26,18 @@ export default function CredentialsTab({ serviceId, isAdmin, t }: CredentialsTab
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <Card hover={false}>
-        <SectionHeading variant="section">
-          {t("service.credentials")}
-        </SectionHeading>
+      <SectionCard
+        title={t("service.credentials")}
+        controls={isAdmin && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => router.push(`/secrets?scope=service&parent_id=${serviceId}`)}
+          >
+            {t("service.addCredential")}
+          </Button>
+        )}
+      >
         {secrets.length > 0 ? (
           <div className="space-y-2">
             {secrets.map((s) => (
@@ -46,18 +53,7 @@ export default function CredentialsTab({ serviceId, isAdmin, t }: CredentialsTab
         ) : (
           <p className="text-sm text-[var(--text-faint)]">{t("service.noCredentials")}</p>
         )}
-        {isAdmin && (
-          <div className="mt-4">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => router.push(`/secrets?scope=service&parent_id=${serviceId}`)}
-            >
-              {t("service.addCredential")}
-            </Button>
-          </div>
-        )}
-      </Card>
+      </SectionCard>
     </div>
   );
 }

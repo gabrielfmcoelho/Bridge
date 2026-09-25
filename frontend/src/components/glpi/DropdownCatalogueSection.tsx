@@ -4,13 +4,16 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { glpiAPI, type GlpiDropdownCatalogueSummary } from "@/lib/api";
 import Button from "@/components/ui/Button";
+import SectionCard from "@/components/ui/SectionCard";
 import DropdownCatalogueEditorModal from "./DropdownCatalogueEditorModal";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 
 // DropdownCatalogueSection is embedded inside GLPIIntegrationSection. Lists
 // the allow-listed itemtypes sshcm can serve picker data for, the current
 // option count and last-updated timestamp, and an Edit button per row.
 export default function DropdownCatalogueSection() {
+  const confirm = useConfirm();
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<string | null>(null);
@@ -35,22 +38,19 @@ export default function DropdownCatalogueSection() {
   const allowed = data?.allowed_itemtypes ?? [];
 
   return (
-    <details className="border-t border-[var(--border-default)] pt-4" open>
-      <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--text-primary)] flex items-center justify-between gap-2">
-        <span>{t("glpi.dropdownCatalogueTitle")}</span>
-        <span className="text-xs font-normal text-[var(--text-muted)]">
-          {t("glpi.itemtypesConfigured", { n: String(data?.catalogues?.length ?? 0) })}
-        </span>
-      </summary>
-
-      <p className="mt-2 text-xs text-[var(--text-muted)]">
-        {t("glpi.dropdownCatalogueHint")}
-      </p>
-
+    // Plain: it sits inside the GLPI integration card, so no second card chrome.
+    <SectionCard
+      as="h3"
+      variant="plain"
+      collapsible
+      title={t("glpi.dropdownCatalogueTitle")}
+      count={data?.catalogues?.length ?? 0}
+      description={t("glpi.dropdownCatalogueHint")}
+    >
       {isLoading ? (
-        <p className="mt-3 text-xs text-[var(--text-muted)] animate-pulse">{t("common.loading")}</p>
+        <p className="text-xs text-[var(--text-muted)] animate-pulse">{t("common.loading")}</p>
       ) : (
-        <ul className="mt-3 space-y-1">
+        <ul className="space-y-1">
           {allowed.map((it) => {
             const summary = summaryByItemtype.get(it);
             return (
@@ -82,8 +82,8 @@ export default function DropdownCatalogueSection() {
                       type="button"
                       size="sm"
                       variant="secondary"
-                      onClick={() => {
-                        if (confirm(t("glpi.catalogueDeleteConfirm", { itemtype: it }))) {
+                      onClick={async () => {
+                        if (await confirm({ title: t("confirm.deleteTitle", { name: it }), message: t("glpi.catalogueDeleteConfirm", { itemtype: it }), danger: true, confirmLabel: t("common.delete") })) {
                           deleteMutation.mutate(it);
                         }
                       }}
@@ -108,6 +108,6 @@ export default function DropdownCatalogueSection() {
           setEditing(null);
         }}
       />
-    </details>
+    </SectionCard>
   );
 }

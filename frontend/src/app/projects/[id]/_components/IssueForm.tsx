@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { issuesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -31,6 +32,7 @@ interface IssueFormProps {
 
 export default function IssueForm({ projectId, services, issue, onSuccess, onDelete }: IssueFormProps) {
   const { t } = useLocale();
+  const confirm = useConfirm();
   const [form, setForm] = useState({
     title: issue?.title || "",
     description: issue?.description || "",
@@ -99,7 +101,7 @@ export default function IssueForm({ projectId, services, issue, onSuccess, onDel
         {onDelete ? (
           <button
             type="button"
-            onClick={() => { if (confirm(t("issue.deleteConfirm"))) onDelete(); }}
+            onClick={async () => { if (await confirm({ title: t("issue.deleteConfirm"), danger: true, confirmLabel: t("common.delete") })) onDelete(); }}
             className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
           >
             {t("common.delete")}

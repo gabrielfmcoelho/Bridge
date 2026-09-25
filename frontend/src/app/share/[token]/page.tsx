@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import ApiReference from "@/components/atlas/apis/ApiReference";
 import ShareIndexSidebar from "@/components/share/ShareIndexSidebar";
 import ShareWikiSection from "@/components/share/ShareWikiSection";
@@ -543,33 +544,27 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                   {effectiveTab === "secrets" && (
                     <div className="space-y-3">
                       {b.secrets.map((s, i) => (
-                        <Card key={i} id={`secret-${i}`} className="scroll-mt-6">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-[var(--text-primary)]">
-                              {s.name} <span className="text-xs text-[var(--text-muted)]">({t("share.types." + s.type)})</span>
-                            </span>
-                          </div>
-                          <SecretPayloadViewer
-                            payload={s.payload}
-                            type={s.type}
-                            onCopy={handleCopy}
-                            copiedKeyPrefix={`s-${i}`}
-                            copiedKey={copied}
-                          />
-                        </Card>
+                        <div key={i} id={`secret-${i}`} className="scroll-mt-6">
+                          <SectionCard title={s.name} description={t("share.types." + s.type)}>
+                            <SecretPayloadViewer
+                              payload={s.payload}
+                              type={s.type}
+                              onCopy={handleCopy}
+                              copiedKeyPrefix={`s-${i}`}
+                              copiedKey={copied}
+                            />
+                          </SectionCard>
+                        </div>
                       ))}
                     </div>
                   )}
 
                   {effectiveTab === "api" &&
                     b.api_docs.map((doc, i) => (
-                      <div key={i} id={`api-${i}`} className="space-y-2 scroll-mt-6">
-                        <div className="flex items-center gap-3">
-                          <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{doc.name}</h2>
-                        </div>
-                        <Card className="p-0 overflow-hidden">
+                      <div key={i} id={`api-${i}`} className="scroll-mt-6">
+                        <SectionCard title={doc.name} body="flush">
                           <ApiReference content={doc.spec} showSidebar={false} hideTestRequest />
-                        </Card>
+                        </SectionCard>
                       </div>
                     ))}
 

@@ -1,20 +1,32 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
-import { useTheme } from "@/contexts/ThemeContext";
-import { useRouter } from "next/navigation";
 import Drawer from "@/components/ui/Drawer";
+import DropdownMenu, { DropdownMenuItem } from "@/components/ui/DropdownMenu";
+import { requestOpen } from "@/hooks/useOpenOnParam";
+import IconButton from "@/components/ui/IconButton";
+import Button from "@/components/ui/Button";
+import Avatar from "@/components/ui/Avatar";
+import Divider from "@/components/ui/Divider";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
 import AiChatDrawer from "@/components/ai/AiChatDrawer";
 import Breadcrumbs from "./Breadcrumbs";
+import CommandPalette from "./CommandPalette";
+import ProfilePanel from "./ProfilePanel";
 
-const roleColors: Record<string, string> = {
-  admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
-  editor: "bg-purple-500/10 text-purple-400/70 border-purple-500/15",
-  viewer: "bg-[var(--bg-overlay)] text-[var(--text-faint)] border-[var(--border-subtle)]",
-};
+// "Create" menu: each list page opens its form on ?new=1 (useOpenOnParam).
+const CREATE_ITEMS = [
+  { href: "/hosts", label: "create.host", icon: NAV_ICONS.Server },
+  { href: "/dns", label: "create.dns", icon: NAV_ICONS.Globe },
+  { href: "/services", label: "create.service", icon: NAV_ICONS.Boxes },
+  { href: "/projects", label: "create.project", icon: NAV_ICONS.FolderKanban },
+  { href: "/contacts", label: "create.contact", icon: NAV_ICONS.Users },
+];
 
 interface HeaderProps {
   onToggleCollapse: () => void;
@@ -23,39 +35,31 @@ interface HeaderProps {
 
 export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
   const { user, logout } = useAuth();
-  const { locale, setLocale, t } = useLocale();
+  const { t } = useLocale();
   const { appName, appColor, appLogo } = useAppearance();
-  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
+  const pathname = usePathname();
   const [userDrawer, setUserDrawer] = useState(false);
-  const [userMenu, setUserMenu] = useState(false);
   const [aiChat, setAiChat] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const hasAiPermission = user?.permissions?.includes("ai.use") ?? false;
+  const name = user ? user.display_name || user.username : "";
+  const canEdit = user?.role === "admin" || user?.role === "editor";
+
+  // Already on the page: it stays mounted on a same-path push, so ask it directly.
+  const create = (href: string) => (pathname === href ? requestOpen("new") : router.push(`${href}?new=1`));
 
   const handleLogout = async () => {
     setUserDrawer(false);
-    setUserMenu(false);
     await logout();
     router.push("/login");
   };
 
-  // Close desktop dropdown on outside click
-  useEffect(() => {
-    if (!userMenu) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setUserMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [userMenu]);
-
   return (
     <header className="h-13 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] flex items-center justify-between px-3 md:px-5 gap-2">
       {/* Left side */}
-      <div className="flex items-center gap-1 min-w-0">
+      {/* Left takes the flexible space and truncates, so a deep breadcrumb
+          never pushes the tools on the right. */}
+      <div className="flex-1 flex items-center gap-1 min-w-0 overflow-hidden">
         {/* Mobile app branding */}
         <div className="md:hidden flex items-center gap-2">
           <div className="w-7 h-7 rounded-[var(--radius-sm)] flex items-center justify-center overflow-hidden shrink-0"
@@ -63,235 +67,111 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
             {appLogo ? (
               <img src={appLogo} alt="" className="w-full h-full object-contain p-0.5" />
             ) : (
-              <svg className="w-3.5 h-3.5" style={{ color: appColor }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 17l6-6-6-6m8 14h8" />
-              </svg>
+              <Icon path={ICON_PATHS.prompt} className="w-3.5 h-3.5" style={{ color: appColor }} />
             )}
           </div>
-          <span className="text-sm font-bold text-[var(--text-primary)] truncate" style={{ fontFamily: "var(--font-display)" }}>
-            {appName}
-          </span>
+          <span className="text-sm font-bold text-[var(--text-primary)] truncate font-display">{appName}</span>
         </div>
-        {/* Desktop collapse toggle */}
-        <button
+        <IconButton
           onClick={onToggleCollapse}
-          className="hidden md:flex w-8 h-8 items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)] transition-colors"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="max-md:hidden"
+          label={collapsed ? t("header.expandSidebar") : t("header.collapseSidebar")}
         >
-          <svg className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-          </svg>
-        </button>
+          <Icon path={ICON_PATHS.chevronsLeft} className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`} />
+        </IconButton>
         <Breadcrumbs />
       </div>
 
-      {/* AI Chat Drawer */}
       <AiChatDrawer open={aiChat} onClose={() => setAiChat(false)} />
 
-      {/* Right side — Desktop */}
-      <div className="hidden md:flex items-center gap-3">
-        {/* AI chat trigger */}
+      {/* Right, fixed order: search · Assistente · Criar · profile. */}
+      <div className="shrink-0 flex items-center gap-2">
+        <CommandPalette />
         {hasAiPermission && (
-          <button
-            onClick={() => setAiChat(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--accent)] transition-colors"
-            title="AI Assistant"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
-            </svg>
-          </button>
-        )}
-        {/* Locale toggle */}
-        <div className="flex h-8 rounded-[var(--radius-md)] border border-[var(--border-default)] overflow-hidden">
-          <button
-            onClick={() => setLocale("en")}
-            className={`px-3 text-[11px] font-medium transition-all duration-150 ${
-              locale === "en"
-                ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-            }`}
-          >
-            EN
-          </button>
-          <button
-            onClick={() => setLocale("pt-BR")}
-            className={`px-3 text-[11px] font-medium border-l border-[var(--border-default)] transition-all duration-150 ${
-              locale === "pt-BR"
-                ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-            }`}
-          >
-            PT
-          </button>
-        </div>
-
-        {/* Theme toggle — sized to match the locale pair and the user avatar */}
-        <button
-          onClick={toggleTheme}
-          aria-label={t("header.toggleTheme")}
-          title={theme === "dark" ? t("header.themeLight") : t("header.themeDark")}
-          className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-elevated)] transition-colors"
-        >
-          {theme === "dark" ? (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2m0 14v2M5.05 5.05l1.41 1.41M17.54 17.54l1.41 1.41M3 12h2m14 0h2M5.05 18.95l1.41-1.41M17.54 6.46l1.41-1.41" />
-              <circle cx="12" cy="12" r="4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
-            </svg>
-          )}
-        </button>
-
-        {/* Desktop user avatar + dropdown */}
-        {user && (
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setUserMenu(!userMenu)}
-              className="w-8 h-8 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] flex items-center justify-center text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-overlay)] transition-all"
-            >
-              {(user.display_name || user.username).charAt(0).toUpperCase()}
-            </button>
-
-            {userMenu && (
-              <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] overflow-hidden z-50 animate-fade-in">
-                {/* User info */}
-                <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] flex items-center justify-center text-sm font-semibold text-[var(--text-secondary)]">
-                      {(user.display_name || user.username).charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                        {user.display_name || user.username}
-                      </p>
-                      <p className="text-[11px] text-[var(--text-faint)] mt-0.5">@{user.username}</p>
-                      <span className={`inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${roleColors[user.role] || roleColors.viewer}`}>
-                        {user.role}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Logout */}
-                <div className="p-1.5">
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-[var(--radius-md)] text-red-400 hover:bg-red-500/10 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                    </svg>
-                    {t("auth.logout")}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <>
+            <Button size="sm" variant="secondary" onClick={() => setAiChat(true)} className="max-md:hidden">
+              <Icon path={ICON_PATHS.sparkles} className="w-4 h-4" />
+              {t("header.assistant")}
+            </Button>
+            <IconButton onClick={() => setAiChat(true)} label={t("header.assistant")} className="md:hidden">
+              <Icon path={ICON_PATHS.sparkles} className="w-4 h-4" />
+            </IconButton>
+          </>
         )}
       </div>
 
-      {/* Right side — Mobile: avatar button opens drawer */}
+      {/* Right side — Desktop. Language and theme live in the profile menu. */}
+      <div className="hidden md:flex items-center gap-2 shrink-0">
+        {canEdit && (
+          <DropdownMenu
+            className="w-44"
+            trigger={
+              <Button size="sm">
+                <Icon path={ICON_PATHS.plus} className="w-4 h-4" />
+                {t("common.create")}
+                <Icon path={ICON_PATHS.chevronDown} className="w-3.5 h-3.5" />
+              </Button>
+            }
+          >
+            <div className="py-1">
+              {CREATE_ITEMS.map((item) => (
+                <DropdownMenuItem key={item.href} onClick={() => create(item.href)} elemBefore={<Icon path={item.icon} className="w-4 h-4" strokeWidth={1.5} />}>
+                  {t(item.label)}
+                </DropdownMenuItem>
+              ))}
+            </div>
+          </DropdownMenu>
+        )}
+        {user && (
+          <DropdownMenu
+            className="w-72"
+            trigger={
+              <button
+                type="button"
+                aria-label={t("header.profileMenu")}
+                className="rounded-full transition duration-150 hover:brightness-110 active:scale-[0.95]"
+              >
+                <Avatar name={name} />
+              </button>
+            }
+          >
+            <div className="p-4">
+              <ProfilePanel />
+            </div>
+            <Divider />
+            <div className="p-1.5">
+              <DropdownMenuItem danger onClick={handleLogout} className="rounded-[var(--radius-md)] py-2" elemBefore={<Icon path={ICON_PATHS.logout} className="w-4 h-4" />}>
+                {t("auth.logout")}
+              </DropdownMenuItem>
+            </div>
+          </DropdownMenu>
+        )}
+      </div>
+
+      {/* Right side — Mobile: the same panel in a drawer */}
       {user && (
         <button
+          type="button"
           onClick={() => setUserDrawer(true)}
-          className="md:hidden ml-auto w-8 h-8 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] flex items-center justify-center text-xs font-semibold text-[var(--text-secondary)]"
+          aria-label={t("header.profileMenu")}
+          className="md:hidden rounded-full"
         >
-          {(user.display_name || user.username).charAt(0).toUpperCase()}
+          <Avatar name={name} />
         </button>
       )}
-
-      {/* Mobile user drawer */}
       <div className="md:hidden">
-        <Drawer open={userDrawer} onClose={() => setUserDrawer(false)}>
-          {user && (
-            <div className="space-y-4">
-              {/* User info */}
-              <div className="flex items-center gap-3 pb-4 border-b border-[var(--border-subtle)]">
-                <div className="w-12 h-12 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-default)] flex items-center justify-center text-lg font-semibold text-[var(--text-secondary)]">
-                  {(user.display_name || user.username).charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-semibold text-[var(--text-primary)]">{user.display_name || user.username}</p>
-                  <p className="text-xs text-[var(--text-muted)]">@{user.username}</p>
-                  <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${roleColors[user.role] || roleColors.viewer}`}>
-                    {user.role}
-                  </span>
-                </div>
-              </div>
-
-              {/* Language */}
-              <div>
-                <p className="text-xs text-[var(--text-faint)] mb-2 font-medium uppercase tracking-wider">Language</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setLocale("en")}
-                    className={`flex-1 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all ${
-                      locale === "en"
-                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20"
-                        : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
-                    }`}
-                  >
-                    English
-                  </button>
-                  <button
-                    onClick={() => setLocale("pt-BR")}
-                    className={`flex-1 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all ${
-                      locale === "pt-BR"
-                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20"
-                        : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
-                    }`}
-                  >
-                    Português
-                  </button>
-                </div>
-              </div>
-
-              {/* Theme */}
-              <div>
-                <p className="text-xs text-[var(--text-faint)] mb-2 font-medium uppercase tracking-wider">{t("header.themeLabel")}</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => theme === "light" && toggleTheme()}
-                    className={`flex-1 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                      theme === "dark"
-                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20"
-                        : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
-                    </svg>
-                    {t("header.themeDark")}
-                  </button>
-                  <button
-                    onClick={() => theme === "dark" && toggleTheme()}
-                    className={`flex-1 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                      theme === "light"
-                        ? "bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20"
-                        : "bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]"
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2m0 14v2M5.05 5.05l1.41 1.41M17.54 17.54l1.41 1.41M3 12h2m14 0h2M5.05 18.95l1.41-1.41M17.54 6.46l1.41-1.41" />
-                      <circle cx="12" cy="12" r="4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    {t("header.themeLight")}
-                  </button>
-                </div>
-              </div>
-
-              {/* Logout */}
-              <button
-                onClick={handleLogout}
-                className="w-full py-2.5 rounded-[var(--radius-md)] text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all"
-              >
-                {t("auth.logout")}
-              </button>
-            </div>
-          )}
+        <Drawer
+          open={userDrawer}
+          onClose={() => setUserDrawer(false)}
+          title={t("header.profileMenu")}
+          footer={
+            <Button variant="danger" className="w-full" onClick={handleLogout}>
+              <Icon path={ICON_PATHS.logout} className="w-4 h-4" />
+              {t("auth.logout")}
+            </Button>
+          }
+        >
+          <ProfilePanel />
         </Drawer>
       </div>
     </header>

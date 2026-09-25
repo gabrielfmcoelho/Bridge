@@ -10,17 +10,19 @@ interface PaginationProps {
   total: number;
   perPage: number;
   onChange: (page: number) => void;
+  /** Inside a SectionCard footer, which already draws the rule and spacing. */
+  bare?: boolean;
 }
 
-export default function Pagination({ page, totalPages, total, perPage, onChange }: PaginationProps) {
+export default function Pagination({ page, totalPages, total, perPage, onChange, bare = false }: PaginationProps) {
   if (totalPages <= 1) return null;
 
   const start = (page - 1) * perPage + 1;
   const end = Math.min(page * perPage, total);
 
   return (
-    <div className="flex items-center justify-between pt-3 mt-3 border-t border-[var(--border-subtle)]">
-      <span className="text-xs text-[var(--text-faint)]">
+    <div className={`flex items-center justify-between ${bare ? "" : "pt-3 mt-3 border-t border-[var(--border-subtle)]"}`}>
+      <span className="text-xs text-[var(--text-muted)]">
         {start}–{end} of {total}
       </span>
       <div className="flex items-center gap-1">

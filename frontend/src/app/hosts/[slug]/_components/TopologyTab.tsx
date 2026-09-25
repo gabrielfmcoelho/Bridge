@@ -1,12 +1,13 @@
 "use client";
 
+import SituacaoText from "@/components/ui/SituacaoText";
+
 import { useState } from "react";
 import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
-import Field from "@/components/ui/Field";
-import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import TopologyGraph from "@/components/graph/TopologyGraph";
 import type { GraphData } from "@/lib/types";
@@ -29,6 +30,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
         icon="topology"
         title={t("host.noTopology")}
         description={t("host.noTopologyDesc")}
+        compact
       />
     );
   }
@@ -48,9 +50,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
 
       {/* Orchestrator */}
       {data.orchestrator && (
-        <>
-          <SectionHeading>{t("topology.orchestrator")}</SectionHeading>
-          <Card hover={false} className="!p-3">
+        <SectionCard title={t("topology.orchestrator")}>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <span className="text-[var(--text-faint)] block mb-0.5">{t("topology.type")}</span>
@@ -61,14 +61,12 @@ export default function TopologyTab({ data, filteredGraph, t }: {
                 <span className="text-[var(--text-muted)] font-mono">{data.orchestrator.version}</span>
               </div>
             </div>
-          </Card>
-        </>
+        </SectionCard>
       )}
 
       {/* DNS Records */}
       {data.dns_records && data.dns_records.length > 0 && (
-        <>
-          <SectionHeading>{t("topology.dnsRecords")}</SectionHeading>
+        <SectionCard variant="plain" title={t("topology.dnsRecords")} count={data.dns_records.length}>
           <div className="grid grid-cols-1 gap-2">
             {data.dns_records.map((dns) => (
               <Card key={dns.id} hover={false} className="!p-3">
@@ -81,23 +79,22 @@ export default function TopologyTab({ data, filteredGraph, t }: {
                     <span className={`${dns.has_https ? "text-[var(--success)]" : "text-[var(--text-faint)]/30"}`} title={dns.has_https ? t("topology.https") : t("topology.noHttps")}>
                       <Icon path={ICON_PATHS.lock} className="w-3.5 h-3.5" />
                     </span>
-                    <Badge variant="situacao" situacao={dns.situacao} compact>{dns.situacao}</Badge>
+                    <SituacaoText situacao={dns.situacao} />
                   </div>
                 </div>
               </Card>
             ))}
           </div>
-        </>
+        </SectionCard>
       )}
 
       {/* Services */}
       {data.services && data.services.length > 0 && (
-        <>
-          <SectionHeading>{t("topology.services")}</SectionHeading>
+        <SectionCard variant="plain" title={t("topology.services")} count={data.services.length}>
           <div className="grid grid-cols-1 gap-2">
             {data.services.map((svc) => (
               <Link key={svc.id} href={`/services/${svc.id}`} className="block">
-                <Card clickIndicator="link" className="!p-3 !pb-7">
+                <Card className="!p-3 !pb-7">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--accent)]/15 text-[var(--accent)]">
                       <Icon path={ICON_PATHS.serverStack} />
@@ -109,29 +106,28 @@ export default function TopologyTab({ data, filteredGraph, t }: {
               </Link>
             ))}
           </div>
-        </>
+        </SectionCard>
       )}
 
       {/* Projects */}
       {data.projects && data.projects.length > 0 && (
-        <>
-          <SectionHeading>{t("topology.projects")}</SectionHeading>
+        <SectionCard variant="plain" title={t("topology.projects")} count={data.projects.length}>
           <div className="grid grid-cols-1 gap-2">
             {data.projects.map((proj) => (
               <Link key={proj.id} href={`/projects/${proj.id}`} className="block">
-                <Card clickIndicator="link" className="!p-3 !pb-7">
+                <Card className="!p-3 !pb-7">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--warning)]/15 text-[var(--warning)]">
                       <Icon path={ICON_PATHS.folder} />
                     </div>
                     <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">{proj.name}</span>
-                    {proj.situacao && <Badge variant="situacao" situacao={proj.situacao} compact>{proj.situacao}</Badge>}
+                    <SituacaoText situacao={proj.situacao} />
                   </div>
                 </Card>
               </Link>
             ))}
           </div>
-        </>
+        </SectionCard>
       )}
     </div>
   );
@@ -161,7 +157,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
               <TopologyGraph data={filteredGraph} className="w-full h-full" />
             </div>
           ) : (
-            <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} />
+            <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} compact />
           )
         )}
       </div>
@@ -176,7 +172,7 @@ export default function TopologyTab({ data, filteredGraph, t }: {
             <TopologyGraph data={filteredGraph} className="w-full h-full" />
           </div>
         ) : (
-          <EmptyState icon="topology" title={t("host.noTopology")} compact />
+          <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} compact />
         )}
         <div className="overflow-y-auto pr-1 max-h-[40vh] lg:max-h-none">
           {connectionList}

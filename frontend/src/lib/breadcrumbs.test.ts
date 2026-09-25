@@ -1,7 +1,7 @@
 // Run: node --test src/lib/breadcrumbs.test.ts   (Node 24 native TS, no runner dep)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildCrumbs as build } from "./breadcrumbs.ts";
+import { buildCrumbs as build, backTarget } from "./breadcrumbs.ts";
 import { NAV_ITEMS } from "./constants.ts";
 
 const buildCrumbs = (p: string) => build(p, NAV_ITEMS);
@@ -61,4 +61,13 @@ test("query string and trailing slash are ignored", () => {
     buildCrumbs("/hosts/web-01/?x=1").map((c) => c.label),
     ["nav.hosts", "web-01"],
   );
+});
+
+test("back goes to the nearest earlier page, disabled at the top", () => {
+  const nav = NAV_ITEMS;
+  assert.equal(backTarget(build("/hosts/web-01", nav)), "/hosts");
+  assert.equal(backTarget(build("/atlas/apis/5", nav)), "/atlas/apis");
+  assert.equal(backTarget(build("/atlas/apis", nav)), undefined); // /atlas is a section, not a page
+  assert.equal(backTarget(build("/hosts", nav)), undefined);
+  assert.equal(backTarget(build("/", nav)), undefined);
 });

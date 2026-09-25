@@ -5,6 +5,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import type { LineageIndexes } from "@/lib/lineage/indexes";
 import type { LineageWarning } from "@/lib/lineage/types";
 import Icon from "@/components/ui/Icon";
+import SectionCard from "@/components/ui/SectionCard";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface Props {
@@ -40,33 +41,24 @@ export default function IssuesPanel({ indexes, filterKind, onNavigate }: Props) 
     <div className="space-y-6">
       {/* Errors */}
       {errors.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-[var(--danger)] mb-2">
-            {t("atlas.lineage.issues.errors")} ({errors.length})
-          </h2>
+        <SectionCard variant="plain" icon={ICON_PATHS.alert} title={t("atlas.lineage.issues.errors")} count={errors.length}>
           <div className="space-y-2">
             {errors.map((w, i) => <WarningRow key={i} w={w} onNavigate={onNavigate} indexes={indexes} severity="error" />)}
           </div>
-        </section>
+        </SectionCard>
       )}
 
       {/* Other warnings */}
       {otherWarnings.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
-            {t("atlas.lineage.issues.warnings")} ({otherWarnings.length})
-          </h2>
+        <SectionCard variant="plain" title={t("atlas.lineage.issues.warnings")} count={otherWarnings.length}>
           <div className="space-y-2">
             {otherWarnings.map((w, i) => <WarningRow key={i} w={w} onNavigate={onNavigate} indexes={indexes} severity="warning" />)}
           </div>
-        </section>
+        </SectionCard>
       )}
 
       {/* Coverage gaps */}
-      <section>
-        <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
-          {t("atlas.lineage.issues.coverageGaps")}
-        </h2>
+      <SectionCard variant="plain" title={t("atlas.lineage.issues.coverageGaps")}>
         <div className="space-y-2">
           {GAP_GROUPS.map(g => {
             const ids = (gaps[g.key] ?? []) as string[];
@@ -106,7 +98,7 @@ export default function IssuesPanel({ indexes, filterKind, onNavigate }: Props) 
             );
           })}
         </div>
-      </section>
+      </SectionCard>
     </div>
   );
 }

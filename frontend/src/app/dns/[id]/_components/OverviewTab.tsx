@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import SectionHeading from "@/components/ui/SectionHeading";
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import Badge from "@/components/ui/Badge";
+import SituacaoText from "@/components/ui/SituacaoText";
+import Tag from "@/components/ui/Tag";
 import Field from "@/components/ui/Field";
 import ResponsaveisSection from "@/components/inventory/ResponsaveisSection";
 import CertificateCard from "./CertificateCard";
@@ -25,13 +26,12 @@ interface OverviewTabProps {
 export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, linkedServices, linkedProjects, canEdit, t }: OverviewTabProps) {
   return (
     <div className="space-y-5 animate-fade-in">
-      <SectionHeading>{t("dns.info")}</SectionHeading>
-      <Card hover={false}>
+      <SectionCard title={t("dns.info")}>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
           <Field label={t("dns.domain")} value={dns.domain} mono />
           <div>
             <span className="text-[var(--text-muted)] text-xs font-medium block mb-0.5">{t("host.situacao")}</span>
-            <Badge variant="situacao" situacao={dns.situacao} dot>{dns.situacao}</Badge>
+            <SituacaoText situacao={dns.situacao} />
           </div>
           <div>
             <span className="text-[var(--text-muted)] text-xs font-medium block mb-0.5">{t("topology.https")}</span>
@@ -47,21 +47,18 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, link
         </div>
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-4 pt-4 border-t border-[var(--border-subtle)]">
-            {tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}
+            {tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
           </div>
         )}
-      </Card>
+      </SectionCard>
 
       <CertificateCard dns={dns} canEdit={canEdit} />
 
       {/* Observations */}
       {dns.observacoes && (
-        <>
-          <SectionHeading>{t("common.observacoes")}</SectionHeading>
-          <Card hover={false}>
-            <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{dns.observacoes}</p>
-          </Card>
-        </>
+        <SectionCard title={t("common.observacoes")}>
+          <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{dns.observacoes}</p>
+        </SectionCard>
       )}
 
       {/* Responsaveis — shared component with cards/table view toggle */}
@@ -69,9 +66,7 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, link
 
       {/* Linked Hosts */}
       {linkedHosts.length > 0 && (
-        <>
-          <SectionHeading>{t("dns.linkedHosts")}</SectionHeading>
-          <Card hover={false}>
+        <SectionCard title={t("dns.linkedHosts")}>
             <div className="flex flex-wrap gap-2">
               {linkedHosts.map((h) => (
                 <Link
@@ -84,14 +79,11 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, link
                 </Link>
               ))}
             </div>
-          </Card>
-        </>
+        </SectionCard>
       )}
 
       {linkedServices.length > 0 && (
-        <>
-          <SectionHeading>{t("dns.linkedServices")}</SectionHeading>
-          <Card hover={false}>
+        <SectionCard title={t("dns.linkedServices")}>
             <div className="flex flex-wrap gap-2">
               {linkedServices.map((x) => (
                 <Link key={x.id} href={`/services/${x.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-colors">
@@ -100,14 +92,11 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, link
                 </Link>
               ))}
             </div>
-          </Card>
-        </>
+        </SectionCard>
       )}
 
       {linkedProjects.length > 0 && (
-        <>
-          <SectionHeading>{t("dns.linkedProjects")}</SectionHeading>
-          <Card hover={false}>
+        <SectionCard title={t("dns.linkedProjects")}>
             <div className="flex flex-wrap gap-2">
               {linkedProjects.map((x) => (
                 <Link key={x.id} href={`/projects/${x.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/30 transition-colors">
@@ -116,8 +105,7 @@ export default function OverviewTab({ dns, tags, responsaveis, linkedHosts, link
                 </Link>
               ))}
             </div>
-          </Card>
-        </>
+        </SectionCard>
       )}
 
       {/* Timestamps */}

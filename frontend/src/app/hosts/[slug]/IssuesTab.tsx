@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { globalIssuesAPI, usersAPI, hostAlertsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import Button from "@/components/ui/Button";
+import SectionCard from "@/components/ui/SectionCard";
 import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
 import { AlertsSection, IssuesKanban, IssuesTableView } from "./_components/IssueViews";
 import { AlertDrawer, AlertDetailDrawer, IssueDrawer } from "./_components/IssueDrawers";
@@ -31,6 +33,7 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
   onChamadoCreateDone?: () => void;
 }) {
   const { t } = useLocale();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [issueView, setIssueView] = useState<"kanban" | "table">("kanban");
   const [showResolvedAlerts, setShowResolvedAlerts] = useState(false);
@@ -162,8 +165,10 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
     });
   };
 
+  const visibleIssues = showArchivedIssues ? hostIssues : hostIssues.filter(i => !i.archived);
+
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       {/* ══════ CHAMADOS SECTION ══════ */}
       <ChamadoSection
         chamados={chamados}
@@ -194,14 +199,12 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
       />
 
       {/* ══════ ISSUES SECTION ══════ */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-[var(--text-faint)]">{t("issue.title")}</h3>
-          <div className="flex items-center gap-1.5">
+      <SectionCard variant="plain" as="h3" title={t("issue.title")} count={visibleIssues.length} empty={visibleIssues.length === 0 ? t("issue.boardEmpty") : undefined} controls={
+          <>
             {hostIssues.some(i => i.archived) && (
               <button
                 onClick={() => setShowArchivedIssues(v => !v)}
-                className={`inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition ${
+                className={`inline-flex items-center gap-1 h-8 px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition ${
                   showArchivedIssues
                     ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
                     : "bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"
@@ -226,15 +229,14 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
                 </Button>
               </span>
             )}
-          </div>
-        </div>
-
+          </>
+        }>
         {issueView === "kanban" ? (
-          <IssuesKanban issues={showArchivedIssues ? hostIssues : hostIssues.filter(i => !i.archived)} users={users} onEdit={openEditIssue} onMove={(id, status, position) => moveIssueMutation.mutate({ id, status, position })} />
+          <IssuesKanban issues={visibleIssues} users={users} onEdit={openEditIssue} onMove={(id, status, position) => moveIssueMutation.mutate({ id, status, position })} />
         ) : (
-          <IssuesTableView issues={showArchivedIssues ? hostIssues : hostIssues.filter(i => !i.archived)} users={users} onEdit={openEditIssue} />
+          <IssuesTableView issues={visibleIssues} users={users} onEdit={openEditIssue} />
         )}
-      </div>
+      </SectionCard>
 
       {/* ══════ DRAWERS ══════ */}
       <AlertDrawer
@@ -277,7 +279,7 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
         alerts={allAlerts}
         onCreate={(data) => { createIssueMutation.mutate(data, { onSuccess: closeIssueDrawer }); }}
         onUpdate={(id, data) => { updateIssueMutation.mutate({ id, ...data }, { onSuccess: closeIssueDrawer }); }}
-        onDelete={(id) => { if (confirm(t("issue.deleteConfirm"))) deleteIssueMutation.mutate(id, { onSuccess: closeIssueDrawer }); }}
+        onDelete={async (id) => { if (await confirm({ title: t("issue.deleteConfirm"), danger: true, confirmLabel: t("common.delete") })) deleteIssueMutation.mutate(id, { onSuccess: closeIssueDrawer }); }}
         onArchive={(id) => { archiveIssueMutation.mutate(id, { onSuccess: closeIssueDrawer }); }}
         loading={createIssueMutation.isPending || updateIssueMutation.isPending}
         t={t}

@@ -7,6 +7,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
@@ -115,10 +116,7 @@ function TrashSection<T extends { id: number }>({
   const { t } = useLocale();
   if (items.length === 0) return null;
   return (
-    <div>
-      <h2 className="text-xs font-semibold text-[var(--text-muted)] mb-2">
-        {title} <span className="text-[var(--text-faint)]">({items.length})</span>
-      </h2>
+    <SectionCard variant="plain" title={title} count={items.length}>
       <div className="space-y-2">
         {items.map((item) => (
           <Card key={item.id}>
@@ -138,6 +136,6 @@ function TrashSection<T extends { id: number }>({
           </Card>
         ))}
       </div>
-    </div>
+    </SectionCard>
   );
 }

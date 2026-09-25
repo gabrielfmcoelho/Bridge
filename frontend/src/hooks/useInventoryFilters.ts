@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useLocalStorage } from "./useLocalStorage";
+import type { GroupEntity } from "@/lib/grouping";
 
 interface SortConfig {
   field: string;
@@ -21,6 +22,7 @@ export function useInventoryFilters<F extends Record<string, string>>({
   const [filters, setFilters] = useState<F>(emptyFilters);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [sort, setSort] = useLocalStorage<SortConfig>(`${storageKey}_sort`, defaultSort);
+  const [groupBy, setGroupBy] = useLocalStorage<GroupEntity | "">(`${storageKey}_groupBy`, "");
 
   const activeFilterCount = useMemo(
     () => Object.values(filters).filter(Boolean).length,
@@ -42,6 +44,8 @@ export function useInventoryFilters<F extends Record<string, string>>({
     setSort,
     viewMode,
     setViewMode,
+    groupBy,
+    setGroupBy,
     activeFilterCount,
     resetAll,
   };

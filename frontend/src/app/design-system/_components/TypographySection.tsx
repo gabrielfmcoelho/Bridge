@@ -34,7 +34,6 @@ const H1_ALSO_IN = [
   "app/ssh-keys/page.tsx:49",
   "app/releases/page.tsx:92",
   "app/issues/IssueBoard.tsx:240",
-  "app/settings/page.tsx:71",
   "app/atlas/lineage/page.tsx:73",
   "app/atlas/topology/page.tsx:30",
   "app/tools/page.tsx:150",

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Badge from "@/components/ui/Badge";
+import Tag from "@/components/ui/Tag";
 import EmptyState from "@/components/ui/EmptyState";
 import { assetHref, assetTypeLabelKey } from "@/lib/requests";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -28,7 +28,7 @@ function AnswerValue({ field, value }: { field: FormField; value: unknown }) {
     return (
       <span className="flex flex-wrap gap-1.5">
         {tags.map((tag) => (
-          <Badge key={tag} color="gray">{tag}</Badge>
+          <Tag key={tag}>{tag}</Tag>
         ))}
       </span>
     );

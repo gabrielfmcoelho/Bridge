@@ -347,6 +347,13 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     Object.assign(record, pickDNS(await readJSON<Partial<DNSRecord>>(request)), { updated_at: new Date().toISOString() });
     return json(record);
   }
+  // Mirrors POST /api/proxmox/{test,sync}. ponytail: static summary, no mock
+  // cluster — seed Proxmox guests into db.hosts if the UI ever needs them.
+  if (method === "POST" && (p === "proxmox/test" || p === "proxmox/sync")) {
+    if (currentUser().role !== "admin") return json({ error: "forbidden" }, 403);
+    if (p === "proxmox/test") return json({ success: true, version: "8.2.4" });
+    return json({ found: db.hosts.length, created: 0, updated: db.hosts.length, deactivated: 0, no_ip: 0 });
+  }
   // Mirrors POST /api/coolify/dns-sync: idempotent — a second run creates nothing.
   if (method === "POST" && p === "coolify/dns-sync") {
     if (currentUser().role !== "admin") return json({ error: "forbidden" }, 403);

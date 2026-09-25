@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import PageShell from "@/components/layout/PageShell";
+import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import Drawer from "@/components/ui/Drawer";
@@ -100,24 +101,15 @@ export default function CatalogPageInner() {
 
   return (
     <PageShell>
-      <div className="flex flex-col gap-5">
-        {/* Header */}
-        <header className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight font-display">
-              {t("atlas.catalog.title")}
-            </h1>
-            {generatedAt && (
-              <span className="text-2xs text-[var(--text-faint)]">
-                {t("atlas.lineage.generatedAt")} · {new Date(generatedAt).toLocaleString()}
-              </span>
-            )}
-          </div>
-          <p className="text-sm text-[var(--text-muted)] max-w-2xl">{t("atlas.catalog.subtitle")}</p>
-        </header>
-
-        {/* Toolbar */}
-        {indexes && (
+      <PageHeader
+        title={t("atlas.catalog.title")}
+        subtitle={t("atlas.catalog.subtitle")}
+        indicators={generatedAt ? (
+          <span className="text-2xs text-[var(--text-faint)]">
+            {t("atlas.lineage.generatedAt")} · {new Date(generatedAt).toLocaleString()}
+          </span>
+        ) : undefined}
+        controls={indexes && (
           <AtlasToolbar
             indexes={indexes}
             filters={filters}
@@ -134,7 +126,8 @@ export default function CatalogPageInner() {
             }
           />
         )}
-
+      />
+      <div className="flex flex-col gap-5">
         {/* Active filter readout */}
         {indexes && (
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] px-1">

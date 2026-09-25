@@ -12,10 +12,11 @@ import Icon from "./Icon";
 // the hierarchy it was meant to create is gone. Uppercase is reserved for
 // table column headers, where it is a real convention and the row below it is
 // data. Differentiate by weight and colour instead.
+// Sizes come from the heading scale (globals.css --text-heading-*).
 const variants = {
-  label: "text-xs font-semibold text-[var(--text-muted)]",
-  section: "text-sm font-semibold text-[var(--text-secondary)] font-display",
-  rule: "text-xs font-semibold text-[var(--text-secondary)]",
+  label: "text-heading-xxs font-semibold text-[var(--text-muted)]",
+  section: "text-heading-xs font-semibold text-[var(--text-secondary)] font-display",
+  rule: "text-heading-xxs font-semibold text-[var(--text-secondary)]",
 };
 
 interface SectionHeadingProps {

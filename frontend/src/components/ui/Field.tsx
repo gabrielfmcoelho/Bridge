@@ -14,7 +14,7 @@ export default function Field({
   className?: string;
 }) {
   const mono_ = mono ? " font-mono" : "";
-  const displayValue = value || "-";
+  const displayValue = value;
   const url = href || (link ? value : undefined);
 
   return (
@@ -29,10 +29,13 @@ export default function Field({
         >
           {displayValue}
         </a>
-      ) : (
-        <p className={`text-sm text-[var(--text-primary)] truncate${mono_}`}>
-          {displayValue}
+      ) : value ? (
+        <p className={`text-sm text-[var(--text-primary)] truncate${mono_}`} title={value}>
+          {value}
         </p>
+      ) : (
+        // Fixed anatomy: an empty value keeps its slot as a muted dash.
+        <p className="text-sm text-[var(--text-muted)]">–</p>
       )}
     </div>
   );

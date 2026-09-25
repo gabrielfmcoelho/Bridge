@@ -7,7 +7,8 @@ import CopyButton from "@/components/ui/CopyButton";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
-import Card from "@/components/ui/Card";
+import PageHeader from "@/components/ui/PageHeader";
+import SectionCard from "@/components/ui/SectionCard";
 import Button from "@/components/ui/Button";
 import DropdownMenu, { DropdownMenuItem } from "@/components/ui/DropdownMenu";
 import Badge from "@/components/ui/Badge";
@@ -76,50 +77,50 @@ export default function SSHConfigPage() {
 
   return (
     <PageShell>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold font-display">{t("sshConfig.title")}</h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">{t("sshConfig.generateDescription")}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleDownload} disabled={!preview?.content}>
-            <Icon path={ICON_PATHS.download} />
-            {t("sshConfig.download")}
-          </Button>
-          <CopyButton value={preview?.content ?? ""} icon label={t("sshConfig.copy")} copiedLabel={t("sshConfig.copied")} disabled={!preview?.content} />
-          {canEdit && (
-            <DropdownMenu
-              trigger={
-                <Button variant="secondary">
-                  <Icon path={ICON_PATHS.moreVertical} />
-                </Button>
-              }
-              className="w-72"
-            >
-              <div className="p-3 border-b border-[var(--border-subtle)]">
-                    <p className="text-xs text-[var(--warning)] flex items-center gap-1.5">
-                      <Icon path={ICON_PATHS.alertOutline} className="w-3.5 h-3.5 shrink-0" />
-                      {t("sshConfig.writeWarning")}
-                    </p>
-                    {serverInfo && (
-                      <code className="block mt-1.5 text-2xs text-[var(--text-muted)] font-mono">
-                        {serverInfo.hostname}:{serverInfo.config_path}
-                      </code>
-                    )}
-                  </div>
-              <div className="p-1.5">
-                <DropdownMenuItem
-                  className="rounded-[var(--radius-sm)] py-2 text-[var(--text-primary)]"
-                  onClick={() => generateMutation.mutate()}
-                  disabled={generateMutation.isPending}
-                >
-                  {generateMutation.isPending ? t("sshConfig.writing") : t("sshConfig.writeToServer")}
-                </DropdownMenuItem>
-              </div>
-            </DropdownMenu>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title={t("sshConfig.title")}
+        subtitle={t("sshConfig.generateDescription")}
+        actions={
+          <div className="flex gap-2">
+            <Button onClick={handleDownload} disabled={!preview?.content}>
+              <Icon path={ICON_PATHS.download} />
+              {t("sshConfig.download")}
+            </Button>
+            <CopyButton value={preview?.content ?? ""} icon label={t("sshConfig.copy")} copiedLabel={t("sshConfig.copied")} disabled={!preview?.content} />
+            {canEdit && (
+              <DropdownMenu
+                trigger={
+                  <Button variant="secondary" aria-label={t("common.more")} title={t("common.more")}>
+                    <Icon path={ICON_PATHS.moreVertical} />
+                  </Button>
+                }
+                className="w-72"
+              >
+                <div className="p-3 border-b border-[var(--border-subtle)]">
+                      <p className="text-xs text-[var(--warning)] flex items-center gap-1.5">
+                        <Icon path={ICON_PATHS.alertOutline} className="w-3.5 h-3.5 shrink-0" />
+                        {t("sshConfig.writeWarning")}
+                      </p>
+                      {serverInfo && (
+                        <code className="block mt-1.5 text-2xs text-[var(--text-muted)] font-mono">
+                          {serverInfo.hostname}:{serverInfo.config_path}
+                        </code>
+                      )}
+                    </div>
+                <div className="p-1.5">
+                  <DropdownMenuItem
+                    className="rounded-[var(--radius-sm)] py-2 text-[var(--text-primary)]"
+                    onClick={() => generateMutation.mutate()}
+                    disabled={generateMutation.isPending}
+                  >
+                    {generateMutation.isPending ? t("sshConfig.writing") : t("sshConfig.writeToServer")}
+                  </DropdownMenuItem>
+                </div>
+              </DropdownMenu>
+            )}
+          </div>
+        }
+      />
 
       {/* Server context banner */}
       {serverInfo && (
@@ -164,17 +165,14 @@ export default function SSHConfigPage() {
         </div>
       )}
 
-      <Card hover={false}>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
-            {t("sshConfig.preview")}
-          </h2>
-          {preview?.content && (
-            <span className="text-xs text-[var(--text-muted)] font-mono">
-              {t("sshConfig.hostsCount", { count: String(preview.content.split("\n").filter((l) => l.startsWith("Host ")).length) })}
-            </span>
-          )}
-        </div>
+      <SectionCard
+        title={t("sshConfig.preview")}
+        controls={preview?.content ? (
+          <span className="text-xs text-[var(--text-muted)] font-mono">
+            {t("sshConfig.hostsCount", { count: String(preview.content.split("\n").filter((l) => l.startsWith("Host ")).length) })}
+          </span>
+        ) : undefined}
+      >
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}
@@ -212,7 +210,7 @@ export default function SSHConfigPage() {
             </div>
           </div>
         )}
-      </Card>
+      </SectionCard>
     </PageShell>
   );
 }

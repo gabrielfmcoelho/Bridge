@@ -1,24 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { hostChamadosAPI, usersAPI } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import SortableTable, { sortRows } from "@/components/ui/SortableTable";
 import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
-import EmptyState from "@/components/ui/EmptyState";
 import ChamadoDrawer from "./ChamadoDrawer";
 import GlpiHostTicketsBlock from "./GlpiHostTicketsBlock";
 import type { HostChamado } from "@/lib/types";
-
-const STATUS_DOT: Record<string, string> = {
-  in_execution: "bg-[var(--warning)]",
-  solved: "bg-[var(--success)]",
-};
 
 const STATUS_BADGE: Record<string, string> = {
   in_execution: "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30",
@@ -36,6 +30,7 @@ interface ChamadoSectionProps {
 }
 
 export default function ChamadoSection({ chamados: initialChamados, hostId, slug, canEdit, t, openCreate, onCreateDone }: ChamadoSectionProps) {
+  const confirm = useConfirm();
   const [view, setView] = useState<"cards" | "table">("cards");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedChamado, setSelectedChamado] = useState<HostChamado | null>(null);
@@ -87,8 +82,8 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
 
   return (
     <>
-      <SectionHeading actions={
-        <div className="flex items-center gap-2">
+      <SectionCard variant="plain" title={t("host.chamados")} count={chamados.length} empty={chamados.length === 0 ? t("host.noChamadosDesc") : undefined} controls={
+        <>
           {chamados.length > 0 && (
             <ViewToggle
               value={view}
@@ -104,14 +99,10 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
               <Button size="sm" onClick={openCreateDrawer}><span className="mr-1">+</span> {t("host.addChamado")}</Button>
             </span>
           )}
-        </div>
+        </>
       }>
-        {t("host.chamados")}
-      </SectionHeading>
 
-      {chamados.length === 0 ? (
-        <EmptyState icon="search" title={t("host.noChamados")} description={t("host.noChamadosDesc")} compact />
-      ) : view === "cards" ? (
+      {view === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
           {chamados.map((c, i) => {
             const isSolved = c.status === "solved";
@@ -128,10 +119,10 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="text-sm font-medium text-[var(--text-primary)] truncate block">
-                      {c.title || c.chamado_id || "--"}
+                      {c.title || c.chamado_id || "–"}
                     </span>
                     <span className="text-2xs text-[var(--text-faint)] truncate block font-mono">
-                      {c.chamado_id || "--"}
+                      {c.chamado_id || "–"}
                     </span>
                   </div>
                   {/* Expandable status dot — same pattern as host situacao compact badge */}
@@ -148,11 +139,11 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <span className="text-[var(--text-faint)] block mb-0.5">{t("host.chamadoUser")}</span>
-                    <span className="text-[var(--text-muted)]">{c.user_display_name || "--"}</span>
+                    <span className="text-[var(--text-muted)]">{c.user_display_name || "–"}</span>
                   </div>
                   <div>
                     <span className="text-[var(--text-faint)] block mb-0.5">{t("host.chamadoDate")}</span>
-                    <span className="text-[var(--text-muted)] font-mono">{c.date || "--"}</span>
+                    <span className="text-[var(--text-muted)] font-mono">{c.date || "–"}</span>
                   </div>
                 </div>
               </Card>
@@ -181,20 +172,21 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
             });
             return sorted.map((c, i) => (
               <tr key={c.id ?? i} className={`border-t border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`} onClick={() => openDetail(c)}>
-                <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] font-mono">{c.chamado_id || "--"}</td>
-                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.title || "--"}</td>
+                <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] font-mono">{c.chamado_id || "–"}</td>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.title || "–"}</td>
                 <td className="px-4 py-2.5">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_BADGE[c.status] || STATUS_BADGE.in_execution}`}>
                     {c.status === "in_execution" ? t("chamado.inExecution") : c.status === "solved" ? t("chamado.solved") : c.status}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 text-[var(--text-muted)]">{c.user_display_name || "--"}</td>
-                <td className="px-4 py-2.5 text-[var(--text-muted)] font-mono">{c.date || "--"}</td>
+                <td className="px-4 py-2.5 text-[var(--text-muted)]">{c.user_display_name || "–"}</td>
+                <td className="px-4 py-2.5 text-[var(--text-muted)] font-mono">{c.date || "–"}</td>
               </tr>
             ));
           }}
         </SortableTable>
       )}
+      </SectionCard>
 
       <ChamadoDrawer
         open={drawerOpen}
@@ -203,7 +195,7 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
         users={users}
         onCreate={(data) => createMutation.mutate(data)}
         onUpdate={(id, data) => updateMutation.mutate({ id, ...data })}
-        onDelete={(id) => { if (confirm(t("chamado.deleteConfirm"))) deleteMutation.mutate(id); }}
+        onDelete={async (id) => { if (await confirm({ title: t("chamado.deleteConfirm"), danger: true, confirmLabel: t("common.delete") })) deleteMutation.mutate(id); }}
         loading={createMutation.isPending || updateMutation.isPending}
         t={t}
         slug={slug}

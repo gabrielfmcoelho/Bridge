@@ -53,7 +53,7 @@ export default function TicketList({
 }) {
   const { locale, t } = useLocale();
   if (tickets.length === 0) {
-    return <p className="text-xs text-[var(--text-muted)] py-6 text-center">{emptyLabel ?? t("glpi.noTickets")}</p>;
+    return <p className="text-sm text-[var(--text-muted)]">{emptyLabel ?? t("glpi.noTickets")}</p>;
   }
   const sorted = [...tickets].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   const rowClass =

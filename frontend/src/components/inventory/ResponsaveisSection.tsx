@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import SortableTable, { sortRows } from "@/components/ui/SortableTable";
 import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
 import EmptyState from "@/components/ui/EmptyState";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import type { EntityResponsavel } from "@/lib/types";
 
 interface ResponsaveisSectionProps {
@@ -14,6 +16,8 @@ interface ResponsaveisSectionProps {
   t: (key: string) => string;
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Narrow column (host detail profile): one card of rows, no view toggle. */
+  compact?: boolean;
 }
 
 function WhatsAppButton({ phone, name }: { phone: string; name: string }) {
@@ -42,13 +46,45 @@ export default function ResponsaveisSection({
   t,
   emptyTitle,
   emptyDescription,
+  compact = false,
 }: ResponsaveisSectionProps) {
   const [respView, setRespView] = useState<"cards" | "table">("cards");
   const items = responsaveis ?? [];
 
+  if (compact) {
+    return (
+      <SectionCard title={t("host.responsaveis")} count={items.length} body="flush" empty={items.length === 0 ? emptyTitle || t("host.noResponsaveis") : undefined}>
+        <ul className="divide-y divide-[var(--border-subtle)]">
+          {[...items].sort((a, b) => Number(b.is_main) - Number(a.is_main)).map((r, i) => (
+            <li key={r.id ?? `${r.name}-${i}`} className="flex items-center gap-3 px-5 py-3">
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${r.is_main ? "bg-[var(--cyan)]/15 text-[var(--cyan)]" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
+                {getInitials(r.name)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] truncate">
+                  {r.name}
+                  {r.is_main && <Icon path={ICON_PATHS.star} className="w-3.5 h-3.5 text-[var(--warning)]" aria-label={t("responsavel.main")} />}
+                  {r.is_external && <Badge color="warning">{t("responsavel.external")}</Badge>}
+                </span>
+                <span className="block text-xs text-[var(--text-muted)] truncate">{[r.role, r.entity].filter(Boolean).join(" · ") || "–"}</span>
+              </span>
+              {r.phone && <WhatsAppButton phone={r.phone} name={r.name} />}
+            </li>
+          ))}
+        </ul>
+      </SectionCard>
+    );
+  }
+
+  // Cards view: the body is itself cards, so no card chrome. Table view: one card, table edge to edge.
+  const asTable = respView === "table" && items.length > 0;
+
   return (
-    <>
-      <SectionHeading actions={
+    <SectionCard
+      title={t("host.responsaveis")}
+      variant={asTable ? "card" : "plain"}
+      body={asTable ? "flush" : "padded"}
+      controls={
         <ViewToggle
           value={respView}
           onChange={(v) => setRespView(v as "cards" | "table")}
@@ -57,10 +93,8 @@ export default function ResponsaveisSection({
             { key: "table", label: t("common.table"), icon: VIEW_ICONS.table },
           ]}
         />
-      }>
-        {t("host.responsaveis")}
-      </SectionHeading>
-
+      }
+    >
       {items.length === 0 ? (
         <EmptyState
           icon="search"
@@ -85,7 +119,7 @@ export default function ResponsaveisSection({
                     )}
                     {r.name}
                   </span>
-                  <span className="text-xs text-[var(--text-muted)] truncate block">{r.role || "--"}</span>
+                  <span className="text-xs text-[var(--text-muted)] truncate block">{r.role || "–"}</span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {r.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}
@@ -95,68 +129,71 @@ export default function ResponsaveisSection({
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <span className="text-[var(--text-faint)] block mb-0.5">{t("host.phone")}</span>
-                  <span className="text-[var(--text-muted)] font-mono">{r.phone || "--"}</span>
+                  <span className="text-[var(--text-muted)] font-mono">{r.phone || "–"}</span>
                 </div>
                 <div>
                   <span className="text-[var(--text-faint)] block mb-0.5">{t("host.entity")}</span>
-                  <span className="text-[var(--text-muted)]">{r.entity || "--"}</span>
+                  <span className="text-[var(--text-muted)]">{r.entity || "–"}</span>
                 </div>
               </div>
             </Card>
           ))}
         </div>
       ) : (
-        <SortableTable
-          columns={[
-            { key: "name" as const, label: t("common.name") },
-            { key: "phone" as const, label: t("host.phone") },
-            { key: "role" as const, label: t("host.role") },
-            { key: "entity" as const, label: t("host.entity") },
-            { key: "type" as const, label: t("common.type") },
-            { key: "actions" as const, label: "" },
-          ]}
-          defaultSort="name"
-        >
-          {(sk, sd) => {
-            const sorted = sortRows(items, sk, sd, {
-              name: (a, b) => a.name.localeCompare(b.name),
-              phone: (a, b) => a.phone.localeCompare(b.phone),
-              role: (a, b) => a.role.localeCompare(b.role),
-              entity: (a, b) => a.entity.localeCompare(b.entity),
-              type: (a, b) => Number(b.is_main) - Number(a.is_main),
-              actions: () => 0,
-            });
-            return sorted.map((r, i) => (
-              <tr key={r.id ?? i} className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}>
-                <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
-                  <span className="flex items-center gap-2">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-3xs font-bold ${r.is_main ? "bg-[var(--cyan)]/15 text-[var(--cyan)]" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
-                      {getInitials(r.name)}
+        // ponytail: SortableTable brings its own bordered wrapper; strip it inside the card.
+        <div className="[&>div]:border-0 [&>div]:rounded-none">
+          <SortableTable
+            columns={[
+              { key: "name" as const, label: t("common.name") },
+              { key: "phone" as const, label: t("host.phone") },
+              { key: "role" as const, label: t("host.role") },
+              { key: "entity" as const, label: t("host.entity") },
+              { key: "type" as const, label: t("common.type") },
+              { key: "actions" as const, label: "" },
+            ]}
+            defaultSort="name"
+          >
+            {(sk, sd) => {
+              const sorted = sortRows(items, sk, sd, {
+                name: (a, b) => a.name.localeCompare(b.name),
+                phone: (a, b) => a.phone.localeCompare(b.phone),
+                role: (a, b) => a.role.localeCompare(b.role),
+                entity: (a, b) => a.entity.localeCompare(b.entity),
+                type: (a, b) => Number(b.is_main) - Number(a.is_main),
+                actions: () => 0,
+              });
+              return sorted.map((r, i) => (
+                <tr key={r.id ?? i} className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}>
+                  <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
+                    <span className="flex items-center gap-2">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-3xs font-bold ${r.is_main ? "bg-[var(--cyan)]/15 text-[var(--cyan)]" : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
+                        {getInitials(r.name)}
+                      </span>
+                      {r.is_main && (
+                        <svg className="w-3.5 h-3.5 text-[var(--warning)] shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                      )}
+                      {r.name}
                     </span>
-                    {r.is_main && (
-                      <svg className="w-3.5 h-3.5 text-[var(--warning)] shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                      </svg>
-                    )}
-                    {r.name}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-[var(--text-muted)] font-mono">{r.phone || "--"}</td>
-                <td className="px-4 py-2.5 text-[var(--text-muted)]">{r.role || "--"}</td>
-                <td className="px-4 py-2.5 text-[var(--text-muted)]">{r.entity || "--"}</td>
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-1">
-                    {r.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}
-                  </div>
-                </td>
-                <td className="px-4 py-2.5">
-                  {r.phone && <WhatsAppButton phone={r.phone} name={r.name} />}
-                </td>
-              </tr>
-            ));
-          }}
-        </SortableTable>
+                  </td>
+                  <td className="px-4 py-2.5 text-[var(--text-muted)] font-mono">{r.phone || "–"}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-muted)]">{r.role || "–"}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-muted)]">{r.entity || "–"}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-1">
+                      {r.is_external && <Badge color="amber">{t("responsavel.external")}</Badge>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {r.phone && <WhatsAppButton phone={r.phone} name={r.name} />}
+                  </td>
+                </tr>
+              ));
+            }}
+          </SortableTable>
+        </div>
       )}
-    </>
+    </SectionCard>
   );
 }

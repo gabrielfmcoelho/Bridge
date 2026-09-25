@@ -1,6 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
 import Icon from "./Icon";
-import { ICON_PATHS } from "@/lib/icon-paths";
 
 // Named accents resolve to theme tokens; anything else passes through as a CSS
 // colour (the situacao enum ships hex from the backend). The hue keys are the
@@ -43,17 +42,17 @@ interface CardProps {
   /** Token name (`success`, `cyan`, …) or any CSS colour. Exposed to children as `var(--card-accent)`. */
   accent?: CardAccent;
   /** How the accent shows. Defaults to `stripe-left` when an accent is given, `none` otherwise. */
-  decorator?: "stripe-left" | "stripe-top" | "tint" | "none";
+  decorator?: "stripe-left" | "stripe-top" | "none";
   padding?: keyof typeof paddings;
   hover?: boolean;
   selected?: boolean;
-  clickIndicator?: "link" | "drawer";
+  /** Whole-card controls that open a drawer show a hint; links don't (the whole card is the link). */
+  clickIndicator?: "drawer";
   /** `button` makes the whole card the control (catalog, atlas). Links wrap the card instead. */
   as?: "div" | "button";
 }
 
 const indicatorIcons: Record<string, string> = {
-  link: ICON_PATHS.chevronRight,
   drawer: "M4 6h16M4 12h16M4 18h7",
 };
 
@@ -78,9 +77,6 @@ export default function Card({
   const decoClass = {
     "stripe-left": "border-l-[3px] border-l-[var(--card-accent)]",
     "stripe-top": "border-t-[3px] border-t-[var(--card-accent)]",
-    // dark: a tinted wash. light: the same gradient turns into a pastel
-    // rectangle, so the accent becomes a top rule over a flat surface instead.
-    tint: "overflow-hidden border-[var(--card-accent)]/20 light:border-t-[3px] light:border-t-[var(--card-accent)] light:border-[var(--border-subtle)]",
     none: "",
   }[deco];
 
@@ -88,14 +84,12 @@ export default function Card({
   // toy-like, and the shadow that was supposed to explain the movement is
   // invisible on a near-black ground. Hover changes the surface instead.
   const hoverClass = hover
-    ? `hover:bg-[var(--bg-elevated)] ${deco === "tint" ? "" : "hover:border-[var(--border-strong)]"}`
+    ? "hover:bg-[var(--bg-elevated)] hover:border-[var(--border-strong)]"
     : "";
 
   const borderClass = selected
     ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30"
-    : deco === "tint"
-      ? ""
-      : "border-[var(--border-subtle)]";
+    : "border-[var(--border-subtle)]";
 
   return (
     <Tag
@@ -115,9 +109,6 @@ export default function Card({
       style={{ ...style, "--card-accent": color ?? "var(--accent)" } as CSSProperties}
       onClick={onClick}
     >
-      {deco === "tint" && (
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--card-accent)]/10 to-transparent pointer-events-none light:hidden" />
-      )}
       {clickIndicator && (
         <Icon
           path={indicatorIcons[clickIndicator]}

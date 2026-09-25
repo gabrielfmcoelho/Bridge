@@ -47,6 +47,9 @@ type Host struct {
 	KeyTestStatus             *string   `json:"key_test_status"`
 	DockerGroupStatus         *string   `json:"docker_group_status"`
 	CoolifyServerUUID         *string   `json:"coolify_server_uuid"`
+	ProxmoxID                 *string   `json:"proxmox_id"`     // set only by the Proxmox sync
+	ParentHostID              *int64    `json:"parent_host_id"` // Proxmox node the guest runs on
+	ParentHostSlug            *string   `json:"parent_host_slug"`
 	Observacoes               string    `json:"observacoes"`
 	GrafanaDashboardUID       string    `json:"grafana_dashboard_uid"`
 	CreatedAt                 time.Time `json:"created_at"`

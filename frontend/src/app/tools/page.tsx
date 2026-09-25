@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toolsAPI, servicesAPI, secretsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSecretReveal } from "@/hooks/useSecretReveal";
 import type { ExternalTool, Secret, AssetGrantsInput } from "@/lib/types";
@@ -51,6 +52,7 @@ function getEmbedHintKey(url: string): string | null {
 }
 
 export default function ToolsPage() {
+  const confirm = useConfirm();
   const { t } = useLocale();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -134,41 +136,40 @@ export default function ToolsPage() {
   if (embedTool) {
     return (
       <PageShell>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                setEmbedTool(null);
-                setEmbedReloadKey(0);
-                setEmbedErrorKey(null);
-              }}
-              className="inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
-            >
-              <Icon path={ICON_PATHS.back} />
-              {t("common.back")}
-            </button>
-            <h1 className="text-lg font-bold font-display">{embedTool.name}</h1>
-            {embedTool.source === "service" && (
-              <Badge color="cyan">{t("tool.synced")}</Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {embedTool.has_credentials && (
-              <Button size="sm" variant="secondary" onClick={() => setCredsTool(embedTool)}>
-                <Icon path={ICON_PATHS.lockOutline} className="w-3.5 h-3.5 mr-1.5" />
-                {t("tool.viewCredentials")}
-              </Button>
-            )}
-            <a
-              href={embedTool.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
-            >
-              {t("tool.openExternal")}
-            </a>
-          </div>
-        </div>
+        {/* Closes the embed (in-page state), so it stays here rather than in the app header's back link. */}
+        <button
+          onClick={() => {
+            setEmbedTool(null);
+            setEmbedReloadKey(0);
+            setEmbedErrorKey(null);
+          }}
+          className="mb-2 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+        >
+          <Icon path={ICON_PATHS.back} />
+          {t("common.back")}
+        </button>
+        <PageHeader
+          title={embedTool.name}
+          indicators={embedTool.source === "service" ? <Badge color="cyan">{t("tool.synced")}</Badge> : undefined}
+          actions={
+            <div className="flex items-center gap-3">
+              {embedTool.has_credentials && (
+                <Button size="sm" variant="secondary" onClick={() => setCredsTool(embedTool)}>
+                  <Icon path={ICON_PATHS.lockOutline} className="w-3.5 h-3.5 mr-1.5" />
+                  {t("tool.viewCredentials")}
+                </Button>
+              )}
+              <a
+                href={embedTool.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+              >
+                {t("tool.openExternal")}
+              </a>
+            </div>
+          }
+        />
         <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] overflow-hidden bg-white" style={{ height: "calc(100vh - 160px)" }}>
           <div className="relative w-full h-full">
             {(embedLoading || embedBlocked) && (
@@ -297,7 +298,7 @@ export default function ToolsPage() {
                     <div className="flex items-center gap-2 ml-auto">
                       {tool.source === "service" && (
                         <button
-                          onClick={() => { if (confirm("Unsync this tool?")) unsyncMutation.mutate(tool.id); }}
+                          onClick={async () => { if (await confirm({ title: t("confirm.unsyncTool"), danger: true, confirmLabel: t("tool.unsync") })) unsyncMutation.mutate(tool.id); }}
                           className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
                         >
                           {t("tool.unsync")}
@@ -369,6 +370,7 @@ function ToolForm({ tool, onSuccess, onDelete }: {
   onDelete?: () => void;
 }) {
   const { t } = useLocale();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const isSynced = tool?.source === "service";
   const [grants, setGrants] = useState<AssetGrantsInput>(tool ? {} : defaultGrants(user));
@@ -415,7 +417,7 @@ function ToolForm({ tool, onSuccess, onDelete }: {
         {onDelete ? (
           <button
             type="button"
-            onClick={() => { if (confirm("Delete this tool?")) onDelete(); }}
+            onClick={async () => { if (await confirm({ title: t("confirm.deleteTool"), danger: true, confirmLabel: t("common.delete") })) onDelete(); }}
             className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
           >
             {t("common.delete")}

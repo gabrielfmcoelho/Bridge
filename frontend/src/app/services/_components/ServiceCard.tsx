@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
+import { StatusText } from "@/components/ui/SituacaoText";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import type { Service } from "@/lib/types";
@@ -18,43 +18,35 @@ export default function ServiceCard({ svc }: { svc: Service }) {
 
   return (
     <Link href={`/services/${svc.id}`} className="block h-full">
-      <Card accent={accent} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
+      <Card accent={accent} className="h-full flex flex-col overflow-hidden">
+        {/* Fixed anatomy: every slot renders, "–" when empty. Origin and
+            discovery moved from header chips into the grid; internal/external
+            is the accent stripe plus the first indicator. */}
         <CardHeader
+          titleFont="display"
           title={svc.nickname}
           subtitle={svc.service_type ? `${svc.service_type}${svc.service_subtype ? ` / ${svc.service_subtype}` : ""}` : undefined}
-          description={svc.description || t("common.noDescription")}
-          badge={
-            <div className="flex items-center gap-1.5">
-              {svc.source !== "manual" && (
-                <Badge color={svc.source === "auto" ? "blue" : "emerald"} compact>
-                  {svc.source === "auto" ? t("service.sourceAuto") : t("service.sourceFixed")}
-                </Badge>
-              )}
-              {svc.discovery_kind && (
-                <Badge color={svc.discovery_kind === "container" ? "cyan" : "accent"} compact>
-                  {svc.discovery_kind === "container" ? t("service.kindContainer") : t("service.kindHost")}
-                </Badge>
-              )}
-              {svc.container_status && (
-                <span className={`inline-block w-2 h-2 rounded-full ${svc.container_status === "online" ? "bg-[var(--success)]" : "bg-[var(--text-faint)]"}`} title={svc.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")} />
-              )}
-              {svc.is_external_dependency ? (
-                <Badge color="red" compact>{t("service.isExternalDependency")}</Badge>
-              ) : (
-                <Badge color={svc.developed_by === "internal" ? "cyan" : "amber"} compact>
-                  {svc.developed_by === "internal" ? t("service.internal") : t("service.external")}
-                </Badge>
-              )}
-            </div>
+          subtitleFont="display"
+          status={
+            svc.container_status ? (
+              <StatusText
+                color={svc.container_status === "online" ? "var(--success)" : "var(--text-muted)"}
+                on={svc.container_status === "online"}
+                label={svc.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")}
+              />
+            ) : undefined
           }
+          description={svc.description}
         />
 
         <CardMetadataGrid
           items={[
-            { label: t("service.technologyStack"), value: svc.technology_stack || "-", mono: true },
-            { label: t("service.environment"), value: svc.environment || "-" },
-            { label: t("service.deployApproach"), value: svc.deploy_approach || "-" },
-            { label: t("service.version"), value: svc.version || "-", mono: true },
+            { label: t("service.technologyStack"), value: svc.technology_stack || "", mono: true },
+            { label: t("service.environment"), value: svc.environment || "" },
+            { label: t("service.deployApproach"), value: svc.deploy_approach || "" },
+            { label: t("service.version"), value: svc.version || "", mono: true },
+            { label: t("service.source"), value: svc.source === "auto" ? t("service.sourceAuto") : svc.source === "fixed" ? t("service.sourceFixed") : t("service.sourceManual") },
+            { label: t("service.discovery"), value: svc.discovery_kind === "container" ? t("service.kindContainer") : svc.discovery_kind ? t("service.kindHost") : "" },
           ]}
         />
 

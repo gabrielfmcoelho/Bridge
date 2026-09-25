@@ -6,6 +6,7 @@ import { projectGitlabAPI, type ProjectGitLabLink } from "@/lib/api";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import StatusDot from "@/components/ui/StatusDot";
+import SectionCard from "@/components/ui/SectionCard";
 import { useLocale } from "@/contexts/LocaleContext";
 
 interface Props {
@@ -122,24 +123,21 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
   })();
 
   return (
-    <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-4">
-      <div className="flex items-center justify-between mb-3 gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="text-xs font-semibold text-[var(--text-primary)]">{t("project.linkedGitlabSourcesTitle")}</h4>
-            <IntegrationStatusBadge enabled={integrationEnabled} configured={integrationConfigured} />
-          </div>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            {t("project.linkedGitlabSourcesHint")}
-          </p>
-        </div>
-        {canEdit && !adding && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => { setAdding(true); setError(null); }}>
-            + {t("project.addLink")}
-          </Button>
-        )}
-      </div>
-
+    <SectionCard
+      as="h3"
+      title={t("project.linkedGitlabSourcesTitle")}
+      description={t("project.linkedGitlabSourcesHint")}
+      controls={
+        <>
+          <IntegrationStatusBadge enabled={integrationEnabled} configured={integrationConfigured} />
+          {canEdit && !adding && (
+            <Button type="button" size="sm" variant="secondary" onClick={() => { setAdding(true); setError(null); }}>
+              + {t("project.addLink")}
+            </Button>
+          )}
+        </>
+      }
+    >
       {!integrationActive && (
         <p className="mb-3 text-xs text-[var(--warning)]">
           {!integrationEnabled
@@ -242,7 +240,7 @@ export default function GitLabLinksEditor({ projectId, canEdit, gitlabBaseURL }:
           ))}
         </ul>
       )}
-    </div>
+    </SectionCard>
   );
 }
 

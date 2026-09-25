@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import PillButton from "@/components/ui/PillButton";
-import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Pagination from "@/components/ui/Pagination";
@@ -145,8 +145,14 @@ export default function CatalogSearch() {
 
 
   const assetsSection = (
-        <section>
-          <SectionHeading variant="rule" count={assetsQuery.isLoading ? undefined : assetTotal}>{t("catalog.resultsExisting")}</SectionHeading>
+        <SectionCard
+          variant="plain"
+          title={t("catalog.resultsExisting")}
+          count={assetsQuery.isLoading ? undefined : assetTotal}
+          footer={!assetsQuery.isLoading && !assetsQuery.isError && assets.length > 0 && assetPages > 1 ? (
+            <Pagination page={assetPage} totalPages={assetPages} total={assetTotal} perPage={ASSETS_PER_PAGE} onChange={setAssetPage} bare />
+          ) : undefined}
+        >
           {assetsQuery.isLoading ? (
             <Skeleton className="h-[320px] rounded-[var(--radius-lg)]" />
           ) : assetsQuery.isError ? (
@@ -154,26 +160,18 @@ export default function CatalogSearch() {
           ) : assets.length === 0 ? (
             <EmptyState icon="search" title={t("catalog.assetsEmpty")} description={t("catalog.assetsEmptyHint")} compact />
           ) : (
-            <>
-              <CatalogAssetsTable
-                hits={assets}
-                sortKey={assetSort.key}
-                sortDir={assetSort.dir}
-                onSortChange={(key, dir) => setAssetSort({ key, dir })}
-              />
-              {assetPages > 1 && (
-                <div className="mt-4">
-                  <Pagination page={assetPage} totalPages={assetPages} total={assetTotal} perPage={ASSETS_PER_PAGE} onChange={setAssetPage} />
-                </div>
-              )}
-            </>
+            <CatalogAssetsTable
+              hits={assets}
+              sortKey={assetSort.key}
+              sortDir={assetSort.dir}
+              onSortChange={(key, dir) => setAssetSort({ key, dir })}
+            />
           )}
-        </section>
+        </SectionCard>
   );
 
   const offeringsSection = (
-        <section>
-          <SectionHeading variant="rule" count={offeringsQuery.isLoading ? undefined : offerings.length}>{t("catalog.resultsOfferings")}</SectionHeading>
+        <SectionCard variant="plain" title={t("catalog.resultsOfferings")} count={offeringsQuery.isLoading ? undefined : offerings.length}>
           {offeringsQuery.isLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -203,7 +201,7 @@ export default function CatalogSearch() {
               ))}
             </div>
           )}
-        </section>
+        </SectionCard>
   );
 
   return (

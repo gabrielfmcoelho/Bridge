@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v85**. Use idempotent idioms:
+per element, currently at **v86**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 
@@ -113,8 +113,12 @@ per element, currently at **v85**. Use idempotent idioms:
   (`frontend/src/lib/lineage/types.ts`) — not for form validation. Forms
   stay hand-rolled; don't take zod's presence there as a cue to convert
   them.
-- There is no toast component. Use `StatusAlert` for banners, `FormError`
-  inline.
+- Feedback: `useFlag()` (`contexts/FlagContext`) for the outcome of
+  something the user started (a sync, a save) — bottom-left, success/info
+  auto-dismiss after 8s, errors stay; `StatusAlert` for a problem with the
+  page or section itself; `FormError` inline in forms. Confirmations are
+  `await useConfirm()({ title, danger, requireText? })`
+  (`contexts/ConfirmContext`) — never `window.confirm`/`alert`/`prompt`.
 - Styling is Tailwind v4 with **no config file**; design tokens are CSS
   custom properties in `frontend/src/app/globals.css`. Never hardcode a hex
   value or a raw palette class (`text-emerald-400`): use `--success` /

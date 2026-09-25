@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { grafanaAPI, alertSettingsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import KpiGrid from "@/components/inventory/KpiGrid";
+import StatusAlert from "@/components/ui/StatusAlert";
 
 interface Props {
   slug: string;
@@ -58,7 +59,7 @@ export default function HostLiveKpis({ slug }: Props) {
       },
       {
         label: t("host.metrics.load1m"),
-        value: data.load_1m === null || data.load_1m === undefined ? "—" : data.load_1m.toFixed(2),
+        value: data.load_1m === null || data.load_1m === undefined ? "–" : data.load_1m.toFixed(2),
         color: "cyan",
         icon: "M13 10V3L4 14h7v7l9-11h-7z",
       },
@@ -77,9 +78,7 @@ export default function HostLiveKpis({ slug }: Props) {
 
   if (!isLoading && data && !data.configured) {
     return (
-      <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-4 py-3 text-xs text-[var(--text-muted)]">
-        {t("host.metrics.liveKpisUnavailable")}
-      </div>
+      <StatusAlert variant="info">{t("host.metrics.liveKpisUnavailable")}</StatusAlert>
     );
   }
 
@@ -111,16 +110,14 @@ export default function HostLiveKpis({ slug }: Props) {
         </details>
       )}
       {data.host_up === false && (
-        <div className="-mt-2 mb-3 rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 px-3 py-2 text-xs text-[var(--danger)]">
-          {t("host.metrics.hostDownNotice")}
-        </div>
+        <StatusAlert variant="error" className="-mt-2 mb-3">{t("host.metrics.hostDownNotice")}</StatusAlert>
       )}
     </div>
   );
 }
 
 function formatPct(v: number | null | undefined): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  if (v === null || v === undefined || Number.isNaN(v)) return "–";
   return `${Math.round(v)}%`;
 }
 
@@ -132,7 +129,7 @@ function pickColor(v: number | null | undefined, warning: number, critical: numb
 }
 
 function formatUptime(seconds: number | null | undefined): string {
-  if (seconds === null || seconds === undefined || seconds <= 0) return "—";
+  if (seconds === null || seconds === undefined || seconds <= 0) return "–";
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);

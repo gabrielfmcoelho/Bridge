@@ -1377,4 +1377,14 @@ var migrationsPostgres = []string{
 		PRIMARY KEY (project_id, dns_id)
 	);
 	CREATE INDEX IF NOT EXISTS idx_project_dns_links_dns ON project_dns_links(dns_id);`,
+
+	// Version 86: Proxmox VE sync. proxmox_id is the cluster resource id
+	// ("qemu/101", "lxc/102", "node/pve1"), unique among live hosts;
+	// parent_host_id points a guest at the host row of the node it runs on.
+	`ALTER TABLE hosts ADD COLUMN IF NOT EXISTS proxmox_id TEXT;
+	ALTER TABLE hosts ADD COLUMN IF NOT EXISTS parent_host_id BIGINT REFERENCES hosts(id) ON DELETE SET NULL;
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_hosts_proxmox_id ON hosts(proxmox_id) WHERE proxmox_id IS NOT NULL AND deleted_at IS NULL;
+	INSERT INTO app_settings (key, value) VALUES
+		('proxmox_enabled', 'false'), ('proxmox_base_url', ''), ('proxmox_token_id', ''), ('proxmox_skip_verify', 'false')
+		ON CONFLICT DO NOTHING;`,
 }

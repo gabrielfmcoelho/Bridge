@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import SortableTable from "@/components/ui/SortableTable";
 import Pagination from "@/components/ui/Pagination";
-import Badge from "@/components/ui/Badge";
+import SituacaoText from "@/components/ui/SituacaoText";
+import Tag from "@/components/ui/Tag";
 import type { Project } from "@/lib/types";
 
 // Server-driven table (inventory pagination). `projects` is ONE server page
@@ -51,10 +52,10 @@ export default function ProjectsTableView({ projects, total, tablePage, onPageCh
             >
               <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">{project.name}</td>
               <td className="px-4 py-2.5 text-[var(--text-secondary)] max-w-[200px] truncate">{project.description || "-"}</td>
-              <td className="px-4 py-2.5"><Badge variant="situacao" situacao={project.situacao} dot>{project.situacao}</Badge></td>
+              <td className="px-4 py-2.5"><SituacaoText situacao={project.situacao} /></td>
               <td className="px-4 py-2.5">
                 <div className="flex flex-wrap gap-1">
-                  {project.tags?.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}
+                  {project.tags?.slice(0, 3).map((tag) => <Tag key={tag}>{tag}</Tag>)}
                   {project.tags && project.tags.length > 3 && <span className="text-2xs text-[var(--text-faint)]">+{project.tags.length - 3}</span>}
                 </div>
               </td>

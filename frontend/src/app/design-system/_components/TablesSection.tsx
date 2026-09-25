@@ -26,7 +26,7 @@ const TABLE_COLUMNS: SortableColumn<RowKey>[] = [
   { key: "situacao", label: "Situação", sortable: false },
 ];
 
-// roleColors: copied verbatim from app/settings/page.tsx:30-34 (components/layout/Header.tsx
+// roleColors: copied verbatim from app/settings/UsersTab.tsx:22-26 (components/layout/Header.tsx
 // duplicates the same map).
 const roleColors: Record<string, string> = {
   admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
@@ -94,7 +94,7 @@ export default function TablesSection() {
 
       <Specimen
         title="Hand-rolled table"
-        source="app/settings/page.tsx:482-532"
+        source="app/settings/UsersTab.tsx:157-210"
         alsoIn={[
           "app/contacts/page.tsx:90",
           "app/issues/IssueBoard.tsx:750 (own SortIcon)",
@@ -104,7 +104,7 @@ export default function TablesSection() {
         ]}
         wide
       >
-        {/* specimen: app/settings/page.tsx:482-532 */}
+        {/* specimen: app/settings/UsersTab.tsx:157-210 */}
         <div className="border border-[var(--border-default)] rounded-[var(--radius-lg)] overflow-x-auto animate-fade-in">
           {/* ponytail: nested overflow-x-auto so the min-w-[600px] table clips here, not at <main> */}
           <div className="overflow-x-auto">

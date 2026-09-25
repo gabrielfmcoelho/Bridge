@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { sshKeysAPI, coolifyAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
@@ -24,6 +25,7 @@ import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 export default function HostCredentialsPage() {
+  const confirm = useConfirm();
   const { t } = useLocale();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -81,7 +83,7 @@ export default function HostCredentialsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {keys.map((cred, i) => (
             <div key={cred.id} className="stagger-in" style={{ "--i": i } as React.CSSProperties}>
-              <CredentialCard cred={cred} onClick={() => setViewingKey(cred.id)} onDelete={canEdit ? () => { if (confirm(`Delete ${cred.name}?`)) deleteMutation.mutate(cred.id); } : undefined} />
+              <CredentialCard cred={cred} onClick={() => setViewingKey(cred.id)} onDelete={canEdit ? async () => { if (await confirm({ title: t("confirm.deleteTitle", { name: cred.name }), danger: true, confirmLabel: t("common.delete") })) deleteMutation.mutate(cred.id); } : undefined} />
             </div>
           ))}
         </div>

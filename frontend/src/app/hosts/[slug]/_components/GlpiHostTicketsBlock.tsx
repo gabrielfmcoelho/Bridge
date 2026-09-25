@@ -4,7 +4,10 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { glpiAPI, integrationsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
+import StatusAlert from "@/components/ui/StatusAlert";
+import ToolbarSelect from "@/components/ui/ToolbarSelect";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import TicketList from "@/components/glpi/TicketList";
 
 interface Props {
@@ -40,7 +43,7 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
     }
   }, [profiles, profileID]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["host-glpi-tickets", slug, profileID],
     queryFn: () => glpiAPI.hostTickets(slug, profileID!),
     enabled: glpiEnabled && !!profileID,
@@ -50,39 +53,34 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
   if (!glpiEnabled) return null;
   if ((profiles?.length ?? 0) === 0) return null;
 
-  return (
-    <div className="mt-6">
-      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-        <h3 className="text-sm font-semibold text-[var(--text-secondary)] tracking-wide uppercase">
-          {t("host.glpiTicketsTitle")}
-        </h3>
-        {(profiles?.length ?? 0) > 1 && (
-          <select
-            value={profileID ?? ""}
-            onChange={(e) => setProfileID(e.target.value ? parseInt(e.target.value, 10) : null)}
-            className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-2 py-1 text-xs"
-          >
-            {(profiles ?? []).map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        )}
-      </div>
+  const profileSelect = (profiles?.length ?? 0) > 1 && (
+    <ToolbarSelect
+      name={t("chamado.profileLabel")}
+      icon={ICON_PATHS.user}
+      value={profileID != null ? String(profileID) : ""}
+      options={(profiles ?? []).map((p) => ({ value: String(p.id), label: p.name }))}
+      onChange={(v) => setProfileID(v ? parseInt(v, 10) : null)}
+    />
+  );
 
-      {isLoading ? (
-        <Card hover={false} className="!p-3">
-          <p className="text-xs text-[var(--text-muted)] animate-pulse">{t("host.glpiQuerying")}</p>
-        </Card>
-      ) : data?.computer == null ? (
-        <Card hover={false} className="!p-3">
-          <p className="text-xs text-[var(--text-muted)]">
-            {t("host.glpiNoComputerBefore")} <code className="font-mono text-[var(--text-secondary)]">{slug}</code>
-            {t("host.glpiNoComputerAfter")}
-          </p>
-        </Card>
-      ) : (
+  return (
+    <SectionCard
+      title={t("host.glpiTicketsTitle")}
+      as="h3"
+      controls={profileSelect || undefined}
+      className="mt-6"
+      empty={
+        isError ? undefined
+        : isLoading ? t("host.glpiQuerying")
+        : data?.computer == null ? `${t("host.glpiNoComputerBefore")} ${slug}${t("host.glpiNoComputerAfter")}`
+        : undefined
+      }
+    >
+      {isError ? (
+        <StatusAlert variant="error">{t("glpi.ticketLoadError", { message: (error as Error)?.message ?? "" })}</StatusAlert>
+      ) : data?.computer == null ? null : (
         <>
-          <Card hover={false} className="!p-3 mb-2 flex items-center justify-between gap-3 flex-wrap">
+          <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
             <div className="min-w-0">
               <p className="text-xs text-[var(--text-muted)]">GLPI Computer</p>
               <p className="text-sm font-mono text-[var(--text-primary)] truncate">
@@ -92,15 +90,13 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
             <span className="text-2xs text-[var(--text-faint)]">
               {t("host.glpiOpenTicketsCount", { n: String(data.tickets.length) })}
             </span>
-          </Card>
+          </div>
           {data.warning && (
-            <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)] text-xs px-3 py-2 mb-2">
-              {data.warning}
-            </div>
+            <StatusAlert variant="warning" className="mb-2">{data.warning}</StatusAlert>
           )}
           <TicketList tickets={data.tickets} emptyLabel={t("host.glpiNoOpenTickets")} />
         </>
       )}
-    </div>
+    </SectionCard>
   );
 }

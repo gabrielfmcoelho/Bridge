@@ -5,13 +5,11 @@ import { Section, Specimen } from "./Section";
 import Button from "@/components/ui/Button";
 import PageHeader from "@/components/ui/PageHeader";
 import Divider from "@/components/ui/Divider";
-import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
-import DetailHeader from "@/components/ui/DetailHeader";
-import DetailActions from "@/components/ui/DetailActions";
+import SituacaoText from "@/components/ui/SituacaoText";
+import CardIndicator from "@/components/inventory/CardIndicator";
 import ListToolbar from "@/components/ui/ListToolbar";
 import SearchBadge from "@/components/ui/SearchBadge";
 import Badge from "@/components/ui/Badge";
-import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 const noop = () => {};
@@ -19,65 +17,76 @@ const noop = () => {};
 export default function NavSection() {
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [search, setSearch] = useState("");
+  const [sideTab, setSideTab] = useState("profile");
 
   return (
     <Section id="nav" title="Navigation & Toolbars">
       <Specimen
         title="PageHeader"
         source="components/ui/PageHeader.tsx"
-        alsoIn={["7 pages still hand-roll the <h1> (atlas/*, tools, login, setup, share); see Typography"]}
+        alsoIn={["login, setup and share keep their own h1 (no app shell)"]}
         wide
       >
-        <div className="space-y-2">
-          <PageHeader title="Hosts" addLabel="Host" onAdd={noop} />
+        <div className="space-y-6">
+          <PageHeader title="Contatos" addLabel="Contato" onAdd={noop} />
           <PageHeader
-            title="Catálogo de Serviços"
-            subtitle="Encontre o que você precisa ou abra uma solicitação"
-            addLabel="Solicitação avulsa"
+            title="Hosts"
+            addLabel="Host"
             onAdd={noop}
-            actions={<Button size="sm" variant="secondary">Action</Button>}
+            hideAddOnPhone
+            controlsKey="ds-demo"
+            controlsBadge={2}
+            controls={
+              <ListToolbar
+                search={search}
+                onSearchChange={setSearch}
+                onFilterClick={noop}
+                activeFilterCount={2}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+              />
+            }
           />
+          <PageHeader
+            title="web-01"
+            titleFont="mono"
+            subtitle="Host"
+            description="Edge proxy"
+            status={<SituacaoText situacao="active" />}
+            indicators={
+              <>
+                <CardIndicator icon={ICON_PATHS.alert} count={2} color="warning" title="Issues" />
+                <CardIndicator icon={ICON_PATHS.lock} count={1} hideCount color="success" title="HTTPS" />
+              </>
+            }
+            onEdit={noop}
+            onDelete={noop}
+            deleteConfirmMessage="Delete web-01?"
+          />
+          <PageHeader
+            title="Configurações"
+            tabs={{
+              idBase: "ds-side",
+              label: "Configurações",
+              variant: "side",
+              active: sideTab,
+              onChange: setSideTab,
+              items: [
+                { key: "profile", label: "Profile", group: "Account" },
+                { key: "users", label: "Users", group: "Admin" },
+                { key: "integrations", label: "Integrations", group: "Admin" },
+              ],
+            }}
+          >
+            <p className="text-xs text-[var(--text-secondary)]">Panel for “{sideTab}”.</p>
+          </PageHeader>
         </div>
         <p className="text-[11px] text-[var(--text-muted)] mt-1">
-          <code>subtitle</code> replaces the <code>-mt-4 mb-6</code> paragraph hack on /catalog and /requests;{" "}
-          <code>actions</code> is the slot the five inline copies needed (settings, issues, releases, ssh-keys, dashboard now use it).
-        </p>
-      </Specimen>
-
-      <Specimen title="InventoryPageHeader" source="components/inventory/InventoryPageHeader.tsx" wide>
-        <InventoryPageHeader title="Hosts" viewMode={viewMode} onViewModeChange={setViewMode} addLabel="Host" onAdd={noop} />
-        <p className="text-[11px] text-[var(--text-muted)] mt-1">
-          <code>PageHeader</code> with a <code>ViewToggle</code> in <code>actions</code> (<code>hidden sm:flex</code>); used by
-          exactly the 4 inventory pages, which hide the add button on phones because they carry a FAB.
-        </p>
-      </Specimen>
-
-      <Specimen
-        title="DetailHeader"
-        source="components/ui/DetailHeader.tsx"
-        alsoIn={["app/hosts/[slug]/HostDetail.tsx:145 (hand-rolled detail header)"]}
-        wide
-      >
-        <DetailHeader
-          backHref="/design-system"
-          backLabel="Back"
-          title="web-01"
-          titleFont="mono"
-          titleColor="var(--accent)"
-          subtitle="Host"
-          description="Edge proxy"
-          badges={<Badge variant="situacao" situacao="active" compact>Active</Badge>}
-          counters={
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-400">
-              <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5" /> 2
-            </span>
-          }
-        >
-          <DetailActions canEdit isAdmin onEdit={noop} onDelete={noop} deleteConfirmMessage="Delete web-01?" />
-        </DetailHeader>
-        <p className="text-[11px] text-[var(--text-muted)]">
-          <code>DetailActions</code> is <code>hidden md:flex</code>; <code>onDelete</code> goes through native{" "}
-          <code>confirm()</code>.
+          One header for every page, fixed anatomy: title with <code>actions</code>, edit/delete (<code>onEdit</code>,{" "}
+          <code>onDelete</code> — it confirms itself) and the one primary (<code>onAdd</code>) last; <code>status</code>{" "}
+          (SituacaoText) then <code>indicators</code> (CardIndicator); <code>controls</code> for the list toolbar,
+          hidable with <code>controlsKey</code>; <code>tabs</code> (top or side) with the panel as children. Breadcrumbs
+          and Voltar live in the app header above it.
         </p>
       </Specimen>
 
@@ -88,11 +97,13 @@ export default function NavSection() {
           onFilterClick={noop}
           activeFilterCount={2}
           actions={<Button size="sm">+ Add</Button>}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
           searchAdornment={<Badge color="cyan" compact>3</Badge>}
         />
         <p className="text-[11px] text-[var(--text-muted)]">
-          <code>mb-5</code> baked in; 5 consumers; the de-facto search box; 11 other files inline the magnifier SVG
-          with their own input markup.
+          No margin of its own: it sits in <code>PageHeader controls</code>. The view switch is a{" "}
+          <code>ToolbarSelect</code> at its end. 11 other files still inline the magnifier SVG with their own input markup.
         </p>
       </Specimen>
 

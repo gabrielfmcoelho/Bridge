@@ -8,11 +8,10 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilteredGraph } from "@/hooks/useFilteredGraph";
 import PageShell from "@/components/layout/PageShell";
-import Badge from "@/components/ui/Badge";
-import TabBar from "@/components/ui/TabBar";
+import SituacaoText from "@/components/ui/SituacaoText";
+import CardIndicator from "@/components/inventory/CardIndicator";
 import Drawer from "@/components/ui/Drawer";
-import DetailHeader from "@/components/ui/DetailHeader";
-import DetailActions from "@/components/ui/DetailActions";
+import PageHeader from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import ProjectForm from "../ProjectForm";
 import DetailKpiSection from "./_components/KpiSection";
@@ -22,7 +21,6 @@ import IssueBoard from "./_components/IssueBoard";
 import CommitsTab from "./_components/CommitsTab";
 import WikiTab from "./_components/WikiTab";
 import ChamadosTab from "./_components/ChamadosTab";
-import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 type TabKey = "overview" | "topology" | "issues" | "commits" | "wiki" | "chamados";
@@ -94,45 +92,29 @@ export default function ProjectDetail({ id }: { id: number }) {
         </div>
       ) : data ? (
         <div className="space-y-5">
-          <DetailHeader
-            backHref="/projects"
-            backLabel={t("common.back")}
+          <PageHeader
+            showEmptyDescription
             title={data.project.name}
-            titleColor="var(--accent)"
             description={data.project.description || undefined}
-            badges={
-              <Badge variant="situacao" situacao={data.project.situacao} dot>{data.project.situacao}</Badge>
-            }
-            counters={
-              safeIssues.length > 0 ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)]">
-                  <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5" />
-                  {safeIssues.length}
-                </span>
-              ) : undefined
-            }
+            status={<SituacaoText situacao={data.project.situacao} />}
+            indicators={<CardIndicator icon={ICON_PATHS.alert} count={safeIssues.length} color="purple" title={t("issue.title")} />}
+            onEdit={canEdit ? () => setShowEditDrawer(true) : undefined}
+            onDelete={isAdmin ? () => deleteMutation.mutate() : undefined}
+            deleteConfirmMessage={`${t("confirm.deleteTitle", { name: `"${data.project.name}"` })} ${t("confirm.cannotUndo")}`}
+            tabs={{
+              idBase: "project",
+              label: data.project.name,
+              active: activeTab,
+              onChange: (key) => setActiveTab(key as TabKey),
+              panelClassName: "animate-fade-in",
+              items: tabs.map((tab) => ({
+                key: tab.key,
+                label: tab.label,
+                icon: tab.icon,
+                badge: tab.key === "issues" && safeIssues.length > 0 ? safeIssues.length : undefined,
+              })),
+            }}
           >
-            <DetailActions
-              canEdit={canEdit}
-              isAdmin={isAdmin}
-              onEdit={() => setShowEditDrawer(true)}
-              onDelete={() => deleteMutation.mutate()}
-              deleteConfirmMessage={`Delete project "${data.project.name}"? This cannot be undone.`}
-            />
-          </DetailHeader>
-
-          <TabBar
-            tabs={tabs.map((tab) => ({
-              key: tab.key,
-              label: tab.label,
-              icon: tab.icon,
-              badge: tab.key === "issues" && safeIssues.length > 0 ? safeIssues.length : undefined,
-            }))}
-            activeTab={activeTab}
-            onChange={(key) => setActiveTab(key as TabKey)}
-          />
-
-          <div className="animate-fade-in">
             {activeTab === "overview" && (
               <>
                 <DetailKpiSection
@@ -166,7 +148,7 @@ export default function ProjectDetail({ id }: { id: number }) {
                 canEdit={canEdit}
               />
             )}
-          </div>
+          </PageHeader>
 
           {/* Edit Drawer — now uses ProjectForm component */}
           <Drawer

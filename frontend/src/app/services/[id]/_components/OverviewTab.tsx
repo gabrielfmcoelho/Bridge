@@ -1,8 +1,8 @@
 "use client";
 
-import SectionHeading from "@/components/ui/SectionHeading";
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import Badge from "@/components/ui/Badge";
+import Tag from "@/components/ui/Tag";
 import Field from "@/components/ui/Field";
 import ResponsaveisSection from "@/components/inventory/ResponsaveisSection";
 import type { Service, EntityResponsavel } from "@/lib/types";
@@ -21,16 +21,13 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
       {tags && tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {tags.map((tag) => (
-            <Badge key={tag}>{tag}</Badge>
+            <Tag key={tag}>{tag}</Tag>
           ))}
         </div>
       )}
 
       {/* Main info grid */}
-      <Card accent="accent" hover={false}>
-        <SectionHeading variant="section">
-          {t("service.serviceInfo")}
-        </SectionHeading>
+      <SectionCard accent="accent" title={t("service.serviceInfo")}>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Field label={t("service.serviceType")} value={[service.service_type, service.service_subtype].filter(Boolean).join(" / ")} />
           <Field label={t("service.technologyStack")} value={service.technology_stack} />
@@ -57,15 +54,12 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
             link
           />
         </div>
-      </Card>
+      </SectionCard>
 
       {/* Discovery section — container fields only apply to container services;
           a host service shows its catalog identity and the same lifecycle. */}
       {service.discovery_kind && (
-        <Card accent="cyan" hover={false}>
-          <SectionHeading variant="section">
-            {service.discovery_kind === "container" ? t("service.containerInfo") : t("service.kindHost")}
-          </SectionHeading>
+        <SectionCard accent="cyan" title={service.discovery_kind === "container" ? t("service.containerInfo") : t("service.kindHost")}>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {service.discovery_kind === "container" ? (
               <>
@@ -83,21 +77,18 @@ export default function OverviewTab({ service, tags, responsaveis, t }: Overview
             <Field label={t("service.containerStatus")} value={service.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")} />
             <Field label={t("service.lastSeen")} value={service.last_seen_at || "-"} />
           </div>
-        </Card>
+        </SectionCard>
       )}
 
       {/* External dependency section */}
       {service.is_external_dependency && (
-        <Card accent="amber" hover={false}>
-          <SectionHeading variant="section">
-            {t("service.isExternalDependency")}
-          </SectionHeading>
+        <SectionCard accent="amber" title={t("service.isExternalDependency")}>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Field label={t("service.externalProvider")} value={service.external_provider} />
             <Field label={t("service.externalUrl")} value={service.external_url} link />
             <Field label={t("service.externalContact")} value={service.external_contact} />
           </div>
-        </Card>
+        </SectionCard>
       )}
 
       {/* Responsaveis */}

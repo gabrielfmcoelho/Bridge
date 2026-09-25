@@ -8,7 +8,13 @@
     "themeLabel": "Tema",
     "themeLight": "Claro",
     "themeDark": "Escuro",
-    "breadcrumbs": "Navegação estrutural"
+    "breadcrumbs": "Navegação estrutural",
+    "language": "Idioma",
+    "expandSidebar": "Expandir menu lateral",
+    "collapseSidebar": "Recolher menu lateral",
+    "aiAssistant": "Assistente de IA",
+    "profileMenu": "Perfil e preferências",
+    "assistant": "Assistente"
   },
   "nav": {
     "dashboard": "Painel",
@@ -43,7 +49,9 @@
     "wiki": "Wiki",
     "chamados": "Chamados",
     "chamadosForms": "Formulários",
-    "designSystem": "Design System"
+    "designSystem": "Design System",
+    "workspace": "Área de trabalho",
+    "selfService": "Autoatendimento"
   },
   "atlas": {
     "apis": {
@@ -434,7 +442,10 @@
     "expand": "Expandir",
     "filters": "Filtros",
     "addTag": "Adicionar tag...",
-    "dialog": "Diálogo"
+    "dialog": "Diálogo",
+    "notAvailable": "Não disponível",
+    "showTools": "Mostrar ferramentas",
+    "hideTools": "Ocultar ferramentas"
   },
   "filters": {
     "title": "Filtros e Ordenação",
@@ -502,7 +513,7 @@
     "acessoExterno": "Acesso Externo",
     "entidadeResponsavel": "Entidade Responsável",
     "scan": "Scan",
-    "scanAll": "Escanear Todos",
+    "scanAll": "Escanear todos",
     "scanAllDescription": "Testa e captura specs em paralelo de todos os hosts ativos com credenciais configuradas.",
     "scanConcurrency": "Scans paralelos",
     "scanScope": "Escopo",
@@ -533,7 +544,7 @@
     "batchDockerEmpty": "Nenhum host com credenciais configuradas.",
     "batchDockerErrNotInstalled": "Docker não está instalado",
     "batchDockerErrNeedsSudo": "Usuário ainda precisa de sudo para docker (re-login pode ser necessário)",
-    "batchDockerLogs": "Auditoria de Logs Docker",
+    "batchDockerLogs": "Auditoria de logs Docker",
     "batchDockerLogsDesc": "Inspeciona driver de logs, política de rotação e tamanho dos arquivos de log por container nos hosts selecionados. Somente leitura.",
     "batchDockerLogsStart": "Executar Auditoria de Logs",
     "batchDockerLogsScopeWithContainers": "Com containers",
@@ -547,19 +558,19 @@
     "batchDockerLogsHostsScanned": "Hosts auditados",
     "batchDockerLogsErrored": "com erro",
     "batchDockerLogsHostsErrored": "hosts com erro ou sem docker",
-    "batchSudo": "Sudo sem Senha",
+    "batchSudo": "Sudo sem senha",
     "batchSudoDesc": "Configura sudo sem senha para o usuário remoto nos hosts selecionados. Requer senha armazenada.",
     "batchSudoStart": "Executar Configuração Sudo",
     "batchSudoScopePasswordOnly": "Apenas senha",
     "batchSudoScopeBoth": "Senha + chave",
     "batchSudoEmpty": "Nenhum host com senha armazenada.",
-    "batchKey": "Configurar Chave",
+    "batchKey": "Configurar chave",
     "batchKeyDesc": "Gera um novo par de chaves ed25519 em cada host e o instala usando a senha armazenada. Chaves existentes são substituídas.",
     "batchKeyStart": "Executar Configuração de Chave",
     "batchKeyScopeNoKey": "Sem chave",
     "batchKeyScopeWithKey": "Reconfigurar",
     "batchKeyEmpty": "Nenhum host com senha armazenada.",
-    "withCredentials": "Com Creds",
+    "withCredentials": "Com credenciais",
     "scanned": "Escaneados",
     "services": "Serviços",
     "alerts": "Alertas",
@@ -680,7 +691,58 @@
     "cardKeyLabel": "Chave:",
     "untested": "não testada",
     "none": "nenhuma",
-    "situacaoUpdateFailed": "Falha ao atualizar"
+    "situacaoUpdateFailed": "Falha ao atualizar",
+    "syncProxmox": "Sincronizar do Proxmox",
+    "syncProxmoxRunning": "Lendo o cluster Proxmox…",
+    "proxmoxSyncDone": "{found} encontrados: {created} novos, {updated} atualizados, {deactivated} marcados inativos, {no_ip} sem IP",
+    "runsOn": "Roda em",
+    "bulkActions": "Ações em lote",
+    "idleNoWorkloads": "Nenhuma carga de trabalho ou container detectado no host.",
+    "kpi": {
+      "maintenance": "Em manutenção",
+      "inactive": "Inativos",
+      "critical": "Alertas críticos",
+      "withAnyAlert": "{count} hosts com algum alerta",
+      "ofScanned": "de {count} escaneados",
+      "highUsage": "Uso alto",
+      "highUsageHint": "CPU, RAM ou disco ≥ {pct}%",
+      "noScan": "Nunca escaneados",
+      "noCreds": "Sem credenciais",
+      "onHosts": "em {count} hosts"
+    },
+    "bulkGroupOps": "Operações nos hosts",
+    "bulkGroupSync": "Integrações",
+    "quickLook": "Visualização rápida",
+    "openPage": "Abrir página",
+    "copyHostname": "Copiar hostname",
+    "quickLookLinked": "Vínculos",
+    "quickLookNoLinks": "Nada vinculado a este host ainda.",
+    "quickLookLastScan": "Último scan",
+    "noPassword": "Nenhuma senha armazenada",
+    "noKey": "Nenhuma chave armazenada",
+    "idleNotFlaggedShort": "Não ociosa",
+    "view": {
+      "overview": "Visão geral",
+      "dashboard": "Dashboard"
+    },
+    "dash": {
+      "bySituacao": "Por situação",
+      "byHospedagem": "Por hospedagem",
+      "byEntidade": "Por entidade",
+      "byTags": "Por tag",
+      "byUsage": "Por uso de pico",
+      "usageLow": "Abaixo de 50%",
+      "usageMid": "50–80%",
+      "usageHigh": "80% ou mais",
+      "usageNone": "Sem scan",
+      "alertsByLevel": "Alertas por nível",
+      "none": "Nenhum",
+      "clickToFilter": "Clique numa linha para filtrar a listagem"
+    },
+    "pageDescription": "Servidores, VMs e containers do inventário: acesso, recursos, vínculos com serviços e DNS, e o estado de cada um.",
+    "profileTitle": "Host",
+    "declared": "Declarado",
+    "declaredHint": "O que foi cadastrado para este host; o último scan mostra o que existe de fato."
   },
   "dns": {
     "title": "Registros DNS",
@@ -924,7 +986,8 @@
     "portWithValue": "Porta {port}",
     "noPort": "Sem porta",
     "listing": "Serviços",
-    "emptyStateAdd": "Adicione seu primeiro serviço para começar"
+    "emptyStateAdd": "Adicione seu primeiro serviço para começar",
+    "discovery": "Descoberta"
   },
   "topology": {
     "title": "Topologia da Arquitetura",
@@ -1114,7 +1177,8 @@
     "saveChanges": "Salvar alterações",
     "saving": "Salvando...",
     "markdownHint": "Suporta formatação **markdown**...",
-    "noneReported": "Nenhuma issue reportada"
+    "noneReported": "Nenhuma issue reportada",
+    "boardEmpty": "Nenhuma issue ainda."
   },
   "release": {
     "title": "Lançamentos",
@@ -1275,7 +1339,6 @@
       "disabled": "Desabilitado",
       "testConnection": "Testar conexão",
       "saveChanges": "Salvar alterações",
-      "readOnlyHint": "Somente leitura — clique em Editar para alterar as configurações.",
       "unsavedChanges": "Alterações não salvas.",
       "noChanges": "Nenhuma alteração.",
       "clearStored": "Limpar valor salvo",
@@ -1321,16 +1384,13 @@
         "fallbackToLocal": "Reverter para autenticação local",
         "usernameAttr": "Atributo de usuário",
         "displayNameAttr": "Atributo de nome de exibição",
-        "emailAttr": "Atributo de e-mail",
-        "saveButton": "Salvar configurações LDAP",
-        "requestFailed": "Falha na requisição"
+        "emailAttr": "Atributo de e-mail"
       },
       "keycloak": {
         "title": "Configuração de SSO Keycloak",
         "environmentPresets": "Predefinições de ambiente",
         "clientId": "ID do cliente",
-        "redirectUriHint": "URI de redirecionamento (adicione ao cliente do Keycloak)",
-        "saveButton": "Salvar configurações do Keycloak"
+        "redirectUriHint": "URI de redirecionamento (adicione ao cliente do Keycloak)"
       },
       "gitlab": {
         "title": "Integração GitLab",
@@ -1373,9 +1433,6 @@
         "appToken": "App-Token (opcional)",
         "appTokenHint": "GLPI → Setup → General → API. Necessário apenas quando sua instância do GLPI exige — muitas instalações aceitam apenas o token por usuário. Deixe em branco se você só tiver tokens de usuário.",
         "defaultEntityIdFallback": "ID da entidade padrão (usado quando um perfil/projeto não tem um definido)",
-        "tokenProfilesHeading": "Perfis de token ({count})",
-        "readOnlyHint": "Somente leitura — clique em Editar para alterar.",
-        "confirmClearSecret": "Excluir o {label} armazenado? Isso não pode ser desfeito.",
         "confirmDeleteProfile": "Excluir o perfil \"{name}\"? Qualquer projeto vinculado a ele ficará sem atribuição.",
         "emptyProfiles": "Nenhum perfil ainda. Adicione um para habilitar o acesso a chamados por projeto.",
         "tokenStored": "token armazenado",
@@ -1389,7 +1446,8 @@
         "entityIdLabel": "ID da entidade padrão",
         "addProfileButton": "+ Adicionar perfil",
         "connectedProfiles": "Conectado ({profiles})",
-        "noProfilesFallback": "nenhum perfil"
+        "noProfilesFallback": "nenhum perfil",
+        "tokenProfilesTitle": "Perfis de token"
       },
       "grafana": {
         "hint": "Dashboards incorporados, métricas em tempo real, ingestão de alertas, instalação do agente.",
@@ -1408,10 +1466,8 @@
         "generateSecretButton": "Gerar segredo aleatório",
         "copyToClipboardTitle": "Copiar para a área de transferência",
         "generateSecretFirstTitle": "Gere um segredo primeiro",
-        "copiedCheck": "Copiado ✓",
         "webhookCopyHint": "Copie agora — depois de salvar, o sshcm mostra apenas a forma mascarada.",
         "webhookConfigHint": "Configure um contact point do Grafana para enviar JSON para /api/webhooks/grafana/alerts com o cabeçalho X-Sshcm-Signature: sha256=<hmac>.",
-        "webhookPromptCopy": "Copie o segredo do webhook abaixo:",
         "remoteWritePasswordConfirmLabel": "senha do remote_write",
         "webhookSecretConfirmLabel": "segredo do webhook",
         "orgLabel": "org {id}"
@@ -1424,7 +1480,6 @@
         "textModel": "Modelo de texto",
         "visionModel": "Modelo de visão",
         "maxTokens": "Máximo de tokens",
-        "saveButton": "Salvar configurações do LLM",
         "endpointOk": "Endpoint OK ({count} modelos)",
         "modelAvailable": "modelo \"{model}\" disponível",
         "modelNotInList": "modelo \"{model}\" NÃO está na lista",
@@ -1435,9 +1490,17 @@
         "hint": "Plataforma de self-hosting — gerencie servidores diretamente pelo SSHCM.",
         "ariaEnableCoolify": "Habilitar Coolify",
         "sshUser": "Usuário SSH",
-        "sshUserHint": "O usuário SSH é usado ao registrar servidores no Coolify. O Coolify não aceita pontos em nomes de usuário. O padrão é \"root\".",
-        "saveButton": "Salvar configurações do Coolify"
-      }
+        "sshUserHint": "O usuário SSH é usado ao registrar servidores no Coolify. O Coolify não aceita pontos em nomes de usuário. O padrão é \"root\"."
+      },
+      "proxmox": {
+        "hint": "Cluster Proxmox VE — sincroniza nós, VMs e containers em Hosts.",
+        "ariaEnable": "Habilitar Proxmox",
+        "tokenId": "ID do token",
+        "tokenSecret": "Segredo do token",
+        "tokenHint": "Token de API somente leitura (usuario@realm!nome) com o papel PVEAuditor em /. Os IPs dos convidados também exigem VM.Monitor (PVE 8) ou VM.GuestAgent.Audit (PVE 9) e o QEMU guest agent.",
+        "connectedVersion": "Conectado — Proxmox VE {version}"
+      },
+      "saved": "Salvo"
     },
     "integrationsTabLabel": "Integrações",
     "permissions": {
@@ -1521,7 +1584,15 @@
       "skipped": "Ignorados",
       "failed": "Com Falha",
       "another": "Importar Outro Arquivo"
-    }
+    },
+    "groups": {
+      "general": "Geral",
+      "access": "Acesso",
+      "catalog": "Catálogo",
+      "integrations": "Integrações",
+      "data": "Dados"
+    },
+    "restoreConfirmWord": "RESTAURAR"
   },
   "operation": {
     "builtIn": "Integradas",
@@ -1664,6 +1735,7 @@
     "nginxCleanupDesc": "Detectar e remover nginx não containerizado. Faz backup da configuração antes.",
     "confirmNginxCleanup": "Isso vai parar e desabilitar o serviço nginx nativo no host remoto. Um backup de /etc/nginx/ será criado antes. Continuar?",
     "confirmNginxPurge": "Também desinstalar os pacotes do nginx? Clique em Cancelar para apenas parar e desabilitar sem remover pacotes.",
+    "confirmGrafanaAgent": "Instalar e iniciar o grafana-agent neste host? Requer sudo e sobrescreve qualquer /etc/grafana-agent/config.yaml existente.",
     "coolifyReachable": "Acessível",
     "coolifyUnreachable": "Inacessível",
     "coolifyUsable": "Utilizável",
@@ -1847,7 +1919,40 @@
     "userPasswordNone": "sem senha",
     "userPasswordNoneTooltip": "Nenhuma senha definida (passwd -S = NP) — login por senha impossível.",
     "lastScanLabel": "Último scan:",
-    "noScanData": "Sem dados de scan"
+    "noScanData": "Sem dados de scan",
+    "pane": {
+      "title": "Último scan",
+      "ago": "Último scan · {ago}",
+      "run": "Executar scan",
+      "running": "Executando scan…",
+      "done": "Scan concluído",
+      "failed": "O scan falhou",
+      "noneTitle": "Nenhum scan ainda",
+      "noneDescription": "Execute um scan para ver recursos, usuários, processos e serviços deste host.",
+      "noCredentials": "Cadastre uma senha ou chave SSH para executar um scan.",
+      "parseError": "Não foi possível ler o último scan.",
+      "sections": "Seções do scan",
+      "group": {
+        "resources": "Recursos",
+        "system": "Sistema",
+        "users": "Usuários",
+        "processes": "Processos",
+        "containers": "Containers",
+        "services": "Serviços",
+        "packages": "Pacotes e agendamentos",
+        "security": "Segurança"
+      },
+      "empty": {
+        "resources": "Sem dados de uso neste scan.",
+        "system": "Sem informações do sistema neste scan.",
+        "users": "Nenhum usuário encontrado no último scan.",
+        "processes": "Nenhum processo encontrado no último scan.",
+        "containers": "Nenhum container encontrado no último scan.",
+        "services": "Nenhum serviço ou agente encontrado no último scan.",
+        "packages": "Nenhum pacote ou agendamento encontrado no último scan.",
+        "security": "Sem dados de firewall ou política SSH neste scan."
+      }
+    }
   },
   "sshKey": {
     "coolifyAlreadyExists": "Chave já existe no Coolify.",
@@ -2254,7 +2359,6 @@
     "importAlternative": "Alternativa: exporte o itemtype do GLPI como CSV (Administração › exportação) e converta para JSON — o formato esperado é array de { id, name }.",
     "saveCatalogue": "Salvar catálogo",
     "dropdownCatalogueTitle": "Catálogo de dropdowns",
-    "itemtypesConfigured": "{n} itemtype(s) configurado(s)",
     "dropdownCatalogueHint": "Quando o perfil GLPI não tem permissão de leitura via REST para dropdowns (ex.: /ITILCategory), os pickers do Formcreator voltam vazios. Cole aqui manualmente a lista — uma vez por itemtype, como os formulários raramente mudam. O snippet abaixo do editor coleta os <option> da página do GLPI já aberta no seu navegador.",
     "clearCatalogue": "Limpar",
     "catalogueDeleteConfirm": "Apagar o catálogo de {itemtype}? Os pickers voltam a tentar o REST.",
@@ -2386,5 +2490,59 @@
     "asyncPicker": {
       "clearSelection": "— limpar seleção —"
     }
+  },
+  "inventory": {
+    "groupBy": {
+      "title": "Agrupar por",
+      "none": "Sem agrupamento",
+      "host": "Host",
+      "dns": "DNS",
+      "service": "Serviço",
+      "project": "Projeto",
+      "contact": "Contato",
+      "entidade": "Entidade responsável"
+    },
+    "unlinked": {
+      "host": "Sem host",
+      "dns": "Sem DNS",
+      "service": "Sem serviço",
+      "project": "Sem projeto",
+      "contact": "Sem contato",
+      "entidade": "Sem entidade responsável"
+    },
+    "kpis": {
+      "customize": "Personalizar",
+      "reset": "Restaurar padrão",
+      "description": "Do que está listado — clique numa linha para filtrar"
+    },
+    "view": {
+      "title": "Exibição"
+    }
+  },
+  "confirm": {
+    "typeToConfirm": "Digite {text} para confirmar",
+    "deleteTitle": "Excluir {name}?",
+    "deleteGeneric": "Excluir este item?",
+    "cannotUndo": "Esta ação não pode ser desfeita.",
+    "deleteUser": "Excluir o usuário {name}?",
+    "deleteRelease": "Excluir este lançamento?",
+    "deleteTool": "Excluir esta ferramenta?",
+    "unsyncTool": "Dessincronizar esta ferramenta?",
+    "deleteRoleMapping": "Excluir este mapeamento de papel?",
+    "restoreTitle": "Substituir todos os dados?",
+    "clearSecretTitle": "Limpar segredo armazenado?",
+    "runOperation": "Executar esta operação?"
+  },
+  "search": {
+    "goTo": "Ir para",
+    "open": "Buscar",
+    "inputLabel": "Buscar páginas, hosts, DNS, serviços…"
+  },
+  "create": {
+    "host": "Host",
+    "dns": "DNS",
+    "service": "Serviço",
+    "project": "Projeto",
+    "contact": "Contato"
   }
 }

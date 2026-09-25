@@ -12,6 +12,7 @@ import Badge from "@/components/ui/Badge";
 import { glpiAPI, integrationsAPI } from "@/lib/api";
 import type { HostChamado } from "@/lib/types";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 
 function applyDateMask(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 8);
@@ -46,6 +47,7 @@ interface ChamadoDrawerProps {
 }
 
 export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate, onUpdate, onDelete, loading, t, slug }: ChamadoDrawerProps) {
+  const confirm = useConfirm();
   const isEdit = !!chamado;
   const [mode, setMode] = useState<"read" | "edit" | "create">("create");
   const [chamadoId, setChamadoId] = useState("");
@@ -75,7 +77,6 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
   }, [open, chamado, users]);
 
   const userOptions = users.map((u) => ({ value: String(u.id), label: u.display_name }));
-  const userName = users.find((u) => u.id === userId)?.display_name || chamado?.user_display_name || "--";
 
   const handleSubmit = () => {
     const data = { chamado_id: chamadoId, title, status, user_id: userId, date };
@@ -102,8 +103,8 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
       >
         <div className="space-y-4">
           <div>
-            <p className="text-base font-semibold text-[var(--text-primary)]">{chamado.title || chamado.chamado_id || "--"}</p>
-            <p className="text-xs text-[var(--text-faint)] font-mono">{chamado.chamado_id || "--"}</p>
+            <p className="text-base font-semibold text-[var(--text-primary)]">{chamado.title || chamado.chamado_id || "–"}</p>
+            <p className="text-xs text-[var(--text-faint)] font-mono">{chamado.chamado_id || "–"}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -113,10 +114,10 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
                 {chamado.status === "in_execution" ? t("chamado.inExecution") : chamado.status === "solved" ? t("chamado.solved") : chamado.status}
               </span>
             </div>
-            <Field label={t("host.chamadoUser")} value={chamado.user_display_name || "--"} />
+            <Field label={t("host.chamadoUser")} value={chamado.user_display_name ?? ""} />
           </div>
 
-          <Field label={t("host.chamadoDate")} value={chamado.date || "--"} />
+          <Field label={t("host.chamadoDate")} value={chamado.date} />
 
           {slug && <GlpiRefreshBlock slug={slug} chamado={chamado} />}
         </div>
@@ -133,7 +134,7 @@ export default function ChamadoDrawer({ open, onClose, chamado, users, onCreate,
         title={t("common.edit") + " " + t("host.chamados")}
         footer={
           <div className="flex gap-2">
-            <Button variant="danger" size="sm" onClick={() => { if (confirm(t("chamado.deleteConfirm")) && chamado.id) onDelete(chamado.id); }} className="mr-auto">
+            <Button variant="danger" size="sm" onClick={async () => { if (chamado.id && await confirm({ title: t("chamado.deleteConfirm"), danger: true, confirmLabel: t("common.delete") })) onDelete(chamado.id); }} className="mr-auto">
               {t("common.delete")}
             </Button>
             <Button variant="secondary" size="sm" className="flex-1" onClick={() => setMode("read")}>{t("common.cancel")}</Button>
@@ -253,7 +254,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
           {chamado.cached_title ? (
             <p className="text-xs text-[var(--text-muted)] truncate">{chamado.cached_title}</p>
           ) : (
-            <p className="text-xs text-[var(--text-faint)] italic">{t("chamado.drawer.noLiveData")}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t("chamado.drawer.noLiveData")}</p>
           )}
           {(chamado.cached_status || liveStatus) && (
             <div className="flex items-center gap-2 mt-1">

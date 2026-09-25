@@ -1,9 +1,10 @@
 "use client";
 
+import SituacaoText from "@/components/ui/SituacaoText";
+
 import { useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Badge from "@/components/ui/Badge";
 import { hostsAPI, enumsAPI } from "@/lib/api";
 import type { Host, EnumOption } from "@/lib/types";
 
@@ -45,9 +46,7 @@ export default function SituacaoCell({
 
   if (!canEdit) {
     return (
-      <Badge variant="situacao" situacao={host.situacao} dot>
-        {host.situacao}
-      </Badge>
+      <SituacaoText situacao={host.situacao} />
     );
   }
 
@@ -64,12 +63,10 @@ export default function SituacaoCell({
             // page transition and lose.
             e.stopPropagation();
           }}
-          className="cursor-pointer hover:ring-2 hover:ring-[var(--accent-muted)] rounded-full transition-shadow"
+          className="cursor-pointer rounded-[var(--radius-sm)] px-1 -mx-1 hover:bg-[var(--bg-elevated)] transition-colors"
           title={t("host.changeSituacao")}
         >
-          <Badge variant="situacao" situacao={host.situacao} dot>
-            {host.situacao}
-          </Badge>
+          <SituacaoText situacao={host.situacao} />
         </button>
       </Popover.Trigger>
       <Popover.Portal>

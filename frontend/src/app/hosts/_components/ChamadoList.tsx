@@ -75,7 +75,7 @@ export default function ChamadoList({
               size="sm"
               type="button"
               onClick={() => remove(idx)}
-              title={t("common.remove")}
+              label={t("common.remove")}
             >
               <Icon path={ICON_PATHS.trashOutline} className="w-3.5 h-3.5" />
             </IconButton>

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import StatCard from "@/components/ui/StatCard";
 import type { LineageIndexes } from "@/lib/lineage/indexes";
 import { LAYER_COLORS, NODE_TYPE_LABELS } from "@/lib/lineage/style";
@@ -81,10 +82,7 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
       </div>
 
       {/* Issue cards */}
-      <div>
-        <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
-          {t("atlas.lineage.issuesHeader")}
-        </h2>
+      <SectionCard variant="plain" title={t("atlas.lineage.issuesHeader")}>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <button onClick={() => onNavigate("issues", { kind: undefined })} className="text-left">
             <StatCard label={t("atlas.lineage.cards.errors")} value={stats.errors} icon={ICONS.error} color="red" />
@@ -102,14 +100,11 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
             <StatCard label={t("atlas.lineage.cards.unusedMacros")} value={stats.unusedMacros} icon={ICONS.macro} color="accent" />
           </button>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Domains */}
       {domains.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
-            {t("atlas.lineage.domainsHeader")}
-          </h2>
+        <SectionCard variant="plain" title={t("atlas.lineage.domainsHeader")} count={domains.length}>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {domains.map(([ns, s]) => (
               <Card key={ns} as="button" padding="sm" onClick={() => onNavigate("graph", { focus: `ns:${ns}` })}>
@@ -122,15 +117,12 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
               </Card>
             ))}
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Layers */}
       {layers.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">
-            {t("atlas.lineage.layersHeader")}
-          </h2>
+        <SectionCard variant="plain" title={t("atlas.lineage.layersHeader")}>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {layers.map(([layer, count]) => (
               <Card key={layer} padding="sm" hover={false}>
@@ -144,7 +136,7 @@ export default function OverviewPanel({ indexes, onNavigate }: Props) {
               </Card>
             ))}
           </div>
-        </div>
+        </SectionCard>
       )}
     </div>
   );

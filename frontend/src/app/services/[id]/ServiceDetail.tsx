@@ -9,11 +9,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFilteredGraph } from "@/hooks/useFilteredGraph";
 import PageShell from "@/components/layout/PageShell";
 import Badge from "@/components/ui/Badge";
-import TabBar from "@/components/ui/TabBar";
+import { StatusText } from "@/components/ui/SituacaoText";
 import Drawer from "@/components/ui/Drawer";
 import Button from "@/components/ui/Button";
-import DetailHeader from "@/components/ui/DetailHeader";
-import DetailActions from "@/components/ui/DetailActions";
+import PageHeader from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import ServiceForm from "../ServiceForm";
 import OverviewTab from "./_components/OverviewTab";
@@ -129,16 +128,20 @@ export default function ServiceDetail({ id }: { id: number }) {
       ) : data ? (
         <div className="space-y-5">
           {/* ── Header ── */}
-          <DetailHeader
-            backHref="/services"
-            backLabel={t("common.back")}
+          <PageHeader
+            showEmptyDescription
             title={data.service.nickname}
             titleFont="mono"
-            titleColor="var(--accent)"
             subtitle={data.service.service_type ? `${data.service.service_type}${data.service.service_subtype ? ` / ${data.service.service_subtype}` : ""}` : undefined}
             description={data.service.description}
-            badges={
-              <>
+            status={data.service.container_status ? (
+              <StatusText
+                color={data.service.container_status === "online" ? "var(--success)" : "var(--text-muted)"}
+                on={data.service.container_status === "online"}
+                label={data.service.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")}
+              />
+            ) : undefined}
+            indicators={<>
                 {data.service.source !== "manual" && (
                   <Badge color={data.service.source === "auto" ? "blue" : "emerald"} compact>
                     {data.service.source === "auto" ? t("service.sourceAuto") : t("service.sourceFixed")}
@@ -147,11 +150,6 @@ export default function ServiceDetail({ id }: { id: number }) {
                 {data.service.discovery_kind && (
                   <Badge color={data.service.discovery_kind === "container" ? "cyan" : "accent"} compact>
                     {data.service.discovery_kind === "container" ? t("service.kindContainer") : t("service.kindHost")}
-                  </Badge>
-                )}
-                {data.service.container_status && (
-                  <Badge color={data.service.container_status === "online" ? "emerald" : "default"} compact>
-                    {data.service.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")}
                   </Badge>
                 )}
                 {data.service.is_external_dependency ? (
@@ -163,41 +161,34 @@ export default function ServiceDetail({ id }: { id: number }) {
                 )}
                 {data.service.environment && <Badge>{data.service.environment}</Badge>}
                 {data.service.technology_stack && <Badge>{data.service.technology_stack}</Badge>}
-              </>
-            }
+              </>}
+            actions={canEdit && data.service.source === "auto" ? (
+              <Button size="sm" variant="secondary" onClick={() => fixateMutation.mutate()} loading={fixateMutation.isPending}>
+                {t("service.fixate")}
+              </Button>
+            ) : undefined}
+            onEdit={canEdit ? () => setShowEditDrawer(true) : undefined}
+            onDelete={isAdmin ? () => deleteMutation.mutate() : undefined}
+            deleteConfirmMessage={`${t("confirm.deleteTitle", { name: `"${data.service.nickname}"` })} ${t("confirm.cannotUndo")}`}
+            tabs={{
+              idBase: "service",
+              label: data.service.nickname,
+              active: activeTab,
+              onChange: (key) => setActiveTab(key as TabKey),
+              panelClassName: "space-y-5",
+              items: [
+                ...VIEW_TABS,
+                ...(grafanaEnabled
+                  ? [{ key: "metrics" as TabKey, label: "Metrics", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" }]
+                  : []),
+              ].map((tab) => ({
+                key: tab.key,
+                label: tab.label,
+                icon: tab.icon,
+                badge: tab.key === "issues" && issues.length > 0 ? issues.length : undefined,
+              })),
+            }}
           >
-            <div className="flex items-center gap-2">
-              {canEdit && data.service.source === "auto" && (
-                <Button size="sm" variant="secondary" onClick={() => fixateMutation.mutate()} loading={fixateMutation.isPending}>
-                  {t("service.fixate")}
-                </Button>
-              )}
-              <DetailActions
-                canEdit={canEdit}
-                isAdmin={isAdmin}
-                onEdit={() => setShowEditDrawer(true)}
-                onDelete={() => deleteMutation.mutate()}
-                deleteConfirmMessage={`Delete service "${data.service.nickname}"? This cannot be undone.`}
-              />
-            </div>
-          </DetailHeader>
-
-          {/* ── Tab bar ── */}
-          <TabBar
-            tabs={[
-              ...VIEW_TABS,
-              ...(grafanaEnabled
-                ? [{ key: "metrics" as TabKey, label: "Metrics", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" }]
-                : []),
-            ].map((tab) => ({
-              key: tab.key,
-              label: tab.label,
-              icon: tab.icon,
-              badge: tab.key === "issues" && issues.length > 0 ? issues.length : undefined,
-            }))}
-            activeTab={activeTab}
-            onChange={(key) => setActiveTab(key as TabKey)}
-          />
 
           {/* ── Tab content ── */}
           {activeTab === "overview" && (
@@ -240,6 +231,8 @@ export default function ServiceDetail({ id }: { id: number }) {
           {activeTab === "metrics" && grafanaEnabled && (
             <MetricsTab serviceId={id} nickname={data.service.nickname} />
           )}
+
+          </PageHeader>
 
           {/* ── Edit Drawer ── */}
           <Drawer

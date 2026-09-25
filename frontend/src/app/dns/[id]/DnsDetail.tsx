@@ -8,18 +8,15 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFilteredGraph } from "@/hooks/useFilteredGraph";
 import PageShell from "@/components/layout/PageShell";
-import Badge from "@/components/ui/Badge";
-import TabBar from "@/components/ui/TabBar";
+import SituacaoText from "@/components/ui/SituacaoText";
+import CardIndicator from "@/components/inventory/CardIndicator";
 import Drawer from "@/components/ui/Drawer";
-import DetailHeader from "@/components/ui/DetailHeader";
-import DetailActions from "@/components/ui/DetailActions";
-import FloatingActionButton, { type FABAction } from "@/components/ui/FloatingActionButton";
+import PageHeader from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import DnsForm from "../DnsForm";
 import OverviewTab from "./_components/OverviewTab";
 import TopologyTab from "./_components/TopologyTab";
 import IssuesTab from "./_components/IssuesTab";
-import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { certState } from "@/lib/dnsCert";
 import CertBadge from "../_components/CertBadge";
@@ -96,14 +93,6 @@ export default function DnsDetail({ id }: { id: number }) {
     },
   ];
 
-  const fabActions: FABAction[] = [];
-  if (canEdit) {
-    fabActions.push({ label: t("common.edit"), icon: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z", onClick: () => setShowEditDrawer(true) });
-  }
-  if (isAdmin) {
-    fabActions.push({ label: t("common.delete"), icon: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16", onClick: () => deleteMutation.mutate(), color: "#ef4444" });
-  }
-
   return (
     <PageShell>
       {isLoading ? (
@@ -117,48 +106,23 @@ export default function DnsDetail({ id }: { id: number }) {
         </div>
       ) : dns ? (
         <div className="space-y-5">
-          <DetailHeader
-            backHref="/dns"
-            backLabel={t("common.back")}
+          <PageHeader
+            showEmptyDescription
             title={dns.domain}
             titleFont="mono"
-            titleColor="var(--accent)"
             subtitle={t("dns.record")}
-            badges={
-              <>
-                <Badge variant="situacao" situacao={dns.situacao} dot>{dns.situacao}</Badge>
-                {dns.has_https && (
-                  <Badge color="emerald">
-                    <Icon path={ICON_PATHS.lock} className="w-3 h-3 mr-1" />
-                    {t("topology.https")}
-                  </Badge>
-                )}
-                {certState(dns) !== "none" && <CertBadge dns={dns} />}
-              </>
-            }
-            counters={
-              dnsIssues.length > 0 ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)]">
-                  <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5" />
-                  {dnsIssues.length}
-                </span>
-              ) : undefined
-            }
+            description={dns.observacoes || undefined}
+            status={<SituacaoText situacao={dns.situacao} />}
+            indicators={<>
+              <CardIndicator icon={ICON_PATHS.lock} count={dns.has_https ? 1 : 0} hideCount color="success" title={t("topology.https")} />
+              <CardIndicator icon={ICON_PATHS.alert} count={dnsIssues.length} color="purple" title={t("host.acontecimentos")} />
+              {certState(dns) !== "none" && <CertBadge dns={dns} />}
+            </>}
+            onEdit={canEdit ? () => setShowEditDrawer(true) : undefined}
+            onDelete={isAdmin ? () => deleteMutation.mutate() : undefined}
+            deleteConfirmMessage={t("dns.deleteConfirm", { name: dns.domain })}
+            tabs={{ idBase: "dns", label: dns.domain, active: activeTab, onChange: (k) => setActiveTab(k as TabKey), items: tabs, panelClassName: "space-y-5" }}
           >
-            <DetailActions
-              canEdit={canEdit}
-              isAdmin={isAdmin}
-              onEdit={() => setShowEditDrawer(true)}
-              onDelete={() => deleteMutation.mutate()}
-              deleteConfirmMessage={t("dns.deleteConfirm", { name: dns.domain })}
-            />
-          </DetailHeader>
-
-          <TabBar
-            tabs={tabs}
-            activeTab={activeTab}
-            onChange={(key) => setActiveTab(key as TabKey)}
-          />
 
           {activeTab === "overview" && (
             <OverviewTab dns={dns} tags={data.tags || []} responsaveis={responsaveis} linkedHosts={linkedHosts} linkedServices={linkedServices} linkedProjects={linkedProjects} canEdit={canEdit} t={t} />
@@ -171,6 +135,8 @@ export default function DnsDetail({ id }: { id: number }) {
           {activeTab === "topology" && (
             <TopologyTab filteredGraph={filteredGraph} linkedHosts={linkedHosts} linkedServices={linkedServices} />
           )}
+
+          </PageHeader>
 
           {/* Edit Drawer — now uses DnsForm component */}
           <Drawer
@@ -198,7 +164,6 @@ export default function DnsDetail({ id }: { id: number }) {
             />
           </Drawer>
 
-          {fabActions.length > 0 && <FloatingActionButton actions={fabActions} />}
         </div>
       ) : null}
     </PageShell>

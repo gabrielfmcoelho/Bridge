@@ -4,8 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { dnsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { certDaysLeft } from "@/lib/dnsCert";
-import SectionHeading from "@/components/ui/SectionHeading";
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import Field from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import StatusAlert from "@/components/ui/StatusAlert";
@@ -31,9 +30,9 @@ export default function CertificateCard({ dns, canEdit }: { dns: DNSRecord; canE
   const expires = exp ? (days >= 0 ? `${formatDate(exp)} · ${t("dns.certDaysLeft", { days: String(days) })}` : formatDate(exp)) : "";
 
   return (
-    <>
-      <SectionHeading
-        actions={
+    <SectionCard
+      title={t("dns.certificate")}
+      controls={
           <>
             <CertBadge dns={dns} />
             {canEdit && (
@@ -42,12 +41,9 @@ export default function CertificateCard({ dns, canEdit }: { dns: DNSRecord; canE
               </Button>
             )}
           </>
-        }
-      >
-        {t("dns.certificate")}
-      </SectionHeading>
-      <Card hover={false}>
-        <div className="space-y-4">
+      }
+    >
+      <div className="space-y-4">
           {rescan.isError && <FormError message={rescan.error.message} />}
           {dns.cert_error && <StatusAlert variant={exp ? "warning" : "error"}>{dns.cert_error}</StatusAlert>}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
@@ -58,8 +54,7 @@ export default function CertificateCard({ dns, canEdit }: { dns: DNSRecord; canE
             <Field label={t("dns.certSubject")} value={dns.cert_subject || ""} />
             <Field label={t("dns.certSans")} value={dns.cert_sans || ""} mono />
           </div>
-        </div>
-      </Card>
-    </>
+      </div>
+    </SectionCard>
   );
 }

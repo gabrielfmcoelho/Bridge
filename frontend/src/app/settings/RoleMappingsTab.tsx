@@ -1,21 +1,24 @@
 "use client";
 
+import RowActions from "@/components/ui/RowActions";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { roleMappingsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import NativeSelect from "@/components/ui/NativeSelect";
-import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 const PROVIDERS = ["ldap", "keycloak", "gitlab"];
 const ROLES = ["viewer", "editor", "admin"];
 
 export default function RoleMappingsTab() {
+  const confirm = useConfirm();
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data: mappings = [], isLoading } = useQuery({
@@ -60,11 +63,7 @@ export default function RoleMappingsTab() {
   }
 
   return (
-    <Card>
-      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">{t("settings.roleMappings.title")}</h3>
-      <p className="text-xs text-[var(--text-muted)] mb-4">
-        {t("settings.roleMappings.intro")}
-      </p>
+    <SectionCard as="h3" title={t("settings.roleMappings.title")} description={t("settings.roleMappings.intro")}>
 
       {/* Existing mappings */}
       {mappings.length > 0 ? (
@@ -110,13 +109,10 @@ export default function RoleMappingsTab() {
                     </span>
                   </td>
                   <td className={tableClasses.compact.td}>
-                    <button
-                      onClick={() => deleteMutation.mutate(m.id)}
-                      className="text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors p-1"
-                      title={t("settings.roleMappings.deleteMapping")}
-                    >
-                      <Icon path={ICON_PATHS.trashOutline} />
-                    </button>
+                    <RowActions
+                      name={m.external_group}
+                      actions={[{ label: t("settings.roleMappings.deleteMapping"), icon: ICON_PATHS.trash, danger: true, onClick: async () => { if (await confirm({ title: t("confirm.deleteRoleMapping"), danger: true, confirmLabel: t("common.delete") })) deleteMutation.mutate(m.id); } }]}
+                    />
                   </td>
                 </tr>
               ))}
@@ -170,6 +166,6 @@ export default function RoleMappingsTab() {
           </Button>
         </div>
       </div>
-    </Card>
+    </SectionCard>
   );
 }

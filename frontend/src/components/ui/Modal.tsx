@@ -5,7 +5,18 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 import { useEffect, useId, type ReactNode } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 
+/** Widths after the ADS modal steps (400/600/800/968px); md keeps the
+ *  app's long-standing 42rem so existing dialogs don't change. */
+export const MODAL_SIZES = {
+  sm: "max-w-[25rem]",
+  md: "max-w-2xl",
+  lg: "max-w-[50rem]",
+  xl: "max-w-[60.5rem]",
+} as const;
+export type ModalSize = keyof typeof MODAL_SIZES;
+
 interface ModalProps {
+  size?: ModalSize;
   open: boolean;
   onClose: () => void;
   title?: string;
@@ -17,7 +28,7 @@ interface ModalProps {
   children: ReactNode;
 }
 
-export default function Modal({ open, onClose, title, subHeader, footer, children }: ModalProps) {
+export default function Modal({ open, onClose, title, subHeader, footer, children, size = "md" }: ModalProps) {
   const { t } = useLocale();
   const titleId = useId();
 
@@ -57,7 +68,7 @@ export default function Modal({ open, onClose, title, subHeader, footer, childre
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         aria-label={title ? undefined : t("common.dialog")}
-        className="relative glass border border-[var(--border-default)] md:rounded-[var(--radius-xl)] rounded-t-[var(--radius-xl)] max-w-2xl w-full md:mx-4 max-h-[95vh] md:max-h-[90vh] flex flex-col overflow-hidden shadow-[var(--shadow-lg)] animate-scale-in md:animate-scale-in"
+        className={`relative glass border border-[var(--border-default)] md:rounded-[var(--radius-xl)] rounded-t-[var(--radius-xl)] ${MODAL_SIZES[size]} w-full md:mx-4 max-h-[95vh] md:max-h-[90vh] flex flex-col overflow-hidden shadow-[var(--shadow-lg)] animate-scale-in md:animate-scale-in`}
         onClick={(e) => e.stopPropagation()}
       >
         {title && (

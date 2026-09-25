@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import PageShell from "@/components/layout/PageShell";
+import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import Drawer from "@/components/ui/Drawer";
@@ -73,38 +74,34 @@ export default function PipelinePageInner() {
   return (
     <PageShell fullBleed>
       <div className="flex flex-col h-full">
-        {/* Header / toolbar */}
-        <div className="px-4 md:px-6 pt-4 pb-3 border-b border-[var(--border-subtle)] flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold tracking-tight font-display">
-                {t("atlas.pipeline.title")}
-              </h1>
-              {generatedAt && (
-                <span className="text-2xs text-[var(--text-faint)]">
-                  {t("atlas.lineage.generatedAt")} · {new Date(generatedAt).toLocaleString()}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-[var(--text-muted)] max-w-2xl">{t("atlas.pipeline.subtitle")}</p>
-          </div>
-          {indexes && (
-            <AtlasToolbar
-              indexes={indexes}
-              filters={filters}
-              onChange={setFilters}
-              showRoleFilter={false}
-              onOpenSearch={() => setSearchOpen(true)}
-              rightSlot={
-                <ViewModeToggle<PipelineViewMode>
-                  value={view}
-                  onChange={setView}
-                  options={viewOptions}
-                  ariaLabel={t("atlas.pipeline.toolbar.view")}
-                />
-              }
-            />
-          )}
+        {/* Header / toolbar. ponytail: PageHeader draws its own bottom divider; its mb-6 is the gap above the graph. */}
+        <div className="shrink-0 px-4 md:px-6 pt-4">
+          <PageHeader
+            title={t("atlas.pipeline.title")}
+            subtitle={t("atlas.pipeline.subtitle")}
+            indicators={generatedAt ? (
+              <span className="text-2xs text-[var(--text-faint)]">
+                {t("atlas.lineage.generatedAt")} · {new Date(generatedAt).toLocaleString()}
+              </span>
+            ) : undefined}
+            controls={indexes && (
+              <AtlasToolbar
+                indexes={indexes}
+                filters={filters}
+                onChange={setFilters}
+                showRoleFilter={false}
+                onOpenSearch={() => setSearchOpen(true)}
+                rightSlot={
+                  <ViewModeToggle<PipelineViewMode>
+                    value={view}
+                    onChange={setView}
+                    options={viewOptions}
+                    ariaLabel={t("atlas.pipeline.toolbar.view")}
+                  />
+                }
+              />
+            )}
+          />
         </div>
 
         {/* Graph */}

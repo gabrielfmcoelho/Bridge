@@ -18,7 +18,7 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 
 const noop = () => {};
 
-// roleColors: copied verbatim from components/layout/Header.tsx:13-17 (app/settings/page.tsx
+// roleColors: copied verbatim from components/layout/Header.tsx:13-17 (app/settings/UsersTab.tsx
 // duplicates the same map).
 const roleColors: Record<string, string> = {
   admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
@@ -75,7 +75,7 @@ export default function OverlaysSection() {
           onClose={close}
           title="Edit host"
           headerAction={
-            <IconButton variant="outline" size="sm" onClick={noop} title="More">
+            <IconButton variant="outline" size="sm" onClick={noop} label="More">
               <Icon path={ICON_PATHS.edit} />
             </IconButton>
           }
@@ -235,7 +235,7 @@ export default function OverlaysSection() {
           </li>
           <li><code>app/hosts/_components/BatchOperationShell.tsx</code></li>
           <li><code>app/secrets/_components/HistoryDrawer.tsx</code> (guardrailed)</li>
-          <li>No toast; <code>window.confirm()</code> ×32</li>
+          <li>Confirms: <code>useConfirm()</code> (<code>ResponsiveModal size=&quot;sm&quot;</code>); notices: <code>useFlag()</code></li>
         </ul>
       </div>
     </Section>

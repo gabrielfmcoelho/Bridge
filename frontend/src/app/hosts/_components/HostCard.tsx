@@ -6,11 +6,16 @@ import { enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import { situacaoAccent } from "@/lib/constants";
-import Badge from "@/components/ui/Badge";
+import SituacaoText from "@/components/ui/SituacaoText";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import ScanIndicator from "./ScanIndicator";
 import { hasPermissionDeniedMessage } from "@/lib/utils";
+import { formatSize } from "@/lib/units";
+import Icon from "@/components/ui/Icon";
+import IconButton from "@/components/ui/IconButton";
+import { QuickLookOutlet } from "./HostQuickLook";
+import { openQuickLook } from "./quickLookStore";
 import type { Host } from "@/lib/types";
 
 export default function HostCard({ host }: { host: Host }) {
@@ -21,138 +26,132 @@ export default function HostCard({ host }: { host: Host }) {
   });
   const situacaoColor = situacoes.find((s) => s.value === host.situacao)?.color;
   const sr = host.scan_resources;
-  const hasCleanResources = host.has_scan && sr &&
+  // A scan that returned "permission denied" etc. counts as no data.
+  const clean = !!(host.has_scan && sr &&
     !hasPermissionDeniedMessage(sr.cpu) &&
     !hasPermissionDeniedMessage(sr.ram) &&
-    !hasPermissionDeniedMessage(sr.storage) &&
-    (sr.cpu || sr.ram || sr.storage);
+    !hasPermissionDeniedMessage(sr.storage));
 
   const mainResp = host.responsaveis?.find((r) => r.is_main);
 
-  const authIconColor = (has: boolean, status?: "success" | "failed" | null) => {
-    if (!has) return "text-[var(--text-faint)]/30";
-    if (status === "success") return "text-[var(--success)]";
-    if (status === "failed") return "text-[var(--danger)]";
-    return "text-[var(--text-faint)]";
-  };
+  const counts = [
+    { icon: ICON_PATHS.globe, count: host.dns_count || 0, color: "success", label: "DNS" },
+    { icon: ICON_PATHS.container, count: host.containers_count || 0, color: "info", label: t("host.containers") },
+    { icon: ICON_PATHS.terminal, count: host.processes_count || 0, color: "accent", label: t("host.processes") },
+    { icon: ICON_PATHS.gear, count: host.services_count || 0, color: "warning", label: t("host.services") },
+    { icon: ICON_PATHS.folder, count: host.projects_count || 0, color: "accent", label: t("nav.projects") },
+    { icon: ICON_PATHS.document, count: host.chamados_count || 0, color: "warning", label: t("nav.chamados") },
+    { icon: ICON_PATHS.alert, count: host.alerts?.length || 0, color: "danger", label: t("host.alerts") },
+    { icon: ICON_PATHS.clipboard, count: host.issues_count || 0, color: "accent", label: t("nav.issues") },
+  ];
 
   return (
-    <Link href={`/hosts/${host.oficial_slug}`} className="block h-full">
-      <Card accent={situacaoAccent(host.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
+    <>
+    {/* `group relative` anchors the quick-look button; the outlet sits outside
+        the Link so clicks inside the (portalled) panel don't bubble into it. */}
+    <Link href={`/hosts/${host.oficial_slug}`} className="group relative block h-full">
+      <Card accent={situacaoAccent(host.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden">
+        {/* Fixed anatomy (DS rule 18): every slot below always renders in the
+            same place, "–"/0/dimmed when there is nothing to show. */}
         <CardHeader
+          titleFont="display"
           title={host.nickname}
           subtitle={host.oficial_slug}
-          description={host.description || t("common.noDescription")}
-          badge={
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Badge variant="situacao" situacao={host.situacao} dot>
-                {host.situacao}
-              </Badge>
-              {/* Idle-VM indicator — a single moon icon takes the chip slot
-                  whenever the host has been scanned. Filled slate when the
-                  heuristic flagged the host (host.idle=true); faded
-                  outline when the heuristic ran but didn't flag it. Hosts
-                  without scan data render nothing since the heuristic
-                  can't be evaluated. The native title tooltip carries the
-                  rule trail — passing reasons when idle, failing
-                  counterfacts when not. */}
-              {host.has_scan && (
-                <span
-                  className={`inline-flex items-center justify-center ${
-                    host.idle ? "text-[var(--text-muted)] " : "text-[var(--text-faint)] opacity-40"
-                  }`}
-                  title={
-                    host.idle
-                      ? `${t("host.idle")}\n\n${(host.idle_reasons ?? []).join("\n") || "Host has no detected workloads or containers."}`
-                      : `${t("host.idle")}: ${t("host.idleNotFlagged")}\n\n${(host.idle_counterfacts ?? []).join("\n")}`
-                  }
-                  aria-label={t("host.idle")}
-                >
-                  <svg className="w-3.5 h-3.5" fill={host.idle ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-                  </svg>
-                </span>
-              )}
-            </div>
+          status={<SituacaoText situacao={host.situacao} />}
+          description={host.description}
+          corner={
+            <IconButton
+              label={`${t("host.quickLook")}: ${host.nickname}`}
+              variant="outline"
+              className="shrink-0 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openQuickLook(host);
+              }}
+            >
+              <Icon path={ICON_PATHS.eye} />
+            </IconButton>
           }
         />
 
         <CardMetadataGrid
           items={[
-            { label: t("host.hostname"), value: host.hostname || "-", mono: true },
-            { label: t("host.hospedagem"), value: host.hospedagem || "-" },
-            { label: t("dns.responsavel"), value: mainResp?.name || host.main_responsavel_name || "-" },
-            { label: t("host.entity"), value: host.main_entidade || "-" },
+            { label: t("host.hostname"), value: host.hostname || "", mono: true },
+            { label: t("host.hospedagem"), value: host.hospedagem || "" },
+            { label: t("dns.responsavel"), value: mainResp?.name || host.main_responsavel_name || "" },
+            { label: t("host.entity"), value: host.main_entidade || "" },
           ]}
         />
 
         <CardTagsSection tags={host.tags} />
 
-        {/* Resources — unique to hosts, and only once a scan has produced them.
-            An unscanned host used to render three empty meter tracks under
-            "CPU -- RAM -- DISK --", which is four rows saying "no data". */}
-        {hasCleanResources && sr && (
-          <div className="mt-3 pt-3 pb-1 border-t border-[var(--border-subtle)]">
-            <div className="grid grid-cols-3 gap-3">
-              <MiniResource label="CPU" value={sr.cpu} usage={sr.cpu_usage} />
-              <MiniResource label="RAM" value={sr.ram} usage={sr.ram_percent} />
-              <MiniResource label={t("vm.disk")} value={sr.storage} usage={sr.disk_percent} />
-            </div>
+        {/* Resources always show; without a (clean) scan they read "–". */}
+        <div className="mt-3 pt-3 pb-1 border-t border-[var(--border-subtle)]">
+          <div className="grid grid-cols-3 gap-3">
+            <MiniResource label="CPU" value={clean ? sr?.cpu : undefined} usage={clean ? sr?.cpu_usage : undefined} />
+            <MiniResource label="RAM" value={clean ? sr?.ram : undefined} usage={clean ? sr?.ram_percent : undefined} />
+            <MiniResource label={t("vm.disk")} value={clean ? sr?.storage : undefined} usage={clean ? sr?.disk_percent : undefined} />
           </div>
-        )}
+        </div>
 
-        {/* Bottom indicators */}
-        <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4">
-          {/* Row 1: scan, dns, containers, processes, services, projects */}
-          <div className="grid grid-cols-[repeat(6,2.25rem)] justify-start gap-x-2">
-            <ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} />
-            <CardIndicator icon={ICON_PATHS.globe} count={host.dns_count || 0} color="cyan" title={`${host.dns_count || 0} DNS`} />
-            <CardIndicator icon={ICON_PATHS.container} count={host.containers_count || 0} color="sky" title={`${host.containers_count || 0} ${t("host.containers").toLowerCase()}`} />
-            <CardIndicator icon={ICON_PATHS.terminal} count={host.processes_count || 0} color="accent" title={`${host.processes_count || 0} ${t("host.processes").toLowerCase()}`} />
-            <CardIndicator icon={ICON_PATHS.gear} count={host.services_count || 0} color="amber" title={`${host.services_count || 0} ${t("host.services").toLowerCase()}`} />
-            <CardIndicator icon={ICON_PATHS.folder} count={host.projects_count || 0} color="accent" title={`${host.projects_count || 0} projetos`} />
-          </div>
-
-          {/* Row 2: auth (pwd, key), chamados, alerts, issues */}
-          <div className="grid grid-cols-[repeat(6,2.25rem)] justify-start gap-x-2">
-            <div className="flex items-center" title={`${t("host.cardPasswordLabel")} ${host.has_password ? (host.password_test_status || t("host.untested")) : t("host.none")}`}>
-              <svg className={`w-3.5 h-3.5 ${authIconColor(host.has_password, host.password_test_status)}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d={ICON_PATHS.lock} />
-              </svg>
-            </div>
-            <div className="flex items-center" title={`${t("host.cardKeyLabel")} ${host.has_key ? (host.key_test_status || t("host.untested")) : t("host.none")}`}>
-              <svg className={`w-3.5 h-3.5 ${authIconColor(host.has_key, host.key_test_status)}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d={ICON_PATHS.key} />
-              </svg>
-            </div>
-            <CardIndicator icon={ICON_PATHS.document} count={host.chamados_count || 0} color="orange" title={`${host.chamados_count || 0} chamados`} />
-            <CardIndicator icon={ICON_PATHS.alert} count={host.alerts?.length || 0} color="amber" title={`${host.alerts?.length || 0} alerts`} />
-            <CardIndicator icon={ICON_PATHS.clipboard} count={host.issues_count || 0} color="accent" title={`${host.issues_count || 0} issues`} />
-          </div>
+        {/* Indicators: a fixed 6×2 grid so every icon has the same cell on
+            every card — links on the first row; alerts, issues, idle, scan,
+            password, key on the second. All always present. */}
+        <div className="grid grid-cols-6 gap-x-2 gap-y-2 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4 [&>*]:h-5 [&>*]:flex [&>*]:items-center">
+          {counts.map((c) => (
+            <CardIndicator key={c.label} icon={c.icon} count={c.count} color={c.color} title={`${c.count} ${c.label.toLowerCase()}`} />
+          ))}
+          <CardIndicator
+            icon={ICON_PATHS.moon}
+            count={host.idle ? 1 : 0}
+            color="info"
+            hideCount
+            disabled={!host.has_scan}
+            title={host.idle ? `${t("host.idle")}: ${(host.idle_reasons ?? []).join("; ") || t("host.idleNoWorkloads")}` : `${t("host.idle")}: ${t("host.idleNotFlaggedShort")}`}
+          />
+          <ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} />
+          <AccessIcon icon={ICON_PATHS.lock} label={t("host.cardPasswordLabel")} has={host.has_password} none={t("host.noPassword")} status={host.password_test_status} t={t} />
+          <AccessIcon icon={ICON_PATHS.key} label={t("host.cardKeyLabel")} has={host.has_key} none={t("host.noKey")} status={host.key_test_status} t={t} />
         </div>
       </Card>
     </Link>
+    <QuickLookOutlet />
+    </>
   );
 }
 
 function MiniResource({ label, value, usage }: { label: string; value?: string; usage?: string }) {
-  if (!value || typeof value !== 'string') return null;
-  if (!value.trim() || value.toLowerCase().includes('bash') || value.toLowerCase().includes('permission') || value.toLowerCase().includes('/dev/null')) return null;
-  if (usage && (usage.toLowerCase().includes('bash') || usage.toLowerCase().includes('permission') || usage.toLowerCase().includes('/dev/null'))) return null;
-
-  const pct = parseInt(usage || "0") || 0;
+  const bad = (v?: string) => !v || !v.trim() || /bash|permission|\/dev\/null/i.test(v);
+  const hasValue = !bad(value);
+  const hasUsage = !bad(usage);
+  const pct = hasUsage ? parseInt(usage!) || 0 : 0;
   const color = pct >= 80 ? "text-[var(--danger)]" : pct >= 50 ? "text-[var(--warning)]" : "text-[var(--success)]";
   const barColor = pct >= 80 ? "bg-[var(--danger)]" : pct >= 50 ? "bg-[var(--warning)]" : "bg-[var(--success)]";
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-[var(--text-faint)]">{label}</span>
-        {usage && <span className={`text-xs font-semibold ${color} font-mono`}>{usage.includes("%") ? usage : `${usage}%`}</span>}
+        <span className="text-xs text-[var(--text-muted)]">{label}</span>
+        <span className={`text-xs font-semibold font-mono ${hasUsage ? color : "text-[var(--text-muted)]"}`}>
+          {hasUsage ? (usage!.includes("%") ? usage : `${usage}%`) : "–"}
+        </span>
       </div>
       <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-        <div className={`h-full rounded-full ${barColor} transition`} style={{ width: `${Math.min(pct, 100)}%` }} />
+        {hasUsage && <div className={`h-full rounded-full ${barColor} transition`} style={{ width: `${Math.min(pct, 100)}%` }} />}
       </div>
-      <p className="text-xs text-[var(--text-muted)] mt-0.5 text-right font-mono">{value}</p>
+      <p className="text-xs text-[var(--text-muted)] mt-0.5 text-right font-mono">{hasValue ? formatSize(value!) : "–"}</p>
     </div>
+  );
+}
+
+/** A credential slot, always shown: coloured by its last test (green ok, red
+ *  failed, muted untested), or dimmed when none is stored. */
+function AccessIcon({ icon, label, has, none, status, t }: { icon: string; label: string; has: boolean; none: string; status?: "success" | "failed" | null; t: (k: string) => string }) {
+  const color = !has ? "text-[var(--text-faint)] opacity-40" : status === "success" ? "text-[var(--success)]" : status === "failed" ? "text-[var(--danger)]" : "text-[var(--text-muted)]";
+  const text = has ? `${label} ${status || t("host.untested")}` : none;
+  return (
+    <span role="img" aria-label={text} title={text} className="inline-flex">
+      <Icon path={icon} className={`w-3.5 h-3.5 ${color}`} />
+    </span>
   );
 }

@@ -12,6 +12,13 @@ export const SITUACAO_DOT_COLORS: Record<string, string> = {
   maintenance: "bg-[var(--warning)]",
 };
 
+// The colour of a situação: the enum's own colour when it has one, otherwise
+// the semantic token. Shared by Badge (legacy) and SituacaoText.
+export function situacaoColorOf(situacao: string | undefined, enumColor?: string): string {
+  if (enumColor) return enumColor;
+  return situacao === "active" ? "var(--success)" : situacao === "maintenance" ? "var(--warning)" : "var(--text-muted)";
+}
+
 // Card accent for an entity's situacao: the enum's own colour when it has one,
 // otherwise the semantic token. Replaces the per-card hex fallbacks.
 export function situacaoAccent(situacao: string | undefined, enumColor?: string): string {
@@ -19,17 +26,28 @@ export function situacaoAccent(situacao: string | undefined, enumColor?: string)
   return situacao === "active" ? "success" : situacao === "maintenance" ? "warning" : "muted";
 }
 
+// Role chip skin (users.role), shared by the header profile menu and the
+// settings users list. Neutral for admin/viewer, accent for editor.
+export const ROLE_COLORS: Record<string, string> = {
+  admin: "bg-[var(--bg-overlay)] text-[var(--text-secondary)] border-[var(--border-default)]",
+  editor: "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20",
+  viewer: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-subtle)]",
+};
+
 // ponytail: `role` gates by users.role; `permission` by permission code. Permission codes are
 // empty under dev:mock (mocks/seed.ts), so admin-only dev pages use `role` instead.
-export type NavItem = { href: string; label: string; icon: string; permission?: string; role?: "admin" };
-export type NavSection = { key: string; label?: string; items: NavItem[] };
+// `count` names a live number shown after the label (ADS side-nav elemAfter).
+export type NavItem = { href: string; label: string; icon: string; permission?: string; role?: "admin"; count?: "openIssues" };
+// `collapsible` sections fold their items under the heading (expanded sidebar only).
+export type NavSection = { key: string; label?: string; items: NavItem[]; collapsible?: boolean };
 
 export const NAV_SECTIONS: NavSection[] = [
   {
     key: "main",
+    label: "nav.workspace",
     items: [
       { href: "/", label: "nav.dashboard", icon: "LayoutDashboard" },
-      { href: "/issues", label: "nav.issues", icon: "ClipboardList" },
+      { href: "/issues", label: "nav.issues", icon: "ClipboardList", count: "openIssues" },
       { href: "/wiki", label: "nav.wiki", icon: "Book" },
       { href: "/chamados", label: "nav.chamados", icon: "Ticket" },
     ],
@@ -45,6 +63,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     key: "serviceCatalog",
+    label: "nav.selfService",
     items: [
       { href: "/catalog", label: "nav.serviceCatalog", icon: "Boxes" },
       { href: "/requests", label: "nav.requests", icon: "ClipboardList" },
@@ -74,6 +93,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: "atlas",
     label: "nav.atlas",
+    collapsible: true,
     items: [
       { href: "/atlas/topology", label: "nav.topology", icon: "Network" },
       { href: "/atlas/lineage", label: "nav.lineage", icon: "GitBranch" },
@@ -93,6 +113,11 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ];
+
+/** Whether a user may see a nav item: its permission code and role gates. */
+export function canSeeNavItem(item: NavItem, permissions: string[], role?: string): boolean {
+  return (!item.permission || permissions.includes(item.permission)) && (!item.role || item.role === role);
+}
 
 // Flat list for mobile drawer and backward compat
 export const NAV_ITEMS: NavItem[] = NAV_SECTIONS.flatMap(s => s.items);

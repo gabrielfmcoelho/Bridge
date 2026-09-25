@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
-import EmptyState from "@/components/ui/EmptyState";
+import SectionCard from "@/components/ui/SectionCard";
 import SortDropdown from "@/components/ui/SortDropdown";
 import SortableTable, { sortRows } from "@/components/ui/SortableTable";
 import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
@@ -37,27 +37,19 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
   const [alertSortDir, setAlertSortDir] = useState<"asc" | "desc">("asc");
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-[var(--text-faint)]">{t("alert.title")}</h3>
-        <div className="flex items-center gap-2">
+    <SectionCard variant="plain" as="h3" title={t("alert.title")} count={alerts.length} empty={alerts.length === 0 ? t("alert.noAlertsDesc") : undefined} controls={
+        <>
           {hasResolved && onToggleResolved && (
             <button
               onClick={onToggleResolved}
-              className={`inline-flex items-center gap-1 h-[30px] px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition ${
+              className={`inline-flex items-center gap-1 h-8 px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition ${
                 showResolved
                   ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
                   : "bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"
               }`}
               title={showResolved ? t("alert.hideResolved") : t("alert.showResolved")}
             >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                {showResolved ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                )}
-              </svg>
+              <Icon path={showResolved ? ICON_PATHS.eyeOff : ICON_PATHS.eye} className="w-3 h-3" />
             </button>
           )}
           {alertView === "cards" && (
@@ -70,12 +62,10 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
           )}
           <ViewToggle value={alertView} onChange={(v) => setAlertView(v as "cards" | "table")} options={[{ key: "cards", label: t("common.cards"), icon: VIEW_ICONS.cards }, { key: "table", label: t("common.table"), icon: VIEW_ICONS.table }]} />
           {addButton}
-        </div>
-      </div>
+        </>
+      }>
 
-      {alerts.length === 0 ? (
-        <EmptyState icon="search" title={t("alert.noAlerts")} description={t("alert.noAlertsDesc")} compact />
-      ) : alertView === "cards" ? (
+      {alertView === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
           {[...alerts].sort((a, b) => { const cmp = alertSort === "type" ? a.type.localeCompare(b.type) : LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]; return alertSortDir === "desc" ? -cmp : cmp; }).map((alert, i) => (
             <Card key={i} onClick={() => onAlertClick(alert)} clickIndicator="drawer" className="!p-3">
@@ -146,7 +136,7 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
           }}
         </SortableTable>
       )}
-    </div>
+    </SectionCard>
   );
 }
 
@@ -173,6 +163,9 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
     if (result.source.droppableId === newStatus && result.source.index === position) return;
     onMove(issueId, newStatus, position);
   };
+
+  // Six empty columns say less than one line.
+  if (issues.length === 0) return <p className="py-4 text-sm text-[var(--text-muted)]">{t("issue.boardEmpty")}</p>;
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
@@ -242,13 +235,13 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
                                           {(issue.assignee_ids?.length || 0) > 3 && <span className="w-5 h-5 rounded-full bg-[var(--bg-overlay)] text-[var(--text-faint)] text-3xs font-bold flex items-center justify-center border border-[var(--bg-surface)]">+{issue.assignee_ids!.length - 3}</span>}
                                         </div>
                                       ) : (
-                                        <span className="text-[var(--text-faint)]">--</span>
+                                        <span className="text-[var(--text-muted)]">–</span>
                                       )}
                                     </div>
                                     <div>
                                       <span className="text-[var(--text-faint)] block mb-0.5">{t("issue.due")}</span>
                                       <span className="text-[var(--text-muted)] font-mono">
-                                        {issue.expected_end_date || "--"}
+                                        {issue.expected_end_date || "–"}
                                       </span>
                                     </div>
                                     <div>
@@ -303,8 +296,6 @@ export function IssuesTableView({ issues, users, onEdit }: {
   const { t } = useLocale();
   const STATUS_LABELS = getStatusLabels(t);
 
-  if (issues.length === 0) return <EmptyState icon="search" title={t("issue.noIssues")} description={t("issue.noIssuesDesc")} compact />;
-
   const PRIORITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
   return (
@@ -330,7 +321,7 @@ export function IssuesTableView({ issues, users, onEdit }: {
             <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">{issue.title}</td>
             <td className="px-4 py-2.5"><Badge>{STATUS_LABELS[issue.status] || issue.status}</Badge></td>
             <td className="px-4 py-2.5 text-[var(--text-secondary)]">
-              {issue.assignee_ids?.map((uid) => users.find((u) => u.id === uid)?.display_name).filter(Boolean).join(", ") || <span className="text-[var(--text-faint)]">-</span>}
+              {issue.assignee_ids?.map((uid) => users.find((u) => u.id === uid)?.display_name).filter(Boolean).join(", ") || <span className="text-[var(--text-muted)]">–</span>}
             </td>
           </tr>
         ));

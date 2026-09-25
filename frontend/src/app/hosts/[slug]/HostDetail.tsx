@@ -3,33 +3,33 @@
 import { useState, useMemo, type ReactNode } from "react";
 import { useFilteredGraph } from "@/hooks/useFilteredGraph";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { hostsAPI, sshAPI, graphAPI, globalIssuesAPI, integrationsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
-import Badge from "@/components/ui/Badge";
 import IconButton from "@/components/ui/IconButton";
 import FloatingActionButton, { type FABAction } from "@/components/ui/FloatingActionButton";
 import { Skeleton } from "@/components/ui/Skeleton";
-import TabBar from "@/components/ui/TabBar";
+import PageHeader from "@/components/ui/PageHeader";
+import SituacaoText from "@/components/ui/SituacaoText";
+import { CardIndicator } from "@/components/inventory";
 import Drawer from "@/components/ui/Drawer";
 import HostForm from "../HostForm";
 import SSHOperations from "./_components/SSHOperations";
 import TopologyTab from "./_components/TopologyTab";
-import OverviewTab from "./_components/OverviewTab";
-import ScansTab from "./_components/ScansTab";
+import HostProfile from "./_components/HostProfile";
+import ScanPane from "./_components/ScanPane";
 import MetricsTab from "./_components/MetricsTab";
 import IssuesTab from "./IssuesTab";
 import SSHConfigDrawer from "./_components/SSHConfigDrawer";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
-type TabKey = "overview" | "scans" | "operations" | "alerts" | "topology" | "metrics";
+type TabKey = "overview" | "operations" | "alerts" | "topology" | "metrics";
 
 export default function HostDetail({ slug }: { slug: string }) {
-  const { t, formatDateTime, locale } = useLocale();
+  const { t, locale } = useLocale();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -95,7 +95,6 @@ export default function HostDetail({ slug }: { slug: string }) {
 
   const tabIcons: Record<string, string> = {
     overview: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0h4",
-    scans: "M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z",
     operations: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
     alerts: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
     topology: "M13 10V3L4 14h7v7l9-11h-7z",
@@ -111,7 +110,6 @@ export default function HostDetail({ slug }: { slug: string }) {
 
   const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
     { key: "overview", label: t("host.tabOverview"), icon: tabIcons.overview },
-    { key: "scans", label: t("host.tabScans"), icon: tabIcons.scans },
     ...(canEdit ? [{ key: "operations" as TabKey, label: t("host.tabOperations"), icon: tabIcons.operations }] : []),
     { key: "alerts" as TabKey, label: t("host.tabTracking"), icon: tabIcons.alerts, badge: issuesTabBadge || undefined },
     { key: "topology", label: t("host.tabTopology"), icon: tabIcons.topology },
@@ -122,14 +120,6 @@ export default function HostDetail({ slug }: { slug: string }) {
 
   return (
     <PageShell>
-      {/* Back link */}
-      <div className="mb-5">
-        <Link href="/hosts" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-faint)] hover:text-[var(--accent)] transition-colors">
-          <Icon path={ICON_PATHS.back} className="w-3.5 h-3.5" />
-          {t("common.back")}
-        </Link>
-      </div>
-
       {isLoading ? (
         <div className="space-y-6">
           <div className="flex justify-between">
@@ -140,96 +130,64 @@ export default function HostDetail({ slug }: { slug: string }) {
         </div>
       ) : data ? (
         <div className="space-y-5">
-          {/* ─── Header ─── */}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-[var(--accent)] font-display">
-              {data.host.nickname}
-            </h1>
-            <p className="text-[var(--text-muted)] text-sm font-mono">
-              {data.host.oficial_slug}
-            </p>
-            {data.host.description && (
-              <p className="text-[var(--text-secondary)] mt-1.5">{data.host.description}</p>
-            )}
-            <div className="flex items-center gap-2 mt-2">
-              <Badge variant="situacao" situacao={data.host.situacao} compact className="[&>span:first-child]:w-3 [&>span:first-child]:h-3">{data.host.situacao}</Badge>
-              {/* Idle-VM indicator — same crescent-moon pattern used on
-                  HostCard. Filled slate when the heuristic flagged the
-                  host (idle=true), faded outline when it ran but didn't
-                  flag. Hosts without scan data render nothing since the
-                  rules can't be evaluated. */}
-              {data.host.has_scan && (
-                <span
-                  className={`inline-flex items-center justify-center ${
-                    data.host.idle ? "text-[var(--text-muted)] " : "text-[var(--text-faint)] opacity-40"
-                  }`}
-                  title={
-                    data.host.idle
-                      ? `${t("host.idle")}\n\n${(data.host.idle_reasons ?? []).join("\n") || "Host has no detected workloads or containers."}`
-                      : `${t("host.idle")}: ${t("host.idleNotFlagged")}\n\n${(data.host.idle_counterfacts ?? []).join("\n")}`
-                  }
-                  aria-label={t("host.idle")}
-                >
-                  <svg className="w-4 h-4" fill={data.host.idle ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-                  </svg>
-                </span>
-              )}
-              {/* Alerts */}
-              <span className={`inline-flex items-center gap-1 text-xs ${alertCount > 0 ? "text-[var(--warning)]" : "text-[var(--text-faint)]"}`} title={t("host.alertsTitle", { count: String(alertCount) })}>
-                <Icon path={ICON_PATHS.alert} />
-                {alertCount > 0 && <span className="font-mono">{alertCount}</span>}
-              </span>
-              {/* Issues */}
-              <span className={`inline-flex items-center gap-1 text-xs ${openIssuesCount > 0 ? "text-[var(--accent)]" : "text-[var(--text-faint)]"}`} title={t("host.openIssuesTitle", { count: String(openIssuesCount) })}>
-                <Icon path={ICON_PATHS.clipboard} />
-                {openIssuesCount > 0 && <span className="font-mono">{openIssuesCount}</span>}
-              </span>
-              {/* Chamados */}
-              <span className={`inline-flex items-center gap-1 text-xs ${(data.host.chamados_count || 0) > 0 ? "text-[var(--warning)]" : "text-[var(--text-faint)]"}`} title={t("host.chamadosTitle", { count: String(data.host.chamados_count || 0) })}>
-                <Icon path={ICON_PATHS.document} />
-                {(data.host.chamados_count || 0) > 0 && <span className="font-mono">{data.host.chamados_count}</span>}
-              </span>
-            </div>
-          </div>
-
-          {/* ─── Tab bar + actions ─── */}
-          <div className="flex items-center justify-between gap-3">
-            <TabBar tabs={tabs} activeTab={activeTab} onChange={(k) => setActiveTab(k as TabKey)} />
-            <div className="hidden md:flex items-center gap-1.5 shrink-0">
-              <IconButton onClick={() => setShowSSHConfigDrawer(true)} title={t("host.sshConfig")}>
+          <PageHeader
+            showEmptyDescription
+            title={data.host.nickname}
+            subtitle={data.host.oficial_slug}
+            subtitleFont="mono"
+            status={<SituacaoText situacao={data.host.situacao} />}
+            indicators={
+              <>
+                <CardIndicator icon={ICON_PATHS.alert} count={alertCount} color="warning" title={t("host.alertsTitle", { count: String(alertCount) })} />
+                <CardIndicator icon={ICON_PATHS.clipboard} count={openIssuesCount} color="accent" title={t("host.openIssuesTitle", { count: String(openIssuesCount) })} />
+                <CardIndicator icon={ICON_PATHS.document} count={data.host.chamados_count || 0} color="warning" title={t("host.chamadosTitle", { count: String(data.host.chamados_count || 0) })} />
+                <CardIndicator
+                  icon={ICON_PATHS.moon}
+                  count={data.host.idle ? 1 : 0}
+                  color="info"
+                  hideCount
+                  disabled={!data.host.has_scan}
+                  title={data.host.idle ? `${t("host.idle")}: ${(data.host.idle_reasons ?? []).join("; ") || t("host.idleNoWorkloads")}` : `${t("host.idle")}: ${t("host.idleNotFlaggedShort")}`}
+                />
+              </>
+            }
+            description={data.host.description || undefined}
+            actions={
+              <IconButton variant="outline" onClick={() => setShowSSHConfigDrawer(true)} label={t("host.sshConfig")}>
                 <Icon path={ICON_PATHS.code} />
               </IconButton>
-              {canEdit && (
-                <IconButton onClick={() => setShowEditDrawer(true)} title={t("common.edit")}>
-                  <Icon path={ICON_PATHS.edit} />
-                </IconButton>
-              )}
-              {isAdmin && (
-                <IconButton variant="danger" onClick={() => { if (confirm(`Delete "${data.host.nickname}"?`)) deleteMutation.mutate(); }} title={t("common.delete")}>
-                  <Icon path={ICON_PATHS.trashOutline} />
-                </IconButton>
-              )}
-            </div>
-          </div>
+            }
+            onEdit={canEdit ? () => setShowEditDrawer(true) : undefined}
+            onDelete={isAdmin ? () => deleteMutation.mutate() : undefined}
+            deleteConfirmMessage={`${t("confirm.deleteTitle", { name: `"${data.host.nickname}"` })} ${t("confirm.cannotUndo")}`}
+            tabs={{
+              idBase: "host",
+              label: data.host.nickname,
+              active: activeTab,
+              onChange: (k) => setActiveTab(k as TabKey),
+              items: tabs,
+              panelClassName: "space-y-5",
+            }}
+          >
+
 
           {/* ═══ OVERVIEW ═══ */}
+          {/* Declared (left, stays in view) beside observed (right, scrolls). */}
           {activeTab === "overview" && (
-            <OverviewTab
-              host={data.host}
-              tags={data.tags}
-              responsaveis={data.responsaveis ?? []}
-              chamados={data.chamados ?? []}
-              canEdit={canEdit}
-              isAdmin={isAdmin}
-              slug={slug}
-              t={t}
-            />
-          )}
-
-          {/* ═══ SCANS TAB ═══ */}
-          {activeTab === "scans" && (
-            <ScansTab lastScan={data.last_scan ?? undefined} formatDateTime={formatDateTime} locale={locale} t={t} />
+            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6 max-lg:space-y-6 animate-fade-in">
+              <aside className="lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto">
+                <HostProfile
+                  host={data.host}
+                  tags={data.tags}
+                  responsaveis={data.responsaveis ?? []}
+                  canEdit={canEdit}
+                  isAdmin={isAdmin}
+                  slug={slug}
+                  t={t}
+                />
+              </aside>
+              <ScanPane slug={slug} host={data.host} lastScan={data.last_scan} canEdit={canEdit} />
+            </div>
           )}
 
           {/* ═══ OPERATIONS TAB ═══ */}
@@ -277,6 +235,7 @@ export default function HostDetail({ slug }: { slug: string }) {
 
           {/* ═══ METRICS TAB ═══ */}
           {activeTab === "metrics" && grafanaEnabled && <MetricsTab slug={slug} />}
+          </PageHeader>
         </div>
       ) : null}
 
@@ -319,15 +278,10 @@ export default function HostDetail({ slug }: { slug: string }) {
         />
       )}
 
-      {/* Mobile FAB */}
-      {data && (
+      {/* Mobile FAB: the tab's "add" actions (edit/delete are in the header on phones too). */}
+      {data && canEdit && activeTab === "alerts" && (
         <FloatingActionButton
           actions={[
-            ...(canEdit ? [{
-              label: t("common.edit") + " Host",
-              icon: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
-              onClick: () => setShowEditDrawer(true),
-            }] : []),
             ...(canEdit && activeTab === "alerts" ? [
               {
                 label: t("host.addChamado"),
@@ -345,12 +299,6 @@ export default function HostDetail({ slug }: { slug: string }) {
                 onClick: () => setOpenIssueCreate(true),
               },
             ] : []),
-            ...(isAdmin ? [{
-              label: t("common.delete") + " Host",
-              icon: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
-              onClick: () => { if (confirm(`Delete "${data.host.nickname}"?`)) deleteMutation.mutate(); },
-              color: "#ef4444",
-            }] : []),
           ] satisfies FABAction[]}
         />
       )}

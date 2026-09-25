@@ -3,6 +3,10 @@
 import { Section, Specimen } from "./Section";
 import Card, { CardIcon } from "@/components/ui/Card";
 import StatCard from "@/components/ui/StatCard";
+import SectionCard from "@/components/ui/SectionCard";
+import Field from "@/components/ui/Field";
+import Button from "@/components/ui/Button";
+import SituacaoText from "@/components/ui/SituacaoText";
 import KpiGrid from "@/components/inventory/KpiGrid";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
 import OfferingCard from "@/app/catalog/_components/OfferingCard";
@@ -79,9 +83,9 @@ export default function CardsSection() {
             <p className="text-sm font-semibold font-mono">decorator=&quot;stripe-top&quot;</p>
             <p className="text-xs text-[var(--text-muted)] mt-1">Atlas TableCard stripe.</p>
           </Card>
-          <Card accent="accent" decorator="tint" padding="sm">
-            <p className="text-sm font-semibold font-mono relative">decorator=&quot;tint&quot;</p>
-            <p className="text-xs text-[var(--text-muted)] mt-1 relative">Border and wash from the accent (StatCard).</p>
+          <Card accent="accent" padding="sm">
+            <p className="text-sm font-semibold font-mono">decorator=&quot;stripe-left&quot; (default)</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Inventory cards and StatCard; the same in both themes.</p>
           </Card>
           <Card as="button" accent="cyan" decorator="none" onClick={noop} selected>
             <div className="flex items-center gap-3">
@@ -100,11 +104,11 @@ export default function CardsSection() {
             </p>
             <p className="text-xs text-[var(--text-muted)] mt-1">No lift on hover.</p>
           </Card>
-          <Card clickIndicator="link" onClick={noop}>
+          <Card onClick={noop}>
             <p className="text-sm font-semibold" style={{ fontFamily: "var(--font-mono)" }}>
-              clickIndicator=&quot;link&quot;
+              link card (no indicator)
             </p>
-            <p className="text-xs text-[var(--text-muted)] mt-1">Chevron in the corner.</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">The whole card is the link; hover changes the surface.</p>
           </Card>
           <Card clickIndicator="drawer" onClick={noop}>
             <p className="text-sm font-semibold" style={{ fontFamily: "var(--font-mono)" }}>
@@ -115,10 +119,49 @@ export default function CardsSection() {
         </div>
       </Specimen>
 
+      <Specimen title="SectionCard" source="components/ui/SectionCard.tsx" wide>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <SectionCard title="Informações básicas" description="Padded body: key-value info, charts, forms.">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Hostname" value="10.0.0.4" mono />
+              <Field label="Hospedagem" value="" />
+            </div>
+          </SectionCard>
+          <SectionCard
+            title="Ofertas"
+            count={2}
+            description="Flush body for tables and row lists; controls and a footer bar."
+            controls={<Button size="sm" variant="secondary">Adicionar</Button>}
+            body="flush"
+            footer={<p className="text-xs text-[var(--text-muted)]">1–2 de 2</p>}
+          >
+            <ul className="divide-y divide-[var(--border-subtle)] text-sm">
+              <li className="px-5 py-3">VM Linux</li>
+              <li className="px-5 py-3">Banco Postgres</li>
+            </ul>
+          </SectionCard>
+          <SectionCard title="Listagem" variant="plain" description="Plain: same header, no card chrome, when the body is cards.">
+            <div className="grid grid-cols-2 gap-3">
+              <Card hover={false} padding="sm"><p className="text-sm">card</p></Card>
+              <Card hover={false} padding="sm"><p className="text-sm">card</p></Card>
+            </div>
+          </SectionCard>
+          <SectionCard title="Webhook de alertas" collapsible defaultOpen={false} description="Collapsible: native details; no controls in the header.">
+            <p className="text-sm text-[var(--text-secondary)]">Folded content.</p>
+          </SectionCard>
+          <SectionCard
+            title="Containers"
+            description="Empty (level 2): the section stays, its body is one muted line plus the action."
+            empty="Nenhum container encontrado no último scan."
+            emptyAction={<Button size="sm" variant="secondary">Executar scan</Button>}
+          />
+        </div>
+      </Specimen>
+
       <Specimen title="StatCard" source="components/ui/StatCard.tsx" wide>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {STAT_CARD_COLORS.map((color) => (
-            <StatCard key={color} label={color} value={42} icon={ICON_PATHS.server} color={color} />
+            <StatCard key={color} label={color} value={42} icon={ICON_PATHS.server} color={color} hint="hint line" />
           ))}
         </div>
       </Specimen>
@@ -145,11 +188,7 @@ export default function CardsSection() {
             title="web-01"
             subtitle="web-01.sead.pi.gov.br"
             description="Nginx edge proxy"
-            badge={
-              <Badge variant="situacao" situacao="active" compact>
-                Active
-              </Badge>
-            }
+            status={<SituacaoText situacao="active" />}
           />
           <CardMetadataGrid
             items={[
@@ -225,7 +264,7 @@ export default function CardsSection() {
             (<code>grep -rl &quot;bg-[var(--bg-surface)]&quot; src --include=*.tsx | xargs grep -l &quot;rounded-&quot;
             | xargs grep -l &quot;border-[var(--border-&quot;</code>; heaviest: <code>app/issues/IssueBoard.tsx</code>,{" "}
             <code>app/chamados/page.tsx</code>, <code>app/wiki/page.tsx</code>, <code>app/share/[token]/page.tsx</code>,{" "}
-            <code>app/settings/IntegrationsTab.tsx</code>, <code>components/glpi/*</code>, <code>components/lineage/*</code>).
+            <code>app/settings/integrations/*</code>, <code>components/glpi/*</code>, <code>components/lineage/*</code>).
           </li>
         </ul>
       </div>

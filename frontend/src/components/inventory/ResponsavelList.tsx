@@ -129,7 +129,7 @@ export default function ResponsavelList({ value, onChange, contacts, t }: Respon
               size="sm"
               type="button"
               onClick={() => remove(idx)}
-              title={t("common.remove")}
+              label={t("common.remove")}
             >
               <Icon path={ICON_PATHS.trashOutline} className="w-3.5 h-3.5" />
             </IconButton>

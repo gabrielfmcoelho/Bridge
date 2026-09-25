@@ -1,11 +1,14 @@
 "use client";
 
+import RowActions from "@/components/ui/RowActions";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { entidadesAPI, offeringsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import type { Offering } from "@/lib/types";
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
@@ -21,6 +24,7 @@ type ColKey = "sort_order" | "name" | "category" | "request_type" | "approver" |
 // Admin CRUD over what the catalog offers. The list is the whole set —
 // inactive and all — because this is where an admin turns an offering back on.
 export default function OfferingsTab() {
+  const confirm = useConfirm();
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data: offerings = [], isLoading, isError, error } = useQuery({
@@ -68,14 +72,13 @@ export default function OfferingsTab() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">{t("settings.offerings.title")}</h3>
-            <p className="text-xs text-[var(--text-muted)]">{t("settings.offerings.intro")}</p>
-          </div>
-          {offerings.length > 0 && addButton}
-        </div>
+      {/* Padded, not flush: SortableTable brings its own bordered wrapper. */}
+      <SectionCard
+        as="h3"
+        title={t("settings.offerings.title")}
+        description={t("settings.offerings.intro")}
+        controls={offerings.length > 0 ? addButton : undefined}
+      >
         <FormError message={deleteError} />
 
         {isLoading ? (
@@ -103,20 +106,22 @@ export default function OfferingsTab() {
                     <Badge color={o.is_active ? "emerald" : "gray"} dot>{o.is_active ? t("common.active") : t("common.inactive")}</Badge>
                   </td>
                   <td className={`${tableClasses.td} text-right whitespace-nowrap`}>
-                    <button onClick={() => setEditing(o)} className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] mr-3">{t("common.edit")}</button>
-                    <button
-                      onClick={() => { if (confirm(t("settings.offerings.deleteConfirm", { name: o.name }))) deleteMutation.mutate(o.id); }}
-                      className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)]"
-                    >
-                      {t("common.delete")}
-                    </button>
+                    <div className="flex justify-end">
+                      <RowActions
+                        name={o.name}
+                        actions={[
+                          { label: t("common.edit"), icon: ICON_PATHS.pencil, onClick: () => setEditing(o) },
+                          { label: t("common.delete"), icon: ICON_PATHS.trash, danger: true, onClick: async () => { if (await confirm({ title: t("confirm.deleteTitle", { name: `"${o.name}"` }), message: t("settings.offerings.deleteConfirm", { name: o.name }), danger: true, confirmLabel: t("common.delete") })) deleteMutation.mutate(o.id); } },
+                        ]}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))
             }
           </SortableTable>
         )}
-      </Card>
+      </SectionCard>
 
       {editing && (
         <OfferingFormModal

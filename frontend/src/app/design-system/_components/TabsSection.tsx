@@ -52,11 +52,11 @@ export default function TabsSection() {
 
       <Specimen
         title="Settings desktop tab bar"
-        source="app/settings/page.tsx:85-100"
-        alsoIn={["app/settings/page.tsx:73-119 (mobile tab selector → Drawer list)"]}
+        source="app/settings/page.tsx:65"
+        alsoIn={["app/settings/page.tsx:69-85 (mobile tab selector → Drawer list)"]}
         wide
       >
-        {/* specimen: app/settings/page.tsx:85-100 */}
+        {/* specimen: app/settings/page.tsx:65 */}
         <div className="hidden md:flex gap-1 mb-6 p-1 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-x-auto">
           {SETTINGS_TABS.map((t) => (
             <button
@@ -143,7 +143,6 @@ export default function TabsSection() {
         title="ViewModeToggle"
         source="components/atlas/shared/ViewModeToggle.tsx"
         alsoIn={[
-          "app/settings/page.tsx:455-476 (inline cards/table toggle)",
           "app/issues/IssueBoard.tsx:348-360 (inline kanban/list toggle)",
         ]}
         wide

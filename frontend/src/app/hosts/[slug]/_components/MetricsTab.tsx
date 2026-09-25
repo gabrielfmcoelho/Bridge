@@ -6,6 +6,7 @@ import { grafanaAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
+import StatusAlert from "@/components/ui/StatusAlert";
 import { Skeleton } from "@/components/ui/Skeleton";
 import HostLiveKpis from "./HostLiveKpis";
 import Icon from "@/components/ui/Icon";
@@ -39,12 +40,10 @@ export default function HostMetricsTab({ slug }: Props) {
     return (
       <div className="space-y-3 animate-fade-in">
         <HostLiveKpis slug={slug} />
-        <EmptyState
-          icon="box"
-          title={t("host.metrics.grafanaUnavailableTitle")}
-          description={error instanceof Error ? error.message : t("host.metrics.unknownError")}
-          compact
-        />
+        <StatusAlert variant="error">
+          <p className="font-medium">{t("host.metrics.grafanaUnavailableTitle")}</p>
+          <p className="text-xs">{error instanceof Error ? error.message : t("host.metrics.unknownError")}</p>
+        </StatusAlert>
       </div>
     );
   }
@@ -83,13 +82,11 @@ export default function HostMetricsTab({ slug }: Props) {
       </Card>
 
       {iframeError && (
-        <Card accent="amber" hover={false}>
-          <p className="text-sm text-[var(--warning)]">
-            {t("host.metrics.embedBlockedBefore")}
-            <code className="mx-1 text-[var(--text-secondary)]">allow_embedding</code>
-            {t("host.metrics.embedBlockedAfter")}
-          </p>
-        </Card>
+        <StatusAlert variant="warning">
+          {t("host.metrics.embedBlockedBefore")}
+          <code className="mx-1 text-[var(--text-secondary)]">allow_embedding</code>
+          {t("host.metrics.embedBlockedAfter")}
+        </StatusAlert>
       )}
 
       <div className="relative w-full" style={{ aspectRatio: "16 / 10", minHeight: "600px" }}>

@@ -1,9 +1,8 @@
 "use client";
 
-import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import type { Issue } from "@/lib/types";
-import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 
 interface IssuesTabProps {
   issues: Issue[];
@@ -13,10 +12,7 @@ interface IssuesTabProps {
 export default function IssuesTab({ issues, t }: IssuesTabProps) {
   return (
     <div className="space-y-5 animate-fade-in">
-      <Card hover={false}>
-        <SectionHeading variant="section">
-          {t("issue.title")}
-        </SectionHeading>
+      <SectionCard title={t("issue.title")} count={issues.length}>
         {issues.length > 0 ? (
           <div className="space-y-1">
             {issues.map((issue) => (
@@ -43,7 +39,7 @@ export default function IssuesTab({ issues, t }: IssuesTabProps) {
         ) : (
           <p className="text-sm text-[var(--text-faint)]">{t("issue.noneReported")}</p>
         )}
-      </Card>
+      </SectionCard>
     </div>
   );
 }

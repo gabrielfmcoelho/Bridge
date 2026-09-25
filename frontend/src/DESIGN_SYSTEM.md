@@ -20,17 +20,44 @@ reprints them.
    `--rose` for categorical identity (see §3 — there is no `--purple`). Tints are opacity modifiers:
    `bg-[var(--success)]/15 border-[var(--success)]/30`. No raw palette classes
    (`text-emerald-400`) and no hex in tsx: the light theme only works through
-   the tokens. Swept app-wide on 2026-09-10; what is left is `Header.tsx`, `app/secrets`
-   and the atlas layer palette in `LayerBadge`.
+   the tokens. Swept app-wide on 2026-09-10 (`Header.tsx` on 2026-09-24); what is left is
+   `app/secrets` and the atlas layer palette in `LayerBadge`.
 2. **One registry for icons.** `lib/icon-paths.ts` (`ICON_PATHS`, `NAV_ICONS`)
    through `<Icon path size>`; `size` scales stroke with the box. Adding an
    icon means adding a named path there, never an inline `<svg>`.
 3. **One card.** `<Card accent decorator padding selected as>`; children read
    `var(--card-accent)`. Inventory cards compose `CardHeader`, `CardMetadataGrid`,
-   `CardTagsSection`, `CardIndicator` inside it. KPI tiles are `StatCard`.
+   `CardTagsSection`, `CardIndicator` inside it. KPI tiles are `StatCard`: the
+   same left stripe, value on `--text-primary`, one recipe in both themes (the
+   old `tint` decorator, a wash in dark and a top rule in light, is gone).
+   **Sections are `SectionCard`.** Any titled block of content — key-value
+   info, a table, a list, a chart, a form — is `<SectionCard title description
+   controls footer body variant>`: header (title, optional icon/count, minimal
+   h-8 controls on the right; one muted description line) → hairline → body
+   (`padded` p-5, or `flush` for tables and row lists) → optional footer bar
+   (save bar, pagination, comment box). `variant="plain"` keeps the same header
+   without card chrome when the body is itself cards; `collapsible` folds it
+   (no controls in a collapsible header). A `SectionHeading` above a `Card`, or
+   an `<h2>/<h3>` row hand-built inside one, is the pattern this replaces;
+   `SectionHeading` stays for page-level list headings and inside drawers/modals.
+   **Empty states have three levels**, nothing else: a missing *value* is a
+   muted "–" (`Field`, `CardMetadataGrid`, table cells — never "-", "--" or
+   "—"); a *section* with nothing keeps its place and says so in one muted line
+   (`SectionCard empty="…" emptyAction`); a whole *pane or page* with nothing is
+   `EmptyState compact` with the action that fills it. Sections are hidden only
+   when the user may not see them or the feature is off; failures are a
+   `StatusAlert`, never a blank area.
+   **Detail pages** read left to right: what was declared (the entity's profile,
+   1–2 `SectionCard`s, sticky) beside what was observed (scans, activity), which
+   scrolls — the host detail "Visão geral" is the reference.
 4. **Three headings.** `PageHeader` (title, subtitle, actions, add) for the page;
-   `SectionHeading variant="section|label|rule"` inside it. No inline `<h1>`/`<h2>`
-   recipes.
+   `SectionHeading variant="section|label|rule"` inside it; `Heading as size`
+   anywhere else. Sizes come from the heading scale in `globals.css`
+   (`text-heading-xl|lg|md|sm|xs|xxs`, 28/32 → 12/16, after ADS
+   `font.heading.*`); the page title is `sm` = 16px, section titles
+   (`SectionCard`) `xs` = 14px; header chrome (breadcrumbs, Voltar, search) is 12px. `as` is the outline level, `size`
+   the look: one h1 per page, no skipped levels. Titles wrap, never truncate.
+   No inline `<h1>`/`<h2>` recipes.
 5. **One field anatomy.** `FormField` = label, control, hint, error, required
    asterisk. `Input`, `Textarea`, `Select` (searchable), `NativeSelect` (plain)
    render through it and wire `useId` into `htmlFor`/`id` themselves, so the
@@ -38,8 +65,17 @@ reprints them.
    placeholder as `aria-label`. Wrap anything else in it. Actions sit in the Modal/Drawer
    `footer` slot: `FormFooter` for Cancel/Confirm, `useMultiStepForm` for wizards.
 6. **Buttons are `Button`, `IconButton`, `PillButton`** (chips: `shape`, `count`,
-   `lead`), `ViewToggle`, `TabBar`, `ToolbarActionButton`, `CopyButton`. All press
+   `lead`), `ViewToggle`, `ToolbarActionButton`, `ToolbarSelect`, `CopyButton`. All press
    (`active:scale`); the global `*:focus-visible` ring is the focus indicator.
+   `IconButton` requires `label` (accessible name + tooltip): an icon alone has
+   no name. One primary button per page or area.
+   **Tabs** (`TabBar`) are underlined, for sections of one page, with arrow-key
+   navigation; a choice of how a list reads (cards/table, group by) is a
+   `ToolbarSelect`, not tabs.
+   **Menus** (`DropdownMenu`): `DropdownMenuGroup title` (title every group once
+   there are two), `DropdownMenuItem elemBefore elemAfter description`,
+   `DropdownMenuRadioItem` (pick one, closes) and `DropdownMenuCheckboxItem`
+   (toggle, stays open).
 7. **Motion**: `.stagger-in` with `--i` per item is the only entrance cascade;
    `transition` (Tailwind's default list), never `transition-all`, except an
    element that animates a size, which names it (`transition-[width]`).
@@ -50,6 +86,24 @@ reprints them.
 10. **Small parts have a home**: `StatusDot`, `Avatar`, `Spinner`, `Divider`,
     `DropdownMenu`, `Field` (read-only key/value), `tableClasses` (table skin),
     `useCopy`, `useDebounce`, `formatPhone` in `lib/utils`.
+    **Status vs tag vs count**: `Lozenge` (square-ish, `appearance`
+    default/success/removed/inprogress/new/moved) is a state — `Badge
+    variant="situacao"` uses the same shape; `Tag` (neutral pill, optionally
+    removable) is metadata you filter by; `Badge` is a category or a count.
+    **Feedback**: `useFlag()` for outcomes of background actions (bottom-left,
+    8s auto-dismiss for success/info, errors stay, max 2 actions);
+    `StatusAlert` for a problem with the page/section; `FormError` in forms.
+    **Confirm**: `useConfirm()` (`ResponsiveModal size="sm"` + `FormFooter`),
+    `danger` for destructive, `requireText` for irreversible (backup restore).
+    **Overlays**: `Modal`/`ResponsiveModal size="sm|md|lg|xl"` (400/672/800/968px).
+    **Row actions**: `RowActions` ("…" menu, trigger named after the row).
+    **Side nav** (`NAV_SECTIONS` in `lib/constants`): `count` on an item shows a
+    live number after the label (a dot on the icon in the collapsed rail;
+    announced as a phrase, never a bare number); `collapsible` on a section
+    folds its items under the heading (remembered; the section holding the
+    current page never folds; the rail always shows the icons).
+    **Empty state**: 464px (304 compact), heading + description, one CTA
+    (`action`) and an optional `secondaryAction`.
 11. **`--text-faint` is for non-text**: icons at rest, hairlines, disabled
     glyphs, empty-cell dashes. If it is a word a human has to read, it gets
     `--text-muted` or above. The three text tiers are contrast-tuned per theme
@@ -62,7 +116,7 @@ reprints them.
 13. **Mono is for machine identifiers** — hostname, domain, IP, ID, path,
     token, version, count, timestamp — where fixed advance width makes
     character-level diffs pop. Prose gets `font-display` (which is the body
-    sans, not a third face). `CardHeader titleFont` and `DetailHeader
+    sans, not a third face). `CardHeader titleFont` and `PageHeader
     titleFont` carry the choice per entity.
 14. **Modals and drawers are dialogs**: `role="dialog"`, `aria-modal`,
     labelled by their title, closable with Escape, and a named close button.
@@ -76,13 +130,15 @@ reprints them.
     has nowhere to land on `#080c14`); in light they map to the real shadows.
 17. **State is never colour alone** (WCAG 1.4.1). A status dot carries shape
     (filled vs ring) and an accessible name; prefer showing the label.
-18. **Render data that exists.** A metadata pair with no value, a zero count,
-    a meter with no reading and a tag row with no tags are not rendered at
-    all — `CardMetadataGrid`, `CardIndicator` and `CardTagsSection` return
-    `null` rather than a `-`. Cards in a grid row stretch to the tallest
-    (`InventoryContent` stretches its cells; a card's `<Link>` is
-    `block h-full`), so footers align. A boolean flag is the
-    exception: pass `hideCount` and the off state stays visible.
+18. **Fixed anatomy.** Every slot of a card and of a page header renders, in
+    a fixed order, whether or not it has data — the user learns where each
+    fact lives, and position carries meaning. Empty values read "–" (muted),
+    a zero count is a faint `0`, a meter with no reading shows its empty
+    track and "–", a tag row with no tags shows "–", an indicator whose data
+    the API doesn't send is `disabled` (dimmed, "não disponível"), and a flag
+    (`hideCount`) keeps its off state. `CardMetadataGrid`, `CardIndicator`,
+    `CardTagsSection` and `CardHeader` implement this; cards in a row stretch
+    to the tallest (`InventoryContent` cells; the card `<Link>` is `block h-full`).
 
 ---
 
@@ -92,7 +148,7 @@ Every inventory card has five vertical sections inside `<Card accent={situacaoAc
 
 ```
 +------------------------------------------+
-| HEADER: title + subtitle + desc | BADGE  |  <- CardHeader
+| HEADER: title / subtitle / status / desc |  <- CardHeader (+ corner)
 +------------------------------------------+
 | METADATA: 2x2 label+value grid          |  <- CardMetadataGrid
 +------------------------------------------+
@@ -104,10 +160,13 @@ Every inventory card has five vertical sections inside `<Card accent={situacaoAc
 +------------------------------------------+
 ```
 
-- Title: sm, semibold, mono when it is an identifier (`titleFont`). Subtitle: mono, xs. Description: body, xs, muted, truncate.
-- Metadata grid `grid-cols-2 gap-x-4 gap-y-3`; labels muted xs, values secondary xs. Valueless pairs are not rendered (§1.16).
-- Tags: `mt-3 pt-3 border-t border-subtle`, max 4 + `+N`; absent when there are no tags.
-- Indicators: `mt-auto pt-4 border-t`; a zero count renders nothing, a flag (`hideCount`) keeps its off state.
+- Title: sm, semibold, mono when it is an identifier (`titleFont`). Subtitle (`subtitleFont`): xs, "–" when absent.
+  Status: `<SituacaoText>` (or `StatusText`) — text with a dot, never a badge. Description: xs, muted, one line, "–" when absent.
+  `corner`: the top-right slot (host quick-look). No chevron: the whole card is the link.
+- Metadata grid `grid-cols-2 gap-x-4 gap-y-3`; labels muted xs, values secondary xs; empty values "–" (rule 18).
+- Tags: `mt-3 pt-3 border-t border-subtle`, max 4 + `+N`; "–" when there are none.
+- Indicators: `mt-auto pt-4 border-t`; every indicator always present — 0 faint, unavailable `disabled`, flags (`hideCount`, e.g. idle) off when off.
+- Hosts add the resources block (CPU/RAM/Disco), always shown, "–" without a scan.
 - Card accent: entity cards pass `situacaoAccent(situacao, enumColor)`; services pass
   `danger | cyan | warning` for external-dependency / in-house / vendor.
 
@@ -119,7 +178,7 @@ Each piece of data should appear in **exactly one** card section:
 |-----------------------|-----------------|-------------------|
 | Primary name/ID       | Header (title)  | Grid, indicators  |
 | Secondary identifier  | Header (subtitle)| Grid              |
-| Status/situacao       | Header (badge)  | Grid, indicators  |
+| Status/situacao       | Header (status line) | Grid, indicators |
 | Entity link counts    | Indicators      | Grid              |
 | Boolean flags         | Indicators      | Grid              |
 | Descriptive text      | Header (desc)   | Grid              |
@@ -158,7 +217,7 @@ tooling guardrail prevents editing — do not use them in new code.
 | Page header margin | `mb-6` (inside `PageHeader`) |
 | KPI section | `mb-5` (inside `KpiGrid`) |
 | Listing label | `mb-3` (inside `SectionHeading`) |
-| Toolbar | `mb-5` (inside `ListToolbar`) |
+| Toolbar | none of its own; `PageHeader controls` (header rows `space-y-3`, `mb-6`) |
 | Card grid | `gap-4` |
 | Card padding | `p-3.5 md:p-5` (`Card padding="md"`), `p-4` (`"sm"`) |
 | Modal / Drawer body and footer | `p-4 md:p-5` |
@@ -170,7 +229,7 @@ tooling guardrail prevents editing — do not use them in new code.
 
 | Usage | Props |
 |---|---|
-| Entity status | `<Badge variant="situacao" situacao compact>` |
+| Entity status | `<SituacaoText situacao>` (text + dot; the badge variant is legacy, secrets only) |
 | Meaning | `color="success | warning | danger | info"` |
 | Category | `color="cyan | purple | rose"` (hue keys `emerald`, `amber`, `red`, `sky` still resolve) |
 | Tags | default |
@@ -181,29 +240,46 @@ Compact badges are a dot that expands with its label on hover.
 
 ## 6. Card Navigation
 
-- All cards wrap in `<Link>` (semantic HTML, SSR-friendly, right-click works) with `clickIndicator="link"`.
+- All cards wrap in `<Link>` (semantic HTML, SSR-friendly, right-click works); no corner chevron — hover changes the surface.
 - Whole-card controls that are not navigation (catalog offerings, atlas tables) are `<Card as="button">`.
 - Never `onClick` + `router.push()` for navigation.
 
 ---
 
-## 7. List Page Pattern
+## 7. Page Header and List Page Pattern
+
+`PageHeader` is the one header for list and detail pages. Its rows never move:
+
+```
+1  title ····························· actions · edit · delete · add · [tools toggle]
+2  subtitle / slug
+3  status  |  indicators
+4  description
+5  controls  (search, filters, group, view, export, ações em lote, personalizar) — hidable (controlsKey)
+6  bottom edge: divider | tabs (top, underlined) | side list (variant "side", Configurações)
+```
 
 ```tsx
 <PageShell>
-  <InventoryPageHeader title viewMode onViewModeChange addLabel onAdd />   {/* PageHeader + ViewToggle */}
-  <KpiGrid heading={t("common.indicators")} kpis={...} />
-  <SearchBadge search onClear />                                            {/* when searching */}
+  <PageHeader title addLabel onAdd hideAddOnPhone
+    controls={<ListToolbar search filters actions viewMode onViewModeChange />}
+    controlsKey="hosts" controlsBadge={activeFilterCount}
+    tabs={{ idBase, label, active, onChange, items }}>     {/* optional */}
+    {/* tab content */}
+  </PageHeader>
+  <SearchBadge search onClear />
   {hasItems && <SectionHeading>{t("x.listing")}</SectionHeading>}
-  <ListToolbar search onSearchChange onFilterClick activeFilterCount actions />
-  <InventoryContent ... />          {/* loading / empty / cards / table; cards use stagger-in */}
+  <InventoryContent columns={4 | 3} ... />
   <Drawer footer={formFooter}> <EntityForm onFooterChange={setFormFooter} /> </Drawer>
   <InventoryFilterDrawer ... />
   <InventoryFAB ... />                                                       {/* phones */}
 </PageShell>
 ```
 
-Content grid: `grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`, items
+Hosts is the reference: tabs **Visão geral** (statistics `KpiGrid layout="list"` in the left quarter,
+sticky; the listing in the other three quarters with `InventoryContent columns={3}`) and **Dashboard**
+(KPI tiles + breakdown bar lists; a row click applies its filter). Content grid: `columns={4}`
+→ `md:grid-cols-2 xl:grid-cols-4`, `columns={3}` → `md:grid-cols-2 xl:grid-cols-3`; items
 `className="stagger-in" style={{ "--i": i }}`. Skeleton: six `<SkeletonCard />`.
 
 ---
@@ -224,47 +300,31 @@ Content grid: `grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`, items
 
 ## 9. Detail Page Pattern
 
-Every inventory detail page follows this canonical structure:
+Same `PageHeader`, with the entity's state and CRUD built in:
 
 ```tsx
 <PageShell>
-  {/* 1. DetailHeader: back link + title (accent color) + subtitle + badges + counters */}
-  <DetailHeader
-    backHref="/entity"
-    backLabel={t("common.back")}
+  <PageHeader
     title={entity.name}
-    titleFont="mono"          // mono for slugs/domains, display for names
-    titleColor="var(--accent)" // accent color for consistency
-    subtitle="Entity Type"
-    badges={<Badge variant="situacao" ... />}
-    counters={/* inline issue/alert counts with colored icons */}
+    titleFont="mono"            // mono for slugs/domains, display for names
+    subtitle={entity.slug} subtitleFont="mono"
+    status={<SituacaoText situacao={entity.situacao} />}
+    indicators={<>{/* CardIndicator: alerts, issues, chamados, idle… — always present */}</>}
+    description={entity.description}
+    actions={/* entity extras, e.g. SSH config */}
+    onEdit={canEdit ? openEdit : undefined}
+    onDelete={isAdmin ? remove : undefined} deleteConfirmMessage={…}   // confirms via useConfirm
+    tabs={{ idBase: "host", label: entity.name, active: tab, onChange: setTab, items: tabs }}
   >
-    <DetailActions canEdit onEdit onDelete />
-  </DetailHeader>
+    {tab === "overview" && <OverviewTab />}
+    {tab === "issues" && <IssuesTab />}
+  </PageHeader>
 
-  {/* 2. TabBar with icons + badge counts */}
-  <TabBar
-    tabs={[
-      { key: "overview", label: "Overview", icon: "M3 12l2-2m0..." },
-      { key: "issues", label: "Acontecimentos", icon: "M12 9v2...", badge: issueCount },
-      { key: "topology", label: "Topology", icon: "M13 10V3..." },
-    ]}
-    activeTab={activeTab}
-    onChange={setActiveTab}
-  />
-
-  {/* 3. Tab content */}
-  {activeTab === "overview" && <OverviewTab />}
-  {activeTab === "issues" && <IssuesTab />}
-  {activeTab === "topology" && <TopologyTab />}
-
-  {/* 4. Edit Drawer with Form component */}
   <Drawer open={showEditDrawer} title="Edit" subHeader={formSubHeader}>
     <EntityForm initial={entity} onSuccess={...} onSubHeaderChange={...} />
   </Drawer>
 
-  {/* 5. Mobile FAB */}
-  <FloatingActionButton actions={[{ label: "Edit", icon: "...", onClick }]} />
+  {/* Phones: the header's CRUD row covers edit/delete; a FAB only for tab-specific "add" actions. */}
 </PageShell>
 ```
 
@@ -393,7 +453,7 @@ Detail pages should include an "Acontecimentos" (Issues/Tracking) tab:
 ## 14. Component Reference
 
 `components/ui/`: Avatar, AsyncPicker, Badge, Button, Card (+CardIcon), Checkbox, CheckboxList, ContactInput,
-CopyButton, DateTimeInput, DetailActions, DetailHeader, Divider, Drawer, DrawerSection, DropdownMenu (+Item),
+CopyButton, DateTimeInput, Divider, Drawer, DrawerSection, DropdownMenu (+Item),
 EmptyState, Field, FloatingActionButton, FormError, FormField, FormFooter, Icon, IconButton, Input,
 LinkedEntityList, ListToolbar, MarkdownEditor, Modal, NativeSelect, OperationOutput, PageHeader, Pagination,
 PillButton, RadioGroup, ResponsiveModal, SearchBadge, SectionHeading, Select, Skeleton (+Card/Table/Stats),
@@ -401,7 +461,7 @@ SortDropdown, SortableTable, Spinner, StatCard, StatusAlert, StatusDot, StepIndi
 (`tableClasses`), TagInput, Textarea, Toggle, ToolbarActionButton, Tooltip, ViewToggle.
 
 `components/inventory/`: CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator,
-InventoryPageHeader, InventoryContent, InventoryFilterDrawer, InventoryFAB, KpiGrid, ResponsavelList,
+InventoryContent, InventoryFilterDrawer, InventoryFAB, KpiGrid, ResponsavelList,
 ResponsaveisSection.
 
 `hooks/`: useMultiStepForm, useCopy, useDebounce, useInventoryFilters, useSecretReveal, useMediaQuery.

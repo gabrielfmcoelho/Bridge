@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
-import Modal from "./Modal";
+import Modal, { type ModalSize } from "./Modal";
 import Drawer from "./Drawer";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
@@ -12,9 +12,11 @@ interface ResponsiveModalProps {
   subHeader?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
+  /** Desktop width (phones get the bottom drawer). */
+  size?: ModalSize;
 }
 
-export default function ResponsiveModal({ open, onClose, title, subHeader, footer, children }: ResponsiveModalProps) {
+export default function ResponsiveModal({ open, onClose, title, subHeader, footer, children, size }: ResponsiveModalProps) {
   const isMobile = useMediaQuery("(max-width: 767px)");
 
   if (isMobile) {
@@ -26,7 +28,7 @@ export default function ResponsiveModal({ open, onClose, title, subHeader, foote
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={title} subHeader={subHeader} footer={footer}>
+    <Modal open={open} onClose={onClose} title={title} subHeader={subHeader} footer={footer} size={size}>
       {children}
     </Modal>
   );

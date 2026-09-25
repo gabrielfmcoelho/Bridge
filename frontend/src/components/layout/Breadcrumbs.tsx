@@ -2,16 +2,19 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocale } from "@/contexts/LocaleContext";
 import { NAV_ITEMS } from "@/lib/constants";
-import { buildCrumbs } from "@/lib/breadcrumbs";
+import { buildCrumbs, backTarget } from "@/lib/breadcrumbs";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import Icon from "@/components/ui/Icon";
+import Button from "@/components/ui/Button";
+import Divider from "@/components/ui/Divider";
 
 export default function Breadcrumbs() {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useLocale();
   const qc = useQueryClient();
   const crumbs = buildCrumbs(pathname ?? "/", NAV_ITEMS);
@@ -27,9 +30,28 @@ export default function Breadcrumbs() {
     () => undefined,
   );
 
+  // "Voltar" is always here, one step up the crumb trail; on a top-level page
+  // there is nowhere to go, so it stays visible but disabled. A single crumb
+  // only repeats the page title below it, so the trail needs two.
+  const back = backTarget(crumbs);
+
   return (
-    <nav aria-label={t("header.breadcrumbs")} className="hidden md:flex ml-2 min-w-0">
-      <ol className="flex items-center gap-1 text-sm min-w-0 font-display">
+    <div className="flex items-center gap-1 min-w-0">
+    <Button
+      variant="ghost"
+      size="sm"
+      disabled={!back}
+      onClick={() => back && router.push(back)}
+      aria-label={t("common.back")}
+      title={t("common.back")}
+    >
+      <Icon path={ICON_PATHS.back} className="w-3.5 h-3.5" />
+      <span className="max-md:hidden">{t("common.back")}</span>
+    </Button>
+    {crumbs.length > 1 && <Divider vertical className="max-md:hidden my-2 mx-1" />}
+    {crumbs.length > 1 && (
+    <nav aria-label={t("header.breadcrumbs")} className="hidden md:flex min-w-0">
+      <ol className="flex items-center gap-1 text-xs min-w-0 overflow-hidden font-display">
         {crumbs.map((c, i) => {
           const last = i === crumbs.length - 1;
           const unresolved = c.raw && !!c.queryKey && !name;
@@ -61,5 +83,7 @@ export default function Breadcrumbs() {
         })}
       </ol>
     </nav>
+    )}
+    </div>
   );
 }

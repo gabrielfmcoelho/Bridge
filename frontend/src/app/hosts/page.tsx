@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { hostsAPI, sshAPI } from "@/lib/api";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { hostsAPI, sshAPI, proxmoxAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useFlag } from "@/contexts/FlagContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOpenOnParam } from "@/hooks/useOpenOnParam";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
@@ -16,19 +18,25 @@ import ListToolbar from "@/components/ui/ListToolbar";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
-import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
+import PageHeader from "@/components/ui/PageHeader";
 import InventoryContent from "@/components/inventory/InventoryContent";
 import HostForm from "./HostForm";
 import FilterDrawer, { emptyFilters } from "./FilterDrawer";
 import HostCard from "./_components/HostCard";
 import InventoryFAB from "@/components/inventory/InventoryFAB";
 import KpiSection from "./_components/KpiSection";
+import HostsDashboard from "./_components/HostsDashboard";
 import BatchScanModal from "./_components/BatchScanModal";
 import BatchDockerSetupModal from "./_components/BatchDockerSetupModal";
 import BatchDockerLogsModal from "./_components/BatchDockerLogsModal";
 import BatchSudoNopasswdModal from "./_components/BatchSudoNopasswdModal";
 import BatchSetupKeyModal from "./_components/BatchSetupKeyModal";
 import HostsTableView from "./_components/HostsTableView";
+import GroupByMenu from "@/components/inventory/GroupByMenu";
+import Icon from "@/components/ui/Icon";
+import DropdownMenu, { DropdownMenuGroup, DropdownMenuItem } from "@/components/ui/DropdownMenu";
+import { useRelationGroups } from "@/hooks/useRelationGroups";
+import type { GroupEntity } from "@/lib/grouping";
 import type { Host, HostFilters, HostSortConfig } from "@/lib/types";
 
 type ScanStatus = "pending" | "scanning" | "success" | "failed" | "skipped";
@@ -83,6 +91,7 @@ export default function HostsPage() {
   const { t } = useLocale();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const flag = useFlag();
 
   // UI state
   const [search, setSearch] = useState("");
@@ -92,6 +101,19 @@ export default function HostsPage() {
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  // Page tab, kept in ?tab= so a dashboard link survives reload.
+  const [pageTab, setPageTab] = useState<"overview" | "dashboard">("overview");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "dashboard") setPageTab("dashboard");
+  }, []);
+  const selectTab = (k: string) => {
+    const tab = k === "dashboard" ? "dashboard" : "overview";
+    setPageTab(tab);
+    const url = new URL(window.location.href);
+    if (tab === "dashboard") url.searchParams.set("tab", "dashboard");
+    else url.searchParams.delete("tab");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search);
+  };
   const [tablePage, setTablePage] = useState(1);
   const [visibleCount, setVisibleCount] = useState(24);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -125,6 +147,7 @@ export default function HostsPage() {
   }, []);
 
   const [sort, setSort] = useLocalStorage<HostSortConfig>("hosts_sort", { field: "nickname", direction: "asc" });
+  const [groupBy, setGroupBy] = useLocalStorage<GroupEntity | "">("hosts_groupBy", "");
 
   useEffect(() => { setVisibleCount(24); setTablePage(1); }, [search, filters, sort]);
   useEffect(() => {
@@ -156,6 +179,7 @@ export default function HostsPage() {
   // also feeds the batch-scan worker pool + scannable/failed/success counts
   // below, so hosts always loads it (card view + scan need the whole set).
   const sortedHosts = hosts;
+  const grouping = useRelationGroups("host", groupBy, sortedHosts);
 
   // Table view drives REAL server-side pagination: a separate query fetches one
   // page (filtered+sorted+limited) so column-sort + paging are server-authoritative.
@@ -163,7 +187,8 @@ export default function HostsPage() {
   const TABLE_PER_PAGE = 20;
   const tableQuery = useQuery({
     queryKey: ["hosts-table", search, filters, sort, tablePage],
-    enabled: viewMode === "table",
+    // Grouped, the table shows every (filtered) row per group from the full list.
+    enabled: viewMode === "table" && !groupBy,
     queryFn: () => {
       const params: Record<string, string> = {};
       if (search) params.search = search;
@@ -179,6 +204,7 @@ export default function HostsPage() {
   const tableTotal = tableQuery.data?.meta.total ?? 0;
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  useOpenOnParam("new", () => setShowForm(true), canEdit);
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const scannableHosts = useMemo(() => hosts.filter(h => h.has_key || h.has_password), [hosts]);
   // Bucketing uses the *active* SSH method (the one startBatchScan actually
@@ -356,82 +382,161 @@ export default function HostsPage() {
     });
   }, []);
 
+  // Outcome as a flag, not a banner: the sync runs in the background and its
+  // result shouldn't push the list down.
+  const proxmoxSync = useMutation({
+    mutationFn: proxmoxAPI.sync,
+    onMutate: () => flag({ appearance: "info", title: t("host.syncProxmoxRunning") }),
+    onSuccess: (d) => {
+      queryClient.invalidateQueries({ queryKey: ["hosts"] });
+      queryClient.invalidateQueries({ queryKey: ["hosts-table"] });
+      flag({
+        appearance: "success",
+        title: t("host.syncProxmox"),
+        description: t("host.proxmoxSyncDone", {
+          found: String(d.found), created: String(d.created), updated: String(d.updated),
+          deactivated: String(d.deactivated), no_ip: String(d.no_ip),
+        }),
+      });
+    },
+    onError: (err) => flag({ appearance: "error", title: t("host.syncProxmox"), description: err.message }),
+  });
+
   const scanCounts = Object.values(scanProgress);
   const scannedCount = scanCounts.filter(s => s.status === "success" || s.status === "failed").length;
   const successCount = scanCounts.filter(s => s.status === "success").length;
   const failedCount = scanCounts.filter(s => s.status === "failed").length;
 
 
+  // Operations over the whole fleet: rare, and editor/admin only, so they sit
+  // behind one menu instead of crowding the list toolbar. The phone FAB gets
+  // the same list.
+  const bulkActions = [
+    ...(canEdit && scannableHosts.length > 0 ? [
+      { label: t("host.scanAll"), icon: ICON_PATHS.scan, color: "var(--accent)", onClick: () => setShowScanModal(true) },
+      { label: t("host.batchDocker"), icon: ICON_PATHS.cube, color: "var(--info)", onClick: () => setShowDockerModal(true) },
+      { label: t("host.batchDockerLogs"), icon: ICON_PATHS.document, color: "var(--cyan)", onClick: () => setShowDockerLogsModal(true) },
+    ] : []),
+    ...(canEdit && hosts.some((h) => h.has_password) ? [
+      { label: t("host.batchSudo"), icon: ICON_PATHS.terminal, color: "var(--warning)", onClick: () => setShowSudoModal(true) },
+      { label: t("host.batchKey"), icon: ICON_PATHS.key, color: "var(--success)", onClick: () => setShowSetupKeyModal(true) },
+    ] : []),
+    ...(user?.role === "admin" ? [
+      { label: t("host.syncProxmox"), icon: ICON_PATHS.refresh, color: "var(--info)", onClick: () => proxmoxSync.mutate(), disabled: proxmoxSync.isPending, group: "sync" },
+    ] : []),
+  ];
+
   return (
     <PageShell>
-      <InventoryPageHeader
+      <PageHeader
         title={t("host.title")}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        description={t("host.pageDescription")}
         addLabel={canEdit ? t("host.addHost") : undefined}
         onAdd={canEdit ? () => setShowForm(true) : undefined}
-      />
-
-      {!isLoading && hosts.length > 0 && <KpiSection hosts={hosts} t={t} />}
-
-      <SearchBadge search={search} onClear={() => setSearch("")} />
-      {!isLoading && hosts.length > 0 && <SectionHeading>{t("host.listing")}</SectionHeading>}
-
-      {/* Toolbar — search, filters, export, scan */}
-      <ListToolbar
-        search={search}
-        onSearchChange={setSearch}
-        onFilterClick={() => setShowFilters(true)}
-        activeFilterCount={activeFilterCount}
-        searchPlaceholder={t("common.search")}
-        searchAdornment={
-          <PinSearchButton
+        hideAddOnPhone
+        controlsKey="hosts"
+        controlsBadge={activeFilterCount}
+        tabs={{
+          idBase: "hosts",
+          label: t("host.title"),
+          active: pageTab,
+          onChange: selectTab,
+          items: [
+            { key: "overview", label: t("host.view.overview"), icon: ICON_PATHS.viewCards },
+            { key: "dashboard", label: t("host.view.dashboard"), icon: ICON_PATHS.layoutGrid },
+          ],
+        }}
+        controls={
+          <ListToolbar
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
             search={search}
-            pinnedSearch={pinnedSearch}
-            onTogglePin={() => setPinnedSearch(pinnedSearch === search && search ? "" : search)}
-            t={t}
+            onSearchChange={setSearch}
+            onFilterClick={() => setShowFilters(true)}
+            activeFilterCount={activeFilterCount}
+            searchPlaceholder={t("common.search")}
+            searchAdornment={
+              <PinSearchButton
+                search={search}
+                pinnedSearch={pinnedSearch}
+                onTogglePin={() => setPinnedSearch(pinnedSearch === search && search ? "" : search)}
+                t={t}
+              />
+            }
+            actions={
+              <div className="flex items-center gap-1.5">
+                {hosts.length > 0 && (
+                  <GroupByMenu options={["service", "dns", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
+                )}
+                {hosts.length > 0 && (
+                  <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
+                )}
+                {bulkActions.length > 0 && (
+                  <DropdownMenu trigger={<ToolbarActionButton icon={ICON_PATHS.bolt} label={t("host.bulkActions")} hideLabel="md" />}>
+                    {(["ops", "sync"] as const).map((g) => {
+                      const items = bulkActions.filter((a) => ("group" in a ? a.group : "ops") === g);
+                      return items.length > 0 && (
+                        <DropdownMenuGroup key={g} title={t(g === "ops" ? "host.bulkGroupOps" : "host.bulkGroupSync")}>
+                          {items.map((a) => (
+                            <DropdownMenuItem
+                              key={a.label}
+                              onClick={a.onClick}
+                              disabled={"disabled" in a ? a.disabled : false}
+                              className="whitespace-nowrap"
+                              elemBefore={<Icon path={a.icon} className="w-4 h-4" style={{ color: a.color }} />}
+                            >
+                              {a.label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuGroup>
+                      );
+                    })}
+                  </DropdownMenu>
+                )}
+              </div>
+            }
           />
         }
-        actions={
-          <div className="flex items-center gap-1.5">
-            {hosts.length > 0 && (
-              <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
-            )}
-            {canEdit && scannableHosts.length > 0 && (
-              <ToolbarActionButton icon={ICON_PATHS.scan} label={t("host.scanAll")} onClick={() => setShowScanModal(true)} hideLabel="md" />
-            )}
-            {canEdit && scannableHosts.length > 0 && (
-              <ToolbarActionButton icon={ICON_PATHS.cube} label={t("host.batchDocker")} onClick={() => setShowDockerModal(true)} hideLabel="md" />
-            )}
-            {canEdit && scannableHosts.length > 0 && (
-              <ToolbarActionButton icon={ICON_PATHS.document} label={t("host.batchDockerLogs")} onClick={() => setShowDockerLogsModal(true)} hideLabel="md" />
-            )}
-            {canEdit && hosts.some(h => h.has_password) && (
-              <ToolbarActionButton icon={ICON_PATHS.terminal} label={t("host.batchSudo")} onClick={() => setShowSudoModal(true)} hideLabel="md" />
-            )}
-            {canEdit && hosts.some(h => h.has_password) && (
-              <ToolbarActionButton icon={ICON_PATHS.key} label={t("host.batchKey")} onClick={() => setShowSetupKeyModal(true)} hideLabel="md" />
-            )}
+      >
+        {pageTab === "overview" ? (
+          // Visão geral: statistics in the left quarter, the listing in the rest.
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] gap-6 max-lg:space-y-6">
+            <aside className="lg:sticky lg:top-0 lg:self-start">
+              {!isLoading && <KpiSection layout="list" hosts={hosts} filters={filters} onFiltersChange={setFilters} sort={sort} onSortChange={setSort} />}
+            </aside>
+            <div className="min-w-0">
+              <SearchBadge search={search} onClear={() => setSearch("")} />
+              {!isLoading && hosts.length > 0 && <SectionHeading>{t("host.listing")}</SectionHeading>}
+              <InventoryContent
+                columns={3}
+                isLoading={grouping.isLoading || (viewMode === "table" && !groupBy ? tableQuery.isLoading : isLoading)}
+                items={viewMode === "table" && !groupBy ? tableHosts : sortedHosts}
+                groups={grouping.groups}
+                viewMode={viewMode}
+                emptyIcon="server"
+                emptyTitle={t("common.noResults")}
+                emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") : t("host.emptyStateAdd")}
+                emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={() => setShowForm(true)}>+ {t("host.addHost")}</Button> : undefined}
+                renderCard={(host) => <HostCard host={host} />}
+                renderTable={(items) => <HostsTableView hosts={items} total={groupBy ? undefined : tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} canEdit={canEdit} t={t} />}
+                visibleCount={visibleCount}
+                loadMoreRef={loadMoreRef}
+                onLoadMore={() => setVisibleCount((c) => c + 24)}
+                loadingMoreLabel={t("common.loadingMore")}
+                loadMoreLabel={t("common.loadMore")}
+              />
+            </div>
           </div>
-        }
-      />
-
-      <InventoryContent
-        isLoading={viewMode === "table" ? tableQuery.isLoading : isLoading}
-        items={viewMode === "table" ? tableHosts : sortedHosts}
-        viewMode={viewMode}
-        emptyIcon="server"
-        emptyTitle={t("common.noResults")}
-        emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") : t("host.emptyStateAdd")}
-        emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={() => setShowForm(true)}>+ {t("host.addHost")}</Button> : undefined}
-        renderCard={(host) => <HostCard host={host} />}
-        renderTable={(items) => <HostsTableView hosts={items} total={tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} canEdit={canEdit} t={t} />}
-        visibleCount={visibleCount}
-        loadMoreRef={loadMoreRef}
-        onLoadMore={() => setVisibleCount((c) => c + 24)}
-        loadingMoreLabel={t("common.loadingMore")}
-        loadMoreLabel={t("common.loadMore")}
-      />
+        ) : (
+          <HostsDashboard
+            hosts={hosts}
+            filters={filters}
+            sort={sort}
+            onSortChange={setSort}
+            onApplyFilter={(f) => { setFilters({ ...filters, ...f }); selectTab("overview"); }}
+          />
+        )}
+      </PageHeader>
 
       <Drawer open={showForm} onClose={() => setShowForm(false)} title={t("host.addHost")} subHeader={formSubHeader} footer={formFooter}>
         <HostForm onClose={() => setShowForm(false)} onFooterChange={setFormFooter} onSubHeaderChange={setFormSubHeader}
@@ -482,38 +587,7 @@ export default function HostsPage() {
         onFilter={() => setShowFilters(true)}
         onExport={exportCSV}
         addLabel={t("host.addHost")}
-        extraActions={canEdit ? [
-          ...(scannableHosts.length > 0 ? [{
-            label: t("host.scanAll"),
-            icon: ICON_PATHS.scan,
-            color: "#8b5cf6",
-            onClick: () => setShowScanModal(true),
-          }] : []),
-          ...(scannableHosts.length > 0 ? [{
-            label: t("host.batchDocker"),
-            icon: ICON_PATHS.cube,
-            color: "#0ea5e9",
-            onClick: () => setShowDockerModal(true),
-          }] : []),
-          ...(scannableHosts.length > 0 ? [{
-            label: t("host.batchDockerLogs"),
-            icon: ICON_PATHS.document,
-            color: "#06b6d4",
-            onClick: () => setShowDockerLogsModal(true),
-          }] : []),
-          ...(hosts.some(h => h.has_password) ? [{
-            label: t("host.batchSudo"),
-            icon: ICON_PATHS.terminal,
-            color: "#f59e0b",
-            onClick: () => setShowSudoModal(true),
-          }] : []),
-          ...(hosts.some(h => h.has_password) ? [{
-            label: t("host.batchKey"),
-            icon: ICON_PATHS.key,
-            color: "#10b981",
-            onClick: () => setShowSetupKeyModal(true),
-          }] : []),
-        ] : undefined}
+        extraActions={bulkActions.length > 0 ? bulkActions.map(({ label, icon, color, onClick }) => ({ label, icon, color, onClick })) : undefined}
       />
     </PageShell>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import { SafeMarkdownContent } from "@/components/ui/MarkdownEditor";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { BundleWikiDoc, BundleWikiItem } from "@/lib/types";
@@ -65,41 +65,47 @@ export default function ShareWikiSection({
 }) {
   const { t } = useLocale();
   return (
-    <div id={`wiki-${index}`} className="space-y-2 scroll-mt-6">
-      <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="text-sm font-semibold text-[var(--text-secondary)]">{item.title}</h2>
-        <span className="text-2xs px-1.5 py-0.5 rounded border border-[var(--border-default)] bg-[var(--bg-overlay)] text-[var(--text-muted)]">
-          {item.kind === "collection" ? t("share.wikiCollection") : t("share.wikiDoc")}
-        </span>
-        {item.browse_url && (
-          <a
-            href={item.browse_url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-2xs text-[var(--accent)] hover:underline"
-          >
-            {t("share.wikiOpen")} ↗
-          </a>
-        )}
-      </div>
-      {item.description && (
-        <SafeMarkdownContent
-          content={item.description}
-          className="markdown-preview text-xs text-[var(--text-muted)]"
-        />
-      )}
-      {item.truncated && (
-        <p className="text-2xs text-[var(--warning)]">{t("share.wikiTruncated")}</p>
-      )}
-      <Card className="space-y-4">
-        {item.documents.length === 0 ? (
-          <p className="text-xs text-[var(--text-muted)]">{t("share.wikiEmpty")}</p>
-        ) : (
-          item.documents.map((doc) => (
-            <WikiDocBlock key={doc.id} doc={doc} sectionIndex={index} />
-          ))
-        )}
-      </Card>
+    <div id={`wiki-${index}`} className="scroll-mt-6">
+      <SectionCard
+        title={item.title}
+        controls={
+          <>
+            <span className="text-2xs px-1.5 py-0.5 rounded border border-[var(--border-default)] bg-[var(--bg-overlay)] text-[var(--text-muted)]">
+              {item.kind === "collection" ? t("share.wikiCollection") : t("share.wikiDoc")}
+            </span>
+            {item.browse_url && (
+              <a
+                href={item.browse_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-2xs text-[var(--accent)] hover:underline"
+              >
+                {t("share.wikiOpen")} ↗
+              </a>
+            )}
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {/* Markdown, so it can't ride in SectionCard's plain-text description. */}
+          {item.description && (
+            <SafeMarkdownContent
+              content={item.description}
+              className="markdown-preview text-xs text-[var(--text-muted)]"
+            />
+          )}
+          {item.truncated && (
+            <p className="text-2xs text-[var(--warning)]">{t("share.wikiTruncated")}</p>
+          )}
+          {item.documents.length === 0 ? (
+            <p className="text-xs text-[var(--text-muted)]">{t("share.wikiEmpty")}</p>
+          ) : (
+            item.documents.map((doc) => (
+              <WikiDocBlock key={doc.id} doc={doc} sectionIndex={index} />
+            ))
+          )}
+        </div>
+      </SectionCard>
     </div>
   );
 }

@@ -1,14 +1,90 @@
+"use client";
+
 import KpiGrid from "@/components/inventory/KpiGrid";
-import type { Host } from "@/lib/types";
+import KpiPicker from "@/components/inventory/KpiPicker";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useLocale } from "@/contexts/LocaleContext";
+import { ICON_PATHS } from "@/lib/icon-paths";
+import type { Host, HostFilters, HostSortConfig } from "@/lib/types";
+import { hostInsights, DEFAULT_HOST_INSIGHTS, type HostInsight } from "./hostInsights";
 
-export default function KpiSection({ hosts, t }: { hosts: Host[]; t: (key: string) => string }) {
-  const kpis = [
-    { label: t("dashboard.totalHosts"), value: hosts.length, color: "cyan", icon: "M5 3h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm0 10h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2z" },
-    { label: t("host.withCredentials"), value: hosts.filter(h => h.has_key || h.has_password).length, color: "emerald", icon: "M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" },
-    { label: t("host.scanned"), value: hosts.filter(h => h.has_scan).length, color: "accent", icon: "M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" },
-    { label: t("host.containers"), value: hosts.reduce((sum, h) => sum + (h.containers_count || 0), 0), color: "sky", icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" },
-    { label: t("host.alerts"), value: hosts.filter(h => h.alerts && h.alerts.length > 0).length, color: "amber", icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" },
-  ];
+const DEFAULT_SORT: HostSortConfig = { field: "nickname", direction: "asc" };
 
-  return <KpiGrid kpis={kpis} heading={t("common.indicators")} columns={5} />;
+/**
+ * The admin's own KPI strip: which insights show is remembered per browser,
+ * and a tile that maps to a filter or sort applies it on click (and clears it
+ * on a second click). Counts describe the current listing.
+ */
+export default function KpiSection({
+  hosts,
+  filters,
+  onFiltersChange,
+  sort,
+  onSortChange,
+  layout = "grid",
+}: {
+  hosts: Host[];
+  filters: HostFilters;
+  onFiltersChange: (f: HostFilters) => void;
+  sort: HostSortConfig;
+  onSortChange: (s: HostSortConfig) => void;
+  /** "list" in the Visão geral side column, "grid" on the Dashboard. */
+  layout?: "grid" | "list";
+}) {
+  const { t } = useLocale();
+  const [selected, setSelected] = useLocalStorage<string[]>("hosts_kpis", DEFAULT_HOST_INSIGHTS);
+  const all = hostInsights(hosts, t);
+  const byKey = new Map(all.map((i) => [i.key, i]));
+
+  const isActive = (i: HostInsight) =>
+    i.filter
+      ? Object.entries(i.filter).every(([k, v]) => filters[k as keyof HostFilters] === v)
+      : !!i.sort && sort.field === i.sort.field && sort.direction === i.sort.direction;
+
+  const apply = (i: HostInsight) => {
+    if (i.filter) {
+      const cleared = Object.fromEntries(Object.keys(i.filter).map((k) => [k, ""]));
+      onFiltersChange({ ...filters, ...(isActive(i) ? cleared : i.filter) });
+    } else if (i.sort) {
+      onSortChange(isActive(i) ? DEFAULT_SORT : i.sort);
+    }
+  };
+
+  // A selected tag may have left the listing; its tile just drops out.
+  const kpis = selected.flatMap((key) => {
+    const i = byKey.get(key);
+    if (!i) return [];
+    const clickable = !!(i.filter || i.sort);
+    return [{
+      label: i.label,
+      value: i.value,
+      color: i.color,
+      icon: ICON_PATHS[i.icon],
+      hint: i.hint || undefined,
+      onClick: clickable ? () => apply(i) : undefined,
+      active: clickable && isActive(i),
+    }];
+  });
+
+  return (
+    <KpiGrid
+      layout={layout}
+      description={layout === "list" ? t("inventory.kpis.description") : undefined}
+      kpis={kpis}
+      heading={t("common.indicators")}
+      columns={Math.min(Math.max(kpis.length, 2), 5) as 2 | 3 | 4 | 5}
+      actions={
+        <KpiPicker
+          options={all.map((i) => ({
+            key: i.key,
+            label: i.label,
+            group: i.key.startsWith("tag:") ? t("common.tags") : t("common.indicators"),
+          }))}
+          selected={selected}
+          onChange={setSelected}
+          onReset={() => setSelected(DEFAULT_HOST_INSIGHTS)}
+        />
+      }
+    />
+  );
 }

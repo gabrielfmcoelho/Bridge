@@ -6,6 +6,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { LocaleProvider } from "@/contexts/LocaleContext";
 import { AppearanceProvider } from "@/contexts/AppearanceContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ConfirmProvider } from "@/contexts/ConfirmContext";
+import { FlagProvider } from "@/contexts/FlagContext";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -25,7 +27,12 @@ export function Providers({ children }: { children: ReactNode }) {
       <ThemeProvider>
         <AppearanceProvider>
           <LocaleProvider>
-            <AuthProvider>{children}</AuthProvider>
+            {/* Dialog and notices render once, above every page. */}
+            <FlagProvider>
+              <ConfirmProvider>
+                <AuthProvider>{children}</AuthProvider>
+              </ConfirmProvider>
+            </FlagProvider>
           </LocaleProvider>
         </AppearanceProvider>
       </ThemeProvider>

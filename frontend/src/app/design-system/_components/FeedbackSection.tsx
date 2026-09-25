@@ -22,7 +22,7 @@ const BADGE_COLORS = ["emerald", "cyan", "amber", "accent", "red", "rose", "gray
 const EMPTY_STATE_ICONS = ["server", "globe", "folder", "box", "search", "key", "topology"] as const;
 const ROLES = ["admin", "editor", "viewer"] as const;
 
-// roleColors copied verbatim from app/settings/page.tsx:30 (duplicated again at
+// roleColors copied verbatim from app/settings/UsersTab.tsx:22 (duplicated again at
 // components/layout/Header.tsx:13; same object, two separate consts).
 const roleColors: Record<string, string> = {
   admin: "bg-[var(--bg-overlay)] text-[var(--text-muted)] border-[var(--border-default)]",
@@ -191,12 +191,12 @@ export default function FeedbackSection() {
         <p className="text-xs text-[var(--text-muted)] mt-2">The only progress bar in the app; not in <code>ui/</code>.</p>
       </Specimen>
 
-      <Specimen title="Role chip" source="app/settings/page.tsx:30,513" wide>
+      <Specimen title="Role chip" source="app/settings/UsersTab.tsx:22,184" wide>
         <div className="space-y-2">
           <div>
-            <p className="text-[11px] text-[var(--text-faint)] mb-1">app/settings/page.tsx:513 (table row)</p>
+            <p className="text-[11px] text-[var(--text-faint)] mb-1">app/settings/UsersTab.tsx:184 (table row)</p>
             <div className="flex flex-wrap gap-1.5">
-              {/* specimen: app/settings/page.tsx:513 */}
+              {/* specimen: app/settings/UsersTab.tsx:184 */}
               {ROLES.map((r) => (
                 <span
                   key={r}
@@ -263,8 +263,8 @@ export default function FeedbackSection() {
         </div>
       </Specimen>
 
-      <Specimen title="Entidade chip" source="app/settings/page.tsx:520">
-        {/* specimen: app/settings/page.tsx:520 */}
+      <Specimen title="Entidade chip" source="app/settings/UsersTab.tsx:191">
+        {/* specimen: app/settings/UsersTab.tsx:191 */}
         <span
           className="px-1.5 py-0.5 rounded border text-[10px] border-[var(--accent)]/40 text-[var(--accent)] bg-[var(--accent-muted)]"
           title="Primary"
@@ -295,7 +295,9 @@ export default function FeedbackSection() {
             <code>app/projects/[id]/_components/IssueBoard.tsx</code>, <code>app/catalog/_components/OfferingCard.tsx</code>.
           </li>
           <li>
-            <code>window.confirm()</code> ×32 for destructive confirms; no toast/snackbar anywhere.
+            Confirms go through <code>useConfirm()</code> (<code>danger</code>, <code>requireText</code>); outcomes of
+            background actions through <code>useFlag()</code> (bottom-left, 8s for success/info, errors stay). One native{" "}
+            <code>prompt()</code> left in <code>secrets/EnvVarBundleEditor.tsx</code> (guardrailed).
           </li>
         </ul>
       </div>

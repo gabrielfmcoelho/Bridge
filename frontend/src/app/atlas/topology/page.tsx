@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { graphAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import PageShell from "@/components/layout/PageShell";
+import PageHeader from "@/components/ui/PageHeader";
 import TopologyGraph from "@/components/graph/TopologyGraph";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -26,25 +27,19 @@ export default function TopologyPage() {
 
   return (
     <PageShell>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold font-display">{t("topology.title")}</h1>
-      </div>
-
-      {/* Legend bar */}
-      {nodes.length > 0 && (
-        <div className="flex gap-2 mb-4 animate-fade-in">
-          {legendItems.map((item) => {
-            const count = nodes.filter(n => n.type === item.type).length;
-            if (count === 0) return null;
-            return (
-              <div key={item.type} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
-                <span className={`w-2 h-2 rounded-full ${item.color}`} />
-                {item.label} ({count})
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <PageHeader
+        title={t("topology.title")}
+        indicators={nodes.length > 0 ? legendItems.map((item) => {
+          const count = nodes.filter(n => n.type === item.type).length;
+          if (count === 0) return null;
+          return (
+            <div key={item.type} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] animate-fade-in">
+              <span className={`w-2 h-2 rounded-full ${item.color}`} />
+              {item.label} ({count})
+            </div>
+          );
+        }) : undefined}
+      />
 
       {isLoading ? (
         <Skeleton className="w-full h-[calc(100vh-14rem)] rounded-[var(--radius-lg)]" />

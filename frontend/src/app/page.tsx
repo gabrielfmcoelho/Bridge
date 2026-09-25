@@ -7,12 +7,10 @@ import { dashboardAPI, hostsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
-import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
+import SectionCard from "@/components/ui/SectionCard";
+import SituacaoText from "@/components/ui/SituacaoText";
 import StatCard from "@/components/ui/StatCard";
 import { SkeletonStats } from "@/components/ui/Skeleton";
-import SectionHeading from "@/components/ui/SectionHeading";
-import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import StatusDot from "@/components/ui/StatusDot";
 
@@ -200,43 +198,31 @@ export default function DashboardPage() {
           {/* Insight cards row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {/* Scan Coverage */}
-            <Card hover={false} className="stagger-in" style={{ "--i": 5 } as React.CSSProperties}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
-                  {t("dashboard.scanCoverage")}
-                </h2>
-                <Icon path={ICON_PATHS.scan} className="w-4 h-4 text-[var(--accent)]" />
-              </div>
-              <div className="flex items-end gap-3 mb-3">
-                <span className="text-2xl font-bold text-[var(--accent)] font-display">
-                  {stats.hosts.with_scans}
-                </span>
-                <span className="text-sm text-[var(--text-muted)] mb-0.5">/ {stats.hosts.total} {t("host.title").toLowerCase()}</span>
-              </div>
-              <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-[var(--accent)] transition duration-700"
-                  style={{ width: `${scanPct}%` }}
-                />
-              </div>
-              <p className="text-xs text-[var(--text-faint)] mt-1.5 font-mono">{scanPct}% {t("dashboard.scanned")}</p>
-            </Card>
+            <div className="stagger-in" style={{ "--i": 5 } as React.CSSProperties}>
+              <SectionCard title={t("dashboard.scanCoverage")} icon={ICON_PATHS.scan} className="h-full">
+                <div className="flex items-end gap-3 mb-3">
+                  <span className="text-2xl font-bold text-[var(--accent)] font-display">
+                    {stats.hosts.with_scans}
+                  </span>
+                  <span className="text-sm text-[var(--text-muted)] mb-0.5">/ {stats.hosts.total} {t("host.title").toLowerCase()}</span>
+                </div>
+                <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-[var(--accent)] transition duration-700"
+                    style={{ width: `${scanPct}%` }}
+                  />
+                </div>
+                <p className="text-xs text-[var(--text-faint)] mt-1.5 font-mono">{scanPct}% {t("dashboard.scanned")}</p>
+              </SectionCard>
+            </div>
 
             {/* Alerts */}
-            <Card hover={false} className="stagger-in" style={{ "--i": 6 } as React.CSSProperties}>
+            <div className="stagger-in" style={{ "--i": 6 } as React.CSSProperties}>
               {(() => {
                 const alertCount = hosts.filter(h => h.alerts && h.alerts.length > 0).length;
                 const criticalCount = hosts.filter(h => h.alerts?.some(a => a.level === "critical")).length;
                 return (
-                  <>
-                    <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
-                        {t("dashboard.maintenanceAlerts")}
-                      </h2>
-                      <svg className={`w-4 h-4 ${alertCount > 0 ? "text-[var(--warning)]" : "text-[var(--success)]"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    </div>
+                  <SectionCard title={t("dashboard.maintenanceAlerts")} icon={ICON_PATHS.alert} className="h-full">
                     <div className="flex items-end gap-3 mb-2">
                       <span className={`text-3xl font-bold ${alertCount > 0 ? "text-[var(--warning)]" : "text-[var(--success)]"} font-display`}>
                         {alertCount}
@@ -248,107 +234,101 @@ export default function DashboardPage() {
                     <p className="text-xs text-[var(--text-faint)]">
                       {alertCount > 0 ? t("dashboard.hostsNeedAttention") : t("dashboard.allHostsHealthy")}
                     </p>
-                  </>
+                  </SectionCard>
                 );
               })()}
-            </Card>
+            </div>
 
             {/* Hosting Distribution */}
-            <Card hover={false} className="stagger-in" style={{ "--i": 7 } as React.CSSProperties}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
-                  {t("dashboard.infrastructure")}
-                </h2>
-                <Icon path={ICON_PATHS.archiveBox} className="w-4 h-4 text-[var(--accent)]" />
-              </div>
-              {hospedagemEntries.length > 0 ? (
-                <div className="space-y-2">
-                  {hospedagemEntries.slice(0, 4).map(([name, count]) => {
-                    const pct = Math.round((count / stats.hosts.total) * 100);
-                    return (
-                      <div key={name}>
-                        <div className="flex items-center justify-between text-xs mb-0.5">
-                          <span className="text-[var(--text-secondary)] truncate">{name}</span>
-                          <span className="text-[var(--text-faint)] ml-2 font-mono">{count}</span>
+            <div className="stagger-in" style={{ "--i": 7 } as React.CSSProperties}>
+              <SectionCard title={t("dashboard.infrastructure")} icon={ICON_PATHS.archiveBox} className="h-full">
+                {hospedagemEntries.length > 0 ? (
+                  <div className="space-y-2">
+                    {hospedagemEntries.slice(0, 4).map(([name, count]) => {
+                      const pct = Math.round((count / stats.hosts.total) * 100);
+                      return (
+                        <div key={name}>
+                          <div className="flex items-center justify-between text-xs mb-0.5">
+                            <span className="text-[var(--text-secondary)] truncate">{name}</span>
+                            <span className="text-[var(--text-faint)] ml-2 font-mono">{count}</span>
+                          </div>
+                          <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-[var(--accent)]/60 transition duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-[var(--accent)]/60 transition duration-500"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {hospedagemEntries.length > 4 && (
-                    <p className="text-2xs text-[var(--text-faint)]">+{hospedagemEntries.length - 4} {t("common.more")}</p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-xs text-[var(--text-faint)]">{t("dashboard.noHostingData")}</p>
-              )}
-            </Card>
+                      );
+                    })}
+                    {hospedagemEntries.length > 4 && (
+                      <p className="text-2xs text-[var(--text-faint)]">+{hospedagemEntries.length - 4} {t("common.more")}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--text-faint)]">{t("dashboard.noHostingData")}</p>
+                )}
+              </SectionCard>
+            </div>
           </div>
 
           {/* Bottom section: Recent Scans + Hosts by Status */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {/* Recent Scans */}
-            <Card hover={false} className="stagger-in" style={{ "--i": 8 } as React.CSSProperties}>
-              <SectionHeading variant="section">
-                {t("dashboard.recentScans")}
-              </SectionHeading>
-              {recentScans.length > 0 ? (
-                <div className="space-y-2">
-                  {recentScans.map((scan) => (
-                    <Link
-                      key={scan.id}
-                      href={`/hosts/${scan.slug}`}
-                      className="flex items-center gap-3 p-2 -mx-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors"
-                    >
-                      <StatusDot className="bg-[var(--success)]" />
-                      <span className="text-sm text-[var(--text-primary)] font-medium truncate font-mono">
-                        {scan.nickname}
-                      </span>
-                      <span className="text-xs text-[var(--text-faint)] ml-auto whitespace-nowrap">
-                        {getTimeAgo(scan.scanned_at)}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-[var(--text-faint)]">{t("dashboard.noScansYet")}</p>
-              )}
-            </Card>
+            <div className="stagger-in" style={{ "--i": 8 } as React.CSSProperties}>
+              <SectionCard title={t("dashboard.recentScans")} className="h-full">
+                {recentScans.length > 0 ? (
+                  <div className="space-y-2">
+                    {recentScans.map((scan) => (
+                      <Link
+                        key={scan.id}
+                        href={`/hosts/${scan.slug}`}
+                        className="flex items-center gap-3 p-2 -mx-2 rounded-[var(--radius-md)] hover:bg-[var(--bg-elevated)] transition-colors"
+                      >
+                        <StatusDot className="bg-[var(--success)]" />
+                        <span className="text-sm text-[var(--text-primary)] font-medium truncate font-mono">
+                          {scan.nickname}
+                        </span>
+                        <span className="text-xs text-[var(--text-faint)] ml-auto whitespace-nowrap">
+                          {getTimeAgo(scan.scanned_at)}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--text-faint)]">{t("dashboard.noScansYet")}</p>
+                )}
+              </SectionCard>
+            </div>
 
             {/* Hosts by status */}
             {Object.keys(stats.hosts.by_situacao).length > 0 && (
-              <Card hover={false} className="stagger-in" style={{ "--i": 9 } as React.CSSProperties}>
-                <SectionHeading variant="section">
-                  {t("dashboard.hostsByStatus", { hosts: t("host.title"), status: t("common.status") })}
-                </SectionHeading>
-                <div className="space-y-5">
-                  {Object.entries(stats.hosts.by_situacao).map(([situacao, count]) => {
-                    const total = stats.hosts.total || 1;
-                    const pct = Math.round(((count as number) / total) * 100);
-                    return (
-                      <div key={situacao}>
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge variant="situacao" situacao={situacao} dot>{situacao}</Badge>
-                          <span className="text-sm text-[var(--text-secondary)] font-mono">
-                            {count as number} <span className="text-[var(--text-faint)]">({pct}%)</span>
-                          </span>
+              <div className="stagger-in" style={{ "--i": 9 } as React.CSSProperties}>
+                <SectionCard title={t("dashboard.hostsByStatus", { hosts: t("host.title"), status: t("common.status") })} className="h-full">
+                  <div className="space-y-5">
+                    {Object.entries(stats.hosts.by_situacao).map(([situacao, count]) => {
+                      const total = stats.hosts.total || 1;
+                      const pct = Math.round(((count as number) / total) * 100);
+                      return (
+                        <div key={situacao}>
+                          <div className="flex items-center justify-between mb-2">
+                            <SituacaoText situacao={situacao} />
+                            <span className="text-sm text-[var(--text-secondary)] font-mono">
+                              {count as number} <span className="text-[var(--text-faint)]">({pct}%)</span>
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition duration-700"
+                              style={{ width: `${pct}%`, backgroundColor: "var(--accent)" }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition duration-700"
-                            style={{ width: `${pct}%`, backgroundColor: "var(--accent)" }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
+                      );
+                    })}
+                  </div>
+                </SectionCard>
+              </div>
             )}
           </div>
 
@@ -356,58 +336,50 @@ export default function DashboardPage() {
           {resourceAnalysis && resourceAnalysis.totalScanned > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Resources by Infrastructure */}
-              <Card hover={false} className="stagger-in" style={{ "--i": 10 } as React.CSSProperties}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
-                    {t("dashboard.resourcesByInfra")}
-                  </h2>
-                  <span className="text-2xs text-[var(--text-faint)]">{t("dashboard.avgUsage")}</span>
-                </div>
-                <div className="space-y-4">
-                  {resourceAnalysis.byHospedagem.map((entry) => (
-                    <div key={entry.name}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-[var(--text-primary)] font-medium">{entry.name}</span>
-                        <span className="text-2xs text-[var(--text-faint)] font-mono">
-                          {entry.count} {entry.count === 1 ? t("dashboard.hostSingular") : t("dashboard.hostPlural")}
-                        </span>
+              <div className="stagger-in" style={{ "--i": 10 } as React.CSSProperties}>
+                <SectionCard title={t("dashboard.resourcesByInfra")} description={t("dashboard.avgUsage")} className="h-full">
+                  <div className="space-y-4">
+                    {resourceAnalysis.byHospedagem.map((entry) => (
+                      <div key={entry.name}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-[var(--text-primary)] font-medium">{entry.name}</span>
+                          <span className="text-2xs text-[var(--text-faint)] font-mono">
+                            {entry.count} {entry.count === 1 ? t("dashboard.hostSingular") : t("dashboard.hostPlural")}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <ResourceMiniBar label="CPU" value={entry.cpu} total={entry.totalCpu} />
+                          <ResourceMiniBar label="RAM" value={entry.ram} total={entry.totalRam} />
+                          <ResourceMiniBar label={t("dashboard.diskLabel")} value={entry.disk} total={entry.totalDisk} />
+                        </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <ResourceMiniBar label="CPU" value={entry.cpu} total={entry.totalCpu} />
-                        <ResourceMiniBar label="RAM" value={entry.ram} total={entry.totalRam} />
-                        <ResourceMiniBar label={t("dashboard.diskLabel")} value={entry.disk} total={entry.totalDisk} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
+                    ))}
+                  </div>
+                </SectionCard>
+              </div>
 
               {/* Resources by Situação */}
-              <Card hover={false} className="stagger-in" style={{ "--i": 11 } as React.CSSProperties}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-[var(--text-secondary)] font-display">
-                    {t("dashboard.resourcesBySituacao")}
-                  </h2>
-                  <span className="text-2xs text-[var(--text-faint)]">{t("dashboard.avgUsage")}</span>
-                </div>
-                <div className="space-y-4">
-                  {resourceAnalysis.bySituacao.map((entry) => (
-                    <div key={entry.name}>
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge variant="situacao" situacao={entry.name} dot>{entry.name}</Badge>
-                        <span className="text-2xs text-[var(--text-faint)] font-mono">
-                          {entry.count} {entry.count === 1 ? t("dashboard.hostSingular") : t("dashboard.hostPlural")}
-                        </span>
+              <div className="stagger-in" style={{ "--i": 11 } as React.CSSProperties}>
+                <SectionCard title={t("dashboard.resourcesBySituacao")} description={t("dashboard.avgUsage")} className="h-full">
+                  <div className="space-y-4">
+                    {resourceAnalysis.bySituacao.map((entry) => (
+                      <div key={entry.name}>
+                        <div className="flex items-center justify-between mb-2">
+                          <SituacaoText situacao={entry.name} />
+                          <span className="text-2xs text-[var(--text-faint)] font-mono">
+                            {entry.count} {entry.count === 1 ? t("dashboard.hostSingular") : t("dashboard.hostPlural")}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <ResourceMiniBar label="CPU" value={entry.cpu} total={entry.totalCpu} />
+                          <ResourceMiniBar label="RAM" value={entry.ram} total={entry.totalRam} />
+                          <ResourceMiniBar label={t("dashboard.diskLabel")} value={entry.disk} total={entry.totalDisk} />
+                        </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <ResourceMiniBar label="CPU" value={entry.cpu} total={entry.totalCpu} />
-                        <ResourceMiniBar label="RAM" value={entry.ram} total={entry.totalRam} />
-                        <ResourceMiniBar label={t("dashboard.diskLabel")} value={entry.disk} total={entry.totalDisk} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
+                    ))}
+                  </div>
+                </SectionCard>
+              </div>
             </div>
           )}
         </>

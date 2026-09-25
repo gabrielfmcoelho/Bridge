@@ -101,6 +101,9 @@ export interface Host {
   coolify_server_uuid?: string | null;
   observacoes: string;
   grafana_dashboard_uid?: string;
+  proxmox_id?: string | null;
+  parent_host_id?: number | null;
+  parent_host_slug?: string | null;
   created_at: string;
   updated_at: string;
   tags?: string[];
@@ -183,6 +186,8 @@ export interface HostFilters {
 
 export interface DNSRecord {
   id: number;
+  /** Creator entidade name (list endpoint), like Host.main_entidade. */
+  main_entidade?: string;
   domain: string;
   has_https: boolean;
   situacao: string;
@@ -209,6 +214,12 @@ export interface DNSRecord {
 
 export interface Project {
   id: number;
+  /** Creator entidade name (list endpoint). */
+  main_entidade?: string;
+  /** Linked counts; absent until the list endpoint sends them. */
+  hosts_count?: number;
+  services_count?: number;
+  dns_count?: number;
   name: string;
   description: string;
   situacao: string;

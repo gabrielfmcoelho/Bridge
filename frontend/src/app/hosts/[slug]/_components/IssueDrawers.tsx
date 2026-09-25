@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { useQuery } from "@tanstack/react-query";
 import { hostsAPI, dnsAPI, servicesAPI, projectsAPI, integrationsAPI } from "@/lib/api";
 import Button from "@/components/ui/Button";
@@ -37,7 +38,7 @@ function LinkReadRow({ label, items }: { label: string; items: string[] }) {
           ))}
         </div>
       ) : (
-        <span className="text-xs text-[var(--text-faint)]">--</span>
+        <span className="text-xs text-[var(--text-muted)]">–</span>
       )}
     </div>
   );
@@ -120,6 +121,7 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
   updateLoading?: boolean;
   t: (k: string, vars?: Record<string, string>) => string;
 }) {
+  const confirm = useConfirm();
   const [editing, setEditing] = useState(false);
   const [escalateOpen, setEscalateOpen] = useState(false);
 
@@ -180,7 +182,7 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
   const editFooter = (
     <div className="flex gap-2">
       {isManual && onDelete && (
-        <Button variant="danger" size="sm" onClick={() => { if (confirm(t("alert.deleteConfirm"))) { onDelete(alert); onClose(); } }} className="mr-auto">
+        <Button variant="danger" size="sm" onClick={async () => { if (await confirm({ title: t("alert.deleteConfirm"), danger: true, confirmLabel: t("common.delete") })) { onDelete(alert); onClose(); } }} className="mr-auto">
           {t("common.delete")}
         </Button>
       )}
@@ -229,7 +231,7 @@ export function AlertDetailDrawer({ open, onClose, alert, slug, canEdit, onCreat
           {alert.description ? (
             <MarkdownContent content={alert.description} />
           ) : (
-            <span className="text-sm text-[var(--text-primary)]">--</span>
+            <span className="text-sm text-[var(--text-muted)]">–</span>
           )}
         </div>
 
@@ -290,6 +292,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
   t: (k: string) => string;
 }) {
   const isEdit = !!issue;
+  const confirm = useConfirm();
   const STATUS_LABELS = getStatusLabels(t);
   const [mode, setMode] = useState<"read" | "edit" | "create">("create");
   const [step, setStep] = useState(1);
@@ -431,7 +434,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
                 })}
               </div>
             ) : (
-              <span className="text-sm text-[var(--text-primary)]">--</span>
+              <span className="text-sm text-[var(--text-muted)]">–</span>
             )}
           </div>
 
@@ -468,7 +471,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
             {issue.description ? (
               <MarkdownContent content={issue.description} />
             ) : (
-              <span className="text-sm text-[var(--text-primary)]">--</span>
+              <span className="text-sm text-[var(--text-muted)]">–</span>
             )}
           </div>
         </div>
@@ -485,7 +488,7 @@ export function IssueDrawer({ open, onClose, issue, users, hostId, alerts, onCre
         title={t("issue.editIssue")}
         footer={
           <div className="flex gap-2">
-            <Button variant="danger" size="sm" onClick={() => { if (confirm(t("issue.deleteConfirm"))) onDelete(issue.id); }} className="mr-auto">
+            <Button variant="danger" size="sm" onClick={async () => { if (await confirm({ title: t("issue.deleteConfirm"), danger: true, confirmLabel: t("common.delete") })) onDelete(issue.id); }} className="mr-auto">
               {t("common.delete")}
             </Button>
             <Button variant="secondary" size="sm" className="flex-1" onClick={() => setMode("read")}>{t("common.cancel")}</Button>

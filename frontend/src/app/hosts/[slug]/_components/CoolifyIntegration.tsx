@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { coolifyAPI, sshKeysAPI } from "@/lib/api";
 import type { CoolifyServer } from "@/lib/api";
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export default function CoolifyIntegration({ slug, coolifyUUID, available, t, isAdmin }: Props) {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [server, setServer] = useState<CoolifyServer | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -125,8 +127,9 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
   );
 
   return (
-    <div className="border border-[var(--border-subtle)] rounded-[var(--radius-md)] overflow-hidden">
-      <div className="px-4 py-3 space-y-3">
+    // A row of the Integrations SectionCard (flush body): brings its own px-5.
+    <div>
+      <div className="px-5 py-4 space-y-3">
         {/* Header */}
         <div className="flex items-center gap-2">
           <Icon path={ICON_PATHS.serverStack} className="w-4 h-4 text-[var(--accent)] shrink-0" />
@@ -178,7 +181,7 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
                 </Button>
               )}
               {isAdmin && (
-                <Button size="sm" variant="secondary" onClick={() => { if (confirm(t("operation.coolifyDeleteConfirm"))) deleteMutation.mutate(); }} loading={deleteMutation.isPending} disabled={loading}>
+                <Button size="sm" variant="secondary" onClick={async () => { if (await confirm({ title: t("operation.coolifyDeleteConfirm"), danger: true, confirmLabel: t("common.remove") })) deleteMutation.mutate(); }} loading={deleteMutation.isPending} disabled={loading}>
                   {t("operation.coolifyDelete")}
                 </Button>
               )}

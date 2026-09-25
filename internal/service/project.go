@@ -41,6 +41,7 @@ type ProjectListItem struct {
 	models.Project
 	Tags                []string `json:"tags"`
 	MainResponsavelName string   `json:"main_responsavel_name"`
+	MainEntidade        string   `json:"main_entidade"` // creator entidade name, as on hosts
 }
 
 // ProjectDetail is the full single-project view (project + relations). HostIDs
@@ -81,12 +82,17 @@ func (s *ProjectService) List(ctx context.Context, f models.ProjectFilter) ([]Pr
 	if err != nil {
 		return nil, err
 	}
+	entidades, err := s.grants.CreatorNamesBulk(ctx, store.AssetProject)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]ProjectListItem, len(projects))
 	for i, p := range projects {
 		out[i] = ProjectListItem{
 			Project:             p,
 			Tags:                tagMap[p.ID],
 			MainResponsavelName: mainNames[p.ID],
+			MainEntidade:        entidades[p.ID],
 		}
 	}
 	return out, nil

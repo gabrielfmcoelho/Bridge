@@ -8,7 +8,13 @@
     "themeLabel": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
-    "breadcrumbs": "Breadcrumb"
+    "breadcrumbs": "Breadcrumb",
+    "language": "Language",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "aiAssistant": "AI assistant",
+    "profileMenu": "Profile and preferences",
+    "assistant": "Assistant"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -43,7 +49,9 @@
     "wiki": "Wiki",
     "chamados": "Tickets",
     "chamadosForms": "Forms",
-    "designSystem": "Design System"
+    "designSystem": "Design System",
+    "workspace": "Workspace",
+    "selfService": "Self-service"
   },
   "atlas": {
     "apis": {
@@ -434,7 +442,10 @@
     "expand": "Expand",
     "filters": "Filters",
     "addTag": "Add tag...",
-    "dialog": "Dialog"
+    "dialog": "Dialog",
+    "notAvailable": "Not available",
+    "showTools": "Show tools",
+    "hideTools": "Hide tools"
   },
   "filters": {
     "title": "Filters & Sort",
@@ -502,7 +513,7 @@
     "acessoExterno": "External Access",
     "entidadeResponsavel": "Responsible Entity",
     "scan": "Scan",
-    "scanAll": "Scan All",
+    "scanAll": "Scan all",
     "scanAllDescription": "Test and capture specs in parallel from all active hosts with credentials configured.",
     "scanConcurrency": "Parallel scans",
     "scanScope": "Scope",
@@ -525,7 +536,7 @@
     "rescan": "Rescan",
     "stopScan": "Stop",
     "batchRunning": "Running...",
-    "batchDocker": "Setup Docker",
+    "batchDocker": "Set up Docker",
     "batchDockerDesc": "Install/check Docker and add the remote user to the docker group across the selected hosts.",
     "batchDockerStart": "Run Docker Setup",
     "batchDockerScopeNeedsSetup": "Needs setup",
@@ -533,7 +544,7 @@
     "batchDockerEmpty": "No hosts with credentials configured.",
     "batchDockerErrNotInstalled": "Docker is not installed",
     "batchDockerErrNeedsSudo": "User still needs sudo for docker (re-login may be required)",
-    "batchDockerLogs": "Docker Logs Audit",
+    "batchDockerLogs": "Docker logs audit",
     "batchDockerLogsDesc": "Inspect docker log driver, rotation policy and per-container log file sizes across the selected hosts. Read-only.",
     "batchDockerLogsStart": "Run Docker Logs Audit",
     "batchDockerLogsScopeWithContainers": "Has containers",
@@ -553,13 +564,13 @@
     "batchSudoScopePasswordOnly": "Password only",
     "batchSudoScopeBoth": "Password + key",
     "batchSudoEmpty": "No hosts with a stored password.",
-    "batchKey": "Setup Key",
+    "batchKey": "Set up key",
     "batchKeyDesc": "Generate a new ed25519 keypair on each host and install it via the stored password. Existing keys are replaced.",
     "batchKeyStart": "Run Key Setup",
     "batchKeyScopeNoKey": "Without key",
     "batchKeyScopeWithKey": "Re-setup",
     "batchKeyEmpty": "No hosts with a stored password.",
-    "withCredentials": "With Creds",
+    "withCredentials": "With credentials",
     "scanned": "Scanned",
     "services": "Services",
     "alerts": "Alerts",
@@ -680,7 +691,58 @@
     "cardKeyLabel": "Key:",
     "untested": "untested",
     "none": "none",
-    "situacaoUpdateFailed": "Update failed"
+    "situacaoUpdateFailed": "Update failed",
+    "syncProxmox": "Sync from Proxmox",
+    "syncProxmoxRunning": "Reading the Proxmox cluster…",
+    "proxmoxSyncDone": "{found} found: {created} new, {updated} updated, {deactivated} marked inactive, {no_ip} without IP",
+    "runsOn": "Runs on",
+    "bulkActions": "Bulk actions",
+    "idleNoWorkloads": "Host has no detected workloads or containers.",
+    "kpi": {
+      "maintenance": "In maintenance",
+      "inactive": "Inactive",
+      "critical": "Critical alerts",
+      "withAnyAlert": "{count} hosts with any alert",
+      "ofScanned": "of {count} scanned",
+      "highUsage": "High usage",
+      "highUsageHint": "CPU, RAM or disk ≥ {pct}%",
+      "noScan": "Never scanned",
+      "noCreds": "No credentials",
+      "onHosts": "on {count} hosts"
+    },
+    "bulkGroupOps": "Host operations",
+    "bulkGroupSync": "Integrations",
+    "quickLook": "Quick look",
+    "openPage": "Open page",
+    "copyHostname": "Copy hostname",
+    "quickLookLinked": "Linked",
+    "quickLookNoLinks": "Nothing linked to this host yet.",
+    "quickLookLastScan": "Last scan",
+    "noPassword": "No password stored",
+    "noKey": "No key stored",
+    "idleNotFlaggedShort": "Not idle",
+    "view": {
+      "overview": "Overview",
+      "dashboard": "Dashboard"
+    },
+    "dash": {
+      "bySituacao": "By situação",
+      "byHospedagem": "By hosting",
+      "byEntidade": "By entidade",
+      "byTags": "By tag",
+      "byUsage": "By peak usage",
+      "usageLow": "Below 50%",
+      "usageMid": "50–80%",
+      "usageHigh": "80% or more",
+      "usageNone": "No scan",
+      "alertsByLevel": "Alerts by level",
+      "none": "None",
+      "clickToFilter": "Click a row to filter the list"
+    },
+    "pageDescription": "Servers, VMs and containers in the inventory: access, resources, links to services and DNS, and their state.",
+    "profileTitle": "Host",
+    "declared": "Declared",
+    "declaredHint": "What was registered for this host; the last scan shows what is actually there."
   },
   "dns": {
     "title": "DNS Records",
@@ -924,7 +986,8 @@
     "portWithValue": "Port {port}",
     "noPort": "No port",
     "listing": "Services",
-    "emptyStateAdd": "Add your first service to get started"
+    "emptyStateAdd": "Add your first service to get started",
+    "discovery": "Discovery"
   },
   "topology": {
     "title": "Architecture Topology",
@@ -1114,7 +1177,8 @@
     "saveChanges": "Save changes",
     "saving": "Saving...",
     "markdownHint": "Supports **markdown** formatting...",
-    "noneReported": "No issues reported"
+    "noneReported": "No issues reported",
+    "boardEmpty": "No issues yet."
   },
   "release": {
     "title": "Releases",
@@ -1275,7 +1339,6 @@
       "disabled": "Disabled",
       "testConnection": "Test Connection",
       "saveChanges": "Save changes",
-      "readOnlyHint": "Read-only — click Edit to change settings.",
       "unsavedChanges": "Unsaved changes.",
       "noChanges": "No changes.",
       "clearStored": "Clear stored",
@@ -1321,16 +1384,13 @@
         "fallbackToLocal": "Fallback to local auth",
         "usernameAttr": "Username Attribute",
         "displayNameAttr": "Display Name Attribute",
-        "emailAttr": "Email Attribute",
-        "saveButton": "Save LDAP Settings",
-        "requestFailed": "Request failed"
+        "emailAttr": "Email Attribute"
       },
       "keycloak": {
         "title": "Keycloak SSO Configuration",
         "environmentPresets": "Environment Presets",
         "clientId": "Client ID",
-        "redirectUriHint": "Redirect URI (add this to Keycloak client)",
-        "saveButton": "Save Keycloak Settings"
+        "redirectUriHint": "Redirect URI (add this to Keycloak client)"
       },
       "gitlab": {
         "title": "GitLab Integration",
@@ -1373,9 +1433,6 @@
         "appToken": "App-Token (optional)",
         "appTokenHint": "GLPI → Setup → General → API. Only required when your GLPI instance demands it — many deployments accept the per-user token on its own. Leave blank if you only have user tokens.",
         "defaultEntityIdFallback": "Default entity ID (fallback when a profile/project has none)",
-        "tokenProfilesHeading": "Token profiles ({count})",
-        "readOnlyHint": "Read-only — click Edit to change.",
-        "confirmClearSecret": "Clear the stored {label}? This cannot be undone.",
         "confirmDeleteProfile": "Delete profile \"{name}\"? Any project pointing at it will become unassigned.",
         "emptyProfiles": "No profiles yet. Add one to enable per-project ticket access.",
         "tokenStored": "token stored",
@@ -1389,7 +1446,8 @@
         "entityIdLabel": "Default entity ID",
         "addProfileButton": "+ Add profile",
         "connectedProfiles": "Connected ({profiles})",
-        "noProfilesFallback": "no profiles"
+        "noProfilesFallback": "no profiles",
+        "tokenProfilesTitle": "Token profiles"
       },
       "grafana": {
         "hint": "Embedded dashboards, live metrics, alert ingestion, agent install.",
@@ -1408,10 +1466,8 @@
         "generateSecretButton": "Generate random secret",
         "copyToClipboardTitle": "Copy to clipboard",
         "generateSecretFirstTitle": "Generate a secret first",
-        "copiedCheck": "Copied ✓",
         "webhookCopyHint": "Copy it now — after saving, sshcm only shows the masked form.",
         "webhookConfigHint": "Configure a Grafana contact point posting JSON to /api/webhooks/grafana/alerts with header X-Sshcm-Signature: sha256=<hmac>.",
-        "webhookPromptCopy": "Copy the webhook secret below:",
         "remoteWritePasswordConfirmLabel": "remote_write password",
         "webhookSecretConfirmLabel": "webhook secret",
         "orgLabel": "org {id}"
@@ -1424,7 +1480,6 @@
         "textModel": "Text Model",
         "visionModel": "Vision Model",
         "maxTokens": "Max Tokens",
-        "saveButton": "Save LLM Settings",
         "endpointOk": "Endpoint OK ({count} models)",
         "modelAvailable": "model \"{model}\" available",
         "modelNotInList": "model \"{model}\" NOT in list",
@@ -1435,9 +1490,17 @@
         "hint": "Self-hosting platform — manage servers directly from SSHCM.",
         "ariaEnableCoolify": "Enable Coolify",
         "sshUser": "SSH User",
-        "sshUserHint": "SSH User is used when registering servers in Coolify. Coolify does not accept dots in usernames. Defaults to \"root\".",
-        "saveButton": "Save Coolify Settings"
-      }
+        "sshUserHint": "SSH User is used when registering servers in Coolify. Coolify does not accept dots in usernames. Defaults to \"root\"."
+      },
+      "proxmox": {
+        "hint": "Proxmox VE cluster — syncs nodes, VMs and containers into Hosts.",
+        "ariaEnable": "Enable Proxmox",
+        "tokenId": "Token ID",
+        "tokenSecret": "Token secret",
+        "tokenHint": "Read-only API token (user@realm!name) with the PVEAuditor role on /. Guest IPs also need VM.Monitor (PVE 8) or VM.GuestAgent.Audit (PVE 9) and the QEMU guest agent.",
+        "connectedVersion": "Connected — Proxmox VE {version}"
+      },
+      "saved": "Saved"
     },
     "integrationsTabLabel": "Integrations",
     "permissions": {
@@ -1521,7 +1584,15 @@
       "skipped": "Skipped",
       "failed": "Failed",
       "another": "Import Another File"
-    }
+    },
+    "groups": {
+      "general": "General",
+      "access": "Access",
+      "catalog": "Catalog",
+      "integrations": "Integrations",
+      "data": "Data"
+    },
+    "restoreConfirmWord": "RESTORE"
   },
   "operation": {
     "builtIn": "Built-in",
@@ -1664,6 +1735,7 @@
     "nginxCleanupDesc": "Detect and remove non-containerized nginx. Backs up config before changes.",
     "confirmNginxCleanup": "This will stop and disable the native nginx service on the remote host. A backup of /etc/nginx/ will be created first. Continue?",
     "confirmNginxPurge": "Also purge (uninstall) the nginx packages? Click Cancel to just stop & disable without removing packages.",
+    "confirmGrafanaAgent": "Install and start grafana-agent on this host? This requires sudo and will overwrite any existing /etc/grafana-agent/config.yaml.",
     "coolifyReachable": "Reachable",
     "coolifyUnreachable": "Unreachable",
     "coolifyUsable": "Usable",
@@ -1847,7 +1919,40 @@
     "userPasswordNone": "no password",
     "userPasswordNoneTooltip": "No password set (passwd -S = NP) — password login impossible.",
     "lastScanLabel": "Last scan:",
-    "noScanData": "No scan data"
+    "noScanData": "No scan data",
+    "pane": {
+      "title": "Last scan",
+      "ago": "Last scan · {ago}",
+      "run": "Run scan",
+      "running": "Running scan…",
+      "done": "Scan finished",
+      "failed": "Scan failed",
+      "noneTitle": "No scan yet",
+      "noneDescription": "Run a scan to see this host's resources, users, processes and services.",
+      "noCredentials": "Store an SSH password or key to run a scan.",
+      "parseError": "The last scan couldn't be read.",
+      "sections": "Scan sections",
+      "group": {
+        "resources": "Resources",
+        "system": "System",
+        "users": "Users",
+        "processes": "Processes",
+        "containers": "Containers",
+        "services": "Services",
+        "packages": "Packages and schedules",
+        "security": "Security"
+      },
+      "empty": {
+        "resources": "No usage data in this scan.",
+        "system": "No system information in this scan.",
+        "users": "No users found in the last scan.",
+        "processes": "No processes found in the last scan.",
+        "containers": "No containers found in the last scan.",
+        "services": "No services or agents found in the last scan.",
+        "packages": "No packages or schedules found in the last scan.",
+        "security": "No firewall or SSH policy data in this scan."
+      }
+    }
   },
   "sshKey": {
     "coolifyAlreadyExists": "Key already exists in Coolify.",
@@ -2254,7 +2359,6 @@
     "importAlternative": "Alternative: export the itemtype from GLPI as CSV (Administration › export) and convert it to JSON — the expected format is an array of { id, name }.",
     "saveCatalogue": "Save catalog",
     "dropdownCatalogueTitle": "Dropdown catalog",
-    "itemtypesConfigured": "{n} itemtype(s) configured",
     "dropdownCatalogueHint": "When the GLPI profile has no REST read permission for dropdowns (e.g. /ITILCategory), Formcreator pickers come back empty. Paste the list here manually — once per itemtype, since forms rarely change. The snippet below the editor collects the <option> elements from the GLPI page already open in your browser.",
     "clearCatalogue": "Clear",
     "catalogueDeleteConfirm": "Delete the {itemtype} catalog? Pickers will fall back to REST.",
@@ -2386,5 +2490,59 @@
     "asyncPicker": {
       "clearSelection": "— clear selection —"
     }
+  },
+  "inventory": {
+    "groupBy": {
+      "title": "Group by",
+      "none": "No grouping",
+      "host": "Host",
+      "dns": "DNS",
+      "service": "Service",
+      "project": "Project",
+      "contact": "Contact",
+      "entidade": "Responsible entidade"
+    },
+    "unlinked": {
+      "host": "No host",
+      "dns": "No DNS",
+      "service": "No service",
+      "project": "No project",
+      "contact": "No contact",
+      "entidade": "No responsible entidade"
+    },
+    "kpis": {
+      "customize": "Customize",
+      "reset": "Restore defaults",
+      "description": "Of what is listed — click a row to filter"
+    },
+    "view": {
+      "title": "View"
+    }
+  },
+  "confirm": {
+    "typeToConfirm": "Type {text} to confirm",
+    "deleteTitle": "Delete {name}?",
+    "deleteGeneric": "Delete this item?",
+    "cannotUndo": "This cannot be undone.",
+    "deleteUser": "Delete user {name}?",
+    "deleteRelease": "Delete this release?",
+    "deleteTool": "Delete this tool?",
+    "unsyncTool": "Unsync this tool?",
+    "deleteRoleMapping": "Delete this role mapping?",
+    "restoreTitle": "Replace all data?",
+    "clearSecretTitle": "Clear stored secret?",
+    "runOperation": "Run this operation?"
+  },
+  "search": {
+    "goTo": "Go to",
+    "open": "Search",
+    "inputLabel": "Search pages, hosts, DNS, services…"
+  },
+  "create": {
+    "host": "Host",
+    "dns": "DNS",
+    "service": "Service",
+    "project": "Project",
+    "contact": "Contact"
   }
 }

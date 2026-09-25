@@ -1,8 +1,9 @@
 "use client";
 
+import { LOZENGE_SHAPE } from "./Lozenge";
 import { useQuery } from "@tanstack/react-query";
 import { enumsAPI } from "@/lib/api";
-import { SITUACAO_COLORS, SITUACAO_DOT_COLORS } from "@/lib/constants";
+import { SITUACAO_COLORS, SITUACAO_DOT_COLORS, situacaoColorOf } from "@/lib/constants";
 
 // Full literals on purpose: Tailwind's scanner only generates utilities it can
 // read verbatim from source, so these cannot be built from a template string.
@@ -51,8 +52,7 @@ export default function Badge({ children, variant = "default", color, situacao, 
   const situacaoColor = situacoes.find((s) => s.value === situacao)?.color;
 
   if (variant === "situacao" && situacao) {
-    const dotColor =
-      situacaoColor || (situacao === "active" ? "var(--success)" : situacao === "maintenance" ? "var(--warning)" : "var(--text-faint)");
+    const dotColor = situacaoColorOf(situacao, situacaoColor);
 
     if (compact) {
       // The label expands on hover, so colour must not be the only carrier of
@@ -88,7 +88,7 @@ export default function Badge({ children, variant = "default", color, situacao, 
       // label takes its contrast from the theme.
       return (
         <span
-          className={`${base} text-[var(--text-secondary)] ${className}`}
+          className={`${LOZENGE_SHAPE} text-[var(--text-secondary)] ${className}`}
           style={{
             backgroundColor: `${situacaoColor}26`,
             borderColor: `${situacaoColor}4d`,
@@ -100,8 +100,9 @@ export default function Badge({ children, variant = "default", color, situacao, 
       );
     }
 
+    // Status reads as a lozenge (square-ish), never as a tag pill.
     return (
-      <span className={`${base} ${SITUACAO_COLORS[situacao] || SITUACAO_COLORS.inactive} ${className}`}>
+      <span className={`${LOZENGE_SHAPE} ${SITUACAO_COLORS[situacao] || SITUACAO_COLORS.inactive} ${className}`}>
         {dot && (
           <span
             className={`w-2 h-2 rounded-full ${SITUACAO_DOT_COLORS[situacao] || SITUACAO_DOT_COLORS.inactive} ${situacao === "active" ? "animate-pulse-glow" : ""}`}

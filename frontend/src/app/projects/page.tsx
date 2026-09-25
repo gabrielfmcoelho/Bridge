@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOpenOnParam } from "@/hooks/useOpenOnParam";
 import { useExportCSV } from "@/hooks/useExportCSV";
 import { useInventoryFilters } from "@/hooks/useInventoryFilters";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -15,7 +16,7 @@ import ListToolbar from "@/components/ui/ListToolbar";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
-import InventoryPageHeader from "@/components/inventory/InventoryPageHeader";
+import PageHeader from "@/components/ui/PageHeader";
 import InventoryContent from "@/components/inventory/InventoryContent";
 import ProjectCard from "./_components/ProjectCard";
 import ProjectsTableView from "./_components/ProjectsTableView";
@@ -115,15 +116,33 @@ export default function ProjectsPage() {
   );
 
   const openCreate = useCallback(() => { setEditing(null); setShowForm(true); }, []);
+  useOpenOnParam("new", openCreate, canEdit);
 
   return (
     <PageShell>
-      <InventoryPageHeader
+      <PageHeader
         title={t("project.title")}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
         addLabel={canEdit ? t("project.addProject") : undefined}
         onAdd={canEdit ? openCreate : undefined}
+        hideAddOnPhone
+        controlsKey="projects"
+        controlsBadge={activeFilterCount}
+        controls={
+          <ListToolbar
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            search={search}
+            onSearchChange={setSearch}
+            onFilterClick={() => setShowFilters(true)}
+            activeFilterCount={activeFilterCount}
+            searchPlaceholder={t("common.search")}
+            actions={
+              allProjects.length > 0 ? (
+                <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />
+              ) : undefined
+            }
+          />
+        }
       />
 
       {!isLoading && allProjects.length > 0 && <KpiSection projects={allProjects} t={t} />}
@@ -131,18 +150,6 @@ export default function ProjectsPage() {
       <SearchBadge search={search} onClear={() => setSearch("")} />
       {!isLoading && allProjects.length > 0 && <SectionHeading>{t("project.listing")}</SectionHeading>}
 
-      <ListToolbar
-        search={search}
-        onSearchChange={setSearch}
-        onFilterClick={() => setShowFilters(true)}
-        activeFilterCount={activeFilterCount}
-        searchPlaceholder={t("common.search")}
-        actions={
-          allProjects.length > 0 ? (
-            <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />
-          ) : undefined
-        }
-      />
 
       <InventoryContent
         isLoading={viewMode === "table" ? tableQuery.isLoading : isLoading}

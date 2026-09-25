@@ -5,6 +5,16 @@ import EmptyState from "@/components/ui/EmptyState";
 import Spinner from "@/components/ui/Spinner";
 import { SkeletonCard, SkeletonTable } from "@/components/ui/Skeleton";
 import { useLocale } from "@/contexts/LocaleContext";
+import SectionHeading from "@/components/ui/SectionHeading";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
+import type { ItemGroup } from "@/lib/grouping";
+
+// Full literals so Tailwind generates them.
+const GRID = {
+  4: "grid-cols-1 md:grid-cols-2 xl:grid-cols-4",
+  3: "grid-cols-1 md:grid-cols-2 xl:grid-cols-3",
+} as const;
 
 interface InventoryContentProps<T extends { id: number }> {
   isLoading: boolean;
@@ -25,6 +35,11 @@ interface InventoryContentProps<T extends { id: number }> {
   onLoadMore?: () => void;
   loadingMoreLabel?: string;
   loadMoreLabel?: string;
+  // When set, items render as one section per group (cards grid or table),
+  // all of them — grouping wants the whole list, so no load-more window.
+  groups?: ItemGroup<T>[];
+  /** Card columns at the widest size: 4 full-width (default), 3 beside a side column. */
+  columns?: 3 | 4;
 }
 
 export default function InventoryContent<T extends { id: number }>({
@@ -43,11 +58,13 @@ export default function InventoryContent<T extends { id: number }>({
   onLoadMore,
   loadingMoreLabel,
   loadMoreLabel,
+  groups,
+  columns = 4,
 }: InventoryContentProps<T>) {
   const { t } = useLocale();
   if (isLoading) {
     return viewMode === "cards" ? (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 max-md:pb-24">
+      <div className={`grid ${GRID[columns]} gap-4 max-md:pb-24`}>
         {Array.from({ length: skeletonCount }).map((_, i) => <SkeletonCard key={i} />)}
       </div>
     ) : (
@@ -66,6 +83,36 @@ export default function InventoryContent<T extends { id: number }>({
     );
   }
 
+  if (groups) {
+    return (
+      <div className="space-y-8 max-md:pb-24">
+        {groups.map((g) => (
+          // Native disclosure: collapsible with no state, keyboard and screen
+          // reader support included.
+          <details key={g.id ?? "unlinked"} open className="group">
+            <summary className="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+              <SectionHeading variant="rule" count={g.items.length}>
+                <Icon path={ICON_PATHS.chevronRight} className="w-3.5 h-3.5 text-[var(--text-muted)] transition-transform duration-150 group-open:rotate-90" />
+                {g.label}
+              </SectionHeading>
+            </summary>
+            {viewMode === "table" ? (
+              renderTable(g.items)
+            ) : (
+              <div className={`grid ${GRID[columns]} gap-4`}>
+                {g.items.map((item, i) => (
+                  <div key={item.id} className="stagger-in h-full" style={{ "--i": Math.min(i, 8) } as React.CSSProperties}>
+                    {renderCard(item, i)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </details>
+        ))}
+      </div>
+    );
+  }
+
   if (viewMode === "table") {
     return <>{renderTable(items)}</>;
   }
@@ -74,7 +121,7 @@ export default function InventoryContent<T extends { id: number }>({
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 max-md:pb-24">
+      <div className={`grid ${GRID[columns]} gap-4 max-md:pb-24`}>
         {displayItems.map((item, i) => (
           <div key={item.id} className="stagger-in h-full" style={{ "--i": i } as React.CSSProperties}>
             {renderCard(item, i)}

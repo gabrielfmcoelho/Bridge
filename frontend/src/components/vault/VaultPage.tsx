@@ -12,6 +12,7 @@ import { useSecretReveal } from "@/hooks/useSecretReveal";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -151,10 +152,7 @@ function VaultPageInner() {
       ) : (
         <div className="space-y-6">
           {groups.map((g) => (
-            <div key={g.title}>
-              <h2 className="text-xs font-semibold text-[var(--text-muted)] mb-2 px-1">
-                {g.title} <span className="text-[var(--text-faint)]">· {g.items.length}</span>
-              </h2>
+            <SectionCard key={g.title} variant="plain" title={g.title} count={g.items.length}>
               <div className="space-y-2">
                 {g.items.map((s) => (
                   <SecretRow
@@ -169,7 +167,7 @@ function VaultPageInner() {
                   />
                 ))}
               </div>
-            </div>
+            </SectionCard>
           ))}
         </div>
       )}

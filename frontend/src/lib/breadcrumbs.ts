@@ -70,3 +70,10 @@ export function buildCrumbs(pathname: string, nav: Pick<NavItem, "href" | "label
   });
   return crumbs;
 }
+
+/** Where "Voltar" goes: the nearest earlier crumb that is a page, or undefined
+ *  on a top-level page (the button is then disabled). */
+export function backTarget(crumbs: Crumb[]): string | undefined {
+  for (let i = crumbs.length - 2; i >= 0; i--) if (crumbs[i].href) return crumbs[i].href;
+  return undefined;
+}

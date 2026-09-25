@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { releasesAPI, projectsAPI, issuesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Release } from "@/lib/types";
 import PageShell from "@/components/layout/PageShell";
@@ -100,7 +101,7 @@ export default function ReleasesPage() {
                 variant={search || statusFilter ? "active" : "outline"}
                 size="md"
                 onClick={() => setShowFilters(true)}
-                title={t("common.filter")}
+                label={t("common.filter")}
                 className="sm:hidden"
               >
                 <Icon path={ICON_PATHS.filter} />
@@ -304,6 +305,7 @@ function ReleaseForm({ release, projects, onSuccess, onDelete }: {
   onDelete?: () => void;
 }) {
   const { t } = useLocale();
+  const confirm = useConfirm();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     title: release?.title || "",
@@ -408,7 +410,7 @@ function ReleaseForm({ release, projects, onSuccess, onDelete }: {
           onDelete ? (
             <button
               type="button"
-              onClick={() => { if (confirm("Delete this release?")) onDelete(); }}
+              onClick={async () => { if (await confirm({ title: t("confirm.deleteRelease"), danger: true, confirmLabel: t("common.delete") })) onDelete(); }}
               className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors"
             >
               {t("common.delete")}

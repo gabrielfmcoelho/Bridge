@@ -7,6 +7,7 @@ import { resolveAuthMethod } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSSHMutation } from "@/hooks/useSSHMutation";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import IconButton from "@/components/ui/IconButton";
@@ -17,6 +18,7 @@ import VMInfoDisplay from "./VMInfoDisplay";
 import IntegrationsSection from "./IntegrationsSection";
 import type { VMInfoType, OperationLog, RemoteKeyInfo, DockerStatusType, NginxCleanupStatusType, RemoteUserInfo, NetworkTestResult } from "@/lib/api";
 import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -40,6 +42,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   locale: string;
   isAdmin: boolean;
 }) {
+  const confirm = useConfirm();
   // Derive the list of non-system users discovered by the most recent scan
   // (see sshtest.captureVMInfo → RemoteUsers). Used by the delete-user wizard
   // to show a picker instead of a free-form text input.
@@ -138,7 +141,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                     ))}
                   </div>
                 )}
-                <VMInfoDisplay info={data.vm_info!} locale={locale} compact />
+                <VMInfoDisplay info={data.vm_info!} locale={locale} />
                 <p className="text-[var(--text-faint)] text-2xs">{t("operation.scanSaved")}</p>
               </div>
             ),
@@ -316,8 +319,8 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             <p>{s.message}</p>
             {s.installed && (
               <div className="grid grid-cols-3 gap-2 text-2xs">
-                <div><span className="text-[var(--text-faint)] block">Docker</span><span className="font-mono">{s.docker_version?.replace("Docker version ", "").split(",")[0] || "-"}</span></div>
-                <div><span className="text-[var(--text-faint)] block">Compose</span><span className="font-mono">{s.compose_version?.replace(/.*version\s*/i, "").split(",")[0] || "-"}</span></div>
+                <div><span className="text-[var(--text-faint)] block">Docker</span><span className="font-mono">{s.docker_version?.replace("Docker version ", "").split(",")[0] || "–"}</span></div>
+                <div><span className="text-[var(--text-faint)] block">Compose</span><span className="font-mono">{s.compose_version?.replace(/.*version\s*/i, "").split(",")[0] || "–"}</span></div>
                 <div><span className="text-[var(--text-faint)] block">{t("operation.dockerGroup")}</span><span className={s.user_in_group ? "text-[var(--success)]" : "text-[var(--danger)]"}>{s.user_in_group ? t("common.yes") : t("common.no")}</span></div>
               </div>
             )}
@@ -452,20 +455,20 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     },
   });
 
-  const handleFixDevNull = () => {
+  const handleFixDevNull = async () => {
     const method = resolveAuthMethod(hasPassword, hasKey, preferredAuth);
     if (!method) {
       setRunningOp(null);
       pushConsole(t("operation.repairDevNull"), "error", t("operation.setPreferredAuth"));
       return;
     }
-    if (!window.confirm(t("operation.confirmRepair"))) return;
+    if (!(await confirm({ title: t("confirm.runOperation"), message: t("operation.confirmRepair") }))) return;
     setRunningOp("fix-devnull");
     fixDevNullMutation.mutate(method);
   };
 
-  const handleSetupSudoNopasswd = () => {
-    if (!window.confirm(t("operation.confirmSudoNopasswd"))) return;
+  const handleSetupSudoNopasswd = async () => {
+    if (!(await confirm({ title: t("confirm.runOperation"), message: t("operation.confirmSudoNopasswd") }))) return;
     setRunningOp("setup-sudo-nopasswd");
     sudoNopasswdMutation.mutate();
   };
@@ -640,9 +643,10 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       command: `systemctl is-active nginx && tar -czf /tmp/nginx-backup.tar.gz /etc/nginx/ && systemctl stop nginx && systemctl disable nginx`,
       disabled: !hasPassword && !hasKey,
       loading: runningOp === "nginx-cleanup",
-      onClick: () => {
-        if (!window.confirm(t("operation.confirmNginxCleanup"))) return;
-        const purge = window.confirm(t("operation.confirmNginxPurge"));
+      onClick: async () => {
+        if (!(await confirm({ title: t("confirm.runOperation"), message: t("operation.confirmNginxCleanup"), danger: true }))) return;
+        // A second question, not a gate: "Cancelar" still runs the cleanup, just without purging (the text says so).
+        const purge = await confirm({ title: t("operation.confirmNginxPurge"), confirmLabel: t("common.yes"), danger: true });
         setRunningOp("nginx-cleanup");
         nginxCleanupMutation.mutate(purge);
       },
@@ -656,8 +660,8 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       command: `curl -fsSL https://github.com/grafana/agent/releases/... -o grafana-agent && install /usr/local/bin/grafana-agent && systemctl enable --now grafana-agent`,
       disabled: !hasPassword || !grafanaRemoteWriteConfigured,
       loading: runningOp === "grafana-agent-setup",
-      onClick: () => {
-        if (!window.confirm("Install and start grafana-agent on this host? This requires sudo and will overwrite any existing /etc/grafana-agent/config.yaml.")) return;
+      onClick: async () => {
+        if (!(await confirm({ title: t("confirm.runOperation"), message: t("operation.confirmGrafanaAgent") }))) return;
         setRunningOp("grafana-agent-setup");
         grafanaAgentMutation.mutate();
       },
@@ -695,29 +699,24 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       )}
 
       {!hasPassword && !hasKey && (
-        <div className="text-sm text-[var(--text-muted)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-4 text-center">
-          {t("operation.noCreds")}
-        </div>
+        <StatusAlert variant="info">{t("operation.noCreds")}</StatusAlert>
       )}
 
-      {/* Built-in operations header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-[var(--text-faint)]">{t("operation.builtIn")}</h3>
+      {/* Built-in operations */}
+      <SectionCard as="h3" title={t("operation.builtIn")} body="flush" controls={
         <IconButton
           variant={consoleEntry ? "active" : "default"}
           onClick={() => setConsoleOpen(true)}
           disabled={!consoleEntry}
-          title={t("operation.console")}
+          label={t("operation.console")}
         >
           <Icon path={ICON_PATHS.terminal} />
         </IconButton>
-      </div>
-
-      {/* Operations list */}
-      <div className="space-y-2">
+      }>
+      <div className="divide-y divide-[var(--border-subtle)]">
         {operations.map((op) => (
-          <div key={op.id} className="border border-[var(--border-subtle)] rounded-[var(--radius-md)] overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-3">
+          <div key={op.id}>
+            <div className="flex items-center gap-3 px-5 py-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-[var(--text-primary)]">{op.label}</span>
@@ -749,7 +748,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               </div>
             </div>
             {expandedOp === op.id && (
-              <div className="px-4 pb-3 pt-0">
+              <div className="px-5 pb-3 pt-0">
                 <pre className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">
                   {op.command}
                 </pre>
@@ -758,14 +757,15 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
           </div>
         ))}
       </div>
+      </SectionCard>
 
       {/* Custom scripts */}
       {customScripts.length > 0 && (
-      <div className="space-y-2">
-        <SectionHeading as="h3">{t("operation.customScripts")}</SectionHeading>
+      <SectionCard as="h3" title={t("operation.customScripts")} count={customScripts.length} body="flush">
+      <div className="divide-y divide-[var(--border-subtle)]">
         {customScripts.map((script) => (
-          <div key={script.id} className="border border-[var(--border-subtle)] rounded-[var(--radius-md)] overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-3">
+          <div key={script.id}>
+            <div className="flex items-center gap-3 px-5 py-3">
               <div className="flex-1 min-w-0">
                 <span className="text-sm font-medium text-[var(--text-primary)]">{script.name}</span>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate font-mono">{script.command}</p>
@@ -792,18 +792,19 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               </div>
             </div>
             {expandedOp === script.id && (
-              <div className="px-4 pb-3 pt-0">
+              <div className="px-5 pb-3 pt-0">
                 <pre className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">{script.command}</pre>
               </div>
             )}
             {customResult?.id === script.id && (
-              <div className={`mx-4 mb-3 rounded-[var(--radius-sm)] p-2.5 text-xs ${customResult.success ? "bg-[var(--success)]/10 text-[var(--success)]" : "bg-[var(--danger)]/10 text-[var(--danger)]"}`}>
+              <div className={`mx-5 mb-3 rounded-[var(--radius-sm)] p-2.5 text-xs ${customResult.success ? "bg-[var(--success)]/10 text-[var(--success)]" : "bg-[var(--danger)]/10 text-[var(--danger)]"}`}>
                 {customResult.success ? t("operation.executedSuccessfully") : `${t("filters.failed")}: ${customResult.error}`}
               </div>
             )}
           </div>
         ))}
       </div>
+      </SectionCard>
       )}
 
       {/* Key setup wizard (in drawer) */}
@@ -990,10 +991,10 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
           setDeleteRemoveHome(false);
         };
 
-        const runDelete = () => {
+        const runDelete = async () => {
           if (!canSubmit) return;
           const confirmMsg = t("operation.deleteRemoteUserConfirm").replace("{username}", deleteUserName.trim());
-          if (!window.confirm(confirmMsg)) return;
+          if (!(await confirm({ title: confirmMsg, danger: true, confirmLabel: t("common.delete") }))) return;
           setRunningOp("delete-remote-user");
           deleteRemoteUserMutation.mutate({ username: deleteUserName.trim(), removeHome: deleteRemoveHome });
         };
@@ -1196,14 +1197,13 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
       {/* Operation Logs */}
       {operationLogs.length > 0 && (
-        <div className="space-y-2 pt-2">
-          <h3 className="text-xs font-semibold text-[var(--text-faint)]">{t("operation.logs")}</h3>
-          <div className="border border-[var(--border-subtle)] rounded-[var(--radius-md)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+        <SectionCard as="h3" title={t("operation.logs")} count={operationLogs.length} body="flush">
+          <div className="divide-y divide-[var(--border-subtle)]">
             {operationLogs.map((log) => (
               <div key={log.id}>
                 <button
                   type="button"
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors"
+                  className="w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors"
                   onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
                 >
                   <span className={`w-2 h-2 rounded-full shrink-0 ${log.status === "success" ? "bg-[var(--success)]" : "bg-[var(--danger)]"}`} />
@@ -1220,14 +1220,14 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                   )}
                 </button>
                 {expandedLogId === log.id && log.output && (
-                  <div className="px-4 pb-3 pt-0">
+                  <div className="px-5 pb-3 pt-0">
                     <pre className="text-2xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">{log.output}</pre>
                   </div>
                 )}
               </div>
             ))}
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Console Drawer — three sections (Wizard / Status / Output) instead
@@ -1319,7 +1319,7 @@ function opTypeLabel(type_: string, t: (k: string) => string): string {
 
 function formatLogTime(dateStr: string, locale: string): string {
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "-";
+  if (isNaN(d.getTime())) return "–";
   const bcp47 = locale === "pt-BR" ? "pt-BR" : "en-US";
   return d.toLocaleString(bcp47, {
     day: "2-digit", month: "2-digit",
@@ -1352,7 +1352,7 @@ function DockerLogsReportView({ report }: { report: import("@/lib/api").DockerLo
           {report.risk_level.toUpperCase()}
         </span>
         <span className="text-2xs text-[var(--text-muted)]">
-          {t("host.ops.dockerLogsDriver")} <span className="font-mono">{report.log_driver || "—"}</span>
+          {t("host.ops.dockerLogsDriver")} <span className="font-mono">{report.log_driver || "–"}</span>
           {" · "}{t("host.ops.dockerLogsRotation")} <span className="font-mono">{report.rotation_configured ? t("host.ops.dockerLogsConfigured") : t("host.ops.dockerLogsMissing")}</span>
         </span>
       </div>

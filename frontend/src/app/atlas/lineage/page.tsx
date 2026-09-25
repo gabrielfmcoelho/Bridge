@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useLocale } from "@/contexts/LocaleContext";
 import PageShell from "@/components/layout/PageShell";
-import TabBar from "@/components/ui/TabBar";
+import PageHeader from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
 
@@ -66,24 +66,16 @@ function LineagePageInner() {
 
   return (
     <PageShell fullBleed={view === "graph"}>
-      <div className={view === "graph" ? "flex flex-col h-full" : ""}>
-        <div className={view === "graph" ? "p-4 pb-2 border-b border-[var(--border-subtle)]" : ""}>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="text-2xl font-bold font-display">
-                {t("atlas.lineage.title")}
-              </h1>
-              {data?.generated_at && (
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                  {t("atlas.lineage.generatedAt")}: {new Date(data.generated_at).toLocaleString()}
-                </p>
-              )}
-            </div>
-          </div>
-          <TabBar tabs={tabs} activeTab={view} onChange={selectTab} />
-        </div>
-
-        <div className={view === "graph" ? "flex-1 min-h-0" : "mt-4"}>
+      {/* ponytail: in graph mode the column's first child is PageHeader's header block
+          (title + tabs, whose hairline is the edge) — pad it and drop its mb-6 so the
+          panel (flex-1 min-h-0) fills the rest full-bleed. Follows PageHeader's
+          fragment order: header, then panel. */}
+      <div className={view === "graph" ? "flex flex-col h-full [&>:first-child]:shrink-0 [&>:first-child]:px-4 [&>:first-child]:pt-4 [&>:first-child]:mb-0" : ""}>
+        <PageHeader
+          title={t("atlas.lineage.title")}
+          subtitle={data?.generated_at ? `${t("atlas.lineage.generatedAt")}: ${new Date(data.generated_at).toLocaleString()}` : undefined}
+          tabs={{ idBase: "lineage", label: t("atlas.lineage.title"), active: view, onChange: selectTab, items: tabs, panelClassName: view === "graph" ? "flex-1 min-h-0" : "" }}
+        >
           {isLoading ? (
             <Skeleton className="w-full h-[60vh] rounded-[var(--radius-lg)]" />
           ) : error ? (
@@ -110,7 +102,7 @@ function LineagePageInner() {
           ) : (
             <IssuesPanel indexes={indexes} filterKind={issueKind} onNavigate={(v, params) => goTo(setView, setFocus, sp, v, params)} />
           )}
-        </div>
+        </PageHeader>
       </div>
     </PageShell>
   );

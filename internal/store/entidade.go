@@ -61,6 +61,16 @@ func (r *EntidadeRepo) Get(ctx context.Context, id int64) (*models.Entidade, err
 	return &e, err
 }
 
+// IDBySlug returns the id of the entidade with that slug, or 0 when absent.
+func (r *EntidadeRepo) IDBySlug(ctx context.Context, slug string) (int64, error) {
+	var id int64
+	err := r.db.QueryRowContext(ctx, `SELECT id FROM entidades WHERE slug = ?`, slug).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return id, err
+}
+
 // Create inserts e and fills ID/timestamps.
 func (r *EntidadeRepo) Create(ctx context.Context, e *models.Entidade) error {
 	return r.db.QueryRowContext(ctx,

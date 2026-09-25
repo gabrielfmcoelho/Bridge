@@ -5,6 +5,7 @@ import { Fragment, useState, useEffect, useMemo } from "react";
 import { permissionsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
 
@@ -83,15 +84,16 @@ export default function PermissionsTab() {
   }
 
   return (
-    <Card>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t("settings.permissions.title")}</h3>
-        {dirty && (
-          <Button size="sm" onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
-            {t("settings.permissions.saveChanges")}
-          </Button>
-        )}
-      </div>
+    <SectionCard
+      as="h3"
+      title={t("settings.permissions.title")}
+      description={t("settings.permissions.adminNote")}
+      controls={dirty ? (
+        <Button size="sm" onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
+          {t("settings.permissions.saveChanges")}
+        </Button>
+      ) : undefined}
+    >
 
       <div className="overflow-x-auto">
         <table className={tableClasses.compact.table}>
@@ -160,10 +162,6 @@ export default function PermissionsTab() {
           </tbody>
         </table>
       </div>
-
-      <p className="mt-3 text-xs text-[var(--text-faint)]">
-        {t("settings.permissions.adminNote")}
-      </p>
-    </Card>
+    </SectionCard>
   );
 }

@@ -47,7 +47,7 @@ export default function ButtonsSection() {
       <Specimen title="IconButton" source="components/ui/IconButton.tsx">
         {ICON_BUTTON_VARIANTS.map((variant) =>
           ICON_BUTTON_SIZES.map((size) => (
-            <IconButton key={`${variant}-${size}`} variant={variant} size={size} title={`${variant} / ${size}`}>
+            <IconButton key={`${variant}-${size}`} variant={variant} size={size} label={`${variant} / ${size}`}>
               <Icon path={ICON_PATHS.edit} />
             </IconButton>
           )),
@@ -115,10 +115,10 @@ export default function ButtonsSection() {
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
           <code>useCopy()</code> owns the clipboard call, the 2 s flash and the non-secure-context fallback;{" "}
-          <code>CopyButton</code> is Button + the hook for the plain case. Migrated: ssh-config, SSHConfigDrawer (hook, two
+          <code>CopyButton</code> is Button + the hook for the plain case. Migrated: ssh-config, settings Grafana webhook secret, SSHConfigDrawer (hook, two
           controls share one state), WikiShareModal, ShareBundleModal, ProjectSecretsSheet. Still inline:{" "}
-          <code>glpi/DropdownCatalogueEditorModal.tsx:112</code>, <code>settings/IntegrationsTab.tsx:1464</code> (prompt
-          fallback), <code>share/[token]/page.tsx:428</code> (keyed multi-copy), <code>secrets/ShareLinkModal.tsx</code> (guardrailed).
+          <code>glpi/DropdownCatalogueEditorModal.tsx:112</code>,{" "}
+          <code>share/[token]/page.tsx:428</code> (keyed multi-copy), <code>secrets/ShareLinkModal.tsx</code> (guardrailed).
         </p>
       </Specimen>
 
@@ -129,9 +129,9 @@ export default function ButtonsSection() {
             ~220 {"<button>"} tags in src, 79 files import <code>Button</code>.
           </li>
           <li>
-            Raw-button hot spots: <code>app/settings/page.tsx</code> (16), <code>components/layout/Header.tsx</code> (13),{" "}
+            Raw-button hot spots: <code>app/settings/</code> (22 across 12 files), {" "}
             <code>app/wiki/page.tsx</code> (11), <code>app/tools/page.tsx</code> (8),{" "}
-            <code>app/share/[token]/page.tsx</code> (8), <code>app/settings/IntegrationsTab.tsx</code> (8).
+            <code>app/share/[token]/page.tsx</code> (8).
           </li>
           <li>
             <code>app/releases/page.tsx:146</code> copies <code>PillButton</code>&apos;s class string;{" "}

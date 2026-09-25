@@ -12,9 +12,11 @@ export default function ScanIndicator({ hasScan, lastScanAt }: { hasScan?: boole
   return (
     <span
       className="inline-flex items-center gap-1"
+      role="img"
+      aria-label={hasScan ? `${t("scan.lastScanLabel")} ${timeAgo}` : t("scan.noScanData")}
       title={hasScan ? `${t("scan.lastScanLabel")} ${timeAgo}` : t("scan.noScanData")}
     >
-      <Icon path={ICON_PATHS.scan} className={`w-3.5 h-3.5 ${hasScan ? "text-[var(--success)]" : "text-[var(--text-faint)]"}`} />
+      <Icon path={ICON_PATHS.scan} className={`w-3.5 h-3.5 ${hasScan ? "text-[var(--success)]" : "text-[var(--text-muted)]"}`} />
     </span>
   );
 }

@@ -4,9 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import PageShell from "@/components/layout/PageShell";
-import DetailHeader from "@/components/ui/DetailHeader";
-import SectionHeading from "@/components/ui/SectionHeading";
-import Card from "@/components/ui/Card";
+import PageHeader from "@/components/ui/PageHeader";
+import SectionCard from "@/components/ui/SectionCard";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
@@ -167,49 +166,34 @@ export default function RequestDetail({ id }: { id: number }) {
   return (
     <PageShell>
       <div className="space-y-5">
-        <DetailHeader
-          backHref="/requests"
-          backLabel={t("common.back")}
+        <PageHeader
           title={request.title}
           subtitle={offering?.name ?? request.offering_name}
-          badges={
-            <>
-              <Badge color={statusColor(request.status)}>{t(statusLabelKey(request.status))}</Badge>
-              <Badge color="gray">{t(`requests.priorityLevels.${request.priority}`)}</Badge>
-            </>
-          }
+          status={<Badge color={statusColor(request.status)}>{t(statusLabelKey(request.status))}</Badge>}
+          indicators={<Badge color="gray">{t(`requests.priorityLevels.${request.priority}`)}</Badge>}
+          onEdit={can.edit ? () => setEditing(true) : undefined}
         />
 
-        {(moves.length > 0 || can.edit) && (
+        {moves.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {moves.map((to) => (
               <Button key={to} size="sm" variant={transitionVariant(to)} onClick={() => setPendingTo(to)}>
                 {t(TRANSITION_ACTION_KEY[to])}
               </Button>
             ))}
-            {can.edit && (
-              <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
-                {t("common.edit")}
-              </Button>
-            )}
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
           <div className="lg:col-span-2 space-y-5">
-            <section>
-              <SectionHeading>{t("requests.answers")}</SectionHeading>
-              <Card accent="none">
-                <RequestAnswers schema={request.form_schema_snapshot} data={request.form_data} />
-              </Card>
-            </section>
+            <SectionCard title={t("requests.answers")}>
+              <RequestAnswers schema={request.form_schema_snapshot} data={request.form_data} />
+            </SectionCard>
 
-            <section>
-              <SectionHeading>{t("requests.activity")}</SectionHeading>
-              <Card accent="none" className="space-y-5">
-                <RequestTimeline events={events} />
-
-                <div className="space-y-2 border-t border-[var(--border-subtle)] pt-4">
+            <SectionCard
+              title={t("requests.activity")}
+              footer={
+                <div className="space-y-2">
                   <Textarea
                     label={t("requests.addComment")}
                     value={comment}
@@ -231,13 +215,14 @@ export default function RequestDetail({ id }: { id: number }) {
                     </Button>
                   </div>
                 </div>
-              </Card>
-            </section>
+              }
+            >
+              <RequestTimeline events={events} />
+            </SectionCard>
           </div>
 
           <aside>
-            <SectionHeading>{t("requests.details")}</SectionHeading>
-            <Card accent="none">
+            <SectionCard title={t("requests.details")}>
               <dl className="space-y-3">
                 {meta.map((row) => (
                   <div key={row.label} className="flex flex-wrap justify-between gap-2">
@@ -246,7 +231,7 @@ export default function RequestDetail({ id }: { id: number }) {
                   </div>
                 ))}
               </dl>
-            </Card>
+            </SectionCard>
           </aside>
         </div>
 

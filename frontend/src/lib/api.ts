@@ -1701,6 +1701,22 @@ export const coolifyAPI = {
   syncDNS: () => request<{ found: number; created: number; existing: number; links_added: number; no_host: number }>("/api/coolify/dns-sync", { method: "POST" }, 10 * 60_000),
 };
 
+// Links between hosts, DNS, services, projects, contacts and entidades, scoped
+// to what the caller can see — list pages group their items by them.
+export const relationsAPI = {
+  list: () => api.getList<import("./grouping").Relation>("/api/relations"),
+};
+
+// Proxmox VE integration
+export interface ProxmoxSyncSummary { found: number; created: number; updated: number; deactivated: number; no_ip: number }
+export const proxmoxAPI = {
+  // Unsaved form values win over stored settings; empty/masked ones fall back.
+  test: (body: { base_url?: string; token_id?: string; token_secret?: string; skip_verify?: boolean }) =>
+    api.post<{ success: boolean; version?: string; error?: string }>("/api/proxmox/test", body),
+  // Reads the whole cluster and upserts every node/guest as a host — can outlive the 120s default.
+  sync: () => request<ProxmoxSyncSummary>("/api/proxmox/sync", { method: "POST" }, 10 * 60_000),
+};
+
 // Users (admin)
 export const usersAPI = {
   list: () => api.getList<import("./types").User>("/api/users"),

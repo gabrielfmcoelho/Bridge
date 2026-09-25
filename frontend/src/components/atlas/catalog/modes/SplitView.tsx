@@ -2,6 +2,7 @@
 
 import { useLocale } from "@/contexts/LocaleContext";
 import EmptyState from "@/components/ui/EmptyState";
+import SectionCard from "@/components/ui/SectionCard";
 import type { AtlasIndexes, AtlasFilters, TableRecord } from "@/lib/atlas/types";
 import DomainTree from "../DomainTree";
 import TableCard from "../TableCard";
@@ -54,18 +55,7 @@ export default function SplitView({ indexes, tables, selectedId, onSelect, filte
         ) : (
           <div className="flex flex-col gap-5">
             {Array.from(grouped.entries()).map(([ns, items]) => (
-              <section key={ns} className="flex flex-col gap-2">
-                <div className="flex items-baseline gap-2 px-1">
-                  <h3
-                    className="text-xs font-semibold text-[var(--text-primary)] font-display"
-                  >
-                    {ns}
-                  </h3>
-                  <span className="text-2xs tabular-nums text-[var(--text-faint)]">
-                    {items.length} {t("atlas.catalog.list.tablesLabel")}
-                  </span>
-                  <span className="flex-1 h-px bg-[var(--border-subtle)]" />
-                </div>
+              <SectionCard key={ns} as="h3" variant="plain" title={ns} count={items.length}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5">
                   {items.map(tb => (
                     <TableCard
@@ -76,7 +66,7 @@ export default function SplitView({ indexes, tables, selectedId, onSelect, filte
                     />
                   ))}
                 </div>
-              </section>
+              </SectionCard>
             ))}
           </div>
         )}

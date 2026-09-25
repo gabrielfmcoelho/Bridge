@@ -154,16 +154,25 @@ export default function RequestList() {
 
   return (
     <PageShell>
-      <PageHeader title={t("requests.title")} subtitle={t("requests.subtitle")} addLabel={t("requests.new")} onAdd={() => router.push("/catalog")} />
-
-      <TabBar tabs={tabs} activeTab={view} onChange={(k) => setView(k as View)} className="mb-4" />
-
-      <ListToolbar
-        search={inputValue}
-        onSearchChange={setInputValue}
-        onFilterClick={() => setFiltersOpen(true)}
-        activeFilterCount={activeFilterCount}
-        searchPlaceholder={t("requests.searchPlaceholder")}
+      <PageHeader
+        title={t("requests.title")}
+        subtitle={t("requests.subtitle")}
+        addLabel={t("requests.new")}
+        onAdd={() => router.push("/catalog")}
+        controlsKey="requests"
+        controlsBadge={activeFilterCount}
+        controls={
+          <>
+            <TabBar tabs={tabs} activeTab={view} onChange={(k) => setView(k as View)} />
+            <ListToolbar
+              search={inputValue}
+              onSearchChange={setInputValue}
+              onFilterClick={() => setFiltersOpen(true)}
+              activeFilterCount={activeFilterCount}
+              searchPlaceholder={t("requests.searchPlaceholder")}
+            />
+          </>
+        }
       />
 
       {isLoading ? (

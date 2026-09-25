@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/netip"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -15,11 +16,21 @@ import (
 // carries the cached has_password / has_key booleans so list/filter queries
 // stay a single-table scan.
 type HostRepo struct {
-	db *sql.DB
+	db hostDB
+}
+
+// hostDB is what HostRepo runs on: the *sql.DB, or a *sql.Tx via WithTx.
+type hostDB interface {
+	Execer
+	Queryer
+	database.Execer
 }
 
 // NewHostRepo constructs a HostRepo over the given DB handle.
 func NewHostRepo(db *sql.DB) *HostRepo { return &HostRepo{db: db} }
+
+// WithTx returns a HostRepo whose statements run inside tx.
+func (r *HostRepo) WithTx(tx *sql.Tx) *HostRepo { return &HostRepo{db: tx} }
 
 // hostColumns / hostScanDest — secret-payload columns intentionally absent.
 func hostColumns() string {
@@ -30,7 +41,8 @@ func hostColumns() string {
 		acesso_empresa_externa, empresa_responsavel, responsavel_externo, contato_responsavel_externo,
 		recurso_cpu, recurso_ram, recurso_armazenamento,
 		situacao, precisa_manutencao, preferred_auth, connections_failed, password_test_status, key_test_status, docker_group_status, coolify_server_uuid, observacoes,
-		grafana_dashboard_uid,
+		grafana_dashboard_uid, proxmox_id, parent_host_id,
+		(SELECT p.oficial_slug FROM hosts p WHERE p.id = hosts.parent_host_id) AS parent_host_slug,
 		created_at, updated_at`
 }
 
@@ -43,7 +55,7 @@ func hostScanDest(h *models.Host) []any {
 		&h.AcessoEmpresaExterna, &h.EmpresaResponsavel, &h.ResponsavelExterno, &h.ContatoResponsavelExterno,
 		&h.RecursoCPU, &h.RecursoRAM, &h.RecursoArmazenamento,
 		&h.Situacao, &h.PrecisaManutencao, &h.PreferredAuth, &h.ConnectionsFailed, &h.PasswordTestStatus, &h.KeyTestStatus, &h.DockerGroupStatus, &h.CoolifyServerUUID, &h.Observacoes,
-		&h.GrafanaDashboardUID,
+		&h.GrafanaDashboardUID, &h.ProxmoxID, &h.ParentHostID, &h.ParentHostSlug,
 		&h.CreatedAt, &h.UpdatedAt,
 	}
 }
@@ -382,6 +394,91 @@ func (r *HostRepo) CoolifyIndex(ctx context.Context) (byUUID, byHostname map[str
 		}
 	}
 	return byUUID, byHostname, rows.Err()
+}
+
+// ProxmoxIndex maps non-deleted hosts by proxmox_id and, for the not-yet-linked
+// ones, by lowercased hostname (an IP or a DNS name; first host wins) and by a
+// DNS hostname's first label ("portal.sead.pi.gov.br" → "portal"; a label two
+// hosts share maps to 0 and never matches). Unscoped — the Proxmox sync
+// resolves machines globally.
+func (r *HostRepo) ProxmoxIndex(ctx context.Context) (byPID, byHostname, byLabel map[string]int64, err error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT id, COALESCE(proxmox_id, ''), hostname FROM hosts WHERE deleted_at IS NULL ORDER BY id`)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	defer rows.Close()
+	byPID, byHostname, byLabel = map[string]int64{}, map[string]int64{}, map[string]int64{}
+	for rows.Next() {
+		var id int64
+		var pid, hostname string
+		if err := rows.Scan(&id, &pid, &hostname); err != nil {
+			return nil, nil, nil, err
+		}
+		if pid != "" {
+			byPID[pid] = id
+			continue // already linked: never claimed again by IP or name
+		}
+		hostname = strings.ToLower(strings.TrimSpace(hostname))
+		if hostname == "" {
+			continue
+		}
+		if _, ok := byHostname[hostname]; !ok {
+			byHostname[hostname] = id
+		}
+		if _, err := netip.ParseAddr(hostname); err == nil {
+			continue
+		}
+		if label, _, ok := strings.Cut(hostname, "."); ok && label != "" {
+			if _, dup := byLabel[label]; dup {
+				byLabel[label] = 0
+			} else {
+				byLabel[label] = id
+			}
+		}
+	}
+	return byPID, byHostname, byLabel, rows.Err()
+}
+
+// ProxmoxState is what the Proxmox sync owns on a linked host.
+type ProxmoxState struct {
+	ProxmoxID            string
+	ParentHostID         *int64
+	IP                   string // replaces hostname only when that is empty or an IPv4
+	RecursoCPU           string
+	RecursoRAM           string
+	RecursoArmazenamento string
+	Situacao             string // not applied over a manual 'maintenance'
+}
+
+// SetProxmoxSync links a host to its Proxmox machine and refreshes the fields
+// the sync owns. Identity, SSH and ownership columns are never touched; a
+// hostname that is an IPv4 follows the guest's current IP (DHCP), a DNS name
+// is kept, and an empty st.IP (agent down) changes nothing.
+func (r *HostRepo) SetProxmoxSync(ctx context.Context, hostID int64, st ProxmoxState) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE hosts SET
+			proxmox_id = ?, parent_host_id = ?,
+			hostname = CASE WHEN ? <> '' AND (hostname = '' OR hostname ~ '^[0-9]{1,3}(\.[0-9]{1,3}){3}$') THEN ? ELSE hostname END,
+			recurso_cpu = ?, recurso_ram = ?, recurso_armazenamento = ?,
+			situacao = CASE WHEN situacao = 'maintenance' THEN situacao ELSE ? END,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?`,
+		st.ProxmoxID, st.ParentHostID, st.IP, st.IP,
+		st.RecursoCPU, st.RecursoRAM, st.RecursoArmazenamento,
+		st.Situacao, hostID)
+	return err
+}
+
+// DeactivateMissingProxmox marks inactive every live Proxmox-linked host whose
+// proxmox_id is not in seen (a manual 'maintenance' is kept, as in
+// SetProxmoxSync), returning how many changed.
+func (r *HostRepo) DeactivateMissingProxmox(ctx context.Context, seen []string) (int, error) {
+	res, err := r.db.ExecContext(ctx, `UPDATE hosts SET situacao = 'inactive', updated_at = CURRENT_TIMESTAMP
+		WHERE proxmox_id IS NOT NULL AND deleted_at IS NULL AND situacao NOT IN ('inactive', 'maintenance') AND NOT (proxmox_id = ANY(?))`, seen)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
 }
 
 // Delete removes a host row by id. (Vault cascade is handled separately via the

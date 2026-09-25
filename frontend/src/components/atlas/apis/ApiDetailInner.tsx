@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import PageShell from "@/components/layout/PageShell";
+import PageHeader from "@/components/ui/PageHeader";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
 import { apiCatalogAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import ApiReference from "./ApiReference";
 import ShareBundleModal from "./ShareBundleModal";
 import ProjectSecretsSheet from "./ProjectSecretsSheet";
@@ -18,6 +20,7 @@ import EditApiModal from "./EditApiModal";
 
 export default function ApiDetailInner({ id }: { id: number }) {
   const { t } = useLocale();
+  const confirm = useConfirm();
   const router = useRouter();
   const qc = useQueryClient();
   const [sharing, setSharing] = useState(false);
@@ -110,55 +113,57 @@ export default function ApiDetailInner({ id }: { id: number }) {
         ← {t("atlas.apis.title")}
       </Link>
 
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3 mt-2 mb-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold truncate font-display">
-              {api.name}
-            </h1>
-            <Badge color={api.scope === "projeto" ? "accent" : "gray"}>{scopeLabel}</Badge>
-            <Badge color="cyan">{api.spec_version}</Badge>
-            {api.version_label && <Badge color="default">v{api.version_label}</Badge>}
-          </div>
-          {api.description && <p className="text-sm text-[var(--text-muted)] mt-1">{api.description}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="primary" size="sm" type="button" onClick={() => setSharing(true)}>
-            {t("atlas.apis.share")}
-          </Button>
-          {hasProject && (
-            <Button variant="secondary" size="sm" type="button" onClick={() => setSecretsOpen(true)}>
-              {t("atlas.apis.secretsButton")}
-            </Button>
-          )}
-          {externalURL && (
-            <a href={externalURL} target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary" size="sm" type="button">
-                {t("atlas.apis.openExternally")} ↗
+      <div className="mt-2">
+        <PageHeader
+          title={api.name}
+          description={api.description || undefined}
+          indicators={
+            <>
+              <Badge color={api.scope === "projeto" ? "accent" : "gray"}>{scopeLabel}</Badge>
+              <Badge color="cyan">{api.spec_version}</Badge>
+              {api.version_label && <Badge color="default">v{api.version_label}</Badge>}
+            </>
+          }
+          // ponytail: six buttons overflow PageHeader's non-wrapping actions slot on phones; the controls row wraps.
+          controls={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="primary" size="sm" type="button" onClick={() => setSharing(true)}>
+                {t("atlas.apis.share")}
               </Button>
-            </a>
-          )}
-          <Button variant="secondary" size="sm" type="button" onClick={() => setEditing(true)}>
-            {t("atlas.apis.edit")}
-          </Button>
-          {api.source_type === "url" && (
-            <Button variant="secondary" size="sm" type="button" loading={refetch.isPending} onClick={() => refetch.mutate()}>
-              {t("atlas.apis.refetch")}
-            </Button>
-          )}
-          <Button
-            variant="danger"
-            size="sm"
-            type="button"
-            loading={remove.isPending}
-            onClick={() => {
-              if (window.confirm(t("atlas.apis.deleteConfirm"))) remove.mutate();
-            }}
-          >
-            {t("atlas.apis.delete")}
-          </Button>
-        </div>
+              {hasProject && (
+                <Button variant="secondary" size="sm" type="button" onClick={() => setSecretsOpen(true)}>
+                  {t("atlas.apis.secretsButton")}
+                </Button>
+              )}
+              {externalURL && (
+                <a href={externalURL} target="_blank" rel="noopener noreferrer">
+                  <Button variant="secondary" size="sm" type="button">
+                    {t("atlas.apis.openExternally")} ↗
+                  </Button>
+                </a>
+              )}
+              <Button variant="secondary" size="sm" type="button" onClick={() => setEditing(true)}>
+                {t("atlas.apis.edit")}
+              </Button>
+              {api.source_type === "url" && (
+                <Button variant="secondary" size="sm" type="button" loading={refetch.isPending} onClick={() => refetch.mutate()}>
+                  {t("atlas.apis.refetch")}
+                </Button>
+              )}
+              <Button
+                variant="danger"
+                size="sm"
+                type="button"
+                loading={remove.isPending}
+                onClick={async () => {
+                  if (await confirm({ title: t("atlas.apis.deleteConfirm"), danger: true, confirmLabel: t("atlas.apis.delete") })) remove.mutate();
+                }}
+              >
+                {t("atlas.apis.delete")}
+              </Button>
+            </div>
+          }
+        />
       </div>
 
       {/* Scalar reference only — full width, no surrounding chrome. */}

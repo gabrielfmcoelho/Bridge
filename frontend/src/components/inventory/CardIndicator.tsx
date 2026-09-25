@@ -1,4 +1,7 @@
+"use client";
+
 import Icon from "@/components/ui/Icon";
+import { useLocale } from "@/contexts/LocaleContext";
 
 // Full literals on purpose: Tailwind only generates classes it can read from
 // source. Hue names are what the entity cards pass; semantic names also work.
@@ -25,25 +28,28 @@ export default function CardIndicator({
   color,
   title,
   hideCount,
+  disabled,
 }: {
   icon: string;
   count?: number;
   color: string;
   title: string;
-  /** Flag, not a count: render the icon either way (coloured when on, faint
-   *  when off) and never print a number. */
+  /** Flag, not a count: coloured when on, faint when off, never a number. */
   hideCount?: boolean;
+  /** The data isn't available (e.g. the API doesn't send it yet): dimmed, no number. */
+  disabled?: boolean;
 }) {
-  const active = (count ?? 0) > 0;
-  // A row of faint zeroes is the loudest thing on an inventory card and says
-  // nothing. Counts disappear at zero; flags keep their off state.
-  if (!active && !hideCount) return null;
+  const { t } = useLocale();
+  const active = !disabled && (count ?? 0) > 0;
+  // Fixed anatomy: every indicator always renders in its place, so position
+  // carries meaning. Zero is a faint 0, unavailable is dimmed.
   const colorClass = active ? colors[color] ?? "text-[var(--accent)]" : "text-[var(--text-faint)]";
+  const label = disabled ? `${title}: ${t("common.notAvailable")}` : title;
 
   return (
-    <div className="flex items-center gap-1" title={title}>
+    <div className={`flex items-center gap-1 ${disabled ? "opacity-40" : ""}`} title={label} role="img" aria-label={label}>
       <Icon path={icon} className={`w-3.5 h-3.5 ${colorClass}`} />
-      {active && !hideCount && <span className={`text-xs font-semibold font-mono ${colorClass}`}>{count}</span>}
+      {!hideCount && !disabled && <span className={`text-xs font-semibold font-mono ${active ? colorClass : "text-[var(--text-muted)]"}`}>{count ?? 0}</span>}
     </div>
   );
 }

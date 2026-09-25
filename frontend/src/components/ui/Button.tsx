@@ -14,7 +14,8 @@ const variants = {
 };
 
 const sizes = {
-  sm: "h-[30px] px-3 text-xs gap-1.5",
+  // h-8 = IconButton sm, ToolbarActionButton and the list search: one control height.
+  sm: "h-8 px-3 text-xs gap-1.5",
   md: "px-4 py-2 text-sm gap-2",
   lg: "px-6 py-2.5 text-base gap-2",
 };

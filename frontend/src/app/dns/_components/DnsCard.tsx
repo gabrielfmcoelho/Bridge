@@ -6,7 +6,8 @@ import { enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import { situacaoAccent } from "@/lib/constants";
-import Badge from "@/components/ui/Badge";
+import SituacaoText from "@/components/ui/SituacaoText";
+import { useHostNames } from "@/hooks/useHostNames";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { certState, certTone } from "@/lib/dnsCert";
@@ -21,37 +22,39 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
   });
   const situacaoColor = situacoes.find((s) => s.value === dns.situacao)?.color;
   const linkedHostsCount = dns.host_ids?.length || 0;
-  const mainResp = dns.main_responsavel_name || dns.responsavel || "-";
+  const mainResp = dns.main_responsavel_name || dns.responsavel || "";
+  // Subtitle: where the domain points — its first linked host, "+N" for more.
+  const hostNames = useHostNames();
+  const firstHost = dns.host_ids?.[0] != null ? hostNames.get(dns.host_ids[0]) : undefined;
+  const linkedHost = firstHost ? `${firstHost}${linkedHostsCount > 1 ? ` +${linkedHostsCount - 1}` : ""}` : undefined;
   const cert = certState(dns);
   const scanned = cert !== "none" && cert !== "unscanned";
 
   return (
     <Link href={`/dns/${dns.id}`} className="block h-full">
-      <Card accent={situacaoAccent(dns.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden" clickIndicator="link">
+      <Card accent={situacaoAccent(dns.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden">
+        {/* Fixed anatomy: every slot renders, "–"/0/dimmed when empty. */}
         <CardHeader
           title={dns.domain}
-          description={dns.observacoes || t("common.noDescription")}
-          badge={
-            <Badge variant="situacao" situacao={dns.situacao} dot>
-              {dns.situacao}
-            </Badge>
-          }
+          subtitle={linkedHost}
+          subtitleFont="display"
+          status={<SituacaoText situacao={dns.situacao} />}
+          description={dns.observacoes}
         />
 
         <CardMetadataGrid
           items={[
             { label: t("dns.responsavel"), value: mainResp },
-            { label: t("host.entity"), value: "-" },
+            { label: t("host.entity"), value: dns.main_entidade || "" },
             { label: t("dns.certificate"), value: certLabel(dns, t) },
+            { label: "HTTPS", value: dns.has_https ? t("common.yes") : t("common.no") },
           ]}
         />
 
         <CardTagsSection tags={dns.tags} />
 
-        <div className="flex-1 min-h-3" />
-
         {/* Bottom indicators — all icons always visible (faint when 0), like hosts */}
-        <div className="flex items-center gap-3 pt-3 border-t border-[var(--border-subtle)]">
+        <div className="flex items-center gap-3 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4">
           <CardIndicator
             icon={ICON_PATHS.lock}
             count={dns.has_https || scanned ? 1 : 0}
@@ -60,12 +63,13 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
             hideCount
           />
           <CardIndicator icon={ICON_PATHS.server} count={linkedHostsCount} color="cyan" title={t("dns.hostCount", { count: String(linkedHostsCount) })} />
-          <CardIndicator icon={ICON_PATHS.gear} count={0} color="amber" title={`0 ${t("host.services").toLowerCase()}`} />
-          <CardIndicator icon={ICON_PATHS.folder} count={0} color="accent" title={`0 ${t("host.linkedProjects").toLowerCase()}`} />
+          {/* The DNS list doesn't send these counts yet: shown dimmed, never a fake 0. */}
+          <CardIndicator icon={ICON_PATHS.gear} disabled color="warning" title={t("host.services")} />
+          <CardIndicator icon={ICON_PATHS.folder} disabled color="accent" title={t("host.linkedProjects")} />
           <CardIndicatorSeparator />
-          <CardIndicator icon={ICON_PATHS.alert} count={0} color="amber" title={`0 ${t("host.alerts").toLowerCase()}`} />
-          <CardIndicator icon={ICON_PATHS.clipboard} count={0} color="accent" title={`0 ${t("issue.title").toLowerCase()}`} />
-          <CardIndicator icon={ICON_PATHS.document} count={0} color="orange" title={`0 ${t("nav.chamados").toLowerCase()}`} />
+          <CardIndicator icon={ICON_PATHS.alert} disabled color="danger" title={t("host.alerts")} />
+          <CardIndicator icon={ICON_PATHS.clipboard} disabled color="accent" title={t("issue.title")} />
+          <CardIndicator icon={ICON_PATHS.document} disabled color="warning" title={t("nav.chamados")} />
         </div>
       </Card>
     </Link>

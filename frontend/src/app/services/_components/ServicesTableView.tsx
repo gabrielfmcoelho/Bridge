@@ -3,6 +3,7 @@
 import SortableTable from "@/components/ui/SortableTable";
 import Pagination from "@/components/ui/Pagination";
 import Badge from "@/components/ui/Badge";
+import Tag from "@/components/ui/Tag";
 import type { Service } from "@/lib/types";
 
 // Server-driven table (inventory pagination). `services` is ONE server page
@@ -16,7 +17,8 @@ type ColKey = "nickname" | "description" | "source" | "technology_stack" | "deve
 
 interface ServicesTableViewProps {
   services: Service[];
-  total: number;
+  /** Omitted when grouped: the rows are the whole group, so no pager. */
+  total?: number;
   tablePage: number;
   onPageChange: (page: number) => void;
   sort: Sort;
@@ -84,7 +86,7 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
               <td className="px-4 py-2.5">
                 <div className="flex flex-wrap gap-1">
                   {svc.tags && svc.tags.length > 0
-                    ? svc.tags.slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)
+                    ? svc.tags.slice(0, 3).map((tag) => <Tag key={tag}>{tag}</Tag>)
                     : <span className="text-[var(--text-faint)]">-</span>}
                   {svc.tags && svc.tags.length > 3 && <span className="text-2xs text-[var(--text-faint)]">+{svc.tags.length - 3}</span>}
                 </div>
@@ -93,7 +95,9 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
           ))
         }
       </SortableTable>
-      <Pagination page={tablePage} totalPages={Math.max(1, Math.ceil(total / PER_PAGE))} total={total} perPage={PER_PAGE} onChange={onPageChange} />
+      {total != null && (
+        <Pagination page={tablePage} totalPages={Math.max(1, Math.ceil(total / PER_PAGE))} total={total} perPage={PER_PAGE} onChange={onPageChange} />
+      )}
     </div>
   );
 }

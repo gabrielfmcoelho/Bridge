@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import MobileBottomNav from "./MobileBottomNav";
@@ -11,7 +12,7 @@ function LoadingSkeleton() {
   return (
     <div className="flex h-screen" style={{ background: "var(--bg-base)" }}>
       {/* Sidebar skeleton - hidden on mobile */}
-      <div className="hidden md:block w-60 border-r border-[var(--border-subtle)] shrink-0" style={{ background: "var(--bg-surface)" }}>
+      <div className="hidden md:block w-16 overflow-hidden border-r border-[var(--border-subtle)] shrink-0" style={{ background: "var(--bg-surface)" }}>
         <div className="p-4 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-[var(--radius-md)] skeleton" />
@@ -56,7 +57,9 @@ export default function PageShell({
 }) {
   const { isAuthenticated, setupRequired, loading } = useAuth();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  // Collapsed by default; the admin's choice sticks across pages (every page
+  // mounts its own PageShell, so plain state would reset on navigation).
+  const [collapsed, setCollapsed] = useLocalStorage("sidebar-collapsed", true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {

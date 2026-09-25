@@ -10,7 +10,7 @@ import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import FormcreatorFormDrawer from "@/components/glpi/FormcreatorFormDrawer";
-import SectionHeading from "@/components/ui/SectionHeading";
+import SectionCard from "@/components/ui/SectionCard";
 import { useLocale } from "@/contexts/LocaleContext";
 
 export default function FormcreatorFormsPage() {
@@ -123,10 +123,13 @@ export default function FormcreatorFormsPage() {
     return (
       <div className="space-y-6">
         {grouped.map(([categoryID, forms]) => (
-          <section key={categoryID}>
-            <SectionHeading as="h3">
-              {categoryID === 0 ? t("chamado.forms.uncategorized") : t("chamado.forms.categoryNumber", { n: String(categoryID) })}
-            </SectionHeading>
+          <SectionCard
+            key={categoryID}
+            as="h3"
+            variant="plain"
+            title={categoryID === 0 ? t("chamado.forms.uncategorized") : t("chamado.forms.categoryNumber", { n: String(categoryID) })}
+            count={forms.length}
+          >
             <ul className="space-y-1.5">
               {forms.map((f) => (
                 <li key={f.id}>
@@ -145,7 +148,7 @@ export default function FormcreatorFormsPage() {
                 </li>
               ))}
             </ul>
-          </section>
+          </SectionCard>
         ))}
       </div>
     );

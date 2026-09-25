@@ -1,6 +1,6 @@
 // Stroke icon from a 24x24 `d` path (lib/icon-paths). `size` scales the stroke
-// with the box so small glyphs don't read heavier than large ones; `className`
-// and `strokeWidth` still override for the odd one-off.
+// with the box so small glyphs don't read heavier than large ones. `className`
+// adds to the preset; a className with its own w-/h-/size- replaces the box.
 const sizes = {
   xs: { box: "w-3.5 h-3.5", stroke: 2 },
   sm: { box: "w-4 h-4", stroke: 2 },
@@ -19,7 +19,9 @@ export default function Icon({ path, size, className, strokeWidth, ...rest }: Ic
   const preset = sizes[size ?? "sm"];
   return (
     <svg
-      className={`shrink-0 ${className ?? preset.box}`}
+      // Merge, don't replace: a colour-only className must keep the preset box
+      // (replacing it once made a delete icon fill its whole button).
+      className={`shrink-0 ${className && /(^|[\s:])(w|h|size)-/.test(className) ? className : `${preset.box} ${className ?? ""}`}`}
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"

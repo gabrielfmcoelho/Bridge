@@ -1,12 +1,15 @@
 "use client";
 
+import RowActions from "@/components/ui/RowActions";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { entidadesAPI } from "@/lib/api";
 import { indentedLabel, withDepth } from "@/lib/entidades";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import type { AssetGrantsInput, AssetType, Entidade } from "@/lib/types";
-import Card from "@/components/ui/Card";
+import SectionCard from "@/components/ui/SectionCard";
 import { tableClasses } from "@/components/ui/Table";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -22,6 +25,7 @@ type EntidadeForm = { id: number | null; name: string; slug: string; parent_id: 
 const emptyForm: EntidadeForm = { id: null, name: "", slug: "", parent_id: null, description: "" };
 
 export default function EntidadesTab() {
+  const confirm = useConfirm();
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const { data: entidades = [], isLoading } = useQuery({ queryKey: ["entidades"], queryFn: entidadesAPI.list });
@@ -50,9 +54,7 @@ export default function EntidadesTab() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">{t("entidades.title")}</h3>
-        <p className="text-xs text-[var(--text-muted)] mb-4">{t("entidades.intro")}</p>
+      <SectionCard as="h3" title={t("entidades.title")} description={t("entidades.intro")}>
         <FormError message={error} />
 
         {isLoading ? (
@@ -76,13 +78,15 @@ export default function EntidadesTab() {
                     </td>
                     <td className={`${tableClasses.compact.td} font-mono text-xs text-[var(--text-secondary)]`}>{e.slug}</td>
                     <td className={`${tableClasses.compact.td} text-right whitespace-nowrap`}>
-                      <button onClick={() => edit(e)} className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] mr-3">{t("common.edit")}</button>
-                      <button
-                        onClick={() => { if (confirm(`${t("common.delete")} ${e.name}?`)) deleteMutation.mutate(e.id); }}
-                        className="text-xs text-[var(--text-faint)] hover:text-[var(--danger)]"
-                      >
-                        {t("common.delete")}
-                      </button>
+                      <div className="flex justify-end">
+                        <RowActions
+                          name={e.name}
+                          actions={[
+                            { label: t("common.edit"), icon: ICON_PATHS.pencil, onClick: () => edit(e) },
+                            { label: t("common.delete"), icon: ICON_PATHS.trash, danger: true, onClick: async () => { if (await confirm({ title: t("confirm.deleteTitle", { name: e.name }), danger: true, confirmLabel: t("common.delete") })) deleteMutation.mutate(e.id); } },
+                          ]}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -122,7 +126,7 @@ export default function EntidadesTab() {
             />
           </form>
         </div>
-      </Card>
+      </SectionCard>
 
       <UnassignedTriage />
     </div>
@@ -161,9 +165,14 @@ function UnassignedTriage() {
   const canAssign = selected.length > 0 && (grants.creator_entidade_id != null || grants.is_global || (grants.responsible_entidade_ids?.length ?? 0) > 0);
 
   return (
-    <Card>
-      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">{t("entidades.unassigned")}</h3>
-      <p className="text-xs text-[var(--text-muted)] mb-4">{t("entidades.unassignedIntro")}</p>
+    <SectionCard
+      as="h3"
+      title={t("entidades.unassigned")}
+      description={t("entidades.unassignedIntro")}
+      footer={total > perPage ? (
+        <Pagination page={page} totalPages={Math.ceil(total / perPage)} total={total} perPage={perPage} onChange={setPage} bare />
+      ) : undefined}
+    >
       <FormError message={error} />
 
       <div className="flex flex-wrap gap-1.5 mb-4">
@@ -211,7 +220,6 @@ function UnassignedTriage() {
               ))
             )}
           </div>
-          <Pagination page={page} totalPages={Math.ceil(total / perPage)} total={total} perPage={perPage} onChange={setPage} />
         </div>
 
         <div className="space-y-4">
@@ -221,6 +229,6 @@ function UnassignedTriage() {
           </Button>
         </div>
       </div>
-    </Card>
+    </SectionCard>
   );
 }
