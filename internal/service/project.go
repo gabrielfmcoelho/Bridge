@@ -42,6 +42,14 @@ type ProjectListItem struct {
 	Tags                []string `json:"tags"`
 	MainResponsavelName string   `json:"main_responsavel_name"`
 	MainEntidade        string   `json:"main_entidade"` // creator entidade name, as on hosts
+	// Counts for the card. Hosts and DNS are the direct links plus those of
+	// the project's services, deduplicated.
+	ServicesCount int `json:"services_count"`
+	HostsCount    int `json:"hosts_count"`
+	DNSCount      int `json:"dns_count"`
+	IssuesCount   int `json:"issues_count"` // open
+	IssuesTotal   int `json:"issues_total"` // open + done, not archived
+	ReposCount    int `json:"repos_count"`  // GitLab links
 }
 
 // ProjectDetail is the full single-project view (project + relations). HostIDs
@@ -86,13 +94,44 @@ func (s *ProjectService) List(ctx context.Context, f models.ProjectFilter) ([]Pr
 	if err != nil {
 		return nil, err
 	}
+	counts, err := s.projects.Counts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	links, err := store.NewGraphRepo(s.db).Links(ctx)
+	if err != nil {
+		return nil, err
+	}
+	svcHosts, svcDNS := store.ByFrom(links.ServiceHost), store.ByFrom(links.ServiceDNS)
+	directHosts, directDNS := store.ByFrom(links.ProjectHost), store.ByFrom(links.ProjectDNS)
 	out := make([]ProjectListItem, len(projects))
 	for i, p := range projects {
+		hosts, dns := map[int64]struct{}{}, map[int64]struct{}{}
+		for _, h := range directHosts[p.ID] {
+			hosts[h] = struct{}{}
+		}
+		for _, d := range directDNS[p.ID] {
+			dns[d] = struct{}{}
+		}
+		for _, sid := range counts.ServiceIDs[p.ID] {
+			for _, h := range svcHosts[sid] {
+				hosts[h] = struct{}{}
+			}
+			for _, d := range svcDNS[sid] {
+				dns[d] = struct{}{}
+			}
+		}
 		out[i] = ProjectListItem{
 			Project:             p,
 			Tags:                tagMap[p.ID],
 			MainResponsavelName: mainNames[p.ID],
 			MainEntidade:        entidades[p.ID],
+			ServicesCount:       len(counts.ServiceIDs[p.ID]),
+			HostsCount:          len(hosts),
+			DNSCount:            len(dns),
+			IssuesCount:         counts.OpenIssues[p.ID],
+			IssuesTotal:         counts.TotalIssues[p.ID],
+			ReposCount:          counts.Repos[p.ID],
 		}
 	}
 	return out, nil
@@ -122,21 +161,30 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	if err != nil {
 		return nil, err
 	}
-	hostIDs, dnsIDs, err := s.aggregateServiceLinks(ctx, services)
+	// Hosts and DNS: direct links plus those of the project's services, from
+	// one read of the link tables (was two queries per service, and direct
+	// host links were missing).
+	links, err := store.NewGraphRepo(s.db).Links(ctx)
 	if err != nil {
 		return nil, err
 	}
-	directDNS, err := s.projects.DirectDNSIDs(ctx, id)
-	if err != nil {
-		return nil, err
+	svcHosts, svcDNS := store.ByFrom(links.ServiceHost), store.ByFrom(links.ServiceDNS)
+	hostSet, dnsSet := map[int64]struct{}{}, map[int64]struct{}{}
+	for _, h := range store.ByFrom(links.ProjectHost)[id] {
+		hostSet[h] = struct{}{}
 	}
-	if len(directDNS) > 0 {
-		set := map[int64]struct{}{}
-		for _, did := range append(dnsIDs, directDNS...) {
-			set[did] = struct{}{}
+	for _, d := range store.ByFrom(links.ProjectDNS)[id] {
+		dnsSet[d] = struct{}{}
+	}
+	for _, svc := range services {
+		for _, h := range svcHosts[svc.ID] {
+			hostSet[h] = struct{}{}
 		}
-		dnsIDs = sortedKeys(set)
+		for _, d := range svcDNS[svc.ID] {
+			dnsSet[d] = struct{}{}
+		}
 	}
+	hostIDs, dnsIDs := sortedKeys(hostSet), sortedKeys(dnsSet)
 	grants, _ := s.grants.Get(ctx, store.AssetProject, id) // best effort
 	return &ProjectDetail{
 		Project:      p,
@@ -152,31 +200,6 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 // Grants returns the entidade grants of a project.
 func (s *ProjectService) Grants(ctx context.Context, id int64) (models.AssetGrants, error) {
 	return s.grants.Get(ctx, store.AssetProject, id)
-}
-
-// aggregateServiceLinks collects the deduplicated, sorted host and dns ids
-// reachable through a project's services. Unlike the old handler (which
-// swallowed each lookup error with `_`), it propagates failures.
-func (s *ProjectService) aggregateServiceLinks(ctx context.Context, services []models.Service) (hostIDs, dnsIDs []int64, err error) {
-	hostSet := map[int64]struct{}{}
-	dnsSet := map[int64]struct{}{}
-	for _, svc := range services {
-		hids, err := s.services.HostIDs(ctx, svc.ID)
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, hid := range hids {
-			hostSet[hid] = struct{}{}
-		}
-		dids, err := s.services.DNSIDs(ctx, svc.ID)
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, did := range dids {
-			dnsSet[did] = struct{}{}
-		}
-	}
-	return sortedKeys(hostSet), sortedKeys(dnsSet), nil
 }
 
 func sortedKeys(set map[int64]struct{}) []int64 {

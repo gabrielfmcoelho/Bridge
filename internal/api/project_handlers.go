@@ -98,7 +98,18 @@ func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req projectWriteRequest
+	// Decode onto the stored project, as hosts and services do: a field the
+	// payload omits (gitlab_url, outline/GLPI ids…) keeps its value.
+	current, err := h.project.Get(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to load project", err)
+		return
+	}
+	if current == nil {
+		jsonError(w, http.StatusNotFound, "project not found")
+		return
+	}
+	req := projectWriteRequest{Project: *current.Project}
 	if !decodeBody(w, r, &req) {
 		return
 	}

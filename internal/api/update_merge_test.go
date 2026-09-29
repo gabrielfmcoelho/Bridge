@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 )
 
@@ -84,5 +86,64 @@ func TestUpdate_KeepsOmittedFields(t *testing.T) {
 	env.d.SQL.QueryRow(`SELECT COUNT(*) FROM dns_host_links WHERE dns_id = ?`, dns).Scan(&links)
 	if links != 0 {
 		t.Fatalf("host_ids:[] should unlink the last host (links=%d)", links)
+	}
+}
+
+// Projects: PUT keeps what the form omits; the list counts relations and
+// issues; the detail includes hosts linked straight to the project.
+func TestProject_MergeCountsAndDirectHosts(t *testing.T) {
+	env := newSecretAPIEnv(t)
+	q := func(sql string, args ...any) int64 {
+		t.Helper()
+		var id int64
+		if err := env.d.SQL.QueryRow(sql, args...).Scan(&id); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+		return id
+	}
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := env.d.SQL.Exec(sql, args...); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	proj := q(`INSERT INTO projects (name, gitlab_url, outline_collection_id) VALUES ('Atlas', 'https://git/atlas', 'col-1') RETURNING id`)
+	direct := q(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('direct', 'direct') RETURNING id`)
+	viaSvc := q(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('via', 'via') RETURNING id`)
+	svc := q(`INSERT INTO services (nickname, project_id) VALUES ('api', ?) RETURNING id`, proj)
+	dns := q(`INSERT INTO dns_records (domain) VALUES ('atlas.gov') RETURNING id`)
+	exec(`INSERT INTO project_host_links (project_id, host_id) VALUES (?, ?)`, proj, direct)
+	exec(`INSERT INTO service_host_links (service_id, host_id) VALUES (?, ?)`, svc, viaSvc)
+	exec(`INSERT INTO service_host_links (service_id, host_id) VALUES (?, ?)`, svc, direct) // counted once
+	exec(`INSERT INTO service_dns_links (service_id, dns_id) VALUES (?, ?)`, svc, dns)
+	exec(`INSERT INTO issues (project_id, entity_type, entity_id, title, status, created_by) VALUES (?, 'project', ?, 'a', 'backlog', ?), (?, 'project', ?, 'b', 'done', ?)`,
+		proj, proj, env.alice.ID, proj, proj, env.alice.ID)
+
+	ph := &projectHandlers{project: service.NewProjectService(env.d.SQL)}
+	rec := putAsAdmin(t, env, ph.handleUpdate, proj, `{"name":"Atlas 2"}`)
+	if rec.Code != 200 {
+		t.Fatalf("PUT project: %d %s", rec.Code, rec.Body)
+	}
+	var name, gitlab, outline string
+	env.d.SQL.QueryRow(`SELECT name, gitlab_url, outline_collection_id FROM projects WHERE id = ?`, proj).Scan(&name, &gitlab, &outline)
+	if name != "Atlas 2" || gitlab != "https://git/atlas" || outline != "col-1" {
+		t.Fatalf("after PUT name=%q gitlab=%q outline=%q — omitted fields must be kept", name, gitlab, outline)
+	}
+
+	items, err := service.NewProjectService(env.d.SQL).List(context.Background(), models.ProjectFilter{})
+	if err != nil || len(items) != 1 {
+		t.Fatalf("list: %v %d", err, len(items))
+	}
+	it := items[0]
+	if it.ServicesCount != 1 || it.HostsCount != 2 || it.DNSCount != 1 || it.IssuesCount != 1 || it.IssuesTotal != 2 {
+		t.Fatalf("counts = svc %d hosts %d dns %d open %d total %d; want 1 2 1 1 2", it.ServicesCount, it.HostsCount, it.DNSCount, it.IssuesCount, it.IssuesTotal)
+	}
+
+	detail, err := service.NewProjectService(env.d.SQL).Get(context.Background(), proj)
+	if err != nil || detail == nil {
+		t.Fatalf("get: %v", err)
+	}
+	if len(detail.HostIDs) != 2 {
+		t.Fatalf("detail host_ids = %v, want the direct and the service host", detail.HostIDs)
 	}
 }

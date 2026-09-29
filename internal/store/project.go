@@ -287,3 +287,60 @@ func (r *ProjectRepo) ListTrash(ctx context.Context) ([]models.Project, error) {
 	}
 	return projects, rows.Err()
 }
+
+// ProjectCounts is what a project card counts that the projects table doesn't
+// hold: the relations and issue totals of every project, read in a handful of
+// grouped queries (the list used to leave them out entirely).
+type ProjectCounts struct {
+	ServiceIDs  map[int64][]int64 // project → its live services
+	OpenIssues  map[int64]int     // project → issues not done and not archived
+	TotalIssues map[int64]int     // project → all non-archived issues
+	Repos       map[int64]int     // project → linked GitLab repos/groups
+}
+
+// Counts reads ProjectCounts for all projects. Host and DNS counts are derived
+// by the caller from these services plus GraphRepo.Links (direct links).
+func (r *ProjectRepo) Counts(ctx context.Context) (ProjectCounts, error) {
+	c := ProjectCounts{ServiceIDs: map[int64][]int64{}, OpenIssues: map[int64]int{}, TotalIssues: map[int64]int{}, Repos: map[int64]int{}}
+	rows, err := r.db.QueryContext(ctx, `SELECT project_id, id FROM services WHERE deleted_at IS NULL AND project_id IS NOT NULL`)
+	if err != nil {
+		return c, err
+	}
+	for rows.Next() {
+		var pid, sid int64
+		if err := rows.Scan(&pid, &sid); err != nil {
+			rows.Close()
+			return c, err
+		}
+		c.ServiceIDs[pid] = append(c.ServiceIDs[pid], sid)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return c, err
+	}
+	rows, err = r.db.QueryContext(ctx, `SELECT project_id, COUNT(*) FILTER (WHERE status <> 'done'), COUNT(*)
+		FROM issues WHERE project_id IS NOT NULL AND NOT archived GROUP BY project_id`)
+	if err != nil {
+		return c, err
+	}
+	for rows.Next() {
+		var pid int64
+		var open, total int
+		if err := rows.Scan(&pid, &open, &total); err != nil {
+			rows.Close()
+			return c, err
+		}
+		c.OpenIssues[pid], c.TotalIssues[pid] = open, total
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return c, err
+	}
+	rows, err = r.db.QueryContext(ctx, `SELECT project_id, COUNT(*) FROM project_gitlab_links GROUP BY project_id`)
+	if err != nil {
+		return c, err
+	}
+	m, err := scanCountMap(rows)
+	c.Repos = m
+	return c, err
+}
