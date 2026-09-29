@@ -9,9 +9,12 @@ import Icon from "@/components/ui/Icon";
 import { RowList, ListRow, RowText } from "@/components/ui/RowList";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import NewSecretModal from "@/app/secrets/_components/NewSecretModal";
+import VaultEntryEditor from "@/components/vault/VaultEntryEditor";
+import type { Secret } from "@/lib/types";
 
 export default function CredentialsTab({ serviceId, isAdmin, t }: { serviceId: number; isAdmin: boolean; t: (key: string) => string }) {
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<Secret | null>(null);
   // Shared service-scoped secrets from the unified vault.
   const { data: secrets = [] } = useQuery({
     // "secrets-all" prefix: the vault modal invalidates it after a save.
@@ -32,13 +35,14 @@ export default function CredentialsTab({ serviceId, isAdmin, t }: { serviceId: n
       >
         <RowList>
           {secrets.map((s) => (
-            <ListRow key={s.id} href={`/secrets?scope=service&parent_id=${serviceId}`}>
+            <ListRow key={s.id} onClick={isAdmin ? () => setEditing(s) : undefined}>
               <Icon path={ICON_PATHS.keyOutline} className="w-3.5 h-3.5 shrink-0 text-[var(--accent)]" />
               <RowText title={s.name} />
             </ListRow>
           ))}
         </RowList>
       </SectionCard>
+      <VaultEntryEditor secret={editing} onClose={() => setEditing(null)} />
       {creating && <NewSecretModal open onClose={() => setCreating(false)} defaultScope="service" defaultParentId={serviceId} />}
     </>
   );
