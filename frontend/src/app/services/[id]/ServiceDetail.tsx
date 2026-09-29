@@ -3,37 +3,37 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { servicesAPI, issuesAPI, hostsAPI, dnsAPI, graphAPI, integrationsAPI } from "@/lib/api";
+import { servicesAPI, hostsAPI, dnsAPI, projectsAPI, globalIssuesAPI, integrationsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilteredGraph } from "@/hooks/useFilteredGraph";
+import { useEntityGraph } from "@/hooks/useEntityGraph";
 import PageShell from "@/components/layout/PageShell";
-import Badge from "@/components/ui/Badge";
 import { StatusText } from "@/components/ui/SituacaoText";
+import CardIndicator from "@/components/inventory/CardIndicator";
 import Drawer from "@/components/ui/Drawer";
 import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
+import DetailSplit from "@/components/detail/DetailSplit";
+import TopologyPane from "@/components/detail/TopologyPane";
+import RelationsCard, { hostsGroup, dnsGroup, servicesGroup, projectsGroup } from "@/components/detail/RelationsCard";
+import IssuesBoard from "@/components/issues/IssuesBoard";
+import { ICON_PATHS } from "@/lib/icon-paths";
+import { getTimeAgo } from "@/lib/utils";
+import { serviceTitle } from "@/lib/serviceDisplay";
 import ServiceForm from "../ServiceForm";
-import OverviewTab from "./_components/OverviewTab";
-import ConnectionsTab from "./_components/ConnectionsTab";
-import TopologyTab from "./_components/TopologyTab";
+import ServiceProfile from "./_components/ServiceProfile";
+import RuntimeCard from "./_components/RuntimeCard";
 import CredentialsTab from "./_components/CredentialsTab";
-import IssuesTab from "./_components/IssuesTab";
 import MetricsTab from "./_components/MetricsTab";
 
-type TabKey = "overview" | "connections" | "topology" | "credentials" | "issues" | "metrics";
+type TabKey = "overview" | "issues" | "topology" | "credentials" | "metrics";
 
-const VIEW_TABS: { key: TabKey; label: string; icon?: string }[] = [
-  { key: "overview", label: "Overview", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
-  { key: "connections", label: "Connections", icon: "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" },
-  { key: "topology", label: "Topology", icon: "M13 10V3L4 14h7v7l9-11h-7z" },
-  { key: "credentials", label: "Credentials", icon: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" },
-  { key: "issues", label: "Issues", icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" },
-];
+const GENERATED = /^Auto-discovered /;
 
 export default function ServiceDetail({ id }: { id: number }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { user } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -45,64 +45,32 @@ export default function ServiceDetail({ id }: { id: number }) {
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [formFooter, setFormFooter] = useState<React.ReactNode>(null);
 
-  // ── Data queries ──
-  const { data, isLoading } = useQuery({
-    queryKey: ["service", id],
-    queryFn: () => servicesAPI.get(id),
-  });
-
-  const { data: allServices = [] } = useQuery({
-    queryKey: ["services"],
-    queryFn: servicesAPI.list,
-  });
-
-  const { data: allHosts = [] } = useQuery({
-    queryKey: ["hosts"],
-    queryFn: () => hostsAPI.list(),
-  });
-
-  const { data: allDns = [] } = useQuery({
-    queryKey: ["dns"],
-    queryFn: dnsAPI.list,
-  });
-
+  // No retry: a 404 (missing or not visible) should say so at once.
+  const { data, isLoading } = useQuery({ queryKey: ["service", id], queryFn: () => servicesAPI.get(id), retry: false });
+  // Names for the linked ids; the lists are cached from the inventory pages.
+  const { data: allServices = [] } = useQuery({ queryKey: ["services"], queryFn: servicesAPI.list });
+  const { data: allHosts = [] } = useQuery({ queryKey: ["hosts"], queryFn: () => hostsAPI.list() });
+  const { data: allDns = [] } = useQuery({ queryKey: ["dns"], queryFn: dnsAPI.list });
+  const { data: allProjects = [] } = useQuery({ queryKey: ["projects"], queryFn: projectsAPI.list });
   const { data: issues = [] } = useQuery({
-    queryKey: ["service-issues", id],
-    queryFn: () => issuesAPI.listByService(id),
+    queryKey: ["issues", "service", id],
+    queryFn: () => globalIssuesAPI.list({ entity_type: "service", entity_id: String(id) }),
+    enabled: !!data,
   });
-
-  const { data: graphData } = useQuery({
-    queryKey: ["graph"],
-    queryFn: graphAPI.get,
-    enabled: activeTab === "topology",
-  });
-
-  const { data: integrations } = useQuery({
-    queryKey: ["integrations"],
-    queryFn: integrationsAPI.get,
-    retry: false,
-    staleTime: 60_000,
-  });
+  const { data: integrations } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get, retry: false, staleTime: 60_000 });
   const grafanaEnabled = integrations?.grafana?.grafana_enabled === "true";
+  const { graph, loading: graphLoading } = useEntityGraph(data ? `service-${id}` : undefined, activeTab === "topology");
 
-  // ── Derived data ──
-  const dependsOnServices = allServices.filter((s) => data?.depends_on_ids?.includes(s.id));
-  const dependentServices = allServices.filter((s) => data?.dependent_ids?.includes(s.id));
+  const dependsOn = allServices.filter((s) => data?.depends_on_ids?.includes(s.id));
+  const dependents = allServices.filter((s) => data?.dependent_ids?.includes(s.id));
   const linkedHosts = allHosts.filter((h) => data?.host_ids?.includes(h.id));
   const linkedDns = allDns.filter((d) => data?.dns_ids?.includes(d.id));
+  const project = allProjects.find((p) => p.id === data?.service.project_id);
 
-  const entityNodeId = data ? `service-${id}` : undefined;
-  const filteredGraph = useFilteredGraph(entityNodeId, graphData, activeTab === "topology");
-
-  // ── Mutations ──
   const deleteMutation = useMutation({
     mutationFn: () => servicesAPI.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["services"] });
-      router.push("/services");
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["services"] }); router.push("/services"); },
   });
-
   const fixateMutation = useMutation({
     mutationFn: () => servicesAPI.fixate(id),
     onSuccess: () => {
@@ -111,151 +79,111 @@ export default function ServiceDetail({ id }: { id: number }) {
     },
   });
 
-  return (
-    <PageShell>
-      {isLoading ? (
+  const openIssues = issues.filter((i) => !i.archived && i.status !== "done").length;
+  const tabs = [
+    { key: "overview", label: t("host.tabOverview"), icon: ICON_PATHS.home },
+    { key: "issues", label: t("host.tabTracking"), icon: ICON_PATHS.alert, badge: openIssues || undefined },
+    { key: "topology", label: t("host.tabTopology"), icon: ICON_PATHS.bolt },
+    { key: "credentials", label: t("service.credentials"), icon: ICON_PATHS.lock },
+    ...(grafanaEnabled ? [{ key: "metrics", label: t("host.tabMetrics"), icon: ICON_PATHS.layoutGrid }] : []),
+  ];
+
+  if (isLoading) {
+    return (
+      <PageShell>
         <div className="space-y-6">
           <Skeleton className="h-4 w-20" />
-          <div className="flex justify-between">
-            <div className="space-y-2">
-              <Skeleton className="h-7 w-48" />
-              <Skeleton className="h-4 w-32" />
-            </div>
-            <Skeleton className="h-6 w-20 rounded-full" />
-          </div>
+          <div className="space-y-2"><Skeleton className="h-7 w-48" /><Skeleton className="h-4 w-32" /></div>
           <div className="h-40 skeleton rounded-[var(--radius-lg)]" />
         </div>
-      ) : data ? (
-        <div className="space-y-5">
-          {/* ── Header ── */}
-          <PageHeader
-            showEmptyDescription
-            title={data.service.nickname}
-            titleFont="mono"
-            subtitle={data.service.service_type ? `${data.service.service_type}${data.service.service_subtype ? ` / ${data.service.service_subtype}` : ""}` : undefined}
-            description={data.service.description}
-            status={data.service.container_status ? (
-              <StatusText
-                color={data.service.container_status === "online" ? "var(--success)" : "var(--text-muted)"}
-                on={data.service.container_status === "online"}
-                label={data.service.container_status === "online" ? t("service.containerOnline") : t("service.containerOffline")}
-              />
-            ) : undefined}
-            indicators={<>
-                {data.service.source !== "manual" && (
-                  <Badge color={data.service.source === "auto" ? "blue" : "emerald"} compact>
-                    {data.service.source === "auto" ? t("service.sourceAuto") : t("service.sourceFixed")}
-                  </Badge>
-                )}
-                {data.service.discovery_kind && (
-                  <Badge color={data.service.discovery_kind === "container" ? "cyan" : "accent"} compact>
-                    {data.service.discovery_kind === "container" ? t("service.kindContainer") : t("service.kindHost")}
-                  </Badge>
-                )}
-                {data.service.is_external_dependency ? (
-                  <Badge color="red" compact>{t("service.isExternalDependency")}</Badge>
-                ) : (
-                  <Badge color={data.service.developed_by === "internal" ? "cyan" : "amber"} compact>
-                    {data.service.developed_by === "internal" ? t("service.internal") : t("service.external")}
-                  </Badge>
-                )}
-                {data.service.environment && <Badge>{data.service.environment}</Badge>}
-                {data.service.technology_stack && <Badge>{data.service.technology_stack}</Badge>}
-              </>}
-            actions={canEdit && data.service.source === "auto" ? (
-              <Button size="sm" variant="secondary" onClick={() => fixateMutation.mutate()} loading={fixateMutation.isPending}>
-                {t("service.fixate")}
-              </Button>
-            ) : undefined}
-            onEdit={canEdit ? () => setShowEditDrawer(true) : undefined}
-            onDelete={isAdmin ? () => deleteMutation.mutate() : undefined}
-            deleteConfirmMessage={`${t("confirm.deleteTitle", { name: `"${data.service.nickname}"` })} ${t("confirm.cannotUndo")}`}
-            tabs={{
-              idBase: "service",
-              label: data.service.nickname,
-              active: activeTab,
-              onChange: (key) => setActiveTab(key as TabKey),
-              panelClassName: "space-y-5",
-              items: [
-                ...VIEW_TABS,
-                ...(grafanaEnabled
-                  ? [{ key: "metrics" as TabKey, label: "Metrics", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" }]
-                  : []),
-              ].map((tab) => ({
-                key: tab.key,
-                label: tab.label,
-                icon: tab.icon,
-                badge: tab.key === "issues" && issues.length > 0 ? issues.length : undefined,
-              })),
-            }}
-          >
+      </PageShell>
+    );
+  }
+  if (!data) {
+    return (
+      <PageShell>
+        <EmptyState icon="box" title={t("service.notFound")} description={t("dns.notFoundDesc")}
+          action={<Button size="sm" variant="secondary" onClick={() => router.push("/services")}>{t("service.backToList")}</Button>} />
+      </PageShell>
+    );
+  }
 
-          {/* ── Tab content ── */}
+  const svc = data.service;
+  const { title, mono, id: runtimeId } = serviceTitle(svc);
+  const online = svc.container_status === "online";
+  const relationGroups = [
+    hostsGroup(linkedHosts, t),
+    dnsGroup(linkedDns, t),
+    { ...servicesGroup(dependsOn, t), title: t("service.dependsOn") },
+    { ...servicesGroup(dependents, t), title: t("service.dependents") },
+    projectsGroup(project ? [project] : [], t),
+  ];
+
+  return (
+    <PageShell>
+      <div className="space-y-5">
+        <PageHeader
+          showEmptyDescription
+          title={title}
+          titleFont={mono ? "mono" : "display"}
+          subtitle={runtimeId}
+          subtitleFont="mono"
+          description={svc.description && !GENERATED.test(svc.description) ? svc.description : undefined}
+          status={svc.container_status ? (
+            <span className="inline-flex items-center gap-2">
+              <StatusText color={online ? "var(--success)" : "var(--text-muted)"} on={online} label={t(`service.status.${svc.container_status}`)} />
+              {svc.last_seen_at && <span className="text-xs text-[var(--text-muted)]">{t("service.seenAgo", { ago: getTimeAgo(svc.last_seen_at, locale) })}</span>}
+            </span>
+          ) : undefined}
+          indicators={<>
+            <CardIndicator icon={ICON_PATHS.server} count={linkedHosts.length} color="info" title={t("service.hostsCount", { count: String(linkedHosts.length) })} />
+            <CardIndicator icon={ICON_PATHS.globe} count={linkedDns.length} color="success" title={t("service.dnsCount", { count: String(linkedDns.length) })} />
+            <CardIndicator icon={ICON_PATHS.link} count={dependsOn.length} color="warning" title={t("service.depsCount", { count: String(dependsOn.length) })} />
+            <CardIndicator icon={ICON_PATHS.clipboard} count={openIssues} color="accent" title={`${openIssues} ${t("nav.issues").toLowerCase()}`} />
+          </>}
+          actions={canEdit && svc.source === "auto" ? (
+            <Button size="sm" variant="secondary" onClick={() => fixateMutation.mutate()} loading={fixateMutation.isPending} title={t("service.fixateHint")}>
+              {t("service.fixate")}
+            </Button>
+          ) : undefined}
+          onEdit={canEdit ? () => setShowEditDrawer(true) : undefined}
+          onDelete={isAdmin ? () => deleteMutation.mutate() : undefined}
+          deleteConfirmMessage={`${t("confirm.deleteTitle", { name: `"${title}"` })} ${t("confirm.cannotUndo")}`}
+          tabs={{ idBase: "service", label: title, active: activeTab, onChange: (k) => setActiveTab(k as TabKey), panelClassName: "space-y-5", items: tabs }}
+        >
           {activeTab === "overview" && (
-            <OverviewTab service={data.service} tags={data.tags || []} responsaveis={data.responsaveis || []} t={t} />
+            <DetailSplit profile={<ServiceProfile service={svc} tags={data.tags || []} responsaveis={data.responsaveis || []} projectName={project?.name} />}>
+              <RuntimeCard service={svc} hosts={linkedHosts} />
+            </DetailSplit>
           )}
 
-          {activeTab === "connections" && (
-            <ConnectionsTab
-              dependsOnServices={dependsOnServices}
-              dependentServices={dependentServices}
-              linkedHosts={linkedHosts}
-              linkedDns={linkedDns}
-              t={t}
-            />
-          )}
+          {activeTab === "issues" && <IssuesBoard entityType="service" entityId={id} canEdit={canEdit} />}
 
           {activeTab === "topology" && (
-            <TopologyTab
-              filteredGraph={filteredGraph}
-              dependsOnServices={dependsOnServices}
-              dependentServices={dependentServices}
-              linkedHosts={linkedHosts}
-              linkedDns={linkedDns}
-              t={t}
-            />
+            <TopologyPane graph={graph} loading={graphLoading} t={t}
+              hasRelations={relationGroups.some((g) => g.rows.length > 0)}
+              relations={<RelationsCard groups={relationGroups} t={t} />} />
           )}
 
-          {activeTab === "credentials" && (
-            <CredentialsTab
-              serviceId={id}
-              isAdmin={isAdmin}
-              t={t}
-            />
-          )}
+          {activeTab === "credentials" && <CredentialsTab serviceId={id} isAdmin={isAdmin} t={t} />}
 
-          {activeTab === "issues" && (
-            <IssuesTab issues={issues} t={t} />
-          )}
+          {activeTab === "metrics" && grafanaEnabled && <MetricsTab serviceId={id} nickname={svc.nickname} />}
+        </PageHeader>
 
-          {activeTab === "metrics" && grafanaEnabled && (
-            <MetricsTab serviceId={id} nickname={data.service.nickname} />
-          )}
-
-          </PageHeader>
-
-          {/* ── Edit Drawer ── */}
-          <Drawer
-            open={showEditDrawer}
-            onClose={() => setShowEditDrawer(false)}
-            title={t("common.edit")}
-            subHeader={formSubHeader}
-            footer={formFooter}
-          >
-            <ServiceForm
-              initial={data.service}
-              initialGrants={data.entidades}
-              onSubHeaderChange={setFormSubHeader}
-              onFooterChange={setFormFooter}
-              onSuccess={() => {
-                setShowEditDrawer(false);
-                queryClient.invalidateQueries({ queryKey: ["service", id] });
-                queryClient.invalidateQueries({ queryKey: ["services"] });
-              }}
-            />
-          </Drawer>
-        </div>
-      ) : null}
+        <Drawer open={showEditDrawer} onClose={() => setShowEditDrawer(false)} title={t("common.edit")} subHeader={formSubHeader} footer={formFooter}>
+          <ServiceForm
+            initial={svc}
+            initialGrants={data.entidades}
+            onSubHeaderChange={setFormSubHeader}
+            onFooterChange={setFormFooter}
+            onSuccess={() => {
+              setShowEditDrawer(false);
+              queryClient.invalidateQueries({ queryKey: ["service", id] });
+              queryClient.invalidateQueries({ queryKey: ["services"] });
+            }}
+          />
+        </Drawer>
+      </div>
     </PageShell>
   );
 }

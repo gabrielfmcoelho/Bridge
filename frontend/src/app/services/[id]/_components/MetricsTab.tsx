@@ -80,7 +80,7 @@ export default function ServiceMetricsTab({ serviceId, nickname }: Props) {
         </Card>
       )}
 
-      <div className="relative w-full" style={{ aspectRatio: "16 / 10", minHeight: "600px" }}>
+      <div className="relative w-full" style={{ aspectRatio: "16 / 10", minHeight: "min(600px, 70vh)" }}>
         {!iframeLoaded && !iframeError && (
           <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-elevated)] rounded-[var(--radius-md)]">
             <p className="text-xs text-[var(--text-muted)] animate-pulse">{t("service.loadingDashboard")}</p>

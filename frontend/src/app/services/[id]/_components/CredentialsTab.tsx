@@ -2,58 +2,41 @@
 
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
 import { secretsAPI } from "@/lib/api";
 import SectionCard from "@/components/ui/SectionCard";
+import IconButton from "@/components/ui/IconButton";
 import Icon from "@/components/ui/Icon";
+import { RowList, ListRow, RowText } from "@/components/ui/RowList";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
-interface CredentialsTabProps {
-  serviceId: number;
-  isAdmin: boolean;
-  t: (key: string) => string;
-}
-
-export default function CredentialsTab({ serviceId, isAdmin, t }: CredentialsTabProps) {
+export default function CredentialsTab({ serviceId, isAdmin, t }: { serviceId: number; isAdmin: boolean; t: (key: string) => string }) {
   const router = useRouter();
-  // Fetch shared service-scoped secrets via the unified vault. The legacy
-  // /api/services/{id}/credentials route was removed in the Phase 1 cutover.
+  // Shared service-scoped secrets from the unified vault.
   const { data: secrets = [] } = useQuery({
     queryKey: ["service-secrets", serviceId],
     queryFn: () => secretsAPI.list({ scope: "service", parent_id: serviceId, visibility: "shared" }),
   });
+  const addHref = `/secrets?scope=service&parent_id=${serviceId}`;
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      <SectionCard
-        title={t("service.credentials")}
-        controls={isAdmin && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => router.push(`/secrets?scope=service&parent_id=${serviceId}`)}
-          >
-            {t("service.addCredential")}
-          </Button>
-        )}
-      >
-        {secrets.length > 0 ? (
-          <div className="space-y-2">
-            {secrets.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center gap-2 text-sm p-2 rounded-[var(--radius-md)] bg-[var(--bg-elevated)]"
-              >
-                <Icon path={ICON_PATHS.keyOutline} className="w-4 h-4 text-[var(--accent)] shrink-0" strokeWidth={1.5} />
-                <Badge>{s.name}</Badge>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-[var(--text-faint)]">{t("service.noCredentials")}</p>
-        )}
-      </SectionCard>
-    </div>
+    <SectionCard
+      as="h3"
+      title={t("service.credentials")}
+      count={secrets.length}
+      body="flush"
+      empty={secrets.length === 0 ? t("service.noCredentials") : undefined}
+      controls={isAdmin && (
+        <IconButton onClick={() => router.push(addHref)} label={t("service.addCredential")}><Icon path={ICON_PATHS.plus} /></IconButton>
+      )}
+    >
+      <RowList>
+        {secrets.map((s) => (
+          <ListRow key={s.id} href={`/secrets?scope=service&parent_id=${serviceId}`}>
+            <Icon path={ICON_PATHS.keyOutline} className="w-3.5 h-3.5 shrink-0 text-[var(--accent)]" />
+            <RowText title={s.name} />
+          </ListRow>
+        ))}
+      </RowList>
+    </SectionCard>
   );
 }

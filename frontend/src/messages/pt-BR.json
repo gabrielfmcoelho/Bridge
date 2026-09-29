@@ -733,7 +733,8 @@
     "pageDescription": "Servidores, VMs e containers do inventário: acesso, recursos, vínculos com serviços e DNS, e o estado de cada um.",
     "profileTitle": "Host",
     "declared": "Declarado",
-    "declaredHint": "O que foi cadastrado para este host; o último scan mostra o que existe de fato."
+    "declaredHint": "O que foi cadastrado para este host; o último scan mostra o que existe de fato.",
+    "tabMetrics": "Métricas"
   },
   "dns": {
     "title": "Registros DNS",
@@ -1068,7 +1069,19 @@
       "byStatus": "Por execução",
       "engines": "Bancos de dados e caches",
       "byHost": "Hosts com mais serviços"
-    }
+    },
+    "profileTitle": "Serviço",
+    "runtimeTitle": "Execução",
+    "runtimeContainer": "Contêiner encontrado pelo scan do host",
+    "runtimeHost": "Serviço do sistema encontrado pelo scan do host",
+    "runtimeManual": "Cadastrado à mão: o scan não acompanha a execução deste serviço.",
+    "catalogName": "Identificação no catálogo",
+    "discoveredAt": "Encontrado em",
+    "links": "Links",
+    "dependsOn": "Depende de",
+    "notFound": "Serviço não encontrado",
+    "backToList": "Voltar para Serviços",
+    "fixateHint": "Confirma o serviço como seu: deixa de contar como automático a revisar e pode ser religado a outro contêiner. O scan continua atualizando a execução."
   },
   "topology": {
     "title": "Topologia da Arquitetura",

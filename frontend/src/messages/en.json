@@ -733,7 +733,8 @@
     "pageDescription": "Servers, VMs and containers in the inventory: access, resources, links to services and DNS, and their state.",
     "profileTitle": "Host",
     "declared": "Declared",
-    "declaredHint": "What was registered for this host; the last scan shows what is actually there."
+    "declaredHint": "What was registered for this host; the last scan shows what is actually there.",
+    "tabMetrics": "Metrics"
   },
   "dns": {
     "title": "DNS Records",
@@ -1068,7 +1069,19 @@
       "byStatus": "By runtime",
       "engines": "Databases and caches",
       "byHost": "Hosts with most services"
-    }
+    },
+    "profileTitle": "Service",
+    "runtimeTitle": "Runtime",
+    "runtimeContainer": "Container found by the host scan",
+    "runtimeHost": "System service found by the host scan",
+    "runtimeManual": "Added by hand: the scan doesn't follow this service's runtime.",
+    "catalogName": "Catalog identity",
+    "discoveredAt": "Found on",
+    "links": "Links",
+    "dependsOn": "Depends on",
+    "notFound": "Service not found",
+    "backToList": "Back to Services",
+    "fixateHint": "Confirms the service as yours: it stops counting as automatic to review and can be rebound to another container. The scan keeps updating its runtime."
   },
   "topology": {
     "title": "Architecture Topology",
