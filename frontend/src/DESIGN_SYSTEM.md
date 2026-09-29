@@ -54,8 +54,13 @@ reprints them.
    `SectionCard body="flush"` row lists — dot, name, mono id, meta on the
    right — not card grids with a cards/table toggle; groups within a list
    are a muted `text-xs` subheader row; "add" is an `IconButton` "+" in
-   `controls`, never a primary `Button` (host Operações, Acompanhamento and
-   Topologia follow this).
+   `controls`, never a primary `Button`. The shells: `DetailSplit`
+   (profile | observed), `RowList`/`RowGroup`/`ListRow`/`RowText`
+   (`components/ui/RowList`), `TopologyPane` + `RelationsCard` (graph with a
+   loading state and a phone list/graph toggle), `IssuesBoard` — hosts, DNS
+   and Serviços all use them. A detail page whose record is missing (404,
+   including not visible) shows an `EmptyState` with a way back, never an
+   endless skeleton.
 4. **Three headings.** `PageHeader` (title, subtitle, actions, add) for the page;
    `SectionHeading variant="section|label|rule"` inside it; `Heading as size`
    anywhere else. Sizes come from the heading scale in `globals.css`
@@ -282,7 +287,9 @@ Compact badges are a dot that expands with its label on hover.
 </PageShell>
 ```
 
-Hosts is the reference: tabs **Visão geral** (statistics as the compact `KpiGrid layout="list"` —
+Hosts, DNS and Serviços share one listing shape (`InventoryOverview`, `InsightKpis`,
+`Breakdowns`, `usePageTab`; each inventory's catalog lives in `<entity>Insights.ts` with a
+`node --test` file). Hosts is the reference: tabs **Visão geral** (statistics as the compact `KpiGrid layout="list"` —
 a bordered grid, value over label, hint on hover, a cell click applies its filter — in the sticky
 left quarter on desktop (2 columns) and as a strip above the listing below `lg`; the listing,
 `InventoryContent columns={3}`, is the page, the indicators are not) and **Dashboard**
@@ -426,26 +433,14 @@ Use `<ResponsaveisSection>` from `components/inventory/ResponsaveisSection.tsx`:
 
 ---
 
-## 12. Acontecimentos Tab Pattern
+## 12. Acompanhamento Tab Pattern
 
-Detail pages should include an "Acontecimentos" (Issues/Tracking) tab:
-
-### Minimal Version (DNS)
-- Issues list (open/closed sections)
-- Create issue drawer
-- Uses `globalIssuesAPI.list({ entity_type, entity_id })`
-
-### Full Version (Hosts)
-- Three sections: Alerts, Issues (kanban + table), Chamados
-- Each section has its own create/edit drawer
-- Alert auto-detection from scans
-
-### Tab Configuration
-- Label: `t("host.acontecimentos") || "Acontecimentos"`
-- Icon: warning triangle path
-- Badge: total issue count (when > 0)
-
----
+Detail pages have an **Acompanhamento** tab (`t("host.tabTracking")`, alert icon, badge =
+open issues). Its core is `IssuesBoard entityType entityId` (`components/issues/`): kanban or
+table, archived toggle, "+" and the create/edit drawer, all over
+`globalIssuesAPI.list({ entity_type, entity_id })`. DNS and Serviços show just the board;
+hosts add what only hosts have — Alertas and Chamados (+ GLPI) side by side above it, as
+flush row lists.
 
 ---
 
@@ -468,13 +463,21 @@ PillButton, RadioGroup, ResponsiveModal, SearchBadge, SectionHeading, Select, Sk
 SortDropdown, SortableTable, Spinner, StatCard, StatusAlert, StatusDot, StepIndicator, TabBar, Table
 (`tableClasses`), TagInput, Textarea, Toggle, ToolbarActionButton, Tooltip, ViewToggle.
 
-`components/inventory/`: CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator,
-InventoryContent, InventoryFilterDrawer, InventoryFAB, KpiGrid, ResponsavelList,
-ResponsaveisSection.
+`components/ui/RowList`: RowList, RowGroup, RowGroupTitle, ListRow, RowText.
 
-`hooks/`: useMultiStepForm, useCopy, useDebounce, useInventoryFilters, useSecretReveal, useMediaQuery.
+`components/inventory/`: CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorGrid,
+CardIndicatorSeparator, CardMeter, InventoryContent, InventoryOverview, InsightKpis, Breakdowns,
+InventoryFilterDrawer, InventoryFAB, KpiGrid, ResponsavelList, ResponsaveisSection.
+
+`components/detail/`: DetailSplit, TopologyPane, RelationsCard (+ `hostsGroup`, `dnsGroup`,
+`servicesGroup`, `projectsGroup`). `components/issues/`: IssuesBoard, IssueDrawer, IssueViews.
+
+`hooks/`: useMultiStepForm, useCopy, useDebounce, useInventoryFilters, useSecretReveal, useMediaQuery,
+usePageTab, useEntityGraph, useHostNames.
 `lib/`: icon-paths (`ICON_PATHS`, `NAV_ICONS`, `REQUEST_TYPE_ICON`), constants (`SITUACAO_*`, `situacaoAccent`,
-`NAV_SECTIONS`), utils (`formatPhone`, `getTimeAgo`, ...), requests (`transitionVariant`, ...).
+`NAV_SECTIONS`), utils (`formatPhone`, `getTimeAgo`, ...), requests (`transitionVariant`, ...), insights
+(`Insight`, `BreakdownRow` types), serviceDisplay (`serviceTitle`, `SERVICE_KINDS`, `originKey`), dnsCert,
+alert-colors.
 
 Retired: `ListingLabel`, the catalog's `SectionLabel`/`StepHeading`/`chipClass`, `VaultPage.Chip`, the
 `.stagger-1..9` classes, `--shadow-glow`, `.animate-shimmer`, `.animate-slide-right`.

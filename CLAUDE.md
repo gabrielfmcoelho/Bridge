@@ -29,7 +29,7 @@ and contacts. Access is scoped by a hierarchical org-unit tree called
 | Frontend build | `cd frontend && npm run build` |
 | Frontend dev | `cd frontend && npm run dev` |
 | Frontend dev, no Go backend | `cd frontend && npm run dev:mock` — sets `NEXT_PUBLIC_USE_MOCK_API=1`, which repoints `API_BASE` at the in-app mock (`src/app/mock/api/[...path]/route.ts` + `src/mocks/`). **Required for `/catalog` and `/requests`**: those routes have no Go backend yet, so plain `npm run dev` proxies them to Go and gets 404. `POST /mock/api/__user {role, entidade_slug}` switches persona, `POST /mock/api/__reset` re-seeds. |
-| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema}.test.ts`, `src/mocks/scope.test.ts` |
+| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts` (insight modules stay runtime-import free so Node can run them) |
 
 ## Architecture
 
