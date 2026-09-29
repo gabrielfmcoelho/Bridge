@@ -31,6 +31,13 @@ func registerPgxRebindDriver() {
 	})
 }
 
+// OpenNoMigrate opens dsn with the rebind driver and nothing else — no
+// migrations, no startup guards. For read-only tooling pointed at a live DB.
+func OpenNoMigrate(dsn string) (*sql.DB, error) {
+	registerPgxRebindDriver()
+	return sql.Open(pgxRebindDriverName, dsn)
+}
+
 type rebindDriver struct{ inner driver.Driver }
 
 func (d *rebindDriver) Open(dsn string) (driver.Conn, error) {

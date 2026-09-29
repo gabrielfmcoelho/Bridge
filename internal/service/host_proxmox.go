@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/proxmox"
@@ -17,6 +18,8 @@ type ProxmoxSyncSummary struct {
 	Updated     int `json:"updated"`
 	Deactivated int `json:"deactivated"`
 	NoIP        int `json:"no_ip"`
+	// NoIPReasons groups the IP-less machines: "reason: name, name", sorted.
+	NoIPReasons []string `json:"no_ip_reasons,omitempty"`
 }
 
 // proxmoxDefaultEntidade owns synced hosts that have no node to inherit from
@@ -41,10 +44,16 @@ func (s *HostService) SyncFromProxmox(ctx context.Context, ms []proxmox.Machine)
 	nodeHost := map[string]int64{}
 	claimed := map[int64]bool{}
 	seen := make([]string, 0, len(ms))
+	noIP := map[string][]string{}
 	for _, m := range ms {
 		seen = append(seen, m.ProxmoxID)
 		if m.IP == "" {
 			sum.NoIP++
+			reason := m.NoIPReason
+			if reason == "" {
+				reason = "unknown"
+			}
+			noIP[reason] = append(noIP[reason], m.Name)
 		}
 		st := store.ProxmoxState{
 			ProxmoxID: m.ProxmoxID, IP: m.IP,
@@ -87,6 +96,10 @@ func (s *HostService) SyncFromProxmox(ctx context.Context, ms []proxmox.Machine)
 			nodeHost[m.Node] = id
 		}
 	}
+	for reason, names := range noIP {
+		sum.NoIPReasons = append(sum.NoIPReasons, reason+": "+strings.Join(names, ", "))
+	}
+	sort.Strings(sum.NoIPReasons)
 	if len(seen) > 0 {
 		if sum.Deactivated, err = s.hosts.DeactivateMissingProxmox(ctx, seen); err != nil {
 			return sum, err

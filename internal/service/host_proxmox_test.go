@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/proxmox"
@@ -39,7 +40,11 @@ func TestHostService_SyncFromProxmox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (service.ProxmoxSyncSummary{Found: 4, Created: 3, Updated: 1, NoIP: 1}); sum != want {
+	if want := []string{"unknown: web"}; !reflect.DeepEqual(sum.NoIPReasons, want) {
+		t.Fatalf("NoIPReasons = %q, want %q", sum.NoIPReasons, want)
+	}
+	sum.NoIPReasons = nil
+	if want := (service.ProxmoxSyncSummary{Found: 4, Created: 3, Updated: 1, NoIP: 1}); !reflect.DeepEqual(sum, want) {
 		t.Fatalf("first sync = %+v, want %+v", sum, want)
 	}
 
@@ -86,7 +91,7 @@ func TestHostService_SyncFromProxmox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (service.ProxmoxSyncSummary{Found: 4, Created: 1, Updated: 3, Deactivated: 1, NoIP: 1}); sum != want {
+	if want := (service.ProxmoxSyncSummary{Found: 4, Created: 1, Updated: 3, Deactivated: 1, NoIP: 1}); !reflect.DeepEqual(withoutReasons(sum), want) {
 		t.Fatalf("second sync = %+v, want %+v", sum, want)
 	}
 	if web, _ = hosts.GetByID(ctx, web.ID); web.Situacao != "inactive" {
@@ -141,7 +146,7 @@ func TestHostService_SyncFromProxmox_Matching(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (service.ProxmoxSyncSummary{Found: 3, Created: 1, Updated: 2, NoIP: 1}); sum != want {
+	if want := (service.ProxmoxSyncSummary{Found: 3, Created: 1, Updated: 2, NoIP: 1}); !reflect.DeepEqual(withoutReasons(sum), want) {
 		t.Fatalf("sync = %+v, want %+v", sum, want)
 	}
 	hosts := store.NewHostRepo(d.SQL)
@@ -171,4 +176,9 @@ func TestHostService_SyncFromProxmox_Matching(t *testing.T) {
 	if h, _ := hosts.GetByID(ctx, dhcp); h.Hostname != "10.0.0.51" {
 		t.Fatalf("IP hostname cleared by a missing IP: %q", h.Hostname)
 	}
+}
+
+func withoutReasons(s service.ProxmoxSyncSummary) service.ProxmoxSyncSummary {
+	s.NoIPReasons = nil
+	return s
 }

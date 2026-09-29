@@ -1708,7 +1708,7 @@ export const relationsAPI = {
 };
 
 // Proxmox VE integration
-export interface ProxmoxSyncSummary { found: number; created: number; updated: number; deactivated: number; no_ip: number }
+export interface ProxmoxSyncSummary { found: number; created: number; updated: number; deactivated: number; no_ip: number; no_ip_reasons?: string[] }
 export const proxmoxAPI = {
   // Unsaved form values win over stored settings; empty/masked ones fall back.
   test: (body: { base_url?: string; token_id?: string; token_secret?: string; skip_verify?: boolean }) =>

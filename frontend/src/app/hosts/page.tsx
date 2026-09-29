@@ -390,13 +390,19 @@ export default function HostsPage() {
     onSuccess: (d) => {
       queryClient.invalidateQueries({ queryKey: ["hosts"] });
       queryClient.invalidateQueries({ queryKey: ["hosts-table"] });
+      // Reasons for missing IPs are actionable (agent, token privilege), so
+      // a warning, which stays until dismissed.
+      const reasons = d.no_ip_reasons ?? [];
       flag({
-        appearance: "success",
+        appearance: reasons.length ? "warning" : "success",
         title: t("host.syncProxmox"),
-        description: t("host.proxmoxSyncDone", {
-          found: String(d.found), created: String(d.created), updated: String(d.updated),
-          deactivated: String(d.deactivated), no_ip: String(d.no_ip),
-        }),
+        description: [
+          t("host.proxmoxSyncDone", {
+            found: String(d.found), created: String(d.created), updated: String(d.updated),
+            deactivated: String(d.deactivated), no_ip: String(d.no_ip),
+          }),
+          ...reasons.map((r) => `• ${r}`),
+        ].join("\n"),
       });
     },
     onError: (err) => flag({ appearance: "error", title: t("host.syncProxmox"), description: err.message }),

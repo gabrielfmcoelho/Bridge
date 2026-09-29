@@ -50,11 +50,29 @@ func (c *Client) get(ctx context.Context, path string, out any) error {
 		return err
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("proxmox api GET %s: %s %s", path, resp.Status, strings.TrimSpace(string(body)))
+		// PVE puts the human reason in the status line or "message".
+		var e struct {
+			Message string `json:"message"`
+		}
+		msg := strings.TrimSpace(string(body))
+		if json.Unmarshal(body, &e) == nil && e.Message != "" {
+			msg = strings.TrimSpace(e.Message)
+		}
+		return &APIError{Status: resp.Status, Message: msg}
 	}
 	return json.Unmarshal(body, &struct {
 		Data any `json:"data"`
 	}{Data: out})
+}
+
+// APIError is a PVE response with status >= 400.
+type APIError struct{ Status, Message string }
+
+func (e *APIError) Error() string {
+	if e.Message == "" || e.Message == "{\"data\":null}" {
+		return e.Status
+	}
+	return e.Status + ": " + e.Message
 }
 
 // Version returns the PVE version string — the connection test.
@@ -130,6 +148,7 @@ func (c *Client) Machines(ctx context.Context) ([]Machine, error) {
 	}
 	var (
 		guestIPs = map[string]string{}
+		ipErrs   = map[string]string{}
 		mu       sync.Mutex
 		wg       sync.WaitGroup
 		sem      = make(chan struct{}, guestIPConcurrency)
@@ -141,13 +160,25 @@ func (c *Client) Machines(ctx context.Context) ([]Machine, error) {
 		sem <- struct{}{}
 		wg.Go(func() {
 			defer func() { <-sem }()
-			if ip, err := c.GuestIP(ctx, r); err == nil && ip != "" {
-				mu.Lock()
+			ip, err := c.GuestIP(ctx, r)
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case err != nil:
+				ipErrs[r.ID] = err.Error()
+			case ip == "":
+				ipErrs[r.ID] = "no usable IPv4 reported"
+			default:
 				guestIPs[r.ID] = ip
-				mu.Unlock()
 			}
 		})
 	}
 	wg.Wait()
-	return Machines(res, nodeIPs, guestIPs), nil
+	ms := Machines(res, nodeIPs, guestIPs)
+	for i := range ms {
+		if ms[i].IP == "" && ms[i].NoIPReason == "" {
+			ms[i].NoIPReason = ipErrs[ms[i].ProxmoxID]
+		}
+	}
+	return ms, nil
 }

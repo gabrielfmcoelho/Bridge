@@ -54,6 +54,7 @@ type Machine struct {
 	IP             string
 	Running        bool
 	CPU, RAM, Disk string
+	NoIPReason     string // why IP is "" — set by Machines / Client.Machines
 }
 
 // TipoMaquina maps the kind onto the tipo_maquina enum.
@@ -80,12 +81,18 @@ func Machines(res []Resource, nodeIPs, guestIPs map[string]string) []Machine {
 		switch {
 		case r.Type == "node":
 			m.Name, m.IP, m.Running = r.Node, nodeIPs[r.Node], r.Status == "online"
+			if m.IP == "" {
+				m.NoIPReason = "node not in /cluster/status"
+			}
 			nodes = append(nodes, m)
 		case r.IsGuest():
 			if m.Name == "" {
 				m.Name = fmt.Sprintf("%s-%d", r.Type, r.VMID)
 			}
 			m.IP, m.Running = guestIPs[r.ID], r.Status == "running"
+			if m.IP == "" && !m.Running {
+				m.NoIPReason = "stopped"
+			}
 			guests = append(guests, m)
 		}
 	}

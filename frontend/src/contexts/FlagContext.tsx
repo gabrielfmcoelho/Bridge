@@ -86,7 +86,7 @@ function FlagItem({ flag, onDismiss }: { flag: Flag; onDismiss: () => void }) {
       <Icon path={icon} className="w-5 h-5 shrink-0 mt-0.5" style={{ color }} />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-[var(--text-primary)]">{flag.title}</p>
-        {flag.description && <p className="text-sm text-[var(--text-secondary)] mt-0.5">{flag.description}</p>}
+        {flag.description && <p className="text-sm text-[var(--text-secondary)] mt-0.5 whitespace-pre-line">{flag.description}</p>}
         {flag.actions && flag.actions.length > 0 && (
           <div className="flex gap-3 mt-2">
             {flag.actions.map((a) => (
