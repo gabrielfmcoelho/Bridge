@@ -1446,4 +1446,21 @@ var migrationsPostgres = []string{
 	ALTER TABLE releases DROP CONSTRAINT IF EXISTS releases_project_id_fkey;
 	ALTER TABLE releases ADD CONSTRAINT releases_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
 	ALTER TABLE releases ALTER COLUMN project_id SET NOT NULL;`,
+
+	// Version 91: host credentials move into the vault. ssh_keys rows become
+	// avulso secrets (legacy_ssh_key_id maps them, filled by the startup
+	// vault.MigrateSSHKeysToVault since values must be re-encrypted), hosts
+	// link a shared key through host_remote_users.key_secret_id (passwords
+	// keep secret_id), and plain metadata columns let lists show the user
+	// and group identical values without decrypting. value_fingerprint is a
+	// keyed HMAC (vault/derived.go), never a plain hash.
+	`ALTER TABLE secrets ADD COLUMN IF NOT EXISTS value_fingerprint BYTEA;
+	ALTER TABLE secrets ADD COLUMN IF NOT EXISTS ssh_fingerprint TEXT;
+	ALTER TABLE secrets ADD COLUMN IF NOT EXISTS username TEXT;
+	ALTER TABLE secrets ADD COLUMN IF NOT EXISTS legacy_ssh_key_id BIGINT;
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_secrets_legacy_ssh_key ON secrets (legacy_ssh_key_id, type) WHERE legacy_ssh_key_id IS NOT NULL;
+	CREATE INDEX IF NOT EXISTS idx_secrets_value_fp ON secrets (type, value_fingerprint) WHERE deleted_at IS NULL;
+	CREATE INDEX IF NOT EXISTS idx_secrets_ssh_fp ON secrets (ssh_fingerprint) WHERE ssh_fingerprint IS NOT NULL AND deleted_at IS NULL;
+	ALTER TABLE host_remote_users ADD COLUMN IF NOT EXISTS key_secret_id BIGINT REFERENCES secrets(id) ON DELETE SET NULL;
+	CREATE INDEX IF NOT EXISTS idx_hru_key_secret ON host_remote_users (key_secret_id) WHERE key_secret_id IS NOT NULL;`,
 }

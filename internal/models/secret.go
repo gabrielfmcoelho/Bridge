@@ -84,22 +84,25 @@ func (v SecretVisibility) Valid() bool {
 // Two users may each own a personal secret with the same (scope, parent_id, name);
 // only one team-shared secret with that key may exist at a time.
 type Secret struct {
-	ID                int64            `json:"id"`
-	Type              SecretType       `json:"type"`
-	Scope             SecretScope      `json:"scope"`
-	Visibility        SecretVisibility `json:"visibility"`
-	ParentID          *int64           `json:"parent_id,omitempty"` // service.id | host.id | external_tool.id; nil for avulso
-	OwnerUserID       int64            `json:"owner_user_id"`       // creator; always set
-	Name              string           `json:"name"`
-	GroupLabel        *string          `json:"group_label,omitempty"` // environment ("prod", "staging", …) for env_var
-	Description       *string          `json:"description,omitempty"`
-	PayloadCiphertext []byte           `json:"-"`
-	PayloadNonce      []byte           `json:"-"`
-	KeyVersion        int              `json:"key_version"`
-	CreatedBy         int64            `json:"created_by"`
-	CreatedAt         time.Time        `json:"created_at"`
-	UpdatedAt         time.Time        `json:"updated_at"`
-	DeletedAt         *time.Time       `json:"deleted_at,omitempty"`
+	ID          int64            `json:"id"`
+	Type        SecretType       `json:"type"`
+	Scope       SecretScope      `json:"scope"`
+	Visibility  SecretVisibility `json:"visibility"`
+	ParentID    *int64           `json:"parent_id,omitempty"` // service.id | host.id | external_tool.id; nil for avulso
+	OwnerUserID int64            `json:"owner_user_id"`       // creator; always set
+	Name        string           `json:"name"`
+	GroupLabel  *string          `json:"group_label,omitempty"` // environment ("prod", "staging", …) for env_var
+	Description *string          `json:"description,omitempty"`
+	// Username is the login a password is for (JSON payloads carry their own;
+	// the vault derives it from them). Plain column so lists show it.
+	Username          string     `json:"username,omitempty"`
+	PayloadCiphertext []byte     `json:"-"`
+	PayloadNonce      []byte     `json:"-"`
+	KeyVersion        int        `json:"key_version"`
+	CreatedBy         int64      `json:"created_by"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	DeletedAt         *time.Time `json:"deleted_at,omitempty"`
 }
 
 // envVarNameRe matches POSIX-style env var names (Task 2.1 / spec §4.2):

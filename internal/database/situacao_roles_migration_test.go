@@ -16,9 +16,15 @@ func TestMigrationV88_SituacaoRolesOnRenamedOptions(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 	defer d.Close()
-	v88 := migrationsPostgres[len(migrationsPostgres)-3] // v89, v90 follow
-	if !strings.Contains(v88, "ADD COLUMN IF NOT EXISTS role") {
-		t.Fatalf("migration v88 is not situação roles")
+	// Found by content, so later migrations don't shift it.
+	var v88 string
+	for _, m := range migrationsPostgres {
+		if strings.Contains(m, "ALTER TABLE enum_options ADD COLUMN IF NOT EXISTS role") {
+			v88 = m
+		}
+	}
+	if v88 == "" {
+		t.Fatalf("situação roles migration (v88) not found")
 	}
 
 	// Rewind to "before v88" with the real install's shape.

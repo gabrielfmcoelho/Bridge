@@ -149,6 +149,9 @@ func (r *SecretRepo) Create(ctx context.Context, actor ActorContext, s *models.S
 		}
 	}
 
+	if s.Type == models.SecretTypeSSHKey {
+		plaintext = NormalizeSSHKeyPayload(plaintext)
+	}
 	ct, nonce, err := r.enc.Encrypt(plaintext)
 	if err != nil {
 		return 0, err
@@ -176,6 +179,14 @@ func (r *SecretRepo) Create(ctx context.Context, actor ActorContext, s *models.S
 	}
 	if err := writeAuditTx(tx, id, models.SecretAuditActionCreate, actor, nil, nil); err != nil {
 		return 0, err
+	}
+	if err := stampDerived(ctx, tx, r.enc, id, s.Type, plaintext); err != nil {
+		return 0, err
+	}
+	if s.Username != "" { // a password carries no username in its payload
+		if _, err := tx.ExecContext(ctx, `UPDATE secrets SET username = ? WHERE id = ?`, s.Username, id); err != nil {
+			return 0, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
@@ -232,6 +243,10 @@ func (r *SecretRepo) Update(ctx context.Context, actor ActorContext, id int64, p
 			changed = append(changed, "group_label")
 		}
 	}
+	if patch.Payload != nil && v.Type == models.SecretTypeSSHKey {
+		normalized := NormalizeSSHKeyPayload(*patch.Payload)
+		patch.Payload = &normalized
+	}
 	if patch.Payload != nil {
 		ct, nonce, err := r.enc.Encrypt(*patch.Payload)
 		if err != nil {
@@ -258,6 +273,11 @@ func (r *SecretRepo) Update(ctx context.Context, actor ActorContext, id int64, p
 	meta, _ := json.Marshal(map[string][]string{"changed_fields": changed})
 	if err := writeAuditTx(tx, id, models.SecretAuditActionUpdate, actor, nil, meta); err != nil {
 		return err
+	}
+	if patch.Payload != nil {
+		if err := stampDerived(ctx, tx, r.enc, id, v.Type, *patch.Payload); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

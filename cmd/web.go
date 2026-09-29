@@ -43,6 +43,10 @@ var webCmd = &cobra.Command{
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
+		// Host credentials (ssh_keys) → vault, and derived columns for older
+		// secrets. Idempotent; runs before the env-gated consolidation below.
+		vault.RunSSHKeyMigration(ctx, db)
+
 		// Env-gated one-shot: consolidate duplicate host passwords into shared
 		// credentials when MIGRATE_SHARED_HOST_PASSWORDS=1 (idempotent, safe to
 		// leave on). Runs after migrations so host_remote_users.secret_id exists.
