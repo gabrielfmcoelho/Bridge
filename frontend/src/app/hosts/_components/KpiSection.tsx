@@ -28,7 +28,7 @@ export default function KpiSection({
   onFiltersChange: (f: HostFilters) => void;
   sort: HostSortConfig;
   onSortChange: (s: HostSortConfig) => void;
-  /** "list" in the Visão geral side column, "grid" on the Dashboard. */
+  /** "list" (compact grid) on Visão geral, "grid" (stat cards) on the Dashboard. */
   layout?: "grid" | "list";
 }) {
   const { t } = useLocale();
@@ -69,7 +69,6 @@ export default function KpiSection({
   return (
     <KpiGrid
       layout={layout}
-      description={layout === "list" ? t("inventory.kpis.description") : undefined}
       kpis={kpis}
       heading={t("common.indicators")}
       columns={Math.min(Math.max(kpis.length, 2), 5) as 2 | 3 | 4 | 5}

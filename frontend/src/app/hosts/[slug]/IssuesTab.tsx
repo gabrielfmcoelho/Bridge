@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { globalIssuesAPI, usersAPI, hostAlertsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
-import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
 import SectionCard from "@/components/ui/SectionCard";
 import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
 import { AlertsSection, IssuesKanban, IssuesTableView } from "./_components/IssueViews";
@@ -169,50 +169,46 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
 
   return (
     <div className="space-y-5 animate-fade-in">
-      {/* ══════ CHAMADOS SECTION ══════ */}
-      <ChamadoSection
-        chamados={chamados}
-        hostId={hostId}
-        slug={slug}
-        canEdit={canEdit}
-        t={t}
-        openCreate={openChamadoCreate}
-        onCreateDone={onChamadoCreateDone}
-      />
-
-      {/* ══════ ALERTS SECTION ══════ */}
-      <AlertsSection
-        alerts={showResolvedAlerts ? allAlerts : allAlerts.filter(a => a.status !== "resolved")}
-        onAlertClick={openAlertDetail}
-        showResolved={showResolvedAlerts}
-        onToggleResolved={() => setShowResolvedAlerts(v => !v)}
-        hasResolved={allAlerts.some(a => a.status === "resolved")}
-        addButton={
-          canEdit ? (
-            <span className="hidden md:contents">
-              <Button size="sm" onClick={() => setShowAlertDrawer(true)}>
-                <span className="mr-1">+</span> {t("host.addAlert")}
-              </Button>
-            </span>
-          ) : undefined
-        }
-      />
+      {/* Signals (alerts from scans, tickets from outside) side by side; the work they turn into spans below. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+        <AlertsSection
+          alerts={showResolvedAlerts ? allAlerts : allAlerts.filter(a => a.status !== "resolved")}
+          onAlertClick={openAlertDetail}
+          showResolved={showResolvedAlerts}
+          onToggleResolved={() => setShowResolvedAlerts(v => !v)}
+          hasResolved={allAlerts.some(a => a.status === "resolved")}
+          addButton={
+            canEdit ? (
+              <span className="hidden md:contents">
+                <IconButton onClick={() => setShowAlertDrawer(true)} label={t("host.addAlert")}><Icon path={ICON_PATHS.plus} /></IconButton>
+              </span>
+            ) : undefined
+          }
+        />
+        <div className="space-y-5 min-w-0">
+          <ChamadoSection
+            chamados={chamados}
+            hostId={hostId}
+            slug={slug}
+            canEdit={canEdit}
+            t={t}
+            openCreate={openChamadoCreate}
+            onCreateDone={onChamadoCreateDone}
+          />
+        </div>
+      </div>
 
       {/* ══════ ISSUES SECTION ══════ */}
-      <SectionCard variant="plain" as="h3" title={t("issue.title")} count={visibleIssues.length} empty={visibleIssues.length === 0 ? t("issue.boardEmpty") : undefined} controls={
+      <SectionCard as="h3" title={t("issue.title")} count={visibleIssues.length} empty={visibleIssues.length === 0 ? t("issue.boardEmpty") : undefined} controls={
           <>
             {hostIssues.some(i => i.archived) && (
-              <button
+              <IconButton
+                variant={showArchivedIssues ? "active" : "default"}
                 onClick={() => setShowArchivedIssues(v => !v)}
-                className={`inline-flex items-center gap-1 h-8 px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition ${
-                  showArchivedIssues
-                    ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
-                    : "bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"
-                }`}
-                title={showArchivedIssues ? t("issue.hideArchived") : t("issue.showArchived")}
+                label={showArchivedIssues ? t("issue.hideArchived") : t("issue.showArchived")}
               >
-                <Icon path={ICON_PATHS.archive} className="w-3 h-3" />
-              </button>
+                <Icon path={ICON_PATHS.archive} />
+              </IconButton>
             )}
             <ViewToggle
               value={issueView}
@@ -224,9 +220,7 @@ export default function IssuesTab({ hostAlerts, chamados, hostId, slug, canEdit,
             />
             {canEdit && (
               <span className="hidden md:contents">
-                <Button size="sm" onClick={() => { setEditingIssue(null); setShowIssueDrawer(true); }}>
-                  <span className="mr-1">+</span> {t("host.addIssue")}
-                </Button>
+                <IconButton onClick={() => { setEditingIssue(null); setShowIssueDrawer(true); }} label={t("host.addIssue")}><Icon path={ICON_PATHS.plus} /></IconButton>
               </span>
             )}
           </>

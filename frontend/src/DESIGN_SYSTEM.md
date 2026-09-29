@@ -49,7 +49,13 @@ reprints them.
    `StatusAlert`, never a blank area.
    **Detail pages** read left to right: what was declared (the entity's profile,
    1–2 `SectionCard`s, sticky) beside what was observed (scans, activity), which
-   scrolls — the host detail "Visão geral" is the reference.
+   scrolls — the host detail "Visão geral" is the reference. Inside detail
+   tabs, an entity's collections (alerts, chamados, logs, relations) are
+   `SectionCard body="flush"` row lists — dot, name, mono id, meta on the
+   right — not card grids with a cards/table toggle; groups within a list
+   are a muted `text-xs` subheader row; "add" is an `IconButton` "+" in
+   `controls`, never a primary `Button` (host Operações, Acompanhamento and
+   Topologia follow this).
 4. **Three headings.** `PageHeader` (title, subtitle, actions, add) for the page;
    `SectionHeading variant="section|label|rule"` inside it; `Heading as size`
    anywhere else. Sizes come from the heading scale in `globals.css`
@@ -276,8 +282,10 @@ Compact badges are a dot that expands with its label on hover.
 </PageShell>
 ```
 
-Hosts is the reference: tabs **Visão geral** (statistics `KpiGrid layout="list"` in the left quarter,
-sticky; the listing in the other three quarters with `InventoryContent columns={3}`) and **Dashboard**
+Hosts is the reference: tabs **Visão geral** (statistics as the compact `KpiGrid layout="list"` —
+a bordered grid, value over label, hint on hover, a cell click applies its filter — in the sticky
+left quarter on desktop (2 columns) and as a strip above the listing below `lg`; the listing,
+`InventoryContent columns={3}`, is the page, the indicators are not) and **Dashboard**
 (KPI tiles + breakdown bar lists; a row click applies its filter). Content grid: `columns={4}`
 → `md:grid-cols-2 xl:grid-cols-4`, `columns={3}` → `md:grid-cols-2 xl:grid-cols-3`; items
 `className="stagger-in" style={{ "--i": i }}`. Skeleton: six `<SkeletonCard />`.

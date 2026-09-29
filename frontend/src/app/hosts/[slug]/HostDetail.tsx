@@ -67,7 +67,7 @@ export default function HostDetail({ slug }: { slug: string }) {
     return match?.alerts || data.host.alerts || [];
   }, [hostsList, data, slug]);
 
-  const { data: graphData } = useQuery({ queryKey: ["graph"], queryFn: graphAPI.get, enabled: activeTab === "topology" });
+  const { data: graphData, isLoading: graphLoading } = useQuery({ queryKey: ["graph"], queryFn: graphAPI.get, enabled: activeTab === "topology" });
   const { data: hostIssues = [] } = useQuery({
     queryKey: ["issues", "host", data?.host?.id],
     queryFn: () => globalIssuesAPI.list({ entity_type: "host", entity_id: String(data!.host.id) }),
@@ -230,7 +230,7 @@ export default function HostDetail({ slug }: { slug: string }) {
 
           {/* ═══ TOPOLOGY TAB ═══ */}
           {activeTab === "topology" && (
-            <TopologyTab data={data} filteredGraph={filteredGraph} t={t} />
+            <TopologyTab data={data} filteredGraph={filteredGraph} graphLoading={graphLoading} t={t} />
           )}
 
           {/* ═══ METRICS TAB ═══ */}

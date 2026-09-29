@@ -1,133 +1,108 @@
 "use client";
 
-import SituacaoText from "@/components/ui/SituacaoText";
-
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import Card from "@/components/ui/Card";
+import SituacaoText from "@/components/ui/SituacaoText";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import SectionCard from "@/components/ui/SectionCard";
+import Spinner from "@/components/ui/Spinner";
+import ViewToggle from "@/components/ui/ViewToggle";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import TopologyGraph from "@/components/graph/TopologyGraph";
 import type { GraphData } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
-export default function TopologyTab({ data, filteredGraph, t }: {
+const rowClass = "flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--bg-elevated)] transition-colors";
+
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <h4 className="px-5 pt-4 pb-1 text-xs font-medium text-[var(--text-faint)]">{title}</h4>
+      <div className="divide-y divide-[var(--border-subtle)]">{children}</div>
+    </div>
+  );
+}
+
+export default function TopologyTab({ data, filteredGraph, graphLoading, t }: {
   data: { orchestrator?: { type: string; version: string } | null; dns_records?: { id: number; domain: string; has_https: boolean; situacao: string }[]; services?: { id: number; nickname: string; technology_stack?: string }[]; projects?: { id: number; name: string; situacao?: string }[] };
   filteredGraph: GraphData;
+  graphLoading: boolean;
   t: (k: string) => string;
 }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const [mobileView, setMobileView] = useState<"list" | "graph">("list");
 
-  const hasConnections = filteredGraph.nodes.length > 0 || data.orchestrator || (data.dns_records && data.dns_records.length > 0) || (data.services && data.services.length > 0) || (data.projects && data.projects.length > 0);
+  const dns = data.dns_records ?? [];
+  const services = data.services ?? [];
+  const projects = data.projects ?? [];
+  const relationCount = dns.length + services.length + projects.length + (data.orchestrator ? 1 : 0);
 
-  if (!hasConnections) {
-    return (
-      <EmptyState
-        icon="topology"
-        title={t("host.noTopology")}
-        description={t("host.noTopologyDesc")}
-        compact
-      />
-    );
+  if (relationCount === 0 && !graphLoading && filteredGraph.nodes.length === 0) {
+    return <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} compact />;
   }
 
-  const hasListItems = !!data.orchestrator || (data.dns_records && data.dns_records.length > 0) || (data.services && data.services.length > 0) || (data.projects && data.projects.length > 0);
-
-  const connectionList = (
-    <div className="space-y-5">
-      {!hasListItems && (
-        <EmptyState
-          icon="topology"
-          title={t("host.noTopology")}
-          description={t("host.noTopologyDesc")}
-          compact
-        />
-      )}
-
-      {/* Orchestrator */}
+  // Same shell as the other tabs: one card, grouped flush rows (as in Operações).
+  const relations = (
+    <SectionCard as="h3" title={t("topology.relations")} count={relationCount} body="flush" empty={relationCount === 0 ? t("host.noTopologyDesc") : undefined}>
       {data.orchestrator && (
-        <SectionCard title={t("topology.orchestrator")}>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <span className="text-[var(--text-faint)] block mb-0.5">{t("topology.type")}</span>
-                <span className="text-[var(--text-muted)] font-mono">{data.orchestrator.type}</span>
-              </div>
-              <div>
-                <span className="text-[var(--text-faint)] block mb-0.5">{t("topology.version")}</span>
-                <span className="text-[var(--text-muted)] font-mono">{data.orchestrator.version}</span>
-              </div>
-            </div>
-        </SectionCard>
-      )}
-
-      {/* DNS Records */}
-      {data.dns_records && data.dns_records.length > 0 && (
-        <SectionCard variant="plain" title={t("topology.dnsRecords")} count={data.dns_records.length}>
-          <div className="grid grid-cols-1 gap-2">
-            {data.dns_records.map((dns) => (
-              <Card key={dns.id} hover={false} className="!p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--success)]/15 text-[var(--success)]">
-                    <Icon path={ICON_PATHS.globeMeridian} />
-                  </div>
-                  <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1 font-mono">{dns.domain}</span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={`${dns.has_https ? "text-[var(--success)]" : "text-[var(--text-faint)]/30"}`} title={dns.has_https ? t("topology.https") : t("topology.noHttps")}>
-                      <Icon path={ICON_PATHS.lock} className="w-3.5 h-3.5" />
-                    </span>
-                    <SituacaoText situacao={dns.situacao} />
-                  </div>
-                </div>
-              </Card>
-            ))}
+        <Group title={t("topology.orchestrator")}>
+          <div className="flex items-center gap-3 px-5 py-2.5 text-sm">
+            <span className="text-[var(--text-primary)] font-mono">{data.orchestrator.type}</span>
+            <span className="ml-auto text-2xs text-[var(--text-muted)] font-mono">{data.orchestrator.version}</span>
           </div>
-        </SectionCard>
+        </Group>
       )}
-
-      {/* Services */}
-      {data.services && data.services.length > 0 && (
-        <SectionCard variant="plain" title={t("topology.services")} count={data.services.length}>
-          <div className="grid grid-cols-1 gap-2">
-            {data.services.map((svc) => (
-              <Link key={svc.id} href={`/services/${svc.id}`} className="block">
-                <Card className="!p-3 !pb-7">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--accent)]/15 text-[var(--accent)]">
-                      <Icon path={ICON_PATHS.serverStack} />
-                    </div>
-                    <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">{svc.nickname}</span>
-                    {svc.technology_stack && <Badge>{svc.technology_stack}</Badge>}
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </SectionCard>
+      {services.length > 0 && (
+        <Group title={t("topology.services")}>
+          {services.map((svc) => (
+            <Link key={svc.id} href={`/services/${svc.id}`} className={rowClass}>
+              <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5 shrink-0 text-[var(--accent)]" />
+              <span className="text-sm text-[var(--text-primary)] truncate flex-1">{svc.nickname}</span>
+              {svc.technology_stack && <Badge>{svc.technology_stack}</Badge>}
+            </Link>
+          ))}
+        </Group>
       )}
+      {dns.length > 0 && (
+        <Group title={t("topology.dnsRecords")}>
+          {dns.map((d) => (
+            <Link key={d.id} href={`/dns/${d.id}`} className={rowClass}>
+              <Icon path={ICON_PATHS.globeMeridian} className="w-3.5 h-3.5 shrink-0 text-[var(--success)]" />
+              <span className="text-sm text-[var(--text-primary)] truncate flex-1 font-mono">{d.domain}</span>
+              <span className={d.has_https ? "text-[var(--success)]" : "text-[var(--text-faint)]/40"} title={d.has_https ? t("topology.https") : t("topology.noHttps")}>
+                <Icon path={ICON_PATHS.lock} className="w-3.5 h-3.5" />
+              </span>
+              <SituacaoText situacao={d.situacao} />
+            </Link>
+          ))}
+        </Group>
+      )}
+      {projects.length > 0 && (
+        <Group title={t("topology.projects")}>
+          {projects.map((p) => (
+            <Link key={p.id} href={`/projects/${p.id}`} className={rowClass}>
+              <Icon path={ICON_PATHS.folder} className="w-3.5 h-3.5 shrink-0 text-[var(--warning)]" />
+              <span className="text-sm text-[var(--text-primary)] truncate flex-1">{p.name}</span>
+              <SituacaoText situacao={p.situacao} />
+            </Link>
+          ))}
+        </Group>
+      )}
+    </SectionCard>
+  );
 
-      {/* Projects */}
-      {data.projects && data.projects.length > 0 && (
-        <SectionCard variant="plain" title={t("topology.projects")} count={data.projects.length}>
-          <div className="grid grid-cols-1 gap-2">
-            {data.projects.map((proj) => (
-              <Link key={proj.id} href={`/projects/${proj.id}`} className="block">
-                <Card className="!p-3 !pb-7">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--warning)]/15 text-[var(--warning)]">
-                      <Icon path={ICON_PATHS.folder} />
-                    </div>
-                    <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">{proj.name}</span>
-                    <SituacaoText situacao={proj.situacao} />
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </SectionCard>
+  // The graph endpoint builds the whole inventory and takes a few seconds:
+  // show it loading, never "no connections" while the list beside it has some.
+  const graph = (
+    <div className="rounded-[var(--radius-lg)] overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] h-full min-h-[300px] flex items-center justify-center">
+      {graphLoading ? (
+        <span className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><Spinner />{t("common.loading")}</span>
+      ) : filteredGraph.nodes.length > 0 ? (
+        <TopologyGraph data={filteredGraph} className="w-full h-full" />
+      ) : (
+        <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} compact />
       )}
     </div>
   );
@@ -135,49 +110,23 @@ export default function TopologyTab({ data, filteredGraph, t }: {
   if (isMobile) {
     return (
       <div className="animate-fade-in space-y-4">
-        {/* Mobile toggle: list / graph */}
-        <div className="flex gap-1 p-1 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
-          {(["list", "graph"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setMobileView(v)}
-              className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-sm)] transition duration-150 capitalize ${
-                mobileView === v
-                  ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-              }`}
-            >
-              {v === "list" ? t("common.list") : t("common.graph")}
-            </button>
-          ))}
-        </div>
-        {mobileView === "list" ? connectionList : (
-          filteredGraph.nodes.length > 0 ? (
-            <div className="rounded-[var(--radius-md)] overflow-hidden border border-[var(--border-subtle)]" style={{ height: "60vh" }}>
-              <TopologyGraph data={filteredGraph} className="w-full h-full" />
-            </div>
-          ) : (
-            <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} compact />
-          )
-        )}
+        <ViewToggle
+          value={mobileView}
+          onChange={(v) => setMobileView(v as "list" | "graph")}
+          options={[
+            { key: "list", label: t("common.list"), icon: ICON_PATHS.viewTable },
+            { key: "graph", label: t("common.graph"), icon: ICON_PATHS.bolt },
+          ]}
+        />
+        {mobileView === "list" ? relations : <div className="h-[60vh]">{graph}</div>}
       </div>
     );
   }
 
   return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 lg:gap-5 h-[60vh] lg:h-[calc(100vh-16rem)]">
-        {filteredGraph.nodes.length > 0 ? (
-          <div className="rounded-[var(--radius-lg)] overflow-hidden border border-[var(--border-subtle)] h-full min-h-[300px]">
-            <TopologyGraph data={filteredGraph} className="w-full h-full" />
-          </div>
-        ) : (
-          <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} compact />
-        )}
-        <div className="overflow-y-auto pr-1 max-h-[40vh] lg:max-h-none">
-          {connectionList}
-        </div>
-      </div>
+    <div className="animate-fade-in grid grid-cols-[minmax(0,1fr)_340px] gap-5 h-[calc(100vh-16rem)]">
+      {graph}
+      <div className="overflow-y-auto min-h-0">{relations}</div>
     </div>
   );
 }

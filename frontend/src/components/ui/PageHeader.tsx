@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Button from "./Button";
 import IconButton from "./IconButton";
+import ToolbarActionButton from "./ToolbarActionButton";
 import Icon from "./Icon";
 import Divider from "./Divider";
 import TabBar, { TabPanel, type Tab } from "./TabBar";
@@ -140,15 +141,15 @@ export default function PageHeader(props: PageHeaderProps) {
               {hasCrud && <div className="max-sm:hidden flex items-center gap-1.5">{crud(false)}</div>}
               {controls && controlsKey && (
                 <span className="relative">
-                  <IconButton
-                    variant={controlsOpen ? "active" : "outline"}
+                  {/* Same skin as the toolbar it toggles (Exportar, Agrupar…); the open state
+                      is the toolbar itself showing, plus aria-expanded. */}
+                  <ToolbarActionButton
+                    icon={ICON_PATHS.filter}
                     onClick={() => setControlsOpen(!controlsOpen)}
-                    label={controlsOpen ? t("common.hideTools") : t("common.showTools")}
+                    title={controlsOpen ? t("common.hideTools") : t("common.showTools")}
                     aria-expanded={controlsOpen}
                     aria-controls={controlsId}
-                  >
-                    <Icon path={ICON_PATHS.filter} />
-                  </IconButton>
+                  />
                   {!controlsOpen && !!controlsBadge && (
                     <span aria-hidden className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-[var(--accent)] text-[var(--bg-base)] text-2xs font-bold flex items-center justify-center">
                       {controlsBadge}

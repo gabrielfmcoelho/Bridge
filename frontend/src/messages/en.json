@@ -999,7 +999,8 @@
     "https": "HTTPS",
     "noHttps": "No HTTPS",
     "emptyDescription": "Add hosts and services to see the topology",
-    "projects": "Projects"
+    "projects": "Projects",
+    "relations": "Relationships"
   },
   "sshConfig": {
     "title": "SSH Config",
@@ -1739,7 +1740,14 @@
     "coolifyReachable": "Reachable",
     "coolifyUnreachable": "Unreachable",
     "coolifyUsable": "Usable",
-    "coolifyNotUsable": "Not usable"
+    "coolifyNotUsable": "Not usable",
+    "group": {
+      "connectivity": "Connectivity",
+      "access": "Access and users",
+      "docker": "Docker",
+      "monitoring": "Monitoring"
+    },
+    "noLogs": "No operations run on this host yet."
   },
   "alert": {
     "title": "Alerts",
@@ -2512,8 +2520,7 @@
     },
     "kpis": {
       "customize": "Customize",
-      "reset": "Restore defaults",
-      "description": "Of what is listed — click a row to filter"
+      "reset": "Restore defaults"
     },
     "view": {
       "title": "View"

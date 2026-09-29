@@ -68,7 +68,6 @@ export default function GlpiHostTicketsBlock({ slug }: Props) {
       title={t("host.glpiTicketsTitle")}
       as="h3"
       controls={profileSelect || undefined}
-      className="mt-6"
       empty={
         isError ? undefined
         : isLoading ? t("host.glpiQuerying")

@@ -13,7 +13,7 @@ interface ListToolbarProps {
   actions?: React.ReactNode;
   /** Optional element rendered absolute-right inside the search input. */
   searchAdornment?: React.ReactNode;
-  /** Cards/table switch, last in the toolbar: it changes how this list reads. */
+  /** Cards/table switch, first of the right-hand controls: it changes how this list reads. */
   viewMode?: "cards" | "table";
   onViewModeChange?: (mode: "cards" | "table") => void;
 }
@@ -31,10 +31,10 @@ export default function ListToolbar({
 }: ListToolbarProps) {
   const { t } = useLocale();
   return (
+    // Phones: search owns its row; every control (filters first) wraps to the row below.
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-      <div className="flex items-center gap-2 flex-1">
         {/* Search input */}
-        <div className="relative flex-1 sm:max-w-sm">
+        <div className="relative sm:flex-1 sm:max-w-sm">
           <Icon path={ICON_PATHS.search} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-faint)] pointer-events-none" />
           <input
             placeholder={searchPlaceholder}
@@ -49,6 +49,7 @@ export default function ListToolbar({
           )}
         </div>
 
+      <div className="flex items-center gap-1.5 sm:flex-1">
         {/* Filter button */}
         <button
           onClick={onFilterClick}
@@ -66,28 +67,25 @@ export default function ListToolbar({
             </span>
           )}
         </button>
-      </div>
-
-      {/* Action slot, then the view switch */}
-      {(actions || (viewMode && onViewModeChange)) && (
+        {/* Order: how the list reads (cards/table), then group, bulk actions, export. */}
         <div className="flex items-center gap-1.5 sm:ml-auto">
-          {actions}
-          {viewMode && onViewModeChange && (
-            <div className="hidden sm:flex">
-              <ToolbarSelect<"cards" | "table">
-                name={t("inventory.view.title")}
-                icon={VIEW_ICONS.cards}
-                value={viewMode}
-                onChange={onViewModeChange}
-                options={[
-                  { value: "cards", label: t("common.cards"), icon: VIEW_ICONS.cards },
-                  { value: "table", label: t("common.table"), icon: VIEW_ICONS.table },
-                ]}
-              />
-            </div>
-          )}
+        {viewMode && onViewModeChange && (
+          <div className="hidden sm:flex">
+            <ToolbarSelect<"cards" | "table">
+              name={t("inventory.view.title")}
+              icon={VIEW_ICONS.cards}
+              value={viewMode}
+              onChange={onViewModeChange}
+              options={[
+                { value: "cards", label: t("common.cards"), icon: VIEW_ICONS.cards },
+                { value: "table", label: t("common.table"), icon: VIEW_ICONS.table },
+              ]}
+            />
+          </div>
+        )}
+        {actions}
         </div>
-      )}
+      </div>
     </div>
   );
 }

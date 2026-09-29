@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
+
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import Badge from "@/components/ui/Badge";
+import IconButton from "@/components/ui/IconButton";
 import Card from "@/components/ui/Card";
 import SectionCard from "@/components/ui/SectionCard";
-import SortDropdown from "@/components/ui/SortDropdown";
 import SortableTable, { sortRows } from "@/components/ui/SortableTable";
-import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
 import type { Issue, HostAlert } from "@/lib/types";
-import { ALERT_DOT_COLOR, ALERT_TEXT_COLOR, LEVEL_ORDER, PRIORITY_DOT_COLOR } from "../../_components/alert-colors";
+import { ALERT_DOT_COLOR, LEVEL_ORDER, PRIORITY_DOT_COLOR } from "../../_components/alert-colors";
 import { useLocale } from "@/contexts/LocaleContext";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -32,110 +31,51 @@ export function AlertsSection({ alerts, onAlertClick, addButton, showResolved, o
   hasResolved?: boolean;
 }) {
   const { t } = useLocale();
-  const [alertView, setAlertView] = useState<"cards" | "table">("cards");
-  const [alertSort, setAlertSort] = useState<"level" | "type">("level");
-  const [alertSortDir, setAlertSortDir] = useState<"asc" | "desc">("asc");
+  // ponytail: fixed order (most severe first) — a host has a handful of alerts, no sort/view controls needed.
+  const sorted = [...alerts].sort((a, b) => (LEVEL_ORDER[a.level] ?? 2) - (LEVEL_ORDER[b.level] ?? 2));
 
   return (
-    <SectionCard variant="plain" as="h3" title={t("alert.title")} count={alerts.length} empty={alerts.length === 0 ? t("alert.noAlertsDesc") : undefined} controls={
+    <SectionCard as="h3" title={t("alert.title")} count={alerts.length} body="flush" empty={alerts.length === 0 ? t("alert.noAlertsDesc") : undefined} controls={
         <>
           {hasResolved && onToggleResolved && (
-            <button
+            <IconButton
+              variant={showResolved ? "active" : "default"}
               onClick={onToggleResolved}
-              className={`inline-flex items-center gap-1 h-8 px-2.5 text-xs font-medium rounded-[var(--radius-md)] border transition ${
-                showResolved
-                  ? "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20"
-                  : "bg-[var(--bg-elevated)] text-[var(--text-faint)] border-[var(--border-default)] hover:text-[var(--text-secondary)]"
-              }`}
-              title={showResolved ? t("alert.hideResolved") : t("alert.showResolved")}
+              label={showResolved ? t("alert.hideResolved") : t("alert.showResolved")}
             >
-              <Icon path={showResolved ? ICON_PATHS.eyeOff : ICON_PATHS.eye} className="w-3 h-3" />
-            </button>
+              <Icon path={showResolved ? ICON_PATHS.eyeOff : ICON_PATHS.eye} />
+            </IconButton>
           )}
-          {alertView === "cards" && (
-            <SortDropdown
-              options={[{ key: "level" as const, label: t("alert.level") }, { key: "type" as const, label: t("alert.type") }]}
-              value={alertSort}
-              direction={alertSortDir}
-              onChange={(v, d) => { setAlertSort(v); setAlertSortDir(d); }}
-            />
-          )}
-          <ViewToggle value={alertView} onChange={(v) => setAlertView(v as "cards" | "table")} options={[{ key: "cards", label: t("common.cards"), icon: VIEW_ICONS.cards }, { key: "table", label: t("common.table"), icon: VIEW_ICONS.table }]} />
           {addButton}
         </>
       }>
-
-      {alertView === "cards" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
-          {[...alerts].sort((a, b) => { const cmp = alertSort === "type" ? a.type.localeCompare(b.type) : LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level]; return alertSortDir === "desc" ? -cmp : cmp; }).map((alert, i) => (
-            <Card key={i} onClick={() => onAlertClick(alert)} clickIndicator="drawer" className="!p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`text-sm font-medium truncate flex-1 ${alert.status === "resolved" ? "text-[var(--text-muted)] line-through" : "text-[var(--text-primary)]"}`}>{alert.message}</span>
-                {alert.status === "resolved" && (
-                  <span title={t("common.resolved")}>
-                    <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0 text-[var(--success)]" />
-                  </span>
-                )}
-                <span title={alert.linked_issue_id ? t("issue.number", { id: String(alert.linked_issue_id) }) : t("alert.noIssueLinked")}>
-                  <Icon path={ICON_PATHS.clipboard} className={`w-3.5 h-3.5 shrink-0 ${alert.linked_issue_id ? "text-[var(--accent)]" : "text-[var(--text-faint)]/30"}`} />
+      <div className="divide-y divide-[var(--border-subtle)]">
+        {sorted.map((alert, i) => {
+          const resolved = alert.status === "resolved";
+          return (
+            <button
+              key={alert.id ?? `auto-${i}`}
+              type="button"
+              onClick={() => onAlertClick(alert)}
+              className="w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors"
+            >
+              {resolved
+                ? <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0 text-[var(--success)]" />
+                : <span className={`w-2 h-2 rounded-full shrink-0 ${ALERT_DOT_COLOR[alert.level]}`} title={alert.level} />}
+              <span className="min-w-0 flex-1">
+                <span className={`block text-sm truncate ${resolved ? "text-[var(--text-muted)] line-through" : "text-[var(--text-primary)]"}`}>{alert.message}</span>
+                <span className="flex gap-3 text-2xs text-[var(--text-muted)] truncate">
+                  <span className="font-mono truncate">{alert.type}</span>
+                  <span>{alert.source === "grafana" ? "Grafana" : alert.source === "manual" ? t("alert.manual") : t("alert.auto")}</span>
                 </span>
-              </div>
-              <div className="grid grid-cols-3 gap-3 text-xs">
-                <div>
-                  <span className="text-[var(--text-faint)] block mb-0.5">{t("alert.type")}</span>
-                  <span className="text-[var(--text-muted)] font-mono">{alert.type}</span>
-                </div>
-                <div>
-                  <span className="text-[var(--text-faint)] block mb-0.5">{t("alert.level")}</span>
-                  <span className={`capitalize ${ALERT_TEXT_COLOR[alert.level] || "text-[var(--text-secondary)]"}`}>{alert.level}</span>
-                </div>
-                <div>
-                  <span className="text-[var(--text-faint)] block mb-0.5">{t("alert.source")}</span>
-                  {alert.source === "grafana" ? (
-                    <span className="inline-flex items-center gap-1 text-[var(--accent)]">
-                      <Icon path={ICON_PATHS.bolt} className="w-3 h-3" />
-                      Grafana
-                    </span>
-                  ) : (
-                    <span className="text-[var(--text-muted)]">{alert.source === "manual" ? t("alert.manual") : t("alert.auto")}</span>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <SortableTable
-          columns={[
-            { key: "level" as const, label: t("alert.level") },
-            { key: "type" as const, label: t("alert.type") },
-            { key: "message" as const, label: t("alert.message") },
-          ]}
-          defaultSort="level"
-        >
-          {(sk, sd) => {
-            const sorted = sortRows(alerts, sk, sd, {
-              level: (a, b) => (LEVEL_ORDER[a.level] ?? 2) - (LEVEL_ORDER[b.level] ?? 2),
-              type: (a, b) => a.type.localeCompare(b.type),
-              message: (a, b) => a.message.localeCompare(b.message),
-            });
-            return sorted.map((alert, i) => (
-              <tr key={i} className={`border-t border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`} onClick={() => onAlertClick(alert)}>
-                <td className="px-4 py-2.5"><span className="inline-flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${ALERT_DOT_COLOR[alert.level]}`} /><span className="capitalize text-[var(--text-secondary)]">{alert.level}</span></span></td>
-                <td className="px-4 py-2.5"><span className="text-[var(--text-muted)] font-mono">{alert.type}</span></td>
-                <td className="px-4 py-2.5">
-                  <span className={`inline-flex items-center gap-1.5 ${alert.status === "resolved" ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>
-                    {alert.status === "resolved" && (
-                      <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0 text-[var(--success)]" />
-                    )}
-                    {alert.message}
-                  </span>
-                </td>
-              </tr>
-            ));
-          }}
-        </SortableTable>
-      )}
+              </span>
+              <span title={alert.linked_issue_id ? t("issue.number", { id: String(alert.linked_issue_id) }) : t("alert.noIssueLinked")}>
+                <Icon path={ICON_PATHS.clipboard} className={`w-3.5 h-3.5 shrink-0 ${alert.linked_issue_id ? "text-[var(--accent)]" : "text-[var(--text-faint)]/40"}`} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </SectionCard>
   );
 }
@@ -176,8 +116,8 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
             return (
               <div key={status} className="flex-1 min-w-[220px]">
                 <div className="flex items-center gap-1.5 mb-2 px-1">
-                  <span className="text-2xs font-semibold text-[var(--text-faint)]">{STATUS_LABELS[status]}</span>
-                  {items.length > 0 && <span className="text-2xs text-[var(--text-faint)] bg-[var(--bg-elevated)] rounded-full px-1.5">{items.length}</span>}
+                  <span className="text-xs font-medium text-[var(--text-muted)]">{STATUS_LABELS[status]}</span>
+                  {items.length > 0 && <span className="text-2xs font-mono tabular-nums text-[var(--text-muted)]">{items.length}</span>}
                 </div>
                 <Droppable droppableId={status}>
                   {(provided, snapshot) => (
@@ -200,72 +140,45 @@ export function IssuesKanban({ issues, users, onEdit, onMove }: {
                                 {...dragProvided.draggableProps}
                                 {...dragProvided.dragHandleProps}
                               >
+                                {/* Title first; one quiet meta line under it. Entity is implied by the page, and
+                                    empty fields are omitted instead of labelled "–" (the drawer has them all). */}
                                 <Card
                                   onClick={() => onEdit(issue)}
-                                  clickIndicator="drawer"
                                   className={`!p-3 ${
                                     dragSnapshot.isDragging
                                       ? "shadow-lg !border-[var(--accent)]/40 ring-1 ring-[var(--accent)]/20"
                                       : ""
                                   }`}
                                 >
-                                  <div className="flex items-start gap-1.5 mb-4 min-h-[1.25rem]">
-                                    {issue.status === "done" && (
-                                      <Icon path={ICON_PATHS.checkCircle} className="w-4 h-4 shrink-0 mt-0.5 text-[var(--success)]" />
+                                  <div className="flex items-start gap-2">
+                                    {issue.status === "done"
+                                      ? <Icon path={ICON_PATHS.checkCircle} className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--success)]" />
+                                      : <span className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${PRIORITY_DOT_COLOR[issue.priority] || PRIORITY_DOT_COLOR.medium}`} title={`${t("common.priority")}: ${t(`issue.${issue.priority}`)}`} />}
+                                    <p className={`text-sm leading-snug line-clamp-3 ${issue.archived ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{issue.title}</p>
+                                  </div>
+                                  <div className="flex items-center gap-2.5 mt-2.5 pl-4 text-2xs text-[var(--text-muted)]">
+                                    <span className="font-mono">#{issue.id}</span>
+                                    {issue.expected_end_date && (
+                                      <span className="inline-flex items-center gap-1 font-mono" title={t("issue.due")}>
+                                        <Icon path={ICON_PATHS.clock} className="w-3 h-3" />{issue.expected_end_date}
+                                      </span>
+                                    )}
+                                    {((issue.alert_ids?.length || 0) > 0 || issue.source === "alert") && (
+                                      <span title={t("issue.entityAlert")}><Icon path={ICON_PATHS.alert} className="w-3 h-3 text-[var(--warning)]" /></span>
                                     )}
                                     {issue.archived && (
-                                      <Icon path={ICON_PATHS.archive} className="w-4 h-4 shrink-0 mt-0.5 text-[var(--text-faint)]" />
+                                      <span title={t("issue.archived")}><Icon path={ICON_PATHS.archive} className="w-3 h-3" /></span>
                                     )}
-                                    <p className={`text-sm font-medium leading-snug line-clamp-3 ${issue.archived ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{issue.title}</p>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-3 text-xs">
-                                    <div>
-                                      <span className="text-[var(--text-faint)] block mb-0.5">{t("common.priority")}</span>
-                                      <span className="text-[var(--text-muted)] capitalize">{issue.priority}</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-[var(--text-faint)] block mb-0.5">{t("common.assignees")}</span>
-                                      {assignees.length > 0 ? (
-                                        <div className="flex -space-x-1">
-                                          {assignees.map((user) => (
-                                            <span key={user!.id} className="w-5 h-5 rounded-full bg-[var(--accent-muted)] text-[var(--accent)] text-3xs font-bold flex items-center justify-center border border-[var(--bg-surface)]" title={user!.display_name}>
-                                              {getInitials(user!.display_name)}
-                                            </span>
-                                          ))}
-                                          {(issue.assignee_ids?.length || 0) > 3 && <span className="w-5 h-5 rounded-full bg-[var(--bg-overlay)] text-[var(--text-faint)] text-3xs font-bold flex items-center justify-center border border-[var(--bg-surface)]">+{issue.assignee_ids!.length - 3}</span>}
-                                        </div>
-                                      ) : (
-                                        <span className="text-[var(--text-muted)]">–</span>
-                                      )}
-                                    </div>
-                                    <div>
-                                      <span className="text-[var(--text-faint)] block mb-0.5">{t("issue.due")}</span>
-                                      <span className="text-[var(--text-muted)] font-mono">
-                                        {issue.expected_end_date || "–"}
+                                    {assignees.length > 0 && (
+                                      <span className="ml-auto flex -space-x-1">
+                                        {assignees.map((user) => (
+                                          <span key={user!.id} className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] border border-[var(--bg-surface)] text-3xs font-semibold text-[var(--text-secondary)] flex items-center justify-center" title={user!.display_name}>
+                                            {getInitials(user!.display_name)}
+                                          </span>
+                                        ))}
+                                        {(issue.assignee_ids?.length || 0) > 3 && <span className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] border border-[var(--bg-surface)] text-3xs text-[var(--text-muted)] flex items-center justify-center">+{issue.assignee_ids!.length - 3}</span>}
                                       </span>
-                                    </div>
-                                    <div>
-                                      <span className="text-[var(--text-faint)] block mb-0.5">{t("issue.source")}</span>
-                                      <span className="text-[var(--text-muted)] capitalize">{issue.source || "manual"}</span>
-                                    </div>
-                                  </div>
-                                  {/* Entity link icons */}
-                                  <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[var(--border-subtle)]">
-                                    <span className={`${issue.entity_type === "host" ? "text-[var(--success)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityHost")}>
-                                      <Icon path={ICON_PATHS.serverStack} className="w-3.5 h-3.5" />
-                                    </span>
-                                    <span className={`${issue.entity_type === "dns" ? "text-[var(--cyan)]" : "text-[var(--text-faint)]/30"}`} title="DNS">
-                                      <Icon path={ICON_PATHS.globeMeridian} className="w-3.5 h-3.5" />
-                                    </span>
-                                    <span className={`${issue.entity_type === "service" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityService")}>
-                                      <Icon path={ICON_PATHS.cube} className="w-3.5 h-3.5" />
-                                    </span>
-                                    <span className={`${issue.entity_type === "project" ? "text-[var(--accent)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityProject")}>
-                                      <Icon path={ICON_PATHS.folder} className="w-3.5 h-3.5" />
-                                    </span>
-                                    <span className={`${(issue.alert_ids?.length || 0) > 0 || issue.source === "alert" ? "text-[var(--warning)]" : "text-[var(--text-faint)]/30"}`} title={t("issue.entityAlert")}>
-                                      <Icon path={ICON_PATHS.alert} className="w-3.5 h-3.5" />
-                                    </span>
+                                    )}
                                   </div>
                                 </Card>
                               </div>

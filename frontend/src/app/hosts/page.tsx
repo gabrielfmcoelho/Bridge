@@ -474,9 +474,6 @@ export default function HostsPage() {
                 {hosts.length > 0 && (
                   <GroupByMenu options={["service", "dns", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
                 )}
-                {hosts.length > 0 && (
-                  <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
-                )}
                 {bulkActions.length > 0 && (
                   <DropdownMenu trigger={<ToolbarActionButton icon={ICON_PATHS.bolt} label={t("host.bulkActions")} hideLabel="md" />}>
                     {(["ops", "sync"] as const).map((g) => {
@@ -499,13 +496,17 @@ export default function HostsPage() {
                     })}
                   </DropdownMenu>
                 )}
+                {hosts.length > 0 && (
+                  <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
+                )}
               </div>
             }
           />
         }
       >
         {pageTab === "overview" ? (
-          // Visão geral: statistics in the left quarter, the listing in the rest.
+          // Visão geral: indicators as a compact grid — a strip above the listing on
+          // phones/tablets, the sticky left column on desktop — the listing gets the rest.
           <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] gap-6 max-lg:space-y-6">
             <aside className="lg:sticky lg:top-0 lg:self-start">
               {!isLoading && <KpiSection layout="list" hosts={hosts} filters={filters} onFiltersChange={setFilters} sort={sort} onSortChange={setSort} />}

@@ -1,7 +1,6 @@
 import SectionHeading from "@/components/ui/SectionHeading";
 import StatCard from "@/components/ui/StatCard";
 import { accentColor } from "@/components/ui/Card";
-import SectionCard from "@/components/ui/SectionCard";
 import Icon from "@/components/ui/Icon";
 
 interface Kpi {
@@ -20,10 +19,8 @@ interface KpiGridProps {
   columns?: 2 | 3 | 4 | 5;
   /** Beside the heading (e.g. the "customize" menu). */
   actions?: React.ReactNode;
-  /** "list": compact rows for a narrow side column (Hosts "Visão geral"). */
+  /** "list": the compact grid above a listing (Hosts "Visão geral"). */
   layout?: "grid" | "list";
-  /** One line under the heading (list layout). */
-  description?: string;
 }
 
 const gridCols: Record<number, string> = {
@@ -35,8 +32,8 @@ const gridCols: Record<number, string> = {
 
 const isZero = (v: string | number) => v === 0 || v === "0";
 
-export default function KpiGrid({ kpis, heading, columns, actions, layout = "grid", description }: KpiGridProps) {
-  if (layout === "list") return <KpiList kpis={kpis} heading={heading} description={description} actions={actions} />;
+export default function KpiGrid({ kpis, heading, columns, actions, layout = "grid" }: KpiGridProps) {
+  if (layout === "list") return <KpiList kpis={kpis} heading={heading} actions={actions} />;
   const cols = columns || Math.min(kpis.length, 5) as 2 | 3 | 4 | 5;
   // On a phone the KPI strip was taking 38% of the viewport to say "0" twice,
   // pushing the list — the thing the page exists for — below the fold. Tiles
@@ -65,44 +62,43 @@ export default function KpiGrid({ kpis, heading, columns, actions, layout = "gri
   );
 }
 
-/** The statistics section as rows (icon, label, hint, value) in a
- *  SectionCard. A row that maps to a filter is a toggle button
- *  (aria-pressed); zero rows stay, faint (fixed anatomy). */
-function KpiList({ kpis, heading, description, actions }: { kpis: Kpi[]; heading?: string; description?: string; actions?: React.ReactNode }) {
+/** Indicators beside a listing: a tight grid, value over label, hint on hover —
+ *  a strip above the listing below lg, two columns in the side column on
+ *  desktop (Hosts "Visão geral"). The listing is what the page is for. */
+function KpiList({ kpis, heading, actions }: { kpis: Kpi[]; heading?: string; actions?: React.ReactNode }) {
   return (
-    <SectionCard title={heading ?? ""} description={description} controls={actions} body="flush">
-      <ul className="divide-y divide-[var(--border-subtle)]">
+    <div>
+      {heading && <SectionHeading actions={actions}>{heading}</SectionHeading>}
+      {/* Cell borders right/bottom, pulled 1px under the frame, so a short last row stays surface-coloured. */}
+      <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+      <ul className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-2 -mr-px -mb-px">
         {kpis.map((k) => {
           const zero = isZero(k.value);
           const body = (
             <>
-              <Icon path={k.icon} className="w-4 h-4 shrink-0" style={{ color: accentColor(k.color) }} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm text-[var(--text-secondary)] truncate">{k.label}</span>
-                {k.hint && <span className="block text-xs text-[var(--text-muted)] truncate mt-0.5">{k.hint}</span>}
+              <span className="flex items-center gap-1.5">
+                <Icon path={k.icon} className="w-3.5 h-3.5 shrink-0" style={{ color: accentColor(k.color) }} />
+                <span className={`font-mono tabular-nums text-base font-semibold ${zero ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{k.value}</span>
               </span>
-              <span className={`font-mono tabular-nums text-lg font-semibold ${zero ? "text-[var(--text-muted)]" : "text-[var(--text-primary)]"}`}>{k.value}</span>
+              <span className="block text-xs text-[var(--text-muted)] truncate mt-0.5">{k.label}</span>
             </>
           );
-          const row = "flex w-full items-center gap-4 px-5 py-3.5 text-left";
+          const cell = "block w-full h-full px-3 py-2.5 text-left";
           return (
-            <li key={k.label}>
+            <li key={k.label} className="min-w-0 border-r border-b border-[var(--border-subtle)]">
               {k.onClick ? (
-                <button
-                  type="button"
-                  onClick={k.onClick}
-                  aria-pressed={!!k.active}
-                  className={`${row} transition-colors duration-100 hover:bg-[var(--bg-elevated)] ${k.active ? "bg-[var(--accent-muted)]" : ""}`}
-                >
+                <button type="button" onClick={k.onClick} aria-pressed={!!k.active} title={k.hint}
+                  className={`${cell} transition-colors duration-100 hover:bg-[var(--bg-elevated)] ${k.active ? "!bg-[var(--accent-muted)]" : ""}`}>
                   {body}
                 </button>
               ) : (
-                <div className={row}>{body}</div>
+                <div className={cell} title={k.hint}>{body}</div>
               )}
             </li>
           );
         })}
       </ul>
-    </SectionCard>
+      </div>
+    </div>
   );
 }

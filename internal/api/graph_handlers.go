@@ -66,13 +66,6 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 			},
 		})
 
-		// DNS -> Host edges
-		hostIDs, _ := store.NewDNSRepo(h.db.SQL).HostIDs(r.Context(), dns.ID)
-		for _, hid := range hostIDs {
-			if target, ok := hostIDMap[hid]; ok {
-				edges = append(edges, graphEdge{Source: nid, Target: target, Label: "points to"})
-			}
-		}
 	}
 
 	// Projects
@@ -113,43 +106,36 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Service -> Host edges
-		hostIDs, _ := store.NewServiceRepo(h.db.SQL).HostIDs(r.Context(), svc.ID)
-		for _, hid := range hostIDs {
-			if target, ok := hostIDMap[hid]; ok {
-				edges = append(edges, graphEdge{Source: nid, Target: target, Label: "runs on"})
-			}
-		}
+	}
 
-		// Service -> DNS edges
-		dnsIDs, _ := store.NewServiceRepo(h.db.SQL).DNSIDs(r.Context(), svc.ID)
-		for _, did := range dnsIDs {
-			if target, ok := dnsIDMap[did]; ok {
-				edges = append(edges, graphEdge{Source: nid, Target: target, Label: "served at"})
+	// Link-table edges: one query per table. An edge is drawn only when both
+	// ends are in the scoped node maps above, so invisible assets never leak.
+	links, err := store.NewGraphRepo(h.db.SQL).Links(r.Context())
+	if err != nil {
+		jsonErrorLogged(w, r, http.StatusInternalServerError, "failed to load graph", err)
+		return
+	}
+	addEdges := func(pairs []store.LinkPair, from, to map[int64]string, label string) {
+		for _, p := range pairs {
+			src, ok1 := from[p.From]
+			dst, ok2 := to[p.To]
+			if ok1 && ok2 {
+				edges = append(edges, graphEdge{Source: src, Target: dst, Label: label})
 			}
 		}
 	}
-
-	// Direct Host -> Project edges
-	for _, p := range projects {
-		hostIDs, _ := store.NewProjectRepo(h.db.SQL).HostIDs(r.Context(), p.ID)
-		for _, hid := range hostIDs {
-			if target, ok := hostIDMap[hid]; ok {
-				edges = append(edges, graphEdge{Source: target, Target: projectIDMap[p.ID], Label: "part of"})
-			}
+	addEdges(links.DNSHost, dnsIDMap, hostIDMap, "points to")
+	addEdges(links.ServiceHost, serviceIDMap, hostIDMap, "runs on")
+	addEdges(links.ServiceDNS, serviceIDMap, dnsIDMap, "served at")
+	// Stored project -> host; drawn host -> project, as before.
+	for _, p := range links.ProjectHost {
+		src, ok1 := hostIDMap[p.To]
+		dst, ok2 := projectIDMap[p.From]
+		if ok1 && ok2 {
+			edges = append(edges, graphEdge{Source: src, Target: dst, Label: "part of"})
 		}
 	}
-
-	// Service dependency edges
-	for _, svc := range services {
-		depIDs, _ := store.NewServiceRepo(h.db.SQL).DependencyIDs(r.Context(), svc.ID)
-		for _, depID := range depIDs {
-			src := serviceIDMap[svc.ID]
-			if target, ok := serviceIDMap[depID]; ok {
-				edges = append(edges, graphEdge{Source: src, Target: target, Label: "depends on"})
-			}
-		}
-	}
+	addEdges(links.ServiceDepends, serviceIDMap, serviceIDMap, "depends on")
 
 	jsonOK(w, map[string]any{
 		"nodes": nodes,

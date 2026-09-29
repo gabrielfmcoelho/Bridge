@@ -6,18 +6,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { hostChamadosAPI, usersAPI } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import SectionCard from "@/components/ui/SectionCard";
-import Card from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import SortableTable, { sortRows } from "@/components/ui/SortableTable";
-import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
+import IconButton from "@/components/ui/IconButton";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import ChamadoDrawer from "./ChamadoDrawer";
 import GlpiHostTicketsBlock from "./GlpiHostTicketsBlock";
 import type { HostChamado } from "@/lib/types";
-
-const STATUS_BADGE: Record<string, string> = {
-  in_execution: "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30",
-  solved: "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30",
-};
 
 interface ChamadoSectionProps {
   chamados: HostChamado[];
@@ -31,7 +25,6 @@ interface ChamadoSectionProps {
 
 export default function ChamadoSection({ chamados: initialChamados, hostId, slug, canEdit, t, openCreate, onCreateDone }: ChamadoSectionProps) {
   const confirm = useConfirm();
-  const [view, setView] = useState<"cards" | "table">("cards");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedChamado, setSelectedChamado] = useState<HostChamado | null>(null);
   const queryClient = useQueryClient();
@@ -82,110 +75,38 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
 
   return (
     <>
-      <SectionCard variant="plain" title={t("host.chamados")} count={chamados.length} empty={chamados.length === 0 ? t("host.noChamadosDesc") : undefined} controls={
-        <>
-          {chamados.length > 0 && (
-            <ViewToggle
-              value={view}
-              onChange={(v) => setView(v as "cards" | "table")}
-              options={[
-                { key: "cards", label: t("common.cards"), icon: VIEW_ICONS.cards },
-                { key: "table", label: t("common.table"), icon: VIEW_ICONS.table },
-              ]}
-            />
-          )}
-          {canEdit && (
-            <span className="hidden md:contents">
-              <Button size="sm" onClick={openCreateDrawer}><span className="mr-1">+</span> {t("host.addChamado")}</Button>
-            </span>
-          )}
-        </>
+      <SectionCard as="h3" title={t("host.chamados")} count={chamados.length} body="flush" empty={chamados.length === 0 ? t("host.noChamadosDesc") : undefined} controls={
+        canEdit && (
+          <span className="hidden md:contents">
+            <IconButton onClick={openCreateDrawer} label={t("host.addChamado")}><Icon path={ICON_PATHS.plus} /></IconButton>
+          </span>
+        )
       }>
-
-      {view === "cards" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
-          {chamados.map((c, i) => {
-            const isSolved = c.status === "solved";
-            const statusColor = isSolved ? "#10b981" : "#f59e0b";
-            const statusLabel = c.status === "in_execution" ? t("chamado.inExecution") : c.status === "solved" ? t("chamado.solved") : c.status;
+        <div className="divide-y divide-[var(--border-subtle)]">
+          {[...chamados].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map((c, i) => {
+            const solved = c.status === "solved";
+            const statusLabel = c.status === "in_execution" ? t("chamado.inExecution") : solved ? t("chamado.solved") : c.status;
             return (
-              <Card key={c.id ?? i} onClick={() => openDetail(c)} clickIndicator="drawer" className="!p-3">
-                <div className="flex items-center gap-2.5 mb-2">
-                  {/* Ticket icon */}
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-[var(--warning)]/15 text-[var(--warning)]">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-sm font-medium text-[var(--text-primary)] truncate block">
-                      {c.title || c.chamado_id || "–"}
-                    </span>
-                    <span className="text-2xs text-[var(--text-faint)] truncate block font-mono">
-                      {c.chamado_id || "–"}
-                    </span>
-                  </div>
-                  {/* Expandable status dot — same pattern as host situacao compact badge */}
-                  <span className="group/status inline-flex items-center gap-0 rounded-full transition duration-300 cursor-default shrink-0">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor }} />
-                    <span
-                      className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/status:max-w-[120px] group-hover/status:opacity-100 group-hover/status:ml-1.5 group-hover/status:pr-1 transition duration-300"
-                      style={{ color: statusColor }}
-                    >
-                      {statusLabel}
-                    </span>
+              <button
+                key={c.id ?? i}
+                type="button"
+                onClick={() => openDetail(c)}
+                className="w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors"
+              >
+                <span className={`w-2 h-2 rounded-full shrink-0 ${solved ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`} title={statusLabel} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm text-[var(--text-primary)] truncate">{c.title || c.chamado_id || "–"}</span>
+                  <span className="flex gap-3 text-2xs text-[var(--text-muted)] truncate">
+                    <span className="font-mono">{c.chamado_id || "–"}</span>
+                    <span className="truncate">{c.user_display_name || "–"}</span>
                   </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-[var(--text-faint)] block mb-0.5">{t("host.chamadoUser")}</span>
-                    <span className="text-[var(--text-muted)]">{c.user_display_name || "–"}</span>
-                  </div>
-                  <div>
-                    <span className="text-[var(--text-faint)] block mb-0.5">{t("host.chamadoDate")}</span>
-                    <span className="text-[var(--text-muted)] font-mono">{c.date || "–"}</span>
-                  </div>
-                </div>
-              </Card>
+                </span>
+                <span className="text-2xs text-[var(--text-muted)] shrink-0">{statusLabel}</span>
+                <span className="text-2xs text-[var(--text-muted)] font-mono tabular-nums shrink-0">{c.date || "–"}</span>
+              </button>
             );
           })}
         </div>
-      ) : (
-        <SortableTable
-          columns={[
-            { key: "chamado_id" as const, label: "ID" },
-            { key: "title" as const, label: t("common.title") },
-            { key: "status" as const, label: t("common.status") },
-            { key: "user" as const, label: t("host.chamadoUser") },
-            { key: "date" as const, label: t("host.chamadoDate") },
-          ]}
-          defaultSort="date"
-          defaultDir="desc"
-        >
-          {(sk, sd) => {
-            const sorted = sortRows(chamados, sk, sd, {
-              chamado_id: (a, b) => a.chamado_id.localeCompare(b.chamado_id),
-              title: (a, b) => (a.title || "").localeCompare(b.title || ""),
-              status: (a, b) => a.status.localeCompare(b.status),
-              user: (a, b) => (a.user_display_name || "").localeCompare(b.user_display_name || ""),
-              date: (a, b) => a.date.localeCompare(b.date),
-            });
-            return sorted.map((c, i) => (
-              <tr key={c.id ?? i} className={`border-t border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-elevated)] transition-colors ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`} onClick={() => openDetail(c)}>
-                <td className="px-4 py-2.5 font-medium text-[var(--text-primary)] font-mono">{c.chamado_id || "–"}</td>
-                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.title || "–"}</td>
-                <td className="px-4 py-2.5">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_BADGE[c.status] || STATUS_BADGE.in_execution}`}>
-                    {c.status === "in_execution" ? t("chamado.inExecution") : c.status === "solved" ? t("chamado.solved") : c.status}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-[var(--text-muted)]">{c.user_display_name || "–"}</td>
-                <td className="px-4 py-2.5 text-[var(--text-muted)] font-mono">{c.date || "–"}</td>
-              </tr>
-            ));
-          }}
-        </SortableTable>
-      )}
       </SectionCard>
 
       <ChamadoDrawer

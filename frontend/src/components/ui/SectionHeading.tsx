@@ -52,7 +52,9 @@ export default function SectionHeading({
           <span className="text-xs text-[var(--text-muted)] font-mono tabular-nums">{count}</span>
         )}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {/* -my-2: an h-8 control doesn't grow the row, so a heading with actions
+          stays level with a sibling heading without (Indicadores | Listagem). */}
+      {actions && <div className="flex items-center gap-2 shrink-0 -my-2">{actions}</div>}
     </div>
   );
 

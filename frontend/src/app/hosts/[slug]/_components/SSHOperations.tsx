@@ -692,12 +692,18 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     } satisfies OpDef] : []),
   ];
 
+  // Stable sort: declaration order is kept inside each group.
+  const groupedOps = [...operations].sort((a, b) => GROUP_ORDER.indexOf(OP_GROUPS[a.id]) - GROUP_ORDER.indexOf(OP_GROUPS[b.id]));
+
   return (
     <div className="space-y-4">
       {serverInfo && !serverInfo.is_local && (
         <p className="text-xs text-[var(--text-faint)]">{t("host.ops.serverLabel")} <span className="text-[var(--text-muted)]">{serverInfo.hostname}</span></p>
       )}
 
+      {/* Run (left) beside history (right, stays in view) — same split as Visão geral. */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-6 max-lg:space-y-6">
+      <div className="space-y-4 min-w-0">
       {!hasPassword && !hasKey && (
         <StatusAlert variant="info">{t("operation.noCreds")}</StatusAlert>
       )}
@@ -714,8 +720,11 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         </IconButton>
       }>
       <div className="divide-y divide-[var(--border-subtle)]">
-        {operations.map((op) => (
+        {groupedOps.map((op, i) => (
           <div key={op.id}>
+            {OP_GROUPS[op.id] !== OP_GROUPS[groupedOps[i - 1]?.id] && (
+              <h4 className="px-5 pt-4 pb-1 text-xs font-medium text-[var(--text-faint)]">{t(`operation.group.${OP_GROUPS[op.id]}`)}</h4>
+            )}
             <div className="flex items-center gap-3 px-5 py-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -807,6 +816,59 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       </SectionCard>
       )}
 
+      {/* Inline status for setup wizard (shown after drawer closes) */}
+      {setupStatus === "testing" && <StatusAlert variant="loading">{t("operation.testingConnection")}</StatusAlert>}
+      {setupStatus === "installing" && <StatusAlert variant="loading">{t("operation.installingKey")}</StatusAlert>}
+      {setupStatus === "done" && <StatusAlert variant="success">{t("operation.keyInstalled")}</StatusAlert>}
+      {setupStatus === "error" && <StatusAlert variant="error">{setupError}</StatusAlert>}
+
+      {/* Integrations */}
+      <IntegrationsSection
+        slug={slug}
+        keyTestStatus={keyTestStatus}
+        coolifyServerUUID={coolifyServerUUID}
+        t={t}
+        isAdmin={isAdmin}
+      />
+
+      </div>
+
+      <aside className="lg:sticky lg:top-0 lg:self-start min-w-0">
+      {/* Operation Logs */}
+        <SectionCard as="h3" title={t("operation.logs")} count={operationLogs.length} body="flush" empty={operationLogs.length === 0 ? t("operation.noLogs") : undefined}>
+          <div className="divide-y divide-[var(--border-subtle)] lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto">
+            {operationLogs.map((log) => (
+              <div key={log.id}>
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors"
+                  onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${log.status === "success" ? "bg-[var(--success)]" : "bg-[var(--danger)]"}`} />
+                  <span className="text-xs font-medium text-[var(--text-primary)] min-w-0 truncate font-mono">
+                    {opTypeLabel(log.operation_type, t)}
+                  </span>
+                  {log.auth_method && <Badge>{log.auth_method}</Badge>}
+                  <span className="text-2xs text-[var(--text-faint)] ml-auto shrink-0 tabular-nums">
+                    {formatLogTime(log.created_at, locale)}
+                  </span>
+                  <span className="text-2xs text-[var(--text-faint)] shrink-0">{log.user_name}</span>
+                  {log.output && (
+                    <Icon path={ICON_PATHS.chevronDown} className={`w-3 h-3 text-[var(--text-faint)] shrink-0 transition-transform duration-150 ${expandedLogId === log.id ? "rotate-180" : ""}`} />
+                  )}
+                </button>
+                {expandedLogId === log.id && log.output && (
+                  <div className="px-5 pb-3 pt-0">
+                    <pre className="text-2xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">{log.output}</pre>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      </aside>
+      </div>
+
       {/* Key setup wizard (in drawer) */}
       <Drawer
         open={setupStatus === "choosing"}
@@ -845,12 +907,6 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
           {setupKeySource === "existing" && sshKeysList.length === 0 && <p className="text-xs text-[var(--text-faint)]">{t("operation.noKeysInDb")}</p>}
         </div>
       </Drawer>
-
-      {/* Inline status for setup wizard (shown after drawer closes) */}
-      {setupStatus === "testing" && <StatusAlert variant="loading">{t("operation.testingConnection")}</StatusAlert>}
-      {setupStatus === "installing" && <StatusAlert variant="loading">{t("operation.installingKey")}</StatusAlert>}
-      {setupStatus === "done" && <StatusAlert variant="success">{t("operation.keyInstalled")}</StatusAlert>}
-      {setupStatus === "error" && <StatusAlert variant="error">{setupError}</StatusAlert>}
 
       {/* Create remote user wizard (in drawer) */}
       {(() => {
@@ -1186,50 +1242,6 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         );
       })()}
 
-      {/* Integrations */}
-      <IntegrationsSection
-        slug={slug}
-        keyTestStatus={keyTestStatus}
-        coolifyServerUUID={coolifyServerUUID}
-        t={t}
-        isAdmin={isAdmin}
-      />
-
-      {/* Operation Logs */}
-      {operationLogs.length > 0 && (
-        <SectionCard as="h3" title={t("operation.logs")} count={operationLogs.length} body="flush">
-          <div className="divide-y divide-[var(--border-subtle)]">
-            {operationLogs.map((log) => (
-              <div key={log.id}>
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors"
-                  onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
-                >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${log.status === "success" ? "bg-[var(--success)]" : "bg-[var(--danger)]"}`} />
-                  <span className="text-xs font-medium text-[var(--text-primary)] min-w-0 truncate font-mono">
-                    {opTypeLabel(log.operation_type, t)}
-                  </span>
-                  {log.auth_method && <Badge>{log.auth_method}</Badge>}
-                  <span className="text-2xs text-[var(--text-faint)] ml-auto shrink-0 tabular-nums">
-                    {formatLogTime(log.created_at, locale)}
-                  </span>
-                  <span className="text-2xs text-[var(--text-faint)] shrink-0">{log.user_name}</span>
-                  {log.output && (
-                    <Icon path={ICON_PATHS.chevronDown} className={`w-3 h-3 text-[var(--text-faint)] shrink-0 transition-transform duration-150 ${expandedLogId === log.id ? "rotate-180" : ""}`} />
-                  )}
-                </button>
-                {expandedLogId === log.id && log.output && (
-                  <div className="px-5 pb-3 pt-0">
-                    <pre className="text-2xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">{log.output}</pre>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      )}
-
       {/* Console Drawer — three sections (Wizard / Status / Output) instead
           of the single tinted card. Removing the colored outer wrapper fixes
           the "card inside card" visual noise when the output itself is made
@@ -1300,6 +1312,17 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     </div>
   );
 }
+
+// Section headers in the built-in list.
+const GROUP_ORDER = ["connectivity", "access", "docker", "monitoring"];
+const OP_GROUPS: Record<string, string> = {
+  "network-test": "connectivity", "test-password": "connectivity", "test-key": "connectivity",
+  "test-capture-password": "connectivity", "test-capture-key": "connectivity",
+  "setup-key": "access", "list-remote-keys": "access", "fix-devnull": "access",
+  "setup-sudo-nopasswd": "access", "create-remote-user": "access", "delete-remote-user": "access",
+  "docker-setup": "docker", "docker-logs-inspect": "docker", "docker-logs-apply-rotation": "docker", "nginx-cleanup": "docker",
+  "grafana-agent-setup": "monitoring",
+};
 
 function opTypeLabel(type_: string, t: (k: string) => string): string {
   switch (type_) {
