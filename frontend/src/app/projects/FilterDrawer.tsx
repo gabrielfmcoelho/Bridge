@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import DrawerSection from "@/components/ui/DrawerSection";
 import PillButton from "@/components/ui/PillButton";
 import InventoryFilterDrawer from "@/components/inventory/InventoryFilterDrawer";
-import { tagsAPI } from "@/lib/api";
+import { tagsAPI, enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 
 export type ProjectFilters = {
@@ -40,7 +40,9 @@ export default function ProjectFilterDrawer({
   const set = (key: keyof ProjectFilters, value: string) => onFiltersChange({ ...filters, [key]: value });
   const toggle = (key: string) => setOpenSection((prev) => (prev === key ? null : key));
 
-  const situacaoOptions = ["active", "maintenance", "deprecated", "inactive"];
+  // The admin-editable situação enum, as on DNS (was a hardcoded English list).
+  const { data: situacoes = [] } = useQuery({ queryKey: ["enums", "situacao"], queryFn: () => enumsAPI.list("situacao") });
+  const situacaoOptions = situacoes.map((o) => o.value);
 
   return (
     <InventoryFilterDrawer

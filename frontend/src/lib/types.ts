@@ -220,10 +220,15 @@ export interface Project {
   id: number;
   /** Creator entidade name (list endpoint). */
   main_entidade?: string;
-  /** Linked counts; absent until the list endpoint sends them. */
+  /** List endpoint: hosts and DNS are direct links plus those of the project's services. */
   hosts_count?: number;
   services_count?: number;
   dns_count?: number;
+  /** Open issues; issues_total also counts done ones (archived excluded). */
+  issues_count?: number;
+  issues_total?: number;
+  /** Linked GitLab repositories/groups. */
+  repos_count?: number;
   name: string;
   description: string;
   situacao: string;

@@ -57,8 +57,10 @@ reprints them.
    `controls`, never a primary `Button`. The shells: `DetailSplit`
    (profile | observed), `RowList`/`RowGroup`/`ListRow`/`RowText`
    (`components/ui/RowList`), `TopologyPane` + `RelationsCard` (graph with a
-   loading state and a phone list/graph toggle), `IssuesBoard` — hosts, DNS
-   and Serviços all use them. A detail page whose record is missing (404,
+   loading state and a phone list/graph toggle), `IssuesBoard` — hosts, DNS,
+   Serviços and Projetos all use them. Entity-specific tabs (a project's
+   Commits, Wiki and Chamados) sit after the shared ones and use the same
+   `SectionCard` / `RowList` shapes. A detail page whose record is missing (404,
    including not visible) shows an `EmptyState` with a way back, never an
    endless skeleton.
 4. **Three headings.** `PageHeader` (title, subtitle, actions, add) for the page;
@@ -287,7 +289,7 @@ Compact badges are a dot that expands with its label on hover.
 </PageShell>
 ```
 
-Hosts, DNS and Serviços share one listing shape (`InventoryOverview`, `InsightKpis`,
+Hosts, DNS, Serviços and Projetos share one listing shape (`InventoryOverview`, `InsightKpis`,
 `Breakdowns`, `usePageTab`; each inventory's catalog lives in `<entity>Insights.ts` with a
 `node --test` file). Hosts is the reference: tabs **Visão geral** (statistics as the compact `KpiGrid layout="list"` —
 a bordered grid, value over label, hint on hover, a cell click applies its filter — in the sticky
@@ -369,7 +371,7 @@ counters={
 
 ## 10. Form Pattern
 
-An entity's create and edit form (host, DNS, serviço) is **one scrolling form in
+An entity's create and edit form (host, DNS, serviço, projeto) is **one scrolling form in
 sections, not a wizard**: the same component with `initial` on edit, in a
 `Drawer` on list and detail pages alike. The form owns fields; the shell owns
 the section index and the actions.

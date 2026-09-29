@@ -928,7 +928,35 @@
       "loading": "Analyzing commits…",
       "generatedAt": "Generated {relative} · {absolute}",
       "commitsAcrossRepos": "{commits} commits across {repos} repos"
-    }
+    },
+    "pageDescription": "Initiatives and systems: who answers for each one, the services they're made of, where they run and the open work.",
+    "kpi": {
+      "total": "Projects",
+      "servicesTotal": "{count} services in total",
+      "openIssues": "Open issues",
+      "inProjects": "in {count} project(s)",
+      "noOwner": "No owner",
+      "noServices": "No services",
+      "external": "External company",
+      "noRepo": "No repository"
+    },
+    "dash": {
+      "bySetor": "By department",
+      "byServices": "Projects with most services",
+      "byIssues": "Projects with most open issues"
+    },
+    "issuesProgress": "Issues done",
+    "openIssues": "{count} open",
+    "reposCount": "{count} repository(ies)",
+    "tab": {
+      "commits": "Commits",
+      "wiki": "Wiki"
+    },
+    "profileTitle": "Project",
+    "servicesTitle": "Project services",
+    "noServices": "No services linked to this project.",
+    "notFound": "Project not found",
+    "backToList": "Back to Projects"
   },
   "service": {
     "title": "Services",
@@ -2698,8 +2726,11 @@
       "linksHint": "Search by name; the context beside each item tells same-named ones apart.",
       "notes": "Notes",
       "origin": "Origin",
-      "originHint": "Who builds it and who runs it."
+      "originHint": "Who builds it and who runs it.",
+      "integrations": "Integrations",
+      "integrationsHint": "Repositories, wiki and tickets tied to this project."
     },
-    "addResponsavel": "Add owner"
+    "addResponsavel": "Add owner",
+    "createProject": "Create project"
   }
 }

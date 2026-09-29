@@ -23,9 +23,13 @@ export const issuesKey = (entityType: string, entityId: number) => ["issues", en
  * the kanban/table, an archived toggle and "+", plus the create/edit drawer.
  * Detail pages drop it into their Acompanhamento tab.
  */
-export default function IssuesBoard({ entityType, entityId, canEdit, alerts, openCreate, onCreateDone }: {
+export default function IssuesBoard({ entityType, entityId, canEdit, alerts, openCreate, onCreateDone, fetcher }: {
   entityType: string;
   entityId: number;
+  /** Where the issues come from, when it isn't the entity list — projects pass
+   *  their project_id list, a superset that keeps pre-entity issues. Writes
+   *  still go through the global issues API. */
+  fetcher?: () => Promise<Issue[]>;
   canEdit: boolean;
   /** Host alerts the drawer can link (hosts only). */
   alerts?: HostAlert[];
@@ -44,7 +48,7 @@ export default function IssuesBoard({ entityType, entityId, canEdit, alerts, ope
   const key = issuesKey(entityType, entityId);
   const { data: issues = [] } = useQuery({
     queryKey: key,
-    queryFn: () => globalIssuesAPI.list({ entity_type: entityType, entity_id: String(entityId) }),
+    queryFn: fetcher ?? (() => globalIssuesAPI.list({ entity_type: entityType, entity_id: String(entityId) })),
   });
   const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: usersAPI.list });
 

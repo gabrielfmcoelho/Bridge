@@ -928,7 +928,35 @@
       "loading": "Analisando commits…",
       "generatedAt": "Gerado {relative} · {absolute}",
       "commitsAcrossRepos": "{commits} commits de {repos} repos"
-    }
+    },
+    "pageDescription": "Iniciativas e sistemas: quem responde por cada um, os serviços que os compõem, onde rodam e o trabalho em aberto.",
+    "kpi": {
+      "total": "Projetos",
+      "servicesTotal": "{count} serviços no total",
+      "openIssues": "Issues abertas",
+      "inProjects": "em {count} projeto(s)",
+      "noOwner": "Sem responsável",
+      "noServices": "Sem serviços",
+      "external": "Empresa externa",
+      "noRepo": "Sem repositório"
+    },
+    "dash": {
+      "bySetor": "Por setor",
+      "byServices": "Projetos com mais serviços",
+      "byIssues": "Projetos com mais issues abertas"
+    },
+    "issuesProgress": "Issues concluídas",
+    "openIssues": "{count} aberta(s)",
+    "reposCount": "{count} repositório(s)",
+    "tab": {
+      "commits": "Commits",
+      "wiki": "Wiki"
+    },
+    "profileTitle": "Projeto",
+    "servicesTitle": "Serviços do projeto",
+    "noServices": "Nenhum serviço vinculado a este projeto.",
+    "notFound": "Projeto não encontrado",
+    "backToList": "Voltar para Projetos"
   },
   "service": {
     "title": "Serviços",
@@ -2698,8 +2726,11 @@
       "linksHint": "Busque pelo nome; o contexto ao lado diferencia itens com o mesmo nome.",
       "notes": "Notas",
       "origin": "Origem",
-      "originHint": "Quem desenvolve e quem mantém."
+      "originHint": "Quem desenvolve e quem mantém.",
+      "integrations": "Integrações",
+      "integrationsHint": "Repositórios, wiki e chamados ligados a este projeto."
     },
-    "addResponsavel": "Adicionar responsável"
+    "addResponsavel": "Adicionar responsável",
+    "createProject": "Criar projeto"
   }
 }

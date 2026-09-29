@@ -3,21 +3,27 @@
 import { useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { projectsAPI, issuesAPI, graphAPI, integrationsAPI } from "@/lib/api";
+import { projectsAPI, issuesAPI, integrationsAPI, hostsAPI, dnsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilteredGraph } from "@/hooks/useFilteredGraph";
+import { useEntityGraph } from "@/hooks/useEntityGraph";
 import PageShell from "@/components/layout/PageShell";
 import SituacaoText from "@/components/ui/SituacaoText";
 import CardIndicator from "@/components/inventory/CardIndicator";
 import Drawer from "@/components/ui/Drawer";
 import PageHeader from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
+import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
+import DetailSplit from "@/components/detail/DetailSplit";
+import TopologyPane from "@/components/detail/TopologyPane";
+import RelationsCard, { hostsGroup, dnsGroup, servicesGroup } from "@/components/detail/RelationsCard";
+import IssuesBoard from "@/components/issues/IssuesBoard";
+import { useFlag } from "@/contexts/FlagContext";
 import ProjectForm from "../ProjectForm";
-import DetailKpiSection from "./_components/KpiSection";
-import OverviewTab from "./_components/OverviewTab";
-import TopologyTab from "./_components/TopologyTab";
-import IssueBoard from "./_components/IssueBoard";
+import ProjectProfile from "./_components/ProjectProfile";
+import ProjectServices from "./_components/ProjectServices";
+import ProjectAiAnalysis from "./_components/ProjectAiAnalysis";
 import CommitsTab from "./_components/CommitsTab";
 import WikiTab from "./_components/WikiTab";
 import ChamadosTab from "./_components/ChamadosTab";
@@ -30,6 +36,7 @@ export default function ProjectDetail({ id }: { id: number }) {
   const { user } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const flag = useFlag();
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isAdmin = user?.role === "admin";
 
@@ -39,15 +46,16 @@ export default function ProjectDetail({ id }: { id: number }) {
   const [formFooter, setFormFooter] = useState<React.ReactNode>(null);
 
   // -- Data queries --
-  const { data, isLoading } = useQuery({ queryKey: ["project", id], queryFn: () => projectsAPI.get(id) });
-  const { data: graphData } = useQuery({ queryKey: ["graph"], queryFn: graphAPI.get, enabled: activeTab === "topology" });
-  const { data: issues = [] } = useQuery({
-    queryKey: ["project-issues", id],
-    queryFn: () => issuesAPI.listByProject(id),
-  });
-
-  const entityNodeId = data ? `project-${id}` : undefined;
-  const filteredGraph = useFilteredGraph(entityNodeId, graphData, activeTab === "topology", 3);
+  // No retry: a 404 (missing or not visible) should say so at once.
+  const { data, isLoading } = useQuery({ queryKey: ["project", id], queryFn: () => projectsAPI.get(id), retry: false });
+  // The project_id list: entity issues plus older ones tied only by project_id.
+  // Same key IssuesBoard uses, so the badge and the board share one fetch.
+  const fetchIssues = () => issuesAPI.listByProject(id);
+  const { data: issues = [] } = useQuery({ queryKey: ["issues", "project", id], queryFn: fetchIssues, enabled: !!data });
+  const { graph, loading: graphLoading } = useEntityGraph(data ? `project-${id}` : undefined, activeTab === "topology");
+  // Names for the relation rows (cached from the inventory pages).
+  const { data: allHosts = [] } = useQuery({ queryKey: ["hosts"], queryFn: () => hostsAPI.list(), enabled: activeTab === "topology" });
+  const { data: allDns = [] } = useQuery({ queryKey: ["dns"], queryFn: dnsAPI.list, enabled: activeTab === "topology" });
 
   // -- Mutations --
   const deleteMutation = useMutation({
@@ -56,6 +64,7 @@ export default function ProjectDetail({ id }: { id: number }) {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       router.push("/projects");
     },
+    onError: (err) => flag({ appearance: "error", title: t("common.delete"), description: err instanceof Error ? err.message : t("form.saveFailed") }),
   });
 
   const { data: integrations } = useQuery({
@@ -68,16 +77,17 @@ export default function ProjectDetail({ id }: { id: number }) {
   const glpiEnabled = integrations?.glpi?.glpi_enabled === "true";
   const projectGlpiProfileID = data?.project?.glpi_token_id ?? null;
 
-  const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
-    { key: "overview", label: "Overview", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
-    { key: "topology", label: "Topology", icon: "M13 10V3L4 14h7v7l9-11h-7z" },
-    { key: "issues", label: t("issue.title"), icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" },
-    { key: "commits", label: "Commits", icon: "M8 7a4 4 0 118 0 4 4 0 01-8 0zM12 11v8M3 15h6m6 0h6" },
-    ...(outlineEnabled ? [{ key: "wiki" as TabKey, label: "Wiki", icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" }] : []),
-    ...(glpiEnabled ? [{ key: "chamados" as TabKey, label: "Chamados", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" }] : []),
+  const projectIssues = Array.isArray(issues) ? issues : [];
+  const openIssues = projectIssues.filter((i) => !i.archived && i.status !== "done").length;
+  const tabs: { key: TabKey; label: string; icon: string; badge?: number }[] = [
+    { key: "overview", label: t("host.tabOverview"), icon: ICON_PATHS.home },
+    { key: "topology", label: t("host.tabTopology"), icon: ICON_PATHS.bolt },
+    { key: "issues", label: t("host.tabTracking"), icon: ICON_PATHS.alert, badge: openIssues || undefined },
+    { key: "commits", label: t("project.tab.commits"), icon: ICON_PATHS.code },
+    ...(outlineEnabled ? [{ key: "wiki" as TabKey, label: t("project.tab.wiki"), icon: ICON_PATHS.document }] : []),
+    ...(glpiEnabled ? [{ key: "chamados" as TabKey, label: t("nav.chamados"), icon: ICON_PATHS.clipboard }] : []),
   ];
 
-  const safeIssues = Array.isArray(issues) ? issues : [];
 
   return (
     <PageShell>
@@ -97,7 +107,12 @@ export default function ProjectDetail({ id }: { id: number }) {
             title={data.project.name}
             description={data.project.description || undefined}
             status={<SituacaoText situacao={data.project.situacao} />}
-            indicators={<CardIndicator icon={ICON_PATHS.alert} count={safeIssues.length} color="purple" title={t("issue.title")} />}
+            indicators={<>
+              <CardIndicator icon={ICON_PATHS.gear} count={data.services?.length ?? 0} color="warning" title={`${data.services?.length ?? 0} ${t("host.services").toLowerCase()}`} />
+              <CardIndicator icon={ICON_PATHS.server} count={data.host_ids?.length ?? 0} color="info" title={`${data.host_ids?.length ?? 0} hosts`} />
+              <CardIndicator icon={ICON_PATHS.globe} count={data.dns_ids?.length ?? 0} color="success" title={`${data.dns_ids?.length ?? 0} DNS`} />
+              <CardIndicator icon={ICON_PATHS.clipboard} count={openIssues} color="accent" title={t("project.openIssues", { count: String(openIssues) })} />
+            </>}
             onEdit={canEdit ? () => setShowEditDrawer(true) : undefined}
             onDelete={isAdmin ? () => deleteMutation.mutate() : undefined}
             deleteConfirmMessage={`${t("confirm.deleteTitle", { name: `"${data.project.name}"` })} ${t("confirm.cannotUndo")}`}
@@ -107,36 +122,29 @@ export default function ProjectDetail({ id }: { id: number }) {
               active: activeTab,
               onChange: (key) => setActiveTab(key as TabKey),
               panelClassName: "animate-fade-in",
-              items: tabs.map((tab) => ({
-                key: tab.key,
-                label: tab.label,
-                icon: tab.icon,
-                badge: tab.key === "issues" && safeIssues.length > 0 ? safeIssues.length : undefined,
-              })),
+              items: tabs,
             }}
           >
             {activeTab === "overview" && (
-              <>
-                <DetailKpiSection
-                  servicesCount={data.services?.length || 0}
-                  hostsCount={data.host_ids?.length || 0}
-                  dnsCount={data.dns_ids?.length || 0}
-                  issuesCount={safeIssues.length}
-                  t={t}
-                />
-                <OverviewTab
-                  project={data.project}
-                  responsaveis={data.responsaveis}
-                  services={data.services}
-                  hostIds={data.host_ids || []}
-                  dnsIds={data.dns_ids || []}
-                  t={t}
-                />
-              </>
+              <DetailSplit profile={<ProjectProfile project={data.project} tags={data.tags || []} responsaveis={data.responsaveis || []} />}>
+                <ProjectAiAnalysis projectId={id} />
+                <ProjectServices services={data.services || []} />
+              </DetailSplit>
             )}
-            {activeTab === "topology" && <TopologyTab filteredGraph={filteredGraph} />}
+            {activeTab === "topology" && (() => {
+              const groups = [
+                servicesGroup(data.services || [], t),
+                hostsGroup(allHosts.filter((h) => data.host_ids?.includes(h.id)), t),
+                dnsGroup(allDns.filter((d) => data.dns_ids?.includes(d.id)), t),
+              ];
+              return (
+                <TopologyPane graph={graph} loading={graphLoading} t={t}
+                  hasRelations={groups.some((g) => g.rows.length > 0)}
+                  relations={<RelationsCard groups={groups} t={t} />} />
+              );
+            })()}
             {activeTab === "issues" && (
-              <IssueBoard projectId={id} services={data.services || []} canEdit={canEdit} />
+              <IssuesBoard entityType="project" entityId={id} canEdit={canEdit} fetcher={fetchIssues} />
             )}
             {activeTab === "commits" && <CommitsTab projectId={id} />}
             {activeTab === "wiki" && outlineEnabled && <WikiTab projectId={id} canEdit={canEdit} />}
@@ -154,13 +162,16 @@ export default function ProjectDetail({ id }: { id: number }) {
           <Drawer
             open={showEditDrawer}
             onClose={() => setShowEditDrawer(false)}
-            title={t("common.edit")}
+            title={t("form.editTitle", { name: data.project.name })}
             subHeader={formSubHeader}
             footer={formFooter}
           >
             <ProjectForm
               initial={data.project}
               initialGrants={data.entidades}
+              initialTags={data.tags}
+              initialResponsaveis={data.responsaveis}
+              onClose={() => setShowEditDrawer(false)}
               onSubHeaderChange={setFormSubHeader}
               onFooterChange={setFormFooter}
               onSuccess={() => {
@@ -171,7 +182,10 @@ export default function ProjectDetail({ id }: { id: number }) {
             />
           </Drawer>
         </div>
-      ) : null}
+      ) : (
+        <EmptyState icon="folder" title={t("project.notFound")} description={t("dns.notFoundDesc")}
+          action={<Button size="sm" variant="secondary" onClick={() => router.push("/projects")}>{t("project.backToList")}</Button>} />
+      )}
     </PageShell>
   );
 }

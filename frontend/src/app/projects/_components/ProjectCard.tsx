@@ -6,18 +6,20 @@ import Card from "@/components/ui/Card";
 import { situacaoAccent } from "@/lib/constants";
 import { useSituacao } from "@/hooks/useSituacao";
 import SituacaoText from "@/components/ui/SituacaoText";
-import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
+import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorGrid, CardMeter } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import type { Project } from "@/lib/types";
 
 export default function ProjectCard({ project }: { project: Project }) {
   const { t } = useLocale();
   const { roleOf, colorOf } = useSituacao();
-  const situacaoColor = colorOf(project.situacao);
+  const total = project.issues_total ?? 0;
+  const open = project.issues_count ?? 0;
+  const done = total - open;
 
   return (
     <Link href={`/projects/${project.id}`} className="block h-full">
-      <Card accent={situacaoAccent(roleOf(project.situacao), situacaoColor)} className="h-full flex flex-col overflow-hidden">
+      <Card accent={situacaoAccent(roleOf(project.situacao), colorOf(project.situacao))} className="h-full flex flex-col overflow-hidden">
         {/* Fixed anatomy: every slot renders, "–" when empty. */}
         <CardHeader
           titleFont="display"
@@ -30,30 +32,34 @@ export default function ProjectCard({ project }: { project: Project }) {
 
         <CardMetadataGrid
           items={[
-            { label: t("project.responsavel"), value: project.responsavel || "" },
-            { label: t("project.externalCompany"), value: project.contato_empresa_responsavel || "" },
-            { label: t("project.managed"), value: project.is_directly_managed ? t("common.yes") : t("common.no") },
+            { label: t("dns.responsavel"), value: project.main_responsavel_name || project.responsavel || "" },
             { label: t("host.entity"), value: project.main_entidade || "" },
+            { label: t("project.externalCompany"), value: project.tem_empresa_externa_responsavel ? project.contato_empresa_responsavel || t("common.yes") : "" },
+            { label: t("project.managed"), value: project.is_directly_managed ? t("common.yes") : t("common.no") },
           ]}
         />
 
         <CardTagsSection tags={project.tags} />
 
-        {/* Bottom indicators */}
-        <div className="flex items-center gap-3 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4">
-          <CardIndicator icon={ICON_PATHS.building} count={project.tem_empresa_externa_responsavel ? 1 : 0} color="amber" title={project.tem_empresa_externa_responsavel ? t("project.hasExternalCompanyTitle") : t("project.noExternalCompanyTitle")} hideCount />
-          <CardIndicator icon={ICON_PATHS.checkCircle} count={project.is_directly_managed ? 1 : 0} color="emerald" title={project.is_directly_managed ? t("project.directlyManagedTitle") : t("project.notDirectlyManagedTitle")} hideCount />
-          <CardIndicator icon={ICON_PATHS.user} count={project.is_responsible ? 1 : 0} color="cyan" title={project.is_responsible ? t("project.isResponsibleTitle") : t("project.notResponsibleTitle")} hideCount />
-          <CardIndicatorSeparator />
-          {/* Entity link counts — icons visible; counts available when backend adds _count fields */}
-          {/* Dimmed until the list endpoint sends the counts — never a fake 0. */}
-          <CardIndicator icon={ICON_PATHS.server} count={project.hosts_count} disabled={project.hosts_count === undefined} color="cyan" title={t("project.linkedHostsTitle")} />
-          <CardIndicator icon={ICON_PATHS.cube} count={project.services_count} disabled={project.services_count === undefined} color="warning" title={t("project.linkedServicesTitle")} />
-          <CardIndicator icon={ICON_PATHS.globe} count={project.dns_count} disabled={project.dns_count === undefined} color="success" title={t("project.linkedDnsTitle")} />
-          <CardIndicatorSeparator />
-          <CardIndicator icon={ICON_PATHS.code} count={project.gitlab_url ? 1 : 0} color="emerald" title={project.gitlab_url ? "GitLab" : t("project.noGitlabTitle")} hideCount />
-          <CardIndicator icon={ICON_PATHS.document} count={project.documentation_url ? 1 : 0} color="sky" title={project.documentation_url ? t("project.hasDocumentationTitle") : t("project.noDocumentationTitle")} hideCount />
+        {/* The project's own block: how much of its tracked work is done. */}
+        <div className="mt-3 pt-3 pb-1 border-t border-[var(--border-subtle)]">
+          <CardMeter
+            label={t("project.issuesProgress")}
+            pct={total ? Math.round((done / total) * 100) : null}
+            reading={total ? `${done}/${total}` : undefined}
+            tone={open === 0 ? "success" : done / Math.max(total, 1) >= 0.5 ? "success" : "warning"}
+            caption={total ? t("project.openIssues", { count: String(open) }) : undefined}
+          />
         </div>
+
+        <CardIndicatorGrid>
+          <CardIndicator icon={ICON_PATHS.gear} count={project.services_count ?? 0} color="warning" title={`${project.services_count ?? 0} ${t("host.services").toLowerCase()}`} />
+          <CardIndicator icon={ICON_PATHS.server} count={project.hosts_count ?? 0} color="info" title={`${project.hosts_count ?? 0} hosts`} />
+          <CardIndicator icon={ICON_PATHS.globe} count={project.dns_count ?? 0} color="success" title={`${project.dns_count ?? 0} DNS`} />
+          <CardIndicator icon={ICON_PATHS.clipboard} count={open} color="accent" title={t("project.openIssues", { count: String(open) })} />
+          <CardIndicator icon={ICON_PATHS.code} count={project.repos_count ?? 0} color="success" title={t("project.reposCount", { count: String(project.repos_count ?? 0) })} />
+          <CardIndicator icon={ICON_PATHS.document} count={project.documentation_url ? 1 : 0} color="info" hideCount title={project.documentation_url ? t("project.hasDocumentationTitle") : t("project.noDocumentationTitle")} />
+        </CardIndicatorGrid>
       </Card>
     </Link>
   );

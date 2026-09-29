@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { glpiAPI } from "@/lib/api";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import StatusAlert from "@/components/ui/StatusAlert";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import TicketList from "@/components/glpi/TicketList";
@@ -64,9 +65,7 @@ export default function ChamadosTab({ projectId, projectName, profileID, canEdit
       </Card>
 
       {warning && warning !== "no_profile_linked" && (
-        <div className="rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 text-[var(--warning)] text-xs px-3 py-2">
-          {warning}
-        </div>
+        <StatusAlert variant="warning">{warning}</StatusAlert>
       )}
 
       <TicketList tickets={tickets} emptyLabel={t("chamado.tab.emptyOpen")} />

@@ -184,7 +184,7 @@ function RepoGroup({ group }: { group: RepoCommitGroup }) {
             // path overflows, so the most specific (rightmost) segment stays visible.
             // The LRM (‎) keeps the path content itself LTR so slashes don't reorder.
             <span
-              className="text-2xs text-[var(--text-faint)] font-mono block overflow-hidden whitespace-nowrap text-left"
+              className="text-2xs text-[var(--text-muted)] font-mono block overflow-hidden whitespace-nowrap text-left"
               style={{ direction: "rtl", textOverflow: "ellipsis" }}
             >
               {"‎" + group.projectPath}
@@ -224,7 +224,7 @@ function CommitRow({ commit }: { commit: ProjectGitLabCommit }) {
         {/* Top row: time + branch on the left, hash anchored top-right */}
         <div className="flex items-start justify-between gap-3">
           <div
-            className="flex items-center gap-2 text-xs text-[var(--text-faint)] min-w-0 flex-1 font-mono"
+            className="flex items-center gap-2 text-xs text-[var(--text-muted)] min-w-0 flex-1 font-mono"
             title={commit.branches?.join(", ")}
           >
             <Icon path={ICON_PATHS.clock} className="w-3 h-3 shrink-0" />
@@ -234,13 +234,13 @@ function CommitRow({ commit }: { commit: ProjectGitLabCommit }) {
                 <Icon path={ICON_PATHS.branch} className="w-3 h-3 shrink-0 text-[var(--text-muted)]" />
                 <span className="text-[var(--text-muted)] truncate min-w-0">{primaryBranch}</span>
                 {extraBranches > 0 && (
-                  <span className="shrink-0 text-[var(--text-faint)]">+{extraBranches}</span>
+                  <span className="shrink-0 text-[var(--text-muted)]">+{extraBranches}</span>
                 )}
               </>
             )}
           </div>
           <code
-            className="shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-xs text-[var(--text-faint)] border border-[var(--border-subtle)] font-mono"
+            className="shrink-0 px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-xs text-[var(--text-muted)] border border-[var(--border-subtle)] font-mono"
             title={commit.id}
           >
             {commit.short_id}

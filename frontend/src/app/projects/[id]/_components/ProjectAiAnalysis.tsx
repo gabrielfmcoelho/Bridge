@@ -81,7 +81,7 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
           {generateLabel}
         </Button>
       }
-      footer={!isLoading && cached?.content && metaLine ? <p className="text-2xs text-[var(--text-faint)]">{metaLine}</p> : undefined}
+      footer={!isLoading && cached?.content && metaLine ? <p className="text-2xs text-[var(--text-muted)]">{metaLine}</p> : undefined}
     >
       {error && (
         <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-xs px-3 py-2 mb-3">
@@ -103,7 +103,7 @@ export default function ProjectAiAnalysis({ projectId }: Props) {
         </div>
       ) : !mutation.isPending && !error ? (
         <p className="text-xs text-[var(--text-muted)]">
-          {emptyLabel} <span className="text-[var(--text-faint)]">{hint}</span>
+          {emptyLabel} <span className="text-[var(--text-muted)]">{hint}</span>
         </p>
       ) : null}
     </SectionCard>
