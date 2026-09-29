@@ -8,15 +8,35 @@ import PillButton from "@/components/ui/PillButton";
 import InventoryFilterDrawer from "@/components/inventory/InventoryFilterDrawer";
 import { tagsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import { SERVICE_KINDS } from "@/lib/serviceDisplay";
 
 export type ServiceFilters = {
   tag: string;
   developed_by: string;
   is_external_dependency: string;
   orchestrator_managed: string;
+  /** service_kind, or "none" for unclassified. */
+  kind: string;
+  /** "auto" (either kind) | "container" | "host" | "fixed" | "manual" — see originParams. */
+  origin: string;
+  /** "online" | "offline" */
+  status: string;
 };
 
-export const emptyFilters: ServiceFilters = { tag: "", developed_by: "", is_external_dependency: "", orchestrator_managed: "" };
+export const emptyFilters: ServiceFilters = {
+  tag: "", developed_by: "", is_external_dependency: "", orchestrator_managed: "",
+  kind: "", origin: "", status: "",
+};
+
+/** The API params (and client predicate fields) an origin filter stands for. */
+export function originParams(origin: string): { source?: string; discovery_kind?: string } {
+  switch (origin) {
+    case "container": return { source: "auto", discovery_kind: "container" };
+    case "host": return { source: "auto", discovery_kind: "host" };
+    case "auto": case "fixed": case "manual": return { source: origin };
+    default: return {};
+  }
+}
 
 interface SortConfig { field: string; direction: "asc" | "desc" }
 
@@ -60,6 +80,33 @@ export default function ServiceFilterDrawer({
       ]}
       defaultSortField="nickname"
     >
+      <DrawerSection title={t("service.category")} open={openSection === "kind"} onToggle={() => toggle("kind")} active={!!filters.kind}>
+        <div className="flex flex-wrap gap-1.5">
+          <PillButton active={!filters.kind} onClick={() => set("kind", "")}>{t("common.all")}</PillButton>
+          {[...SERVICE_KINDS, "none"].map((k) => (
+            <PillButton key={k} active={filters.kind === k} onClick={() => set("kind", filters.kind === k ? "" : k)}>{t(`service.kind.${k}`)}</PillButton>
+          ))}
+        </div>
+      </DrawerSection>
+
+      <DrawerSection title={t("service.originTitle")} open={openSection === "origin"} onToggle={() => toggle("origin")} active={!!filters.origin}>
+        <div className="flex flex-wrap gap-1.5">
+          <PillButton active={!filters.origin} onClick={() => set("origin", "")}>{t("common.all")}</PillButton>
+          {["container", "host", "fixed", "manual"].map((o) => (
+            <PillButton key={o} active={filters.origin === o} onClick={() => set("origin", filters.origin === o ? "" : o)}>{t(`service.origin.${o}`)}</PillButton>
+          ))}
+        </div>
+      </DrawerSection>
+
+      <DrawerSection title={t("service.statusTitle")} open={openSection === "status"} onToggle={() => toggle("status")} active={!!filters.status}>
+        <div className="flex flex-wrap gap-1.5">
+          <PillButton active={!filters.status} onClick={() => set("status", "")}>{t("common.all")}</PillButton>
+          {(["online", "offline"] as const).map((v) => (
+            <PillButton key={v} active={filters.status === v} onClick={() => set("status", filters.status === v ? "" : v)}>{t(`service.status.${v}`)}</PillButton>
+          ))}
+        </div>
+      </DrawerSection>
+
       <DrawerSection title={t("common.tags")} open={openSection === "tags"} onToggle={() => toggle("tags")} active={!!filters.tag}>
         <div className="flex flex-wrap gap-1.5">
           <PillButton active={!filters.tag} onClick={() => set("tag", "")}>{t("common.all")}</PillButton>

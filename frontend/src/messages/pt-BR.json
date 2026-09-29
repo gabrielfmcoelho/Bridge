@@ -784,7 +784,34 @@
     "linkedProjects": "Projetos vinculados",
     "syncCoolify": "Sincronizar do Coolify",
     "syncCoolifyRunning": "Sincronizando domínios do Coolify…",
-    "coolifySyncDone": "{found} encontrados: {created} novos, {links_added} vínculos adicionados, {no_host} sem host"
+    "coolifySyncDone": "{found} encontrados: {created} novos, {links_added} vínculos adicionados, {no_host} sem host",
+    "pageDescription": "Domínios do inventário: para onde apontam, a saúde do certificado TLS e o que depende de cada um.",
+    "certValidity": "Validade do certificado",
+    "daysLeft": "{days} d",
+    "kpi": {
+      "httpsCount": "{count} com HTTPS",
+      "certExpiring": "A vencer",
+      "certExpiringHint": "Certificado vence em até 30 dias",
+      "certError": "Erro de TLS",
+      "certErrorHint": "Certificado não confiável ou inacessível",
+      "noHttps": "Sem HTTPS",
+      "orphan": "Sem vínculo",
+      "orphanHint": "Nenhum host, serviço ou projeto"
+    },
+    "certBucket": {
+      "expired": "Vencido",
+      "critical": "Vence em até 7 dias",
+      "warning": "Vence em até 30 dias",
+      "error": "Com erro",
+      "unscanned": "Não verificado",
+      "none": "Sem HTTPS",
+      "ok": "Válido"
+    },
+    "dash": {
+      "certHealth": "Saúde do certificado",
+      "byIssuer": "Por emissor",
+      "byHost": "Hosts com mais domínios"
+    }
   },
   "project": {
     "title": "Projetos",
@@ -978,7 +1005,64 @@
     "noPort": "Sem porta",
     "listing": "Serviços",
     "emptyStateAdd": "Adicione seu primeiro serviço para começar",
-    "discovery": "Descoberta"
+    "discovery": "Descoberta",
+    "pageDescription": "O que roda na infraestrutura: serviços encontrados pelo scan nos hosts e cadastrados à mão, por categoria, origem e estado.",
+    "category": "Categoria",
+    "originTitle": "Origem",
+    "statusTitle": "Execução",
+    "seenAgo": "visto {ago}",
+    "depsCount": "{count} dependência(s)",
+    "inProject": "Vinculado a um projeto",
+    "noProject": "Sem projeto",
+    "origin": {
+      "container": "Contêiner (auto)",
+      "host": "Host (auto)",
+      "auto": "Automático",
+      "fixed": "Fixado",
+      "manual": "Manual"
+    },
+    "status": {
+      "online": "Online",
+      "offline": "Offline",
+      "stale": "Sem sinal"
+    },
+    "kind": {
+      "database": "Banco de dados",
+      "cache": "Cache",
+      "queue": "Fila",
+      "web": "Servidor web",
+      "proxy": "Proxy",
+      "runtime": "Runtime",
+      "orchestration": "Orquestração",
+      "analytics": "Dados e analytics",
+      "monitoring": "Monitoramento",
+      "logging": "Logs",
+      "mail": "E-mail",
+      "dns": "DNS",
+      "directory": "Diretório",
+      "file-sharing": "Arquivos",
+      "platform": "Plataforma",
+      "agent": "Agente",
+      "app": "Aplicação",
+      "none": "Não classificado"
+    },
+    "kpi": {
+      "total": "Serviços",
+      "onlineOffline": "{online} online, {offline} offline",
+      "offline": "Offline",
+      "autoReview": "A revisar",
+      "autoReviewHint": "Encontrados pelo scan, ainda não fixados",
+      "noResponsavel": "Sem responsável",
+      "stale": "Sem sinal",
+      "staleHint": "Scan não os vê há mais de {days} dias"
+    },
+    "dash": {
+      "byKind": "Por categoria",
+      "byOrigin": "Por origem",
+      "byStatus": "Por execução",
+      "engines": "Bancos de dados e caches",
+      "byHost": "Hosts com mais serviços"
+    }
   },
   "topology": {
     "title": "Topologia da Arquitetura",

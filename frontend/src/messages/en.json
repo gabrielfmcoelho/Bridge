@@ -784,7 +784,34 @@
     "linkedProjects": "Linked Projects",
     "syncCoolify": "Sync from Coolify",
     "syncCoolifyRunning": "Syncing domains from Coolify…",
-    "coolifySyncDone": "{found} found: {created} new, {links_added} links added, {no_host} without a host"
+    "coolifySyncDone": "{found} found: {created} new, {links_added} links added, {no_host} without a host",
+    "pageDescription": "Inventory domains: where they point, TLS certificate health and what depends on each one.",
+    "certValidity": "Certificate validity",
+    "daysLeft": "{days} d",
+    "kpi": {
+      "httpsCount": "{count} with HTTPS",
+      "certExpiring": "Expiring",
+      "certExpiringHint": "Certificate expires within 30 days",
+      "certError": "TLS error",
+      "certErrorHint": "Certificate untrusted or unreachable",
+      "noHttps": "No HTTPS",
+      "orphan": "Unlinked",
+      "orphanHint": "No host, service or project"
+    },
+    "certBucket": {
+      "expired": "Expired",
+      "critical": "Expires within 7 days",
+      "warning": "Expires within 30 days",
+      "error": "Error",
+      "unscanned": "Not checked",
+      "none": "No HTTPS",
+      "ok": "Valid"
+    },
+    "dash": {
+      "certHealth": "Certificate health",
+      "byIssuer": "By issuer",
+      "byHost": "Hosts with most domains"
+    }
   },
   "project": {
     "title": "Projects",
@@ -978,7 +1005,64 @@
     "noPort": "No port",
     "listing": "Services",
     "emptyStateAdd": "Add your first service to get started",
-    "discovery": "Discovery"
+    "discovery": "Discovery",
+    "pageDescription": "What runs on the infrastructure: services the scan found on hosts and ones added by hand, by category, origin and state.",
+    "category": "Category",
+    "originTitle": "Origin",
+    "statusTitle": "Runtime",
+    "seenAgo": "seen {ago}",
+    "depsCount": "{count} dependency(ies)",
+    "inProject": "Linked to a project",
+    "noProject": "No project",
+    "origin": {
+      "container": "Container (auto)",
+      "host": "Host (auto)",
+      "auto": "Automatic",
+      "fixed": "Fixed",
+      "manual": "Manual"
+    },
+    "status": {
+      "online": "Online",
+      "offline": "Offline",
+      "stale": "No signal"
+    },
+    "kind": {
+      "database": "Database",
+      "cache": "Cache",
+      "queue": "Queue",
+      "web": "Web server",
+      "proxy": "Proxy",
+      "runtime": "Runtime",
+      "orchestration": "Orchestration",
+      "analytics": "Data and analytics",
+      "monitoring": "Monitoring",
+      "logging": "Logging",
+      "mail": "Email",
+      "dns": "DNS",
+      "directory": "Directory",
+      "file-sharing": "File sharing",
+      "platform": "Platform",
+      "agent": "Agent",
+      "app": "Application",
+      "none": "Unclassified"
+    },
+    "kpi": {
+      "total": "Services",
+      "onlineOffline": "{online} online, {offline} offline",
+      "offline": "Offline",
+      "autoReview": "To review",
+      "autoReviewHint": "Found by the scan, not fixed yet",
+      "noResponsavel": "No owner",
+      "stale": "No signal",
+      "staleHint": "Not seen by the scan for over {days} days"
+    },
+    "dash": {
+      "byKind": "By category",
+      "byOrigin": "By origin",
+      "byStatus": "By runtime",
+      "engines": "Databases and caches",
+      "byHost": "Hosts with most services"
+    }
   },
   "topology": {
     "title": "Architecture Topology",

@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import SortableTable from "@/components/ui/SortableTable";
+import { serviceTitle } from "@/lib/serviceDisplay";
 import Pagination from "@/components/ui/Pagination";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
@@ -27,6 +29,8 @@ interface ServicesTableViewProps {
 }
 
 export default function ServicesTableView({ services, total, tablePage, onPageChange, sort, onSortChange, t }: ServicesTableViewProps) {
+  // Client-side navigation: a full reload refetched the whole inventory.
+  const router = useRouter();
   return (
     <div className="animate-fade-in">
       <SortableTable
@@ -50,17 +54,17 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
             <tr
               key={svc.id}
               className={`border-t border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] transition-colors cursor-pointer ${i % 2 === 1 ? "bg-[var(--bg-surface)]" : ""}`}
-              onClick={() => window.location.href = `/services/${svc.id}`}
+              onClick={() => router.push(`/services/${svc.id}`)}
             >
               <td className="px-4 py-2.5 font-medium text-[var(--text-primary)]">
                 <div className="flex items-center gap-1.5">
                   {svc.container_status && (
                     <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${svc.container_status === "online" ? "bg-[var(--success)]" : "bg-[var(--text-faint)]"}`} />
                   )}
-                  {svc.nickname}
+                  {serviceTitle(svc).title}
                 </div>
               </td>
-              <td className="px-4 py-2.5 text-[var(--text-secondary)] max-w-[200px] truncate">{svc.description || "-"}</td>
+              <td className="px-4 py-2.5 text-[var(--text-secondary)] max-w-[200px] truncate">{svc.description || "–"}</td>
               <td className="px-4 py-2.5">
                 <div className="flex items-center gap-1.5">
                   <Badge color={svc.source === "auto" ? "blue" : svc.source === "fixed" ? "emerald" : "default"}>
@@ -73,7 +77,7 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
                   )}
                 </div>
               </td>
-              <td className="px-4 py-2.5">{svc.technology_stack ? <Badge>{svc.technology_stack}</Badge> : <span className="text-[var(--text-faint)]">-</span>}</td>
+              <td className="px-4 py-2.5">{svc.technology_stack ? <Badge>{svc.technology_stack}</Badge> : <span className="text-[var(--text-muted)]">–</span>}</td>
               <td className="px-4 py-2.5">
                 {svc.is_external_dependency ? (
                   <Badge color="amber">{t("service.isExternalDependency")}</Badge>
@@ -87,7 +91,7 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
                 <div className="flex flex-wrap gap-1">
                   {svc.tags && svc.tags.length > 0
                     ? svc.tags.slice(0, 3).map((tag) => <Tag key={tag}>{tag}</Tag>)
-                    : <span className="text-[var(--text-faint)]">-</span>}
+                    : <span className="text-[var(--text-muted)]">–</span>}
                   {svc.tags && svc.tags.length > 3 && <span className="text-2xs text-[var(--text-faint)]">+{svc.tags.length - 3}</span>}
                 </div>
               </td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { dnsAPI, coolifyAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOpenOnParam } from "@/hooks/useOpenOnParam";
 import { useExportCSV } from "@/hooks/useExportCSV";
 import { useInventoryFilters } from "@/hooks/useInventoryFilters";
+import { usePageTab } from "@/hooks/usePageTab";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
@@ -17,17 +18,22 @@ import ListToolbar from "@/components/ui/ListToolbar";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
+import Icon from "@/components/ui/Icon";
+import DropdownMenu, { DropdownMenuGroup, DropdownMenuItem } from "@/components/ui/DropdownMenu";
+import InventoryOverview from "@/components/inventory/InventoryOverview";
+import InsightKpis from "@/components/inventory/InsightKpis";
 import PageHeader from "@/components/ui/PageHeader";
 import InventoryContent from "@/components/inventory/InventoryContent";
 import DnsCard from "./_components/DnsCard";
 import DnsTableView from "./_components/DnsTableView";
 import GroupByMenu from "@/components/inventory/GroupByMenu";
 import { useRelationGroups } from "@/hooks/useRelationGroups";
-import KpiSection from "./_components/KpiSection";
+import DnsDashboard from "./_components/DnsDashboard";
+import { dnsInsights, DEFAULT_DNS_INSIGHTS } from "./_components/dnsInsights";
 import InventoryFAB from "@/components/inventory/InventoryFAB";
 import DnsForm from "./DnsForm";
 import DnsFilterDrawer, { emptyFilters, type DNSFilters } from "./FilterDrawer";
-import { matchesCertFilter, compareCertExpiry } from "@/lib/dnsCert";
+import { matchesCertFilter, compareCertExpiry, certState } from "@/lib/dnsCert";
 import type { DNSRecord } from "@/lib/types";
 
 export default function DNSPage() {
@@ -40,11 +46,13 @@ export default function DNSPage() {
     useInventoryFilters<DNSFilters>({ storageKey: "dns", emptyFilters, defaultSort: { field: "domain", direction: "asc" } });
 
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<DNSRecord | null>(null);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [formFooter, setFormFooter] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [tablePage, setTablePage] = useState(1);
+  const [pageTab, selectTab] = usePageTab();
+  const [visibleCount, setVisibleCount] = useState(24);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isAdmin = user?.role === "admin";
@@ -78,7 +86,7 @@ export default function DNSPage() {
   const tableRecords = tableQuery.data?.data ?? [];
   const tableTotal = tableQuery.data?.meta.total ?? 0;
 
-  useEffect(() => { setTablePage(1); }, [search, filters, sort]);
+  useEffect(() => { setTablePage(1); setVisibleCount(24); }, [search, filters, sort]);
 
   const filteredAndSorted = useMemo(() => {
     let result = [...allRecords];
@@ -106,11 +114,6 @@ export default function DNSPage() {
     return result;
   }, [allRecords, search, filters, sort]);
   const grouping = useRelationGroups("dns", groupBy, filteredAndSorted);
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => dnsAPI.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dns"] }),
-  });
 
   // Background jobs report through flags, so the list doesn't jump.
   const refresh = () => {
@@ -155,18 +158,39 @@ export default function DNSPage() {
     "dns_export",
   );
 
-  const openCreate = useCallback(() => { setEditing(null); setShowForm(true); }, []);
+  // Whole-inventory jobs sit behind one menu (and the phone FAB), as on hosts.
+  const bulkActions = [
+    ...(canEdit && allRecords.length > 0 ? [
+      { label: t("dns.scanCerts"), icon: ICON_PATHS.scan, color: "var(--accent)", onClick: () => scanMutation.mutate(), disabled: scanMutation.isPending, group: "ops" },
+    ] : []),
+    ...(isAdmin ? [
+      { label: t("dns.syncCoolify"), icon: ICON_PATHS.refresh, color: "var(--info)", onClick: () => syncMutation.mutate(), disabled: syncMutation.isPending, group: "sync" },
+    ] : []),
+  ];
+
+  const openCreate = useCallback(() => setShowForm(true), []);
   useOpenOnParam("new", openCreate, canEdit);
 
   return (
     <PageShell>
       <PageHeader
         title={t("dns.title")}
+        description={t("dns.pageDescription")}
         addLabel={canEdit ? t("dns.addDns") : undefined}
         onAdd={canEdit ? openCreate : undefined}
         hideAddOnPhone
         controlsKey="dns"
         controlsBadge={activeFilterCount}
+        tabs={{
+          idBase: "dns",
+          label: t("dns.title"),
+          active: pageTab,
+          onChange: selectTab,
+          items: [
+            { key: "overview", label: t("inventory.view.overview"), icon: ICON_PATHS.viewCards },
+            { key: "dashboard", label: t("inventory.view.dashboard"), icon: ICON_PATHS.layoutGrid },
+          ],
+        }}
         controls={
           <ListToolbar
             viewMode={viewMode}
@@ -177,51 +201,71 @@ export default function DNSPage() {
             activeFilterCount={activeFilterCount}
             searchPlaceholder={t("common.search")}
             actions={
-              allRecords.length > 0 || isAdmin ? (
-                <>
-                  {allRecords.length > 0 && (
-                    <GroupByMenu options={["host", "service", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
-                  )}
-                  {canEdit && allRecords.length > 0 && (
-                    <ToolbarActionButton icon={ICON_PATHS.scan} label={t("dns.scanCerts")} onClick={() => scanMutation.mutate()} disabled={scanMutation.isPending} />
-                  )}
-                  {isAdmin && (
-                    <ToolbarActionButton icon={ICON_PATHS.refresh} label={t("dns.syncCoolify")} onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} />
-                  )}
-                  {allRecords.length > 0 && <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />}
-                </>
-              ) : undefined
+              <>
+                {allRecords.length > 0 && (
+                  <GroupByMenu options={["host", "service", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
+                )}
+                {bulkActions.length > 0 && (
+                  <DropdownMenu trigger={<ToolbarActionButton icon={ICON_PATHS.bolt} label={t("host.bulkActions")} hideLabel="md" />}>
+                    {(["ops", "sync"] as const).map((g) => {
+                      const items = bulkActions.filter((a) => a.group === g);
+                      return items.length > 0 && (
+                        <DropdownMenuGroup key={g} title={t(g === "ops" ? "host.bulkGroupOps" : "host.bulkGroupSync")}>
+                          {items.map((a) => (
+                            <DropdownMenuItem key={a.label} onClick={a.onClick} disabled={a.disabled} className="whitespace-nowrap"
+                              elemBefore={<Icon path={a.icon} className="w-4 h-4" style={{ color: a.color }} />}>
+                              {a.label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuGroup>
+                      );
+                    })}
+                  </DropdownMenu>
+                )}
+                {allRecords.length > 0 && <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />}
+              </>
             }
           />
         }
-      />
+      >
+        {pageTab === "overview" ? (
+          <InventoryOverview kpis={!isLoading && <InsightKpis layout="list" insights={dnsInsights(allRecords, t, certState)} defaults={DEFAULT_DNS_INSIGHTS} storageKey="dns_kpis" filters={filters} onFiltersChange={setFilters} />}>
+            <SearchBadge search={search} onClear={() => setSearch("")} />
+            {!isLoading && allRecords.length > 0 && <SectionHeading>{t("dns.listing")}</SectionHeading>}
+            <InventoryContent
+              columns={3}
+              isLoading={grouping.isLoading || (viewMode === "table" && !groupBy ? tableQuery.isLoading : isLoading)}
+              items={viewMode === "table" && !groupBy ? tableRecords : filteredAndSorted}
+              groups={grouping.groups}
+              viewMode={viewMode}
+              emptyIcon="globe"
+              emptyTitle={t("common.noResults")}
+              emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") : t("dns.emptyStateAdd")}
+              emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={openCreate}>+ {t("dns.addDns")}</Button> : undefined}
+              renderCard={(dns) => <DnsCard dns={dns} />}
+              renderTable={(items) => <DnsTableView records={items} total={groupBy ? undefined : tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}
+              visibleCount={visibleCount}
+              loadMoreRef={loadMoreRef}
+              onLoadMore={() => setVisibleCount((c) => c + 24)}
+              loadingMoreLabel={t("common.loadingMore")}
+              loadMoreLabel={t("common.loadMore")}
+            />
+          </InventoryOverview>
+        ) : (
+          <DnsDashboard
+            records={allRecords}
+            filters={filters}
+            onApplyFilter={(f) => { setFilters({ ...filters, ...f }); selectTab("overview"); }}
+          />
+        )}
+      </PageHeader>
 
-      {!isLoading && allRecords.length > 0 && <KpiSection records={allRecords} t={t} />}
-
-      <SearchBadge search={search} onClear={() => setSearch("")} />
-      {!isLoading && allRecords.length > 0 && <SectionHeading>{t("dns.listing")}</SectionHeading>}
-
-
-
-      <InventoryContent
-        isLoading={grouping.isLoading || (viewMode === "table" && !groupBy ? tableQuery.isLoading : isLoading)}
-        items={viewMode === "table" && !groupBy ? tableRecords : filteredAndSorted}
-        groups={grouping.groups}
-        viewMode={viewMode}
-        emptyIcon="globe"
-        emptyTitle={t("common.noResults")}
-        emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") : t("dns.emptyStateAdd")}
-        emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={openCreate}>+ {t("dns.addDns")}</Button> : undefined}
-        renderCard={(dns) => <DnsCard dns={dns} />}
-        renderTable={(items) => <DnsTableView records={items} total={groupBy ? undefined : tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}
-      />
-
-      <Drawer open={showForm} onClose={() => setShowForm(false)} title={editing ? t("common.edit") : t("dns.addDns")} subHeader={formSubHeader} footer={formFooter}>
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title={t("dns.addDns")} subHeader={formSubHeader} footer={formFooter}>
         <DnsForm
-          initial={editing}
+          initial={null}
           onSubHeaderChange={setFormSubHeader}
           onFooterChange={setFormFooter}
-          onSuccess={() => { setShowForm(false); setEditing(null); queryClient.invalidateQueries({ queryKey: ["dns"] }); }}
+          onSuccess={() => { setShowForm(false); queryClient.invalidateQueries({ queryKey: ["dns"] }); }}
         />
       </Drawer>
 
@@ -244,7 +288,7 @@ export default function DNSPage() {
         onFilter={() => setShowFilters(true)}
         onExport={exportCSV}
         addLabel={t("dns.addDns")}
-        addColor="#06b6d4"
+        extraActions={bulkActions.length > 0 ? bulkActions.map(({ label, icon, color, onClick }) => ({ label, icon, color, onClick })) : undefined}
       />
     </PageShell>
   );

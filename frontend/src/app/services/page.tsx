@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { servicesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOpenOnParam } from "@/hooks/useOpenOnParam";
 import { useExportCSV } from "@/hooks/useExportCSV";
 import { useInventoryFilters } from "@/hooks/useInventoryFilters";
+import { usePageTab } from "@/hooks/usePageTab";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
@@ -16,16 +17,20 @@ import ListToolbar from "@/components/ui/ListToolbar";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
+import InventoryOverview from "@/components/inventory/InventoryOverview";
+import InsightKpis from "@/components/inventory/InsightKpis";
 import PageHeader from "@/components/ui/PageHeader";
 import InventoryContent from "@/components/inventory/InventoryContent";
 import ServiceCard from "./_components/ServiceCard";
 import ServicesTableView from "./_components/ServicesTableView";
 import GroupByMenu from "@/components/inventory/GroupByMenu";
 import { useRelationGroups } from "@/hooks/useRelationGroups";
-import KpiSection from "./_components/KpiSection";
+import ServicesDashboard from "./_components/ServicesDashboard";
+import { serviceInsights, DEFAULT_SERVICE_INSIGHTS } from "./_components/serviceInsights";
+import { serviceTitle } from "@/lib/serviceDisplay";
 import InventoryFAB from "@/components/inventory/InventoryFAB";
 import ServiceForm from "./ServiceForm";
-import ServiceFilterDrawer, { emptyFilters, type ServiceFilters } from "./FilterDrawer";
+import ServiceFilterDrawer, { emptyFilters, originParams, type ServiceFilters } from "./FilterDrawer";
 import type { Service } from "@/lib/types";
 
 export default function ServicesPage() {
@@ -41,6 +46,9 @@ export default function ServicesPage() {
   const [formFooter, setFormFooter] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [tablePage, setTablePage] = useState(1);
+  const [pageTab, selectTab] = usePageTab();
+  const [visibleCount, setVisibleCount] = useState(24);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
 
@@ -64,6 +72,9 @@ export default function ServicesPage() {
       if (filters.developed_by) params.developed_by = filters.developed_by;
       if (filters.is_external_dependency) params.is_external_dependency = filters.is_external_dependency;
       if (filters.orchestrator_managed) params.orchestrator_managed = filters.orchestrator_managed;
+      if (filters.kind) params.kind = filters.kind;
+      if (filters.status) params.status = filters.status;
+      Object.assign(params, originParams(filters.origin));
       params.sort_by = sort.field;
       params.sort_dir = sort.direction;
       params.page = String(tablePage);
@@ -74,7 +85,7 @@ export default function ServicesPage() {
   const tableServices = tableQuery.data?.data ?? [];
   const tableTotal = tableQuery.data?.meta.total ?? 0;
 
-  useEffect(() => { setTablePage(1); }, [search, filters, sort]);
+  useEffect(() => { setTablePage(1); setVisibleCount(24); }, [search, filters, sort]);
 
   const services = useMemo(() => {
     let filtered = allServices;
@@ -82,6 +93,7 @@ export default function ServicesPage() {
       const s = search.toLowerCase();
       filtered = filtered.filter(svc =>
         svc.nickname.toLowerCase().includes(s) ||
+        serviceTitle(svc).title.toLowerCase().includes(s) ||
         svc.description?.toLowerCase().includes(s) ||
         svc.technology_stack?.toLowerCase().includes(s)
       );
@@ -99,6 +111,12 @@ export default function ServicesPage() {
     if (filters.orchestrator_managed) {
       const val = filters.orchestrator_managed === "yes";
       filtered = filtered.filter(svc => !!svc.orchestrator_managed === val);
+    }
+    if (filters.kind) filtered = filtered.filter(svc => (svc.service_kind || "none") === filters.kind);
+    if (filters.status) filtered = filtered.filter(svc => svc.container_status === filters.status);
+    if (filters.origin) {
+      const o = originParams(filters.origin);
+      filtered = filtered.filter(svc => (!o.source || (svc.source || "manual") === o.source) && (!o.discovery_kind || svc.discovery_kind === o.discovery_kind));
     }
     const arr = [...filtered];
     arr.sort((a, b) => {
@@ -133,11 +151,22 @@ export default function ServicesPage() {
     <PageShell>
       <PageHeader
         title={t("service.title")}
+        description={t("service.pageDescription")}
         addLabel={canEdit ? t("service.addService") : undefined}
         onAdd={canEdit ? openCreate : undefined}
         hideAddOnPhone
         controlsKey="services"
         controlsBadge={activeFilterCount}
+        tabs={{
+          idBase: "services",
+          label: t("service.title"),
+          active: pageTab,
+          onChange: selectTab,
+          items: [
+            { key: "overview", label: t("inventory.view.overview"), icon: ICON_PATHS.viewCards },
+            { key: "dashboard", label: t("inventory.view.dashboard"), icon: ICON_PATHS.layoutGrid },
+          ],
+        }}
         controls={
           <ListToolbar
             viewMode={viewMode}
@@ -151,36 +180,46 @@ export default function ServicesPage() {
               allServices.length > 0 ? (
                 <>
                   <GroupByMenu options={["host", "dns", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
-                  <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} />
+                  <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
                 </>
               ) : undefined
             }
           />
         }
-      />
-
-      {/* KPI indicators */}
-      {!isLoading && allServices.length > 0 && <KpiSection services={allServices} t={t} />}
-
-      <SearchBadge search={search} onClear={() => setSearch("")} />
-      {!isLoading && allServices.length > 0 && <SectionHeading>{t("service.listing")}</SectionHeading>}
-
-      {/* Toolbar */}
-
-      <InventoryContent
-        isLoading={grouping.isLoading || (viewMode === "table" && !groupBy ? tableQuery.isLoading : isLoading)}
-        items={viewMode === "table" && !groupBy ? tableServices : services}
-        groups={grouping.groups}
-        viewMode={viewMode}
-        emptyIcon="box"
-        emptyTitle={t("common.noResults")}
-        emptyDescription={search || activeFilterCount > 0 ? t("host.emptyStateFilter") : t("service.emptyStateAdd")}
-        emptyAction={canEdit && !search && activeFilterCount === 0 ? (
-          <Button size="sm" onClick={openCreate}><span className="mr-1">+</span> {t("service.addService")}</Button>
-        ) : undefined}
-        renderCard={(svc) => <ServiceCard svc={svc} />}
-        renderTable={(items) => <ServicesTableView services={items} total={groupBy ? undefined : tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}
-      />
+      >
+        {pageTab === "overview" ? (
+          <InventoryOverview kpis={!isLoading && <InsightKpis layout="list" insights={serviceInsights(allServices, t)} defaults={DEFAULT_SERVICE_INSIGHTS} storageKey="services_kpis" filters={filters} onFiltersChange={setFilters} />}>
+            <SearchBadge search={search} onClear={() => setSearch("")} />
+            {!isLoading && allServices.length > 0 && <SectionHeading>{t("service.listing")}</SectionHeading>}
+            <InventoryContent
+              columns={3}
+              isLoading={grouping.isLoading || (viewMode === "table" && !groupBy ? tableQuery.isLoading : isLoading)}
+              items={viewMode === "table" && !groupBy ? tableServices : services}
+              groups={grouping.groups}
+              viewMode={viewMode}
+              emptyIcon="box"
+              emptyTitle={t("common.noResults")}
+              emptyDescription={search || activeFilterCount > 0 ? t("host.emptyStateFilter") : t("service.emptyStateAdd")}
+              emptyAction={canEdit && !search && activeFilterCount === 0 ? (
+                <Button size="sm" onClick={openCreate}>+ {t("service.addService")}</Button>
+              ) : undefined}
+              renderCard={(svc) => <ServiceCard svc={svc} />}
+              renderTable={(items) => <ServicesTableView services={items} total={groupBy ? undefined : tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} t={t} />}
+              visibleCount={visibleCount}
+              loadMoreRef={loadMoreRef}
+              onLoadMore={() => setVisibleCount((c) => c + 24)}
+              loadingMoreLabel={t("common.loadingMore")}
+              loadMoreLabel={t("common.loadMore")}
+            />
+          </InventoryOverview>
+        ) : (
+          <ServicesDashboard
+            services={allServices}
+            filters={filters}
+            onApplyFilter={(f) => { setFilters({ ...filters, ...f }); selectTab("overview"); }}
+          />
+        )}
+      </PageHeader>
 
       {/* Create modal */}
       <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={t("service.addService")} subHeader={formSubHeader} footer={formFooter}>
@@ -215,7 +254,6 @@ export default function ServicesPage() {
         onFilter={() => setShowFilters(true)}
         onExport={exportCSV}
         addLabel={t("service.addService")}
-        addColor="#a855f7"
       />
     </PageShell>
   );

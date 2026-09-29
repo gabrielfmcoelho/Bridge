@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { servicesAPI, hostsAPI, dnsAPI, projectsAPI, enumsAPI, grafanaAPI, integrationsAPI } from "@/lib/api";
+import { SERVICE_KINDS } from "@/lib/serviceDisplay";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
 import Button from "@/components/ui/Button";
@@ -34,6 +35,7 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
     description: initial?.description || "",
     service_type: initial?.service_type || "",
     service_subtype: initial?.service_subtype || "",
+    service_kind: initial?.service_kind || "",
     technology_stack: initial?.technology_stack || "",
     deploy_approach: initial?.deploy_approach || "",
     orchestrator_tool: initial?.orchestrator_tool || "",
@@ -106,7 +108,8 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
           <Input label={t("service.nickname")} value={form.nickname} onChange={(e) => set("nickname", e.target.value)} required placeholder={t("service.namePlaceholder")} />
           <Input label={t("common.description")} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder={t("service.descriptionPlaceholder")} />
           <Select label={t("service.projectLabel")} value={form.project_id?.toString() || ""} onChange={(e) => set("project_id", e.target.value ? parseInt(e.target.value) : null)} options={projects.map((p) => ({ value: p.id.toString(), label: p.name }))} />
-          <div className="grid grid-cols-2 gap-3">
+          <Select label={t("service.category")} value={form.service_kind} onChange={(e) => set("service_kind", e.target.value)} options={SERVICE_KINDS.map((k) => ({ value: k, label: t(`service.kind.${k}`) }))} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label={t("service.serviceType")} value={form.service_type} onChange={(e) => set("service_type", e.target.value)} options={enumOpts(serviceTypes)} />
             <Select label={t("service.serviceSubtype")} value={form.service_subtype} onChange={(e) => set("service_subtype", e.target.value)} options={enumOpts(serviceSubtypes)} />
           </div>
@@ -154,11 +157,11 @@ export default function ServiceForm({ initial, initialGrants, onSuccess, onSubHe
       {/* Step 3: Deploy & Config */}
       {step === 3 && (
         <div className="space-y-4 animate-fade-in">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label={t("service.deployApproach")} value={form.deploy_approach} onChange={(e) => set("deploy_approach", e.target.value)} options={enumOpts(deployApproaches)} />
             <Select label={t("service.orchestratorTool")} value={form.orchestrator_tool} onChange={(e) => set("orchestrator_tool", e.target.value)} options={enumOpts(orchestratorTools)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label={t("service.environment")} value={form.environment} onChange={(e) => set("environment", e.target.value)} options={enumOpts(environments)} />
             <Input label={t("service.port")} value={form.port} onChange={(e) => set("port", e.target.value)} placeholder="8080" />
           </div>

@@ -7,6 +7,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useFlag } from "@/contexts/FlagContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOpenOnParam } from "@/hooks/useOpenOnParam";
+import { usePageTab } from "@/hooks/usePageTab";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
@@ -102,19 +103,7 @@ export default function HostsPage() {
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  // Page tab, kept in ?tab= so a dashboard link survives reload.
-  const [pageTab, setPageTab] = useState<"overview" | "dashboard">("overview");
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tab") === "dashboard") setPageTab("dashboard");
-  }, []);
-  const selectTab = (k: string) => {
-    const tab = k === "dashboard" ? "dashboard" : "overview";
-    setPageTab(tab);
-    const url = new URL(window.location.href);
-    if (tab === "dashboard") url.searchParams.set("tab", "dashboard");
-    else url.searchParams.delete("tab");
-    window.history.replaceState(window.history.state, "", url.pathname + url.search);
-  };
+  const [pageTab, selectTab] = usePageTab();
   const [tablePage, setTablePage] = useState(1);
   const [visibleCount, setVisibleCount] = useState(24);
   const loadMoreRef = useRef<HTMLDivElement>(null);

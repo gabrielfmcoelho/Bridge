@@ -8,14 +8,14 @@ import Card from "@/components/ui/Card";
 import { situacaoAccent } from "@/lib/constants";
 import SituacaoText from "@/components/ui/SituacaoText";
 import { useHostNames } from "@/hooks/useHostNames";
-import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
+import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorGrid, CardMeter } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import { certState, certTone } from "@/lib/dnsCert";
+import { certState, certTone, certDaysLeft, certValidityPct } from "@/lib/dnsCert";
 import { certLabel } from "./CertBadge";
 import type { DNSRecord } from "@/lib/types";
 
 export default function DnsCard({ dns }: { dns: DNSRecord }) {
-  const { t } = useLocale();
+  const { t, formatDate } = useLocale();
   const { data: situacoes = [] } = useQuery({
     queryKey: ["enums", "situacao"],
     queryFn: () => enumsAPI.list("situacao"),
@@ -29,6 +29,9 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
   const linkedHost = firstHost ? `${firstHost}${linkedHostsCount > 1 ? ` +${linkedHostsCount - 1}` : ""}` : undefined;
   const cert = certState(dns);
   const scanned = cert !== "none" && cert !== "unscanned";
+  const tone = certTone(cert);
+  const daysLeft = dns.cert_expires_at ? certDaysLeft(dns.cert_expires_at) : null;
+  const validity = certValidityPct(dns);
 
   return (
     <Link href={`/dns/${dns.id}`} className="block h-full">
@@ -37,6 +40,7 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
         <CardHeader
           title={dns.domain}
           subtitle={linkedHost}
+          titleFont="mono"
           subtitleFont="display"
           status={<SituacaoText situacao={dns.situacao} />}
           description={dns.observacoes}
@@ -47,14 +51,26 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
             { label: t("dns.responsavel"), value: mainResp },
             { label: t("host.entity"), value: dns.main_entidade || "" },
             { label: t("dns.certificate"), value: certLabel(dns, t) },
-            { label: "HTTPS", value: dns.has_https ? t("common.yes") : t("common.no") },
+            { label: t("dns.certIssuer"), value: dns.cert_issuer || "" },
           ]}
         />
 
         <CardTagsSection tags={dns.tags} />
 
-        {/* Bottom indicators — all icons always visible (faint when 0), like hosts */}
-        <div className="flex items-center gap-3 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4">
+        {/* The domain's own block, as CPU/RAM/disk is the host's: how much of the
+            certificate's validity is left. Empty track + "–" until scanned. */}
+        <div className="mt-3 pt-3 pb-1 border-t border-[var(--border-subtle)]">
+          <CardMeter
+            label={t("dns.certValidity")}
+            pct={validity}
+            reading={daysLeft !== null ? t("dns.daysLeft", { days: String(Math.max(daysLeft, 0)) }) : undefined}
+            tone={tone === "danger" ? "danger" : tone === "warning" ? "warning" : "success"}
+            caption={dns.cert_expires_at ? formatDate(dns.cert_expires_at) : undefined}
+          />
+        </div>
+
+        {/* Only what a DNS record has: alerts and chamados are host-only. */}
+        <CardIndicatorGrid>
           <CardIndicator
             icon={ICON_PATHS.lock}
             count={dns.has_https || scanned ? 1 : 0}
@@ -62,15 +78,11 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
             title={scanned ? certLabel(dns, t) : dns.has_https ? t("topology.https") : t("topology.noHttps")}
             hideCount
           />
-          <CardIndicator icon={ICON_PATHS.server} count={linkedHostsCount} color="cyan" title={t("dns.hostCount", { count: String(linkedHostsCount) })} />
-          {/* The DNS list doesn't send these counts yet: shown dimmed, never a fake 0. */}
-          <CardIndicator icon={ICON_PATHS.gear} disabled color="warning" title={t("host.services")} />
-          <CardIndicator icon={ICON_PATHS.folder} disabled color="accent" title={t("host.linkedProjects")} />
-          <CardIndicatorSeparator />
-          <CardIndicator icon={ICON_PATHS.alert} disabled color="danger" title={t("host.alerts")} />
-          <CardIndicator icon={ICON_PATHS.clipboard} disabled color="accent" title={t("issue.title")} />
-          <CardIndicator icon={ICON_PATHS.document} disabled color="warning" title={t("nav.chamados")} />
-        </div>
+          <CardIndicator icon={ICON_PATHS.server} count={linkedHostsCount} color="info" title={t("dns.hostCount", { count: String(linkedHostsCount) })} />
+          <CardIndicator icon={ICON_PATHS.gear} count={dns.services_count || 0} color="warning" title={`${dns.services_count || 0} ${t("host.services").toLowerCase()}`} />
+          <CardIndicator icon={ICON_PATHS.folder} count={dns.projects_count || 0} color="accent" title={`${dns.projects_count || 0} ${t("nav.projects").toLowerCase()}`} />
+          <CardIndicator icon={ICON_PATHS.clipboard} count={dns.issues_count || 0} color="accent" title={`${dns.issues_count || 0} ${t("nav.issues").toLowerCase()}`} />
+        </CardIndicatorGrid>
       </Card>
     </Link>
   );

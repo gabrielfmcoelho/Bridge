@@ -40,6 +40,15 @@ export function certDaysLeft(expiresAt: string, now = Date.now()): number {
   return Math.floor((Date.parse(expiresAt) - now) / DAY);
 }
 
+/** Percent of the certificate's validity window (not_before → expires_at)
+ *  still ahead, 0–100; null without both dates. */
+export function certValidityPct(d: Pick<DNSRecord, "cert_not_before" | "cert_expires_at">, now = Date.now()): number | null {
+  if (!d.cert_expires_at || !d.cert_not_before) return null;
+  const end = Date.parse(d.cert_expires_at);
+  const span = end - Date.parse(d.cert_not_before);
+  return span > 0 ? Math.max(0, Math.min(100, Math.round(((end - now) / span) * 100))) : null;
+}
+
 function expiresWithin(d: CertFields, days: number, now: number): boolean {
   if (!d.cert_expires_at) return false;
   const exp = Date.parse(d.cert_expires_at);
