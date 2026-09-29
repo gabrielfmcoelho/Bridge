@@ -112,7 +112,18 @@ func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req dnsWriteRequest
+	// Decode onto the stored record, as hosts do: a field the payload omits
+	// (e.g. the legacy responsavel text) keeps its value.
+	current, err := h.dns.Get(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to load DNS record", err)
+		return
+	}
+	if current == nil {
+		jsonError(w, http.StatusNotFound, "DNS record not found")
+		return
+	}
+	req := dnsWriteRequest{DNSRecord: *current.Record}
 	if !decodeBody(w, r, &req) {
 		return
 	}

@@ -144,7 +144,18 @@ func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req serviceWriteRequest
+	// Decode onto the stored row, as hosts do: a field the payload omits keeps
+	// its value instead of being written back as zero.
+	current, err := h.service.Get(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to load service", err)
+		return
+	}
+	if current == nil {
+		jsonError(w, http.StatusNotFound, "service not found")
+		return
+	}
+	req := serviceWriteRequest{Service: *current.Service}
 	if !decodeBody(w, r, &req) {
 		return
 	}

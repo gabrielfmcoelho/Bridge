@@ -267,9 +267,11 @@ func (r *ServiceRepo) ListDiscoveredByHost(ctx context.Context, hostID int64) ([
 	return scanServices(rows)
 }
 
-// Update writes the mutable fields of a service by id. source is not among
-// them: it changes only through the scan (auto) and Fixate (auto→fixed), so an
-// API payload can't relabel a manual service as scan-owned or vice versa.
+// Update writes the operator-editable fields of a service by id. Scan-owned
+// state is not among them: source changes only through the scan and Fixate,
+// and the runtime (container_*, discovered_at, last_seen_at) only through
+// ReconcileDiscovered and UpdateContainerBinding — so saving the form can't
+// wipe what the last scan saw.
 func (r *ServiceRepo) Update(ctx context.Context, s *models.Service) error {
 	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
 	_, err := r.db.ExecContext(ctx,
@@ -278,16 +280,14 @@ func (r *ServiceRepo) Update(ctx context.Context, s *models.Service) error {
 			orchestrator_managed = ?, is_directly_managed = ?, is_responsible = ?, developed_by = ?,
 			is_external_dependency = ?, external_provider = ?, external_url = ?, external_contact = ?,
 			repository_url = ?, gitlab_url = ?, documentation_url = ?,
-			container_status = ?, container_id = ?, container_name = ?, container_image = ?, container_ports = ?,
-			discovered_at = ?, last_seen_at = ?, grafana_dashboard_uid = ?, updated_at = CURRENT_TIMESTAMP
+			grafana_dashboard_uid = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND `+vis,
 		append([]any{s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype, s.ServiceKind,
 			s.TechnologyStack, s.DeployApproach, s.OrchestratorTool, s.Environment, s.Port, s.Version,
 			s.OrchestratorManaged, s.IsDirectlyManaged, s.IsResponsible, s.DevelopedBy,
 			s.IsExternalDependency, s.ExternalProvider, s.ExternalURL, s.ExternalContact,
 			s.RepositoryURL, s.GitlabURL, s.DocumentationURL,
-			s.ContainerStatus, s.ContainerID, s.ContainerName, s.ContainerImage, s.ContainerPorts,
-			s.DiscoveredAt, s.LastSeenAt, s.GrafanaDashboardUID, s.ID}, vargs...)...,
+			s.GrafanaDashboardUID, s.ID}, vargs...)...,
 	)
 	return err
 }
