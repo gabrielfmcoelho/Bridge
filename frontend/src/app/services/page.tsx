@@ -12,7 +12,7 @@ import { usePageTab } from "@/hooks/usePageTab";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
-import ResponsiveModal from "@/components/ui/ResponsiveModal";
+import Drawer from "@/components/ui/Drawer";
 import ListToolbar from "@/components/ui/ListToolbar";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
@@ -222,8 +222,9 @@ export default function ServicesPage() {
       </PageHeader>
 
       {/* Create modal */}
-      <ResponsiveModal open={showForm} onClose={() => setShowForm(false)} title={t("service.addService")} subHeader={formSubHeader} footer={formFooter}>
+      <Drawer open={showForm} onClose={() => setShowForm(false)} title={t("service.addService")} subHeader={formSubHeader} footer={formFooter}>
         <ServiceForm
+          onClose={() => setShowForm(false)}
           onSubHeaderChange={setFormSubHeader}
           onFooterChange={setFormFooter}
           onSuccess={() => {
@@ -231,7 +232,7 @@ export default function ServicesPage() {
             queryClient.invalidateQueries({ queryKey: ["services"] });
           }}
         />
-      </ResponsiveModal>
+      </Drawer>
 
       {/* Filter drawer */}
       <ServiceFilterDrawer

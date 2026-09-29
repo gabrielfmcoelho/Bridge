@@ -263,6 +263,7 @@ export default function DNSPage() {
       <Drawer open={showForm} onClose={() => setShowForm(false)} title={t("dns.addDns")} subHeader={formSubHeader} footer={formFooter}>
         <DnsForm
           initial={null}
+          onClose={() => setShowForm(false)}
           onSubHeaderChange={setFormSubHeader}
           onFooterChange={setFormFooter}
           onSuccess={() => { setShowForm(false); queryClient.invalidateQueries({ queryKey: ["dns"] }); }}

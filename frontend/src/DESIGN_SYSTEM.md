@@ -369,23 +369,44 @@ counters={
 
 ## 10. Form Pattern
 
-Every entity form is a multi-step wizard on create and the same component with
-`initial` on edit. The form owns fields; the container owns actions.
+An entity's create and edit form (host, DNS, serviço) is **one scrolling form in
+sections, not a wizard**: the same component with `initial` on edit, in a
+`Drawer` on list and detail pages alike. The form owns fields; the shell owns
+the section index and the actions.
 
 ```tsx
-<Drawer title subHeader={formSubHeader} footer={formFooter}>
-  <EntityForm initial onSuccess onSubHeaderChange={setFormSubHeader} onFooterChange={setFormFooter} />
+<Drawer title={isEdit ? t("form.editTitle", { name }) : addLabel} subHeader={formSubHeader} footer={formFooter}>
+  <EntityForm initial onSuccess onClose onSubHeaderChange={setFormSubHeader} onFooterChange={setFormFooter} />
 </Drawer>
+
+// inside the form
+<EntityFormShell id sections={[{ id, label }]} isEdit isPending submitLabel error onSubmit onCancel onFooterChange onSubHeaderChange>
+  <FormSection id title description? stack?>…fields…</FormSection>
+</EntityFormShell>
 ```
 
-- `useMultiStepFormEffects({ step, setStep, totalSteps, stepLabels, onSubmit, canProceed, isPending, onFooterChange, onSubHeaderChange })`
-  pushes `StepIndicator` into `subHeader` and Back / Next / Save into `footer`. Forms render no action bars of their own.
-- Fields: `Input`, `Textarea`, `Select`, `NativeSelect`, `Checkbox`, `CheckboxList`, `RadioGroup`, `Toggle`,
-  `DateTimeInput`, `TagInput`, `AsyncPicker`, `ContactInput`, `MarkdownEditor`; anything else inside `<FormField label required hint error>`.
-- `required` draws the asterisk; `hint` is the helper line; per-field `error` under the control; form-level `<FormError>` at the top.
-- Scope: `<EntidadeScopeFields value onChange compact>` with `defaultGrants(user)`; spread `...grants` into the payload.
-- Cancel/Confirm dialogs (not wizards): `<ResponsiveModal footer={<FormFooter onCancel submitLabel onSubmit loading variant />}>`;
-  a submit button outside its `<form>` uses `submitType="submit" form="<id>"`.
+- **Shell** (`components/forms/EntityFormShell`): a `<form noValidate>` — Enter submits, the first
+  field is focused on create — with `FormSectionNav` (a pill per section, scroll-spy) in the drawer
+  `subHeader` and `FormFooter` (Cancelar + a primary that names the result: "Criar host", "Salvar
+  alterações") in its `footer`. `onSubmit` returns `false` when validation blocks the save; the shell
+  then scrolls to and focuses the first `aria-invalid` field.
+- **Canonical section order**, same labels everywhere (`form.section.*`); a section with nothing for an
+  entity is left out: Identidade → Operação → Acesso SSH (hosts) / Origem (serviços) → Responsáveis
+  (`EntidadeScopeFields` + `ResponsavelList`) → Vínculos → Notas (tags, observações in `MarkdownEditor`).
+- **Validation**: errors appear per field (`error` + `aria-invalid`) after the first save attempt;
+  the primary stays enabled so a blocked save says why. Format rules (slug, port, domain, URL) apply
+  only to values typed in this form, so an older record saved in another shape stays editable.
+- **Links to other assets**: `RelationPicker` (chips + combobox) fed by `useRelationOptions`, whose
+  secondary line tells same-named items apart (a service's host and category). Never a checkbox cloud
+  of the whole inventory. Always send the id lists, empty included — `[]` is how the last link goes.
+- **Edit payloads** carry only the form's fields; the API merges them onto the stored row, and
+  scan-owned state (service runtime, `source`) is never written by a form.
+- Fields: `Input`, `Textarea`, `Select`, `NativeSelect`, `Checkbox`, `CheckboxList` (short lists such as
+  entidades), `Toggle`, `DateTimeInput`, `TagInput`, `RelationPicker`, `ContactInput`, `MarkdownEditor`,
+  `GrafanaUidField`; anything else inside `<FormField label required hint error>`.
+- New records start in the situação with the `active` role (`useDefaultSituacao`).
+- Cancel/Confirm dialogs: `<ResponsiveModal footer={<FormFooter onCancel submitLabel onSubmit loading variant />}>`.
+  `useMultiStepFormEffects` + `StepIndicator` remain only for genuinely sequential flows (projects, key setup).
 - Submit: `useState` per field, `useMutation`, `loading={mutation.isPending}`. No react-hook-form, no zod.
 
 ---
@@ -469,11 +490,14 @@ SortDropdown, SortableTable, Spinner, StatCard, StatusAlert, StatusDot, StepIndi
 CardIndicatorSeparator, CardMeter, InventoryContent, InventoryOverview, InsightKpis, Breakdowns,
 InventoryFilterDrawer, InventoryFAB, KpiGrid, ResponsavelList, ResponsaveisSection.
 
+`components/forms/`: EntityFormShell, FormSection, FormSectionNav, RelationPicker (+ `useRelationOptions`),
+GrafanaUidField.
+
 `components/detail/`: DetailSplit, TopologyPane, RelationsCard (+ `hostsGroup`, `dnsGroup`,
 `servicesGroup`, `projectsGroup`). `components/issues/`: IssuesBoard, IssueDrawer, IssueViews.
 
 `hooks/`: useMultiStepForm, useCopy, useDebounce, useInventoryFilters, useSecretReveal, useMediaQuery,
-usePageTab, useEntityGraph, useHostNames.
+usePageTab, useEntityGraph, useHostNames, useSituacao, useDefaultSituacao.
 `lib/`: icon-paths (`ICON_PATHS`, `NAV_ICONS`, `REQUEST_TYPE_ICON`), constants (`SITUACAO_*`, `situacaoAccent`,
 `NAV_SECTIONS`), utils (`formatPhone`, `getTimeAgo`, ...), requests (`transitionVariant`, ...), insights
 (`Insight`, `BreakdownRow` types), serviceDisplay (`serviceTitle`, `SERVICE_KINDS`, `originKey`), dnsCert,

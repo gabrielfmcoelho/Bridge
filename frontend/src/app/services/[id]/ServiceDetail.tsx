@@ -170,10 +170,16 @@ export default function ServiceDetail({ id }: { id: number }) {
           {activeTab === "metrics" && grafanaEnabled && <MetricsTab serviceId={id} nickname={svc.nickname} />}
         </PageHeader>
 
-        <Drawer open={showEditDrawer} onClose={() => setShowEditDrawer(false)} title={t("common.edit")} subHeader={formSubHeader} footer={formFooter}>
+        <Drawer open={showEditDrawer} onClose={() => setShowEditDrawer(false)} title={t("form.editTitle", { name: title })} subHeader={formSubHeader} footer={formFooter}>
           <ServiceForm
             initial={svc}
             initialGrants={data.entidades}
+            initialTags={data.tags}
+            initialHostIds={data.host_ids}
+            initialDnsIds={data.dns_ids}
+            initialDependsOnIds={data.depends_on_ids}
+            initialResponsaveis={data.responsaveis}
+            onClose={() => setShowEditDrawer(false)}
             onSubHeaderChange={setFormSubHeader}
             onFooterChange={setFormFooter}
             onSuccess={() => {

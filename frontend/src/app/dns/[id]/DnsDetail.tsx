@@ -154,12 +154,13 @@ export default function DnsDetail({ id }: { id: number }) {
           <Drawer
             open={showEditDrawer}
             onClose={() => setShowEditDrawer(false)}
-            title={t("common.edit")}
+            title={t("form.editTitle", { name: dns.domain })}
             subHeader={formSubHeader}
             footer={formFooter}
           >
             <DnsForm
               initial={dns}
+              onClose={() => setShowEditDrawer(false)}
               initialTags={data.tags}
               initialHostIds={data.host_ids}
               initialServiceIds={data.service_ids}

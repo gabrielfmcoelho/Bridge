@@ -5,7 +5,7 @@ import type { EntityResponsavel, Contact } from "@/lib/types";
 import { formatPhone } from "@/lib/utils";
 import Select from "@/components/ui/Select";
 import IconButton from "@/components/ui/IconButton";
-import Button from "@/components/ui/Button";
+import PillButton from "@/components/ui/PillButton";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import Icon from "@/components/ui/Icon";
@@ -90,19 +90,19 @@ export default function ResponsavelList({ value, onChange, contacts, t }: Respon
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
               {item.phone && (
                 <div>
-                  <span className="text-[var(--text-faint)] block">{t("responsavel.phone")}</span>
+                  <span className="text-[var(--text-muted)] block">{t("responsavel.phone")}</span>
                   <span className="font-mono">{formatPhone(item.phone)}</span>
                 </div>
               )}
               {item.role && (
                 <div>
-                  <span className="text-[var(--text-faint)] block">{t("responsavel.role")}</span>
+                  <span className="text-[var(--text-muted)] block">{t("responsavel.role")}</span>
                   <span>{item.role}</span>
                 </div>
               )}
               {item.entity && (
                 <div>
-                  <span className="text-[var(--text-faint)] block">{t("responsavel.entity")}</span>
+                  <span className="text-[var(--text-muted)] block">{t("responsavel.entity")}</span>
                   <span>{item.entity}</span>
                 </div>
               )}
@@ -110,20 +110,16 @@ export default function ResponsavelList({ value, onChange, contacts, t }: Respon
           </div>
 
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <button
-              type="button"
+            <PillButton
+              shape="pill"
+              size="sm"
+              active={!!item.is_main}
               onClick={() => setMain(idx)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                item.is_main
-                  ? "bg-[var(--accent)] text-white"
-                  : "bg-[var(--bg-surface)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[var(--border-default)]"
-              }`}
+              aria-pressed={!!item.is_main}
+              lead={item.is_main ? <Icon path={ICON_PATHS.check} className="w-3 h-3" strokeWidth={3} /> : undefined}
             >
-              {item.is_main && (
-                <Icon path={ICON_PATHS.check} className="w-3 h-3" strokeWidth={3} />
-              )}
               {t("responsavel.main")}
-            </button>
+            </PillButton>
             <IconButton
               variant="danger"
               size="sm"
@@ -138,24 +134,18 @@ export default function ResponsavelList({ value, onChange, contacts, t }: Respon
       ))}
 
       {availableContacts.length > 0 ? (
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <Select
-              value=""
-              options={options}
-              onChange={(e) => {
-                const id = Number(e.target.value);
-                if (id) addContact(id);
-              }}
-            />
-          </div>
-          <Button type="button" variant="secondary" size="sm" disabled>
-            {t("responsavel.add")}
-          </Button>
-        </div>
+        <Select
+          label={t("form.addResponsavel")}
+          value=""
+          options={options}
+          onChange={(e) => {
+            const id = Number(e.target.value);
+            if (id) addContact(id);
+          }}
+        />
       ) : (
         value.length > 0 && (
-          <p className="text-xs text-[var(--text-faint)]">{t("responsavel.alreadyLinked")}</p>
+          <p className="text-xs text-[var(--text-muted)]">{t("responsavel.alreadyLinked")}</p>
         )
       )}
     </div>

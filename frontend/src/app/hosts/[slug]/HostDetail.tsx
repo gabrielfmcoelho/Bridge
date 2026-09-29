@@ -244,7 +244,7 @@ export default function HostDetail({ slug }: { slug: string }) {
         <Drawer
           open={showEditDrawer}
           onClose={() => setShowEditDrawer(false)}
-          title={t("common.edit") + " " + data.host.nickname}
+          title={t("form.editTitle", { name: data.host.nickname })}
           subHeader={formSubHeader}
           footer={formFooter}
         >

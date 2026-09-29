@@ -734,7 +734,8 @@
     "profileTitle": "Host",
     "declared": "Declarado",
     "declaredHint": "O que foi cadastrado para este host; o último scan mostra o que existe de fato.",
-    "tabMetrics": "Métricas"
+    "tabMetrics": "Métricas",
+    "authPickDefault": "Com senha e chave configuradas, escolha o método de autenticação padrão."
   },
   "dns": {
     "title": "Registros DNS",
@@ -2661,5 +2662,44 @@
     "service": "Serviço",
     "project": "Projeto",
     "contact": "Contato"
+  },
+  "form": {
+    "sectionsLabel": "Seções do formulário",
+    "relationsCount": "{count} vinculado(s)",
+    "searchToLink": "Buscar para vincular…",
+    "selectedCount": "{count} selecionado(s)",
+    "addTag": "Adicionar",
+    "required": "Obrigatório",
+    "slugInvalid": "Use só letras, números, ponto, hífen ou sublinhado.",
+    "slugHint": "Identificador usado na URL e no SSH config.",
+    "portInvalid": "Informe uma porta entre 1 e 65535.",
+    "domainInvalid": "Informe um domínio válido, como app.sead.pi.gov.br.",
+    "urlInvalid": "Informe uma URL começando com http:// ou https://.",
+    "saveFailed": "Não foi possível salvar. Tente de novo.",
+    "saveChanges": "Salvar alterações",
+    "createHost": "Criar host",
+    "createDns": "Criar registro DNS",
+    "createService": "Criar serviço",
+    "editTitle": "Editar {name}",
+    "markdownPlaceholder": "Aceita Markdown",
+    "httpsHint": "O certificado é verificado depois, pelo scan de certificados.",
+    "software": "Software",
+    "softwareHint": "O que roda, como PostgreSQL ou Nginx. O scan preenche nos serviços encontrados.",
+    "management": "Gestão",
+    "section": {
+      "identity": "Identidade",
+      "identityHostHint": "Como o host é chamado e onde responde.",
+      "operation": "Operação",
+      "access": "Acesso SSH",
+      "accessHint": "Usado para scans e operações. A senha é gravada cifrada.",
+      "owners": "Responsáveis",
+      "ownersHint": "Quem vê o registro e quem responde por ele.",
+      "links": "Vínculos",
+      "linksHint": "Busque pelo nome; o contexto ao lado diferencia itens com o mesmo nome.",
+      "notes": "Notas",
+      "origin": "Origem",
+      "originHint": "Quem desenvolve e quem mantém."
+    },
+    "addResponsavel": "Adicionar responsável"
   }
 }

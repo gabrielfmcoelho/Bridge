@@ -1,18 +1,21 @@
 "use client";
 
 import { useSituacao } from "@/hooks/useSituacao";
-import { useState, useEffect } from "react";
+import { useDefaultSituacao } from "@/hooks/useDefaultSituacao";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { hostsAPI, enumsAPI, sshKeysAPI, contactsAPI, usersAPI, dnsAPI, servicesAPI, projectsAPI, grafanaAPI, integrationsAPI } from "@/lib/api";
+import { hostsAPI, enumsAPI, sshKeysAPI, contactsAPI, usersAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
-import { useMultiStepFormEffects } from "@/hooks/useMultiStepForm";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import TagInput from "@/components/ui/TagInput";
-import FormError from "@/components/ui/FormError";
-import DrawerSection from "@/components/ui/DrawerSection";
+import FormField from "@/components/ui/FormField";
 import MarkdownEditor from "@/components/ui/MarkdownEditor";
-import CheckboxList from "@/components/ui/CheckboxList";
+import EntityFormShell from "@/components/forms/EntityFormShell";
+import FormSection from "@/components/forms/FormSection";
+import RelationPicker from "@/components/forms/RelationPicker";
+import GrafanaUidField from "@/components/forms/GrafanaUidField";
+import { useRelationOptions } from "@/components/forms/useRelationOptions";
 import ResponsavelList from "./_components/ResponsavelList";
 import ChamadoList from "./_components/ChamadoList";
 import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
@@ -34,7 +37,6 @@ interface HostFormProps {
   onSubHeaderChange?: (subHeader: React.ReactNode) => void;
 }
 
-const STEP_COUNT = 4;
 
 export default function HostForm({
   host, tags, responsaveis, chamados, entidades, dnsRecords, services: linkedServices, projects: linkedProjects,
@@ -79,13 +81,8 @@ export default function HostForm({
   const [linkedProjectIds, setLinkedProjectIds] = useState<number[]>(linkedProjects?.map((p) => p.id) ?? []);
   const [error, setError] = useState("");
 
-  // Create mode: step-based | Edit mode: section-based
-  const [step, setStep] = useState(1);
-  const [openSection, setOpenSection] = useState<string>("basic");
-  // Inner collapsible sections within steps 3 and 4
-  const [openStepSection, setOpenStepSection] = useState<string | null>(null);
-  const toggleStepSection = (key: string) =>
-    setOpenStepSection((prev) => (prev === key ? null : key));
+  // Field errors show after the first save attempt.
+  const [attempted, setAttempted] = useState(false);
 
   /* ── Queries ─────────────────────────────────────────────────────── */
 
@@ -118,27 +115,13 @@ export default function HostForm({
     ? rawUsers.map((u) => ({ id: u.id, display_name: u.display_name }))
     : [];
 
-  // Lists for linking step
-  const { data: allDns = [] } = useQuery({
-    queryKey: ["dns"],
-    queryFn: dnsAPI.list,
-  });
-  const { data: allServices = [] } = useQuery({
-    queryKey: ["services"],
-    queryFn: servicesAPI.list,
-  });
-  const { data: allProjects = [] } = useQuery({
-    queryKey: ["projects"],
-    queryFn: projectsAPI.list,
-  });
+  const relationOptions = useRelationOptions(["dns", "services", "projects"]);
 
   /* ── Helpers ─────────────────────────────────────────────────────── */
 
   const set = (key: string, value: string | boolean) =>
     setForm((f) => ({ ...f, [key]: value }));
-
-  const toggleSection = (key: string) =>
-    setOpenSection((prev) => (prev === key ? "" : key));
+  useDefaultSituacao(form.situacao, (v) => set("situacao", v), !isEdit);
 
   /* ── Mutation ────────────────────────────────────────────────────── */
 
@@ -150,10 +133,7 @@ export default function HostForm({
       const keptExistingKey = isEdit && Boolean(host?.has_key) && !willClearKey && !willLinkNewKey;
       const effectiveHasKey = willLinkNewKey || keptExistingKey;
       const preferredAuth = resolvePreferredAuth(effectiveHasPassword, effectiveHasKey, String(form.preferred_auth || ""));
-      if (!preferredAuth.valid) {
-        setError(preferredAuth.error);
-        throw new Error(preferredAuth.error);
-      }
+      if (!preferredAuth.valid) throw new Error(t(preferredAuth.error));
       const payload: Record<string, unknown> = {
         ...form,
         preferred_auth: preferredAuth.value,
@@ -179,62 +159,73 @@ export default function HostForm({
       return hostsAPI.create(payload);
     },
     onSuccess: () => onSuccess(),
-    onError: (err) => setError(err instanceof Error ? err.message : t("filters.failed")),
+    onError: (err) => setError(err instanceof Error ? err.message : t("form.saveFailed")),
   });
 
-  /* ── SSH key selection is driven entirely by the picker; the backend
-     stores the encrypted key bytes on the host row itself, so there is no
-     stable filesystem path to auto-match against on edit. ─────────────── */
+  /* ── Validation ──────────────────────────────────────────────────── */
 
-  /* ── Step validation ─────────────────────────────────────────────── */
+  const portNum = Number(form.port);
+  const errors: Record<string, string> = {};
+  if (!form.nickname.trim()) errors.nickname = t("form.required");
+  if (!form.oficial_slug.trim()) errors.oficial_slug = t("form.required");
+  // Formats only for what was typed here, so older records stay editable.
+  else if (form.oficial_slug !== (host?.oficial_slug ?? "") && !/^[A-Za-z0-9._-]+$/.test(form.oficial_slug.trim())) errors.oficial_slug = t("form.slugInvalid");
+  if (form.port && form.port !== (host?.port ?? "") && !(Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535)) errors.port = t("form.portInvalid");
+  const err = (k: string) => (attempted ? errors[k] : undefined);
 
-  const canProceedStep1 = form.nickname.trim().length > 0 && form.oficial_slug.trim().length > 0;
+  const submit = () => {
+    setAttempted(true);
+    if (Object.keys(errors).length) return false;
+    setError("");
+    mutation.mutate();
+  };
 
-  /* ── Footer / SubHeader ──────────────────────────────────────────── */
+  /* ── Render ──────────────────────────────────────────────────────── */
 
-  useMultiStepFormEffects({
-    step,
-    setStep,
-    totalSteps: STEP_COUNT,
-    stepLabels: [t("host.basicInfo"), t("host.sshConnection"), t("host.responsibility"), t("host.links")],
-    onSubmit: () => mutation.mutate(),
-    canProceed: step === 1 ? canProceedStep1 : true,
-    isPending: mutation.isPending,
-    isEditMode: isEdit,
-    onClose,
-    t,
-    onFooterChange,
-    onSubHeaderChange,
-  });
+  const sections = [
+    { id: "host-identity", label: t("form.section.identity") },
+    { id: "host-operation", label: t("form.section.operation") },
+    { id: "host-access", label: t("form.section.access") },
+    { id: "host-owners", label: t("form.section.owners") },
+    { id: "host-links", label: t("form.section.links") },
+    { id: "host-notes", label: t("form.section.notes") },
+  ];
 
-  // Reset open section when step changes in create mode
-  useEffect(() => {
-    if (!isEdit) setOpenStepSection(null);
-  }, [step, isEdit]);
+  return (
+    <EntityFormShell
+      id="host-form"
+      sections={sections}
+      isEdit={isEdit}
+      isPending={mutation.isPending}
+      submitLabel={isEdit ? t("form.saveChanges") : t("form.createHost")}
+      error={error}
+      onSubmit={submit}
+      onCancel={onClose}
+      onFooterChange={onFooterChange}
+      onSubHeaderChange={onSubHeaderChange}
+    >
+      <FormSection id="host-identity" title={t("form.section.identity")} description={t("form.section.identityHostHint")}>
+        <Input label={t("host.nickname")} value={form.nickname} onChange={(e) => set("nickname", e.target.value)} required error={err("nickname")} aria-invalid={!!err("nickname")} />
+        <Input label={t("host.oficialSlug")} value={form.oficial_slug} onChange={(e) => set("oficial_slug", e.target.value)} required error={err("oficial_slug")} aria-invalid={!!err("oficial_slug")} className="font-mono" hint={t("form.slugHint")} />
+        <Input label={t("host.hostname")} value={form.hostname} onChange={(e) => set("hostname", e.target.value)} className="font-mono" placeholder="10.0.0.12" />
+        <div className="sm:col-span-2">
+          <Input label={t("common.description")} value={form.description} onChange={(e) => set("description", e.target.value)} />
+        </div>
+      </FormSection>
 
-  /* ── Shared field groups ─────────────────────────────────────────── */
-
-  const basicInfoFields = (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Input label={t("host.nickname")} value={form.nickname} onChange={(e) => set("nickname", e.target.value)} required />
-        <Input label={t("host.oficialSlug")} value={form.oficial_slug} onChange={(e) => set("oficial_slug", e.target.value)} required />
-        <Input label={t("host.hostname")} value={form.hostname} onChange={(e) => set("hostname", e.target.value)} />
+      <FormSection id="host-operation" title={t("form.section.operation")}>
+        <Select label={t("host.situacao")} value={form.situacao} onChange={(e) => set("situacao", e.target.value)} options={situacoes.map((e) => ({ value: e.value, label: e.value }))} />
         <Select label={t("host.hospedagem")} value={form.hospedagem} onChange={(e) => set("hospedagem", e.target.value)} options={hospedagens.map((e) => ({ value: e.value, label: e.value }))} />
         <Select label={t("host.tipoMaquina")} value={form.tipo_maquina} onChange={(e) => set("tipo_maquina", e.target.value)} options={tipoMaquinas.map((e) => ({ value: e.value, label: e.value }))} />
-        <Select label={t("host.situacao")} value={form.situacao} onChange={(e) => set("situacao", e.target.value)} options={situacoes.map((e) => ({ value: e.value, label: e.value }))} />
-      </div>
-      <Input label={t("common.description")} value={form.description} onChange={(e) => set("description", e.target.value)} />
-      <TagInput label={t("common.tags")} tags={formTags} onChange={setFormTags} entityType="host" />
-    </>
-  );
+        <div className="sm:col-span-2">
+          <GrafanaUidField kind="host" target={isEdit ? host?.oficial_slug : undefined} value={form.grafana_dashboard_uid} onChange={(v) => set("grafana_dashboard_uid", v)} />
+        </div>
+      </FormSection>
 
-  const sshFields = (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Input label={t("host.user")} value={form.user} onChange={(e) => set("user", e.target.value)} />
-        <Input label={t("host.port")} value={form.port} onChange={(e) => set("port", e.target.value)} />
-        <Input label={t("host.proxyJump")} value={form.proxy_jump} onChange={(e) => set("proxy_jump", e.target.value)} placeholder="bastion-host" />
+      <FormSection id="host-access" title={t("form.section.access")} description={t("form.section.accessHint")}>
+        <Input label={t("host.user")} value={form.user} onChange={(e) => set("user", e.target.value)} className="font-mono" />
+        <Input label={t("host.port")} value={form.port} onChange={(e) => set("port", e.target.value)} inputMode="numeric" className="font-mono" error={err("port")} aria-invalid={!!err("port")} />
+        <Input label={t("host.proxyJump")} value={form.proxy_jump} onChange={(e) => set("proxy_jump", e.target.value)} placeholder="bastion-host" className="font-mono" />
         <Select
           label={t("host.forwardAgent")}
           value={form.forward_agent}
@@ -244,198 +235,69 @@ export default function HostForm({
             { value: "no", label: t("common.no") },
           ]}
         />
-      </div>
-      {sshKeys.length > 0 ? (
-        <div className="space-y-1">
-          <Select
-            label={t("host.sshKey")}
-            value={selectedKeyId ?? ""}
-            onChange={(e) => setSelectedKeyId(e.target.value === "" ? null : e.target.value)}
-            options={[
-              {
-                value: "",
-                label: isEdit && host?.has_key
-                  ? t("host.sshKeyKeepCurrent")
-                  : t("host.sshKeyNone"),
-              },
-              ...(isEdit && host?.has_key
-                ? [{ value: "__clear__", label: t("host.sshKeyClear") }]
-                : []),
-              ...sshKeys.map((k) => ({
-                value: k.id.toString(),
-                label: `${k.name}${k.fingerprint ? ` (${k.fingerprint})` : ""}`,
-              })),
-            ]}
-          />
-          {isEdit && host?.has_key && selectedKeyId === null && (
-            <p className="text-2xs text-[var(--text-faint)]">{t("host.sshKeyKeepCurrentHint")}</p>
-          )}
-          {selectedKeyId === "__clear__" && (
-            <p className="text-2xs text-[var(--warning)]">{t("host.sshKeyClearHint")}</p>
-          )}
-        </div>
-      ) : isEdit && host?.has_key ? (
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">{t("host.sshKey")}</label>
-          <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-3 py-2">
-            {t("host.sshKeyStored")}
-          </p>
-        </div>
-      ) : null}
-      <Input
-        label={t("auth.password")}
-        type="password"
-        value={form.password}
-        onChange={(e) => set("password", e.target.value)}
-        placeholder={isEdit ? t("host.passwordKeepCurrentPlaceholder") : undefined}
-      />
-      <Select
-        label={t("host.defaultAuth")}
-        value={form.preferred_auth as string}
-        onChange={(e) => set("preferred_auth", e.target.value)}
-        options={[
-          { value: "", label: t("host.scanAuthMethodAuto") },
-          { value: "password", label: t("auth.password") },
-          { value: "key", label: t("host.sshKey") },
-        ]}
-      />
-    </>
-  );
-
-  const responsaveisFields = (
-    <div className="space-y-0">
-      <DrawerSection title={t("entidades.title")} open={openStepSection === "entidades"} onToggle={() => toggleStepSection("entidades")} active={grants.creator_entidade_id != null || !!grants.is_global || (grants.responsible_entidade_ids?.length ?? 0) > 0}>
-        <EntidadeScopeFields value={grants} onChange={setGrants} compact />
-      </DrawerSection>
-      <DrawerSection title={t("project.responsaveis")} open={openStepSection === "responsaveis"} onToggle={() => toggleStepSection("responsaveis")} active={formResponsaveis.length > 0}>
-        <ResponsavelList
-          value={formResponsaveis}
-          onChange={setFormResponsaveis}
-          contacts={contacts}
-          t={t}
-        />
-      </DrawerSection>
-      <DrawerSection title={t("host.chamados")} open={openStepSection === "chamados"} onToggle={() => toggleStepSection("chamados")} active={formChamados.length > 0}>
-        <ChamadoList
-          value={formChamados}
-          onChange={setFormChamados}
-          users={users}
-          t={t}
-        />
-      </DrawerSection>
-      <DrawerSection title={t("common.observacoes")} open={openStepSection === "observacoes"} onToggle={() => toggleStepSection("observacoes")} active={!!form.observacoes}>
-        <MarkdownEditor
-          value={form.observacoes as string}
-          onChange={(v) => set("observacoes", v)}
-          rows={4}
-          placeholder="Markdown..."
-        />
-      </DrawerSection>
-      <DrawerSection title="Grafana" open={openStepSection === "grafana"} onToggle={() => toggleStepSection("grafana")} active={!!form.grafana_dashboard_uid}>
+        {sshKeys.length > 0 ? (
+          <div className="sm:col-span-2">
+            <Select
+              label={t("host.sshKey")}
+              value={selectedKeyId ?? ""}
+              onChange={(e) => setSelectedKeyId(e.target.value === "" ? null : e.target.value)}
+              hint={selectedKeyId === "__clear__" ? undefined : isEdit && host?.has_key && selectedKeyId === null ? t("host.sshKeyKeepCurrentHint") : undefined}
+              options={[
+                { value: "", label: isEdit && host?.has_key ? t("host.sshKeyKeepCurrent") : t("host.sshKeyNone") },
+                ...(isEdit && host?.has_key ? [{ value: "__clear__", label: t("host.sshKeyClear") }] : []),
+                ...sshKeys.map((k) => ({ value: k.id.toString(), label: `${k.name}${k.fingerprint ? ` (${k.fingerprint})` : ""}` })),
+              ]}
+            />
+            {selectedKeyId === "__clear__" && <p className="mt-1.5 text-xs text-[var(--warning)]">{t("host.sshKeyClearHint")}</p>}
+          </div>
+        ) : isEdit && host?.has_key ? (
+          <div className="sm:col-span-2">
+            <FormField label={t("host.sshKey")}>
+              <p className="text-sm text-[var(--text-secondary)]">{t("host.sshKeyStored")}</p>
+            </FormField>
+          </div>
+        ) : null}
         <Input
-          label={t("host.grafanaDashboardUidLabel")}
-          value={form.grafana_dashboard_uid as string}
-          onChange={(e) => set("grafana_dashboard_uid", e.target.value)}
-          placeholder={t("host.grafanaDashboardUidPlaceholder")}
+          label={t("auth.password")}
+          type="password"
+          autoComplete="new-password"
+          value={form.password}
+          onChange={(e) => set("password", e.target.value)}
+          placeholder={isEdit ? t("host.passwordKeepCurrentPlaceholder") : undefined}
         />
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          {t("host.grafanaDashboardHint")}
-        </p>
-        {isEdit && host?.oficial_slug && (
-          <HostDashboardProvisionButton
-            slug={host.oficial_slug}
-            onProvisioned={(uid) => set("grafana_dashboard_uid", uid)}
-          />
-        )}
-      </DrawerSection>
-    </div>
-  );
-
-  const linksFields = (
-    <div className="space-y-0">
-      <DrawerSection title={t("host.linkedDns")} open={openStepSection === "dns"} onToggle={() => toggleStepSection("dns")} active={linkedDnsIds.length > 0}>
-        <CheckboxList
-          label=""
-          items={allDns.map((d) => ({ id: d.id, name: d.domain }))}
-          selected={linkedDnsIds}
-          onChange={setLinkedDnsIds}
+        <Select
+          label={t("host.defaultAuth")}
+          value={form.preferred_auth as string}
+          onChange={(e) => set("preferred_auth", e.target.value)}
+          options={[
+            { value: "", label: t("host.scanAuthMethodAuto") },
+            { value: "password", label: t("auth.password") },
+            { value: "key", label: t("host.sshKey") },
+          ]}
         />
-      </DrawerSection>
-      <DrawerSection title={t("host.linkedServices")} open={openStepSection === "services"} onToggle={() => toggleStepSection("services")} active={linkedServiceIds.length > 0}>
-        <CheckboxList
-          label=""
-          items={allServices.map((s) => ({ id: s.id, name: s.nickname }))}
-          selected={linkedServiceIds}
-          onChange={setLinkedServiceIds}
-        />
-      </DrawerSection>
-      <DrawerSection title={t("host.linkedProjects")} open={openStepSection === "projects"} onToggle={() => toggleStepSection("projects")} active={linkedProjectIds.length > 0}>
-        <CheckboxList
-          label=""
-          items={allProjects.map((p) => ({ id: p.id, name: p.name }))}
-          selected={linkedProjectIds}
-          onChange={setLinkedProjectIds}
-        />
-      </DrawerSection>
-    </div>
-  );
+      </FormSection>
 
-  /* ── Render ──────────────────────────────────────────────────────── */
+      <FormSection id="host-owners" title={t("form.section.owners")} description={t("form.section.ownersHint")} stack>
+        <EntidadeScopeFields value={grants} onChange={setGrants} compact />
+        <ResponsavelList value={formResponsaveis} onChange={setFormResponsaveis} contacts={contacts} t={t} />
+        <FormField label={t("host.chamados")}>
+          <ChamadoList value={formChamados} onChange={setFormChamados} users={users} t={t} />
+        </FormField>
+      </FormSection>
 
-  if (isEdit) {
-    // Edit mode: collapsible sections for quick random access
-    return (
-      <div className="space-y-0">
-        <FormError message={error} />
+      <FormSection id="host-links" title={t("form.section.links")} description={t("form.section.linksHint")} stack>
+        <RelationPicker label={t("topology.services")} options={relationOptions.services} selected={linkedServiceIds} onChange={setLinkedServiceIds} />
+        <RelationPicker label={t("topology.dnsRecords")} options={relationOptions.dns} selected={linkedDnsIds} onChange={setLinkedDnsIds} />
+        <RelationPicker label={t("topology.projects")} options={relationOptions.projects} selected={linkedProjectIds} onChange={setLinkedProjectIds} />
+      </FormSection>
 
-        <DrawerSection title={t("host.basicInfo")} open={openSection === "basic"} onToggle={() => toggleSection("basic")}>
-          {basicInfoFields}
-        </DrawerSection>
-
-        <DrawerSection title={t("host.sshConnection")} open={openSection === "ssh"} onToggle={() => toggleSection("ssh")}>
-          {sshFields}
-        </DrawerSection>
-
-        <DrawerSection title={t("host.responsibility")} open={openSection === "responsaveis"} onToggle={() => toggleSection("responsaveis")}>
-          {responsaveisFields}
-        </DrawerSection>
-
-        <DrawerSection title={t("host.links")} open={openSection === "links"} onToggle={() => toggleSection("links")}>
-          {linksFields}
-        </DrawerSection>
-      </div>
-    );
-  }
-
-  // Create mode: stepped wizard
-  return (
-    <div className="space-y-4">
-      <FormError message={error} />
-
-      {step === 1 && (
-        <div className="space-y-3 animate-fade-in">
-          {basicInfoFields}
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="space-y-3 animate-fade-in">
-          {sshFields}
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="space-y-3 animate-fade-in">
-          {responsaveisFields}
-        </div>
-      )}
-
-      {step === 4 && (
-        <div className="space-y-3 animate-fade-in">
-          {linksFields}
-        </div>
-      )}
-    </div>
+      <FormSection id="host-notes" title={t("form.section.notes")} stack>
+        <TagInput label={t("common.tags")} tags={formTags} onChange={setFormTags} entityType="host" />
+        <FormField label={t("common.observacoes")}>
+          <MarkdownEditor value={form.observacoes as string} onChange={(v) => set("observacoes", v)} rows={4} placeholder={t("form.markdownPlaceholder")} />
+        </FormField>
+      </FormSection>
+    </EntityFormShell>
   );
 }
 
@@ -449,60 +311,10 @@ function resolvePreferredAuth(hasPassword: boolean, hasKey: boolean, preferredAu
     return {
       valid: false as const,
       value: "",
-      error: "Select default auth method (password or key) when both are configured.",
+      error: "host.authPickDefault",
     };
   }
   if (hasPassword) return { valid: true as const, value: "password", error: "" };
   if (hasKey) return { valid: true as const, value: "key", error: "" };
   return { valid: true as const, value: "", error: "" };
-}
-
-// HostDashboardProvisionButton calls POST /api/hosts/{slug}/grafana/provision
-// and populates the UID field with the returned deterministic UID on success.
-// Only rendered for existing hosts (slug must be persisted).
-function HostDashboardProvisionButton({ slug, onProvisioned }: { slug: string; onProvisioned: (uid: string) => void }) {
-  const { t } = useLocale();
-  const { data: integrations } = useQuery({
-    queryKey: ["integrations"],
-    queryFn: integrationsAPI.get,
-    retry: false,
-    staleTime: 60_000,
-  });
-  const grafanaEnabled = integrations?.grafana?.grafana_enabled === "true";
-  const datasourceSet = !!integrations?.grafana?.grafana_datasource_uid;
-
-  const mutation = useMutation({
-    mutationFn: () => grafanaAPI.provisionHostDashboard(slug),
-    onSuccess: (res) => {
-      onProvisioned(res.uid);
-    },
-  });
-
-  if (!grafanaEnabled) return null;
-
-  return (
-    <div className="mt-3 space-y-1">
-      <button
-        type="button"
-        onClick={() => mutation.mutate()}
-        disabled={mutation.isPending || !datasourceSet}
-        className="text-xs text-[var(--accent)] hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
-      >
-        {mutation.isPending ? t("host.grafanaProvisioning") : t("host.grafanaProvisionButton")}
-      </button>
-      {!datasourceSet && (
-        <p className="text-2xs text-[var(--warning)]">
-          {t("host.grafanaDatasourceRequired")}
-        </p>
-      )}
-      {mutation.isSuccess && !mutation.isPending && (
-        <p className="text-2xs text-[var(--success)]">{mutation.data?.message}</p>
-      )}
-      {mutation.isError && (
-        <p className="text-2xs text-[var(--danger)]">
-          {mutation.error instanceof Error ? mutation.error.message : t("host.grafanaProvisionFailed")}
-        </p>
-      )}
-    </div>
-  );
 }

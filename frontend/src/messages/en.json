@@ -734,7 +734,8 @@
     "profileTitle": "Host",
     "declared": "Declared",
     "declaredHint": "What was registered for this host; the last scan shows what is actually there.",
-    "tabMetrics": "Metrics"
+    "tabMetrics": "Metrics",
+    "authPickDefault": "With both a password and a key, pick the default auth method."
   },
   "dns": {
     "title": "DNS Records",
@@ -2661,5 +2662,44 @@
     "service": "Service",
     "project": "Project",
     "contact": "Contact"
+  },
+  "form": {
+    "sectionsLabel": "Form sections",
+    "relationsCount": "{count} linked",
+    "searchToLink": "Search to link…",
+    "selectedCount": "{count} selected",
+    "addTag": "Add",
+    "required": "Required",
+    "slugInvalid": "Use only letters, numbers, dot, hyphen or underscore.",
+    "slugHint": "Identifier used in the URL and the SSH config.",
+    "portInvalid": "Enter a port between 1 and 65535.",
+    "domainInvalid": "Enter a valid domain, like app.example.gov.",
+    "urlInvalid": "Enter a URL starting with http:// or https://.",
+    "saveFailed": "Couldn't save. Try again.",
+    "saveChanges": "Save changes",
+    "createHost": "Create host",
+    "createDns": "Create DNS record",
+    "createService": "Create service",
+    "editTitle": "Edit {name}",
+    "markdownPlaceholder": "Markdown supported",
+    "httpsHint": "The certificate is checked later, by the certificate scan.",
+    "software": "Software",
+    "softwareHint": "What runs, like PostgreSQL or Nginx. The scan fills it for services it finds.",
+    "management": "Management",
+    "section": {
+      "identity": "Identity",
+      "identityHostHint": "What the host is called and where it answers.",
+      "operation": "Operation",
+      "access": "SSH access",
+      "accessHint": "Used for scans and operations. The password is stored encrypted.",
+      "owners": "Owners",
+      "ownersHint": "Who sees the record and who answers for it.",
+      "links": "Links",
+      "linksHint": "Search by name; the context beside each item tells same-named ones apart.",
+      "notes": "Notes",
+      "origin": "Origin",
+      "originHint": "Who builds it and who runs it."
+    },
+    "addResponsavel": "Add owner"
   }
 }

@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useId } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import * as Popover from "@radix-ui/react-popover";
 import { useQuery } from "@tanstack/react-query";
 import { tagsAPI } from "@/lib/api";
+import FormField, { INPUT_CLASS } from "./FormField";
+import Tag from "./Tag";
+import Button from "./Button";
 
 interface TagInputProps {
   label?: string;
@@ -17,6 +20,7 @@ interface TagInputProps {
 
 export default function TagInput({ label, tags, onChange, suggestions: externalSuggestions, entityType, placeholder }: TagInputProps) {
   const { t } = useLocale();
+  const id = useId();
   const [input, setInput] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,18 +53,14 @@ export default function TagInput({ label, tags, onChange, suggestions: externalS
   const shouldShowDropdown = showSuggestions && filtered.length > 0;
 
   return (
-    <div className="space-y-1.5">
-      {label && (
-        <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
-          {label}
-        </label>
-      )}
+    <FormField label={label} htmlFor={id}>
       <Popover.Root open={shouldShowDropdown} onOpenChange={(isOpen) => { if (!isOpen) setShowSuggestions(false); }}>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Popover.Anchor asChild>
               <input
                 ref={inputRef}
+                id={id}
                 type="text"
                 value={input}
                 onChange={(e) => { setInput(e.target.value); setShowSuggestions(true); }}
@@ -70,17 +70,13 @@ export default function TagInput({ label, tags, onChange, suggestions: externalS
                   if (e.key === "Escape") setShowSuggestions(false);
                 }}
                 placeholder={placeholder || t("common.addTag")}
-                className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2.5 md:py-2 text-base md:text-sm transition duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-muted)] focus:outline-none"
+                className={INPUT_CLASS}
               />
             </Popover.Anchor>
           </div>
-          <button
-            type="button"
-            onClick={() => addTag()}
-            className="px-4 py-2.5 md:py-2 text-sm font-medium bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent)]/20 rounded-[var(--radius-md)] hover:bg-[var(--accent)]/20 transition-colors"
-          >
-            +
-          </button>
+          <Button type="button" variant="secondary" onClick={() => addTag()} disabled={!input.trim()}>
+            {t("form.addTag")}
+          </Button>
         </div>
         <Popover.Portal>
           <Popover.Content
@@ -109,17 +105,12 @@ export default function TagInput({ label, tags, onChange, suggestions: externalS
         </Popover.Portal>
       </Popover.Root>
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-3">
+        <div className="flex flex-wrap gap-1.5 mt-2">
           {tags.map((tag) => (
-            <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-[var(--bg-overlay)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
-              {tag}
-              <button type="button" onClick={() => removeTag(tag)} className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-[var(--danger)]/20 hover:text-[var(--danger)] transition-colors text-xs leading-none">
-                &times;
-              </button>
-            </span>
+            <Tag key={tag} onRemove={() => removeTag(tag)} removeLabel={t("common.removeItem", { label: tag })}>{tag}</Tag>
           ))}
         </div>
       )}
-    </div>
+    </FormField>
   );
 }
