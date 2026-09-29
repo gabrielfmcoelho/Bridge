@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { secretsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
@@ -10,6 +9,7 @@ import IconButton from "@/components/ui/IconButton";
 import Icon from "@/components/ui/Icon";
 import { RowList, RowGroup, ListRow, RowText } from "@/components/ui/RowList";
 import VaultEntryEditor from "@/components/vault/VaultEntryEditor";
+import NewSecretModal from "@/app/secrets/_components/NewSecretModal";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { serviceTitle } from "@/lib/serviceDisplay";
 import type { Secret, Service } from "@/lib/types";
@@ -21,8 +21,8 @@ import type { Secret, Service } from "@/lib/types";
  */
 export default function ProjectSecretsTab({ projectId, services, canEdit }: { projectId: number; services: Service[]; canEdit: boolean }) {
   const { t } = useLocale();
-  const router = useRouter();
   const [editing, setEditing] = useState<Secret | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const { data: own = [] } = useQuery({
     queryKey: ["secrets-all", "projeto", projectId],
@@ -58,7 +58,7 @@ export default function ProjectSecretsTab({ projectId, services, canEdit }: { pr
         body="flush"
         empty={own.length === 0 ? t("project.noSecrets") : undefined}
         controls={canEdit && (
-          <IconButton onClick={() => router.push("/secrets?scope=projeto")} label={t("vault.newSecretButton")}><Icon path={ICON_PATHS.plus} /></IconButton>
+          <IconButton onClick={() => setCreating(true)} label={t("vault.newSecretButton")}><Icon path={ICON_PATHS.plus} /></IconButton>
         )}
       >
         <RowList>{own.map(row)}</RowList>
@@ -73,6 +73,8 @@ export default function ProjectSecretsTab({ projectId, services, canEdit }: { pr
       )}
 
       <VaultEntryEditor secret={editing} onClose={() => setEditing(null)} />
+      {/* Mounted only while open: the modal reads its preset once, on mount. */}
+      {creating && <NewSecretModal open onClose={() => setCreating(false)} defaultScope="projeto" defaultParentId={projectId} />}
     </div>
   );
 }

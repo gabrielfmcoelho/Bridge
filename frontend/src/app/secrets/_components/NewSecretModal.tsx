@@ -18,6 +18,10 @@ import type { AssetGrantsInput } from "@/lib/types";
 interface NewSecretModalProps {
   open: boolean;
   onClose: () => void;
+  /** Opened from an asset (a project's or service's Segredos tab): start
+   *  attached to it, shared. */
+  defaultScope?: Scope;
+  defaultParentId?: number;
 }
 
 type SecretType = "password" | "cred" | "sshkey" | "app_login" | "env_var";
@@ -67,18 +71,18 @@ interface EnvVarRow {
 // Parent selection: when scope != avulso we fetch the relevant list
 // (services / hosts / external_tools) and surface it as a dropdown so
 // operators don't need to remember numeric IDs.
-export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
+export default function NewSecretModal({ open, onClose, defaultScope, defaultParentId }: NewSecretModalProps) {
   const qc = useQueryClient();
 
   // Common metadata fields.
   const [type, setType] = useState<SecretType>("password");
-  const [scope, setScope] = useState<Scope>("avulso");
-  const [visibility, setVisibility] = useState<Visibility>("personal");
+  const [scope, setScope] = useState<Scope>(defaultScope ?? "avulso");
+  const [visibility, setVisibility] = useState<Visibility>(defaultParentId ? "shared" : "personal");
   // Entidade grants apply only to shared avulso secrets (parented ones inherit
   // from their parent; personal ones are owner-only).
   const { user } = useAuth();
   const [grants, setGrants] = useState<AssetGrantsInput>(() => defaultGrants(user));
-  const [parentID, setParentID] = useState<string>(""); // stored as string for Select compat
+  const [parentID, setParentID] = useState<string>(defaultParentId ? String(defaultParentId) : ""); // stored as string for Select compat
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
@@ -173,9 +177,9 @@ export default function NewSecretModal({ open, onClose }: NewSecretModalProps) {
 
   const reset = () => {
     setType("password");
-    setScope("avulso");
-    setVisibility("personal");
-    setParentID("");
+    setScope(defaultScope ?? "avulso");
+    setVisibility(defaultParentId ? "shared" : "personal");
+    setParentID(defaultParentId ? String(defaultParentId) : "");
     setName("");
     setDescription("");
     setValueField("");
