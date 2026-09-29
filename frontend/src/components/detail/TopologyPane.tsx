@@ -25,7 +25,7 @@ export default function TopologyPane({ graph, loading, relations, hasRelations, 
   const [mobileView, setMobileView] = useState<"list" | "graph">("list");
 
   if (!hasRelations && !loading && graph.nodes.length === 0) {
-    return <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} compact />;
+    return <EmptyState icon="topology" title={t("host.noTopology")} description={t("topology.noRelations")} compact />;
   }
 
   const graphBox = (
@@ -35,7 +35,7 @@ export default function TopologyPane({ graph, loading, relations, hasRelations, 
       ) : graph.nodes.length > 0 ? (
         <TopologyGraph data={graph} className="w-full h-full" />
       ) : (
-        <EmptyState icon="topology" title={t("host.noTopology")} description={t("host.noTopologyDesc")} compact />
+        <EmptyState icon="topology" title={t("host.noTopology")} description={t("topology.noRelations")} compact />
       )}
     </div>
   );

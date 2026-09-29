@@ -811,7 +811,13 @@
       "certHealth": "Certificate health",
       "byIssuer": "By issuer",
       "byHost": "Hosts with most domains"
-    }
+    },
+    "profileTitle": "Domain",
+    "certNone": "This domain doesn't use HTTPS.",
+    "certUnscannedHint": "Certificate not checked yet. Use the button beside to check it now.",
+    "notFound": "DNS record not found",
+    "notFoundDesc": "It was deleted or you don't have access to it.",
+    "backToList": "Back to DNS records"
   },
   "project": {
     "title": "Projects",
@@ -1075,7 +1081,8 @@
     "noHttps": "No HTTPS",
     "emptyDescription": "Add hosts and services to see the topology",
     "projects": "Projects",
-    "relations": "Relationships"
+    "relations": "Relationships",
+    "noRelations": "No links to hosts, DNS, services or projects. Add them from the edit form."
   },
   "sshConfig": {
     "title": "SSH Config",

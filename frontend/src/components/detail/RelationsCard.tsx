@@ -27,7 +27,7 @@ export default function RelationsCard({ groups, t }: { groups: RelationGroup[]; 
   const shown = groups.filter((g) => g.rows.length > 0);
   const count = shown.reduce((n, g) => n + g.rows.length, 0);
   return (
-    <SectionCard as="h3" title={t("topology.relations")} count={count} body="flush" empty={count === 0 ? t("host.noTopologyDesc") : undefined}>
+    <SectionCard as="h3" title={t("topology.relations")} count={count} body="flush" empty={count === 0 ? t("topology.noRelations") : undefined}>
       {shown.map((g) => (
         <RowGroup key={g.title} title={g.title}>
           {g.rows.map((r) => (

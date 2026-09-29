@@ -811,7 +811,13 @@
       "certHealth": "Saúde do certificado",
       "byIssuer": "Por emissor",
       "byHost": "Hosts com mais domínios"
-    }
+    },
+    "profileTitle": "Domínio",
+    "certNone": "Este domínio não usa HTTPS.",
+    "certUnscannedHint": "Certificado ainda não verificado. Use o botão ao lado para verificar agora.",
+    "notFound": "Registro DNS não encontrado",
+    "notFoundDesc": "Ele foi excluído ou você não tem acesso a ele.",
+    "backToList": "Voltar para Registros DNS"
   },
   "project": {
     "title": "Projetos",
@@ -1075,7 +1081,8 @@
     "noHttps": "Sem HTTPS",
     "emptyDescription": "Adicione hosts e serviços para ver a topologia",
     "projects": "Projetos",
-    "relations": "Relacionamentos"
+    "relations": "Relacionamentos",
+    "noRelations": "Nenhum vínculo com hosts, DNS, serviços ou projetos. Vincule pelo formulário de edição."
   },
   "sshConfig": {
     "title": "Config SSH",

@@ -3,23 +3,28 @@
 import { useState, useMemo, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { dnsAPI, hostsAPI, servicesAPI, projectsAPI, graphAPI, globalIssuesAPI } from "@/lib/api";
+import { dnsAPI, hostsAPI, servicesAPI, projectsAPI, globalIssuesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFilteredGraph } from "@/hooks/useFilteredGraph";
+import { useEntityGraph } from "@/hooks/useEntityGraph";
 import PageShell from "@/components/layout/PageShell";
 import SituacaoText from "@/components/ui/SituacaoText";
 import CardIndicator from "@/components/inventory/CardIndicator";
 import Drawer from "@/components/ui/Drawer";
 import PageHeader from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
+import Button from "@/components/ui/Button";
 import DnsForm from "../DnsForm";
-import OverviewTab from "./_components/OverviewTab";
-import TopologyTab from "./_components/TopologyTab";
-import IssuesTab from "./_components/IssuesTab";
+import DnsProfile from "./_components/DnsProfile";
+import CertificateCard from "./_components/CertificateCard";
+import DetailSplit from "@/components/detail/DetailSplit";
+import TopologyPane from "@/components/detail/TopologyPane";
+import RelationsCard, { hostsGroup, servicesGroup, projectsGroup } from "@/components/detail/RelationsCard";
+import IssuesBoard from "@/components/issues/IssuesBoard";
+import EmptyState from "@/components/ui/EmptyState";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import { certState } from "@/lib/dnsCert";
-import CertBadge from "../_components/CertBadge";
+import { certState, certTone } from "@/lib/dnsCert";
+import { certLabel } from "../_components/CertBadge";
 
 type TabKey = "overview" | "topology" | "issues";
 
@@ -37,11 +42,11 @@ export default function DnsDetail({ id }: { id: number }) {
   const [formSubHeader, setFormSubHeader] = useState<ReactNode>(null);
 
   // ── Data queries ──
-  const { data, isLoading } = useQuery({ queryKey: ["dns", id], queryFn: () => dnsAPI.get(id) });
+  // No retry: a 404 (missing or not visible) should say so at once, not after backoff.
+  const { data, isLoading } = useQuery({ queryKey: ["dns", id], queryFn: () => dnsAPI.get(id), retry: false });
   const { data: allHosts = [] } = useQuery({ queryKey: ["hosts"], queryFn: () => hostsAPI.list() });
   const { data: allServices = [] } = useQuery({ queryKey: ["services"], queryFn: servicesAPI.list });
   const { data: allProjects = [] } = useQuery({ queryKey: ["projects"], queryFn: projectsAPI.list });
-  const { data: graphData } = useQuery({ queryKey: ["graph"], queryFn: graphAPI.get, enabled: activeTab === "topology" });
   const { data: dnsIssues = [] } = useQuery({
     queryKey: ["issues", "dns", id],
     queryFn: () => globalIssuesAPI.list({ entity_type: "dns", entity_id: String(id) }),
@@ -50,8 +55,7 @@ export default function DnsDetail({ id }: { id: number }) {
 
   const dns = data?.dns_record;
   const responsaveis = data?.responsaveis || [];
-  const entityNodeId = data ? `dns-${id}` : undefined;
-  const filteredGraph = useFilteredGraph(entityNodeId, graphData, activeTab === "topology");
+  const { graph, loading: graphLoading } = useEntityGraph(data ? `dns-${id}` : undefined, activeTab === "topology");
 
   const linkedHosts = useMemo(() => {
     if (!data?.host_ids || !allHosts.length) return [];
@@ -78,18 +82,18 @@ export default function DnsDetail({ id }: { id: number }) {
     {
       key: "overview",
       label: t("host.tabOverview"),
-      icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
+      icon: ICON_PATHS.home,
     },
     {
       key: "issues",
-      label: t("host.acontecimentos"),
-      icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+      label: t("host.tabTracking"),
+      icon: ICON_PATHS.alert,
       badge: dnsIssues.length || undefined,
     },
     {
       key: "topology",
       label: t("host.tabTopology"),
-      icon: "M13 10V3L4 14h7v7l9-11h-7z",
+      icon: ICON_PATHS.bolt,
     },
   ];
 
@@ -114,9 +118,10 @@ export default function DnsDetail({ id }: { id: number }) {
             description={dns.observacoes || undefined}
             status={<SituacaoText situacao={dns.situacao} />}
             indicators={<>
-              <CardIndicator icon={ICON_PATHS.lock} count={dns.has_https ? 1 : 0} hideCount color="success" title={t("topology.https")} />
-              <CardIndicator icon={ICON_PATHS.alert} count={dnsIssues.length} color="purple" title={t("host.acontecimentos")} />
-              {certState(dns) !== "none" && <CertBadge dns={dns} />}
+              <CardIndicator icon={ICON_PATHS.lock} count={dns.has_https ? 1 : 0} hideCount color={certTone(certState(dns)) === "default" ? "success" : certTone(certState(dns))} title={certLabel(dns, t) || t("topology.noHttps")} />
+              <CardIndicator icon={ICON_PATHS.server} count={linkedHosts.length} color="info" title={t("dns.hostCount", { count: String(linkedHosts.length) })} />
+              <CardIndicator icon={ICON_PATHS.gear} count={linkedServices.length} color="warning" title={`${linkedServices.length} ${t("host.services").toLowerCase()}`} />
+              <CardIndicator icon={ICON_PATHS.clipboard} count={dnsIssues.length} color="accent" title={`${dnsIssues.length} ${t("nav.issues").toLowerCase()}`} />
             </>}
             onEdit={canEdit ? () => setShowEditDrawer(true) : undefined}
             onDelete={isAdmin ? () => deleteMutation.mutate() : undefined}
@@ -125,16 +130,23 @@ export default function DnsDetail({ id }: { id: number }) {
           >
 
           {activeTab === "overview" && (
-            <OverviewTab dns={dns} tags={data.tags || []} responsaveis={responsaveis} linkedHosts={linkedHosts} linkedServices={linkedServices} linkedProjects={linkedProjects} canEdit={canEdit} t={t} />
+            <DetailSplit profile={<DnsProfile dns={dns} tags={data.tags || []} responsaveis={responsaveis} />}>
+              <CertificateCard dns={dns} canEdit={canEdit} />
+            </DetailSplit>
           )}
 
           {activeTab === "issues" && (
-            <IssuesTab issues={dnsIssues} entityType="dns" entityId={id} t={t} canEdit={canEdit} />
+            <IssuesBoard entityType="dns" entityId={id} canEdit={canEdit} />
           )}
 
-          {activeTab === "topology" && (
-            <TopologyTab filteredGraph={filteredGraph} linkedHosts={linkedHosts} linkedServices={linkedServices} />
-          )}
+          {activeTab === "topology" && (() => {
+            const groups = [hostsGroup(linkedHosts, t), servicesGroup(linkedServices, t), projectsGroup(linkedProjects, t)];
+            return (
+              <TopologyPane graph={graph} loading={graphLoading} t={t}
+                hasRelations={groups.some((g) => g.rows.length > 0)}
+                relations={<RelationsCard groups={groups} t={t} />} />
+            );
+          })()}
 
           </PageHeader>
 
@@ -165,7 +177,10 @@ export default function DnsDetail({ id }: { id: number }) {
           </Drawer>
 
         </div>
-      ) : null}
+      ) : (
+        <EmptyState icon="globe" title={t("dns.notFound")} description={t("dns.notFoundDesc")}
+          action={<Button size="sm" variant="secondary" onClick={() => router.push("/dns")}>{t("dns.backToList")}</Button>} />
+      )}
     </PageShell>
   );
 }
