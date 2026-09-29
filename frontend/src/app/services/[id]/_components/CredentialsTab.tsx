@@ -8,7 +8,7 @@ import IconButton from "@/components/ui/IconButton";
 import Icon from "@/components/ui/Icon";
 import { RowList, ListRow, RowText } from "@/components/ui/RowList";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import NewSecretModal from "@/app/secrets/_components/NewSecretModal";
+import { NewSecretDrawer } from "@/components/vault/SecretForm";
 import VaultEntryEditor from "@/components/vault/VaultEntryEditor";
 import type { Secret } from "@/lib/types";
 
@@ -43,7 +43,7 @@ export default function CredentialsTab({ serviceId, isAdmin, t }: { serviceId: n
         </RowList>
       </SectionCard>
       <VaultEntryEditor secret={editing} onClose={() => setEditing(null)} />
-      {creating && <NewSecretModal open onClose={() => setCreating(false)} defaultScope="service" defaultParentId={serviceId} />}
+      <NewSecretDrawer open={creating} onClose={() => setCreating(false)} defaultScope="service" defaultParentId={serviceId} />
     </>
   );
 }

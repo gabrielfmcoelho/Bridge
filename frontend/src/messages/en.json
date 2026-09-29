@@ -2774,7 +2774,6 @@
       "projeto": "Project"
     },
     "parentHint": "Pick one of the existing records.",
-    "select": "Select…",
     "alsoSyncServices": "Also write to this project's services",
     "projectNoServices": "This project has no services.",
     "nameHint": "How the secret shows up in lists.",
@@ -2813,6 +2812,15 @@
     "errorVarName": "Every variable needs a name.",
     "errorVarNameFormat": "Variable \"{name}\" must use only uppercase letters, digits and _ (e.g. DB_URL).",
     "errorVarValue": "Variable \"{name}\" needs a value.",
-    "errorVarDuplicate": "Variable \"{name}\" appears twice; names must be unique."
+    "errorVarDuplicate": "Variable \"{name}\" appears twice; names must be unique.",
+    "sectionWhat": "What to keep",
+    "sectionWhatHint": "The type decides the fields. The value is stored encrypted.",
+    "sectionWhere": "Where it lives",
+    "sectionWhereHint": "The item the secret belongs to; deleting it takes the secret along.",
+    "sectionWho": "Who sees it",
+    "visibilityPersonalHint": "Only you see and use it.",
+    "visibilitySharedHint": "Whoever sees the linked item sees this secret.",
+    "visibilitySharedAvulsoHint": "Members of the entidades checked below see this secret.",
+    "select": "Select…"
   }
 }

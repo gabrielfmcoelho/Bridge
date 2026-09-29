@@ -2774,7 +2774,6 @@
       "projeto": "Projeto"
     },
     "parentHint": "Escolha entre os já cadastrados.",
-    "select": "Selecione…",
     "alsoSyncServices": "Gravar também nos serviços deste projeto",
     "projectNoServices": "Este projeto não tem serviços.",
     "nameHint": "Como o segredo aparece nas listas.",
@@ -2813,6 +2812,15 @@
     "errorVarName": "Toda variável precisa de nome.",
     "errorVarNameFormat": "A variável \"{name}\" deve usar só maiúsculas, números e _ (ex.: DB_URL).",
     "errorVarValue": "A variável \"{name}\" precisa de valor.",
-    "errorVarDuplicate": "A variável \"{name}\" aparece duas vezes; os nomes devem ser únicos."
+    "errorVarDuplicate": "A variável \"{name}\" aparece duas vezes; os nomes devem ser únicos.",
+    "sectionWhat": "O que guardar",
+    "sectionWhatHint": "O tipo decide os campos. O valor é gravado cifrado.",
+    "sectionWhere": "Onde fica",
+    "sectionWhereHint": "O item a que o segredo pertence; excluí-lo leva o segredo junto.",
+    "sectionWho": "Quem vê",
+    "visibilityPersonalHint": "Só você vê e usa.",
+    "visibilitySharedHint": "Quem vê o item vinculado vê este segredo.",
+    "visibilitySharedAvulsoHint": "Quem pertence às entidades marcadas abaixo vê este segredo.",
+    "select": "Selecione…"
   }
 }

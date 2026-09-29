@@ -20,7 +20,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import PillButton from "@/components/ui/PillButton";
 import ShareLinkModal from "@/app/secrets/_components/ShareLinkModal";
 import HistoryDrawer from "@/app/secrets/_components/HistoryDrawer";
-import NewSecretModal from "@/app/secrets/_components/NewSecretModal";
+import { NewSecretDrawer } from "@/components/vault/SecretForm";
 import LinkedHostsModal from "@/app/secrets/_components/LinkedHostsModal";
 import VaultEntryEditor from "@/components/vault/VaultEntryEditor";
 
@@ -174,7 +174,7 @@ function VaultPageInner() {
 
       <ShareLinkModal secretID={shareTarget} onClose={() => setShareTarget(null)} />
       <HistoryDrawer secretID={historyTarget} onClose={() => setHistoryTarget(null)} />
-      <NewSecretModal open={newOpen} onClose={() => setNewOpen(false)} />
+      <NewSecretDrawer open={newOpen} onClose={() => setNewOpen(false)} />
       <LinkedHostsModal secretID={manageHostsTarget} onClose={() => setManageHostsTarget(null)} />
       <VaultEntryEditor secret={editTarget} onClose={() => setEditTarget(null)} />
     </PageShell>

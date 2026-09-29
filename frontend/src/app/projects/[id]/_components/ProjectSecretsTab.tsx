@@ -9,7 +9,7 @@ import IconButton from "@/components/ui/IconButton";
 import Icon from "@/components/ui/Icon";
 import { RowList, RowGroup, ListRow, RowText } from "@/components/ui/RowList";
 import VaultEntryEditor from "@/components/vault/VaultEntryEditor";
-import NewSecretModal from "@/app/secrets/_components/NewSecretModal";
+import { NewSecretDrawer } from "@/components/vault/SecretForm";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { serviceTitle } from "@/lib/serviceDisplay";
 import type { Secret, Service } from "@/lib/types";
@@ -73,8 +73,7 @@ export default function ProjectSecretsTab({ projectId, services, canEdit }: { pr
       )}
 
       <VaultEntryEditor secret={editing} onClose={() => setEditing(null)} />
-      {/* Mounted only while open: the modal reads its preset once, on mount. */}
-      {creating && <NewSecretModal open onClose={() => setCreating(false)} defaultScope="projeto" defaultParentId={projectId} />}
+      <NewSecretDrawer open={creating} onClose={() => setCreating(false)} defaultScope="projeto" defaultParentId={projectId} />
     </div>
   );
 }
