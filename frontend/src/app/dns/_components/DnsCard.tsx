@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import { situacaoAccent } from "@/lib/constants";
+import { useSituacao } from "@/hooks/useSituacao";
 import SituacaoText from "@/components/ui/SituacaoText";
 import { useHostNames } from "@/hooks/useHostNames";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorGrid, CardMeter } from "@/components/inventory";
@@ -16,11 +15,8 @@ import type { DNSRecord } from "@/lib/types";
 
 export default function DnsCard({ dns }: { dns: DNSRecord }) {
   const { t, formatDate } = useLocale();
-  const { data: situacoes = [] } = useQuery({
-    queryKey: ["enums", "situacao"],
-    queryFn: () => enumsAPI.list("situacao"),
-  });
-  const situacaoColor = situacoes.find((s) => s.value === dns.situacao)?.color;
+  const { roleOf, colorOf } = useSituacao();
+  const situacaoColor = colorOf(dns.situacao);
   const linkedHostsCount = dns.host_ids?.length || 0;
   const mainResp = dns.main_responsavel_name || dns.responsavel || "";
   // Subtitle: where the domain points — its first linked host, "+N" for more.
@@ -35,7 +31,7 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
 
   return (
     <Link href={`/dns/${dns.id}`} className="block h-full">
-      <Card accent={situacaoAccent(dns.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden">
+      <Card accent={situacaoAccent(roleOf(dns.situacao), situacaoColor)} className="h-full flex flex-col overflow-hidden">
         {/* Fixed anatomy: every slot renders, "–"/0/dimmed when empty. */}
         <CardHeader
           title={dns.domain}

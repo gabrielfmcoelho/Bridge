@@ -86,6 +86,9 @@ export default function EnumsTab() {
           <h3 className="text-xs font-semibold mb-2 font-mono text-[var(--text-secondary)]">
             {category}
           </h3>
+          {isSituacaoCategory(category) && (
+            <p className="text-xs text-[var(--text-muted)] mb-2">{t("settings.situacaoRolesHint")}</p>
+          )}
           <div className="flex flex-wrap gap-1.5 mb-2">
             {options.map((opt) => (
               <span key={opt.value} className="group inline-flex items-center gap-1">
@@ -95,6 +98,7 @@ export default function EnumsTab() {
                       <span className="w-2 h-2 rounded-full border border-white/20" style={{ backgroundColor: opt.color }} />
                     )}
                     {opt.value}
+                    {opt.role && <span className="text-[var(--text-muted)] font-normal">({t(`settings.situacaoRole.${opt.role}`)})</span>}
                   </Badge>
                 </button>
                 {isAdmin && (

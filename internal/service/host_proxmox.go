@@ -58,10 +58,10 @@ func (s *HostService) SyncFromProxmox(ctx context.Context, ms []proxmox.Machine)
 		st := store.ProxmoxState{
 			ProxmoxID: m.ProxmoxID, IP: m.IP,
 			RecursoCPU: m.CPU, RecursoRAM: m.RAM, RecursoArmazenamento: m.Disk,
-			Situacao: "inactive",
+			SituacaoRole: store.SituacaoInactive,
 		}
 		if m.Running {
-			st.Situacao = "active"
+			st.SituacaoRole = store.SituacaoActive
 		}
 		var parent int64
 		if m.Kind != "node" {

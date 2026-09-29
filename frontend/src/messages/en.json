@@ -1688,7 +1688,13 @@
       "integrations": "Integrations",
       "data": "Data"
     },
-    "restoreConfirmWord": "RESTORE"
+    "restoreConfirmWord": "RESTORE",
+    "situacaoRole": {
+      "active": "active",
+      "inactive": "off",
+      "maintenance": "maintenance"
+    },
+    "situacaoRolesHint": "The roles in parentheses tell the system which option means active, off and under maintenance (SSH config, Proxmox and Coolify sync). Renaming keeps the role; deleting the option drops it."
   },
   "operation": {
     "builtIn": "Built-in",

@@ -51,3 +51,14 @@ test("breakdowns count per value, most frequent first, with filters", () => {
   assert.deepEqual(b.usage.map((r) => [r.key, r.count]), [["high", 1], ["mid", 1], ["low", 0], ["none", 1]]);
   assert.deepEqual(b.alerts.map((r) => [r.key, r.count]), [["critical", 1], ["warning", 0], ["info", 0]]);
 });
+
+test("situação KPIs follow roles when the values are renamed", () => {
+  const renamed = [host({ id: 1, situacao: "Ativa" }), host({ id: 2, situacao: "Em manutenção" }), host({ id: 3, situacao: "active" })];
+  const roleOf = (v?: string) => ({ Ativa: "active", "Em manutenção": "maintenance", active: "active" } as Record<string, string>)[v ?? ""] ?? "";
+  const valueOf = (r: string) => ({ active: "Ativa", maintenance: "Em manutenção", inactive: "Desligada" } as Record<string, string>)[r] ?? r;
+  const by = Object.fromEntries(hostInsights(renamed, t, { roleOf, valueOf }).map((i) => [i.key, i]));
+  assert.equal(by.maintenance.value, 1);
+  assert.deepEqual(by.maintenance.filter, { situacao: "Em manutenção" });
+  assert.deepEqual(by.inactive.filter, { situacao: "Desligada" });
+  assert.equal(by.total.hint, "2 common.active · 1 common.maintenance");
+});

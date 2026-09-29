@@ -8,4 +8,8 @@ type EnumOption struct {
 	Value     string `json:"value"`
 	SortOrder int    `json:"sort_order"`
 	Color     string `json:"color"`
+	// Role pins a meaning the code relies on to an option, whatever its
+	// value is renamed to: situação "active" | "inactive" | "maintenance";
+	// "" = none. See store.SituacaoValueSQL.
+	Role string `json:"role"`
 }

@@ -12,18 +12,30 @@ export const SITUACAO_DOT_COLORS: Record<string, string> = {
   maintenance: "bg-[var(--warning)]",
 };
 
-// The colour of a situação: the enum's own colour when it has one, otherwise
-// the semantic token. Shared by Badge (legacy) and SituacaoText.
-export function situacaoColorOf(situacao: string | undefined, enumColor?: string): string {
-  if (enumColor) return enumColor;
-  return situacao === "active" ? "var(--success)" : situacao === "maintenance" ? "var(--warning)" : "var(--text-muted)";
+// Situação values are admin-editable ("active" became "Ativa"), so code keys
+// on the option's role instead. A value no option carries (a row written
+// before roles) is its own role when it's one of the factory values.
+export const SITUACAO_ROLES = ["active", "inactive", "maintenance"] as const;
+
+export function situacaoRole(value: string | undefined, options: { value: string; role?: string }[]): string {
+  if (!value) return "";
+  const role = options.find((o) => o.value === value)?.role;
+  if (role) return role;
+  return (SITUACAO_ROLES as readonly string[]).includes(value) ? value : "";
 }
 
-// Card accent for an entity's situacao: the enum's own colour when it has one,
-// otherwise the semantic token. Replaces the per-card hex fallbacks.
-export function situacaoAccent(situacao: string | undefined, enumColor?: string): string {
+// The colour of a situação by role: the enum's own colour when it has one,
+// otherwise the semantic token. Shared by Badge (legacy) and SituacaoText.
+export function situacaoColorOf(role: string | undefined, enumColor?: string): string {
   if (enumColor) return enumColor;
-  return situacao === "active" ? "success" : situacao === "maintenance" ? "warning" : "muted";
+  return role === "active" ? "var(--success)" : role === "maintenance" ? "var(--warning)" : "var(--text-muted)";
+}
+
+// Card accent for an entity's situação by role: the enum's own colour when it
+// has one, otherwise the semantic token.
+export function situacaoAccent(role: string | undefined, enumColor?: string): string {
+  if (enumColor) return enumColor;
+  return role === "active" ? "success" : role === "maintenance" ? "warning" : "muted";
 }
 
 // Role chip skin (users.role), shared by the header profile menu and the

@@ -1,5 +1,6 @@
 "use client";
 
+import { useSituacao } from "@/hooks/useSituacao";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { projectsAPI, enumsAPI, contactsAPI, integrationsAPI, glpiAPI } from "@/lib/api";
@@ -31,10 +32,12 @@ export default function ProjectForm({ initial, initialGrants, onSuccess, onSubHe
   const { user } = useAuth();
   const [grants, setGrants] = useState<AssetGrantsInput>(initialGrants ?? defaultGrants(user));
   const [step, setStep] = useState(1);
+  // New records start in whichever situação carries the "active" role.
+  const { valueOf: situacaoValueOf } = useSituacao();
   const [form, setForm] = useState({
     name: initial?.name || "",
     description: initial?.description || "",
-    situacao: initial?.situacao || "active",
+    situacao: initial?.situacao || situacaoValueOf("active"),
     setor_responsavel: initial?.setor_responsavel || "",
     responsavel: initial?.responsavel || "",
     tem_empresa_externa_responsavel: initial?.tem_empresa_externa_responsavel || false,

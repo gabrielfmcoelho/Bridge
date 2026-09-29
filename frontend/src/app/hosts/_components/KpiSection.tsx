@@ -2,6 +2,7 @@
 
 import InsightKpis from "@/components/inventory/InsightKpis";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useSituacao } from "@/hooks/useSituacao";
 import type { Host, HostFilters, HostSortConfig } from "@/lib/types";
 import type { SortConfig } from "@/lib/insights";
 import { hostInsights, DEFAULT_HOST_INSIGHTS } from "./hostInsights";
@@ -19,9 +20,10 @@ export default function KpiSection({ hosts, filters, onFiltersChange, sort, onSo
   layout?: "grid" | "list";
 }) {
   const { t } = useLocale();
+  const { roleOf, valueOf } = useSituacao();
   return (
     <InsightKpis
-      insights={hostInsights(hosts, t)}
+      insights={hostInsights(hosts, t, { roleOf, valueOf })}
       defaults={DEFAULT_HOST_INSIGHTS}
       storageKey="hosts_kpis"
       filters={filters}

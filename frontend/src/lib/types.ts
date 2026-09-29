@@ -346,6 +346,9 @@ export interface EnumOption {
   value: string;
   sort_order: number;
   color?: string;
+  /** situação only: the meaning code relies on ("active" | "inactive" |
+   *  "maintenance"), kept when the value is renamed; "" = none. */
+  role?: string;
 }
 
 export interface GraphNode {

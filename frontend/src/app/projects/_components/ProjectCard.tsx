@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import { situacaoAccent } from "@/lib/constants";
+import { useSituacao } from "@/hooks/useSituacao";
 import SituacaoText from "@/components/ui/SituacaoText";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -13,15 +12,12 @@ import type { Project } from "@/lib/types";
 
 export default function ProjectCard({ project }: { project: Project }) {
   const { t } = useLocale();
-  const { data: situacoes = [] } = useQuery({
-    queryKey: ["enums", "situacao"],
-    queryFn: () => enumsAPI.list("situacao"),
-  });
-  const situacaoColor = situacoes.find((s) => s.value === project.situacao)?.color;
+  const { roleOf, colorOf } = useSituacao();
+  const situacaoColor = colorOf(project.situacao);
 
   return (
     <Link href={`/projects/${project.id}`} className="block h-full">
-      <Card accent={situacaoAccent(project.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden">
+      <Card accent={situacaoAccent(roleOf(project.situacao), situacaoColor)} className="h-full flex flex-col overflow-hidden">
         {/* Fixed anatomy: every slot renders, "–" when empty. */}
         <CardHeader
           titleFont="display"

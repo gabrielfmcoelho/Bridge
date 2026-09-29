@@ -20,9 +20,17 @@ export function peakUsage(h: Host): number | null {
 
 export const HIGH_USAGE = 80;
 
-export function hostInsights(hosts: Host[], t: T): HostInsight[] {
+/** How the page reads situação roles (useSituacao); the defaults treat the
+ *  factory values as their own roles, which is what the tests use. */
+export interface SituacaoRoles {
+  roleOf: (value: string | undefined) => string;
+  valueOf: (role: string) => string;
+}
+const factoryRoles: SituacaoRoles = { roleOf: (v) => v ?? "", valueOf: (r) => r };
+
+export function hostInsights(hosts: Host[], t: T, roles: SituacaoRoles = factoryRoles): HostInsight[] {
   const n = (pred: (h: Host) => boolean) => hosts.filter(pred).length;
-  const bySituacao = (s: string) => n((h) => h.situacao === s);
+  const bySituacao = (role: string) => n((h) => roles.roleOf(h.situacao) === role);
   const pct = (v: number) => (hosts.length ? `${Math.round((v / hosts.length) * 100)}%` : "0%");
   const scanned = n((h) => !!h.has_scan);
   const withAlerts = n((h) => (h.alerts?.length ?? 0) > 0);
@@ -36,8 +44,8 @@ export function hostInsights(hosts: Host[], t: T): HostInsight[] {
         [bySituacao("inactive"), t("common.inactive")],
       ].filter(([c]) => c).map(([c, l]) => `${c} ${String(l).toLowerCase()}`).join(" · "),
     },
-    { key: "maintenance", label: t("host.kpi.maintenance"), icon: "gear", color: "warning", value: bySituacao("maintenance"), hint: pct(bySituacao("maintenance")), filter: { situacao: "maintenance" } },
-    { key: "inactive", label: t("host.kpi.inactive"), icon: "archive", color: "var(--text-secondary)", value: bySituacao("inactive"), hint: pct(bySituacao("inactive")), filter: { situacao: "inactive" } },
+    { key: "maintenance", label: t("host.kpi.maintenance"), icon: "gear", color: "warning", value: bySituacao("maintenance"), hint: pct(bySituacao("maintenance")), filter: { situacao: roles.valueOf("maintenance") } },
+    { key: "inactive", label: t("host.kpi.inactive"), icon: "archive", color: "var(--text-secondary)", value: bySituacao("inactive"), hint: pct(bySituacao("inactive")), filter: { situacao: roles.valueOf("inactive") } },
     {
       key: "critical", label: t("host.kpi.critical"), icon: "alert", color: "danger",
       value: n((h) => !!h.alerts?.some((a) => a.level === "critical")),

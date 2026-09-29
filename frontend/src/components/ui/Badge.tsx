@@ -1,9 +1,8 @@
 "use client";
 
 import { LOZENGE_SHAPE } from "./Lozenge";
-import { useQuery } from "@tanstack/react-query";
-import { enumsAPI } from "@/lib/api";
 import { SITUACAO_COLORS, SITUACAO_DOT_COLORS, situacaoColorOf } from "@/lib/constants";
+import { useSituacao } from "@/hooks/useSituacao";
 
 // Full literals on purpose: Tailwind's scanner only generates utilities it can
 // read verbatim from source, so these cannot be built from a template string.
@@ -44,15 +43,12 @@ interface BadgeProps {
 
 export default function Badge({ children, variant = "default", color, situacao, className = "", dot = false, compact = false }: BadgeProps) {
   const base = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors";
-  const { data: situacoes = [] } = useQuery({
-    queryKey: ["enums", "situacao"],
-    queryFn: () => enumsAPI.list("situacao"),
-  });
-
-  const situacaoColor = situacoes.find((s) => s.value === situacao)?.color;
+  const { roleOf, colorOf } = useSituacao();
+  const situacaoColor = colorOf(situacao);
+  const role = roleOf(situacao);
 
   if (variant === "situacao" && situacao) {
-    const dotColor = situacaoColorOf(situacao, situacaoColor);
+    const dotColor = situacaoColorOf(role, situacaoColor);
 
     if (compact) {
       // The label expands on hover, so colour must not be the only carrier of
@@ -67,8 +63,8 @@ export default function Badge({ children, variant = "default", color, situacao, 
           role="img"
         >
           <span
-            className={`w-2 h-2 rounded-full shrink-0 ${situacao === "active" ? "" : "border-2 bg-transparent"}`}
-            style={situacao === "active" ? { backgroundColor: dotColor } : { borderColor: dotColor }}
+            className={`w-2 h-2 rounded-full shrink-0 ${role === "active" ? "" : "border-2 bg-transparent"}`}
+            style={role === "active" ? { backgroundColor: dotColor } : { borderColor: dotColor }}
           />
           <span
             aria-hidden
@@ -102,10 +98,10 @@ export default function Badge({ children, variant = "default", color, situacao, 
 
     // Status reads as a lozenge (square-ish), never as a tag pill.
     return (
-      <span className={`${LOZENGE_SHAPE} ${SITUACAO_COLORS[situacao] || SITUACAO_COLORS.inactive} ${className}`}>
+      <span className={`${LOZENGE_SHAPE} ${SITUACAO_COLORS[role] || SITUACAO_COLORS.inactive} ${className}`}>
         {dot && (
           <span
-            className={`w-2 h-2 rounded-full ${SITUACAO_DOT_COLORS[situacao] || SITUACAO_DOT_COLORS.inactive} ${situacao === "active" ? "animate-pulse-glow" : ""}`}
+            className={`w-2 h-2 rounded-full ${SITUACAO_DOT_COLORS[role] || SITUACAO_DOT_COLORS.inactive} ${role === "active" ? "animate-pulse-glow" : ""}`}
           />
         )}
         {children}

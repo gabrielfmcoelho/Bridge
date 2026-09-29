@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { enumsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import { situacaoAccent } from "@/lib/constants";
+import { useSituacao } from "@/hooks/useSituacao";
 import SituacaoText from "@/components/ui/SituacaoText";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorGrid, CardMeter } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -20,11 +19,8 @@ import type { Host } from "@/lib/types";
 
 export default function HostCard({ host }: { host: Host }) {
   const { t } = useLocale();
-  const { data: situacoes = [] } = useQuery({
-    queryKey: ["enums", "situacao"],
-    queryFn: () => enumsAPI.list("situacao"),
-  });
-  const situacaoColor = situacoes.find((s) => s.value === host.situacao)?.color;
+  const { roleOf, colorOf } = useSituacao();
+  const situacaoColor = colorOf(host.situacao);
   const sr = host.scan_resources;
   // A scan that returned "permission denied" etc. counts as no data.
   const clean = !!(host.has_scan && sr &&
@@ -50,7 +46,7 @@ export default function HostCard({ host }: { host: Host }) {
     {/* `group relative` anchors the quick-look button; the outlet sits outside
         the Link so clicks inside the (portalled) panel don't bubble into it. */}
     <Link href={`/hosts/${host.oficial_slug}`} className="group relative block h-full">
-      <Card accent={situacaoAccent(host.situacao, situacaoColor)} className="h-full flex flex-col overflow-hidden">
+      <Card accent={situacaoAccent(roleOf(host.situacao), situacaoColor)} className="h-full flex flex-col overflow-hidden">
         {/* Fixed anatomy (DS rule 18): every slot below always renders in the
             same place, "–"/0/dimmed when there is nothing to show. */}
         <CardHeader

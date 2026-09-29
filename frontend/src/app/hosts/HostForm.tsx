@@ -1,5 +1,6 @@
 "use client";
 
+import { useSituacao } from "@/hooks/useSituacao";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { hostsAPI, enumsAPI, sshKeysAPI, contactsAPI, usersAPI, dnsAPI, servicesAPI, projectsAPI, grafanaAPI, integrationsAPI } from "@/lib/api";
@@ -43,6 +44,8 @@ export default function HostForm({
   const { user } = useAuth();
   const isEdit = !!host;
 
+  // New records start in whichever situação carries the "active" role.
+  const { valueOf: situacaoValueOf } = useSituacao();
   const [form, setForm] = useState({
     nickname: host?.nickname ?? "",
     oficial_slug: host?.oficial_slug ?? "",
@@ -52,7 +55,7 @@ export default function HostForm({
     hospedagem: host?.hospedagem ?? "",
     tipo_maquina: host?.tipo_maquina ?? "",
     description: host?.description ?? "",
-    situacao: host?.situacao || "active",
+    situacao: host?.situacao || situacaoValueOf("active"),
     preferred_auth: host?.preferred_auth ?? "",
     password: "",
     proxy_jump: host?.proxy_jump ?? "",

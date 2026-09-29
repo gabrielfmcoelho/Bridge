@@ -1,5 +1,6 @@
 "use client";
 
+import { useSituacao } from "@/hooks/useSituacao";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { dnsAPI, hostsAPI, servicesAPI, projectsAPI, enumsAPI, contactsAPI } from "@/lib/api";
@@ -44,10 +45,12 @@ export default function DnsForm({
 }: DnsFormProps) {
   const { t } = useLocale();
   const [step, setStep] = useState(1);
+  // New records start in whichever situação carries the "active" role.
+  const { valueOf: situacaoValueOf } = useSituacao();
   const [form, setForm] = useState({
     domain: initial?.domain || "",
     has_https: initial?.has_https || false,
-    situacao: initial?.situacao || "active",
+    situacao: initial?.situacao || situacaoValueOf("active"),
     observacoes: initial?.observacoes || "",
     host_ids: initialHostIds || initial?.host_ids || ([] as number[]),
     service_ids: initialServiceIds || ([] as number[]),

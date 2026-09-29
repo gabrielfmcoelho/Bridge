@@ -19,7 +19,7 @@ func NewEnumOptionRepo(db *sql.DB) *EnumOptionRepo { return &EnumOptionRepo{db: 
 // List returns the options for a single category, ordered by sort_order/value.
 func (r *EnumOptionRepo) List(ctx context.Context, category string) ([]models.EnumOption, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT category, value, sort_order, color FROM enum_options WHERE category = ? ORDER BY sort_order, value`,
+		`SELECT category, value, sort_order, color, role FROM enum_options WHERE category = ? ORDER BY sort_order, value`,
 		category)
 	if err != nil {
 		return nil, err
@@ -28,7 +28,7 @@ func (r *EnumOptionRepo) List(ctx context.Context, category string) ([]models.En
 	var out []models.EnumOption
 	for rows.Next() {
 		var o models.EnumOption
-		if err := rows.Scan(&o.Category, &o.Value, &o.SortOrder, &o.Color); err != nil {
+		if err := rows.Scan(&o.Category, &o.Value, &o.SortOrder, &o.Color, &o.Role); err != nil {
 			return nil, err
 		}
 		out = append(out, o)
@@ -39,7 +39,7 @@ func (r *EnumOptionRepo) List(ctx context.Context, category string) ([]models.En
 // ListAll returns every option grouped by category.
 func (r *EnumOptionRepo) ListAll(ctx context.Context) (map[string][]models.EnumOption, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT category, value, sort_order, color FROM enum_options ORDER BY category, sort_order, value`)
+		`SELECT category, value, sort_order, color, role FROM enum_options ORDER BY category, sort_order, value`)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (r *EnumOptionRepo) ListAll(ctx context.Context) (map[string][]models.EnumO
 	m := make(map[string][]models.EnumOption)
 	for rows.Next() {
 		var o models.EnumOption
-		if err := rows.Scan(&o.Category, &o.Value, &o.SortOrder, &o.Color); err != nil {
+		if err := rows.Scan(&o.Category, &o.Value, &o.SortOrder, &o.Color, &o.Role); err != nil {
 			return nil, err
 		}
 		m[o.Category] = append(m[o.Category], o)
@@ -88,4 +88,32 @@ func (r *EnumOptionRepo) Delete(ctx context.Context, category, value string) err
 	_, err := r.db.ExecContext(ctx,
 		`DELETE FROM enum_options WHERE category = ? AND value = ?`, category, value)
 	return err
+}
+
+// Situação roles: meanings the code relies on, pinned to whichever option
+// carries them (enum_options.role) so admins can rename values freely.
+const (
+	SituacaoActive      = "active"
+	SituacaoInactive    = "inactive"
+	SituacaoMaintenance = "maintenance"
+)
+
+// SituacaoValueSQL is an SQL expression for the situação value that carries a
+// role; it takes two args (role, role) and falls back to the role name itself
+// (the factory value) when no option carries it.
+const SituacaoValueSQL = `COALESCE((SELECT value FROM enum_options WHERE category = 'situacao' AND role = ? ORDER BY sort_order LIMIT 1), ?)`
+
+// SituacaoInRoleSQL is a predicate "<col> has this role" for a situação
+// column; it takes two args (role, role): the carrying option's value, or the
+// bare role name as stored by rows older than roles.
+func SituacaoInRoleSQL(col string) string {
+	return `(` + col + ` IN (SELECT value FROM enum_options WHERE category = 'situacao' AND role = ?) OR ` + col + ` = ?)`
+}
+
+// SituacaoValue returns the situação value that carries role, or role itself
+// when no option does.
+func (r *EnumOptionRepo) SituacaoValue(ctx context.Context, role string) (string, error) {
+	var v string
+	err := r.db.QueryRowContext(ctx, `SELECT `+SituacaoValueSQL, role, role).Scan(&v)
+	return v, err
 }

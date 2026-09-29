@@ -59,7 +59,10 @@ type Host struct {
 // HostFilter is the value object describing list/count predicates, sort, and
 // pagination. Consumed by store.HostRepo.List / Count.
 type HostFilter struct {
-	Situacao           string
+	Situacao string
+	// SituacaoRole matches hosts whose situação carries this role
+	// (store.SituacaoActive …), however the option is named.
+	SituacaoRole       string
 	Tag                string
 	Hospedagem         string
 	Search             string

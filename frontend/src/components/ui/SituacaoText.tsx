@@ -1,21 +1,20 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { enumsAPI } from "@/lib/api";
 import { situacaoColorOf } from "@/lib/constants";
+import { useSituacao } from "@/hooks/useSituacao";
 
 /**
  * Situação as a line of text (no badge): a dot and the label in the state's
- * colour. The dot is filled only for "active" and a ring otherwise, so the
+ * colour. The dot is filled only for the active role and a ring otherwise, so the
  * state never rides on colour alone (rule 17); the label is mixed toward the
  * primary text colour so a backend enum hex can't fail text contrast. Always
  * renders — "–" when there is no situação — so the slot stays in place.
  */
 export default function SituacaoText({ situacao, className = "" }: { situacao?: string; className?: string }) {
-  const { data: situacoes = [] } = useQuery({ queryKey: ["enums", "situacao"], queryFn: () => enumsAPI.list("situacao") });
+  const { roleOf, colorOf } = useSituacao();
   if (!situacao) return <span className={`text-xs text-[var(--text-muted)] ${className}`}>–</span>;
-  const color = situacaoColorOf(situacao, situacoes.find((s) => s.value === situacao)?.color);
-  return <StatusText color={color} on={situacao === "active"} label={situacao} className={className} />;
+  const role = roleOf(situacao);
+  return <StatusText color={situacaoColorOf(role, colorOf(situacao))} on={role === "active"} label={situacao} className={className} />;
 }
 
 /** The status line's look for any state: a dot (filled when `on`, ring

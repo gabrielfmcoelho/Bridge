@@ -151,6 +151,10 @@ func (r *HostRepo) List(ctx context.Context, f models.HostFilter) ([]models.Host
 		where = append(where, "situacao = ?")
 		args = append(args, f.Situacao)
 	}
+	if f.SituacaoRole != "" {
+		where = append(where, SituacaoInRoleSQL("situacao"))
+		args = append(args, f.SituacaoRole, f.SituacaoRole)
+	}
 	if f.Hospedagem != "" {
 		where = append(where, "hospedagem = ?")
 		args = append(args, f.Hospedagem)
@@ -256,7 +260,7 @@ func (r *HostRepo) List(ctx context.Context, f models.HostFilter) ([]models.Host
 
 // ListForSSHConfig returns all active hosts with SSH-relevant fields populated.
 func (r *HostRepo) ListForSSHConfig(ctx context.Context) ([]models.Host, error) {
-	return r.List(ctx, models.HostFilter{Situacao: "active"})
+	return r.List(ctx, models.HostFilter{SituacaoRole: SituacaoActive})
 }
 
 // Count returns the number of hosts matching the (situacao/hospedagem/search/tag
@@ -447,7 +451,10 @@ type ProxmoxState struct {
 	RecursoCPU           string
 	RecursoRAM           string
 	RecursoArmazenamento string
-	Situacao             string // not applied over a manual 'maintenance'
+	// SituacaoRole is the power state as a role (SituacaoActive running,
+	// SituacaoInactive stopped); stored as the option carrying it, and never
+	// over a manual maintenance.
+	SituacaoRole string
 }
 
 // SetProxmoxSync links a host to its Proxmox machine and refreshes the fields
@@ -459,12 +466,12 @@ func (r *HostRepo) SetProxmoxSync(ctx context.Context, hostID int64, st ProxmoxS
 			proxmox_id = ?, parent_host_id = ?,
 			hostname = CASE WHEN ? <> '' AND (hostname = '' OR hostname ~ '^[0-9]{1,3}(\.[0-9]{1,3}){3}$') THEN ? ELSE hostname END,
 			recurso_cpu = ?, recurso_ram = ?, recurso_armazenamento = ?,
-			situacao = CASE WHEN situacao = 'maintenance' THEN situacao ELSE ? END,
+			situacao = CASE WHEN `+SituacaoInRoleSQL("situacao")+` THEN situacao ELSE `+SituacaoValueSQL+` END,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
 		st.ProxmoxID, st.ParentHostID, st.IP, st.IP,
 		st.RecursoCPU, st.RecursoRAM, st.RecursoArmazenamento,
-		st.Situacao, hostID)
+		SituacaoMaintenance, SituacaoMaintenance, st.SituacaoRole, st.SituacaoRole, hostID)
 	return err
 }
 
@@ -472,8 +479,11 @@ func (r *HostRepo) SetProxmoxSync(ctx context.Context, hostID int64, st ProxmoxS
 // proxmox_id is not in seen (a manual 'maintenance' is kept, as in
 // SetProxmoxSync), returning how many changed.
 func (r *HostRepo) DeactivateMissingProxmox(ctx context.Context, seen []string) (int, error) {
-	res, err := r.db.ExecContext(ctx, `UPDATE hosts SET situacao = 'inactive', updated_at = CURRENT_TIMESTAMP
-		WHERE proxmox_id IS NOT NULL AND deleted_at IS NULL AND situacao NOT IN ('inactive', 'maintenance') AND NOT (proxmox_id = ANY(?))`, seen)
+	res, err := r.db.ExecContext(ctx, `UPDATE hosts SET situacao = `+SituacaoValueSQL+`, updated_at = CURRENT_TIMESTAMP
+		WHERE proxmox_id IS NOT NULL AND deleted_at IS NULL
+			AND NOT `+SituacaoInRoleSQL("situacao")+` AND NOT `+SituacaoInRoleSQL("situacao")+`
+			AND NOT (proxmox_id = ANY(?))`,
+		SituacaoInactive, SituacaoInactive, SituacaoInactive, SituacaoInactive, SituacaoMaintenance, SituacaoMaintenance, seen)
 	if err != nil {
 		return 0, err
 	}

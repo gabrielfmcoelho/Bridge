@@ -29,6 +29,11 @@ func (s *DNSService) SyncFromCoolify(ctx context.Context, refs []coolify.DomainR
 	if err != nil {
 		return sum, err
 	}
+	// New records start in whichever situação carries the "active" role.
+	activeSituacao, err := store.NewEnumOptionRepo(s.db).SituacaoValue(ctx, store.SituacaoActive)
+	if err != nil {
+		return sum, err
+	}
 	for _, ref := range refs {
 		hostID, ok := byUUID[ref.ServerUUID]
 		if !ok || ref.ServerUUID == "" {
@@ -46,7 +51,7 @@ func (s *DNSService) SyncFromCoolify(ctx context.Context, refs []coolify.DomainR
 		if exists {
 			sum.Existing++
 		} else {
-			rec := models.DNSRecord{Domain: ref.Domain, HasHTTPS: ref.HTTPS, Situacao: "active", Observacoes: "Coolify: " + ref.Source}
+			rec := models.DNSRecord{Domain: ref.Domain, HasHTTPS: ref.HTTPS, Situacao: activeSituacao, Observacoes: "Coolify: " + ref.Source}
 			if err := s.dns.Create(ctx, &rec); err != nil {
 				return sum, err
 			}

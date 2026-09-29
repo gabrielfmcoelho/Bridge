@@ -1396,4 +1396,32 @@ var migrationsPostgres = []string{
 	`ALTER TABLE services ADD COLUMN IF NOT EXISTS service_kind TEXT NOT NULL DEFAULT '';
 	CREATE INDEX IF NOT EXISTS idx_services_service_kind ON services(service_kind);
 	CREATE INDEX IF NOT EXISTS idx_services_source ON services(source);`,
+
+	// Version 88: situação roles. Code needs three meanings — active,
+	// inactive, maintenance (SSH config, Proxmox power state, "keep a manual
+	// maintenance") — while admins rename the situação values freely
+	// ("active" became "Ativa"). role pins the meaning to an option whatever
+	// its value; producers resolve role → value. Roles go to the factory
+	// values and their usual pt-BR renames, first option per role only.
+	// Rows that stored the bare role after it stopped being an option value
+	// are rewritten to the option that now carries it.
+	`ALTER TABLE enum_options ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT '';
+	UPDATE enum_options o SET role = r.role FROM (
+		SELECT DISTINCT ON (role) value, role FROM (
+			SELECT value, sort_order, CASE
+				WHEN lower(value) IN ('active', 'ativa', 'ativo') THEN 'active'
+				WHEN lower(value) IN ('inactive', 'inativa', 'inativo', 'desligada', 'desligado') THEN 'inactive'
+				WHEN lower(value) IN ('maintenance', 'em manutenção', 'manutenção') THEN 'maintenance'
+			END AS role
+			FROM enum_options WHERE category = 'situacao'
+		) c WHERE role IS NOT NULL ORDER BY role, sort_order, value
+	) r
+	WHERE o.category = 'situacao' AND o.value = r.value AND o.role = ''
+		AND NOT EXISTS (SELECT 1 FROM enum_options x WHERE x.category = 'situacao' AND x.role = r.role);
+	UPDATE hosts h SET situacao = o.value FROM enum_options o
+		WHERE o.category = 'situacao' AND o.role <> '' AND h.situacao = o.role AND o.value <> o.role;
+	UPDATE dns_records d SET situacao = o.value FROM enum_options o
+		WHERE o.category = 'situacao' AND o.role <> '' AND d.situacao = o.role AND o.value <> o.role;
+	UPDATE projects p SET situacao = o.value FROM enum_options o
+		WHERE o.category = 'situacao' AND o.role <> '' AND p.situacao = o.role AND o.value <> o.role;`,
 }

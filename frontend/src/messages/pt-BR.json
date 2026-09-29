@@ -1688,7 +1688,13 @@
       "integrations": "Integrações",
       "data": "Dados"
     },
-    "restoreConfirmWord": "RESTAURAR"
+    "restoreConfirmWord": "RESTAURAR",
+    "situacaoRole": {
+      "active": "ativo",
+      "inactive": "desligado",
+      "maintenance": "manutenção"
+    },
+    "situacaoRolesHint": "Os papéis entre parênteses dizem ao sistema qual opção significa ativo, desligado e em manutenção (SSH config, sync do Proxmox e do Coolify). Renomear mantém o papel; excluir a opção o remove."
   },
   "operation": {
     "builtIn": "Integradas",
