@@ -1,22 +1,12 @@
 // The hosts page's KPI catalog. Each insight counts something in the current
 // listing and, where the list can show exactly those hosts, carries the
 // filter (or sort) a click applies. Tags become insights of their own.
-import type { Host, HostFilters, HostSortConfig } from "@/lib/types";
-import type { ICON_PATHS } from "@/lib/icon-paths";
+import type { Host, HostFilters } from "@/lib/types";
+import type { Insight, BreakdownRow as BreakdownRowOf } from "@/lib/insights";
 
 type T = (key: string, vars?: Record<string, string>) => string;
 
-export interface HostInsight {
-  key: string;
-  label: string;
-  /** Name in ICON_PATHS; resolved by the caller, so this module stays runtime-import free. */
-  icon: keyof typeof ICON_PATHS;
-  color: string;
-  value: number;
-  hint?: string;
-  filter?: Partial<HostFilters>;
-  sort?: HostSortConfig;
-}
+export type HostInsight = Insight<HostFilters>;
 
 export const DEFAULT_HOST_INSIGHTS = ["total", "critical", "idle", "highUsage", "noScan"];
 
@@ -80,14 +70,7 @@ export function hostInsights(hosts: Host[], t: T): HostInsight[] {
   return [...fixed, ...tags];
 }
 
-export interface BreakdownRow {
-  key: string;
-  /** Display label; the caller translates `labelKey` rows. */
-  label: string;
-  labelKey?: boolean;
-  count: number;
-  filter?: Partial<HostFilters>;
-}
+export type BreakdownRow = BreakdownRowOf<HostFilters>;
 
 export interface HostBreakdowns {
   situacao: BreakdownRow[];
@@ -125,9 +108,9 @@ export function hostBreakdowns(hosts: Host[]): HostBreakdowns {
 
   const levels = ["critical", "warning", "info"] as const;
   return {
-    situacao: countBy(hosts, (h) => h.situacao, "host.dash.none", (v) => ({ situacao: v })),
-    hospedagem: countBy(hosts, (h) => h.hospedagem, "host.dash.none"),
-    entidade: countBy(hosts, (h) => h.main_entidade, "host.dash.none"),
+    situacao: countBy(hosts, (h) => h.situacao, "inventory.dash.none", (v) => ({ situacao: v })),
+    hospedagem: countBy(hosts, (h) => h.hospedagem, "inventory.dash.none"),
+    entidade: countBy(hosts, (h) => h.main_entidade, "inventory.dash.none"),
     tags: [...tagRows].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([tag, count]) => ({ key: tag, label: tag, count, filter: { tag } })),
     usage: [
       { key: "high", label: "host.dash.usageHigh", labelKey: true, count: bands.high },

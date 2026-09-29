@@ -721,23 +721,14 @@
     "noPassword": "No password stored",
     "noKey": "No key stored",
     "idleNotFlaggedShort": "Not idle",
-    "view": {
-      "overview": "Overview",
-      "dashboard": "Dashboard"
-    },
     "dash": {
-      "bySituacao": "By situação",
       "byHospedagem": "By hosting",
-      "byEntidade": "By entidade",
-      "byTags": "By tag",
       "byUsage": "By peak usage",
       "usageLow": "Below 50%",
       "usageMid": "50–80%",
       "usageHigh": "80% or more",
       "usageNone": "No scan",
-      "alertsByLevel": "Alerts by level",
-      "none": "None",
-      "clickToFilter": "Click a row to filter the list"
+      "alertsByLevel": "Alerts by level"
     },
     "pageDescription": "Servers, VMs and containers in the inventory: access, resources, links to services and DNS, and their state.",
     "profileTitle": "Host",
@@ -2523,7 +2514,16 @@
       "reset": "Restore defaults"
     },
     "view": {
-      "title": "View"
+      "title": "View",
+      "overview": "Overview",
+      "dashboard": "Dashboard"
+    },
+    "dash": {
+      "bySituacao": "By situação",
+      "byEntidade": "By entidade",
+      "byTags": "By tag",
+      "none": "None",
+      "clickToFilter": "Click a row to filter the list"
     }
   },
   "confirm": {

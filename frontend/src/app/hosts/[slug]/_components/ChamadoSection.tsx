@@ -7,6 +7,7 @@ import { hostChamadosAPI, usersAPI } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import SectionCard from "@/components/ui/SectionCard";
 import IconButton from "@/components/ui/IconButton";
+import { RowList, ListRow, RowText } from "@/components/ui/RowList";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import ChamadoDrawer from "./ChamadoDrawer";
@@ -82,31 +83,26 @@ export default function ChamadoSection({ chamados: initialChamados, hostId, slug
           </span>
         )
       }>
-        <div className="divide-y divide-[var(--border-subtle)]">
+        <RowList>
           {[...chamados].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map((c, i) => {
             const solved = c.status === "solved";
             const statusLabel = c.status === "in_execution" ? t("chamado.inExecution") : solved ? t("chamado.solved") : c.status;
             return (
-              <button
-                key={c.id ?? i}
-                type="button"
-                onClick={() => openDetail(c)}
-                className="w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-[var(--bg-elevated)] transition-colors"
-              >
+              <ListRow key={c.id ?? i} onClick={() => openDetail(c)}>
                 <span className={`w-2 h-2 rounded-full shrink-0 ${solved ? "bg-[var(--success)]" : "bg-[var(--warning)]"}`} title={statusLabel} />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-[var(--text-primary)] truncate">{c.title || c.chamado_id || "–"}</span>
-                  <span className="flex gap-3 text-2xs text-[var(--text-muted)] truncate">
+                <RowText
+                  title={c.title || c.chamado_id || "–"}
+                  meta={<>
                     <span className="font-mono">{c.chamado_id || "–"}</span>
                     <span className="truncate">{c.user_display_name || "–"}</span>
-                  </span>
-                </span>
+                  </>}
+                />
                 <span className="text-2xs text-[var(--text-muted)] shrink-0">{statusLabel}</span>
                 <span className="text-2xs text-[var(--text-muted)] font-mono tabular-nums shrink-0">{c.date || "–"}</span>
-              </button>
+              </ListRow>
             );
           })}
-        </div>
+        </RowList>
       </SectionCard>
 
       <ChamadoDrawer

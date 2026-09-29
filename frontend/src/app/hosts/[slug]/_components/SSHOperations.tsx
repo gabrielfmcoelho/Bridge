@@ -19,6 +19,7 @@ import IntegrationsSection from "./IntegrationsSection";
 import type { VMInfoType, OperationLog, RemoteKeyInfo, DockerStatusType, NginxCleanupStatusType, RemoteUserInfo, NetworkTestResult } from "@/lib/api";
 import SectionHeading from "@/components/ui/SectionHeading";
 import SectionCard from "@/components/ui/SectionCard";
+import { RowGroupTitle } from "@/components/ui/RowList";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -723,7 +724,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         {groupedOps.map((op, i) => (
           <div key={op.id}>
             {OP_GROUPS[op.id] !== OP_GROUPS[groupedOps[i - 1]?.id] && (
-              <h4 className="px-5 pt-4 pb-1 text-xs font-medium text-[var(--text-faint)]">{t(`operation.group.${OP_GROUPS[op.id]}`)}</h4>
+              <RowGroupTitle>{t(`operation.group.${OP_GROUPS[op.id]}`)}</RowGroupTitle>
             )}
             <div className="flex items-center gap-3 px-5 py-3">
               <div className="flex-1 min-w-0">

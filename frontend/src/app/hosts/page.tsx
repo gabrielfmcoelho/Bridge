@@ -20,6 +20,7 @@ import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
 import PageHeader from "@/components/ui/PageHeader";
 import InventoryContent from "@/components/inventory/InventoryContent";
+import InventoryOverview from "@/components/inventory/InventoryOverview";
 import HostForm from "./HostForm";
 import FilterDrawer, { emptyFilters } from "./FilterDrawer";
 import HostCard from "./_components/HostCard";
@@ -448,8 +449,8 @@ export default function HostsPage() {
           active: pageTab,
           onChange: selectTab,
           items: [
-            { key: "overview", label: t("host.view.overview"), icon: ICON_PATHS.viewCards },
-            { key: "dashboard", label: t("host.view.dashboard"), icon: ICON_PATHS.layoutGrid },
+            { key: "overview", label: t("inventory.view.overview"), icon: ICON_PATHS.viewCards },
+            { key: "dashboard", label: t("inventory.view.dashboard"), icon: ICON_PATHS.layoutGrid },
           ],
         }}
         controls={
@@ -505,13 +506,7 @@ export default function HostsPage() {
         }
       >
         {pageTab === "overview" ? (
-          // Visão geral: indicators as a compact grid — a strip above the listing on
-          // phones/tablets, the sticky left column on desktop — the listing gets the rest.
-          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] gap-6 max-lg:space-y-6">
-            <aside className="lg:sticky lg:top-0 lg:self-start">
-              {!isLoading && <KpiSection layout="list" hosts={hosts} filters={filters} onFiltersChange={setFilters} sort={sort} onSortChange={setSort} />}
-            </aside>
-            <div className="min-w-0">
+          <InventoryOverview kpis={!isLoading && <KpiSection layout="list" hosts={hosts} filters={filters} onFiltersChange={setFilters} sort={sort} onSortChange={setSort} />}>
               <SearchBadge search={search} onClear={() => setSearch("")} />
               {!isLoading && hosts.length > 0 && <SectionHeading>{t("host.listing")}</SectionHeading>}
               <InventoryContent
@@ -532,8 +527,7 @@ export default function HostsPage() {
                 loadingMoreLabel={t("common.loadingMore")}
                 loadMoreLabel={t("common.loadMore")}
               />
-            </div>
-          </div>
+          </InventoryOverview>
         ) : (
           <HostsDashboard
             hosts={hosts}

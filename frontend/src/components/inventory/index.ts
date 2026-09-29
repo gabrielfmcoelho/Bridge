@@ -6,3 +6,5 @@ export type { MetadataItem } from "./CardMetadataGrid";
 export { default as CardHeader } from "./CardHeader";
 export { default as ResponsavelList } from "./ResponsavelList";
 export { default as ResponsaveisSection } from "./ResponsaveisSection";
+export { default as CardIndicatorGrid } from "./CardIndicatorGrid";
+export { default as CardMeter } from "./CardMeter";

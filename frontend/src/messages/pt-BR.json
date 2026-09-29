@@ -721,23 +721,14 @@
     "noPassword": "Nenhuma senha armazenada",
     "noKey": "Nenhuma chave armazenada",
     "idleNotFlaggedShort": "Não ociosa",
-    "view": {
-      "overview": "Visão geral",
-      "dashboard": "Dashboard"
-    },
     "dash": {
-      "bySituacao": "Por situação",
       "byHospedagem": "Por hospedagem",
-      "byEntidade": "Por entidade",
-      "byTags": "Por tag",
       "byUsage": "Por uso de pico",
       "usageLow": "Abaixo de 50%",
       "usageMid": "50–80%",
       "usageHigh": "80% ou mais",
       "usageNone": "Sem scan",
-      "alertsByLevel": "Alertas por nível",
-      "none": "Nenhum",
-      "clickToFilter": "Clique numa linha para filtrar a listagem"
+      "alertsByLevel": "Alertas por nível"
     },
     "pageDescription": "Servidores, VMs e containers do inventário: acesso, recursos, vínculos com serviços e DNS, e o estado de cada um.",
     "profileTitle": "Host",
@@ -2523,7 +2514,16 @@
       "reset": "Restaurar padrão"
     },
     "view": {
-      "title": "Exibição"
+      "title": "Exibição",
+      "overview": "Visão geral",
+      "dashboard": "Dashboard"
+    },
+    "dash": {
+      "bySituacao": "Por situação",
+      "byEntidade": "Por entidade",
+      "byTags": "Por tag",
+      "none": "Nenhum",
+      "clickToFilter": "Clique numa linha para filtrar a listagem"
     }
   },
   "confirm": {

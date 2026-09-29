@@ -1,7 +1,7 @@
 "use client";
 
 import Tooltip from "@/components/ui/Tooltip";
-import { ALERT_DOT_COLOR, ALERT_TEXT_COLOR } from "./alert-colors";
+import { ALERT_DOT_COLOR, ALERT_TEXT_COLOR } from "@/lib/alert-colors";
 import type { HostAlert, AlertLevel } from "@/lib/types";
 
 export default function AlertBadge({ alerts }: { alerts?: HostAlert[] }) {

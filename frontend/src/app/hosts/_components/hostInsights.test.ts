@@ -46,7 +46,7 @@ test("breakdowns count per value, most frequent first, with filters", () => {
   ]);
   assert.deepEqual(b.situacao.map((r) => [r.key, r.count]), [["active", 2], ["maintenance", 1]]);
   assert.deepEqual(b.situacao[0].filter, { situacao: "active" });
-  assert.deepEqual(b.hospedagem.map((r) => [r.key, r.count, !!r.labelKey]), [["ETIPI", 2, false], ["host.dash.none", 1, true]]);
+  assert.deepEqual(b.hospedagem.map((r) => [r.key, r.count, !!r.labelKey]), [["ETIPI", 2, false], ["inventory.dash.none", 1, true]]);
   assert.deepEqual(b.tags.map((r) => [r.key, r.count]), [["web", 2], ["db", 1]]);
   assert.deepEqual(b.usage.map((r) => [r.key, r.count]), [["high", 1], ["mid", 1], ["low", 0], ["none", 1]]);
   assert.deepEqual(b.alerts.map((r) => [r.key, r.count]), [["critical", 1], ["warning", 0], ["info", 0]]);

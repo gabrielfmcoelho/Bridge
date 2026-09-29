@@ -199,6 +199,10 @@ export interface DNSRecord {
   host_ids?: number[];
   service_ids?: number[];
   project_ids?: number[];
+  /** List endpoint: linked services/projects and open issues. */
+  services_count?: number;
+  projects_count?: number;
+  issues_count?: number;
   main_responsavel_name?: string;
   responsaveis?: EntityResponsavel[];
   // TLS certificate from the latest scan. cert_checked_at null = never scanned;
@@ -259,6 +263,8 @@ export interface Service {
   description: string;
   service_type: string;
   service_subtype: string;
+  /** Category (database, cache, queue, web, proxy, …); "" = unclassified. */
+  service_kind?: string;
   technology_stack: string;
   deploy_approach: string;
   orchestrator_tool: string;
@@ -296,6 +302,8 @@ export interface Service {
   dns_ids?: number[];
   depends_on_ids?: number[];
   main_responsavel_name?: string;
+  /** List endpoint: open issues. */
+  issues_count?: number;
   responsaveis?: EntityResponsavel[];
 }
 

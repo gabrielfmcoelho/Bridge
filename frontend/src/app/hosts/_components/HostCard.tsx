@@ -7,7 +7,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import Card from "@/components/ui/Card";
 import { situacaoAccent } from "@/lib/constants";
 import SituacaoText from "@/components/ui/SituacaoText";
-import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator } from "@/components/inventory";
+import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorGrid, CardMeter } from "@/components/inventory";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import ScanIndicator from "./ScanIndicator";
 import { hasPermissionDeniedMessage } from "@/lib/utils";
@@ -98,7 +98,7 @@ export default function HostCard({ host }: { host: Host }) {
         {/* Indicators: a fixed 6×2 grid so every icon has the same cell on
             every card — links on the first row; alerts, issues, idle, scan,
             password, key on the second. All always present. */}
-        <div className="grid grid-cols-6 gap-x-2 gap-y-2 mt-auto pt-4 border-t border-[var(--border-subtle)] mt-4 [&>*]:h-5 [&>*]:flex [&>*]:items-center">
+        <CardIndicatorGrid>
           {counts.map((c) => (
             <CardIndicator key={c.label} icon={c.icon} count={c.count} color={c.color} title={`${c.count} ${c.label.toLowerCase()}`} />
           ))}
@@ -113,7 +113,7 @@ export default function HostCard({ host }: { host: Host }) {
           <ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} />
           <AccessIcon icon={ICON_PATHS.lock} label={t("host.cardPasswordLabel")} has={host.has_password} none={t("host.noPassword")} status={host.password_test_status} t={t} />
           <AccessIcon icon={ICON_PATHS.key} label={t("host.cardKeyLabel")} has={host.has_key} none={t("host.noKey")} status={host.key_test_status} t={t} />
-        </div>
+        </CardIndicatorGrid>
       </Card>
     </Link>
     <QuickLookOutlet />
@@ -123,24 +123,15 @@ export default function HostCard({ host }: { host: Host }) {
 
 function MiniResource({ label, value, usage }: { label: string; value?: string; usage?: string }) {
   const bad = (v?: string) => !v || !v.trim() || /bash|permission|\/dev\/null/i.test(v);
-  const hasValue = !bad(value);
-  const hasUsage = !bad(usage);
-  const pct = hasUsage ? parseInt(usage!) || 0 : 0;
-  const color = pct >= 80 ? "text-[var(--danger)]" : pct >= 50 ? "text-[var(--warning)]" : "text-[var(--success)]";
-  const barColor = pct >= 80 ? "bg-[var(--danger)]" : pct >= 50 ? "bg-[var(--warning)]" : "bg-[var(--success)]";
+  const pct = bad(usage) ? null : parseInt(usage!) || 0;
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-[var(--text-muted)]">{label}</span>
-        <span className={`text-xs font-semibold font-mono ${hasUsage ? color : "text-[var(--text-muted)]"}`}>
-          {hasUsage ? (usage!.includes("%") ? usage : `${usage}%`) : "–"}
-        </span>
-      </div>
-      <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-        {hasUsage && <div className={`h-full rounded-full ${barColor} transition`} style={{ width: `${Math.min(pct, 100)}%` }} />}
-      </div>
-      <p className="text-xs text-[var(--text-muted)] mt-0.5 text-right font-mono">{hasValue ? formatSize(value!) : "–"}</p>
-    </div>
+    <CardMeter
+      label={label}
+      reading={pct === null ? undefined : usage!.includes("%") ? usage : `${usage}%`}
+      pct={pct}
+      tone={pct !== null && pct >= 80 ? "danger" : pct !== null && pct >= 50 ? "warning" : "success"}
+      caption={bad(value) ? undefined : formatSize(value!)}
+    />
   );
 }
 

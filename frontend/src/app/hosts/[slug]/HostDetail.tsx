@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useMemo, type ReactNode } from "react";
-import { useFilteredGraph } from "@/hooks/useFilteredGraph";
+import { useEntityGraph } from "@/hooks/useEntityGraph";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { hostsAPI, sshAPI, graphAPI, globalIssuesAPI, integrationsAPI } from "@/lib/api";
+import { hostsAPI, sshAPI, globalIssuesAPI, integrationsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
@@ -18,6 +18,7 @@ import Drawer from "@/components/ui/Drawer";
 import HostForm from "../HostForm";
 import SSHOperations from "./_components/SSHOperations";
 import TopologyTab from "./_components/TopologyTab";
+import DetailSplit from "@/components/detail/DetailSplit";
 import HostProfile from "./_components/HostProfile";
 import ScanPane from "./_components/ScanPane";
 import MetricsTab from "./_components/MetricsTab";
@@ -67,15 +68,13 @@ export default function HostDetail({ slug }: { slug: string }) {
     return match?.alerts || data.host.alerts || [];
   }, [hostsList, data, slug]);
 
-  const { data: graphData, isLoading: graphLoading } = useQuery({ queryKey: ["graph"], queryFn: graphAPI.get, enabled: activeTab === "topology" });
   const { data: hostIssues = [] } = useQuery({
     queryKey: ["issues", "host", data?.host?.id],
     queryFn: () => globalIssuesAPI.list({ entity_type: "host", entity_id: String(data!.host.id) }),
     enabled: !!data?.host?.id,
   });
 
-  const entityNodeId = data ? `host-${data.host.id}` : undefined;
-  const filteredGraph = useFilteredGraph(entityNodeId, graphData, activeTab === "topology");
+  const { graph: filteredGraph, loading: graphLoading } = useEntityGraph(data ? `host-${data.host.id}` : undefined, activeTab === "topology");
 
   /* ─── Mutations ─── */
 
@@ -174,8 +173,8 @@ export default function HostDetail({ slug }: { slug: string }) {
           {/* ═══ OVERVIEW ═══ */}
           {/* Declared (left, stays in view) beside observed (right, scrolls). */}
           {activeTab === "overview" && (
-            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6 max-lg:space-y-6 animate-fade-in">
-              <aside className="lg:sticky lg:top-0 lg:self-start lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto">
+            <DetailSplit
+              profile={
                 <HostProfile
                   host={data.host}
                   tags={data.tags}
@@ -185,9 +184,10 @@ export default function HostDetail({ slug }: { slug: string }) {
                   slug={slug}
                   t={t}
                 />
-              </aside>
+              }
+            >
               <ScanPane slug={slug} host={data.host} lastScan={data.last_scan} canEdit={canEdit} />
-            </div>
+            </DetailSplit>
           )}
 
           {/* ═══ OPERATIONS TAB ═══ */}
