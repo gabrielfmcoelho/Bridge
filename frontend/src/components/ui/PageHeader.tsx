@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Button from "./Button";
 import IconButton from "./IconButton";
 import Icon from "./Icon";
@@ -10,7 +10,6 @@ import SectionNav, { type SectionNavGroup } from "./SectionNav";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export interface PageHeaderTabs {
   idBase: string;
@@ -51,7 +50,7 @@ interface PageHeaderProps {
   deleteConfirmMessage?: string;
   /** Search, filters, group, view, export, bulk actions, customize. */
   controls?: ReactNode;
-  /** Makes the controls row hidable; the choice is remembered under this key. */
+  /** Makes the controls row hidable (open on every load); also seeds its DOM id. */
   controlsKey?: string;
   /** Shown on the toggle while the controls are hidden (e.g. active filters). */
   controlsBadge?: number;
@@ -79,7 +78,7 @@ export default function PageHeader(props: PageHeaderProps) {
   } = props;
   const { t } = useLocale();
   const confirm = useConfirm();
-  const [controlsOpen, setControlsOpen] = useLocalStorage<boolean>(`ph_controls:${controlsKey ?? "_"}`, true);
+  const [controlsOpen, setControlsOpen] = useState(true);
   const showControls = !!controls && (!controlsKey || controlsOpen);
   const controlsId = `${controlsKey ?? "page"}-controls`;
 

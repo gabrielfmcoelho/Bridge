@@ -5,7 +5,7 @@ const variants = {
   outline: "text-[var(--text-muted)] border-[var(--border-default)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)]",
   accent: "bg-[var(--accent)] text-white border-transparent hover:brightness-110",
   danger: "text-[var(--danger)] hover:bg-[var(--danger)]/10 hover:brightness-110 border-transparent",
-  active: "bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/20",
+  active: "text-[var(--accent)] border-[var(--border-default)] hover:bg-[var(--bg-elevated)]",
 };
 
 const sizes = {

@@ -77,7 +77,7 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
           className="max-md:hidden"
           label={collapsed ? t("header.expandSidebar") : t("header.collapseSidebar")}
         >
-          <Icon path={ICON_PATHS.chevronsLeft} className={`w-4 h-4 transition-transform duration-200 ${collapsed ? "rotate-180" : ""}`} />
+          <Icon path={ICON_PATHS.panelLeft} className="w-4 h-4" />
         </IconButton>
         <Breadcrumbs />
       </div>
@@ -106,7 +106,7 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
           <DropdownMenu
             className="w-44"
             trigger={
-              <Button size="sm">
+              <Button size="sm" variant="secondary">
                 <Icon path={ICON_PATHS.plus} className="w-4 h-4" />
                 {t("common.create")}
                 <Icon path={ICON_PATHS.chevronDown} className="w-3.5 h-3.5" />
