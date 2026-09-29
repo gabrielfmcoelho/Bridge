@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { projectsAPI, issuesAPI, integrationsAPI, hostsAPI, dnsAPI } from "@/lib/api";
+import { projectsAPI, issuesAPI, integrationsAPI, hostsAPI, dnsAPI, projectEmbedsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntityGraph } from "@/hooks/useEntityGraph";
@@ -27,9 +27,12 @@ import ProjectAiAnalysis from "./_components/ProjectAiAnalysis";
 import CommitsTab from "./_components/CommitsTab";
 import WikiTab from "./_components/WikiTab";
 import ChamadosTab from "./_components/ChamadosTab";
-import { ICON_PATHS } from "@/lib/icon-paths";
+import ProjectReleases from "./_components/ProjectReleases";
+import ProjectEmbeds, { projectEmbedsKey } from "./_components/ProjectEmbeds";
+import ProjectSecretsTab from "./_components/ProjectSecretsTab";
+import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
 
-type TabKey = "overview" | "topology" | "issues" | "commits" | "wiki" | "chamados";
+type TabKey = "overview" | "topology" | "issues" | "releases" | "commits" | "wiki" | "chamados" | "observability" | "secrets";
 
 export default function ProjectDetail({ id }: { id: number }) {
   const { t } = useLocale();
@@ -56,6 +59,8 @@ export default function ProjectDetail({ id }: { id: number }) {
   // Names for the relation rows (cached from the inventory pages).
   const { data: allHosts = [] } = useQuery({ queryKey: ["hosts"], queryFn: () => hostsAPI.list(), enabled: activeTab === "topology" });
   const { data: allDns = [] } = useQuery({ queryKey: ["dns"], queryFn: dnsAPI.list, enabled: activeTab === "topology" });
+  // Viewers only get the Observabilidade tab when there's something in it.
+  const { data: embeds = [] } = useQuery({ queryKey: projectEmbedsKey(id), queryFn: () => projectEmbedsAPI.list(id), enabled: !!data });
 
   // -- Mutations --
   const deleteMutation = useMutation({
@@ -83,9 +88,12 @@ export default function ProjectDetail({ id }: { id: number }) {
     { key: "overview", label: t("host.tabOverview"), icon: ICON_PATHS.home },
     { key: "topology", label: t("host.tabTopology"), icon: ICON_PATHS.bolt },
     { key: "issues", label: t("host.tabTracking"), icon: ICON_PATHS.alert, badge: openIssues || undefined },
+    { key: "releases", label: t("release.title"), icon: NAV_ICONS.Rocket },
     { key: "commits", label: t("project.tab.commits"), icon: ICON_PATHS.code },
     ...(outlineEnabled ? [{ key: "wiki" as TabKey, label: t("project.tab.wiki"), icon: ICON_PATHS.document }] : []),
     ...(glpiEnabled ? [{ key: "chamados" as TabKey, label: t("nav.chamados"), icon: ICON_PATHS.clipboard }] : []),
+    ...(canEdit || embeds.length > 0 ? [{ key: "observability" as TabKey, label: t("embed.title"), icon: ICON_PATHS.layoutGrid }] : []),
+    { key: "secrets", label: t("project.tab.secrets"), icon: ICON_PATHS.lock },
   ];
 
 
@@ -146,6 +154,7 @@ export default function ProjectDetail({ id }: { id: number }) {
             {activeTab === "issues" && (
               <IssuesBoard entityType="project" entityId={id} canEdit={canEdit} fetcher={fetchIssues} />
             )}
+            {activeTab === "releases" && <ProjectReleases projectId={id} canEdit={canEdit} canDelete={isAdmin} />}
             {activeTab === "commits" && <CommitsTab projectId={id} />}
             {activeTab === "wiki" && outlineEnabled && <WikiTab projectId={id} canEdit={canEdit} />}
             {activeTab === "chamados" && glpiEnabled && data && (
@@ -156,6 +165,8 @@ export default function ProjectDetail({ id }: { id: number }) {
                 canEdit={canEdit}
               />
             )}
+            {activeTab === "observability" && <ProjectEmbeds projectId={id} canEdit={canEdit} />}
+            {activeTab === "secrets" && <ProjectSecretsTab projectId={id} services={data.services || []} canEdit={canEdit} />}
           </PageHeader>
 
           <Drawer

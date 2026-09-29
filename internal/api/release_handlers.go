@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -13,14 +14,14 @@ type releaseHandlers struct {
 	db *database.DB
 }
 
-// projectVisible 404s when the release's target project (if any) is outside
-// the caller's entidade scope, so a release can't be attached to an invisible project.
+// projectVisible rejects a release without a project (releases live inside
+// one) and 404s when the project is outside the caller's entidade scope.
 func (h *releaseHandlers) projectVisible(w http.ResponseWriter, r *http.Request, projectID *int64) bool {
-	if projectID == nil {
-		return true
+	if projectID == nil || *projectID == 0 {
+		jsonError(w, http.StatusBadRequest, "project_id is required")
+		return false
 	}
-	ok, err := store.CanSee(r.Context(), h.db.SQL, store.AssetProject, *projectID)
-	if err != nil || !ok {
+	if p, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), *projectID); err != nil || p == nil {
 		jsonError(w, http.StatusNotFound, "project not found")
 		return false
 	}
@@ -28,7 +29,26 @@ func (h *releaseHandlers) projectVisible(w http.ResponseWriter, r *http.Request,
 }
 
 func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	releases, err := store.NewReleaseRepo(h.db.SQL).List(r.Context())
+	var projectID int64
+	if v := r.URL.Query().Get("project_id"); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			jsonBadRequest(w, r, "invalid project_id", err)
+			return
+		}
+		projectID = id
+	}
+	repo := store.NewReleaseRepo(h.db.SQL)
+	releases, err := repo.List(r.Context(), projectID)
+	if err != nil {
+		jsonServerError(w, r, "failed to list releases", err)
+		return
+	}
+	ids := make([]int64, len(releases))
+	for i, rel := range releases {
+		ids[i] = rel.ID
+	}
+	issues, err := repo.IssueIDsByRelease(r.Context(), ids)
 	if err != nil {
 		jsonServerError(w, r, "failed to list releases", err)
 		return
@@ -40,8 +60,7 @@ func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	}
 	result := make([]releaseWithIssues, len(releases))
 	for i, rel := range releases {
-		issueIDs, _ := store.NewReleaseRepo(h.db.SQL).IssueIDs(r.Context(), rel.ID)
-		result[i] = releaseWithIssues{Release: rel, IssueIDs: issueIDs}
+		result[i] = releaseWithIssues{Release: rel, IssueIDs: issues[rel.ID]}
 	}
 	jsonPaged(w, r, result)
 }
@@ -111,10 +130,12 @@ func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Decode onto the stored row, so fields the client omits are kept.
 	var req struct {
 		models.Release
 		IssueIDs []int64 `json:"issue_ids"`
 	}
+	req.Release = *existing
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return

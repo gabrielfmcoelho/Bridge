@@ -1424,4 +1424,26 @@ var migrationsPostgres = []string{
 		WHERE o.category = 'situacao' AND o.role <> '' AND d.situacao = o.role AND o.value <> o.role;
 	UPDATE projects p SET situacao = o.value FROM enum_options o
 		WHERE o.category = 'situacao' AND o.role <> '' AND p.situacao = o.role AND o.value <> o.role;`,
+
+	// Version 89: embeddable BIs / observability tools of a project, shown
+	// in iframes on its Observabilidade tab. Scoped through the project.
+	`CREATE TABLE IF NOT EXISTS project_embeds (
+		id         BIGSERIAL PRIMARY KEY,
+		project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		title      TEXT NOT NULL,
+		url        TEXT NOT NULL,
+		height     INT NOT NULL DEFAULT 600,
+		sort_order INT NOT NULL DEFAULT 0,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_project_embeds_project ON project_embeds(project_id);`,
+
+	// Version 90: releases live inside their project (the standalone page is
+	// gone), so a release without one is unreachable: drop them and make the
+	// project required. Deleting the project takes its releases along.
+	`DELETE FROM releases WHERE project_id IS NULL;
+	ALTER TABLE releases DROP CONSTRAINT IF EXISTS releases_project_id_fkey;
+	ALTER TABLE releases ADD CONSTRAINT releases_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+	ALTER TABLE releases ALTER COLUMN project_id SET NOT NULL;`,
 }

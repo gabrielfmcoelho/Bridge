@@ -57,9 +57,14 @@ func (r *ReleaseRepo) Get(ctx context.Context, id int64) (*models.Release, error
 	return rel, err
 }
 
-// List returns all releases ordered by lifecycle status then recency.
-func (r *ReleaseRepo) List(ctx context.Context) ([]models.Release, error) {
+// List returns the visible releases ordered by lifecycle status then
+// recency; projectID > 0 narrows it to one project.
+func (r *ReleaseRepo) List(ctx context.Context, projectID int64) ([]models.Release, error) {
 	vis, vargs := releaseVisible(ctx)
+	if projectID > 0 {
+		vis += " AND releases.project_id = ?"
+		vargs = append(vargs, projectID)
+	}
 	rows, err := r.db.QueryContext(ctx, `SELECT `+releaseCols+` FROM releases WHERE `+vis+` ORDER BY
 		CASE status
 			WHEN 'live' THEN 1
@@ -135,4 +140,26 @@ func (r *ReleaseRepo) IssueIDs(ctx context.Context, releaseID int64) ([]int64, e
 		ids = append(ids, id)
 	}
 	return ids, rows.Err()
+}
+
+// IssueIDsByRelease returns the linked issue ids of several releases at once,
+// keyed by release id.
+func (r *ReleaseRepo) IssueIDsByRelease(ctx context.Context, releaseIDs []int64) (map[int64][]int64, error) {
+	out := map[int64][]int64{}
+	if len(releaseIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT release_id, issue_id FROM release_issues WHERE release_id = ANY(?)`, releaseIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rid, iid int64
+		if err := rows.Scan(&rid, &iid); err != nil {
+			return nil, err
+		}
+		out[rid] = append(out[rid], iid)
+	}
+	return out, rows.Err()
 }

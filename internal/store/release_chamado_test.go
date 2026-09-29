@@ -10,9 +10,19 @@ import (
 
 func TestReleaseRepo_CRUD(t *testing.T) {
 	ctx := context.Background()
-	repo := store.NewReleaseRepo(openDB(t).SQL)
+	d := openDB(t)
+	repo := store.NewReleaseRepo(d.SQL)
+	var projectID int64
+	if err := d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('p') RETURNING id`).Scan(&projectID); err != nil {
+		t.Fatalf("seed project: %v", err)
+	}
 
-	rel := &models.Release{Title: "v1", Description: "first", Status: "pending"}
+	// Releases live inside a project (v90): none without one.
+	if err := repo.Create(ctx, &models.Release{Title: "orphan", Status: "pending"}); err == nil {
+		t.Fatal("create without project succeeded, want NOT NULL violation")
+	}
+
+	rel := &models.Release{ProjectID: &projectID, Title: "v1", Description: "first", Status: "pending"}
 	if err := repo.Create(ctx, rel); err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -35,16 +45,73 @@ func TestReleaseRepo_CRUD(t *testing.T) {
 	if err := repo.Update(ctx, rel); err != nil {
 		t.Fatalf("update: %v", err)
 	}
-	list, _ := repo.List(ctx)
+	list, _ := repo.List(ctx, projectID)
 	if len(list) != 1 || list[0].Status != "live" {
 		t.Fatalf("list = %+v", list)
 	}
+	if other, _ := repo.List(ctx, projectID+1); len(other) != 0 {
+		t.Fatalf("list(other project) = %+v, want empty", other)
+	}
+	var userID, issueID int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin') RETURNING id`).Scan(&userID); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	if err := d.SQL.QueryRow(`INSERT INTO issues (project_id, title, created_by) VALUES (?, 'i', ?) RETURNING id`, projectID, userID).Scan(&issueID); err != nil {
+		t.Fatalf("seed issue: %v", err)
+	}
+	if err := repo.SetIssues(ctx, rel.ID, []int64{issueID}); err != nil {
+		t.Fatalf("set issues: %v", err)
+	}
+	if byRel, err := repo.IssueIDsByRelease(ctx, []int64{rel.ID}); err != nil || len(byRel[rel.ID]) != 1 || byRel[rel.ID][0] != issueID {
+		t.Fatalf("IssueIDsByRelease = %+v, %v", byRel, err)
+	}
 
-	if err := repo.Delete(ctx, rel.ID); err != nil {
-		t.Fatalf("delete: %v", err)
+	// Deleting the project takes its releases along.
+	if _, err := d.SQL.Exec(`DELETE FROM projects WHERE id = ?`, projectID); err != nil {
+		t.Fatalf("delete project: %v", err)
 	}
 	if got, _ := repo.Get(ctx, rel.ID); got != nil {
-		t.Fatalf("after delete = %+v, want nil", got)
+		t.Fatalf("release after project delete = %+v, want gone", got)
+	}
+}
+
+func TestProjectEmbedRepo_CRUD(t *testing.T) {
+	ctx := context.Background()
+	d := openDB(t)
+	repo := store.NewProjectEmbedRepo(d.SQL)
+	var p1, p2 int64
+	d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('p1') RETURNING id`).Scan(&p1)
+	d.SQL.QueryRow(`INSERT INTO projects (name) VALUES ('p2') RETURNING id`).Scan(&p2)
+
+	e := &models.ProjectEmbed{ProjectID: p1, Title: "BI", URL: "https://bi.example/x", Height: 600}
+	if err := repo.Create(ctx, e); err != nil || e.ID == 0 {
+		t.Fatalf("create: %v (id %d)", err, e.ID)
+	}
+	// Another project can't reach it.
+	e2 := *e
+	e2.ProjectID, e2.Title = p2, "hijack"
+	if found, err := repo.Update(ctx, &e2); err != nil || found {
+		t.Fatalf("update via other project = %v, %v; want not found", found, err)
+	}
+	if err := repo.Delete(ctx, p2, e.ID); err != nil {
+		t.Fatalf("delete via other project: %v", err)
+	}
+	list, _ := repo.List(ctx, p1)
+	if len(list) != 1 || list[0].Title != "BI" {
+		t.Fatalf("list = %+v; want the untouched embed", list)
+	}
+	if other, _ := repo.List(ctx, p2); len(other) != 0 {
+		t.Fatalf("list(p2) = %+v, want empty", other)
+	}
+	e.Title = "BI 2"
+	if found, err := repo.Update(ctx, e); err != nil || !found {
+		t.Fatalf("update = %v, %v", found, err)
+	}
+	if err := repo.Delete(ctx, p1, e.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if list, _ := repo.List(ctx, p1); len(list) != 0 {
+		t.Fatalf("after delete = %+v", list)
 	}
 }
 

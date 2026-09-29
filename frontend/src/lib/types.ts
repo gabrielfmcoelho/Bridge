@@ -403,7 +403,7 @@ export interface Issue {
 
 export interface Release {
   id: number;
-  project_id: number | null;
+  project_id: number;
   title: string;
   description: string;
   status: string;
@@ -412,6 +412,16 @@ export interface Release {
   created_at: string;
   updated_at: string;
   issue_ids?: number[];
+}
+
+/** A BI / observability tool a project shows in an iframe. */
+export interface ProjectEmbed {
+  id: number;
+  project_id: number;
+  title: string;
+  url: string;
+  height: number;
+  sort_order: number;
 }
 
 export interface ExternalTool {

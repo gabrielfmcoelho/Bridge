@@ -23,7 +23,6 @@
     "dns": "DNS",
     "projects": "Projects",
     "services": "Services",
-    "releases": "Releases",
     "topology": "Topology",
     "sshConfig": "SSH Config",
     "sshKeys": "SSH Keys",
@@ -950,7 +949,8 @@
     "reposCount": "{count} repository(ies)",
     "tab": {
       "commits": "Commits",
-      "wiki": "Wiki"
+      "wiki": "Wiki",
+      "secrets": "Secrets"
     },
     "profileTitle": "Project",
     "servicesTitle": "Project services",
@@ -959,7 +959,11 @@
     "backToList": "Back to Projects",
     "linksHint": "A checked service moves to this project, leaving any other it was in. Hosts and DNS of its services come along on their own; pick below only those linked straight to the project.",
     "directHosts": "Direct hosts",
-    "directDns": "Direct DNS"
+    "directDns": "Direct DNS",
+    "secretsTitle": "Project secrets",
+    "secretsHint": "Shared with whoever sees the project. Each service's are listed below.",
+    "noSecrets": "No secrets in this project.",
+    "serviceSecretsTitle": "Service secrets"
   },
   "service": {
     "title": "Services",
@@ -1311,26 +1315,25 @@
   "release": {
     "title": "Releases",
     "create": "New Release",
-    "editRelease": "Edit Release",
     "titleField": "Title",
-    "project": "Project",
     "targetDate": "Target Date",
     "liveDate": "Live Date",
     "linkedIssues": "Linked Issues",
-    "noReleases": "No releases yet",
     "pending": "Pending",
     "ongoing": "Ongoing",
     "ready": "Ready",
     "live": "Live",
     "canceled": "Canceled",
-    "basicInfo": "Basic Info",
     "titleRequired": "Title is required",
-    "selectProjectFirst": "Select a project in Step 1 to link issues.",
-    "clearFilters": "Clear all filters",
-    "targetLabel": "Target: {date}",
-    "liveLabel": "Live: {date}",
     "issueSingular": "issue",
-    "issuePlural": "issues"
+    "issuePlural": "issues",
+    "planned": "Planned",
+    "achieved": "Reached",
+    "canceledGroup": "Canceled",
+    "overdue": "Overdue",
+    "noDate": "No date",
+    "emptyProject": "No releases in this project. Add planned milestones to follow the timeline.",
+    "liveDateHint": "Filled in when marked Live."
   },
   "tool": {
     "title": "Tools",
@@ -2735,5 +2738,16 @@
     },
     "addResponsavel": "Add owner",
     "createProject": "Create project"
+  },
+  "embed": {
+    "title": "Observability",
+    "empty": "No embedded dashboards. Add a BI or tool by its URL.",
+    "add": "Add dashboard",
+    "titleField": "Name",
+    "titlePlaceholder": "Access dashboard",
+    "urlHint": "The dashboard address. If the site refuses to be embedded, use the open-in-new-tab button.",
+    "height": "Height (px)",
+    "openNewTab": "Open in new tab",
+    "deleteConfirm": "Remove the \"{name}\" dashboard?"
   }
 }

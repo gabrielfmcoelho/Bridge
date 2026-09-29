@@ -32,6 +32,7 @@ var TableCopyOrder = []string{
 	"user_external_identities",
 	"user_gitlab_tokens",
 	"project_gitlab_links",
+	"project_embeds",
 	"host_scans",
 	"host_chamados",
 	"host_alerts",
@@ -133,7 +134,7 @@ var SerialTables = []string{
 	"external_tools", "contacts", "ssh_keys", "host_scans",
 	"host_chamados", "host_alerts", "issues", "releases",
 	"host_operation_logs", "user_external_identities",
-	"user_gitlab_tokens", "project_gitlab_links", "auth_role_mappings",
+	"user_gitlab_tokens", "project_gitlab_links", "project_embeds", "auth_role_mappings",
 	"entidades", "asset_entidades",
 }
 

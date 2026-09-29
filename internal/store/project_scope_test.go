@@ -57,7 +57,7 @@ func TestProjectRepo_EntidadeScope(t *testing.T) {
 	if got, err := projects.Get(bg, hidden.ID); err != nil || got == nil || got.Name != "hidden" {
 		t.Fatalf("hidden after scoped update/delete = %+v, %v; want untouched", got, err)
 	}
-	if rels, err := releases.List(scoped); err != nil || len(rels) != 1 || *rels[0].ProjectID != visible.ID {
+	if rels, err := releases.List(scoped, 0); err != nil || len(rels) != 1 || *rels[0].ProjectID != visible.ID {
 		t.Fatalf("scoped releases.List = %+v, %v; want only visible's release", rels, err)
 	}
 
@@ -65,7 +65,10 @@ func TestProjectRepo_EntidadeScope(t *testing.T) {
 	if list, err := projects.List(bg); err != nil || len(list) != 2 {
 		t.Fatalf("unscoped List = %+v, %v; want 2", list, err)
 	}
-	if rels, err := releases.List(bg); err != nil || len(rels) != 2 {
+	if rels, err := releases.List(bg, 0); err != nil || len(rels) != 2 {
 		t.Fatalf("unscoped releases.List = %+v, %v; want 2", rels, err)
+	}
+	if rels, err := releases.List(bg, visible.ID); err != nil || len(rels) != 1 || *rels[0].ProjectID != visible.ID {
+		t.Fatalf("releases.List(project) = %+v, %v; want only visible's release", rels, err)
 	}
 }

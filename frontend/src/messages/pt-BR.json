@@ -23,7 +23,6 @@
     "dns": "DNS",
     "projects": "Projetos",
     "services": "Serviços",
-    "releases": "Lançamentos",
     "topology": "Topologia",
     "sshConfig": "Config SSH",
     "sshKeys": "Chaves SSH",
@@ -950,7 +949,8 @@
     "reposCount": "{count} repositório(s)",
     "tab": {
       "commits": "Commits",
-      "wiki": "Wiki"
+      "wiki": "Wiki",
+      "secrets": "Segredos"
     },
     "profileTitle": "Projeto",
     "servicesTitle": "Serviços do projeto",
@@ -959,7 +959,11 @@
     "backToList": "Voltar para Projetos",
     "linksHint": "Um serviço marcado passa para este projeto, saindo de outro se estiver em um. Hosts e DNS dos serviços entram sozinhos; marque abaixo só os ligados direto ao projeto.",
     "directHosts": "Hosts diretos",
-    "directDns": "DNS diretos"
+    "directDns": "DNS diretos",
+    "secretsTitle": "Segredos do projeto",
+    "secretsHint": "Compartilhados com quem vê o projeto. Os de cada serviço aparecem abaixo.",
+    "noSecrets": "Nenhum segredo no projeto.",
+    "serviceSecretsTitle": "Segredos dos serviços"
   },
   "service": {
     "title": "Serviços",
@@ -1311,26 +1315,25 @@
   "release": {
     "title": "Lançamentos",
     "create": "Novo Lançamento",
-    "editRelease": "Editar Lançamento",
     "titleField": "Título",
-    "project": "Projeto",
     "targetDate": "Data Prevista",
     "liveDate": "Data de Lançamento",
     "linkedIssues": "Issues Vinculadas",
-    "noReleases": "Nenhum lançamento ainda",
     "pending": "Pendente",
     "ongoing": "Em Andamento",
     "ready": "Pronto",
     "live": "No Ar",
     "canceled": "Cancelado",
-    "basicInfo": "Informações Básicas",
     "titleRequired": "O título é obrigatório",
-    "selectProjectFirst": "Selecione um projeto na Etapa 1 para vincular issues.",
-    "clearFilters": "Limpar todos os filtros",
-    "targetLabel": "Previsto: {date}",
-    "liveLabel": "No ar: {date}",
     "issueSingular": "issue",
-    "issuePlural": "issues"
+    "issuePlural": "issues",
+    "planned": "Previstos",
+    "achieved": "Alcançados",
+    "canceledGroup": "Cancelados",
+    "overdue": "Atrasado",
+    "noDate": "Sem data",
+    "emptyProject": "Nenhum lançamento neste projeto. Registre marcos previstos para acompanhar a linha do tempo.",
+    "liveDateHint": "Preenchida sozinha ao marcar como No ar."
   },
   "tool": {
     "title": "Ferramentas",
@@ -2735,5 +2738,16 @@
     },
     "addResponsavel": "Adicionar responsável",
     "createProject": "Criar projeto"
+  },
+  "embed": {
+    "title": "Observabilidade",
+    "empty": "Nenhum painel incorporado. Adicione um BI ou ferramenta pela URL.",
+    "add": "Adicionar painel",
+    "titleField": "Nome",
+    "titlePlaceholder": "Painel de acessos",
+    "urlHint": "Endereço do painel. Se o site recusar ser incorporado, use o botão de abrir em nova aba.",
+    "height": "Altura (px)",
+    "openNewTab": "Abrir em nova aba",
+    "deleteConfirm": "Remover o painel \"{name}\"?"
   }
 }

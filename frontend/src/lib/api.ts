@@ -804,7 +804,8 @@ export const globalIssuesAPI = {
 
 // Releases
 export const releasesAPI = {
-  list: () => api.getList<import("./types").Release & { issue_ids: number[] }>("/api/releases"),
+  list: (projectId?: number) =>
+    api.getList<import("./types").Release & { issue_ids: number[] }>(`/api/releases${projectId ? `?project_id=${projectId}` : ""}`),
   get: (id: number) => api.get<{ release: import("./types").Release; issue_ids: number[] }>(`/api/releases/${id}`),
   create: (data: Partial<import("./types").Release> & { issue_ids?: number[] }) =>
     api.post<import("./types").Release>("/api/releases", data),
@@ -1176,6 +1177,15 @@ export type ProjectGitLabCommitsResponse = {
   commits: ProjectGitLabCommit[];
   warnings?: string[];
   error?: string;
+};
+
+export const projectEmbedsAPI = {
+  list: (projectId: number) => api.get<import("./types").ProjectEmbed[]>(`/api/projects/${projectId}/embeds`),
+  create: (projectId: number, data: Partial<import("./types").ProjectEmbed>) =>
+    api.post<import("./types").ProjectEmbed>(`/api/projects/${projectId}/embeds`, data),
+  update: (projectId: number, id: number, data: Partial<import("./types").ProjectEmbed>) =>
+    api.put<import("./types").ProjectEmbed>(`/api/projects/${projectId}/embeds/${id}`, data),
+  delete: (projectId: number, id: number) => api.delete(`/api/projects/${projectId}/embeds/${id}`),
 };
 
 export const projectGitlabAPI = {

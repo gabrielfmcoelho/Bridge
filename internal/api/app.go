@@ -46,6 +46,7 @@ type App struct {
 	oauth               *oauthHandlers
 	gitlab              *gitlabHandlers
 	projectGitlab       *projectGitLabHandlers
+	projectEmbed        *projectEmbedHandlers
 	ai                  *aiHandlers
 	coolify             *coolifyHandlers
 	proxmox             *proxmoxHandlers
@@ -100,6 +101,7 @@ func newApp(db *database.DB, configPath string) *App {
 		oauth:               &oauthHandlers{db: db, registry: registry, ah: ah},
 		gitlab:              &gitlabHandlers{db: db},
 		projectGitlab:       &projectGitLabHandlers{db: db},
+		projectEmbed:        &projectEmbedHandlers{db: db},
 		ai:                  &aiHandlers{db: db},
 		coolify:             &coolifyHandlers{db: db, dns: deps.DNS},
 		proxmox:             &proxmoxHandlers{db: db, hosts: deps.Host},

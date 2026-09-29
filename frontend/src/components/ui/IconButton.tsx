@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 const variants = {
   default: "text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-secondary)] border-transparent",
@@ -40,3 +40,20 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconB
 });
 
 export default IconButton;
+
+/** IconButton's look on an external link (opens in a new tab). */
+export function IconLink({ href, label, variant = "outline", size = "sm", className = "", children }: {
+  href: string;
+  label: string;
+  variant?: keyof typeof variants;
+  size?: keyof typeof sizes;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label}
+      className={`flex items-center justify-center rounded-[var(--radius-md)] border transition duration-150 active:scale-[0.95] ${variants[variant]} ${sizes[size]} ${className}`}>
+      {children}
+    </a>
+  );
+}

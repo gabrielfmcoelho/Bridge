@@ -4,6 +4,11 @@ import SectionCard from "@/components/ui/SectionCard";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Field from "@/components/ui/Field";
 import Tag from "@/components/ui/Tag";
+import Icon from "@/components/ui/Icon";
+import { IconLink } from "@/components/ui/IconButton";
+import { ICON_PATHS } from "@/lib/icon-paths";
+import { useQuery } from "@tanstack/react-query";
+import { projectGitlabAPI } from "@/lib/api";
 import ResponsaveisSection from "@/components/inventory/ResponsaveisSection";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { Project, ProjectResponsavel } from "@/lib/types";
@@ -15,6 +20,18 @@ import type { Project, ProjectResponsavel } from "@/lib/types";
  */
 export default function ProjectProfile({ project, tags, responsaveis }: { project: Project; tags: string[]; responsaveis: ProjectResponsavel[] }) {
   const { t } = useLocale();
+  // Same key as the form's GitLabLinksEditor, so the two share one fetch.
+  const { data: gitlab } = useQuery({ queryKey: ["project-gitlab-links", project.id], queryFn: () => projectGitlabAPI.listLinks(project.id) });
+  const links = [
+    ...(project.documentation_url ? [{ href: project.documentation_url, label: t("project.documentationUrl"), icon: ICON_PATHS.document }] : []),
+    ...(gitlab?.links ?? []).map((l) => ({
+      href: `${l.gitlab_base_url.replace(/\/+$/, "")}/${l.gitlab_path}`,
+      label: `GitLab · ${l.display_name || l.gitlab_path}`,
+      icon: ICON_PATHS.branch,
+    })),
+    // Legacy single URL, from before repositories were linked.
+    ...(project.gitlab_url ? [{ href: project.gitlab_url, label: `GitLab · ${project.gitlab_url}`, icon: ICON_PATHS.branch }] : []),
+  ].filter((l, i, all) => all.findIndex((x) => x.href === l.href) === i);
   const block = "pt-4 mt-4 border-t border-[var(--border-subtle)]";
   return (
     <>
@@ -29,9 +46,10 @@ export default function ProjectProfile({ project, tags, responsaveis }: { projec
         </div>
         <div className={block}>
           <SectionHeading as="h3" className="!mb-2">{t("service.links")}</SectionHeading>
-          <div className="grid grid-cols-1 gap-4">
-            <Field label={t("project.documentationUrl")} value={project.documentation_url} link />
-            <Field label={t("project.gitlabUrl")} value={project.gitlab_url} link />
+          <div className="flex flex-wrap gap-1.5">
+            {links.length > 0 ? links.map((l) => (
+              <IconLink key={l.href} href={l.href} label={l.label}><Icon path={l.icon} className="w-4 h-4" /></IconLink>
+            )) : <span className="text-sm text-[var(--text-muted)]">–</span>}
           </div>
         </div>
         <div className={block}>
