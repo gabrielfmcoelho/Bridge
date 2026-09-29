@@ -13,6 +13,7 @@ import { parseDotenv } from "@/lib/parseDotenv";
 import { buildEnvTargets } from "@/lib/envTargets";
 import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocale } from "@/contexts/LocaleContext";
 import type { AssetGrantsInput } from "@/lib/types";
 
 interface NewSecretModalProps {
@@ -73,6 +74,7 @@ interface EnvVarRow {
 // operators don't need to remember numeric IDs.
 export default function NewSecretModal({ open, onClose, defaultScope, defaultParentId }: NewSecretModalProps) {
   const qc = useQueryClient();
+  const { t } = useLocale();
 
   // Common metadata fields.
   const [type, setType] = useState<SecretType>("password");
@@ -149,7 +151,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
   // shape varies per parent: services + hosts use nickname; tools use name.
   const parentOptions = useMemo(() => {
     type Opt = { value: string; label: string };
-    const empty: Opt = { value: "", label: scope === "avulso" ? "—" : `Select a ${scope}…` };
+    const empty: Opt = { value: "", label: scope === "avulso" ? "—" : t("secretForm.select") };
     switch (scope) {
       case "service":
         return [empty, ...(services.data ?? []).map((s) => ({ value: String(s.id), label: s.nickname }))];
@@ -165,7 +167,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
       default:
         return [empty];
     }
-  }, [scope, services.data, hosts.data, tools.data, projects.data]);
+  }, [scope, services.data, hosts.data, tools.data, projects.data, t]);
 
   // Services belonging to the selected project (parentID when scope=projeto).
   // The checklist below only offers these, so an out-of-project service is
@@ -240,45 +242,45 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
   // for the obvious cases.
   const validate = (): string | null => {
     if (scope !== "avulso" && !parentID) {
-      return `Pick a ${scope} to attach this secret to.`;
+      return t("secretForm.errorPickParent");
     }
     if (type === "env_var") {
       // env_var doesn't use the top-level `name` (each var has its own
       // name); only group_label is required at the bundle level.
       if (!groupLabel || !/^[a-z][a-z0-9-]*$/.test(groupLabel)) {
-        return "Group label must match ^[a-z][a-z0-9-]*$ (lowercase only).";
+        return t("secretForm.errorGroupLabel");
       }
       if (scope === "projeto" && alsoSyncServices && syncServiceIDs.length === 0) {
-        return "Select at least one service, or uncheck 'also sync to services'.";
+        return t("secretForm.errorPickServices");
       }
       const filled = envVars.filter((v) => v.name.trim() || v.value);
-      if (filled.length === 0) return "Add at least one env var.";
+      if (filled.length === 0) return t("secretForm.errorAddVar");
       const seen = new Set<string>();
       for (const v of filled) {
-        if (!v.name) return "Every env var needs a name.";
+        if (!v.name) return t("secretForm.errorVarName");
         if (!/^[A-Z_][A-Z0-9_]*$/.test(v.name)) {
-          return `env_var name "${v.name}" must match ^[A-Z_][A-Z0-9_]*$ (uppercase only).`;
+          return t("secretForm.errorVarNameFormat", { name: v.name });
         }
-        if (!v.value) return `env_var "${v.name}" needs a value.`;
-        if (seen.has(v.name)) return `env_var "${v.name}" appears twice — names must be unique.`;
+        if (!v.value) return t("secretForm.errorVarValue", { name: v.name });
+        if (seen.has(v.name)) return t("secretForm.errorVarDuplicate", { name: v.name });
         seen.add(v.name);
       }
       return null;
     }
-    if (!name.trim()) return "Name is required.";
+    if (!name.trim()) return t("vault.errorNameRequired");
     switch (type) {
       case "password":
-        if (!valueField) return "Value is required.";
+        if (!valueField) return t("vault.errorValueRequired");
         break;
       case "cred":
-        if (!credUsername || !credPassword) return "Username and password are required.";
+        if (!credUsername || !credPassword) return t("vault.errorUsernamePasswordRequired");
         break;
       case "sshkey":
-        if (!sshPrivKey) return "Private key is required.";
+        if (!sshPrivKey) return t("vault.errorPrivateKeyRequired");
         break;
       case "app_login":
         if (!appName || !appUsername || !appPassword) {
-          return "App name, username, and password are required.";
+          return t("vault.errorAppLoginRequired");
         }
         break;
     }
@@ -372,7 +374,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
   const parsePasteIntoRows = () => {
     const parsed = parseDotenv(pasteText);
     if (parsed.length === 0) {
-      setPasteHint("No KEY=value lines found.");
+      setPasteHint(t("secretForm.pasteNoLines"));
       return;
     }
     const existing = envVars.filter((v) => v.name.trim() || v.value);
@@ -383,7 +385,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
   };
 
   return (
-    <ResponsiveModal open={open} onClose={handleClose} title="New secret">
+    <ResponsiveModal open={open} onClose={handleClose} title={t("secretForm.title")}>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -393,20 +395,20 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
       >
         <Card>
           <div className="grid grid-cols-3 gap-2">
-            <FormRow label="Type" required>
+            <FormRow label={t("secretForm.type")} required>
               <Select
                 value={type}
                 onChange={(e) => setType(e.target.value as SecretType)}
                 options={[
-                  { value: "password", label: "password" },
-                  { value: "cred", label: "cred" },
-                  { value: "sshkey", label: "sshkey" },
-                  { value: "app_login", label: "app_login" },
-                  { value: "env_var", label: "env_var (bulk)" },
+                  { value: "password", label: t("secretForm.typePassword") },
+                  { value: "cred", label: t("secretForm.typeCred") },
+                  { value: "sshkey", label: t("secretForm.typeSshkey") },
+                  { value: "app_login", label: t("secretForm.typeAppLogin") },
+                  { value: "env_var", label: t("secretForm.typeEnvVar") },
                 ]}
               />
             </FormRow>
-            <FormRow label="Scope" required>
+            <FormRow label={t("secretForm.scope")} required>
               <Select
                 value={scope}
                 onChange={(e) => {
@@ -414,21 +416,21 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                   setParentID(""); // dropping the previous selection avoids stale FK reference
                 }}
                 options={[
-                  { value: "avulso", label: "avulso" },
-                  { value: "service", label: "service" },
-                  { value: "host", label: "host" },
-                  { value: "tool", label: "tool" },
-                  { value: "projeto", label: "projeto" },
+                  { value: "avulso", label: t("secretForm.scopeAvulso") },
+                  { value: "service", label: t("secretForm.scopeService") },
+                  { value: "host", label: t("secretForm.scopeHost") },
+                  { value: "tool", label: t("secretForm.scopeTool") },
+                  { value: "projeto", label: t("secretForm.scopeProjeto") },
                 ]}
               />
             </FormRow>
-            <FormRow label="Visibility" required>
+            <FormRow label={t("secretForm.visibility")} required>
               <Select
                 value={visibility}
                 onChange={(e) => setVisibility(e.target.value as Visibility)}
                 options={[
-                  { value: "personal", label: "personal" },
-                  { value: "shared", label: "shared" },
+                  { value: "personal", label: t("secretForm.visibilityPersonal") },
+                  { value: "shared", label: t("secretForm.visibilityShared") },
                 ]}
               />
             </FormRow>
@@ -442,7 +444,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
 
           {scope !== "avulso" && (
             <div className="mt-3">
-              <FormRow label={`Parent ${scope}`} required hint="Pick from the list of existing rows.">
+              <FormRow label={t(`secretForm.parent.${scope}`)} required hint={t("secretForm.parentHint")}>
                 <Select
                   value={parentID}
                   onChange={(e) => {
@@ -457,7 +459,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
               (scope === "host" && hosts.isLoading) ||
               (scope === "tool" && tools.isLoading) ||
               (scope === "projeto" && projects.isLoading) ? (
-                <p className="text-[10px] text-[var(--text-faint)] mt-1">Loading {scope}s…</p>
+                <p className="text-[10px] text-[var(--text-faint)] mt-1">{t("common.loading")}</p>
               ) : null}
 
               {/* env_var only: sync the same bundle to services of this project. */}
@@ -472,15 +474,15 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                         if (!e.target.checked) setSyncServiceIDs([]);
                       }}
                     />
-                    Also sync to services of this project
+                    {t("secretForm.alsoSyncServices")}
                   </label>
                   {alsoSyncServices && (
                     <div className="mt-2 space-y-1 pl-6">
                       {services.isLoading ? (
-                        <p className="text-[10px] text-[var(--text-faint)]">Loading services…</p>
+                        <p className="text-[10px] text-[var(--text-faint)]">{t("common.loading")}</p>
                       ) : projectServices.length === 0 ? (
                         <p className="text-[10px] text-[var(--text-faint)]">
-                          This project has no services.
+                          {t("secretForm.projectNoServices")}
                         </p>
                       ) : (
                         projectServices.map((s) => (
@@ -513,10 +515,10 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
           {/* env_var hides the single-name field — each var-row carries its own. */}
           {type !== "env_var" && (
             <div className="mt-3 space-y-3">
-              <FormRow label="Name" required hint="Human-readable label.">
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="primary" />
+              <FormRow label={t("common.name")} required hint={t("secretForm.nameHint")}>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("secretForm.namePlaceholder")} />
               </FormRow>
-              <FormRow label="Description" hint="Optional. Visible to anyone who can see the secret metadata.">
+              <FormRow label={t("common.description")} hint={t("secretForm.descriptionHint")}>
                 <Input value={description} onChange={(e) => setDescription(e.target.value)} />
               </FormRow>
             </div>
@@ -526,12 +528,12 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
         {/* Per-type payload section */}
         <Card>
           <h3 className="text-sm font-semibold mb-3">
-            {type === "env_var" ? "Variables" : "Payload"}
+            {type === "env_var" ? t("secretForm.variables") : t("secretForm.payload")}
           </h3>
 
           {type === "password" && (
             <div className="space-y-3">
-              <FormRow label="Value" required>
+              <FormRow label={t("secretForm.value")} required>
                 <Input
                   type="password"
                   value={valueField}
@@ -542,19 +544,19 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
               {scope === "avulso" && (
                 <div>
                   <label className="text-xs font-medium text-[var(--text-muted)] block mb-1">
-                    Link to hosts{" "}
+                    {t("secretForm.linkHosts")}{" "}
                     <span className="text-[var(--text-faint)]">
-                      (optional — reuse this one credential across hosts)
+                      {t("secretForm.linkHostsHint")}
                     </span>
                   </label>
                   <Input
                     value={hostSearch}
                     onChange={(e) => setHostSearch(e.target.value)}
-                    placeholder="Search hosts…"
+                    placeholder={t("secretForm.searchHosts")}
                   />
                   <div className="mt-2 max-h-40 overflow-y-auto space-y-1 pr-1">
                     {hosts.isLoading ? (
-                      <p className="text-[10px] text-[var(--text-faint)]">Loading hosts…</p>
+                      <p className="text-[10px] text-[var(--text-faint)]">{t("common.loading")}</p>
                     ) : (
                       (hosts.data ?? [])
                         .filter(
@@ -586,8 +588,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                   </div>
                   {linkHostIDs.length > 0 && (
                     <p className="text-[10px] text-[var(--text-faint)] mt-1">
-                      {linkHostIDs.length} host{linkHostIDs.length === 1 ? "" : "s"} will use
-                      this credential.
+                      {t(linkHostIDs.length === 1 ? "secretForm.hostsWillUseOne" : "secretForm.hostsWillUseMany", { count: String(linkHostIDs.length) })}
                     </p>
                   )}
                 </div>
@@ -597,10 +598,10 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
 
           {type === "cred" && (
             <div className="space-y-3">
-              <FormRow label="Username" required>
+              <FormRow label={t("share.fields.username")} required>
                 <Input value={credUsername} onChange={(e) => setCredUsername(e.target.value)} autoComplete="off" />
               </FormRow>
-              <FormRow label="Password" required>
+              <FormRow label={t("share.fields.password")} required>
                 <Input
                   type="password"
                   value={credPassword}
@@ -613,10 +614,10 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
 
           {type === "sshkey" && (
             <div className="space-y-3">
-              <FormRow label="SSH username" hint="The remote user this key authenticates as.">
+              <FormRow label={t("secretForm.sshUsername")} hint={t("secretForm.sshUsernameHint")}>
                 <Input value={sshUsername} onChange={(e) => setSshUsername(e.target.value)} placeholder="deploy" />
               </FormRow>
-              <FormRow label="Private key (PEM)" required>
+              <FormRow label={t("vault.privateKeyPemLabel")} required>
                 <textarea
                   value={sshPrivKey}
                   onChange={(e) => setSshPrivKey(e.target.value)}
@@ -625,7 +626,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                   placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
                 />
               </FormRow>
-              <FormRow label="Public key" hint="Optional but recommended for fingerprint matching.">
+              <FormRow label={t("vault.publicKeyLabel")} hint={t("secretForm.publicKeyHint")}>
                 <Input
                   value={sshPubKey}
                   onChange={(e) => setSshPubKey(e.target.value)}
@@ -637,10 +638,10 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
 
           {type === "app_login" && (
             <div className="space-y-3">
-              <FormRow label="App name" required>
+              <FormRow label={t("vault.appNameLabel")} required>
                 <Input value={appName} onChange={(e) => setAppName(e.target.value)} placeholder="Jira" />
               </FormRow>
-              <FormRow label="URL" hint="Optional — link to the app's login page.">
+              <FormRow label="URL" hint={t("secretForm.appUrlHint")}>
                 <Input
                   type="url"
                   value={appURL}
@@ -648,10 +649,10 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                   placeholder="https://example.atlassian.net"
                 />
               </FormRow>
-              <FormRow label="Username" required>
+              <FormRow label={t("share.fields.username")} required>
                 <Input value={appUsername} onChange={(e) => setAppUsername(e.target.value)} autoComplete="off" />
               </FormRow>
-              <FormRow label="Password" required>
+              <FormRow label={t("share.fields.password")} required>
                 <Input
                   type="password"
                   value={appPassword}
@@ -659,7 +660,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                   autoComplete="new-password"
                 />
               </FormRow>
-              <FormRow label="Notes">
+              <FormRow label={t("share.fields.notes")}>
                 <Input value={appNotes} onChange={(e) => setAppNotes(e.target.value)} />
               </FormRow>
             </div>
@@ -668,9 +669,9 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
           {type === "env_var" && (
             <div className="space-y-3">
               <FormRow
-                label="Group label"
+                label={t("vault.groupLabel")}
                 required
-                hint="Environment bucket. Lowercase + hyphens only (e.g. prod, staging, prod-eu-1)."
+                hint={t("secretForm.groupLabelHint")}
               >
                 <Input
                   value={groupLabel}
@@ -681,8 +682,8 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
 
               <TabBar
                 tabs={[
-                  { key: "rows", label: "Rows" },
-                  { key: "paste", label: "Paste .env" },
+                  { key: "rows", label: t("secretForm.rows") },
+                  { key: "paste", label: t("secretForm.paste") },
                 ]}
                 activeTab={envInputMode}
                 onChange={(k) => {
@@ -702,10 +703,10 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                   />
                   <div className="flex items-center gap-2">
                     <Button type="button" size="sm" variant="secondary" onClick={parsePasteIntoRows}>
-                      Parse → rows
+                      {t("secretForm.parse")}
                     </Button>
                     <p className="text-[10px] text-[var(--text-faint)]">
-                      One KEY=value per line; added to the Rows tab to review before saving.
+                      {t("secretForm.parseHint")}
                     </p>
                   </div>
                   {pasteHint && <p className="text-[10px] text-red-400">{pasteHint}</p>}
@@ -716,9 +717,9 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                 <>
               <div className="space-y-2">
                 <div className="grid grid-cols-12 gap-2 text-[10px] font-medium text-[var(--text-faint)] uppercase tracking-wider">
-                  <span className="col-span-4">Name</span>
-                  <span className="col-span-4">Value</span>
-                  <span className="col-span-3">Description</span>
+                  <span className="col-span-4">{t("common.name")}</span>
+                  <span className="col-span-4">{t("secretForm.value")}</span>
+                  <span className="col-span-3">{t("common.description")}</span>
                   <span className="col-span-1"></span>
                 </div>
                 {envVars.map((row, idx) => (
@@ -735,14 +736,14 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                         type="password"
                         value={row.value}
                         onChange={(e) => updateRow(idx, { value: e.target.value })}
-                        placeholder="value"
+                        placeholder={t("secretForm.valuePlaceholder")}
                       />
                     </div>
                     <div className="col-span-3">
                       <Input
                         value={row.description}
                         onChange={(e) => updateRow(idx, { description: e.target.value })}
-                        placeholder="(optional)"
+                        placeholder={t("secretForm.optional")}
                       />
                     </div>
                     <div className="col-span-1 flex justify-end">
@@ -751,6 +752,7 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
                         size="sm"
                         variant="ghost"
                         onClick={() => removeRow(idx)}
+                        aria-label={t("secretForm.removeVar")}
                       >
                         ✕
                       </Button>
@@ -761,10 +763,10 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
 
               <div className="flex items-center gap-2">
                 <Button type="button" size="sm" variant="secondary" onClick={addRow}>
-                  + Add var
+                  + {t("secretForm.addVar")}
                 </Button>
                 <p className="text-[10px] text-[var(--text-faint)]">
-                  All vars commit in one transaction — partial failure rolls back the whole batch.
+                  {t("secretForm.txHint")}
                 </p>
               </div>
                 </>
@@ -775,10 +777,10 @@ export default function NewSecretModal({ open, onClose, defaultScope, defaultPar
 
         <div className="flex items-center gap-2">
           <Button type="submit" size="sm" disabled={create.isPending}>
-            {create.isPending ? "Saving..." : type === "env_var" ? "Save bundle" : "Create secret"}
+            {create.isPending ? t("secretForm.saving") : type === "env_var" ? t("secretForm.saveBundle") : t("secretForm.create")}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={handleClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           {create.isError && (
             <span className="text-xs text-red-400">{(create.error as Error).message}</span>
