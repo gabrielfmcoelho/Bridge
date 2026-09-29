@@ -52,6 +52,9 @@ type DNSListItem struct {
 	models.DNSRecord
 	Tags                []string `json:"tags"`
 	HostIDs             []int64  `json:"host_ids"`
+	ServicesCount       int      `json:"services_count"`
+	ProjectsCount       int      `json:"projects_count"`
+	IssuesCount         int      `json:"issues_count"` // open issues
 	MainResponsavelName string   `json:"main_responsavel_name"`
 	MainEntidade        string   `json:"main_entidade"` // creator entidade name, as on hosts
 }
@@ -102,16 +105,25 @@ func (s *DNSService) List(ctx context.Context, f models.DNSFilter) ([]DNSListIte
 	if err != nil {
 		return nil, err
 	}
+	// Links for every row in one query per table (was one query per row).
+	links, err := store.NewGraphRepo(s.db).Links(ctx)
+	if err != nil {
+		return nil, err
+	}
+	hostIDs, svcIDs, projIDs := store.ByFrom(links.DNSHost), store.ByTo(links.ServiceDNS), store.ByTo(links.ProjectDNS)
+	issueCounts, err := models.GetIssueCountsByEntity(s.db, "dns")
+	if err != nil {
+		return nil, err
+	}
 	out := make([]DNSListItem, len(records))
 	for i, rec := range records {
-		hostIDs, err := s.dns.HostIDs(ctx, rec.ID)
-		if err != nil {
-			return nil, err
-		}
 		out[i] = DNSListItem{
 			DNSRecord:           rec,
 			Tags:                tagMap[rec.ID],
-			HostIDs:             hostIDs,
+			HostIDs:             hostIDs[rec.ID],
+			ServicesCount:       len(svcIDs[rec.ID]),
+			ProjectsCount:       len(projIDs[rec.ID]),
+			IssuesCount:         issueCounts[rec.ID],
 			MainResponsavelName: mainNames[rec.ID],
 			MainEntidade:        entidades[rec.ID],
 		}

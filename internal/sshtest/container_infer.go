@@ -8,6 +8,9 @@ type ContainerInference struct {
 	ServiceType    string
 	ServiceSubtype string
 	Nickname       string
+	// Kind is the service category persisted as services.service_kind: the
+	// catalog Kind, an imageRule's kind, or "app" for unknown images.
+	Kind string
 }
 
 // kindToServiceType maps a serviceCatalog Kind onto the `service_type` enum the
@@ -33,6 +36,7 @@ type imageRule struct {
 	keyword     string
 	serviceType string
 	subtype     string
+	kind        string // services.service_kind; see ContainerInference.Kind
 }
 
 // imageRules covers container images with no serviceCatalog entry — app
@@ -43,58 +47,58 @@ type imageRule struct {
 // page can't disagree about what a container is.
 var imageRules = []imageRule{
 	// Databases with no host-service catalog entry
-	{"sqlite", "database", "SQLite"},
+	{"sqlite", "database", "SQLite", "database"},
 
 	// Infrastructure
-	{"kong", "infrastructure", "Kong"},
-	{"portainer", "infrastructure", "Portainer"},
-	{"coolify", "infrastructure", "Coolify"},
-	{"vault", "infrastructure", ""},
-	{"consul", "infrastructure", ""},
+	{"kong", "infrastructure", "Kong", "proxy"},
+	{"portainer", "infrastructure", "Portainer", "platform"},
+	{"coolify", "infrastructure", "Coolify", "platform"},
+	{"vault", "infrastructure", "", "platform"},
+	{"consul", "infrastructure", "", "platform"},
 
 	// Monitoring
-	{"grafana", "monitoring", "Grafana"},
-	{"metabase", "monitoring", "Metabase"},
-	{"signoz", "monitoring", ""},
-	{"prometheus", "monitoring", ""},
-	{"loki", "monitoring", ""},
-	{"jaeger", "monitoring", ""},
+	{"grafana", "monitoring", "Grafana", "monitoring"},
+	{"metabase", "monitoring", "Metabase", "analytics"},
+	{"signoz", "monitoring", "", "monitoring"},
+	{"prometheus", "monitoring", "", "monitoring"},
+	{"loki", "monitoring", "", "logging"},
+	{"jaeger", "monitoring", "", "monitoring"},
 
 	// Workers / orchestration
-	{"airflow", "worker", "Airflow"},
-	{"prefect", "worker", "Prefect"},
-	{"n8n", "worker", "n8n"},
-	{"celery", "worker", ""},
-	{"temporal", "worker", ""},
-	{"dagster", "worker", ""},
-	{"trino", "worker", "Trino"},
+	{"airflow", "worker", "Airflow", "orchestration"},
+	{"prefect", "worker", "Prefect", "orchestration"},
+	{"n8n", "worker", "n8n", "orchestration"},
+	{"celery", "worker", "", "queue"},
+	{"temporal", "worker", "", "orchestration"},
+	{"dagster", "worker", "", "orchestration"},
+	{"trino", "worker", "Trino", "analytics"},
 
 	// Agents
-	{"watchtower", "agents", ""},
-	{"datadog", "agents", ""},
-	{"newrelic", "agents", ""},
-	{"telegraf", "agents", ""},
-	{"fluentd", "agents", ""},
-	{"filebeat", "agents", ""},
+	{"watchtower", "agents", "", "agent"},
+	{"datadog", "agents", "", "agent"},
+	{"newrelic", "agents", "", "agent"},
+	{"telegraf", "agents", "", "agent"},
+	{"fluentd", "agents", "", "logging"},
+	{"filebeat", "agents", "", "logging"},
 
 	// Fullstack
-	{"next", "app-fullstack", ""},
-	{"nuxt", "app-fullstack", ""},
-	{"remix", "app-fullstack", ""},
+	{"next", "app-fullstack", "", "app"},
+	{"nuxt", "app-fullstack", "", "app"},
+	{"remix", "app-fullstack", "", "app"},
 
 	// API
-	{"fastapi", "app-api", ""},
-	{"flask", "app-api", ""},
-	{"django", "app-api", ""},
-	{"express", "app-api", ""},
-	{"spring", "app-api", ""},
-	{"gin", "app-api", ""},
+	{"fastapi", "app-api", "", "app"},
+	{"flask", "app-api", "", "app"},
+	{"django", "app-api", "", "app"},
+	{"express", "app-api", "", "app"},
+	{"spring", "app-api", "", "app"},
+	{"gin", "app-api", "", "app"},
 
 	// Frontend
-	{"react", "app-frontend", ""},
-	{"angular", "app-frontend", ""},
-	{"vue", "app-frontend", ""},
-	{"svelte", "app-frontend", ""},
+	{"react", "app-frontend", "", "app"},
+	{"angular", "app-frontend", "", "app"},
+	{"vue", "app-frontend", "", "app"},
+	{"svelte", "app-frontend", "", "app"},
 }
 
 // InferFromImage maps a Docker image name to a service type/subtype.
@@ -129,6 +133,7 @@ func InferFromImage(imageName, containerName string) ContainerInference {
 					ServiceType:    ServiceTypeForCatalog(spec.Name),
 					ServiceSubtype: spec.Label,
 					Nickname:       nickname,
+					Kind:           spec.Kind,
 				}
 			}
 		}
@@ -140,6 +145,7 @@ func InferFromImage(imageName, containerName string) ContainerInference {
 				ServiceType:    rule.serviceType,
 				ServiceSubtype: rule.subtype,
 				Nickname:       nickname,
+				Kind:           rule.kind,
 			}
 		}
 	}
@@ -148,7 +154,19 @@ func InferFromImage(imageName, containerName string) ContainerInference {
 		ServiceType:    "application",
 		ServiceSubtype: "",
 		Nickname:       nickname,
+		Kind:           "app",
 	}
+}
+
+// KindForCatalog returns the catalog Kind (services.service_kind) for a
+// serviceCatalog entry key (DiscoveredService.Name), or "" if unknown.
+func KindForCatalog(name string) string {
+	for _, spec := range serviceCatalog {
+		if spec.Name == name {
+			return spec.Kind
+		}
+	}
+	return ""
 }
 
 // ServiceTypeForCatalog returns the `service_type` enum value for a

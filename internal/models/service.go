@@ -8,12 +8,16 @@ import "time"
 // reconciliation live in internal/service.ServiceService / store.ServiceRepo
 // (R2 refactor).
 type Service struct {
-	ID                   int64  `json:"id"`
-	Nickname             string `json:"nickname"`
-	ProjectID            *int64 `json:"project_id"`
-	Description          string `json:"description"`
-	ServiceType          string `json:"service_type"`
-	ServiceSubtype       string `json:"service_subtype"`
+	ID             int64  `json:"id"`
+	Nickname       string `json:"nickname"`
+	ProjectID      *int64 `json:"project_id"`
+	Description    string `json:"description"`
+	ServiceType    string `json:"service_type"`
+	ServiceSubtype string `json:"service_subtype"`
+	// ServiceKind is the category (database, cache, queue, web, proxy, runtime,
+	// orchestration, monitoring, app, …): the scan catalog's Kind for
+	// discovered rows, the operator's pick for manual ones; "" = unclassified.
+	ServiceKind          string `json:"service_kind"`
 	TechnologyStack      string `json:"technology_stack"`
 	DeployApproach       string `json:"deploy_approach"`
 	OrchestratorTool     string `json:"orchestrator_tool"`
@@ -62,8 +66,15 @@ type ServiceFilter struct {
 	DevelopedBy          string
 	IsExternalDependency string
 	OrchestratorManaged  string
-	SortBy               string
-	SortDir              string
-	Page                 int
-	PerPage              int
+	// Kind, Source ("auto"|"fixed"|"manual"), DiscoveryKind ("container"|
+	// "host") and Status ("online"|"offline") are exact-match; "" = any.
+	// Kind "none" matches unclassified rows.
+	Kind          string
+	Source        string
+	DiscoveryKind string
+	Status        string
+	SortBy        string
+	SortDir       string
+	Page          int
+	PerPage       int
 }

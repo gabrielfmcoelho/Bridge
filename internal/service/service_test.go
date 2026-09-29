@@ -9,6 +9,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 func newServiceService(t *testing.T) (*service.ServiceService, *database.DB) {
@@ -139,7 +140,7 @@ func TestServiceService_UpdateAndDelete(t *testing.T) {
 
 func TestServiceService_FixateAndContainerRules(t *testing.T) {
 	ctx := context.Background()
-	svc, _ := newServiceService(t)
+	svc, d := newServiceService(t)
 
 	// A manual service cannot be fixated.
 	manual := &service.ServiceWrite{Service: models.Service{Nickname: "m", Source: "manual"}}
@@ -150,9 +151,16 @@ func TestServiceService_FixateAndContainerRules(t *testing.T) {
 		t.Fatalf("fixate(manual) err = %v, want ErrServiceNotAuto", err)
 	}
 
-	// An auto service can be fixated and then rebound.
+	// The API can't mint scan-owned rows: Create forces "manual".
+	spoof := &service.ServiceWrite{Service: models.Service{Nickname: "s", Source: "auto"}}
+	if err := svc.Create(ctx, spoof); err != nil || spoof.Service.Source != "manual" {
+		t.Fatalf("create(source=auto) = %q, %v; want manual", spoof.Service.Source, err)
+	}
+
+	// An auto service (scan-created, so seeded through the repo) can be
+	// fixated and then rebound.
 	auto := &service.ServiceWrite{Service: models.Service{Nickname: "a", Source: "auto"}}
-	if err := svc.Create(ctx, auto); err != nil {
+	if err := store.NewServiceRepo(d.SQL).Create(ctx, &auto.Service); err != nil {
 		t.Fatalf("create auto: %v", err)
 	}
 	// Auto cannot be rebound until fixated.

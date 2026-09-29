@@ -40,6 +40,7 @@ func TestGraphRepo_Links(t *testing.T) {
 		{`INSERT INTO service_dns_links (service_id, dns_id) VALUES (?, ?)`, svc, dns},
 		{`INSERT INTO project_host_links (project_id, host_id) VALUES (?, ?)`, proj, host},
 		{`INSERT INTO service_dependencies (service_id, depends_on_id) VALUES (?, ?)`, svc, dep},
+		{`INSERT INTO project_dns_links (project_id, dns_id) VALUES (?, ?)`, proj, dns},
 	} {
 		if _, err := d.SQL.Exec(q.sql, q.a, q.b); err != nil {
 			t.Fatalf("%s: %v", q.sql, err)
@@ -56,8 +57,15 @@ func TestGraphRepo_Links(t *testing.T) {
 		ServiceDNS:     []store.LinkPair{{svc, dns}},
 		ProjectHost:    []store.LinkPair{{proj, host}},
 		ServiceDepends: []store.LinkPair{{svc, dep}},
+		ProjectDNS:     []store.LinkPair{{proj, dns}},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Links:\n got %+v\nwant %+v", got, want)
+	}
+	if m := store.ByTo(got.ServiceHost); !reflect.DeepEqual(m[host], []int64{svc}) {
+		t.Fatalf("ByTo(ServiceHost)[host] = %v, want [%d]", m[host], svc)
+	}
+	if m := store.ByFrom(got.ServiceDNS); !reflect.DeepEqual(m[svc], []int64{dns}) {
+		t.Fatalf("ByFrom(ServiceDNS)[svc] = %v, want [%d]", m[svc], dns)
 	}
 }

@@ -53,6 +53,7 @@ type ServiceListItem struct {
 	DNSIDs              []int64  `json:"dns_ids"`
 	DependsOnIDs        []int64  `json:"depends_on_ids"`
 	MainResponsavelName string   `json:"main_responsavel_name"`
+	IssuesCount         int      `json:"issues_count"` // open issues
 }
 
 // ServiceDetail is the full single-service view (service + relations).
@@ -99,27 +100,26 @@ func (s *ServiceService) List(ctx context.Context, f models.ServiceFilter) ([]Se
 	if err != nil {
 		return nil, err
 	}
+	// Links for every row in one query per table (was 3 queries per row).
+	links, err := store.NewGraphRepo(s.db).Links(ctx)
+	if err != nil {
+		return nil, err
+	}
+	hostIDs, dnsIDs, depIDs := store.ByFrom(links.ServiceHost), store.ByFrom(links.ServiceDNS), store.ByFrom(links.ServiceDepends)
+	issueCounts, err := models.GetIssueCountsByEntity(s.db, "service")
+	if err != nil {
+		return nil, err
+	}
 	out := make([]ServiceListItem, len(services))
 	for i, svc := range services {
-		hostIDs, err := s.services.HostIDs(ctx, svc.ID)
-		if err != nil {
-			return nil, err
-		}
-		dnsIDs, err := s.services.DNSIDs(ctx, svc.ID)
-		if err != nil {
-			return nil, err
-		}
-		depIDs, err := s.services.DependencyIDs(ctx, svc.ID)
-		if err != nil {
-			return nil, err
-		}
 		out[i] = ServiceListItem{
 			Service:             svc,
 			Tags:                tagMap[svc.ID],
-			HostIDs:             hostIDs,
-			DNSIDs:              dnsIDs,
-			DependsOnIDs:        depIDs,
+			HostIDs:             hostIDs[svc.ID],
+			DNSIDs:              dnsIDs[svc.ID],
+			DependsOnIDs:        depIDs[svc.ID],
 			MainResponsavelName: mainNames[svc.ID],
+			IssuesCount:         issueCounts[svc.ID],
 		}
 	}
 	return out, nil
@@ -182,6 +182,8 @@ func (s *ServiceService) Grants(ctx context.Context, id int64) (models.AssetGran
 // Create inserts the service and applies its relations (only the non-empty ones).
 // On success w.Service.ID is set.
 func (s *ServiceService) Create(ctx context.Context, w *ServiceWrite) error {
+	// Only the scan creates "auto" rows; anything through the API is manual.
+	w.Service.Source = "manual"
 	if err := s.services.Create(ctx, &w.Service); err != nil {
 		return err
 	}

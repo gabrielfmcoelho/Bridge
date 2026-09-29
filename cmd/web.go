@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/api"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 	"github.com/spf13/cobra"
 )
@@ -51,6 +53,14 @@ var webCmd = &cobra.Command{
 		// by consolidation. Safe only because resolution above is link-first.
 		if err := vault.RunSharedHostPasswordCleanupIfEnabled(ctx, db); err != nil {
 			return err
+		}
+
+		// Classify scan-owned services that predate services.service_kind
+		// (idempotent; a failure only leaves them unclassified).
+		if n, err := store.NewServiceRepo(db.SQL).BackfillKinds(ctx); err != nil {
+			log.Printf("[services] backfill service_kind: %v", err)
+		} else if n > 0 {
+			log.Printf("[services] classified %d service(s) by kind", n)
 		}
 
 		// Background: clean up expired share links every hour (Phase 3 Task 3.4).

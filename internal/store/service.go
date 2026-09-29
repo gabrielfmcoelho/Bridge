@@ -24,7 +24,7 @@ type ServiceRepo struct {
 // NewServiceRepo constructs a ServiceRepo over the given DB handle.
 func NewServiceRepo(db *sql.DB) *ServiceRepo { return &ServiceRepo{db: db} }
 
-const serviceCols = `id, nickname, project_id, description, service_type, service_subtype,
+const serviceCols = `id, nickname, project_id, description, service_type, service_subtype, service_kind,
 	technology_stack, deploy_approach, orchestrator_tool, environment, port, version,
 	orchestrator_managed, is_directly_managed, is_responsible, developed_by,
 	is_external_dependency, external_provider, external_url, external_contact,
@@ -34,7 +34,7 @@ const serviceCols = `id, nickname, project_id, description, service_type, servic
 	discovered_at, last_seen_at, grafana_dashboard_uid, created_at, updated_at`
 
 // serviceColsS is serviceCols qualified with the `s.` table alias, for joins.
-const serviceColsS = `s.id, s.nickname, s.project_id, s.description, s.service_type, s.service_subtype,
+const serviceColsS = `s.id, s.nickname, s.project_id, s.description, s.service_type, s.service_subtype, s.service_kind,
 	s.technology_stack, s.deploy_approach, s.orchestrator_tool, s.environment, s.port, s.version,
 	s.orchestrator_managed, s.is_directly_managed, s.is_responsible, s.developed_by,
 	s.is_external_dependency, s.external_provider, s.external_url, s.external_contact,
@@ -44,7 +44,7 @@ const serviceColsS = `s.id, s.nickname, s.project_id, s.description, s.service_t
 	s.discovered_at, s.last_seen_at, s.grafana_dashboard_uid, s.created_at, s.updated_at`
 
 func scanService(scanner interface{ Scan(...any) error }, s *models.Service) error {
-	return scanner.Scan(&s.ID, &s.Nickname, &s.ProjectID, &s.Description, &s.ServiceType, &s.ServiceSubtype,
+	return scanner.Scan(&s.ID, &s.Nickname, &s.ProjectID, &s.Description, &s.ServiceType, &s.ServiceSubtype, &s.ServiceKind,
 		&s.TechnologyStack, &s.DeployApproach, &s.OrchestratorTool, &s.Environment, &s.Port, &s.Version,
 		&s.OrchestratorManaged, &s.IsDirectlyManaged, &s.IsResponsible, &s.DevelopedBy,
 		&s.IsExternalDependency, &s.ExternalProvider, &s.ExternalURL, &s.ExternalContact,
@@ -79,16 +79,16 @@ func (r *ServiceRepo) Create(ctx context.Context, s *models.Service) error {
 		s.Source = "manual"
 	}
 	id, err := database.InsertReturningID(r.db,
-		`INSERT INTO services (nickname, project_id, description, service_type, service_subtype,
+		`INSERT INTO services (nickname, project_id, description, service_type, service_subtype, service_kind,
 			technology_stack, deploy_approach, orchestrator_tool, environment, port, version,
 			orchestrator_managed, is_directly_managed, is_responsible, developed_by,
 			is_external_dependency, external_provider, external_url, external_contact,
 			repository_url, gitlab_url, documentation_url,
 			source, container_status, container_id, container_name, container_image, container_ports,
 			discovered_at, last_seen_at, grafana_dashboard_uid)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 			?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype,
+		s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype, s.ServiceKind,
 		s.TechnologyStack, s.DeployApproach, s.OrchestratorTool, s.Environment, s.Port, s.Version,
 		s.OrchestratorManaged, s.IsDirectlyManaged, s.IsResponsible, s.DevelopedBy,
 		s.IsExternalDependency, s.ExternalProvider, s.ExternalURL, s.ExternalContact,
@@ -159,6 +159,20 @@ func serviceWhere(ctx context.Context, f models.ServiceFilter) ([]string, []any)
 		where = append(where, "orchestrator_managed = true")
 	case "no":
 		where = append(where, "orchestrator_managed = false")
+	}
+	switch f.Kind {
+	case "":
+	case "none":
+		where = append(where, "service_kind = ''")
+	default:
+		where = append(where, "service_kind = ?")
+		args = append(args, f.Kind)
+	}
+	for col, v := range map[string]string{"source": f.Source, "discovery_kind": f.DiscoveryKind, "container_status": f.Status} {
+		if v != "" {
+			where = append(where, col+" = ?")
+			args = append(args, v)
+		}
 	}
 	return where, args
 }
@@ -253,24 +267,26 @@ func (r *ServiceRepo) ListDiscoveredByHost(ctx context.Context, hostID int64) ([
 	return scanServices(rows)
 }
 
-// Update writes the mutable fields of a service by id.
+// Update writes the mutable fields of a service by id. source is not among
+// them: it changes only through the scan (auto) and Fixate (auto→fixed), so an
+// API payload can't relabel a manual service as scan-owned or vice versa.
 func (r *ServiceRepo) Update(ctx context.Context, s *models.Service) error {
 	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE services SET nickname = ?, project_id = ?, description = ?, service_type = ?, service_subtype = ?,
+		`UPDATE services SET nickname = ?, project_id = ?, description = ?, service_type = ?, service_subtype = ?, service_kind = ?,
 			technology_stack = ?, deploy_approach = ?, orchestrator_tool = ?, environment = ?, port = ?, version = ?,
 			orchestrator_managed = ?, is_directly_managed = ?, is_responsible = ?, developed_by = ?,
 			is_external_dependency = ?, external_provider = ?, external_url = ?, external_contact = ?,
 			repository_url = ?, gitlab_url = ?, documentation_url = ?,
-			source = ?, container_status = ?, container_id = ?, container_name = ?, container_image = ?, container_ports = ?,
+			container_status = ?, container_id = ?, container_name = ?, container_image = ?, container_ports = ?,
 			discovered_at = ?, last_seen_at = ?, grafana_dashboard_uid = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND `+vis,
-		append([]any{s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype,
+		append([]any{s.Nickname, s.ProjectID, s.Description, s.ServiceType, s.ServiceSubtype, s.ServiceKind,
 			s.TechnologyStack, s.DeployApproach, s.OrchestratorTool, s.Environment, s.Port, s.Version,
 			s.OrchestratorManaged, s.IsDirectlyManaged, s.IsResponsible, s.DevelopedBy,
 			s.IsExternalDependency, s.ExternalProvider, s.ExternalURL, s.ExternalContact,
 			s.RepositoryURL, s.GitlabURL, s.DocumentationURL,
-			s.Source, s.ContainerStatus, s.ContainerID, s.ContainerName, s.ContainerImage, s.ContainerPorts,
+			s.ContainerStatus, s.ContainerID, s.ContainerName, s.ContainerImage, s.ContainerPorts,
 			s.DiscoveredAt, s.LastSeenAt, s.GrafanaDashboardUID, s.ID}, vargs...)...,
 	)
 	return err
@@ -434,6 +450,7 @@ type discoveredRow struct {
 	description    string
 	serviceType    string
 	serviceSubtype string
+	serviceKind    string
 	version        string
 	port           string
 	containerID    string
@@ -460,7 +477,7 @@ func containerRows(containers []sshtest.ContainerInfo) []discoveredRow {
 			kind: "container", key: c.Name,
 			nickname:    inf.Nickname,
 			description: "Auto-discovered from container " + c.Name,
-			serviceType: inf.ServiceType, serviceSubtype: inf.ServiceSubtype,
+			serviceType: inf.ServiceType, serviceSubtype: inf.ServiceSubtype, serviceKind: inf.Kind,
 			port:           extractFirstHostPort(c.Ports),
 			containerID:    c.ID,
 			containerName:  c.Name,
@@ -503,7 +520,7 @@ func hostServiceRows(services []sshtest.DiscoveredService) []discoveredRow {
 			kind: "host", key: s.Name,
 			nickname:    s.Label,
 			description: desc,
-			serviceType: sshtest.ServiceTypeForCatalog(s.Name), serviceSubtype: s.Label,
+			serviceType: sshtest.ServiceTypeForCatalog(s.Name), serviceSubtype: s.Label, serviceKind: s.Kind,
 			version: s.Version,
 			port:    port,
 		})
@@ -563,10 +580,11 @@ func (r *ServiceRepo) ReconcileDiscovered(ctx context.Context, hostID int64, inv
 			if _, err := tx.ExecContext(ctx,
 				`UPDATE services SET discovery_key = ?, container_id = ?, container_name = ?,
 					container_image = ?, container_ports = ?, container_status = 'online',
+					service_kind = CASE WHEN service_kind = '' THEN ? ELSE service_kind END,
 					last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
 				WHERE id = ?`,
 				row.key, row.containerID, row.containerName, row.containerImage, row.containerPorts,
-				now, match.ID,
+				row.serviceKind, now, match.ID,
 			); err != nil {
 				return err
 			}
@@ -575,13 +593,13 @@ func (r *ServiceRepo) ReconcileDiscovered(ctx context.Context, hostID int64, inv
 
 		var id int64
 		if err := tx.QueryRowContext(ctx,
-			`INSERT INTO services (nickname, description, service_type, service_subtype, version,
+			`INSERT INTO services (nickname, description, service_type, service_subtype, service_kind, version,
 				source, discovery_kind, discovery_key,
 				container_status, container_id, container_name, container_image, container_ports,
 				port, orchestrator_managed, discovered_at, last_seen_at)
-			VALUES (?, ?, ?, ?, ?, 'auto', ?, ?, 'online', ?, ?, ?, ?, ?, ?, ?, ?)
+			VALUES (?, ?, ?, ?, ?, ?, 'auto', ?, ?, 'online', ?, ?, ?, ?, ?, ?, ?, ?)
 			RETURNING id`,
-			row.nickname, row.description, row.serviceType, row.serviceSubtype, row.version,
+			row.nickname, row.description, row.serviceType, row.serviceSubtype, row.serviceKind, row.version,
 			row.kind, row.key,
 			row.containerID, row.containerName, row.containerImage, row.containerPorts,
 			row.port, row.orchestrated, now, now,
@@ -617,6 +635,50 @@ func (r *ServiceRepo) ReconcileDiscovered(ctx context.Context, hostID int64, inv
 	}
 
 	return tx.Commit()
+}
+
+// BackfillKinds classifies scan-owned services that predate service_kind (or
+// were never classified), from the same sources the scan uses: the catalog
+// entry for host rows, the image for container rows. Idempotent — only rows
+// with service_kind = ” are read — so it is safe to run on every start.
+// Returns how many rows it classified.
+func (r *ServiceRepo) BackfillKinds(ctx context.Context) (int, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, discovery_kind, discovery_key, container_image, container_name FROM services
+		 WHERE service_kind = '' AND source IN ('auto', 'fixed') AND discovery_kind != ''`)
+	if err != nil {
+		return 0, err
+	}
+	type pending struct {
+		id   int64
+		kind string
+	}
+	var todo []pending
+	for rows.Next() {
+		var id int64
+		var dk, key, image, name string
+		if err := rows.Scan(&id, &dk, &key, &image, &name); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		kind := sshtest.KindForCatalog(key)
+		if dk == "container" {
+			kind = sshtest.InferFromImage(image, name).Kind
+		}
+		if kind != "" {
+			todo = append(todo, pending{id, kind})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	for _, p := range todo {
+		if _, err := r.db.ExecContext(ctx, `UPDATE services SET service_kind = ? WHERE id = ? AND service_kind = ''`, p.kind, p.id); err != nil {
+			return 0, err
+		}
+	}
+	return len(todo), nil
 }
 
 // scanCountMap reads (id, count) rows into a map.

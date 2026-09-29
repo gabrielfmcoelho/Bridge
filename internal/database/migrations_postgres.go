@@ -1387,4 +1387,13 @@ var migrationsPostgres = []string{
 	INSERT INTO app_settings (key, value) VALUES
 		('proxmox_enabled', 'false'), ('proxmox_base_url', ''), ('proxmox_token_id', ''), ('proxmox_skip_verify', 'false')
 		ON CONFLICT DO NOTHING;`,
+
+	// Version 87: service category. service_kind keeps the scan catalog's Kind
+	// (database, cache, queue, web, proxy, …) that service_type flattens
+	// (cache→database, queue→worker); '' = unclassified. Existing scan rows are
+	// classified at startup by ServiceRepo.BackfillKinds. source gets an index
+	// for the auto/manual filter.
+	`ALTER TABLE services ADD COLUMN IF NOT EXISTS service_kind TEXT NOT NULL DEFAULT '';
+	CREATE INDEX IF NOT EXISTS idx_services_service_kind ON services(service_kind);
+	CREATE INDEX IF NOT EXISTS idx_services_source ON services(source);`,
 }
