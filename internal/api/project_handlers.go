@@ -66,10 +66,16 @@ type projectWriteRequest struct {
 	models.AssetGrantsInput
 	Tags         *[]string                  `json:"tags"`
 	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
+	// Project-side links: services join the project (services.project_id);
+	// hosts and DNS are direct links. Absent = leave unchanged.
+	ServiceIDs *[]int64 `json:"service_ids"`
+	HostIDs    *[]int64 `json:"host_ids"`
+	DNSIDs     *[]int64 `json:"dns_ids"`
 }
 
 func (req *projectWriteRequest) toWrite() *service.ProjectWrite {
-	return &service.ProjectWrite{Project: req.Project, Tags: req.Tags, Responsaveis: req.Responsaveis}
+	return &service.ProjectWrite{Project: req.Project, Tags: req.Tags, Responsaveis: req.Responsaveis,
+		ServiceIDs: req.ServiceIDs, DirectHostIDs: req.HostIDs, DirectDNSIDs: req.DNSIDs}
 }
 
 func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {

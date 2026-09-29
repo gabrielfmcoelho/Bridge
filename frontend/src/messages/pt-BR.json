@@ -956,7 +956,10 @@
     "servicesTitle": "Serviços do projeto",
     "noServices": "Nenhum serviço vinculado a este projeto.",
     "notFound": "Projeto não encontrado",
-    "backToList": "Voltar para Projetos"
+    "backToList": "Voltar para Projetos",
+    "linksHint": "Um serviço marcado passa para este projeto, saindo de outro se estiver em um. Hosts e DNS dos serviços entram sozinhos; marque abaixo só os ligados direto ao projeto.",
+    "directHosts": "Hosts diretos",
+    "directDns": "DNS diretos"
   },
   "service": {
     "title": "Serviços",

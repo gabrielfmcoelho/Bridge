@@ -212,6 +212,7 @@ export default function ProjectsPage() {
           onSuccess={() => {
             setShowForm(false);
             queryClient.invalidateQueries({ queryKey: ["projects"] });
+            queryClient.invalidateQueries({ queryKey: ["services"] });
           }}
         />
       </Drawer>

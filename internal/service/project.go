@@ -61,7 +61,11 @@ type ProjectDetail struct {
 	Services     []models.Service     `json:"services"`
 	HostIDs      []int64              `json:"host_ids"`
 	DNSIDs       []int64              `json:"dns_ids"`
-	Entidades    models.AssetGrants   `json:"entidades"`
+	// The links set on the project itself (the form edits these); HostIDs /
+	// DNSIDs above also include those reached through the services.
+	DirectHostIDs []int64            `json:"direct_host_ids"`
+	DirectDNSIDs  []int64            `json:"direct_dns_ids"`
+	Entidades     models.AssetGrants `json:"entidades"`
 }
 
 // ProjectWrite carries the create/update payload (project + relations). For
@@ -71,7 +75,12 @@ type ProjectWrite struct {
 	Project      models.Project
 	Tags         *[]string
 	Responsaveis *[]models.ResponsavelInput
-	Grants       *models.AssetGrants // nil = leave unchanged
+	// Links set from the project side; nil = leave unchanged. ServiceIDs moves
+	// services into (and, when dropped, out of) the project.
+	ServiceIDs    *[]int64
+	DirectHostIDs *[]int64
+	DirectDNSIDs  *[]int64
+	Grants        *models.AssetGrants // nil = leave unchanged
 }
 
 // List returns the projects matching the filter (server-side filter/sort/
@@ -170,10 +179,11 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	}
 	svcHosts, svcDNS := store.ByFrom(links.ServiceHost), store.ByFrom(links.ServiceDNS)
 	hostSet, dnsSet := map[int64]struct{}{}, map[int64]struct{}{}
-	for _, h := range store.ByFrom(links.ProjectHost)[id] {
+	directHosts, directDNS := store.ByFrom(links.ProjectHost)[id], store.ByFrom(links.ProjectDNS)[id]
+	for _, h := range directHosts {
 		hostSet[h] = struct{}{}
 	}
-	for _, d := range store.ByFrom(links.ProjectDNS)[id] {
+	for _, d := range directDNS {
 		dnsSet[d] = struct{}{}
 	}
 	for _, svc := range services {
@@ -187,13 +197,15 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	hostIDs, dnsIDs := sortedKeys(hostSet), sortedKeys(dnsSet)
 	grants, _ := s.grants.Get(ctx, store.AssetProject, id) // best effort
 	return &ProjectDetail{
-		Project:      p,
-		Tags:         tags,
-		Responsaveis: resp,
-		Services:     services,
-		HostIDs:      hostIDs,
-		DNSIDs:       dnsIDs,
-		Entidades:    grants,
+		Project:       p,
+		Tags:          tags,
+		Responsaveis:  resp,
+		Services:      services,
+		HostIDs:       hostIDs,
+		DNSIDs:        dnsIDs,
+		DirectHostIDs: directHosts,
+		DirectDNSIDs:  directDNS,
+		Entidades:     grants,
 	}, nil
 }
 
@@ -235,7 +247,7 @@ func (s *ProjectService) Create(ctx context.Context, w *ProjectWrite) error {
 			return err
 		}
 	}
-	return nil
+	return s.applyLinks(ctx, w.Project.ID, w)
 }
 
 // Update writes the project by id and applies any relations whose slice is
@@ -264,7 +276,30 @@ func (s *ProjectService) Update(ctx context.Context, id int64, w *ProjectWrite) 
 			return true, err
 		}
 	}
+	if err := s.applyLinks(ctx, id, w); err != nil {
+		return true, err
+	}
 	return true, nil
+}
+
+// applyLinks writes the project-side links a ProjectWrite carries.
+func (s *ProjectService) applyLinks(ctx context.Context, id int64, w *ProjectWrite) error {
+	if w.ServiceIDs != nil {
+		if err := s.projects.SetServices(ctx, id, *w.ServiceIDs); err != nil {
+			return err
+		}
+	}
+	if w.DirectHostIDs != nil {
+		if err := s.projects.SetDirectHosts(ctx, id, *w.DirectHostIDs); err != nil {
+			return err
+		}
+	}
+	if w.DirectDNSIDs != nil {
+		if err := s.projects.SetDirectDNS(ctx, id, *w.DirectDNSIDs); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Delete removes the project's tags then cascade-deletes the project (and any

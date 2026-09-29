@@ -158,7 +158,6 @@ export default function ProjectDetail({ id }: { id: number }) {
             )}
           </PageHeader>
 
-          {/* Edit Drawer — now uses ProjectForm component */}
           <Drawer
             open={showEditDrawer}
             onClose={() => setShowEditDrawer(false)}
@@ -171,6 +170,9 @@ export default function ProjectDetail({ id }: { id: number }) {
               initialGrants={data.entidades}
               initialTags={data.tags}
               initialResponsaveis={data.responsaveis}
+              initialServiceIds={(data.services ?? []).map((s) => s.id)}
+              initialHostIds={data.direct_host_ids}
+              initialDnsIds={data.direct_dns_ids}
               onClose={() => setShowEditDrawer(false)}
               onSubHeaderChange={setFormSubHeader}
               onFooterChange={setFormFooter}
@@ -178,6 +180,9 @@ export default function ProjectDetail({ id }: { id: number }) {
                 setShowEditDrawer(false);
                 queryClient.invalidateQueries({ queryKey: ["project", id] });
                 queryClient.invalidateQueries({ queryKey: ["projects"] });
+                // Moving a service here changes it and the project it left.
+                queryClient.invalidateQueries({ queryKey: ["services"] });
+                queryClient.invalidateQueries({ queryKey: ["graph"] });
               }}
             />
           </Drawer>

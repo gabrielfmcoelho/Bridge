@@ -956,7 +956,10 @@
     "servicesTitle": "Project services",
     "noServices": "No services linked to this project.",
     "notFound": "Project not found",
-    "backToList": "Back to Projects"
+    "backToList": "Back to Projects",
+    "linksHint": "A checked service moves to this project, leaving any other it was in. Hosts and DNS of its services come along on their own; pick below only those linked straight to the project.",
+    "directHosts": "Direct hosts",
+    "directDns": "Direct DNS"
   },
   "service": {
     "title": "Services",

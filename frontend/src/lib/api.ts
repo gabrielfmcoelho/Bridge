@@ -557,6 +557,16 @@ export const alertSettingsAPI = {
 };
 
 // Projects
+/** Project create/update body. The id lists replace the project's links when
+ *  present (only among assets the caller can see); omit them to keep as is. */
+type ProjectWrite = Partial<import("./types").Project> & {
+  tags?: string[];
+  responsaveis?: import("./types").EntityResponsavelInput[];
+  service_ids?: number[];
+  host_ids?: number[];
+  dns_ids?: number[];
+};
+
 export const projectsAPI = {
   list: () => api.getList<import("./types").Project>("/api/projects"),
   // Server-side filtered/sorted/paginated page (table view). Params: search,
@@ -571,11 +581,14 @@ export const projectsAPI = {
       services: import("./types").Service[];
       host_ids: number[];
       dns_ids: number[];
+      /** Linked to the project itself, not reached through a service. */
+      direct_host_ids?: number[];
+      direct_dns_ids?: number[];
       entidades?: import("./types").AssetGrants;
     }>(`/api/projects/${id}`),
-  create: (data: Partial<import("./types").Project> & { tags?: string[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
+  create: (data: ProjectWrite) =>
     api.post<import("./types").Project>("/api/projects", data),
-  update: (id: number, data: Partial<import("./types").Project> & { tags?: string[]; responsaveis?: import("./types").EntityResponsavelInput[] }) =>
+  update: (id: number, data: ProjectWrite) =>
     api.put<import("./types").Project>(`/api/projects/${id}`, data),
   delete: (id: number) => api.delete(`/api/projects/${id}`),
   trash: () => api.getList<import("./types").Project>("/api/projects/trash"),

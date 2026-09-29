@@ -16,6 +16,8 @@ import ResponsavelList from "@/components/inventory/ResponsavelList";
 import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
 import EntityFormShell from "@/components/forms/EntityFormShell";
 import FormSection from "@/components/forms/FormSection";
+import RelationPicker from "@/components/forms/RelationPicker";
+import { useRelationOptions } from "@/components/forms/useRelationOptions";
 import GitLabLinksEditor from "./[id]/_components/GitLabLinksEditor";
 import type { Project, EntityResponsavel, AssetGrants, AssetGrantsInput } from "@/lib/types";
 
@@ -27,6 +29,10 @@ interface ProjectFormProps {
   /** The detail endpoint returns these beside the project, not on it. */
   initialTags?: string[];
   initialResponsaveis?: EntityResponsavel[];
+  initialServiceIds?: number[];
+  /** Linked to the project itself, not through one of its services. */
+  initialHostIds?: number[];
+  initialDnsIds?: number[];
   onSuccess: () => void;
   onClose?: () => void;
   onSubHeaderChange?: (subHeader: React.ReactNode) => void;
@@ -40,7 +46,7 @@ interface ProjectFormProps {
  * anything else not shown here are kept.
  */
 export default function ProjectForm({
-  initial, initialGrants, initialTags, initialResponsaveis, onSuccess, onClose, onSubHeaderChange, onFooterChange,
+  initial, initialGrants, initialTags, initialResponsaveis, initialServiceIds, initialHostIds, initialDnsIds, onSuccess, onClose, onSubHeaderChange, onFooterChange,
 }: ProjectFormProps) {
   const { t } = useLocale();
   const { user } = useAuth();
@@ -64,6 +70,10 @@ export default function ProjectForm({
   });
   const [tags, setTags] = useState<string[]>(initialTags ?? initial?.tags ?? []);
   const [responsaveis, setResponsaveis] = useState<EntityResponsavel[]>(initialResponsaveis ?? []);
+  const [serviceIds, setServiceIds] = useState<number[]>(initialServiceIds ?? []);
+  const [hostIds, setHostIds] = useState<number[]>(initialHostIds ?? []);
+  const [dnsIds, setDnsIds] = useState<number[]>(initialDnsIds ?? []);
+  const relationOptions = useRelationOptions(["services", "hosts", "dns"]);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
 
@@ -88,6 +98,9 @@ export default function ProjectForm({
         name: form.name.trim(),
         tags,
         responsaveis: responsaveis.map((r) => ({ contact_id: r.contact_id, is_main: r.is_main })),
+        service_ids: serviceIds,
+        host_ids: hostIds,
+        dns_ids: dnsIds,
         ...grants,
       };
       return initial ? projectsAPI.update(initial.id, payload) : projectsAPI.create(payload);
@@ -115,6 +128,7 @@ export default function ProjectForm({
     { id: "prj-operation", label: t("form.section.operation") },
     { id: "prj-integrations", label: t("form.section.integrations") },
     { id: "prj-owners", label: t("form.section.owners") },
+    { id: "prj-links", label: t("form.section.links") },
     { id: "prj-notes", label: t("form.section.notes") },
   ];
 
@@ -181,6 +195,12 @@ export default function ProjectForm({
       <FormSection id="prj-owners" title={t("form.section.owners")} description={t("form.section.ownersHint")} stack>
         <EntidadeScopeFields value={grants} onChange={setGrants} compact />
         <ResponsavelList value={responsaveis} onChange={setResponsaveis} contacts={contacts} t={t} />
+      </FormSection>
+
+      <FormSection id="prj-links" title={t("form.section.links")} description={t("project.linksHint")} stack>
+        <RelationPicker label={t("nav.services")} options={relationOptions.services} selected={serviceIds} onChange={setServiceIds} />
+        <RelationPicker label={t("project.directHosts")} options={relationOptions.hosts} selected={hostIds} onChange={setHostIds} />
+        <RelationPicker label={t("project.directDns")} options={relationOptions.dns} selected={dnsIds} onChange={setDnsIds} />
       </FormSection>
 
       <FormSection id="prj-notes" title={t("form.section.notes")} stack>

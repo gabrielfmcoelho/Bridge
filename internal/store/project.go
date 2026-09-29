@@ -344,3 +344,73 @@ func (r *ProjectRepo) Counts(ctx context.Context) (ProjectCounts, error) {
 	c.Repos = m
 	return c, err
 }
+
+// Linking from the project side. Each setter replaces the project's links
+// with ids, but only among assets the caller can see: a link to a host, DNS
+// record or service the caller can't see is neither removed nor added (the
+// picker never showed it, so leaving it out isn't a request to drop it).
+
+// SetDirectHosts replaces the hosts linked straight to a project
+// (project_host_links); hosts reached through the project's services are
+// separate and unaffected.
+func (r *ProjectRepo) SetDirectHosts(ctx context.Context, projectID int64, hostIDs []int64) error {
+	return r.replaceVisibleLinks(ctx, `project_host_links`, `host_id`, `hosts`, AssetHost, projectID, hostIDs)
+}
+
+// SetDirectDNS replaces the DNS records linked straight to a project
+// (project_dns_links).
+func (r *ProjectRepo) SetDirectDNS(ctx context.Context, projectID int64, dnsIDs []int64) error {
+	return r.replaceVisibleLinks(ctx, `project_dns_links`, `dns_id`, `dns_records`, AssetDNS, projectID, dnsIDs)
+}
+
+func (r *ProjectRepo) replaceVisibleLinks(ctx context.Context, table, col, assetTable string, asset AssetType, projectID int64, ids []int64) error {
+	if ids == nil {
+		ids = []int64{}
+	}
+	vis, vargs := VisibleExpr(ctx, asset, assetTable+".id")
+	visible := `SELECT id FROM ` + assetTable + ` WHERE ` + vis
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM `+table+` WHERE project_id = ? AND `+col+` IN (`+visible+`) AND NOT (`+col+` = ANY(?))`,
+		append(append([]any{projectID}, vargs...), ids)...); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO `+table+` (project_id, `+col+`) SELECT ?, id FROM `+assetTable+` WHERE id = ANY(?) AND `+vis+` ON CONFLICT DO NOTHING`,
+		append([]any{projectID, ids}, vargs...)...); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// SetServices makes serviceIDs the project's services (services.project_id):
+// listed visible services move into the project — out of any other — and
+// visible services no longer listed leave it.
+func (r *ProjectRepo) SetServices(ctx context.Context, projectID int64, serviceIDs []int64) error {
+	if serviceIDs == nil {
+		serviceIDs = []int64{}
+	}
+	vis, vargs := VisibleExpr(ctx, AssetService, "services.id")
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE services SET project_id = NULL, updated_at = CURRENT_TIMESTAMP
+		 WHERE project_id = ? AND deleted_at IS NULL AND NOT (id = ANY(?)) AND `+vis,
+		append([]any{projectID, serviceIDs}, vargs...)...); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE services SET project_id = ?, updated_at = CURRENT_TIMESTAMP
+		 WHERE id = ANY(?) AND deleted_at IS NULL AND project_id IS DISTINCT FROM ? AND `+vis,
+		append([]any{projectID, serviceIDs, projectID}, vargs...)...); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
