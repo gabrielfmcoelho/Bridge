@@ -2820,7 +2820,6 @@
     "sectionWho": "Quem vê",
     "visibilityPersonalHint": "Só você vê e usa.",
     "visibilitySharedHint": "Quem vê o item vinculado vê este segredo.",
-    "visibilitySharedAvulsoHint": "Quem pertence às entidades marcadas abaixo vê este segredo.",
-    "select": "Selecione…"
+    "visibilitySharedAvulsoHint": "Quem pertence às entidades marcadas abaixo vê este segredo."
   }
 }

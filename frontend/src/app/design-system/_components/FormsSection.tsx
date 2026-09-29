@@ -407,15 +407,14 @@ export default function FormsSection() {
         <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
           Name<span className="text-[var(--danger)] ml-0.5">*</span>
         </label>
-        {/* specimen: app/secrets/_components/NewSecretModal.tsx:44; copied, NOT imported (guardrailed path) */}
+        {/* specimen: app/secrets/_components/AppLoginForm.tsx:25; copied, NOT imported (guardrailed path) */}
         <label className="text-xs font-medium text-[var(--text-muted)] block">
           Name<span className="text-red-400 ml-0.5">*</span>
         </label>
       </Specimen>
       <p className="text-xs text-[var(--text-muted)]">
-        The two <code>text-red-400</code> sites are byte-identical private <code>FormRow</code> components (
-        <code>NewSecretModal.tsx:29</code>, <code>AppLoginForm.tsx:25</code>); the token version above is the
-        one that follows the theme.
+        The <code>text-red-400</code> site is a private <code>FormRow</code> in <code>AppLoginForm.tsx:25</code>;
+        the token version above is the one that follows the theme.
       </p>
 
       <Specimen title="Field wrapper + helper text" source="components/requests/DynamicField.tsx:53-63" wide>

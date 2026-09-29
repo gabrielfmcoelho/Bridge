@@ -2820,7 +2820,6 @@
     "sectionWho": "Who sees it",
     "visibilityPersonalHint": "Only you see and use it.",
     "visibilitySharedHint": "Whoever sees the linked item sees this secret.",
-    "visibilitySharedAvulsoHint": "Members of the entidades checked below see this secret.",
-    "select": "Select…"
+    "visibilitySharedAvulsoHint": "Members of the entidades checked below see this secret."
   }
 }
