@@ -2,7 +2,7 @@ import Icon from "./Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 interface EmptyStateProps {
-  icon?: "server" | "globe" | "folder" | "box" | "search" | "key" | "topology";
+  icon?: "server" | "globe" | "folder" | "box" | "search" | "key" | "topology" | "trash";
   title: string;
   description?: string;
   /** The one call to action (ADS: never more than one primary). */
@@ -20,6 +20,7 @@ const icons: Record<string, string> = {
   search: ICON_PATHS.search,
   key: ICON_PATHS.key,
   topology: ICON_PATHS.bolt,
+  trash: ICON_PATHS.trashOutline,
 };
 
 // ADS empty state: centred, 464px (304px compact), header + description, one CTA.

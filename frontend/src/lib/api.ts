@@ -488,6 +488,8 @@ export const dnsAPI = {
   update: (id: number, data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; service_ids?: number[]; project_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>
     api.put<import("./types").DNSRecord>(`/api/dns/${id}`, data),
   delete: (id: number) => api.delete(`/api/dns/${id}`),
+  trash: () => api.getList<import("./types").DNSRecord>("/api/dns/trash"),
+  restore: (id: number) => api.post(`/api/dns/${id}/restore`),
   // Probes every visible https record synchronously — can outlive the 120s default.
   scanCerts: () => request<{ scanned: number; ok: number; failed: number }>("/api/dns/cert-scan", { method: "POST" }, 10 * 60_000),
   scanCert: (id: number) => api.post<import("./types").DNSRecord>(`/api/dns/${id}/cert-scan`),
@@ -745,6 +747,8 @@ export const contactsAPI = {
   update: (id: number, data: ContactPayload) =>
     api.put<import("./types").Contact>(`/api/contacts/${id}`, data),
   delete: (id: number) => api.delete(`/api/contacts/${id}`),
+  trash: () => api.getList<import("./types").Contact>("/api/contacts/trash"),
+  restore: (id: number) => api.post(`/api/contacts/${id}/restore`),
 };
 
 // Issues

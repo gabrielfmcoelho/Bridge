@@ -31,8 +31,6 @@
     "tools": "Tools",
     "settings": "Settings",
     "inventory": "Inventory",
-    "management": "Management",
-    "credentials": "Credentials",
     "hostCredentials": "Host Credentials",
     "serviceCredentials": "Service Credentials",
     "vault": "Vault",
@@ -2490,7 +2488,6 @@
     "errorPrivateKeyRequired": "Private key is required.",
     "errorAppLoginRequired": "App name, username, and password are required.",
     "subtitle": "All secrets you can access. Personal secrets are owner-only; shared secrets follow role-based ACL.",
-    "viewTrash": "Trash",
     "newSecretButton": "New secret",
     "searchPlaceholder": "Search secrets by name, description, project…",
     "visibilityLabel": "Visibility",
@@ -2722,10 +2719,15 @@
     "addTitle": "Add Contact"
   },
   "trash": {
-    "description": "Soft-deleted hosts, services and projects. Restoring one also brings back the secrets that were cascade-deleted with it. Admin only.",
     "emptyTitle": "Trash is empty",
-    "emptyDescription": "Deleted hosts, services and projects you can restore appear here.",
-    "restore": "Restore"
+    "restore": "Restore",
+    "title": "Trash · {module}",
+    "button": "Trash",
+    "buttonCount": "Trash ({count})",
+    "drawerHint": "Items deleted here. Restoring brings the item back with its links.",
+    "emptyModule": "Nothing deleted in this module.",
+    "restoredTitle": "Restored",
+    "deletedAgo": "deleted {ago}"
   },
   "ui": {
     "aiChatDrawer": {

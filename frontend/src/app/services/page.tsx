@@ -14,6 +14,7 @@ import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
 import ListToolbar from "@/components/ui/ListToolbar";
+import TrashButton from "@/components/inventory/TrashDrawer";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -177,12 +178,18 @@ export default function ServicesPage() {
             activeFilterCount={activeFilterCount}
             searchPlaceholder={t("common.search")}
             actions={
-              allServices.length > 0 ? (
-                <>
-                  <GroupByMenu options={["host", "dns", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
-                  <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
-                </>
-              ) : undefined
+              <>
+                {allServices.length > 0 && (
+                  <>
+                    <GroupByMenu options={["host", "dns", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
+                    <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
+                  </>
+                )}
+                <TrashButton title={t("trash.title", { module: t("nav.services") })} source={{
+                  key: ["services-trash"], fetch: servicesAPI.trash, restore: servicesAPI.restore, invalidate: [["services"], ["services-table"]],
+                  label: (x) => x.nickname, meta: (x) => x.service_type,
+                }} />
+              </>
             }
           />
         }

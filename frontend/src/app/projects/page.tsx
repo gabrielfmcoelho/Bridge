@@ -15,6 +15,7 @@ import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
 import ListToolbar from "@/components/ui/ListToolbar";
+import TrashButton from "@/components/inventory/TrashDrawer";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -159,12 +160,18 @@ export default function ProjectsPage() {
             activeFilterCount={activeFilterCount}
             searchPlaceholder={t("common.search")}
             actions={
-              allProjects.length > 0 ? (
-                <>
-                  <GroupByMenu options={["host", "service", "dns", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
-                  <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
-                </>
-              ) : undefined
+              <>
+                {allProjects.length > 0 && (
+                  <>
+                    <GroupByMenu options={["host", "service", "dns", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
+                    <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
+                  </>
+                )}
+                <TrashButton title={t("trash.title", { module: t("nav.projects") })} source={{
+                  key: ["projects-trash"], fetch: projectsAPI.trash, restore: projectsAPI.restore, invalidate: [["projects"], ["projects-table"]],
+                  label: (x) => x.name, meta: (x) => x.situacao,
+                }} />
+              </>
             }
           />
         }

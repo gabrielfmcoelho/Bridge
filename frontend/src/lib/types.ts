@@ -186,6 +186,8 @@ export interface HostFilters {
 
 export interface DNSRecord {
   id: number;
+  /** Set while the record is in the trash. */
+  deleted_at?: string | null;
   /** Creator entidade name (list endpoint), like Host.main_entidade. */
   main_entidade?: string;
   domain: string;
@@ -469,6 +471,8 @@ export interface Contact {
   entity: string;
   notes: string;
   is_external: boolean;
+  /** Set while the contact is in the trash. */
+  deleted_at?: string | null;
 }
 
 // Generic entity responsavel — shared across hosts, DNS, services, projects.

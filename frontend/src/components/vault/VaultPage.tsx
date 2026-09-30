@@ -26,7 +26,8 @@ import type { RowAction } from "@/components/ui/RowActions";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { NewSecretDrawer } from "./SecretForm";
 import VaultEntryEditor from "./VaultEntryEditor";
-import SecretDetailDrawer from "./SecretDetailDrawer";
+import SecretDetailDrawer, { scopeLabel } from "./SecretDetailDrawer";
+import TrashButton from "@/components/inventory/TrashDrawer";
 import VaultTable from "./VaultTable";
 import VaultCards from "./VaultCards";
 import ShareLinkDrawer from "./ShareLinkDrawer";
@@ -154,7 +155,10 @@ function VaultPageInner() {
                 <ToolbarActionButton icon={ICON_PATHS.link} label={t("vault.consolidateN", { count: String(plan.length) })} hideLabel="md"
                   onClick={() => setConsolidateOpen(true)} />
               )}
-              <ToolbarActionButton icon={ICON_PATHS.trashOutline} label={t("vault.viewTrash")} hideLabel="md" onClick={() => router.push("/secrets/trash")} />
+              <TrashButton everyone title={t("trash.title", { module: t("nav.vault") })} source={{
+                key: ["secrets-trash"], fetch: secretsAPI.trash, restore: secretsAPI.restore, invalidate: [["secrets-all"]],
+                label: (s) => s.name, meta: (s) => `${t(`vault.type.${s.type}`)} · ${scopeLabel(s, t)}`,
+              }} />
             </>}
           />
         }

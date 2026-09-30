@@ -71,6 +71,11 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/hosts", label: "nav.hosts", icon: "Server" },
       { href: "/dns", label: "nav.dns", icon: "Globe" },
       { href: "/services", label: "nav.services", icon: "Boxes" },
+      { href: "/projects", label: "nav.projects", icon: "FolderKanban" },
+      { href: "/contacts", label: "nav.contacts", icon: "Users" },
+      // The vault: every credential, host credentials included (the former
+      // /ssh-keys library redirects here). Each module keeps its own trash.
+      { href: "/secrets", label: "nav.vault", icon: "Lock" },
     ],
   },
   {
@@ -79,26 +84,6 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/catalog", label: "nav.serviceCatalog", icon: "Boxes" },
       { href: "/requests", label: "nav.requests", icon: "ClipboardList" },
-    ],
-  },
-  {
-    key: "management",
-    label: "nav.management",
-    items: [
-      { href: "/projects", label: "nav.projects", icon: "FolderKanban" },
-      { href: "/contacts", label: "nav.contacts", icon: "Users" },
-      { href: "/trash", label: "nav.trash", icon: "Trash2" },
-    ],
-  },
-  {
-    key: "credentials",
-    label: "nav.credentials",
-    items: [
-      // Unified secrets manager. Covers host credentials (the former
-      // /ssh-keys library, which now redirects here), service credentials,
-      // env-var bundles, app logins, and share links.
-      // The legacy /service-credentials route 308-redirects here.
-      { href: "/secrets", label: "nav.vault", icon: "Lock" },
     ],
   },
   {

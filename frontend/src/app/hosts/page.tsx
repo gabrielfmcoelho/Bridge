@@ -16,6 +16,7 @@ import Drawer from "@/components/ui/Drawer";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useExportCSV } from "@/hooks/useExportCSV";
 import ListToolbar from "@/components/ui/ListToolbar";
+import TrashButton from "@/components/inventory/TrashDrawer";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -489,6 +490,10 @@ export default function HostsPage() {
                 {hosts.length > 0 && (
                   <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
                 )}
+                <TrashButton title={t("trash.title", { module: t("nav.hosts") })} source={{
+                  key: ["hosts-trash"], fetch: hostsAPI.trash, restore: hostsAPI.restore, invalidate: [["hosts"], ["hosts-table"]],
+                  label: (h) => h.nickname || h.oficial_slug, meta: (h) => h.hostname || h.oficial_slug,
+                }} />
               </div>
             }
           />

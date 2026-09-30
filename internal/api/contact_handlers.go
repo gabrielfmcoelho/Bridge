@@ -108,7 +108,7 @@ func (h *contactHandlers) handleListTrash(w http.ResponseWriter, r *http.Request
 		jsonServerError(w, r, "failed to list contact trash", err)
 		return
 	}
-	jsonOK(w, items)
+	jsonPaged(w, r, items) // list envelope, like every list endpoint
 }
 
 func (h *contactHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {

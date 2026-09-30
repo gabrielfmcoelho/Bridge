@@ -15,6 +15,7 @@ import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
 import ListToolbar from "@/components/ui/ListToolbar";
+import TrashButton from "@/components/inventory/TrashDrawer";
 import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import SearchBadge from "@/components/ui/SearchBadge";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -223,6 +224,10 @@ export default function DNSPage() {
                   </DropdownMenu>
                 )}
                 {allRecords.length > 0 && <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />}
+                <TrashButton title={t("trash.title", { module: t("nav.dns") })} source={{
+                  key: ["dns-trash"], fetch: dnsAPI.trash, restore: dnsAPI.restore, invalidate: [["dns"], ["dns-table"]],
+                  label: (d) => d.domain, meta: (d) => d.situacao,
+                }} />
               </>
             }
           />

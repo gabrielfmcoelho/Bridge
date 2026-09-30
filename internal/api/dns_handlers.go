@@ -117,7 +117,7 @@ func (h *dnsHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to list DNS trash", err)
 		return
 	}
-	jsonOK(w, items)
+	jsonPaged(w, r, items) // list envelope, like every list endpoint
 }
 
 func (h *dnsHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {

@@ -18,6 +18,7 @@ import Select from "@/components/ui/Select";
 import Checkbox from "@/components/ui/Checkbox";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import PageHeader from "@/components/ui/PageHeader";
+import TrashButton from "@/components/inventory/TrashDrawer";
 import FormError from "@/components/ui/FormError";
 import EmptyState from "@/components/ui/EmptyState";
 import Badge from "@/components/ui/Badge";
@@ -47,7 +48,10 @@ export default function ContactsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => contactsAPI.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["contacts"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["contacts-trash"] });
+    },
   });
 
   const filtered = contacts.filter((c) => {
@@ -64,12 +68,18 @@ export default function ContactsPage() {
     <PageShell>
       <PageHeader title={t("nav.contacts")} addLabel={canEdit ? t("common.add") : undefined} onAdd={canEdit ? () => { setEditing(null); setShowForm(true); } : undefined} />
 
-      <div className="mb-5 max-w-xs">
-        <Input
-          placeholder={t("common.search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="mb-5 flex items-center gap-2">
+        <div className="max-w-xs flex-1">
+          <Input
+            placeholder={t("common.search")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <TrashButton title={t("trash.title", { module: t("nav.contacts") })} source={{
+          key: ["contacts-trash"], fetch: contactsAPI.trash, restore: contactsAPI.restore, invalidate: [["contacts"]],
+          label: (c) => c.name, meta: (c) => [c.role, c.entity].filter(Boolean).join(" · ") || undefined,
+        }} />
       </div>
 
       {isLoading ? (

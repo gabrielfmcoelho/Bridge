@@ -31,8 +31,6 @@
     "tools": "Ferramentas",
     "settings": "Configurações",
     "inventory": "Inventário",
-    "management": "Gestão",
-    "credentials": "Credenciais",
     "hostCredentials": "Credenciais de Host",
     "serviceCredentials": "Credenciais de Serviço",
     "vault": "Cofre",
@@ -2490,7 +2488,6 @@
     "errorPrivateKeyRequired": "Chave privada é obrigatória.",
     "errorAppLoginRequired": "Nome do app, usuário e senha são obrigatórios.",
     "subtitle": "Todos os segredos aos quais você tem acesso. Segredos pessoais são exclusivos do proprietário; segredos compartilhados seguem controle de acesso baseado em papéis (ACL).",
-    "viewTrash": "Lixeira",
     "newSecretButton": "Novo segredo",
     "searchPlaceholder": "Buscar segredos por nome, descrição, projeto…",
     "visibilityLabel": "Visibilidade",
@@ -2722,10 +2719,15 @@
     "addTitle": "Adicionar Contato"
   },
   "trash": {
-    "description": "Hosts, serviços e projetos excluídos (exclusão reversível). Restaurar um deles também traz de volta os segredos excluídos em cascata junto com ele. Apenas administradores.",
     "emptyTitle": "A lixeira está vazia",
-    "emptyDescription": "Hosts, serviços e projetos excluídos que podem ser restaurados aparecem aqui.",
-    "restore": "Restaurar"
+    "restore": "Restaurar",
+    "title": "Lixeira · {module}",
+    "button": "Lixeira",
+    "buttonCount": "Lixeira ({count})",
+    "drawerHint": "Itens excluídos daqui. Restaurar devolve o item com seus vínculos.",
+    "emptyModule": "Nada excluído neste módulo.",
+    "restoredTitle": "Restaurado",
+    "deletedAgo": "excluído {ago}"
   },
   "ui": {
     "aiChatDrawer": {

@@ -455,7 +455,7 @@ func (h *hostHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 	if items == nil {
 		items = []models.Host{}
 	}
-	jsonOK(w, items)
+	jsonPaged(w, r, items) // list envelope, like every list endpoint
 }
 
 func (h *hostHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
