@@ -276,6 +276,6 @@ type SecretAuditLog struct {
 	ActorUserID *int64            `json:"actor_user_id,omitempty"`
 	ActorIP     *string           `json:"actor_ip,omitempty"`
 	ShareLinkID *int64            `json:"share_link_id,omitempty"`
-	Metadata    json.RawMessage   `json:"metadata,omitempty"`
+	Metadata    json.RawMessage   `json:"metadata,omitempty" swaggertype:"object"`
 	At          time.Time         `json:"at"`
 }

@@ -16,6 +16,14 @@ type authHandlers struct {
 	registry *auth.ProviderRegistry
 }
 
+// handleStatus godoc
+//
+//	@Summary		Auth status
+//	@Description	Public, no auth. Answers {"setup_required": bool, "authenticated": bool, "providers": [{name, type ("oauth" or "direct"), label, icon, color}]} for the login page.
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Router			/api/auth/status [get]
 func (h *authHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	setupRequired, err := auth.SetupRequired(h.db.SQL)
 	if err != nil {
@@ -64,12 +72,27 @@ func (h *authHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// authSetupRequest is the first-run master-user body.
+type authSetupRequest struct {
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	DisplayName string `json:"display_name"`
+}
+
+// handleSetup godoc
+//
+//	@Summary		Create the first admin
+//	@Description	Public, no auth. Only works before any user exists (409 afterwards). Sets the session cookie and answers {"user": models.User, "token": string, "expires_at": time}.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		authSetupRequest	true	"Master user credentials"
+//	@Success		201		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/auth/setup [post]
 func (h *authHandlers) handleSetup(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Username    string `json:"username"`
-		Password    string `json:"password"`
-		DisplayName string `json:"display_name"`
-	}
+	var req authSetupRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -99,12 +122,27 @@ func (h *authHandlers) handleSetup(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// authLoginRequest is the login body; provider defaults to "local".
+type authLoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Provider string `json:"provider"`
+}
+
+// handleLogin godoc
+//
+//	@Summary		Log in
+//	@Description	Public, no auth. provider defaults to "local"; other providers must be enabled and support direct login (e.g. LDAP, optionally falling back to local). Unknown external identities are auto-provisioned when enabled. Sets the session cookie and answers {"user": models.User, "token": string, "expires_at": time}.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		authLoginRequest	true	"Credentials and optional provider"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Router			/api/auth/login [post]
 func (h *authHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Provider string `json:"provider"`
-	}
+	var req authLoginRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -273,6 +311,15 @@ func (h *authHandlers) ensureUniqueUsername(username string) string {
 	}
 }
 
+// handleLogout godoc
+//
+//	@Summary		Log out
+//	@Description	Any role. Deletes the session and clears the cookie.
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	StatusResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/auth/logout [post]
 func (h *authHandlers) handleLogout(w http.ResponseWriter, r *http.Request) {
 	token := auth.GetSessionToken(r)
 	if token != "" {
@@ -282,6 +329,15 @@ func (h *authHandlers) handleLogout(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "logged out"})
 }
 
+// handleMe godoc
+//
+//	@Summary		Current user
+//	@Description	Any role. The caller's profile plus "permissions" (codes; every code for admins), "external_identities" [{provider, external_id}] and "entidades" (memberships).
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/auth/me [get]
 func (h *authHandlers) handleMe(w http.ResponseWriter, r *http.Request) {
 	user := auth.UserFromContext(r.Context())
 	if user == nil {
@@ -367,6 +423,18 @@ func (h *authHandlers) applyUserEntidades(w http.ResponseWriter, r *http.Request
 
 // User management (admin only)
 
+// handleListUsers godoc
+//
+//	@Summary		List users
+//	@Description	Admin. Each user with their entidade memberships.
+//	@Tags			users
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[userWithEntidades]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Router			/api/users [get]
 func (h *authHandlers) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := store.NewUserRepo(h.db.SQL).List(r.Context())
 	if err != nil {
@@ -385,15 +453,32 @@ func (h *authHandlers) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, out)
 }
 
+// userCreateRequest is the admin create-user body; role defaults to viewer.
+type userCreateRequest struct {
+	Username          string   `json:"username"`
+	Password          string   `json:"password"`
+	DisplayName       string   `json:"display_name"`
+	Role              string   `json:"role"`
+	EntidadeIDs       *[]int64 `json:"entidade_ids"`
+	PrimaryEntidadeID *int64   `json:"primary_entidade_id"`
+}
+
+// handleCreateUser godoc
+//
+//	@Summary		Create a user
+//	@Description	Admin. Local user; role defaults to viewer. 409 when the username exists.
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		userCreateRequest	true	"User, password and optional entidade memberships"
+//	@Success		201		{object}	models.User
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/users [post]
 func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Username          string   `json:"username"`
-		Password          string   `json:"password"`
-		DisplayName       string   `json:"display_name"`
-		Role              string   `json:"role"`
-		EntidadeIDs       *[]int64 `json:"entidade_ids"`
-		PrimaryEntidadeID *int64   `json:"primary_entidade_id"`
-	}
+	var req userCreateRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -429,6 +514,31 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 	jsonCreated(w, u)
 }
 
+// userUpdateRequest patches a user: blank fields and a nil entidade_ids are left unchanged.
+type userUpdateRequest struct {
+	Username          string   `json:"username"`
+	DisplayName       string   `json:"display_name"`
+	Role              string   `json:"role"`
+	Password          string   `json:"password"`
+	EntidadeIDs       *[]int64 `json:"entidade_ids"`
+	PrimaryEntidadeID *int64   `json:"primary_entidade_id"`
+}
+
+// handleUpdateUser godoc
+//
+//	@Summary		Update a user
+//	@Description	Admin. Blank fields stay unchanged; a password resets it; entidade_ids replaces memberships when sent.
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"User ID"
+//	@Param			body	body		userUpdateRequest	true	"Fields to change"
+//	@Success		200		{object}	models.User
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/users/{id} [put]
 func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -436,14 +546,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req struct {
-		Username          string   `json:"username"`
-		DisplayName       string   `json:"display_name"`
-		Role              string   `json:"role"`
-		Password          string   `json:"password"`
-		EntidadeIDs       *[]int64 `json:"entidade_ids"`
-		PrimaryEntidadeID *int64   `json:"primary_entidade_id"`
-	}
+	var req userUpdateRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -487,6 +590,18 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, user)
 }
 
+// handleDeleteUser godoc
+//
+//	@Summary		Delete a user
+//	@Description	Admin. Deleting yourself answers 400.
+//	@Tags			users
+//	@Produce		json
+//	@Param			id	path		int	true	"User ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/users/{id} [delete]
 func (h *authHandlers) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {

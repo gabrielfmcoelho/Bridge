@@ -13,7 +13,7 @@ import (
 type GlpiDropdownCatalogue struct {
 	ID          int64           `json:"id"`
 	Itemtype    string          `json:"itemtype"`
-	Options     json.RawMessage `json:"options"`
+	Options     json.RawMessage `json:"options" swaggertype:"array,object"`
 	OptionCount int             `json:"option_count"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 	UpdatedBy   *int64          `json:"updated_by,omitempty"`

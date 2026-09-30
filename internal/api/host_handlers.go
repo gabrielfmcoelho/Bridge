@@ -31,6 +31,31 @@ func entidadeIDParam(r *http.Request) int64 {
 	return n
 }
 
+// handleList godoc
+//
+//	@Summary		List hosts
+//	@Description	Any role. Visible hosts, enriched with tags, scan summary, counts and alerts. The one list paginated in SQL: per_page is capped at 100 here.
+//	@Tags			hosts
+//	@Produce		json
+//	@Param			situacao				query		string	false	"Filter by situação"
+//	@Param			tag						query		string	false	"Filter by tag"
+//	@Param			hospedagem				query		string	false	"Filter by hospedagem"
+//	@Param			search					query		string	false	"Free-text search"
+//	@Param			entidade_id				query		int		false	"Filter by entidade"
+//	@Param			responsavel_interno		query		string	false	"Filter by internal responsável"
+//	@Param			key_test_status			query		string	false	"Filter by SSH key test status"
+//	@Param			password_test_status	query		string	false	"Filter by password test status"
+//	@Param			scan_result				query		string	false	"Filter by last scan result"
+//	@Param			has_scan				query		string	false	"Filter by scan presence"
+//	@Param			sort_by					query		string	false	"Sort column"
+//	@Param			sort_dir				query		string	false	"Sort direction (asc, desc)"
+//	@Param			alert_level				query		string	false	"Keep hosts with an alert of this level, or none"
+//	@Param			idle					query		string	false	"idle or active (active excludes hosts without scan)"
+//	@Param			page					query		int		false	"Page (1-based)"
+//	@Param			per_page				query		int		false	"Page size (max 100); omit for every row"
+//	@Success		200						{object}	ListEnvelope[service.HostListItem]
+//	@Failure		401						{object}	httpx.ErrorResponse
+//	@Router			/api/hosts [get]
 func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	f := models.HostFilter{
 		Situacao:           r.URL.Query().Get("situacao"),
@@ -114,6 +139,17 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	jsonList(w, result, metaFor(PageParams{Page: 1, PerPage: 0}, len(result)))
 }
 
+// handleGet godoc
+//
+//	@Summary		Get a host
+//	@Description	Any role. The host with its relations. Invisible hosts answer 404.
+//	@Tags			hosts
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host oficial slug"
+//	@Success		200		{object}	service.HostDetail
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug} [get]
 func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	detail, err := h.host.Get(r.Context(), slug)
@@ -128,20 +164,38 @@ func (h *hostHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, detail)
 }
 
+// hostCreateRequest is the create body: the host, its entidade grants,
+// credentials and relations.
+type hostCreateRequest struct {
+	models.Host
+	models.AssetGrantsInput
+	Tags         []string                  `json:"tags"`
+	Password     string                    `json:"password"`
+	KeySecretID  int64                     `json:"key_secret_id"`
+	SSHKeyID     int64                     `json:"ssh_key_id"` // pre-v91 clients: mapped to its vault key
+	Responsaveis []models.ResponsavelInput `json:"responsaveis"`
+	Chamados     []models.HostChamadoInput `json:"chamados"`
+	DNSIDs       []int64                   `json:"dns_ids"`
+	ServiceIDs   []int64                   `json:"service_ids"`
+	ProjectIDs   []int64                   `json:"project_ids"`
+}
+
+// handleCreate godoc
+//
+//	@Summary		Create a host
+//	@Description	Editor+. nickname and oficial_slug are required; a taken slug answers 409. The password and SSH key go to the vault.
+//	@Tags			hosts
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		hostCreateRequest	true	"Host, credentials, relations and entidade grants"
+//	@Success		201		{object}	models.Host
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts [post]
 func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		models.Host
-		models.AssetGrantsInput
-		Tags         []string                  `json:"tags"`
-		Password     string                    `json:"password"`
-		KeySecretID  int64                     `json:"key_secret_id"`
-		SSHKeyID     int64                     `json:"ssh_key_id"` // pre-v91 clients: mapped to its vault key
-		Responsaveis []models.ResponsavelInput `json:"responsaveis"`
-		Chamados     []models.HostChamadoInput `json:"chamados"`
-		DNSIDs       []int64                   `json:"dns_ids"`
-		ServiceIDs   []int64                   `json:"service_ids"`
-		ProjectIDs   []int64                   `json:"project_ids"`
-	}
+	var req hostCreateRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -228,6 +282,39 @@ func (h *hostHandlers) maybeProvisionGrafanaDashboard(host models.Host) {
 	}(host)
 }
 
+// hostUpdateRequest is the update body. Pointer relation fields change only
+// when sent; the body is decoded over the existing host.
+type hostUpdateRequest struct {
+	models.Host
+	models.AssetGrantsInput
+	Tags         []string                   `json:"tags"`
+	Password     string                     `json:"password"`
+	KeySecretID  int64                      `json:"key_secret_id"`
+	SSHKeyID     int64                      `json:"ssh_key_id"` // pre-v91 clients: mapped to its vault key
+	ClearKey     bool                       `json:"clear_key"`
+	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
+	Chamados     *[]models.HostChamadoInput `json:"chamados"`
+	DNSIDs       *[]int64                   `json:"dns_ids"`
+	ServiceIDs   *[]int64                   `json:"service_ids"`
+	ProjectIDs   *[]int64                   `json:"project_ids"`
+}
+
+// handleUpdate godoc
+//
+//	@Summary		Update a host
+//	@Description	Editor+. Partial: fields are merged over the existing host, relations change only when sent, grants only when a grant field is sent. A body with only key_secret_id (no nickname) just links that vault key and returns the host as it was. A taken slug answers 409.
+//	@Tags			hosts
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string				true	"Host oficial slug"
+//	@Param			body	body		hostUpdateRequest	true	"Host fields, credentials, relations and optional entidade grants"
+//	@Success		200		{object}	models.Host
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug} [put]
 func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	existing, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -236,20 +323,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		models.Host
-		models.AssetGrantsInput
-		Tags         []string                   `json:"tags"`
-		Password     string                     `json:"password"`
-		KeySecretID  int64                      `json:"key_secret_id"`
-		SSHKeyID     int64                      `json:"ssh_key_id"` // pre-v91 clients: mapped to its vault key
-		ClearKey     bool                       `json:"clear_key"`
-		Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
-		Chamados     *[]models.HostChamadoInput `json:"chamados"`
-		DNSIDs       *[]int64                   `json:"dns_ids"`
-		ServiceIDs   *[]int64                   `json:"service_ids"`
-		ProjectIDs   *[]int64                   `json:"project_ids"`
-	}
+	var req hostUpdateRequest
 	req.Host = *existing
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -381,6 +455,18 @@ func normalizePreferredAuth(hasPassword, hasKey bool, preferredAuth string) (str
 	}
 }
 
+// handleDelete godoc
+//
+//	@Summary		Move a host to the trash
+//	@Description	Admin.
+//	@Tags			hosts
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host oficial slug"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug} [delete]
 func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -397,6 +483,18 @@ func (h *hostHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
+// handleGetPassword godoc
+//
+//	@Summary		Reveal a host's password
+//	@Description	Admin. Reads the password from the vault; 404 when the host has none stored.
+//	@Tags			hosts
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host oficial slug"
+//	@Success		200		{object}	map[string]string
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/password [get]
 func (h *hostHandlers) handleGetPassword(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -446,6 +544,17 @@ func (h *hostHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "GET /api/hosts/{slug}/password", h.handleGetPassword)
 }
 
+// handleListTrash godoc
+//
+//	@Summary		List trashed hosts
+//	@Description	Any role.
+//	@Tags			hosts
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.Host]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/trash [get]
 func (h *hostHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 	items, err := h.host.ListTrash(r.Context())
 	if err != nil {
@@ -458,6 +567,18 @@ func (h *hostHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, items) // list envelope, like every list endpoint
 }
 
+// handleRestore godoc
+//
+//	@Summary		Restore a host from the trash
+//	@Description	Admin. The path segment is the numeric host ID (named slug only to share the router node).
+//	@Tags			hosts
+//	@Produce		json
+//	@Param			slug	path		int	true	"Host ID"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/restore [post]
 func (h *hostHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	// The param is named slug only to share the router node with /hosts/{slug}
 	// (Echo needs one wildcard name per position); restore takes the numeric id.

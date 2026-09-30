@@ -37,6 +37,18 @@ func (h *proxmoxHandlers) resolveClient() (*proxmox.Client, string) {
 
 // handleSync reads the whole cluster and upserts its nodes and guests as
 // hosts. Synchronous: the response is the sync summary.
+//
+//	@Summary		Sync hosts from Proxmox
+//	@Description	Admin. Reads the whole cluster and upserts its nodes and guests as hosts; synchronous (up to 10 minutes). 409 while another sync runs, 400 when the integration is disabled or unconfigured, 502 when Proxmox fails.
+//	@Tags			proxmox
+//	@Produce		json
+//	@Success		200	{object}	service.ProxmoxSyncSummary
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		409	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/proxmox/sync [post]
 func (h *proxmoxHandlers) handleSync(w http.ResponseWriter, r *http.Request) {
 	// Two overlapping syncs would both create the same new machines.
 	if !h.syncing.TryLock() {
@@ -66,15 +78,30 @@ func (h *proxmoxHandlers) handleSync(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, sum)
 }
 
+// proxmoxTestRequest carries unsaved form values; blank fields fall back to
+// the stored settings.
+type proxmoxTestRequest struct {
+	BaseURL     string `json:"base_url"`
+	TokenID     string `json:"token_id"`
+	TokenSecret string `json:"token_secret"`
+	SkipVerify  *bool  `json:"skip_verify"`
+}
+
 // handleTest checks reachability + token with GET /version. Unsaved form
 // values in the body win over stored settings; nothing is persisted.
+//
+//	@Summary		Test the Proxmox connection
+//	@Description	Admin. Calls GET /version with the body values over the stored settings; nothing is persisted. Always 200: {"success": bool, "version"?: ..., "error"?: string}. The body is optional.
+//	@Tags			proxmox
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		proxmoxTestRequest	false	"Unsaved settings to test"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/proxmox/test [post]
 func (h *proxmoxHandlers) handleTest(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		BaseURL     string `json:"base_url"`
-		TokenID     string `json:"token_id"`
-		TokenSecret string `json:"token_secret"`
-		SkipVerify  *bool  `json:"skip_verify"`
-	}
+	var req proxmoxTestRequest
 	if r.ContentLength > 0 {
 		_ = decodeJSON(r, &req)
 	}

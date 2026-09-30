@@ -138,7 +138,7 @@ type BundleAPIDocItem struct {
 	Title       string          `json:"title"`
 	Version     string          `json:"version,omitempty"`
 	ExternalURL string          `json:"external_url,omitempty"`
-	Spec        json.RawMessage `json:"spec"`
+	Spec        json.RawMessage `json:"spec" swaggertype:"object"`
 }
 
 // BundleWikiDoc is one resolved Outline document — raw markdown plus a nested

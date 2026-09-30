@@ -35,13 +35,29 @@ type importResult struct {
 	Errors  []importItemResult `json:"errors,omitempty"`
 }
 
+// importHostsRequest is one element of the host import array.
+type importHostsRequest struct {
+	models.Host
+	models.AssetGrantsInput          // optional per-item entidade grants; absent ⇒ admin-only until triaged
+	Tags                    []string `json:"tags"`
+	Password                string   `json:"password"`
+}
+
+// handleImportHosts godoc
+//
+//	@Summary		Bulk-import hosts
+//	@Description	Admin. 1 to 500 hosts; each needs nickname and oficial_slug. Taken slugs are skipped, per-item failures are reported in errors, never fail the call. Items without grants stay admin-only until triaged.
+//	@Tags			import
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		[]importHostsRequest	true	"Hosts to import"
+//	@Success		200		{object}	importResult
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/import/hosts [post]
 func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Request) {
-	var items []struct {
-		models.Host
-		models.AssetGrantsInput          // optional per-item entidade grants; absent ⇒ admin-only until triaged
-		Tags                    []string `json:"tags"`
-		Password                string   `json:"password"`
-	}
+	var items []importHostsRequest
 	if err := decodeJSON(r, &items); err != nil {
 		jsonBadRequest(w, r, "invalid JSON: expected array of host objects", err)
 		return
@@ -121,13 +137,29 @@ func (h *importHandlers) handleImportHosts(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, result)
 }
 
+// importDNSRequest is one element of the DNS import array.
+type importDNSRequest struct {
+	models.DNSRecord
+	models.AssetGrantsInput          // optional per-item entidade grants; absent ⇒ admin-only until triaged
+	Tags                    []string `json:"tags"`
+	HostIDs                 []int64  `json:"host_ids"`
+}
+
+// handleImportDNS godoc
+//
+//	@Summary		Bulk-import DNS records
+//	@Description	Admin. 1 to 500 records; each needs a domain. Existing domains are skipped, per-item failures are reported in errors, never fail the call. Items without grants stay admin-only until triaged.
+//	@Tags			import
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		[]importDNSRequest	true	"DNS records to import"
+//	@Success		200		{object}	importResult
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/import/dns [post]
 func (h *importHandlers) handleImportDNS(w http.ResponseWriter, r *http.Request) {
-	var items []struct {
-		models.DNSRecord
-		models.AssetGrantsInput          // optional per-item entidade grants; absent ⇒ admin-only until triaged
-		Tags                    []string `json:"tags"`
-		HostIDs                 []int64  `json:"host_ids"`
-	}
+	var items []importDNSRequest
 	if err := decodeJSON(r, &items); err != nil {
 		jsonBadRequest(w, r, "invalid JSON: expected array of DNS objects", err)
 		return
@@ -173,6 +205,26 @@ func (h *importHandlers) handleImportDNS(w http.ResponseWriter, r *http.Request)
 	jsonOK(w, result)
 }
 
+// importRequest is the generic import body: type picks the importer, data is
+// its array (importHostsRequest or importDNSRequest items).
+type importRequest struct {
+	Type string            `json:"type"`
+	Data []json.RawMessage `json:"data" swaggertype:"array,object"`
+}
+
+// handleImport godoc
+//
+//	@Summary		Bulk-import hosts or DNS records
+//	@Description	Admin. {"type": "hosts"|"dns", "data": [...]} dispatched to /api/import/hosts or /api/import/dns, with the same rules.
+//	@Tags			import
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		importRequest	true	"Import type and items"
+//	@Success		200		{object}	importResult
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/import [post]
 func (h *importHandlers) handleImport(w http.ResponseWriter, r *http.Request) {
 	// Generic import endpoint that auto-detects type from the JSON structure
 	var raw json.RawMessage
@@ -182,10 +234,7 @@ func (h *importHandlers) handleImport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if it's a wrapped object with "type" field
-	var wrapper struct {
-		Type string            `json:"type"`
-		Data []json.RawMessage `json:"data"`
-	}
+	var wrapper importRequest
 	if err := json.Unmarshal(raw, &wrapper); err == nil && wrapper.Type != "" && wrapper.Data != nil {
 		// Re-encode data as array body and dispatch
 		body, _ := json.Marshal(wrapper.Data)

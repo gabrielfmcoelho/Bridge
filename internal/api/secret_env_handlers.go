@@ -35,6 +35,20 @@ type envBulkVarEntry struct {
 	Description *string `json:"description,omitempty"`
 }
 
+// handleEnvBulk godoc
+//
+//	@Summary		Bulk upsert env vars
+//	@Description	Any role; the vault ACL decides (shared needs editor+). All vars share one group and visibility (default shared) and are written in one transaction to every target (or the legacy scope/parent_id pair). Validation failures (bad or duplicate name, empty value) answer 400. Answers {"created": n, "updated": n}.
+//	@Tags			secrets
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		envBulkRequest	true	"Targets, group and vars"
+//	@Success		200		{object}	map[string]int
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/env/bulk [post]
 func (h *secretHandlers) handleEnvBulk(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -111,6 +125,17 @@ func (h *secretHandlers) handleEnvBulk(w http.ResponseWriter, r *http.Request) {
 // personal rows. The grouping ignores ownership — both personal and shared
 // vars in the same group appear under the same key (the UI is responsible
 // for visually disambiguating if needed, e.g. by checking visibility).
+//
+//	@Summary		List env vars grouped by group label
+//	@Description	Any role. Metadata only (never a value), keyed by group_label ("" for ungrouped); shared rows plus the caller's personal ones.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			scope		query		string	false	"Filter by scope"
+//	@Param			parent_id	query		int		false	"Filter by parent asset ID"
+//	@Param			group_label	query		string	false	"Filter by group label"
+//	@Success		200			{object}	map[string][]vault.SecretView
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/env [get]
 func (h *secretHandlers) handleEnvList(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {

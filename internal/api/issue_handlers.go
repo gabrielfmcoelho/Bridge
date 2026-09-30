@@ -14,6 +14,20 @@ type issueHandlers struct {
 	db *database.DB
 }
 
+// handleList godoc
+//
+//	@Summary		List a project's issues
+//	@Description	Issues whose parent is visible to the caller. Any role.
+//	@Tags			issues
+//	@Produce		json
+//	@Param			id			path		int	true	"Project ID"
+//	@Param			service_id	query		int	false	"Restrict to one service"
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.Issue]
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/issues [get]
 func (h *issueHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -38,6 +52,21 @@ func (h *issueHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, issues)
 }
 
+// handleCreate godoc
+//
+//	@Summary		Create a project issue
+//	@Description	Editor+. Parent defaults to the project; status defaults to "backlog", priority to "medium". An invisible parent answers 404.
+//	@Tags			issues
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int				true	"Project ID"
+//	@Param			body	body		models.Issue	true	"Issue"
+//	@Success		201		{object}	models.Issue
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/issues [post]
 func (h *issueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -83,6 +112,22 @@ func (h *issueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	jsonCreated(w, req)
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a project issue
+//	@Description	Editor+. Empty status/priority keep their stored value.
+//	@Tags			issues
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int				true	"Project ID"
+//	@Param			issueId	path		int				true	"Issue ID"
+//	@Param			body	body		models.Issue	true	"Issue"
+//	@Success		200		{object}	models.Issue
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/issues/{issueId} [put]
 func (h *issueHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "issueId")
 	if err != nil {
@@ -120,6 +165,22 @@ func (h *issueHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, req)
 }
 
+// handleMove godoc
+//
+//	@Summary		Move a project issue on the board
+//	@Description	Editor+.
+//	@Tags			issues
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Project ID"
+//	@Param			issueId	path		int					true	"Issue ID"
+//	@Param			body	body		issueMoveRequest	true	"Target column and position"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/issues/{issueId}/move [patch]
 func (h *issueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "issueId")
 	if err != nil {
@@ -127,10 +188,7 @@ func (h *issueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Status   string  `json:"status"`
-		Position float64 `json:"position"`
-	}
+	var req issueMoveRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -152,6 +210,20 @@ func (h *issueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
+// handleDelete godoc
+//
+//	@Summary		Delete a project issue
+//	@Description	Admin.
+//	@Tags			issues
+//	@Produce		json
+//	@Param			id		path		int	true	"Project ID"
+//	@Param			issueId	path		int	true	"Issue ID"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/issues/{issueId} [delete]
 func (h *issueHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "issueId")
 	if err != nil {
@@ -171,6 +243,19 @@ func (h *issueHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
+// handleListByService godoc
+//
+//	@Summary		List a service's issues
+//	@Description	Issues whose parent is visible to the caller. Any role.
+//	@Tags			issues
+//	@Produce		json
+//	@Param			id			path		int	true	"Service ID"
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.Issue]
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/services/{id}/issues [get]
 func (h *issueHandlers) handleListByService(w http.ResponseWriter, r *http.Request) {
 	serviceID, err := pathInt64(r, "id")
 	if err != nil {

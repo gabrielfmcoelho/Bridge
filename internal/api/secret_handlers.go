@@ -60,6 +60,25 @@ func (h *secretHandlers) registerRoutes(rr routeRegistrar) {
 
 // --- handlers ---------------------------------------------------------------
 
+// handleList godoc
+//
+//	@Summary		List secrets
+//	@Description	Any role. Metadata only, never a payload; per-row ACL (shared: RBAC and entidade visibility; personal: owner, admins see metadata only). Query params are optional filters.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			scope			query		string	false	"Filter by scope (e.g. avulso, host, project, service)"
+//	@Param			type			query		string	false	"Filter by secret type"
+//	@Param			visibility		query		string	false	"Filter by visibility (shared or personal)"
+//	@Param			group_label		query		string	false	"Filter by group label"
+//	@Param			q				query		string	false	"Search name, username, group and parent name"
+//	@Param			kind			query		string	false	"host_cred = only SSH keys and passwords"
+//	@Param			parent_id		query		int		false	"Filter by parent asset ID"
+//	@Param			include_deleted	query		string	false	"1 to include trashed secrets"
+//	@Param			page			query		int		false	"Page (1-based)"
+//	@Param			per_page		query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200				{object}	ListEnvelope[vault.SecretView]
+//	@Failure		401				{object}	httpx.ErrorResponse
+//	@Router			/api/secrets [get]
 func (h *secretHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -116,6 +135,20 @@ func ownsGrants(scope models.SecretScope, vis models.SecretVisibility) bool {
 	return scope == models.SecretScopeAvulso && vis == models.SecretVisibilityShared
 }
 
+// handleCreate godoc
+//
+//	@Summary		Create a secret
+//	@Description	Any role; the vault ACL decides (shared secrets need editor+, a scoped secret needs access to its parent). Entidade grants are honoured only for shared avulso secrets. Answers {"id": <new id>}.
+//	@Tags			secrets
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		createSecretRequest	true	"Secret metadata, plaintext payload and optional entidade grants"
+//	@Success		201		{object}	map[string]int
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/secrets [post]
 func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -185,6 +218,18 @@ func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	jsonCreated(w, map[string]any{"id": id})
 }
 
+// handleGetMetadata godoc
+//
+//	@Summary		Get a secret's metadata
+//	@Description	Any role; invisible secrets answer 404. Never includes the payload. A shared avulso secret also carries its entidade grants.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			id	path		int	true	"Secret ID"
+//	@Success		200	{object}	vault.SecretView
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/{id} [get]
 func (h *secretHandlers) handleGetMetadata(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -209,6 +254,19 @@ func (h *secretHandlers) handleGetMetadata(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, v)
 }
 
+// handleReveal godoc
+//
+//	@Summary		Reveal a secret's plaintext
+//	@Description	Any role; invisible secrets answer 404. Answers {"payload": "<plaintext>"}: the decrypted payload string exactly as it was stored (structured types keep the JSON text the client saved). Writes a reveal audit row. Another user's personal secret answers 403, even for admins.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			id	path		int	true	"Secret ID"
+//	@Success		200	{object}	map[string]string
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/{id}/reveal [get]
 func (h *secretHandlers) handleReveal(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -243,6 +301,22 @@ type updateSecretRequest struct {
 	models.AssetGrantsInput
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a secret
+//	@Description	Any role; the vault ACL decides (editor+ on shared, owner on personal). Omitted fields stay unchanged; a new payload is re-encrypted. Sending visibility answers 422 (it is immutable). Grants apply only to shared avulso secrets. Answers {"id": <id>}.
+//	@Tags			secrets
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Secret ID"
+//	@Param			body	body		updateSecretRequest	true	"Fields to change and optional entidade grants"
+//	@Success		200		{object}	map[string]int
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		422		{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/{id} [put]
 func (h *secretHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -306,6 +380,19 @@ func (h *secretHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"id": id})
 }
 
+// handleDelete godoc
+//
+//	@Summary		Move a secret to the trash
+//	@Description	Any role; the vault ACL decides.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			id	path	int	true	"Secret ID"
+//	@Success		204
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/{id} [delete]
 func (h *secretHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -324,6 +411,19 @@ func (h *secretHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handleRestore godoc
+//
+//	@Summary		Restore a secret from the trash
+//	@Description	Any role; the vault ACL decides.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			id	path	int	true	"Secret ID"
+//	@Success		204
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/{id}/restore [post]
 func (h *secretHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -342,6 +442,21 @@ func (h *secretHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handleHistory godoc
+//
+//	@Summary		A secret's audit history
+//	@Description	Any role; invisible secrets answer 404.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			id			path		int	true	"Secret ID"
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.SecretAuditLog]
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Failure		404			{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/{id}/history [get]
 func (h *secretHandlers) handleHistory(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -364,6 +479,17 @@ func (h *secretHandlers) handleHistory(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, rows)
 }
 
+// handleTrash godoc
+//
+//	@Summary		List trashed secrets
+//	@Description	Any role. Only trashed secrets the caller may see.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[vault.SecretView]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/trash [get]
 func (h *secretHandlers) handleTrash(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -381,6 +507,17 @@ func (h *secretHandlers) handleTrash(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, views)
 }
 
+// handleMine godoc
+//
+//	@Summary		List my personal secrets
+//	@Description	Any role. The caller's own personal secrets (metadata only).
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[vault.SecretView]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/mine [get]
 func (h *secretHandlers) handleMine(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {

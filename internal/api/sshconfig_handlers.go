@@ -164,6 +164,15 @@ func (h *sshHandlers) dial(w http.ResponseWriter, host *models.Host, user string
 }
 
 // handlePreviewConfig renders the SSH config that would be generated.
+//
+//	@Summary		Preview the generated SSH config
+//	@Description	Any role. Body is {"content": string}.
+//	@Tags			ssh
+//	@Produce		json
+//	@Success		200	{object}	map[string]string
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/preview-config [get]
 func (h *sshHandlers) handlePreviewConfig(w http.ResponseWriter, r *http.Request) {
 	hosts, err := store.NewHostRepo(h.db.SQL).ListForSSHConfig(r.Context())
 	if err != nil {
@@ -178,6 +187,16 @@ func (h *sshHandlers) handlePreviewConfig(w http.ResponseWriter, r *http.Request
 }
 
 // handleGenerateConfig writes the SSH config file from DB data.
+//
+//	@Summary		Write the SSH config file
+//	@Description	Editor+. Renders every host into the server's config path. Body is {"status": "generated", "host_count", "path"}.
+//	@Tags			ssh
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/generate-config [post]
 func (h *sshHandlers) handleGenerateConfig(w http.ResponseWriter, r *http.Request) {
 	hosts, err := store.NewHostRepo(h.db.SQL).ListForSSHConfig(r.Context())
 	if err != nil {
@@ -198,7 +217,29 @@ func (h *sshHandlers) handleGenerateConfig(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// sshTestConnectionRequest is the test body: auth method and whether to capture VM specs.
+type sshTestConnectionRequest struct {
+	Method  string `json:"method"`  // "password" or "key"
+	Capture bool   `json:"capture"` // capture VM specs
+}
+
 // handleTestConnection tests SSH connectivity to a host.
+//
+//	@Summary		Test SSH to a host
+//	@Description	Editor+. method is "password" or "key" (auto-picked when empty); capture also scans VM specs. A failed connection is 200 with success false.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string						true	"Host slug"
+//	@Param			body	body		sshTestConnectionRequest	true	"Auth method and capture flag"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/test/{slug} [post]
 func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
@@ -209,10 +250,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var req struct {
-		Method  string `json:"method"`  // "password" or "key"
-		Capture bool   `json:"capture"` // capture VM specs
-	}
+	var req sshTestConnectionRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -376,7 +414,28 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, result)
 }
 
+// sshFixDevNullRequest is the fix-dev-null body: optional auth method.
+type sshFixDevNullRequest struct {
+	Method string `json:"method"`
+}
+
 // handleFixDevNull attempts to repair /dev/null permissions on remote host.
+//
+//	@Summary		Repair /dev/null on a host
+//	@Description	Editor+. A failed repair is 200 with success false and the command output.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string					true	"Host slug"
+//	@Param			body	body		sshFixDevNullRequest	true	"Optional auth method"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/fix-dev-null/{slug} [post]
 func (h *sshHandlers) handleFixDevNull(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
@@ -387,9 +446,7 @@ func (h *sshHandlers) handleFixDevNull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Method string `json:"method"`
-	}
+	var req sshFixDevNullRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -419,6 +476,20 @@ func (h *sshHandlers) handleFixDevNull(w http.ResponseWriter, r *http.Request) {
 // handleDockerLogsInspect runs the read-only docker log inspection: log
 // driver, daemon.json policy, per-container log file sizes, rotation
 // risk verdict. No host changes — pure observation.
+//
+//	@Summary		Inspect a host's Docker log usage
+//	@Description	Editor+. Also raises or clears the host's docker-logs alert. A failure is 200 with success false.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/docker-logs/{slug} [post]
 func (h *sshHandlers) handleDockerLogsInspect(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
@@ -566,10 +637,33 @@ func humanizeBytesAPI(n int64) string {
 	return fmt.Sprintf("%.1f %s", float64(n)/div, suffix)
 }
 
+// sshDockerLogsRotationRequest is the log-rotation policy to write into daemon.json.
+type sshDockerLogsRotationRequest struct {
+	MaxSize string `json:"max_size"`
+	MaxFile int    `json:"max_file"`
+	Driver  string `json:"driver"`
+}
+
 // handleDockerLogsApplyRotation writes the recommended log-rotation policy
 // to /etc/docker/daemon.json and reloads the daemon. Requires admin role
 // because it modifies daemon configuration; sudo password must be on
 // file (this is purely a host-mutation operation).
+//
+//	@Summary		Apply Docker log rotation
+//	@Description	Admin. Merges the policy into /etc/docker/daemon.json and reloads Docker; needs the host's stored password.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string							true	"Host slug"
+//	@Param			body	body		sshDockerLogsRotationRequest	true	"Rotation policy"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/docker-logs-rotation/{slug} [post]
 func (h *sshHandlers) handleDockerLogsApplyRotation(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
@@ -580,11 +674,7 @@ func (h *sshHandlers) handleDockerLogsApplyRotation(w http.ResponseWriter, r *ht
 		return
 	}
 
-	var req struct {
-		MaxSize string `json:"max_size"`
-		MaxFile int    `json:"max_file"`
-		Driver  string `json:"driver"`
-	}
+	var req sshDockerLogsRotationRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -624,7 +714,32 @@ func (h *sshHandlers) handleDockerLogsApplyRotation(w http.ResponseWriter, r *ht
 	jsonOK(w, map[string]any{"success": true, "method": method, "message": msg, "daemon_json": merged})
 }
 
+// sshSetupKeyRequest is the setup-key body: login credentials and key mode.
+type sshSetupKeyRequest struct {
+	User             string `json:"user"`
+	Password         string `json:"password"`
+	UseSavedPassword bool   `json:"use_saved_password"`
+	Mode             string `json:"mode"` // "generate" or "existing"
+	ExistingKeyPath  string `json:"existing_key_path"`
+}
+
 // handleSetupKey sets up an SSH key for a host.
+//
+//	@Summary		Install an SSH key on a host
+//	@Description	Editor+. mode "generate" makes a new key, "existing" reuses existing_key_path.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string				true	"Host slug"
+//	@Param			body	body		sshSetupKeyRequest	true	"Credentials and key mode"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/setup-key/{slug} [post]
 func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -633,13 +748,7 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		User             string `json:"user"`
-		Password         string `json:"password"`
-		UseSavedPassword bool   `json:"use_saved_password"`
-		Mode             string `json:"mode"` // "generate" or "existing"
-		ExistingKeyPath  string `json:"existing_key_path"`
-	}
+	var req sshSetupKeyRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -712,6 +821,15 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleListKeys returns available SSH keys.
+//
+//	@Summary		List the server's local SSH keys
+//	@Description	Any role.
+//	@Tags			ssh
+//	@Produce		json
+//	@Success		200	{array}		sshkeys.KeyInfo
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/keys [get]
 func (h *sshHandlers) handleListKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := sshkeys.ListKeys()
 	if err != nil {
@@ -722,6 +840,15 @@ func (h *sshHandlers) handleListKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDownloadConfig returns the SSH config as a downloadable file.
+//
+//	@Summary		Download the generated SSH config
+//	@Description	Any role. Served as an attachment named config.
+//	@Tags			ssh
+//	@Produce		plain
+//	@Success		200	{string}	string
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/download-config [get]
 func (h *sshHandlers) handleDownloadConfig(w http.ResponseWriter, r *http.Request) {
 	hosts, err := store.NewHostRepo(h.db.SQL).ListForSSHConfig(r.Context())
 	if err != nil {
@@ -739,6 +866,14 @@ func (h *sshHandlers) handleDownloadConfig(w http.ResponseWriter, r *http.Reques
 }
 
 // handleServerInfo returns information about the server running SSHCM.
+//
+//	@Summary		SSH details of the Bridge server
+//	@Description	Any role.
+//	@Tags			ssh
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/server-info [get]
 func (h *sshHandlers) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 	hostname, _ := os.Hostname()
 	user := os.Getenv("USER")
@@ -768,6 +903,20 @@ func (h *sshHandlers) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSetupSudoNopasswd configures passwordless sudo for the remote host's user.
+//
+//	@Summary		Configure NOPASSWD sudo for the host user
+//	@Description	Admin. Needs the host's stored password. A failure is 200 with success false.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/setup-sudo-nopasswd/{slug} [post]
 func (h *sshHandlers) handleSetupSudoNopasswd(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
@@ -805,21 +954,40 @@ func (h *sshHandlers) handleSetupSudoNopasswd(w http.ResponseWriter, r *http.Req
 	jsonOK(w, map[string]any{"success": true, "output": output, "message": "NOPASSWD sudo configured for " + user})
 }
 
+// sshCreateRemoteUserRequest is the new remote account and the public key to authorize.
+type sshCreateRemoteUserRequest struct {
+	Username    string `json:"username"`
+	PubKey      string `json:"pub_key"`
+	KeySecretID int64  `json:"key_secret_id"` // vault key; its public half is installed
+	SSHKeyID    int64  `json:"ssh_key_id"`    // pre-v91 clients
+	Force       bool   `json:"force"`
+}
+
 // handleCreateRemoteUser creates a new user on the remote host with an authorized
 // SSH key and passwordless sudo.
+//
+//	@Summary		Create a sudo user on a host
+//	@Description	Admin. Installs pub_key (or the public half of vault key key_secret_id) and NOPASSWD sudo. Needs the host's stored password. A failure is 200 with success false.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string						true	"Host slug"
+//	@Param			body	body		sshCreateRemoteUserRequest	true	"Username and key"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/create-remote-user/{slug} [post]
 func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
 		return
 	}
 
-	var req struct {
-		Username    string `json:"username"`
-		PubKey      string `json:"pub_key"`
-		KeySecretID int64  `json:"key_secret_id"` // vault key; its public half is installed
-		SSHKeyID    int64  `json:"ssh_key_id"`    // pre-v91 clients
-		Force       bool   `json:"force"`
-	}
+	var req sshCreateRemoteUserRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -898,19 +1066,38 @@ func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Requ
 	jsonOK(w, map[string]any{"success": true, "output": output, "message": "User " + req.Username + " created with sudo NOPASSWD"})
 }
 
+// sshDeleteRemoteUserRequest is the remote account to remove.
+type sshDeleteRemoteUserRequest struct {
+	Username   string `json:"username"`
+	RemoveHome bool   `json:"remove_home"`
+}
+
 // handleDeleteRemoteUser removes a non-system user from the remote host and
 // cleans up its NOPASSWD sudoers drop-in. Safety rails live in sshtest.
 // DeleteRemoteUser (root, UID<1000, and SSH login user are refused).
+//
+//	@Summary		Delete a user from a host
+//	@Description	Admin. root, system users (UID<1000) and the SSH login user are refused. A failure is 200 with success false.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string						true	"Host slug"
+//	@Param			body	body		sshDeleteRemoteUserRequest	true	"Username and home removal"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/delete-remote-user/{slug} [post]
 func (h *sshHandlers) handleDeleteRemoteUser(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
 		return
 	}
 
-	var req struct {
-		Username   string `json:"username"`
-		RemoveHome bool   `json:"remove_home"`
-	}
+	var req sshDeleteRemoteUserRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -968,7 +1155,28 @@ func (h *sshHandlers) handleDeleteRemoteUser(w http.ResponseWriter, r *http.Requ
 	jsonOK(w, map[string]any{"success": true, "output": output, "message": "User " + req.Username + " deleted"})
 }
 
+// sshDockerSetupRequest is whether to add the user to the docker group.
+type sshDockerSetupRequest struct {
+	Fix bool `json:"fix"`
+}
+
 // handleDockerSetup checks docker status and optionally adds user to docker group.
+//
+//	@Summary		Check Docker on a host
+//	@Description	Admin. fix adds the host user to the docker group. A failure is 200 with success false.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string					true	"Host slug"
+//	@Param			body	body		sshDockerSetupRequest	false	"Whether to fix"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/docker-setup/{slug} [post]
 func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
@@ -979,9 +1187,7 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req struct {
-		Fix bool `json:"fix"`
-	}
+	var req sshDockerSetupRequest
 	decodeJSON(r, &req)
 
 	method, auth, ok := h.resolveAuth(w, host, "")
@@ -1027,7 +1233,28 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, map[string]any{"success": true, "status": status})
 }
 
+// sshNginxCleanupRequest is whether to purge the host nginx packages.
+type sshNginxCleanupRequest struct {
+	Purge bool `json:"purge"`
+}
+
 // handleNginxCleanup detects and removes non-containerized nginx from a remote host.
+//
+//	@Summary		Remove host-level nginx
+//	@Description	Admin. Detects nginx running outside containers; purge removes it. Needs the host's stored password.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string					true	"Host slug"
+//	@Param			body	body		sshNginxCleanupRequest	true	"Whether to purge"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/nginx-cleanup/{slug} [post]
 func (h *sshHandlers) handleNginxCleanup(w http.ResponseWriter, r *http.Request) {
 	// Recover from any panic to return a proper JSON error.
 	defer func() {
@@ -1046,9 +1273,7 @@ func (h *sshHandlers) handleNginxCleanup(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var req struct {
-		Purge bool `json:"purge"`
-	}
+	var req sshNginxCleanupRequest
 	if err := decodeJSON(r, &req); err != nil {
 		// Body might be empty; purge defaults to false — that's fine.
 		req.Purge = false
@@ -1088,6 +1313,20 @@ func (h *sshHandlers) handleNginxCleanup(w http.ResponseWriter, r *http.Request)
 // handleGrafanaAgentSetup installs and starts grafana-agent on the target host,
 // configured to scrape node_exporter locally and remote_write to the Prometheus
 // endpoint from Grafana integration settings. Mirrors handleDockerSetup's shape.
+//
+//	@Summary		Install the Grafana Agent on a host
+//	@Description	Admin. Needs the Grafana integration enabled and configured, and the host's stored password.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/grafana-agent-setup/{slug} [post]
 func (h *sshHandlers) handleGrafanaAgentSetup(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if rv := recover(); rv != nil {
@@ -1164,6 +1403,20 @@ func (h *sshHandlers) handleGrafanaAgentSetup(w http.ResponseWriter, r *http.Req
 }
 
 // handleListRemoteKeys lists SSH keys found on the remote host.
+//
+//	@Summary		List a host's authorized keys
+//	@Description	Editor+. A failure is 200 with success false.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/list-remote-keys/{slug} [post]
 func (h *sshHandlers) handleListRemoteKeys(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
@@ -1230,6 +1483,18 @@ func (h *sshHandlers) resolveIdentityFile(host *models.Host) string {
 }
 
 // handleHostSSHConfig returns the SSH config snippet for a single host.
+//
+//	@Summary		SSH config block for one host
+//	@Description	Any role. Body is {"config": string}.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			slug		path		string	true	"Host slug"
+//	@Param			include_key	query		bool	false	"Include the IdentityFile line"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		404			{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/host-config/{slug} [get]
 func (h *sshHandlers) handleHostSSHConfig(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -1262,6 +1527,19 @@ func (h *sshHandlers) handleHostSSHConfig(w http.ResponseWriter, r *http.Request
 }
 
 // handleOperationLogs returns operation logs for a host.
+//
+//	@Summary		A host's SSH operation log
+//	@Description	Any role. Newest first.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Param			limit	query		int		false	"Max rows (default 50)"
+//	@Success		200		{array}		models.OperationLog
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/operation-logs/{slug} [get]
 func (h *sshHandlers) handleOperationLogs(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -1350,19 +1628,37 @@ func runTCPConnect(host string, port int, timeout time.Duration) portCheckResult
 	return portCheckResult{Port: port, OK: true, LatencyMS: latency}
 }
 
+// sshNetworkTestRequest is an optional extra TCP port to probe.
+type sshNetworkTestRequest struct {
+	Port int `json:"port"`
+}
+
 // handleNetworkTest probes a host's reachability without using SSH. It
 // always pings (best-effort) and TCP-connects to the configured SSH port,
 // plus an optional custom port supplied by the caller. This is the
 // "is it even on the network" check before debugging SSH itself.
+//
+//	@Summary		Probe a host's network reachability
+//	@Description	Editor+. Ping plus TCP connect to the SSH port and an optional extra port; no SSH. The body is optional.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string					true	"Host slug"
+//	@Param			body	body		sshNetworkTestRequest	false	"Optional extra port"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/network-test/{slug} [post]
 func (h *sshHandlers) handleNetworkTest(w http.ResponseWriter, r *http.Request) {
 	host := h.requireHost(w, r)
 	if host == nil {
 		return
 	}
 
-	var req struct {
-		Port int `json:"port"`
-	}
+	var req sshNetworkTestRequest
 	if r.ContentLength > 0 {
 		if err := decodeJSON(r, &req); err != nil {
 			jsonBadRequest(w, r, "invalid request body", err)

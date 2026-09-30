@@ -123,6 +123,15 @@ var secretKeys = map[string]bool{
 }
 
 // handleGetIntegrations returns all integration settings grouped by provider.
+//
+//	@Summary		Get integration settings
+//	@Description	Admin. Every integration group (ldap, gitlab, keycloak, llm, coolify, grafana, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read "••••••••" when set, "" otherwise.
+//	@Tags			integration-settings
+//	@Produce		json
+//	@Success		200	{object}	map[string]map[string]string
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations [get]
 func (h *integrationSettingsHandlers) handleGetIntegrations(w http.ResponseWriter, r *http.Request) {
 	result := make(map[string]map[string]string)
 
@@ -147,6 +156,19 @@ func (h *integrationSettingsHandlers) handleGetIntegrations(w http.ResponseWrite
 }
 
 // handleUpdateIntegrationGroup updates settings for a specific integration group.
+//
+//	@Summary		Update an integration group
+//	@Description	Admin. Keys outside the group are ignored. For secret keys, "" or "••••••••" means no change (clear them with DELETE .../secret/{key}); other values are encrypted.
+//	@Tags			integration-settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			group	path		string				true	"Integration group (ldap, gitlab, keycloak, llm, coolify, grafana, outline, proxmox, glpi, general)"
+//	@Param			body	body		map[string]string	true	"Setting key to value"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/{group} [put]
 func (h *integrationSettingsHandlers) handleUpdateIntegrationGroup(w http.ResponseWriter, r *http.Request) {
 	group := r.PathValue("group")
 	keys, ok := integrationGroups[group]
@@ -194,6 +216,17 @@ func (h *integrationSettingsHandlers) handleUpdateIntegrationGroup(w http.Respon
 }
 
 // handleTestLDAP tests the LDAP connection with current saved settings.
+//
+//	@Summary		Test the LDAP connection
+//	@Description	Admin. Uses the saved settings. A failed test still answers 200: {"success": false, "error": "..."}; success is {"success": true}.
+//	@Tags			integration-settings
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/test/ldap [post]
 func (h *integrationSettingsHandlers) handleTestLDAP(w http.ResponseWriter, r *http.Request) {
 	provider, ok := h.registry.Get("ldap")
 	if !ok {
@@ -226,6 +259,18 @@ func (h *integrationSettingsHandlers) handleTestLDAP(w http.ResponseWriter, r *h
 
 // handleClearIntegrationSecret wipes the cipher/nonce pair for one secret key.
 // This is the ONLY path that can zero a stored secret — the save handler never clears.
+//
+//	@Summary		Clear an integration secret
+//	@Description	Admin. The only way to wipe a stored integration secret; the key must be a secret key of that group (else 400).
+//	@Tags			integration-settings
+//	@Produce		json
+//	@Param			group	path		string	true	"Integration group"
+//	@Param			key		path		string	true	"Secret setting key"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/{group}/secret/{key} [delete]
 func (h *integrationSettingsHandlers) handleClearIntegrationSecret(w http.ResponseWriter, r *http.Request) {
 	group := r.PathValue("group")
 	key := r.PathValue("key")
@@ -251,14 +296,28 @@ func (h *integrationSettingsHandlers) handleClearIntegrationSecret(w http.Respon
 	jsonOK(w, map[string]string{"status": "cleared"})
 }
 
+// integrationTestOutlineRequest optionally overrides the stored Outline settings.
+type integrationTestOutlineRequest struct {
+	BaseURL string `json:"base_url"`
+	Token   string `json:"token"`
+}
+
 // handleTestOutline verifies the stored (or caller-supplied) Outline base URL + API
 // token by calling POST /api/auth.info. Returns the authenticated Outline user and
 // workspace name on success so admins can sanity-check which identity they wired.
+//
+//	@Summary		Test the Outline integration
+//	@Description	Admin. Body is optional; empty fields fall back to the saved settings. Always 200: {"success": false, "error"} or {"success": true, "user", "user_email", "workspace", "workspace_url"}.
+//	@Tags			integration-settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		integrationTestOutlineRequest	false	"Unsaved values to test"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/test/outline [post]
 func (h *integrationSettingsHandlers) handleTestOutline(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		BaseURL string `json:"base_url"`
-		Token   string `json:"token"`
-	}
+	var req integrationTestOutlineRequest
 	if r.ContentLength > 0 {
 		_ = decodeJSON(r, &req)
 	}
@@ -325,15 +384,29 @@ func mapOutlineError(err error) string {
 	return msg
 }
 
+// integrationTestGrafanaRequest optionally overrides the stored Grafana settings.
+type integrationTestGrafanaRequest struct {
+	BaseURL string `json:"base_url"`
+	Token   string `json:"token"`
+}
+
 // handleTestGrafana probes Grafana with the stored (or caller-supplied) base URL + API
 // token, verifying reachability and that the token resolves to a real user/service
 // account. Mirrors handleTestGitLabCode's UX: accept unsaved form values in the body,
 // fall back to stored settings for anything empty, and never alter persisted secrets.
+//
+//	@Summary		Test the Grafana integration
+//	@Description	Admin. Body is optional; empty fields fall back to the saved settings. Checks health, then the token. Always 200: {"success": false, "error", "stage"?, "version"?} or {"success": true, "version", "database", "user", "name", "org_id"}.
+//	@Tags			integration-settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		integrationTestGrafanaRequest	false	"Unsaved values to test"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/test/grafana [post]
 func (h *integrationSettingsHandlers) handleTestGrafana(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		BaseURL string `json:"base_url"`
-		Token   string `json:"token"`
-	}
+	var req integrationTestGrafanaRequest
 	if r.ContentLength > 0 {
 		_ = decodeJSON(r, &req)
 	}
@@ -414,15 +487,29 @@ func mapGrafanaError(err error) string {
 	return msg
 }
 
+// integrationTestLLMRequest optionally overrides the stored LLM settings.
+type integrationTestLLMRequest struct {
+	BaseURL string `json:"base_url"`
+	APIKey  string `json:"api_key"`
+	Model   string `json:"model"`
+}
+
 // handleTestLLM checks the LLM integration by listing available models against
 // the OpenAI-compatible endpoint. Accepts optional overrides in the request body
 // so admins can validate unsaved form values; empty fields fall back to stored settings.
+//
+//	@Summary		Test the LLM integration
+//	@Description	Admin. Body is optional; empty fields fall back to the saved settings. Lists models, then runs a tiny chat completion with the text model. Always 200: {"success", "error"?, "stage"?, "models_count", "model", "model_available", "chat_ok", "chat_reply"?, "warning"?}.
+//	@Tags			integration-settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		integrationTestLLMRequest	false	"Unsaved values to test"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/test/llm [post]
 func (h *integrationSettingsHandlers) handleTestLLM(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		BaseURL string `json:"base_url"`
-		APIKey  string `json:"api_key"`
-		Model   string `json:"model"`
-	}
+	var req integrationTestLLMRequest
 	if r.ContentLength > 0 {
 		_ = decodeJSON(r, &req)
 	}
@@ -545,14 +632,28 @@ func mapLLMError(err error) string {
 	return msg
 }
 
+// integrationTestGitLabCodeRequest optionally overrides the stored GitLab service settings.
+type integrationTestGitLabCodeRequest struct {
+	BaseURL string `json:"base_url"`
+	Token   string `json:"token"`
+}
+
 // handleTestGitLabCode verifies a GitLab service PAT by hitting /user. Callers may
 // pass {base_url, token} in the request body to test unsaved form values; empty
 // fields fall back to the encrypted settings already stored in app_settings.
+//
+//	@Summary		Test the GitLab service token
+//	@Description	Admin. Body is optional; empty fields fall back to the saved settings. Always 200: {"success": false, "error": "..."} or {"success": true, "username", "name"}.
+//	@Tags			integration-settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		integrationTestGitLabCodeRequest	false	"Unsaved values to test"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/test/gitlab-code [post]
 func (h *integrationSettingsHandlers) handleTestGitLabCode(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		BaseURL string `json:"base_url"`
-		Token   string `json:"token"`
-	}
+	var req integrationTestGitLabCodeRequest
 	// Body is optional — an empty request tests stored settings.
 	if r.ContentLength > 0 {
 		_ = decodeJSON(r, &req)
@@ -605,6 +706,15 @@ func (h *integrationSettingsHandlers) handleTestGitLabCode(w http.ResponseWriter
 // --- Permissions management ---
 
 // handleGetPermissions returns all permissions and the role-permission matrix.
+//
+//	@Summary		Get permissions and the role matrix
+//	@Description	Admin. Answers {"permissions": [models.Permission], "matrix": {role: [permission codes]}}.
+//	@Tags			integration-settings
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/permissions [get]
 func (h *integrationSettingsHandlers) handleGetPermissions(w http.ResponseWriter, r *http.Request) {
 	perms, err := store.NewPermissionRepo(h.db.SQL).ListPermissions(r.Context())
 	if err != nil {
@@ -630,12 +740,27 @@ func (h *integrationSettingsHandlers) handleGetPermissions(w http.ResponseWriter
 	})
 }
 
+// permissionsUpdateRequest replaces one role's permission codes.
+type permissionsUpdateRequest struct {
+	Role        string   `json:"role"`
+	Permissions []string `json:"permissions"`
+}
+
 // handleUpdatePermissions replaces the permission set for a role.
+//
+//	@Summary		Replace a role's permissions
+//	@Description	Admin. The admin role cannot be edited (403).
+//	@Tags			integration-settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		permissionsUpdateRequest	true	"Role and its permission codes"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/permissions [put]
 func (h *integrationSettingsHandlers) handleUpdatePermissions(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Role        string   `json:"role"`
-		Permissions []string `json:"permissions"`
-	}
+	var req permissionsUpdateRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid JSON", err)
 		return
@@ -661,6 +786,15 @@ func (h *integrationSettingsHandlers) handleUpdatePermissions(w http.ResponseWri
 // --- Role mappings management ---
 
 // handleGetRoleMappings returns all external group-to-role mappings.
+//
+//	@Summary		List external group to role mappings
+//	@Description	Admin.
+//	@Tags			integration-settings
+//	@Produce		json
+//	@Success		200	{array}		models.AuthRoleMapping
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/role-mappings [get]
 func (h *integrationSettingsHandlers) handleGetRoleMappings(w http.ResponseWriter, r *http.Request) {
 	mappings, err := store.NewPermissionRepo(h.db.SQL).ListRoleMappings(r.Context())
 	if err != nil {
@@ -674,6 +808,19 @@ func (h *integrationSettingsHandlers) handleGetRoleMappings(w http.ResponseWrite
 }
 
 // handleCreateRoleMapping creates a new external group-to-role mapping.
+//
+//	@Summary		Create an external group to role mapping
+//	@Description	Admin. provider_name, external_group and local_role are required; 409 on a duplicate.
+//	@Tags			integration-settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		models.AuthRoleMapping	true	"Mapping"
+//	@Success		201		{object}	models.AuthRoleMapping
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/role-mappings [post]
 func (h *integrationSettingsHandlers) handleCreateRoleMapping(w http.ResponseWriter, r *http.Request) {
 	var req models.AuthRoleMapping
 	if err := decodeJSON(r, &req); err != nil {
@@ -694,6 +841,17 @@ func (h *integrationSettingsHandlers) handleCreateRoleMapping(w http.ResponseWri
 }
 
 // handleDeleteRoleMapping deletes a role mapping by ID.
+//
+//	@Summary		Delete a role mapping
+//	@Description	Admin.
+//	@Tags			integration-settings
+//	@Produce		json
+//	@Param			id	path		int	true	"Mapping ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/role-mappings/{id} [delete]
 func (h *integrationSettingsHandlers) handleDeleteRoleMapping(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {

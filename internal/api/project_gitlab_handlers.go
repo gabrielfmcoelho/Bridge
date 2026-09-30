@@ -45,6 +45,17 @@ type linksEnvelope struct {
 // handleListLinks returns every GitLab link attached to a project, along with the
 // integration's active status and a live reachability check for each link (one
 // GitLab API call per link, fanned out with bounded concurrency).
+//
+//	@Summary		List a project's GitLab links
+//	@Description	Any role. Includes the integration's enabled/configured flags and a live reachability check per link (reachable is omitted when unknown).
+//	@Tags			gitlab
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{object}	linksEnvelope
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/gitlab/links [get]
 func (h *projectGitLabHandlers) handleListLinks(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -110,9 +121,31 @@ func (h *projectGitLabHandlers) handleListLinks(w http.ResponseWriter, r *http.R
 	jsonOK(w, env)
 }
 
+// projectGitlabCreateLinkRequest attaches a GitLab project or subgroup by path.
+type projectGitlabCreateLinkRequest struct {
+	Kind    string `json:"kind"`     // "project" (default) or "group"
+	Path    string `json:"path"`     // "org/repo" or "org/subgroup"
+	RefName string `json:"ref_name"` // optional branch override
+}
+
 // handleCreateLink attaches a GitLab project or subgroup to an SSHCM project.
 // The client sends a path ("org/repo" or "org/subgroup") plus a kind.
 // The backend resolves the path to a stable numeric ID before persisting.
+//
+//	@Summary		Attach a GitLab project or subgroup
+//	@Description	Editor+. Uses the shared service token; the path is resolved to a stable numeric ID. kind defaults to "project".
+//	@Tags			gitlab
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int								true	"Project ID"
+//	@Param			body	body		projectGitlabCreateLinkRequest	true	"Path, kind and optional branch"
+//	@Success		201		{object}	models.ProjectGitLabLink
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/gitlab/links [post]
 func (h *projectGitLabHandlers) handleCreateLink(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -124,11 +157,7 @@ func (h *projectGitLabHandlers) handleCreateLink(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var req struct {
-		Kind    string `json:"kind"`     // "project" (default) or "group"
-		Path    string `json:"path"`     // "org/repo" or "org/subgroup"
-		RefName string `json:"ref_name"` // optional branch override
-	}
+	var req projectGitlabCreateLinkRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid JSON", err)
 		return
@@ -198,6 +227,19 @@ func (h *projectGitLabHandlers) handleCreateLink(w http.ResponseWriter, r *http.
 }
 
 // handleDeleteLink removes a link, enforcing that it belongs to the URL's project.
+//
+//	@Summary		Remove a GitLab link
+//	@Description	Editor+. The link must belong to the project in the URL.
+//	@Tags			gitlab
+//	@Produce		json
+//	@Param			id		path		int	true	"Project ID"
+//	@Param			linkId	path		int	true	"Link ID"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/gitlab/links/{linkId} [delete]
 func (h *projectGitLabHandlers) handleDeleteLink(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -250,6 +292,17 @@ const commitsPerRepo = 10
 // attached to the SSHCM project, expanding subgroup links into their member repos.
 // Each returned commit is enriched with the branches that contain it (one extra
 // API call per commit, fanned out with bounded concurrency).
+//
+//	@Summary		Recent commits across a project's linked repos
+//	@Description	Any role. Subgroup links expand to their repos; each commit carries its source repo and branches, newest first. GitLab failures come back in the envelope's error/warnings, not as a status.
+//	@Tags			gitlab
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{object}	commitEnvelope
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/gitlab/commits [get]
 func (h *projectGitLabHandlers) handleListCommits(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {

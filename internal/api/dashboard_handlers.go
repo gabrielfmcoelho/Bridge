@@ -12,6 +12,15 @@ type dashboardHandlers struct {
 	db *database.DB
 }
 
+// handleDashboard godoc
+//
+//	@Summary		Dashboard counters
+//	@Description	Any role. Host totals (by situação, by hospedagem, with scans, needing maintenance), the 5 most recent scans and counts of DNS records, projects, services, orchestrators and visible open issues.
+//	@Tags			dashboard
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/dashboard [get]
 func (h *dashboardHandlers) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	hostCount, _ := store.NewHostRepo(h.db.SQL).CountAll(r.Context())
 	hostBySituacao, _ := store.NewHostRepo(h.db.SQL).CountBySituacao(r.Context())

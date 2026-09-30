@@ -16,6 +16,14 @@ type settingsHandlers struct {
 	db *database.DB
 }
 
+// handleGetAppearance godoc
+//
+//	@Summary		Get appearance settings
+//	@Description	Public, no auth, so the login and setup pages can load branding.
+//	@Tags			settings
+//	@Produce		json
+//	@Success		200	{object}	models.AppSettings
+//	@Router			/api/settings/appearance [get]
 func (h *settingsHandlers) handleGetAppearance(w http.ResponseWriter, r *http.Request) {
 	s, err := store.NewAppSettingsRepo(h.db.SQL).Get(r.Context())
 	if err != nil {
@@ -25,6 +33,19 @@ func (h *settingsHandlers) handleGetAppearance(w http.ResponseWriter, r *http.Re
 	jsonOK(w, s)
 }
 
+// handleUpdateAppearance godoc
+//
+//	@Summary		Update appearance settings
+//	@Description	Admin. app_name is required; app_color defaults to #06b6d4.
+//	@Tags			settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		models.AppSettings	true	"Appearance settings"
+//	@Success		200		{object}	models.AppSettings
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/appearance [put]
 func (h *settingsHandlers) handleUpdateAppearance(w http.ResponseWriter, r *http.Request) {
 	var req models.AppSettings
 	if err := decodeJSON(r, &req); err != nil {
@@ -47,6 +68,19 @@ func (h *settingsHandlers) handleUpdateAppearance(w http.ResponseWriter, r *http
 
 const maxLogoSize = 512 * 1024 // 512KB
 
+// handleUploadLogo godoc
+//
+//	@Summary		Upload the app logo
+//	@Description	Admin. An image up to 512KB, stored as a data URI. Answers {"logo": "data:<type>;base64,..."}.
+//	@Tags			settings
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			logo	formData	file	true	"Logo image (max 512KB)"
+//	@Success		200		{object}	map[string]string
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/appearance/logo [post]
 func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxLogoSize+1024)
 	if err := r.ParseMultipartForm(maxLogoSize + 1024); err != nil {
@@ -89,6 +123,15 @@ func (h *settingsHandlers) handleUploadLogo(w http.ResponseWriter, r *http.Reque
 	jsonOK(w, map[string]string{"logo": dataURI})
 }
 
+// handleGetAlertThresholds godoc
+//
+//	@Summary		Get alert thresholds
+//	@Description	Any role.
+//	@Tags			settings
+//	@Produce		json
+//	@Success		200	{object}	models.AlertThresholds
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/alerts [get]
 func (h *settingsHandlers) handleGetAlertThresholds(w http.ResponseWriter, r *http.Request) {
 	t, err := store.NewAlertSettingsRepo(h.db.SQL).GetThresholds(r.Context())
 	if err != nil {
@@ -98,6 +141,19 @@ func (h *settingsHandlers) handleGetAlertThresholds(w http.ResponseWriter, r *ht
 	jsonOK(w, t)
 }
 
+// handleUpdateAlertThresholds godoc
+//
+//	@Summary		Update alert thresholds
+//	@Description	Admin. Resource thresholds must be between 0 and 100.
+//	@Tags			settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		models.AlertThresholds	true	"Alert thresholds"
+//	@Success		200		{object}	models.AlertThresholds
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/alerts [put]
 func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r *http.Request) {
 	var req models.AlertThresholds
 	if err := decodeJSON(r, &req); err != nil {
@@ -117,6 +173,16 @@ func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r 
 	jsonOK(w, req)
 }
 
+// handleDeleteLogo godoc
+//
+//	@Summary		Remove the app logo
+//	@Description	Admin.
+//	@Tags			settings
+//	@Produce		json
+//	@Success		200	{object}	StatusResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/appearance/logo [delete]
 func (h *settingsHandlers) handleDeleteLogo(w http.ResponseWriter, r *http.Request) {
 	s, err := store.NewAppSettingsRepo(h.db.SQL).Get(r.Context())
 	if err != nil {

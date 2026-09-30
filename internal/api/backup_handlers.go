@@ -17,6 +17,15 @@ type backupHandlers struct {
 // or Postgres, so backups are cross-dialect by construction: a file
 // downloaded from a SQLite deployment can be restored into a Postgres
 // deployment and vice versa.
+//
+//	@Summary		Download a backup
+//	@Description	Admin. Streams a portable gzipped-JSON backup (.sshcmbak) of every user-data table.
+//	@Tags			backup
+//	@Produce		application/gzip
+//	@Success		200	{file}		file
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/backup [get]
 func (h *backupHandlers) handleBackup(w http.ResponseWriter, r *http.Request) {
 	name := fmt.Sprintf("sshcm_backup_%s.sshcmbak", time.Now().Format("2006-01-02_150405"))
 	w.Header().Set("Content-Type", "application/gzip")
@@ -32,6 +41,18 @@ func (h *backupHandlers) handleBackup(w http.ResponseWriter, r *http.Request) {
 // handleRestore ingests a portable backup and replaces all user-data
 // tables on the active database. Accepts the new .sshcmbak format
 // regardless of which dialect produced it.
+//
+//	@Summary		Restore a backup
+//	@Description	Admin. Replaces all user-data tables with the uploaded .sshcmbak (max 500MB); answers {"status": "restored", source/target dialect, schema_version, row_count, cross_dialect, message}. Sessions may need to log in again.
+//	@Tags			backup
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			backup	formData	file	true	"Backup file (.sshcmbak)"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/restore [post]
 func (h *backupHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 500*1024*1024)
 	if err := r.ParseMultipartForm(64 * 1024 * 1024); err != nil {

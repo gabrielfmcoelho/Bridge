@@ -36,6 +36,13 @@ func callbackURL(r *http.Request, providerName string) string {
 
 // handleAuthorize initiates the OAuth flow by redirecting to the external provider.
 // GET /api/auth/oauth/{provider}/authorize
+//
+//	@Summary		Start an OAuth login
+//	@Description	Public, no auth. Redirects (302) to the provider's authorization URL; on any failure redirects to /login?auth=error&message=...
+//	@Tags			oauth
+//	@Param			provider	path	string	true	"OAuth provider name"
+//	@Success		302
+//	@Router			/api/auth/oauth/{provider}/authorize [get]
 func (h *oauthHandlers) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	providerName := r.PathValue("provider")
 
@@ -63,6 +70,17 @@ func (h *oauthHandlers) handleAuthorize(w http.ResponseWriter, r *http.Request) 
 
 // handleCallback handles the OAuth callback from the external provider.
 // GET /api/auth/oauth/{provider}/callback
+//
+//	@Summary		OAuth callback
+//	@Description	Public, no auth. Called by the provider: validates state, exchanges the code, resolves or auto-provisions the user, sets the session cookie and redirects (302) to /login?auth=success, or to /login?auth=error&message=... on failure.
+//	@Tags			oauth
+//	@Param			provider			path	string	true	"OAuth provider name"
+//	@Param			code				query	string	false	"Authorization code"
+//	@Param			state				query	string	false	"OAuth state (CSRF)"
+//	@Param			error				query	string	false	"Provider error code"
+//	@Param			error_description	query	string	false	"Provider error description"
+//	@Success		302
+//	@Router			/api/auth/oauth/{provider}/callback [get]
 func (h *oauthHandlers) handleCallback(w http.ResponseWriter, r *http.Request) {
 	providerName := r.PathValue("provider")
 

@@ -62,6 +62,20 @@ func (h *apiCatalogHandlers) registerRoutes(rr routeRegistrar) {
 
 // --- list / search ----------------------------------------------------------
 
+// handleList godoc
+//
+//	@Summary		List catalogued APIs
+//	@Description	Any role. Only APIs visible to the caller (entidade scoping).
+//	@Tags			atlas
+//	@Produce		json
+//	@Param			scope		query		string	false	"Filter by scope (projeto or avulso)"
+//	@Param			q			query		string	false	"Search text"
+//	@Param			parent_id	query		int		false	"Filter by parent project ID"
+//	@Param			page		query		int		false	"Page (1-based)"
+//	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.APICatalog]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog [get]
 func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	f := models.APICatalogFilter{
 		Scope: r.URL.Query().Get("scope"),
@@ -83,6 +97,20 @@ func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) 
 	jsonPaged(w, r, list)
 }
 
+// handleSearchOperations godoc
+//
+//	@Summary		Search operations across catalogued APIs
+//	@Description	Any role. Searches the operation index of visible APIs.
+//	@Tags			atlas
+//	@Produce		json
+//	@Param			q			query		string	false	"Search text"
+//	@Param			scope		query		string	false	"Filter by scope (projeto or avulso)"
+//	@Param			parent_id	query		int		false	"Filter by parent project ID"
+//	@Param			page		query		int		false	"Page (1-based)"
+//	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.OperationSearchResult]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/search [get]
 func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *http.Request) {
 	var parentID *int64
 	if v := r.URL.Query().Get("parent_id"); v != "" {
@@ -103,6 +131,18 @@ func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *ht
 
 // --- get --------------------------------------------------------------------
 
+// handleGet godoc
+//
+//	@Summary		Get a catalogued API
+//	@Description	Any role; invisible APIs answer 404. Includes its entidade grants.
+//	@Tags			atlas
+//	@Produce		json
+//	@Param			id	path		int	true	"API catalog ID"
+//	@Success		200	{object}	models.APICatalog
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/{id} [get]
 func (h *apiCatalogHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -131,6 +171,17 @@ func (h *apiCatalogHandlers) attachGrants(ctx context.Context, a *models.APICata
 }
 
 // handleGetSpec returns the canonical spec JSON verbatim for the renderer.
+//
+//	@Summary		Get an API's spec
+//	@Description	Any role; invisible APIs answer 404. The canonical OpenAPI/Swagger JSON document, verbatim.
+//	@Tags			atlas
+//	@Produce		json
+//	@Param			id	path		int						true	"API catalog ID"
+//	@Success		200	{object}	map[string]interface{}	"OpenAPI/Swagger document"
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/{id}/spec [get]
 func (h *apiCatalogHandlers) handleGetSpec(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -159,6 +210,19 @@ type filterSpecRequest struct {
 
 // handleFilterSpec returns a spec reduced to the selected operations/tags —
 // a preview of what a partial share bundle (Phase D) would expose.
+//
+//	@Summary		Preview a filtered spec
+//	@Description	Any role; invisible APIs answer 404. The spec reduced to the selected operations or tags — what a partial share bundle would expose.
+//	@Tags			atlas
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int						true	"API catalog ID"
+//	@Param			body	body		filterSpecRequest		true	"Selector: mode plus op_keys or tags"
+//	@Success		200		{object}	map[string]interface{}	"Filtered OpenAPI/Swagger document"
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/{id}/spec/filter [post]
 func (h *apiCatalogHandlers) handleFilterSpec(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -191,6 +255,28 @@ func (h *apiCatalogHandlers) handleFilterSpec(w http.ResponseWriter, r *http.Req
 
 // --- import -----------------------------------------------------------------
 
+// handleImportUpload godoc
+//
+//	@Summary		Import an API from an uploaded spec
+//	@Description	Editor+. Multipart upload of an OpenAPI/Swagger file; name falls back to the spec's title. projeto scope requires parent_id.
+//	@Tags			atlas
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			spec						formData	file	true	"OpenAPI/Swagger spec file (JSON or YAML)"
+//	@Param			name						formData	string	false	"Name (defaults to the spec title)"
+//	@Param			description					formData	string	false	"Description"
+//	@Param			scope						formData	string	false	"projeto or avulso (default avulso)"
+//	@Param			parent_id					formData	int		false	"Parent project ID (required for projeto scope)"
+//	@Param			base_url					formData	string	false	"Base URL of the running API"
+//	@Param			docs_url					formData	string	false	"Human docs URL"
+//	@Param			creator_entidade_id			formData	int		false	"Creator entidade ID"
+//	@Param			responsible_entidade_ids	formData	string	false	"Comma-separated responsible entidade IDs"
+//	@Param			is_global					formData	string	false	"true or 1 to make it globally visible"
+//	@Success		201							{object}	models.APICatalog
+//	@Failure		400							{object}	httpx.ErrorResponse
+//	@Failure		401							{object}	httpx.ErrorResponse
+//	@Failure		403							{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/import/upload [post]
 func (h *apiCatalogHandlers) handleImportUpload(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -234,6 +320,19 @@ type importURLRequest struct {
 	models.AssetGrantsInput
 }
 
+// handleImportURL godoc
+//
+//	@Summary		Import an API from a spec URL
+//	@Description	Editor+. Fetches source_url (private addresses are allowed unless ATLAS_BLOCK_PRIVATE_SPEC_FETCH is set); a fetch or parse failure answers 400. projeto scope requires parent_id.
+//	@Tags			atlas
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		importURLRequest	true	"Spec URL, metadata and entidade grants"
+//	@Success		201		{object}	models.APICatalog
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/import/url [post]
 func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -278,6 +377,21 @@ type updateCatalogRequest struct {
 	models.AssetGrantsInput
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a catalogued API's metadata
+//	@Description	Editor+; invisible APIs answer 404. Grants change only when a grant field is sent.
+//	@Tags			atlas
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int						true	"API catalog ID"
+//	@Param			body	body		updateCatalogRequest	true	"Metadata and optional entidade grants"
+//	@Success		200		{object}	models.APICatalog
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/{id} [put]
 func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -320,6 +434,18 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 
 // handleRefetch re-downloads a URL-sourced spec and replaces the stored spec
 // + operation index.
+//
+//	@Summary		Re-fetch a URL-imported spec
+//	@Description	Editor+; invisible APIs answer 404. Replaces the stored spec and operation index; 400 when the API was not imported from a URL or the fetch/parse fails.
+//	@Tags			atlas
+//	@Produce		json
+//	@Param			id	path		int	true	"API catalog ID"
+//	@Success		200	{object}	models.APICatalog
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/{id}/refetch [post]
 func (h *apiCatalogHandlers) handleRefetch(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -362,6 +488,18 @@ func (h *apiCatalogHandlers) handleRefetch(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, reloaded)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Delete a catalogued API
+//	@Description	Admin. Soft delete.
+//	@Tags			atlas
+//	@Produce		json
+//	@Param			id	path	int	true	"API catalog ID"
+//	@Success		204
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/{id} [delete]
 func (h *apiCatalogHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {

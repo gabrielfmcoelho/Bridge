@@ -43,6 +43,18 @@ type docSummary struct {
 // handleListProjectWiki returns recent docs in the project's linked Outline collection.
 // Status surface (via the envelope flags) lets the UI pick the right empty state
 // without having to introspect HTTP errors.
+//
+//	@Summary		Recent docs of a project's Outline collection
+//	@Description	Any role. Integration and link state come back as envelope flags and warning (e.g. "no_collection_linked"), not as errors.
+//	@Tags			wiki
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{object}	wikiEnvelope
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/wiki [get]
 func (h *outlineHandlers) handleListProjectWiki(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -110,6 +122,15 @@ type commonWikiEnvelope struct {
 // handleListCommonWiki targets the site-wide common collections from admin settings.
 // Each configured collection becomes its own section. Failed lookups surface a
 // per-section warning rather than failing the whole call.
+//
+//	@Summary		Recent docs of every common Outline collection
+//	@Description	Any role. One section per configured collection; a failing collection carries a warning instead of failing the call.
+//	@Tags			wiki
+//	@Produce		json
+//	@Success		200	{object}	commonWikiEnvelope
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/wiki/documents [get]
 func (h *outlineHandlers) handleListCommonWiki(w http.ResponseWriter, r *http.Request) {
 	env := commonWikiEnvelope{Sections: []commonWikiSection{}}
 	settings, err := outlineclient.LoadSettings(h.db.SQL, h.db.Encryptor)
@@ -239,6 +260,21 @@ func (h *outlineHandlers) populateWikiEnvelope(
 
 // handleCreateProjectDocument makes a new doc in the project's collection.
 // Body: {title, text?}. The collection id is picked server-side — the client never sees it.
+//
+//	@Summary		Create a doc in a project's Outline collection
+//	@Description	Editor+. The project must have a linked collection.
+//	@Tags			wiki
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int							true	"Project ID"
+//	@Param			body	body		wikiCreateDocumentRequest	true	"Title and optional markdown"
+//	@Success		201		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/wiki/documents [post]
 func (h *outlineHandlers) handleCreateProjectDocument(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -261,11 +297,32 @@ func (h *outlineHandlers) handleCreateProjectDocument(w http.ResponseWriter, r *
 	h.createDoc(w, r, project.OutlineCollectionID)
 }
 
+// wikiCreateCommonDocumentRequest is the common-wiki create body; collection_id
+// defaults to the first configured common collection.
+type wikiCreateCommonDocumentRequest struct {
+	Title        string `json:"title"`
+	Text         string `json:"text"`
+	CollectionID string `json:"collection_id"`
+}
+
 // handleCreateCommonDocument makes a new doc in one of the configured common
 // collections. Body: {title, text?, collection_id?}. When collection_id is omitted
 // we default to the first configured id (preserves the pre-multi-collection UX).
 // When present we validate it against the admin-configured set so callers can't
 // write into arbitrary collections.
+//
+//	@Summary		Create a doc in a common Outline collection
+//	@Description	Editor+. collection_id defaults to the first configured common collection and must be one of them.
+//	@Tags			wiki
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		wikiCreateCommonDocumentRequest	true	"Title, optional markdown and collection"
+//	@Success		201		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/wiki/documents [post]
 func (h *outlineHandlers) handleCreateCommonDocument(w http.ResponseWriter, r *http.Request) {
 	settings, err := outlineclient.LoadSettings(h.db.SQL, h.db.Encryptor)
 	if err != nil {
@@ -277,11 +334,7 @@ func (h *outlineHandlers) handleCreateCommonDocument(w http.ResponseWriter, r *h
 		return
 	}
 
-	var req struct {
-		Title        string `json:"title"`
-		Text         string `json:"text"`
-		CollectionID string `json:"collection_id"`
-	}
+	var req wikiCreateCommonDocumentRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -338,12 +391,15 @@ func (h *outlineHandlers) handleCreateCommonDocument(w http.ResponseWriter, r *h
 	})
 }
 
+// wikiCreateDocumentRequest is the project-wiki create body.
+type wikiCreateDocumentRequest struct {
+	Title string `json:"title"`
+	Text  string `json:"text"`
+}
+
 // createDoc is the shared body for the two create-document endpoints.
 func (h *outlineHandlers) createDoc(w http.ResponseWriter, r *http.Request, collectionID string) {
-	var req struct {
-		Title string `json:"title"`
-		Text  string `json:"text"`
-	}
+	var req wikiCreateDocumentRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -388,6 +444,19 @@ func (h *outlineHandlers) createDoc(w http.ResponseWriter, r *http.Request, coll
 }
 
 // handleSearchProjectWiki runs Outline's search scoped to this project's collection.
+//
+//	@Summary		Search a project's Outline collection
+//	@Description	Any role. Body is {"results": [searchResult]}; empty when q is blank or the integration is off.
+//	@Tags			wiki
+//	@Produce		json
+//	@Param			id	path		int		true	"Project ID"
+//	@Param			q	query		string	false	"Search text"
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/wiki/search [get]
 func (h *outlineHandlers) handleSearchProjectWiki(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -407,6 +476,16 @@ func (h *outlineHandlers) handleSearchProjectWiki(w http.ResponseWriter, r *http
 }
 
 // handleSearchCommonWiki searches the whole workspace (no collection filter).
+//
+//	@Summary		Search the whole Outline workspace
+//	@Description	Any role. Body is {"results": [searchResult]}.
+//	@Tags			wiki
+//	@Produce		json
+//	@Param			q	query		string	false	"Search text"
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/wiki/search [get]
 func (h *outlineHandlers) handleSearchCommonWiki(w http.ResponseWriter, r *http.Request) {
 	h.runSearch(w, r, "")
 }
@@ -482,6 +561,17 @@ type workspaceCollectionSummary struct {
 // handleListWorkspaceCollections powers the admin picker in Settings.
 // Returns every collection the service token can see; the frontend chooses
 // which ones to expose as "common".
+//
+//	@Summary		List Outline workspace collections
+//	@Description	Admin. Feeds the common-collection picker in Settings. Body is {"collections": [workspaceCollectionSummary]}.
+//	@Tags			wiki
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/wiki/collections [get]
 func (h *outlineHandlers) handleListWorkspaceCollections(w http.ResponseWriter, r *http.Request) {
 	settings, err := outlineclient.LoadSettings(h.db.SQL, h.db.Encryptor)
 	if err != nil {
@@ -540,6 +630,15 @@ type commonWikiTreeEnvelope struct {
 
 // handleCommonWikiTree returns the full nested nav for every configured common
 // collection. Used by the /wiki page's left sidebar.
+//
+//	@Summary		Nested nav of every common Outline collection
+//	@Description	Any role. Drives the /wiki sidebar; a failing collection carries a warning.
+//	@Tags			wiki
+//	@Produce		json
+//	@Success		200	{object}	commonWikiTreeEnvelope
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/wiki/tree [get]
 func (h *outlineHandlers) handleCommonWikiTree(w http.ResponseWriter, r *http.Request) {
 	env := commonWikiTreeEnvelope{Sections: []commonWikiTreeSection{}}
 	settings, err := outlineclient.LoadSettings(h.db.SQL, h.db.Encryptor)
@@ -625,6 +724,18 @@ type wikiDocumentResponse struct {
 // Enforces that the doc lives inside an admin-configured common collection —
 // otherwise any authenticated user could fetch arbitrary docs by guessing ids
 // (the service token's visibility is typically wider than what admins wired).
+//
+//	@Summary		Get one Outline document
+//	@Description	Any role. Only documents inside a configured common collection (403 otherwise).
+//	@Tags			wiki
+//	@Produce		json
+//	@Param			id	path		string	true	"Outline document ID"
+//	@Success		200	{object}	wikiDocumentResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/wiki/documents/{id} [get]
 func (h *outlineHandlers) handleGetWikiDocument(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(r.PathValue("id"))
 	if id == "" {

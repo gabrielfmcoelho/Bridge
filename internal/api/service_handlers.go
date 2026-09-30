@@ -22,6 +22,28 @@ type serviceHandlers struct {
 	db      *database.DB
 }
 
+// handleList godoc
+//
+//	@Summary		List services
+//	@Description	Any role. Visible services, enriched with their relations. Paginated in SQL.
+//	@Tags			services
+//	@Produce		json
+//	@Param			search					query		string	false	"Free-text search"
+//	@Param			tag						query		string	false	"Filter by tag"
+//	@Param			developed_by			query		string	false	"Filter by developer"
+//	@Param			is_external_dependency	query		string	false	"Filter external dependencies"
+//	@Param			orchestrator_managed	query		string	false	"Filter orchestrator-managed services"
+//	@Param			kind					query		string	false	"Filter by kind"
+//	@Param			source					query		string	false	"Filter by source"
+//	@Param			discovery_kind			query		string	false	"Filter by discovery kind"
+//	@Param			status					query		string	false	"Filter by status"
+//	@Param			sort_by					query		string	false	"Sort column"
+//	@Param			sort_dir				query		string	false	"Sort direction (asc, desc)"
+//	@Param			page					query		int		false	"Page (1-based)"
+//	@Param			per_page				query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200						{object}	ListEnvelope[service.ServiceListItem]
+//	@Failure		401						{object}	httpx.ErrorResponse
+//	@Router			/api/services [get]
 func (h *serviceHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	pp := parsePageParams(r)
 	f := models.ServiceFilter{
@@ -55,6 +77,18 @@ func (h *serviceHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	jsonList(w, items, metaFor(pp, total))
 }
 
+// handleGet godoc
+//
+//	@Summary		Get a service
+//	@Description	Any role. The service with its relations. Invisible services answer 404.
+//	@Tags			services
+//	@Produce		json
+//	@Param			id	path		int	true	"Service ID"
+//	@Success		200	{object}	service.ServiceDetail
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/services/{id} [get]
 func (h *serviceHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -96,6 +130,19 @@ func (req *serviceWriteRequest) toWrite() *service.ServiceWrite {
 	}
 }
 
+// handleCreate godoc
+//
+//	@Summary		Create a service
+//	@Description	Editor+. nickname is required.
+//	@Tags			services
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		serviceWriteRequest	true	"Service, relations and entidade grants"
+//	@Success		201		{object}	models.Service
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/services [post]
 func (h *serviceHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req serviceWriteRequest
 	if !decodeBody(w, r, &req) {
@@ -139,6 +186,21 @@ func (h *serviceHandlers) maybeProvisionGrafanaDashboard(svc models.Service) {
 	}(svc)
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a service
+//	@Description	Editor+. Partial: decoded over the stored row; relations change only when sent, grants only when a grant field is sent.
+//	@Tags			services
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Service ID"
+//	@Param			body	body		serviceWriteRequest	true	"Service fields, relations and optional entidade grants"
+//	@Success		200		{object}	models.Service
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/services/{id} [put]
 func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -180,6 +242,18 @@ func (h *serviceHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, wr.Service)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Move a service to the trash
+//	@Description	Admin.
+//	@Tags			services
+//	@Produce		json
+//	@Param			id	path		int	true	"Service ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/services/{id} [delete]
 func (h *serviceHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -194,6 +268,18 @@ func (h *serviceHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleFixate converts an auto-discovered service to a fixed service.
+//
+//	@Summary		Fixate an auto-discovered service
+//	@Description	Editor+. Converts an auto-discovered service into a fixed one; a service that is not auto-discovered answers 400.
+//	@Tags			services
+//	@Produce		json
+//	@Param			id	path		int	true	"Service ID"
+//	@Success		200	{object}	models.Service
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/services/{id}/fixate [post]
 func (h *serviceHandlers) handleFixate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -215,16 +301,33 @@ func (h *serviceHandlers) handleFixate(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, svc)
 }
 
+// serviceUpdateContainerRequest names the container to bind the service to.
+type serviceUpdateContainerRequest struct {
+	ContainerName string `json:"container_name"`
+	ContainerID   string `json:"container_id"`
+}
+
 // handleUpdateContainer rebinds a fixed/manual service to a different container.
+//
+//	@Summary		Rebind a service to another container
+//	@Description	Editor+. Only fixed/manual container services; auto-discovered or non-container services answer 400.
+//	@Tags			services
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int								true	"Service ID"
+//	@Param			body	body		serviceUpdateContainerRequest	true	"Container binding"
+//	@Success		200		{object}	models.Service
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/services/{id}/container [put]
 func (h *serviceHandlers) handleUpdateContainer(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
 		return
 	}
-	var req struct {
-		ContainerName string `json:"container_name"`
-		ContainerID   string `json:"container_id"`
-	}
+	var req serviceUpdateContainerRequest
 	if !decodeBody(w, r, &req) {
 		return
 	}
@@ -257,6 +360,17 @@ func (h *serviceHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("editor", "PUT /api/services/{id}/container", h.handleUpdateContainer)
 }
 
+// handleListTrash godoc
+//
+//	@Summary		List trashed services
+//	@Description	Any role.
+//	@Tags			services
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.Service]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/services/trash [get]
 func (h *serviceHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListTrash(r.Context())
 	if err != nil {
@@ -266,6 +380,18 @@ func (h *serviceHandlers) handleListTrash(w http.ResponseWriter, r *http.Request
 	jsonPaged(w, r, items)
 }
 
+// handleRestore godoc
+//
+//	@Summary		Restore a service from the trash
+//	@Description	Admin.
+//	@Tags			services
+//	@Produce		json
+//	@Param			id	path		int	true	"Service ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/services/{id}/restore [post]
 func (h *serviceHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {

@@ -50,6 +50,14 @@ func (h *aiHandlers) getClient() (*llm.Client, error) {
 }
 
 // handleStatus checks if the LLM integration is configured.
+//
+//	@Summary		LLM integration status
+//	@Description	Any role. Returns {enabled, configured, model}.
+//	@Tags			ai
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/ai/status [get]
 func (h *aiHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	enabled := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_enabled") == "true"
 	configured := store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), "llm_api_key")
@@ -60,7 +68,27 @@ func (h *aiHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// aiAssistIssueRequest is the issue-draft body.
+type aiAssistIssueRequest struct {
+	Summary string `json:"summary"`
+	Context string `json:"context"`
+}
+
 // handleAssistIssue generates a structured issue description from a brief summary.
+//
+//	@Summary		Draft an issue description
+//	@Description	Requires permission ai.use. Returns {description}. 503 when the LLM is not configured.
+//	@Tags			ai
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		aiAssistIssueRequest	true	"Summary and optional context"
+//	@Success		200		{object}	map[string]string
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/ai/assist/issue [post]
 func (h *aiHandlers) handleAssistIssue(w http.ResponseWriter, r *http.Request) {
 	client, err := h.getClient()
 	if err != nil {
@@ -68,10 +96,7 @@ func (h *aiHandlers) handleAssistIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Summary string `json:"summary"`
-		Context string `json:"context"`
-	}
+	var req aiAssistIssueRequest
 	if err := decodeJSON(r, &req); err != nil || req.Summary == "" {
 		jsonError(w, http.StatusBadRequest, "summary is required")
 		return
@@ -96,7 +121,27 @@ func (h *aiHandlers) handleAssistIssue(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"description": result})
 }
 
+// aiAssistHostDocRequest names the host to document.
+type aiAssistHostDocRequest struct {
+	HostSlug string `json:"host_slug"`
+}
+
 // handleAssistHostDoc generates documentation for a host from its data.
+//
+//	@Summary		Draft host documentation
+//	@Description	Requires permission ai.use. Returns {documentation}. 503 when the LLM is not configured.
+//	@Tags			ai
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		aiAssistHostDocRequest	true	"Host to document"
+//	@Success		200		{object}	map[string]string
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/ai/assist/host-doc [post]
 func (h *aiHandlers) handleAssistHostDoc(w http.ResponseWriter, r *http.Request) {
 	client, err := h.getClient()
 	if err != nil {
@@ -104,9 +149,7 @@ func (h *aiHandlers) handleAssistHostDoc(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var req struct {
-		HostSlug string `json:"host_slug"`
-	}
+	var req aiAssistHostDocRequest
 	if err := decodeJSON(r, &req); err != nil || req.HostSlug == "" {
 		jsonError(w, http.StatusBadRequest, "host_slug is required")
 		return
@@ -141,9 +184,30 @@ func (h *aiHandlers) handleAssistHostDoc(w http.ResponseWriter, r *http.Request)
 	jsonOK(w, map[string]string{"documentation": result})
 }
 
+// aiAnalyzeProjectRequest is the optional analyze body.
+type aiAnalyzeProjectRequest struct {
+	Locale string `json:"locale"`
+}
+
 // handleAnalyzeProject summarizes what the team is currently working on across
 // the project's linked GitLab repos, based on the most recent commits. It returns
 // a markdown string in the locale supplied by the caller.
+//
+//	@Summary		Generate a project AI analysis
+//	@Description	Requires permission ai.use. Summarizes the recent commits of the project's linked GitLab repos (markdown, in the requested locale) and caches the result. The body is optional. 400 when GitLab is disabled/unconfigured or no repos are linked; 503 when the LLM is not configured.
+//	@Tags			ai
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int						true	"Project ID"
+//	@Param			body	body		aiAnalyzeProjectRequest	false	"Response locale (pt* → Portuguese, else English)"
+//	@Success		200		{object}	models.ProjectAIAnalysis
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/ai/analyze [post]
 func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -161,9 +225,7 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var req struct {
-		Locale string `json:"locale"`
-	}
+	var req aiAnalyzeProjectRequest
 	if r.ContentLength > 0 {
 		_ = decodeJSON(r, &req)
 	}
@@ -355,6 +417,17 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 // handleGetProjectAnalysis returns the cached analysis (if any). Never calls the LLM.
 // Returns 200 with null content when no cached analysis exists — the frontend treats
 // that as "show Generate button" rather than an error.
+//
+//	@Summary		Cached project AI analysis
+//	@Description	Any role. Never calls the LLM. Answers 200 with a null body when no analysis is cached.
+//	@Tags			ai
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{object}	models.ProjectAIAnalysis
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/ai/analyze [get]
 func (h *aiHandlers) handleGetProjectAnalysis(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -377,7 +450,26 @@ func (h *aiHandlers) handleGetProjectAnalysis(w http.ResponseWriter, r *http.Req
 	jsonOK(w, cached)
 }
 
+// aiChatRequest is the chat body.
+type aiChatRequest struct {
+	Message string `json:"message"`
+}
+
 // handleChat handles a natural language query about infrastructure.
+//
+//	@Summary		Ask about the infrastructure
+//	@Description	Requires permission ai.use. Returns {response}. 503 when the LLM is not configured.
+//	@Tags			ai
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		aiChatRequest	true	"User message"
+//	@Success		200		{object}	map[string]string
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/ai/chat [post]
 func (h *aiHandlers) handleChat(w http.ResponseWriter, r *http.Request) {
 	client, err := h.getClient()
 	if err != nil {
@@ -385,9 +477,7 @@ func (h *aiHandlers) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Message string `json:"message"`
-	}
+	var req aiChatRequest
 	if err := decodeJSON(r, &req); err != nil || req.Message == "" {
 		jsonError(w, http.StatusBadRequest, "message is required")
 		return

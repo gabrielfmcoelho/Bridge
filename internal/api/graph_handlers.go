@@ -27,6 +27,16 @@ type graphEdge struct {
 	Label  string `json:"label"`
 }
 
+// handleGraph godoc
+//
+//	@Summary		Inventory graph
+//	@Description	Any role. {"nodes": [graphNode], "edges": [graphEdge]} over visible hosts, DNS records, projects and services; edges only between visible nodes.
+//	@Tags			graph
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/graph [get]
 func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	nodes := []graphNode{}
 	edges := []graphEdge{}

@@ -17,6 +17,25 @@ type dnsHandlers struct {
 	dns *service.DNSService
 }
 
+// handleList godoc
+//
+//	@Summary		List DNS records
+//	@Description	Any role. Visible records, enriched with their relations. Paginated in SQL.
+//	@Tags			dns
+//	@Produce		json
+//	@Param			search		query		string	false	"Free-text search"
+//	@Param			situacao	query		string	false	"Filter by situação"
+//	@Param			tag			query		string	false	"Filter by tag"
+//	@Param			responsavel	query		string	false	"Filter by responsável"
+//	@Param			has_https	query		string	false	"Filter by HTTPS"
+//	@Param			cert		query		string	false	"Filter by certificate state"
+//	@Param			sort_by		query		string	false	"Sort column"
+//	@Param			sort_dir	query		string	false	"Sort direction (asc, desc)"
+//	@Param			page		query		int		false	"Page (1-based)"
+//	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[service.DNSListItem]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/dns [get]
 func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	pp := parsePageParams(r)
 	f := models.DNSFilter{
@@ -47,6 +66,18 @@ func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	jsonList(w, items, metaFor(pp, total))
 }
 
+// handleGet godoc
+//
+//	@Summary		Get a DNS record
+//	@Description	Any role. The record with its relations. Invisible records answer 404.
+//	@Tags			dns
+//	@Produce		json
+//	@Param			id	path		int	true	"DNS record ID"
+//	@Success		200	{object}	service.DNSDetail
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/dns/{id} [get]
 func (h *dnsHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -82,6 +113,20 @@ func (req *dnsWriteRequest) toWrite() *service.DNSWrite {
 		ServiceIDs: req.ServiceIDs, ProjectIDs: req.ProjectIDs, Responsaveis: req.Responsaveis}
 }
 
+// handleCreate godoc
+//
+//	@Summary		Create a DNS record
+//	@Description	Editor+. domain is required. A duplicate domain answers 409 (a distinct message when the domain is in the trash).
+//	@Tags			dns
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		dnsWriteRequest	true	"Record, relations and entidade grants"
+//	@Success		201		{object}	models.DNSRecord
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/dns [post]
 func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req dnsWriteRequest
 	if !decodeBody(w, r, &req) {
@@ -111,6 +156,17 @@ func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	jsonCreated(w, wr.Record)
 }
 
+// handleListTrash godoc
+//
+//	@Summary		List trashed DNS records
+//	@Description	Any role.
+//	@Tags			dns
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.DNSRecord]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/dns/trash [get]
 func (h *dnsHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 	items, err := h.dns.ListTrash(r.Context())
 	if err != nil {
@@ -120,6 +176,19 @@ func (h *dnsHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, items) // list envelope, like every list endpoint
 }
 
+// handleRestore godoc
+//
+//	@Summary		Restore a DNS record from the trash
+//	@Description	Admin.
+//	@Tags			dns
+//	@Produce		json
+//	@Param			id	path		int	true	"DNS record ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/dns/{id}/restore [post]
 func (h *dnsHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -137,6 +206,21 @@ func (h *dnsHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "restored"})
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a DNS record
+//	@Description	Editor+. Partial: decoded over the stored record; relations change only when sent, grants only when a grant field is sent.
+//	@Tags			dns
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int				true	"DNS record ID"
+//	@Param			body	body		dnsWriteRequest	true	"Record fields, relations and optional entidade grants"
+//	@Success		200		{object}	models.DNSRecord
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/dns/{id} [put]
 func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -182,6 +266,18 @@ func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, wr.Record)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Move a DNS record to the trash
+//	@Description	Admin.
+//	@Tags			dns
+//	@Produce		json
+//	@Param			id	path		int	true	"DNS record ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/dns/{id} [delete]
 func (h *dnsHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -196,6 +292,15 @@ func (h *dnsHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 // handleCertScanAll probes the certificate of every visible has_https record.
 // Synchronous: the response is the scan summary.
+//
+//	@Summary		Scan every HTTPS certificate
+//	@Description	Editor+. Synchronous (up to 10 minutes) over every visible has_https record.
+//	@Tags			dns
+//	@Produce		json
+//	@Success		200	{object}	service.CertScanSummary
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/dns/cert-scan [post]
 func (h *dnsHandlers) handleCertScanAll(w http.ResponseWriter, r *http.Request) {
 	// Detached from the request: if the client or proxy gives up mid-scan,
 	// the probes already under way still finish and get saved. The deadline
@@ -211,6 +316,18 @@ func (h *dnsHandlers) handleCertScanAll(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleCertScan probes one record's certificate and returns the updated record.
+//
+//	@Summary		Scan one record's certificate
+//	@Description	Editor+. Returns the updated record.
+//	@Tags			dns
+//	@Produce		json
+//	@Param			id	path		int	true	"DNS record ID"
+//	@Success		200	{object}	models.DNSRecord
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/dns/{id}/cert-scan [post]
 func (h *dnsHandlers) handleCertScan(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {

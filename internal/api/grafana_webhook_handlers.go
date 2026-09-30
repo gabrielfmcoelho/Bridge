@@ -46,6 +46,20 @@ type grafanaAlert struct {
 // Idempotency: every alert keyed by its Grafana fingerprint. Repeat deliveries
 // (Grafana retries, receiver config dupes) UPDATE in place instead of creating
 // duplicate rows. A "resolved" status transitions the persisted alert to resolved.
+//
+//	@Summary		Grafana alert webhook
+//	@Description	Public, no auth, but HMAC-signed: X-Sshcm-Signature must be the HMAC-SHA256 of the raw body with the configured webhook secret ("sha256=<hex>" or bare hex). Alerts are upserted by fingerprint and matched to hosts via the sshcm_slug, host or instance label. Returns {processed, skipped, unmatched?}. Errors are plain text, not JSON.
+//	@Tags			grafana
+//	@Accept			json
+//	@Produce		json
+//	@Param			X-Sshcm-Signature	header		string					true	"HMAC-SHA256 of the raw body"
+//	@Param			body				body		grafanaWebhookPayload	true	"Grafana Unified Alerting contact-point payload"
+//	@Success		200					{object}	map[string]interface{}
+//	@Failure		400					{string}	string	"Unreadable body or invalid JSON"
+//	@Failure		401					{string}	string	"Signature mismatch"
+//	@Failure		500					{string}	string	"Server misconfigured"
+//	@Failure		503					{string}	string	"Webhook secret not configured"
+//	@Router			/api/webhooks/grafana/alerts [post]
 func (h *grafanaWebhookHandlers) handleAlertWebhook(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if rv := recover(); rv != nil {

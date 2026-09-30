@@ -37,6 +37,21 @@ type createBundleRequest struct {
 	Items       []vault.BundleItemInput `json:"items"`
 }
 
+// handleCreate godoc
+//
+//	@Summary		Create a share bundle
+//	@Description	Any role; the caller must be able to access every item (secrets must be personal). Answers the bundle metadata plus the raw "token" and its guest "url" (/share/{token}) — shown only here. ttl_seconds < 0 means no expiry. 502 when a wiki item is requested but the wiki integration is unavailable.
+//	@Tags			share-bundles
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		createBundleRequest	true	"Title, lifetime, optional passphrase and items"
+//	@Success		201		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles [post]
 func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -86,6 +101,22 @@ func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleList godoc
+//
+//	@Summary		List my share bundles
+//	@Description	Any role. The caller's bundles. item_type with ref_id (or ref_key for wiki items) returns every bundle containing that item; secret_id returns only single-secret bundles for that secret.
+//	@Tags			share-bundles
+//	@Produce		json
+//	@Param			item_type	query		string	false	"Item type to filter by (with ref_id or ref_key)"
+//	@Param			ref_id		query		int		false	"Item ID (with item_type)"
+//	@Param			ref_key		query		string	false	"Item key for wiki items (with item_type)"
+//	@Param			secret_id	query		int		false	"Only single-secret bundles for this secret"
+//	@Param			page		query		int		false	"Page (1-based)"
+//	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[vault.BundleView]
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles [get]
 func (h *bundleHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -159,6 +190,21 @@ type reissueBundleRequest struct {
 // handleReissue rebuilds a bundle under a caller-supplied raw token, reviving a
 // link whose row was already hard-deleted so the exact URL works again. Mirrors
 // handleCreate's validation; 409 if a live link already owns the token.
+//
+//	@Summary		Reissue a share bundle under an existing token
+//	@Description	Any role. Rebuilds a hard-deleted link under the caller-supplied raw token so the same URL works again; same item validation as create. 409 when a live link already owns the token.
+//	@Tags			share-bundles
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		reissueBundleRequest	true	"Raw token, title, lifetime, optional passphrase and items"
+//	@Success		201		{object}	vault.BundleView
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles/reissue [post]
 func (h *bundleHandlers) handleReissue(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -210,6 +256,19 @@ type renewBundleRequest struct {
 // handleRenew extends a bundle's expiry (and reactivates it if revoked) without
 // changing the token, so a previously-issued URL keeps working. Owner-only;
 // optionally adjusts max_views.
+//
+//	@Summary		Renew a share bundle
+//	@Description	Any role; owner only (others get 404). Extends expiry from now (ttl_seconds < 0 = never expires, 0 = 24h) and reactivates a revoked bundle, keeping the token. max_views > 0 sets the cap, <= 0 clears it, omitted keeps it.
+//	@Tags			share-bundles
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Bundle ID"
+//	@Param			body	body		renewBundleRequest	true	"New lifetime and optional view cap"
+//	@Success		200		{object}	vault.BundleView
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles/{id} [patch]
 func (h *bundleHandlers) handleRenew(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -249,6 +308,21 @@ type updateBundleItemsRequest struct {
 // the same token/URL. Lets an owner add/remove secrets, API docs, or wiki
 // content on an already-shared link without re-issuing it. Every new item is
 // re-validated for access; expiry/passphrase/view_count are preserved.
+//
+//	@Summary		Replace a share bundle's items
+//	@Description	Any role; owner only (others get 404). Same token and URL; expiry, passphrase and view count are kept. Every item is re-validated for access.
+//	@Tags			share-bundles
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int							true	"Bundle ID"
+//	@Param			body	body		updateBundleItemsRequest	true	"New item set"
+//	@Success		200		{object}	vault.BundleView
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles/{id}/items [put]
 func (h *bundleHandlers) handleUpdateItems(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -286,6 +360,18 @@ func (h *bundleHandlers) handleUpdateItems(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// handleRevoke godoc
+//
+//	@Summary		Revoke a share bundle
+//	@Description	Any role; owner only (others get 404).
+//	@Tags			share-bundles
+//	@Produce		json
+//	@Param			id	path	int	true	"Bundle ID"
+//	@Success		204
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles/{id} [delete]
 func (h *bundleHandlers) handleRevoke(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -310,6 +396,19 @@ func (h *bundleHandlers) handleRevoke(w http.ResponseWriter, r *http.Request) {
 // handleAccessLog returns a bundle's anonymous access log (network metadata
 // only), newest-first. Owner-only: a missing or foreign bundle collapses to 404
 // so a caller can't probe another owner's link state.
+//
+//	@Summary		A share bundle's access log
+//	@Description	Any role; owner only (others get 404). Anonymous redemptions, newest first: time, best-effort IP, user agent, whether a passphrase was used.
+//	@Tags			share-bundles
+//	@Produce		json
+//	@Param			id			path		int	true	"Bundle ID"
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[vault.BundleAccessEntry]
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		404			{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles/{id}/access-log [get]
 func (h *bundleHandlers) handleAccessLog(w http.ResponseWriter, r *http.Request) {
 	actor, ok := actorFrom(r)
 	if !ok {
@@ -341,6 +440,18 @@ type publicBundleHandlers struct {
 	repo *vault.SecretRepo
 }
 
+// handleRedeem godoc
+//
+//	@Summary		Redeem a share bundle
+//	@Description	Public, no auth; the token is the capability. Returns the resolved contents, including decrypted secret payloads, and counts a view. Unknown, expired, revoked and exhausted links all answer 404; a missing or wrong passphrase answers 401. Sent with Cache-Control: no-store and Referrer-Policy: no-referrer.
+//	@Tags			share-bundles
+//	@Produce		json
+//	@Param			token		path		string	true	"Raw bundle token"
+//	@Param			passphrase	query		string	false	"Passphrase, when the bundle has one"
+//	@Success		200			{object}	vault.BundlePayload
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		404			{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundle/{token} [get]
 func (h *publicBundleHandlers) handleRedeem(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	w.Header().Set("Referrer-Policy", "no-referrer")

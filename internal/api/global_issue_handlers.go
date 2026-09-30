@@ -31,6 +31,31 @@ func loadVisibleIssue(r *http.Request, db *sql.DB, id int64) *models.Issue {
 	return issue
 }
 
+// issueWithLinks is an issue list row with its assignee and alert IDs.
+type issueWithLinks struct {
+	models.Issue
+	AssigneeIDs []int64 `json:"assignee_ids"`
+	AlertIDs    []int64 `json:"alert_ids"`
+}
+
+// handleList godoc
+//
+//	@Summary		List issues
+//	@Description	Issues across every entity, with assignee and alert IDs; only those whose parent is visible. Any role.
+//	@Tags			issues
+//	@Produce		json
+//	@Param			entity_type			query		string	false	"Parent type (project, host, service, ...)"
+//	@Param			entity_id			query		int		false	"Parent ID"
+//	@Param			status				query		string	false	"Board column"
+//	@Param			priority			query		string	false	"Priority"
+//	@Param			assignee_id			query		int		false	"Assigned user"
+//	@Param			search				query		string	false	"Title search"
+//	@Param			exclude_archived	query		bool	false	"Hide archived issues"
+//	@Param			page				query		int		false	"Page (1-based)"
+//	@Param			per_page			query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200					{object}	ListEnvelope[issueWithLinks]
+//	@Failure		401					{object}	httpx.ErrorResponse
+//	@Router			/api/issues [get]
 func (h *globalIssueHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	f := models.IssueFilter{
@@ -62,11 +87,6 @@ func (h *globalIssueHandlers) handleList(w http.ResponseWriter, r *http.Request)
 	assigneeMap, _ := models.GetIssueAssigneesBulk(h.db.SQL)
 	alertMap, _ := models.GetIssueAlertsBulk(h.db.SQL)
 
-	type issueWithLinks struct {
-		models.Issue
-		AssigneeIDs []int64 `json:"assignee_ids"`
-		AlertIDs    []int64 `json:"alert_ids"`
-	}
 	result := make([]issueWithLinks, len(issues))
 	for i, issue := range issues {
 		result[i] = issueWithLinks{Issue: issue, AssigneeIDs: assigneeMap[issue.ID], AlertIDs: alertMap[issue.ID]}
@@ -75,14 +95,31 @@ func (h *globalIssueHandlers) handleList(w http.ResponseWriter, r *http.Request)
 	jsonPaged(w, r, result)
 }
 
+// issueCreateRequest is the issue plus its assignee and alert links.
+type issueCreateRequest struct {
+	models.Issue
+	AssigneeIDs []int64 `json:"assignee_ids"`
+	AlertIDs    []int64 `json:"alert_ids"`
+}
+
+// handleCreate godoc
+//
+//	@Summary		Create an issue
+//	@Description	Editor+. entity_type is required and the parent must be visible (404 otherwise). Defaults: status "backlog", priority "medium", source "manual".
+//	@Tags			issues
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		issueCreateRequest	true	"Issue with assignee and alert links"
+//	@Success		201		{object}	models.Issue
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/issues [post]
 func (h *globalIssueHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	user := auth.UserFromContext(r.Context())
 
-	var req struct {
-		models.Issue
-		AssigneeIDs []int64 `json:"assignee_ids"`
-		AlertIDs    []int64 `json:"alert_ids"`
-	}
+	var req issueCreateRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -141,6 +178,29 @@ func (h *globalIssueHandlers) handleCreate(w http.ResponseWriter, r *http.Reques
 	jsonCreated(w, req.Issue)
 }
 
+// issueUpdateRequest is the issue plus optional assignee and alert links
+// (omit either list to keep it).
+type issueUpdateRequest struct {
+	models.Issue
+	AssigneeIDs *[]int64 `json:"assignee_ids"`
+	AlertIDs    *[]int64 `json:"alert_ids"`
+}
+
+// handleUpdate godoc
+//
+//	@Summary		Update an issue
+//	@Description	Editor+. Empty fields keep their stored value; omit a link list to keep it. Status "done" resolves the linked alerts.
+//	@Tags			issues
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Issue ID"
+//	@Param			body	body		issueUpdateRequest	true	"Issue with optional links"
+//	@Success		200		{object}	models.Issue
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/issues/{id} [put]
 func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "id")
 	if err != nil {
@@ -154,11 +214,7 @@ func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var req struct {
-		models.Issue
-		AssigneeIDs *[]int64 `json:"assignee_ids"`
-		AlertIDs    *[]int64 `json:"alert_ids"`
-	}
+	var req issueUpdateRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -214,6 +270,28 @@ func (h *globalIssueHandlers) handleUpdate(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, req.Issue)
 }
 
+// issueMoveRequest moves an issue to a board column and position. Shared by
+// the global and per-project move routes.
+type issueMoveRequest struct {
+	Status   string  `json:"status"`
+	Position float64 `json:"position"`
+}
+
+// handleMove godoc
+//
+//	@Summary		Move an issue on the board
+//	@Description	Editor+. Moving to "done" resolves the linked alerts.
+//	@Tags			issues
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Issue ID"
+//	@Param			body	body		issueMoveRequest	true	"Target column and position"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/issues/{id}/move [patch]
 func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "id")
 	if err != nil {
@@ -221,10 +299,7 @@ func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var req struct {
-		Status   string  `json:"status"`
-		Position float64 `json:"position"`
-	}
+	var req issueMoveRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -253,6 +328,19 @@ func (h *globalIssueHandlers) handleMove(w http.ResponseWriter, r *http.Request)
 	jsonOK(w, map[string]string{"status": "ok"})
 }
 
+// handleArchive godoc
+//
+//	@Summary		Toggle an issue's archived flag
+//	@Description	Editor+.
+//	@Tags			issues
+//	@Produce		json
+//	@Param			id	path		int	true	"Issue ID"
+//	@Success		200	{object}	models.Issue
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/issues/{id}/archive [patch]
 func (h *globalIssueHandlers) handleArchive(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "id")
 	if err != nil {
@@ -275,6 +363,19 @@ func (h *globalIssueHandlers) handleArchive(w http.ResponseWriter, r *http.Reque
 	jsonOK(w, existing)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Delete an issue
+//	@Description	Admin.
+//	@Tags			issues
+//	@Produce		json
+//	@Param			id	path		int	true	"Issue ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/issues/{id} [delete]
 func (h *globalIssueHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	issueID, err := pathInt64(r, "id")
 	if err != nil {

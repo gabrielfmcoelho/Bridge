@@ -14,6 +14,17 @@ type toolHandlers struct {
 	db *database.DB
 }
 
+// handleList godoc
+//
+//	@Summary		List external tools
+//	@Description	Visible tools. Any role.
+//	@Tags			tools
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.ExternalTool]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/tools [get]
 func (h *toolHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	tools, err := store.NewExternalToolRepo(h.db.SQL).List(r.Context())
 	if err != nil {
@@ -26,6 +37,18 @@ func (h *toolHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, tools)
 }
 
+// handleGet godoc
+//
+//	@Summary		Get an external tool
+//	@Description	Any role.
+//	@Tags			tools
+//	@Produce		json
+//	@Param			id	path		int	true	"Tool ID"
+//	@Success		200	{object}	models.ExternalTool
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/tools/{id} [get]
 func (h *toolHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -41,11 +64,28 @@ func (h *toolHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, tool)
 }
 
+// toolUpsertRequest is the create/update body: the tool plus its entidade
+// grants (omit the grant fields on update to keep them).
+type toolUpsertRequest struct {
+	models.ExternalTool
+	models.AssetGrantsInput
+}
+
+// handleCreate godoc
+//
+//	@Summary		Create an external tool
+//	@Description	Admin.
+//	@Tags			tools
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		toolUpsertRequest	true	"Tool and entidade grants"
+//	@Success		201		{object}	models.ExternalTool
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/tools [post]
 func (h *toolHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		models.ExternalTool
-		models.AssetGrantsInput
-	}
+	var req toolUpsertRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -70,6 +110,21 @@ func (h *toolHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	jsonCreated(w, req.ExternalTool)
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update an external tool
+//	@Description	Admin. A service-synced tool keeps its service/DNS link. Grants change only when a grant field is sent.
+//	@Tags			tools
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Tool ID"
+//	@Param			body	body		toolUpsertRequest	true	"Tool and optional entidade grants"
+//	@Success		200		{object}	models.ExternalTool
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/tools/{id} [put]
 func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -83,10 +138,7 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		models.ExternalTool
-		models.AssetGrantsInput
-	}
+	var req toolUpsertRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -122,6 +174,18 @@ func (h *toolHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, req.ExternalTool)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Move an external tool to the trash
+//	@Description	Admin. Its secrets are soft-deleted with it.
+//	@Tags			tools
+//	@Produce		json
+//	@Param			id	path		int	true	"Tool ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/tools/{id} [delete]
 func (h *toolHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -145,6 +209,17 @@ func (h *toolHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 // restores any child secrets that were soft-deleted by the parent's
 // previous delete (matched by audit metadata or just by being currently
 // soft-deleted with the same parent — CascadeRestore is idempotent).
+//
+//	@Summary		Restore an external tool from the trash
+//	@Description	Admin. Restores the secrets its delete cascaded to.
+//	@Tags			tools
+//	@Produce		json
+//	@Param			id	path		int	true	"Tool ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/tools/{id}/restore [post]
 func (h *toolHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -159,15 +234,32 @@ func (h *toolHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "restored"})
 }
 
+// toolSyncServiceRequest links a tool to a service+DNS pair.
+type toolSyncServiceRequest struct {
+	ServiceID    int64  `json:"service_id"`
+	DNSID        int64  `json:"dns_id"`
+	EmbedEnabled bool   `json:"embed_enabled"`
+	Icon         string `json:"icon"`
+	SortOrder    int    `json:"sort_order"`
+}
+
 // handleSyncFromService creates or updates a tool entry linked to a service+DNS pair.
+//
+//	@Summary		Create or refresh a tool from a service
+//	@Description	Admin. The DNS record must be linked to the service; the URL is built from it. Answers 200 when the synced tool already existed, 201 when created (inheriting the service's grants).
+//	@Tags			tools
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		toolSyncServiceRequest	true	"Service and DNS to sync from"
+//	@Success		200		{object}	models.ExternalTool
+//	@Success		201		{object}	models.ExternalTool
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/tools/sync-service [post]
 func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		ServiceID    int64  `json:"service_id"`
-		DNSID        int64  `json:"dns_id"`
-		EmbedEnabled bool   `json:"embed_enabled"`
-		Icon         string `json:"icon"`
-		SortOrder    int    `json:"sort_order"`
-	}
+	var req toolSyncServiceRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -259,6 +351,18 @@ func (h *toolHandlers) handleSyncFromService(w http.ResponseWriter, r *http.Requ
 }
 
 // handleUnsyncService deletes a synced tool by its ID.
+//
+//	@Summary		Delete a service-synced tool
+//	@Description	Admin. Hard delete; only tools with source "service".
+//	@Tags			tools
+//	@Produce		json
+//	@Param			id	path		int	true	"Tool ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/tools/sync-service/{id} [delete]
 func (h *toolHandlers) handleUnsyncService(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {

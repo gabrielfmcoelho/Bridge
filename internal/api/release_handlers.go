@@ -28,6 +28,25 @@ func (h *releaseHandlers) projectVisible(w http.ResponseWriter, r *http.Request,
 	return true
 }
 
+// releaseWithIssues is a release list row with its linked issue IDs.
+type releaseWithIssues struct {
+	models.Release
+	IssueIDs []int64 `json:"issue_ids"`
+}
+
+// handleList godoc
+//
+//	@Summary		List releases
+//	@Description	Releases with their linked issue IDs, optionally for one project. Any role.
+//	@Tags			releases
+//	@Produce		json
+//	@Param			project_id	query		int	false	"Restrict to one project"
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[releaseWithIssues]
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/releases [get]
 func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	var projectID int64
 	if v := r.URL.Query().Get("project_id"); v != "" {
@@ -54,10 +73,6 @@ func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type releaseWithIssues struct {
-		models.Release
-		IssueIDs []int64 `json:"issue_ids"`
-	}
 	result := make([]releaseWithIssues, len(releases))
 	for i, rel := range releases {
 		result[i] = releaseWithIssues{Release: rel, IssueIDs: issues[rel.ID]}
@@ -65,6 +80,18 @@ func (h *releaseHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, result)
 }
 
+// handleGet godoc
+//
+//	@Summary		Get a release
+//	@Description	Any role. Body is {"release": models.Release, "issue_ids": [int]}.
+//	@Tags			releases
+//	@Produce		json
+//	@Param			id	path		int	true	"Release ID"
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/releases/{id} [get]
 func (h *releaseHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -85,11 +112,29 @@ func (h *releaseHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// releaseUpsertRequest is the create/update body: the release plus the issue
+// IDs it ships (omit issue_ids on update to keep them).
+type releaseUpsertRequest struct {
+	models.Release
+	IssueIDs []int64 `json:"issue_ids"`
+}
+
+// handleCreate godoc
+//
+//	@Summary		Create a release
+//	@Description	Editor+. project_id is required and must be visible to the caller; status defaults to "pending".
+//	@Tags			releases
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		releaseUpsertRequest	true	"Release and the issue IDs it ships"
+//	@Success		201		{object}	models.Release
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/releases [post]
 func (h *releaseHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		models.Release
-		IssueIDs []int64 `json:"issue_ids"`
-	}
+	var req releaseUpsertRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -117,6 +162,21 @@ func (h *releaseHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	jsonCreated(w, req.Release)
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a release
+//	@Description	Editor+. Omitted fields keep their stored value; omit issue_ids to keep the links. Moving to status "live" stamps live_date.
+//	@Tags			releases
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int						true	"Release ID"
+//	@Param			body	body		releaseUpsertRequest	true	"Release fields to change"
+//	@Success		200		{object}	models.Release
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/releases/{id} [put]
 func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -131,10 +191,7 @@ func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decode onto the stored row, so fields the client omits are kept.
-	var req struct {
-		models.Release
-		IssueIDs []int64 `json:"issue_ids"`
-	}
+	var req releaseUpsertRequest
 	req.Release = *existing
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
@@ -163,6 +220,18 @@ func (h *releaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, req.Release)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Delete a release
+//	@Description	Admin.
+//	@Tags			releases
+//	@Produce		json
+//	@Param			id	path		int	true	"Release ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/releases/{id} [delete]
 func (h *releaseHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {

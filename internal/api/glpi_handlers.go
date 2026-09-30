@@ -63,6 +63,18 @@ func (h *glpiHandlers) sessionFor(ctx context.Context, client *glpiclient.Client
 
 // ─── Admin CRUD for token profiles ───────────────────────────────────────────
 
+// handleListTokenProfiles godoc
+//
+//	@Summary		List GLPI token profiles
+//	@Description	Admin. Tokens are never returned, only has_token.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.GlpiToken]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/glpi/tokens [get]
 func (h *glpiHandlers) handleListTokenProfiles(w http.ResponseWriter, r *http.Request) {
 	tokens, err := store.NewGlpiTokenRepo(h.db.SQL).List(r.Context())
 	if err != nil {
@@ -72,6 +84,20 @@ func (h *glpiHandlers) handleListTokenProfiles(w http.ResponseWriter, r *http.Re
 	jsonPaged(w, r, tokens)
 }
 
+// handleCreateTokenProfile godoc
+//
+//	@Summary		Create a GLPI token profile
+//	@Description	Admin. name and user_token are required; the token is stored encrypted.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		models.GlpiTokenInput	true	"Profile and user token"
+//	@Success		201		{object}	models.GlpiToken
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/glpi/tokens [post]
 func (h *glpiHandlers) handleCreateTokenProfile(w http.ResponseWriter, r *http.Request) {
 	var req models.GlpiTokenInput
 	if err := decodeJSON(r, &req); err != nil {
@@ -109,6 +135,21 @@ func (h *glpiHandlers) handleCreateTokenProfile(w http.ResponseWriter, r *http.R
 	jsonCreated(w, tok)
 }
 
+// handleUpdateTokenProfile godoc
+//
+//	@Summary		Update a GLPI token profile
+//	@Description	Admin. An empty or masked user_token keeps the stored one. Answers status "updated".
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int						true	"Token profile ID"
+//	@Param			body	body		models.GlpiTokenInput	true	"Profile and optional new user token"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/glpi/tokens/{id} [put]
 func (h *glpiHandlers) handleUpdateTokenProfile(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -160,6 +201,18 @@ func (h *glpiHandlers) handleUpdateTokenProfile(w http.ResponseWriter, r *http.R
 	jsonOK(w, map[string]any{"status": "updated"})
 }
 
+// handleDeleteTokenProfile godoc
+//
+//	@Summary		Delete a GLPI token profile
+//	@Description	Admin.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			id	path		int	true	"Token profile ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/glpi/tokens/{id} [delete]
 func (h *glpiHandlers) handleDeleteTokenProfile(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -177,6 +230,17 @@ func (h *glpiHandlers) handleDeleteTokenProfile(w http.ResponseWriter, r *http.R
 // handleTestTokenProfile hits /initSession + /getMyProfiles for a specific
 // profile and returns the list of accessible profile names. Admins use this
 // to sanity-check which identity the stored token belongs to.
+//
+//	@Summary		Test a GLPI token profile
+//	@Description	Admin. Opens a fresh GLPI session and lists the accessible profile names. Always 200 once the id parses: {success, profiles?: string[], error?: string}.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			id	path		int	true	"Token profile ID"
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/glpi/tokens/{id}/test [post]
 func (h *glpiHandlers) handleTestTokenProfile(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -218,6 +282,15 @@ func (h *glpiHandlers) handleTestTokenProfile(w http.ResponseWriter, r *http.Req
 // handleListDropdownCatalogues returns a summary per itemtype (counts + last
 // updated). The full options payload isn't in this response — it's only
 // fetched when the admin opens the editor for one row.
+//
+//	@Summary		List GLPI dropdown catalogues
+//	@Description	Admin. Returns {catalogues: GlpiDropdownCatalogueSummary[], allowed_itemtypes: string[]} (no options bodies).
+//	@Tags			glpi
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/glpi/dropdowns [get]
 func (h *glpiHandlers) handleListDropdownCatalogues(w http.ResponseWriter, r *http.Request) {
 	list, err := store.NewGlpiDropdownCatalogueRepo(h.db.SQL).List(r.Context())
 	if err != nil {
@@ -235,6 +308,17 @@ func (h *glpiHandlers) handleListDropdownCatalogues(w http.ResponseWriter, r *ht
 
 // handleGetDropdownCatalogue returns the full JSON options body for one
 // itemtype. Empty response with 404 when the admin hasn't seeded it yet.
+//
+//	@Summary		Get a GLPI dropdown catalogue
+//	@Description	Admin. Full options body for one itemtype; an unseeded itemtype answers an empty shell ({itemtype, options: [], option_count: 0}).
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			itemtype	path		string	true	"GLPI itemtype"	Enums(Entity, ITILCategory, Location, Supplier, Computer, Monitor, NetworkEquipment, Printer, Phone, User, Group, Software, State)
+//	@Success		200			{object}	models.GlpiDropdownCatalogue
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/glpi/dropdowns/{itemtype} [get]
 func (h *glpiHandlers) handleGetDropdownCatalogue(w http.ResponseWriter, r *http.Request) {
 	itemtype := r.PathValue("itemtype")
 	if !allowedDropdownItemtype(itemtype) {
@@ -259,20 +343,36 @@ func (h *glpiHandlers) handleGetDropdownCatalogue(w http.ResponseWriter, r *http
 	jsonOK(w, cat)
 }
 
+// glpiDropdownCatalogueUpsertRequest is the catalogue replace body.
+type glpiDropdownCatalogueUpsertRequest struct {
+	Options []catalogueOption `json:"options"`
+}
+
 // handleUpsertDropdownCatalogue accepts a JSON body shaped like:
 //
 //	{"options": [{"id": 1, "name": "…", "completename": "…", "parent_id": 0}, …]}
 //
 // Validates every row has id>0 and a non-empty name, then persists.
+//
+//	@Summary		Replace a GLPI dropdown catalogue
+//	@Description	Admin. Rows with id<=0, an empty name or a duplicate id are dropped. Returns {itemtype, option_count}.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			itemtype	path		string								true	"GLPI itemtype"	Enums(Entity, ITILCategory, Location, Supplier, Computer, Monitor, NetworkEquipment, Printer, Phone, User, Group, Software, State)
+//	@Param			body		body		glpiDropdownCatalogueUpsertRequest	true	"Catalogue options"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/glpi/dropdowns/{itemtype} [put]
 func (h *glpiHandlers) handleUpsertDropdownCatalogue(w http.ResponseWriter, r *http.Request) {
 	itemtype := r.PathValue("itemtype")
 	if !allowedDropdownItemtype(itemtype) {
 		jsonError(w, http.StatusBadRequest, "itemtype not allowed")
 		return
 	}
-	var req struct {
-		Options []catalogueOption `json:"options"`
-	}
+	var req glpiDropdownCatalogueUpsertRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid JSON body", err)
 		return
@@ -316,6 +416,17 @@ func (h *glpiHandlers) handleUpsertDropdownCatalogue(w http.ResponseWriter, r *h
 
 // handleDeleteDropdownCatalogue wipes the row for an itemtype — picker falls
 // back to the REST path next request.
+//
+//	@Summary		Delete a GLPI dropdown catalogue
+//	@Description	Admin. Pickers fall back to the GLPI REST search afterwards.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			itemtype	path		string	true	"GLPI itemtype"	Enums(Entity, ITILCategory, Location, Supplier, Computer, Monitor, NetworkEquipment, Printer, Phone, User, Group, Software, State)
+//	@Success		200			{object}	StatusResponse
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/glpi/dropdowns/{itemtype} [delete]
 func (h *glpiHandlers) handleDeleteDropdownCatalogue(w http.ResponseWriter, r *http.Request) {
 	itemtype := r.PathValue("itemtype")
 	if !allowedDropdownItemtype(itemtype) {
@@ -367,6 +478,20 @@ type createTicketResponse struct {
 // handleCreateTicket is the single creation entry point. Route:
 //
 //	POST /api/glpi/tickets
+//
+//	@Summary		Create a GLPI ticket
+//	@Description	Editor+. entity_id falls back to the profile default, then the instance default. With host_slug the ticket is also saved as a host chamado (and linked to alert_id); link_computer also attaches the matching GLPI Computer. Partial failures after creation come back in warning. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		createTicketRequest	true	"Ticket"
+//	@Success		201		{object}	createTicketResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets [post]
 func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request) {
 	var req createTicketRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -480,6 +605,22 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 // existing ChamadoSection showing live GLPI data.
 //
 //	POST /api/hosts/{slug}/chamados/{chamadoId}/glpi/refresh?profile_id=<N>
+//
+//	@Summary		Refresh a chamado from GLPI
+//	@Description	Editor+. Re-fetches the chamado's GLPI ticket, updates its cached title and status, and returns the flattened ticket (upstream GLPI JSON). 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			slug		path		string	true	"Host slug"
+//	@Param			chamadoId	path		int		true	"Chamado ID"
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Failure		404			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/chamados/{chamadoId}/glpi/refresh [post]
 func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	chamadoID, err := pathInt64(r, "chamadoId")
@@ -540,6 +681,19 @@ func (h *glpiHandlers) handleRefreshChamadoCache(w http.ResponseWriter, r *http.
 // refresh path. Route:
 //
 //	GET /api/glpi/tickets/{id}?profile_id=<N>
+//
+//	@Summary		Get a GLPI ticket
+//	@Description	Any role. The ticket as a flattened view built from the upstream GLPI JSON (free-form object). 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			id			path		int	true	"GLPI ticket ID"
+//	@Param			profile_id	query		int	true	"GLPI token profile ID whose session is used"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id} [get]
 func (h *glpiHandlers) handleGetTicket(w http.ResponseWriter, r *http.Request) {
 	ticketIDStr := r.PathValue("id")
 	ticketID, err := strconv.Atoi(ticketIDStr)
@@ -577,6 +731,19 @@ func (h *glpiHandlers) handleGetTicket(w http.ResponseWriter, r *http.Request) {
 // solutions merged into a chronological timeline. Route:
 //
 //	GET /api/glpi/tickets/{id}/details?profile_id=<N>
+//
+//	@Summary		GLPI ticket with its timeline
+//	@Description	Any role. The ticket plus followups, tasks and solutions merged into a chronological timeline; ticket and requester are upstream GLPI JSON. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			id			path		int	true	"GLPI ticket ID"
+//	@Param			profile_id	query		int	true	"GLPI token profile ID whose session is used"
+//	@Success		200			{object}	glpiclient.TicketDetail
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/details [get]
 func (h *glpiHandlers) handleGetTicketDetails(w http.ResponseWriter, r *http.Request) {
 	ticketIDStr := r.PathValue("id")
 	ticketID, err := strconv.Atoi(ticketIDStr)
@@ -615,6 +782,20 @@ func (h *glpiHandlers) handleGetTicketDetails(w http.ResponseWriter, r *http.Req
 
 // handleListForms returns the Formcreator forms the profile can see.
 // GET /api/glpi/forms?profile_id=<N>&q=<optional substring>
+//
+//	@Summary		List Formcreator forms
+//	@Description	Any role. Forms the profile can see, as upstream GLPI JSON: {forms, count}. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			profile_id			query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			q					query		string	false	"Substring filter on name and description"
+//	@Param			include_inactive	query		bool	false	"Include inactive forms"
+//	@Success		200					{object}	map[string]interface{}
+//	@Failure		400					{object}	httpx.ErrorResponse
+//	@Failure		401					{object}	httpx.ErrorResponse
+//	@Failure		502					{object}	httpx.ErrorResponse
+//	@Failure		503					{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/forms [get]
 func (h *glpiHandlers) handleListForms(w http.ResponseWriter, r *http.Request) {
 	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
 	if err != nil || profileID <= 0 {
@@ -673,6 +854,19 @@ func (h *glpiHandlers) handleListForms(w http.ResponseWriter, r *http.Request) {
 // into a single payload. Fan-out matches handleGetTicketDetails so partial
 // failures degrade gracefully to warnings.
 // GET /api/glpi/forms/{id}?profile_id=<N>
+//
+//	@Summary		Get a Formcreator form bundle
+//	@Description	Any role. {form, sections, questions, conditions, glpi_base_url, warnings?}; failed sub-queries degrade to warnings. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			id			path		int	true	"Formcreator form ID"
+//	@Param			profile_id	query		int	true	"GLPI token profile ID whose session is used"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/forms/{id} [get]
 func (h *glpiHandlers) handleGetFormBundle(w http.ResponseWriter, r *http.Request) {
 	formID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || formID <= 0 {
@@ -760,6 +954,11 @@ func (h *glpiHandlers) handleGetFormBundle(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, out)
 }
 
+// glpiFormSubmitRequest carries Formcreator answers keyed by question ID.
+type glpiFormSubmitRequest struct {
+	Answers map[string]any `json:"answers"`
+}
+
 // handleSubmitForm posts answers back to Formcreator. Body:
 //
 //	{"answers": {"<question_id>": value, ...}}
@@ -767,6 +966,22 @@ func (h *glpiHandlers) handleGetFormBundle(w http.ResponseWriter, r *http.Reques
 // Values are passed through as-is; arrays for multiselect/checkboxes, strings
 // for single-value. The wrapping into `formcreator_field_<id>` keys happens
 // inside the client.
+//
+//	@Summary		Submit a Formcreator form
+//	@Description	Editor+. Answers are keyed by question ID and passed through as-is (arrays for multi-value questions). 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id			path		int						true	"Formcreator form ID"
+//	@Param			profile_id	query		int						true	"GLPI token profile ID whose session is used"
+//	@Param			body		body		glpiFormSubmitRequest	true	"Answers by question ID"
+//	@Success		201			{object}	glpiclient.FormcreatorSubmitResult
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/forms/{id}/submit [post]
 func (h *glpiHandlers) handleSubmitForm(w http.ResponseWriter, r *http.Request) {
 	formID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || formID <= 0 {
@@ -778,9 +993,7 @@ func (h *glpiHandlers) handleSubmitForm(w http.ResponseWriter, r *http.Request) 
 		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
 		return
 	}
-	var req struct {
-		Answers map[string]any `json:"answers"`
-	}
+	var req glpiFormSubmitRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -820,6 +1033,20 @@ func (h *glpiHandlers) handleSubmitForm(w http.ResponseWriter, r *http.Request) 
 // generic GLPI search proxy; extend the map as new form fields need support.
 //
 //	GET /api/glpi/dropdowns/{itemtype}/search?profile_id=<N>&q=<substring>
+//
+//	@Summary		Search GLPI dropdown items
+//	@Description	Any role. Served from the admin catalogue when one exists for the itemtype (no GLPI call, profile_id not needed), else from GLPI REST. Returns {items: [{id, name, completename?}], count, source: catalogue|rest}; at most 50 items. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			itemtype	path		string	true	"GLPI itemtype"	Enums(Entity, ITILCategory, Location, Supplier, Computer, Monitor, NetworkEquipment, Printer, Phone, User, Group, Software, State)
+//	@Param			q			query		string	false	"Substring filter"
+//	@Param			profile_id	query		int		false	"GLPI token profile ID; required when no catalogue exists"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/dropdowns/{itemtype}/search [get]
 func (h *glpiHandlers) handleSearchDropdown(w http.ResponseWriter, r *http.Request) {
 	itemtype := r.PathValue("itemtype")
 	if !allowedDropdownItemtype(itemtype) {
@@ -959,6 +1186,19 @@ func allowedDropdownItemtype(t string) bool {
 // Returns enough to render "Firstname Realname (login)" in the UI.
 //
 //	GET /api/glpi/users/search?profile_id=<N>&q=<substring>
+//
+//	@Summary		Search GLPI users
+//	@Description	Any role. Served from the User catalogue when one exists (profile_id not needed), else from GLPI REST. Returns {users: [{id, login, display, email?}], count, source: catalogue|rest}. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			q			query		string	false	"Substring filter"
+//	@Param			profile_id	query		int		false	"GLPI token profile ID; required when no User catalogue exists"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/users/search [get]
 func (h *glpiHandlers) handleSearchUsers(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 
@@ -1056,6 +1296,19 @@ func (h *glpiHandlers) serveUsersFromCatalogue(w http.ResponseWriter, query stri
 // full tag catalogue on every keystroke.
 //
 //	GET /api/glpi/formcreator/tags/search?profile_id=<N>&q=<substring>
+//
+//	@Summary		Search Formcreator tags
+//	@Description	Any role. Returns {tags: [{id, name, color}], count}. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			q			query		string	false	"Substring filter"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/formcreator/tags/search [get]
 func (h *glpiHandlers) handleSearchFormcreatorTags(w http.ResponseWriter, r *http.Request) {
 	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
 	if err != nil || profileID <= 0 {
@@ -1101,6 +1354,21 @@ func (h *glpiHandlers) handleSearchFormcreatorTags(w http.ResponseWriter, r *htt
 // submission references these ids as its answer value.
 //
 //	POST /api/glpi/forms/uploads?profile_id=<N>   multipart "file"
+//
+//	@Summary		Upload a document for a form answer
+//	@Description	Editor+. Forwards the file (max 50 MiB) to GLPI as a Document. Returns {id, filename, mime, size}; the id is the file question's answer value. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			file		formData	file	true	"File to upload"
+//	@Success		201			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/forms/uploads [post]
 func (h *glpiHandlers) handleUploadFormDocument(w http.ResponseWriter, r *http.Request) {
 	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
 	if err != nil || profileID <= 0 {
@@ -1157,6 +1425,19 @@ func (h *glpiHandlers) handleUploadFormDocument(w http.ResponseWriter, r *http.R
 //
 // Uses the profile's cached session token to authenticate against GLPI and
 // forwards Content-Type/Disposition from the upstream response.
+//
+//	@Summary		Download a GLPI document
+//	@Description	Any role. Streams the document through Bridge, forwarding the upstream Content-Type and Content-Disposition; cached privately for 5 minutes. Errors are JSON. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		octet-stream
+//	@Param			id			path		int	true	"GLPI document ID"
+//	@Param			profile_id	query		int	true	"GLPI token profile ID whose session is used"
+//	@Success		200			{file}		file
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/documents/{id} [get]
 func (h *glpiHandlers) handleGetGlpiDocument(w http.ResponseWriter, r *http.Request) {
 	docID, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || docID <= 0 {
@@ -1209,6 +1490,17 @@ func (h *glpiHandlers) handleGetGlpiDocument(w http.ResponseWriter, r *http.Requ
 
 // handleListProjectTickets returns open tickets for a project, using the
 // project's linked profile. Empty profile → empty list.
+//
+//	@Summary		Open GLPI tickets for a project
+//	@Description	Any role. Uses the project's linked profile, scoped by its GLPI entity/category, closed excluded. GLPI problems never fail the call: tickets comes back empty with warning set ("no_profile_linked" when no profile is linked). Tickets are flattened upstream GLPI JSON.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{object}	projectTicketEnvelope
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/glpi/tickets [get]
 func (h *glpiHandlers) handleListProjectTickets(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -1271,6 +1563,20 @@ type projectTicketEnvelope struct {
 //	status=open (default)  → excludes closed (GLPI status 6)
 //	status=all             → includes closed
 //	range=0-199 (default)  → GLPI paginates; we expose the same window format
+//
+//	@Summary		Every GLPI ticket a profile can see
+//	@Description	Any role. No entity/category scope. Returns {tickets, count, range}; tickets are flattened upstream GLPI JSON. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			id		path		int		true	"Token profile ID"
+//	@Param			status	query		string	false	"open (default) excludes closed; all includes them"	Enums(open, all)
+//	@Param			range	query		string	false	"GLPI window start-end (default 0-199, max 500 rows)"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/profiles/{id}/tickets [get]
 func (h *glpiHandlers) handleListProfileTickets(w http.ResponseWriter, r *http.Request) {
 	profileID, err := pathInt64(r, "id")
 	if err != nil {
@@ -1341,6 +1647,20 @@ func parseRange(s string) (int, int, bool) {
 // handleListHostTickets tries to resolve a GLPI Computer matching the host's
 // oficial_slug, then returns its non-closed tickets. Used by the per-host
 // chamado block on the host detail page.
+//
+//	@Summary		Open GLPI tickets for a host
+//	@Description	Any role. Finds the GLPI Computer named after the host slug and returns its non-closed tickets: {tickets, computer?, warning?}. Without profile_id, answers an empty list with a warning. Tickets and computer are upstream GLPI JSON. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			slug		path		string	true	"Host slug"
+//	@Param			profile_id	query		int		false	"GLPI token profile ID"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		404			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/glpi/tickets [get]
 func (h *glpiHandlers) handleListHostTickets(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)

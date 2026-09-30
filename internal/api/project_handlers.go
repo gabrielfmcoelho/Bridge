@@ -14,6 +14,22 @@ type projectHandlers struct {
 	project *service.ProjectService
 }
 
+// handleList godoc
+//
+//	@Summary		List projects
+//	@Description	Any role. Visible projects, enriched with their relations. Paginated in SQL.
+//	@Tags			projects
+//	@Produce		json
+//	@Param			search		query		string	false	"Free-text search"
+//	@Param			situacao	query		string	false	"Filter by situação"
+//	@Param			tag			query		string	false	"Filter by tag"
+//	@Param			sort_by		query		string	false	"Sort column"
+//	@Param			sort_dir	query		string	false	"Sort direction (asc, desc)"
+//	@Param			page		query		int		false	"Page (1-based)"
+//	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[service.ProjectListItem]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/projects [get]
 func (h *projectHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	pp := parsePageParams(r)
 	f := models.ProjectFilter{
@@ -41,6 +57,18 @@ func (h *projectHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	jsonList(w, items, metaFor(pp, total))
 }
 
+// handleGet godoc
+//
+//	@Summary		Get a project
+//	@Description	Any role. The project with its relations. Invisible projects answer 404.
+//	@Tags			projects
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{object}	service.ProjectDetail
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id} [get]
 func (h *projectHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -78,6 +106,19 @@ func (req *projectWriteRequest) toWrite() *service.ProjectWrite {
 		ServiceIDs: req.ServiceIDs, DirectHostIDs: req.HostIDs, DirectDNSIDs: req.DNSIDs}
 }
 
+// handleCreate godoc
+//
+//	@Summary		Create a project
+//	@Description	Editor+. name is required.
+//	@Tags			projects
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		projectWriteRequest	true	"Project, links and entidade grants"
+//	@Success		201		{object}	models.Project
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/projects [post]
 func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var req projectWriteRequest
 	if !decodeBody(w, r, &req) {
@@ -99,6 +140,21 @@ func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	jsonCreated(w, wr.Project)
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a project
+//	@Description	Editor+. Partial: decoded over the stored project; links change only when sent, grants only when a grant field is sent.
+//	@Tags			projects
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Project ID"
+//	@Param			body	body		projectWriteRequest	true	"Project fields, links and optional entidade grants"
+//	@Success		200		{object}	models.Project
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id} [put]
 func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -140,6 +196,18 @@ func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, wr.Project)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Delete a project
+//	@Description	Admin. Soft-deletes the vault entries scoped to it.
+//	@Tags			projects
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id} [delete]
 func (h *projectHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -166,6 +234,17 @@ func (h *projectHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "DELETE /api/projects/{id}", h.handleDelete)
 }
 
+// handleListTrash godoc
+//
+//	@Summary		List trashed projects
+//	@Description	Any role.
+//	@Tags			projects
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.Project]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/projects/trash [get]
 func (h *projectHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 	items, err := h.project.ListTrash(r.Context())
 	if err != nil {
@@ -175,6 +254,18 @@ func (h *projectHandlers) handleListTrash(w http.ResponseWriter, r *http.Request
 	jsonPaged(w, r, items)
 }
 
+// handleRestore godoc
+//
+//	@Summary		Restore a project from the trash
+//	@Description	Admin.
+//	@Tags			projects
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/restore [post]
 func (h *projectHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {

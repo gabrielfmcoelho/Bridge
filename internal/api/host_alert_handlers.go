@@ -23,6 +23,25 @@ func (h *hostAlertHandlers) resolveHost(w http.ResponseWriter, r *http.Request) 
 	return host
 }
 
+// hostAlertWithLink is a host alert plus the issue linked to it, if any.
+type hostAlertWithLink struct {
+	models.HostAlert
+	LinkedIssueID *int64 `json:"linked_issue_id,omitempty"`
+}
+
+// handleList godoc
+//
+//	@Summary		List a host's alerts
+//	@Description	Any role. Each alert carries the linked issue ID when one exists. Invisible hosts answer 404.
+//	@Tags			host-alerts
+//	@Produce		json
+//	@Param			slug		path		string	true	"Host oficial slug"
+//	@Param			page		query		int		false	"Page (1-based)"
+//	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[hostAlertWithLink]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		404			{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/alerts [get]
 func (h *hostAlertHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	host := h.resolveHost(w, r)
 	if host == nil {
@@ -38,14 +57,9 @@ func (h *hostAlertHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	// Enrich with linked issue IDs
 	linkedIssues, _ := store.NewHostAlertRepo(h.db.SQL).LinkedIssueIDsByHost(r.Context(), host.ID)
 
-	type alertWithLink struct {
-		models.HostAlert
-		LinkedIssueID *int64 `json:"linked_issue_id,omitempty"`
-	}
-
-	result := make([]alertWithLink, len(alerts))
+	result := make([]hostAlertWithLink, len(alerts))
 	for i, a := range alerts {
-		result[i] = alertWithLink{HostAlert: a}
+		result[i] = hostAlertWithLink{HostAlert: a}
 		if issueID, ok := linkedIssues[a.ID]; ok {
 			id := issueID
 			result[i].LinkedIssueID = &id
@@ -55,6 +69,21 @@ func (h *hostAlertHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, result)
 }
 
+// handleCreate godoc
+//
+//	@Summary		Create a manual host alert
+//	@Description	Editor+. type and message are required; source defaults to manual.
+//	@Tags			host-alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string				true	"Host oficial slug"
+//	@Param			body	body		models.HostAlert	true	"Alert"
+//	@Success		201		{object}	models.HostAlert
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/alerts [post]
 func (h *hostAlertHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	host := h.resolveHost(w, r)
 	if host == nil {
@@ -89,6 +118,22 @@ func (h *hostAlertHandlers) handleCreate(w http.ResponseWriter, r *http.Request)
 	jsonCreated(w, req)
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a manual host alert
+//	@Description	Editor+. Only type, level, message and description change. Auto-generated alerts answer 403.
+//	@Tags			host-alerts
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string				true	"Host oficial slug"
+//	@Param			alertId	path		int					true	"Alert ID"
+//	@Param			body	body		models.HostAlert	true	"Alert fields"
+//	@Success		200		{object}	models.HostAlert
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/alerts/{alertId} [put]
 func (h *hostAlertHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	host := h.resolveHost(w, r)
 	if host == nil {
@@ -130,6 +175,21 @@ func (h *hostAlertHandlers) handleUpdate(w http.ResponseWriter, r *http.Request)
 	jsonOK(w, existing)
 }
 
+// handleConclude godoc
+//
+//	@Summary		Conclude a host alert
+//	@Description	Editor+. An alert with a linked issue answers 409: resolve the issue instead.
+//	@Tags			host-alerts
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host oficial slug"
+//	@Param			alertId	path		int		true	"Alert ID"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/alerts/{alertId}/conclude [post]
 func (h *hostAlertHandlers) handleConclude(w http.ResponseWriter, r *http.Request) {
 	host := h.resolveHost(w, r)
 	if host == nil {
@@ -164,6 +224,20 @@ func (h *hostAlertHandlers) handleConclude(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, map[string]string{"status": "resolved"})
 }
 
+// handleDelete godoc
+//
+//	@Summary		Delete a manual host alert
+//	@Description	Admin. Auto-generated alerts answer 403.
+//	@Tags			host-alerts
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host oficial slug"
+//	@Param			alertId	path		int		true	"Alert ID"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/alerts/{alertId} [delete]
 func (h *hostAlertHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	host := h.resolveHost(w, r)
 	if host == nil {

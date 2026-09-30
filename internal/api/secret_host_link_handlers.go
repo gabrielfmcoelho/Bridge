@@ -74,6 +74,18 @@ func (h *secretHandlers) hostLoginUser(r *http.Request, hostID int64) (string, b
 	return sshUser, true, nil
 }
 
+// handleListLinkedHosts godoc
+//
+//	@Summary		Hosts linked to a shared credential
+//	@Description	Any role; invisible secrets answer 404. Only an avulso password or SSH key (else 400). Answers {"host_ids": [...]}.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			id	path		int	true	"Secret ID"
+//	@Success		200	{object}	map[string][]int
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/{id}/hosts [get]
 func (h *secretHandlers) handleListLinkedHosts(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -94,6 +106,26 @@ func (h *secretHandlers) handleListLinkedHosts(w http.ResponseWriter, r *http.Re
 	jsonOK(w, map[string]any{"host_ids": ids})
 }
 
+// secretLinkHostsRequest lists the hosts to link to the credential.
+type secretLinkHostsRequest struct {
+	HostIDs []int64 `json:"host_ids"`
+}
+
+// handleLinkHosts godoc
+//
+//	@Summary		Link hosts to a shared credential
+//	@Description	Any role at the route; the handler requires editor+ (403 otherwise). Only an avulso password or SSH key; each host's login user now uses it (a key also switches the host to key auth). Answers {"linked": n}.
+//	@Tags			secrets
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int						true	"Secret ID"
+//	@Param			body	body		secretLinkHostsRequest	true	"Hosts to link"
+//	@Success		200		{object}	map[string]int
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/{id}/hosts [post]
 func (h *secretHandlers) handleLinkHosts(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {
@@ -113,9 +145,7 @@ func (h *secretHandlers) handleLinkHosts(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
-	var req struct {
-		HostIDs []int64 `json:"host_ids"`
-	}
+	var req secretLinkHostsRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
@@ -151,6 +181,20 @@ func (h *secretHandlers) handleLinkHosts(w http.ResponseWriter, r *http.Request)
 	jsonOK(w, map[string]any{"linked": linked})
 }
 
+// handleUnlinkHost godoc
+//
+//	@Summary		Unlink a host from a shared credential
+//	@Description	Any role at the route; the handler requires editor+ (403 otherwise). Answers {"unlinked": true}.
+//	@Tags			secrets
+//	@Produce		json
+//	@Param			id		path		int	true	"Secret ID"
+//	@Param			host_id	path		int	true	"Host ID"
+//	@Success		200		{object}	map[string]bool
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/secrets/{id}/hosts/{host_id} [delete]
 func (h *secretHandlers) handleUnlinkHost(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {

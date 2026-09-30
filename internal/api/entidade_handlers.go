@@ -24,6 +24,17 @@ func newEntidadeHandlers(db *database.DB) *entidadeHandlers {
 	return &entidadeHandlers{db: db, entidades: store.NewEntidadeRepo(db.SQL), grants: store.NewAssetEntidadeRepo(db.SQL)}
 }
 
+// handleList godoc
+//
+//	@Summary		List entidades
+//	@Description	Any role. The whole entidade tree, flat (for pickers).
+//	@Tags			entidades
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.Entidade]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/entidades [get]
 func (h *entidadeHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	items, err := h.entidades.List(r.Context())
 	if err != nil {
@@ -33,6 +44,18 @@ func (h *entidadeHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, items)
 }
 
+// handleGet godoc
+//
+//	@Summary		Get an entidade
+//	@Description	Any role.
+//	@Tags			entidades
+//	@Produce		json
+//	@Param			id	path		int	true	"Entidade ID"
+//	@Success		200	{object}	models.Entidade
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/entidades/{id} [get]
 func (h *entidadeHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -70,6 +93,20 @@ func (h *entidadeHandlers) decodeEntidade(w http.ResponseWriter, r *http.Request
 	return &req, true
 }
 
+// handleCreate godoc
+//
+//	@Summary		Create an entidade
+//	@Description	Admin. name is required; slug defaults to the slugified name. A taken slug or invalid parent answers 409.
+//	@Tags			entidades
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		models.Entidade	true	"Entidade"
+//	@Success		201		{object}	models.Entidade
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/entidades [post]
 func (h *entidadeHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	req, ok := h.decodeEntidade(w, r)
 	if !ok {
@@ -82,6 +119,22 @@ func (h *entidadeHandlers) handleCreate(w http.ResponseWriter, r *http.Request) 
 	jsonCreated(w, req)
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update an entidade
+//	@Description	Admin. A rejected update (taken slug, cyclic parent, ...) answers 409.
+//	@Tags			entidades
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int				true	"Entidade ID"
+//	@Param			body	body		models.Entidade	true	"Entidade"
+//	@Success		200		{object}	models.Entidade
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/entidades/{id} [put]
 func (h *entidadeHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -104,6 +157,19 @@ func (h *entidadeHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, e)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Delete an entidade
+//	@Description	Admin. An entidade that still has children, members or assets answers 409.
+//	@Tags			entidades
+//	@Produce		json
+//	@Param			id	path		int	true	"Entidade ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		409	{object}	httpx.ErrorResponse
+//	@Router			/api/entidades/{id} [delete]
 func (h *entidadeHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -131,6 +197,20 @@ func assetTypeParam(w http.ResponseWriter, raw string) (store.AssetType, bool) {
 	return t, true
 }
 
+// handleUnassigned godoc
+//
+//	@Summary		List assets without entidade grants
+//	@Description	Admin. Assets of one type with no grant rows (admin-only today). Defaults to 50 per page.
+//	@Tags			entidades
+//	@Produce		json
+//	@Param			asset_type	query		string	true	"Asset type"
+//	@Param			page		query		int		false	"Page (1-based)"
+//	@Param			per_page	query		int		false	"Page size (max 200, default 50)"
+//	@Success		200			{object}	ListEnvelope[store.UnassignedRow]
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Router			/api/entidades/unassigned [get]
 func (h *entidadeHandlers) handleUnassigned(w http.ResponseWriter, r *http.Request) {
 	t, ok := assetTypeParam(w, r.URL.Query().Get("asset_type"))
 	if !ok {
@@ -148,12 +228,29 @@ func (h *entidadeHandlers) handleUnassigned(w http.ResponseWriter, r *http.Reque
 	jsonList(w, rows, metaFor(pp, total))
 }
 
+// entidadeBulkAssignRequest sets the same grants on many assets of one type.
+type entidadeBulkAssignRequest struct {
+	AssetType string  `json:"asset_type"`
+	AssetIDs  []int64 `json:"asset_ids"`
+	models.AssetGrantsInput
+}
+
+// handleBulkAssign godoc
+//
+//	@Summary		Assign entidades to many assets
+//	@Description	Admin. Replaces the grants of every listed asset; answers {"status": "ok", "count": N}. An unknown entidade answers 409.
+//	@Tags			entidades
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		entidadeBulkAssignRequest	true	"Asset type, IDs and grants"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/entidades/bulk-assign [post]
 func (h *entidadeHandlers) handleBulkAssign(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		AssetType string  `json:"asset_type"`
-		AssetIDs  []int64 `json:"asset_ids"`
-		models.AssetGrantsInput
-	}
+	var req entidadeBulkAssignRequest
 	if !decodeBody(w, r, &req) {
 		return
 	}
@@ -200,6 +297,19 @@ func (h *entidadeHandlers) assetRef(w http.ResponseWriter, r *http.Request) (sto
 	return t, id, true
 }
 
+// handleGetAssetGrants godoc
+//
+//	@Summary		Get an asset's entidade grants
+//	@Description	Any role. Invisible assets answer 404.
+//	@Tags			entidades
+//	@Produce		json
+//	@Param			type	path		string	true	"Asset type (host, service, dns, project, ...)"
+//	@Param			id		path		int		true	"Asset ID"
+//	@Success		200		{object}	models.AssetGrants
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/assets/{type}/{id}/entidades [get]
 func (h *entidadeHandlers) handleGetAssetGrants(w http.ResponseWriter, r *http.Request) {
 	t, id, ok := h.assetRef(w, r)
 	if !ok {
@@ -213,6 +323,23 @@ func (h *entidadeHandlers) handleGetAssetGrants(w http.ResponseWriter, r *http.R
 	jsonOK(w, g)
 }
 
+// handlePutAssetGrants godoc
+//
+//	@Summary		Replace an asset's entidade grants
+//	@Description	Editor+. Invisible assets answer 404; granting an entidade outside the caller's visible set answers 403; an unknown entidade answers 409.
+//	@Tags			entidades
+//	@Accept			json
+//	@Produce		json
+//	@Param			type	path		string					true	"Asset type (host, service, dns, project, ...)"
+//	@Param			id		path		int						true	"Asset ID"
+//	@Param			body	body		models.AssetGrantsInput	true	"Grants"
+//	@Success		200		{object}	models.AssetGrants
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/assets/{type}/{id}/entidades [put]
 func (h *entidadeHandlers) handlePutAssetGrants(w http.ResponseWriter, r *http.Request) {
 	t, id, ok := h.assetRef(w, r)
 	if !ok {

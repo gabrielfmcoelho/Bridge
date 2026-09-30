@@ -59,6 +59,14 @@ func (h *coolifyHandlers) logOp(r *http.Request, hostID int64, opType, status, o
 }
 
 // handleStatus returns whether the Coolify integration is enabled and configured.
+//
+//	@Summary		Coolify integration status
+//	@Description	Any role. Returns {enabled, configured}.
+//	@Tags			coolify
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/status [get]
 func (h *coolifyHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	enabled := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "coolify_enabled") == "true"
 	configured := store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), "coolify_api_token")
@@ -69,6 +77,15 @@ func (h *coolifyHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleTestConnection tests the Coolify connection using the healthcheck endpoint.
+//
+//	@Summary		Test the Coolify connection
+//	@Description	Admin. Calls the Coolify healthcheck. Always 200: {success: bool, error?: string}.
+//	@Tags			coolify
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/test [post]
 func (h *coolifyHandlers) handleTestConnection(w http.ResponseWriter, r *http.Request) {
 	client, err := h.getClient()
 	if err != nil {
@@ -83,6 +100,20 @@ func (h *coolifyHandlers) handleTestConnection(w http.ResponseWriter, r *http.Re
 }
 
 // handleGetServerStatus fetches the current status of a host's linked Coolify server.
+//
+//	@Summary		Linked Coolify server status
+//	@Description	Editor+. Returns {server} with the Coolify server linked to the host. 400 when the host is not linked; 503 when the integration is disabled or unconfigured.
+//	@Tags			coolify
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/server-status/{slug} [get]
 func (h *coolifyHandlers) handleGetServerStatus(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -113,6 +144,19 @@ func (h *coolifyHandlers) handleGetServerStatus(w http.ResponseWriter, r *http.R
 }
 
 // handleCheckHost searches Coolify for a server matching this host's IP.
+//
+//	@Summary		Find the host's server in Coolify
+//	@Description	Editor+. Searches Coolify for a server matching the host's IP; when found, stores its UUID on the host. Returns {found, server?}.
+//	@Tags			coolify
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/check/{slug} [post]
 func (h *coolifyHandlers) handleCheckHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -197,7 +241,30 @@ func coolifyManagedKeyName(name string) string {
 	return "sshcm-key-" + safe
 }
 
+// coolifyKeyRequest picks the vault SSH key to upload to Coolify (register and
+// key-swap bodies).
+type coolifyKeyRequest struct {
+	KeySecretID int64 `json:"key_secret_id"`
+	SSHKeyID    int64 `json:"ssh_key_id"` // pre-v91 clients
+}
+
 // handleRegisterHost uploads the chosen SSH key and creates a server in Coolify.
+//
+//	@Summary		Register the host as a Coolify server
+//	@Description	Admin. Uploads the SSH key (the chosen vault key, else the default user's linked key, else the host's own key) and creates the server in Coolify. The body is optional. Returns {uuid}.
+//	@Tags			coolify
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string				true	"Host slug"
+//	@Param			body	body		coolifyKeyRequest	false	"Vault key to upload (optional)"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/register/{slug} [post]
 func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -207,10 +274,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Optional body; legacy callers POST with no payload.
-	var req struct {
-		KeySecretID int64 `json:"key_secret_id"`
-		SSHKeyID    int64 `json:"ssh_key_id"` // pre-v91 clients
-	}
+	var req coolifyKeyRequest
 	_ = decodeJSON(r, &req)
 	keySecretID, ok := resolveKeySecret(w, r, h.db, req.KeySecretID, req.SSHKeyID)
 	if !ok {
@@ -272,6 +336,20 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 }
 
 // handleValidateHost triggers Coolify server validation.
+//
+//	@Summary		Trigger Coolify server validation
+//	@Description	Admin. 400 when the host is not linked to a Coolify server. Returns {message}.
+//	@Tags			coolify
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/validate/{slug} [post]
 func (h *coolifyHandlers) handleValidateHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -303,6 +381,22 @@ func (h *coolifyHandlers) handleValidateHost(w http.ResponseWriter, r *http.Requ
 // handleUpdateServerKey swaps the private key a Coolify server uses to SSH into
 // the host. Uploads the selected sshcm key to Coolify (reusing any existing
 // match), then PATCHes the server with the new key's UUID.
+//
+//	@Summary		Swap the Coolify server's SSH key
+//	@Description	Admin. Uploads the selected vault key to Coolify (reusing a match) and points the linked server at it. Returns {success, private_key_uuid}.
+//	@Tags			coolify
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string				true	"Host slug"
+//	@Param			body	body		coolifyKeyRequest	true	"Vault key to use (key_secret_id required)"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/server/{slug}/key [post]
 func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -315,10 +409,7 @@ func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var req struct {
-		KeySecretID int64 `json:"key_secret_id"`
-		SSHKeyID    int64 `json:"ssh_key_id"` // pre-v91 clients
-	}
+	var req coolifyKeyRequest
 	if err := decodeJSON(r, &req); err != nil || (req.KeySecretID <= 0 && req.SSHKeyID <= 0) {
 		jsonError(w, http.StatusBadRequest, "key_secret_id is required")
 		return
@@ -362,6 +453,20 @@ func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.R
 }
 
 // handleSyncHost updates the Coolify server with current host info.
+//
+//	@Summary		Push host info to its Coolify server
+//	@Description	Admin. Updates name, description, IP, port and user on the linked Coolify server. Returns {success}.
+//	@Tags			coolify
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/sync/{slug} [post]
 func (h *coolifyHandlers) handleSyncHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -407,6 +512,20 @@ func (h *coolifyHandlers) handleSyncHost(w http.ResponseWriter, r *http.Request)
 }
 
 // handleDeleteHost removes the server from Coolify and clears the UUID.
+//
+//	@Summary		Delete the host's Coolify server
+//	@Description	Admin. Deletes the server in Coolify and clears the link on the host. Returns {success}.
+//	@Tags			coolify
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/server/{slug} [delete]
 func (h *coolifyHandlers) handleDeleteHost(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -456,6 +575,20 @@ func (h *coolifyHandlers) pathSharedKey(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleCheckKey checks if a managed SSH key exists in Coolify by fingerprint.
+//
+//	@Summary		Check whether a vault SSH key exists in Coolify
+//	@Description	Editor+. Matches by fingerprint. Returns {found, coolify_uuid?, coolify_name?}.
+//	@Tags			coolify
+//	@Produce		json
+//	@Param			id	path		int	true	"Vault SSH key secret ID"
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Failure		503	{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/keys/{id}/check [get]
 func (h *coolifyHandlers) handleCheckKey(w http.ResponseWriter, r *http.Request) {
 	key, ok := h.pathSharedKey(w, r)
 	if !ok {
@@ -488,6 +621,20 @@ func (h *coolifyHandlers) handleCheckKey(w http.ResponseWriter, r *http.Request)
 }
 
 // handleSyncKey uploads or updates a managed SSH key in Coolify.
+//
+//	@Summary		Upload a vault SSH key to Coolify
+//	@Description	Admin. Creates the key in Coolify, or returns the existing one matched by fingerprint. Returns {uuid, name, already_existed}.
+//	@Tags			coolify
+//	@Produce		json
+//	@Param			id	path		int	true	"Vault SSH key secret ID"
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Failure		503	{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/keys/{id}/sync [post]
 func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) {
 	key, ok := h.pathSharedKey(w, r)
 	if !ok {
@@ -528,6 +675,17 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 
 // handleDNSSync pulls every application/service domain from Coolify into
 // dns_records, linked to the Bridge host running it.
+//
+//	@Summary		Sync DNS records from Coolify
+//	@Description	Admin. Pulls every application/service domain from Coolify into dns_records, linked to the Bridge host running it. 400 when the integration is disabled or unconfigured.
+//	@Tags			coolify
+//	@Produce		json
+//	@Success		200	{object}	service.CoolifySyncSummary
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/dns-sync [post]
 func (h *coolifyHandlers) handleDNSSync(w http.ResponseWriter, r *http.Request) {
 	client, err := h.getClient()
 	if err != nil {

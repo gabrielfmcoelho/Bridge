@@ -40,6 +40,14 @@ func (h *gitlabHandlers) getClientForUser(r *http.Request) (*gitlabclient.Client
 }
 
 // handleStatus checks if the user has a valid GitLab token configured.
+//
+//	@Summary		Caller's GitLab connection status
+//	@Description	Any role. {"connected": false[, "error"]} when no usable token, else connected plus username and name.
+//	@Tags			gitlab
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/gitlab/status [get]
 func (h *gitlabHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	client, _, err := h.getClientForUser(r)
 	if err != nil || client == nil {
@@ -60,7 +68,25 @@ func (h *gitlabHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// gitlabSaveTokenRequest is a personal access token; base_url defaults to the
+// configured GitLab instance.
+type gitlabSaveTokenRequest struct {
+	Token   string `json:"token"`
+	BaseURL string `json:"base_url"`
+}
+
 // handleSaveToken saves a personal access token for the current user.
+//
+//	@Summary		Save the caller's GitLab token
+//	@Description	Any role. The token is validated against GitLab, then stored encrypted. Answers {"status": "saved", "username"}.
+//	@Tags			gitlab
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		gitlabSaveTokenRequest	true	"Personal access token"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Router			/api/gitlab/token [post]
 func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request) {
 	user := auth.UserFromContext(r.Context())
 	if user == nil {
@@ -68,10 +94,7 @@ func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var req struct {
-		Token   string `json:"token"`
-		BaseURL string `json:"base_url"`
-	}
+	var req gitlabSaveTokenRequest
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid JSON", err)
 		return
@@ -119,6 +142,14 @@ func (h *gitlabHandlers) handleSaveToken(w http.ResponseWriter, r *http.Request)
 }
 
 // handleDeleteToken removes the user's GitLab token.
+//
+//	@Summary		Remove the caller's GitLab token
+//	@Description	Any role.
+//	@Tags			gitlab
+//	@Produce		json
+//	@Success		200	{object}	StatusResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/gitlab/token [delete]
 func (h *gitlabHandlers) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	user := auth.UserFromContext(r.Context())
 	if user == nil {
@@ -136,6 +167,18 @@ func (h *gitlabHandlers) handleDeleteToken(w http.ResponseWriter, r *http.Reques
 }
 
 // handleListCommits returns recent commits for a linked GitLab project.
+//
+//	@Summary		Recent commits of a project's linked GitLab repo
+//	@Description	Any role. Uses the caller's own token; 20 most recent commits of the first link.
+//	@Tags			gitlab
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{array}		gitlab.Commit
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/gitlab/projects/{id}/commits [get]
 func (h *gitlabHandlers) handleListCommits(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -165,6 +208,19 @@ func (h *gitlabHandlers) handleListCommits(w http.ResponseWriter, r *http.Reques
 }
 
 // handleListIssues returns GitLab issues for a linked project.
+//
+//	@Summary		GitLab issues of a project's linked repo
+//	@Description	Any role. Uses the caller's own token; 20 per call.
+//	@Tags			gitlab
+//	@Produce		json
+//	@Param			id		path		int		true	"Project ID"
+//	@Param			state	query		string	false	"opened, closed or all"
+//	@Success		200		{array}		gitlab.Issue
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/gitlab/projects/{id}/issues [get]
 func (h *gitlabHandlers) handleListIssues(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -198,7 +254,27 @@ func (h *gitlabHandlers) handleListIssues(w http.ResponseWriter, r *http.Request
 	jsonOK(w, issues)
 }
 
+// gitlabLinkProjectRequest names the GitLab project to link by path.
+type gitlabLinkProjectRequest struct {
+	GitLabPath string `json:"gitlab_path"` // e.g., "org/repo"
+}
+
 // handleLinkProject links an SSHCM project to a GitLab project.
+//
+//	@Summary		Link a project to a GitLab repo (caller's token)
+//	@Description	Editor+. The path is resolved with the caller's token.
+//	@Tags			gitlab
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int							true	"Project ID"
+//	@Param			body	body		gitlabLinkProjectRequest	true	"GitLab project path"
+//	@Success		201		{object}	models.ProjectGitLabLink
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/gitlab/projects/{id}/link [post]
 func (h *gitlabHandlers) handleLinkProject(w http.ResponseWriter, r *http.Request) {
 	projectID, err := pathInt64(r, "id")
 	if err != nil {
@@ -206,9 +282,7 @@ func (h *gitlabHandlers) handleLinkProject(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var req struct {
-		GitLabPath string `json:"gitlab_path"` // e.g., "org/repo"
-	}
+	var req gitlabLinkProjectRequest
 	if err := decodeJSON(r, &req); err != nil || req.GitLabPath == "" {
 		jsonError(w, http.StatusBadRequest, "gitlab_path is required")
 		return

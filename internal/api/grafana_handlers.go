@@ -23,6 +23,19 @@ type grafanaHandlers struct {
 // handleEmbedURL returns the iframe URL for a host's or service's Grafana dashboard.
 // Falls back to the group default UID if the entity doesn't have its own set.
 // Callers: frontend MetricsTab component. Requires authentication.
+//
+//	@Summary		Grafana dashboard embed URL
+//	@Description	Any role. Iframe URL for a host's or service's dashboard, falling back to the default dashboard UID. Returns {configured: false} when no dashboard applies, else {configured, url, dashboard_uid, variable, value}. 503 when the integration is disabled.
+//	@Tags			grafana
+//	@Produce		json
+//	@Param			entity	query		string	true	"Entity kind"	Enums(host, service)
+//	@Param			id		query		string	true	"Host slug, or numeric service ID"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		503		{object}	httpx.ErrorResponse
+//	@Router			/api/grafana/embed-url [get]
 func (h *grafanaHandlers) handleEmbedURL(w http.ResponseWriter, r *http.Request) {
 	entity := r.URL.Query().Get("entity")
 	id := strings.TrimSpace(r.URL.Query().Get("id"))
@@ -146,6 +159,16 @@ type hostLiveMetrics struct {
 // configured Prometheus datasource and returns the results as a flat struct.
 // Label convention: the Grafana Agent we install (Phase G) sets host="<slug>"
 // as an external label, so all selectors use {host=<slug>}.
+//
+//	@Summary		Live host metrics
+//	@Description	Any role. Runs a small PromQL pack against the configured datasource. A null metric means the series is missing; per-query failures land in warnings.
+//	@Tags			grafana
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	hostLiveMetrics
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/metrics/live [get]
 func (h *grafanaHandlers) handleHostLiveMetrics(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -375,6 +398,18 @@ func ProvisionServiceDashboard(ctx context.Context, db *database.DB, svc *models
 
 // handleProvisionHostDashboard is the HTTP entry point — admin clicks the "Provision
 // default dashboard" button in the host form. Synchronous; returns the new UID.
+//
+//	@Summary		Provision the host's default dashboard
+//	@Description	Admin. Uploads the default host dashboard to Grafana (idempotent) and stores its UID on the host. Returns {uid, message}.
+//	@Tags			grafana
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/grafana/provision [post]
 func (h *grafanaHandlers) handleProvisionHostDashboard(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	host, err := store.NewHostRepo(h.db.SQL).GetBySlug(r.Context(), slug)
@@ -404,6 +439,19 @@ func (h *grafanaHandlers) handleProvisionHostDashboard(w http.ResponseWriter, r 
 }
 
 // handleProvisionServiceDashboard is the service equivalent.
+//
+//	@Summary		Provision the service's default dashboard
+//	@Description	Admin. Uploads the default service dashboard to Grafana (idempotent) and stores its UID on the service. Returns {uid, message}.
+//	@Tags			grafana
+//	@Produce		json
+//	@Param			id	path		int	true	"Service ID"
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/services/{id}/grafana/provision [post]
 func (h *grafanaHandlers) handleProvisionServiceDashboard(w http.ResponseWriter, r *http.Request) {
 	id, err := pathInt64(r, "id")
 	if err != nil {

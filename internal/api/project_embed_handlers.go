@@ -54,6 +54,18 @@ func (h *projectEmbedHandlers) decode(w http.ResponseWriter, r *http.Request, e 
 	return true
 }
 
+// handleList godoc
+//
+//	@Summary		List a project's embeds
+//	@Description	Any role. An invisible project answers 404.
+//	@Tags			projects
+//	@Produce		json
+//	@Param			id	path		int	true	"Project ID"
+//	@Success		200	{array}		models.ProjectEmbed
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/embeds [get]
 func (h *projectEmbedHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	projectID, ok := h.project(w, r)
 	if !ok {
@@ -67,6 +79,21 @@ func (h *projectEmbedHandlers) handleList(w http.ResponseWriter, r *http.Request
 	jsonOK(w, embeds)
 }
 
+// handleCreate godoc
+//
+//	@Summary		Add an embed to a project
+//	@Description	Editor+. title is required, url must be http(s); height defaults to 600.
+//	@Tags			projects
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Project ID"
+//	@Param			body	body		models.ProjectEmbed	true	"Embed"
+//	@Success		201		{object}	models.ProjectEmbed
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/embeds [post]
 func (h *projectEmbedHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	projectID, ok := h.project(w, r)
 	if !ok {
@@ -84,6 +111,22 @@ func (h *projectEmbedHandlers) handleCreate(w http.ResponseWriter, r *http.Reque
 	jsonCreated(w, e)
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a project embed
+//	@Description	Editor+. Same validation as create.
+//	@Tags			projects
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int					true	"Project ID"
+//	@Param			embedId	path		int					true	"Embed ID"
+//	@Param			body	body		models.ProjectEmbed	true	"Embed"
+//	@Success		200		{object}	models.ProjectEmbed
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/embeds/{embedId} [put]
 func (h *projectEmbedHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	projectID, ok := h.project(w, r)
 	if !ok {
@@ -111,6 +154,20 @@ func (h *projectEmbedHandlers) handleUpdate(w http.ResponseWriter, r *http.Reque
 	jsonOK(w, e)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Delete a project embed
+//	@Description	Editor+.
+//	@Tags			projects
+//	@Produce		json
+//	@Param			id		path		int	true	"Project ID"
+//	@Param			embedId	path		int	true	"Embed ID"
+//	@Success		200		{object}	StatusResponse
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/projects/{id}/embeds/{embedId} [delete]
 func (h *projectEmbedHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	projectID, ok := h.project(w, r)
 	if !ok {
