@@ -135,12 +135,12 @@ func newSecretAPIEnv(t *testing.T) *secretAPIEnv {
 	// Build a mux with the secret routes wired AND a test-only middleware
 	// that pulls the actor from the X-Test-User-ID header (one of the
 	// seeded user IDs) and stamps the context just like RequireAuth would.
-	mux := http.NewServeMux()
+	mux := newEcho()
 	sh := &secretHandlers{db: d, repo: repo}
-	// Identity wrap: test middleware (below) sits outside the mux and injects
-	// the actor per-request. Production wires the same register() call with
-	// authenticated(db, ...) as the wrapper — single source of truth for routes.
-	sh.register(mux, func(h http.Handler) http.Handler { return h })
+	// No db on the registrar = no auth middleware: the test middleware (below)
+	// sits outside the router and injects the actor per-request. Production
+	// wires the same registerRoutes — single source of truth for routes.
+	sh.registerRoutes(routeRegistrar{e: mux})
 	wrapped := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		idStr := r.Header.Get("X-Test-User-ID")
 		if idStr == "" {

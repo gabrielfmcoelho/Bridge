@@ -27,32 +27,35 @@ type secretHandlers struct {
 	repo *vault.SecretRepo
 }
 
-// register wires all secret routes onto mux. The wrap callback adapts auth
-// for the target environment (authenticated in prod, identity in tests).
-// Centralising routes here keeps prod + tests in lockstep.
-func (h *secretHandlers) register(mux *http.ServeMux, wrap func(http.Handler) http.Handler) {
-	if wrap == nil {
-		wrap = func(next http.Handler) http.Handler { return next }
-	}
-	mux.Handle("GET /api/secrets", wrap(http.HandlerFunc(h.handleList)))
-	mux.Handle("POST /api/secrets", wrap(http.HandlerFunc(h.handleCreate)))
-	// Literal sub-paths (mine, trash, env) must be registered before the
-	// catch-all /{id} pattern. Go 1.22+ mux specificity picks the literal
-	// match automatically, but listing them first keeps the intent obvious.
-	mux.Handle("GET /api/secrets/mine", wrap(http.HandlerFunc(h.handleMine)))
-	mux.Handle("GET /api/secrets/trash", wrap(http.HandlerFunc(h.handleTrash)))
+// registerRoutes wires all secret routes (self-registration, R2). Auth is at
+// the perimeter only; per-row ACL (RBAC for shared, ownership for personal)
+// lives in vault. Handler tests pass a registrar without a db, so no auth
+// middleware, and inject the actor themselves.
+func (h *secretHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/secrets", h.handleList)
+	rr.auth("POST /api/secrets", h.handleCreate)
+	rr.auth("GET /api/secrets/mine", h.handleMine)
+	rr.auth("GET /api/secrets/trash", h.handleTrash)
 	// Env-var bundle endpoints (Phase 2 — Tasks 2.2 + 2.3).
-	mux.Handle("POST /api/secrets/env/bulk", wrap(http.HandlerFunc(h.handleEnvBulk)))
-	mux.Handle("GET /api/secrets/env", wrap(http.HandlerFunc(h.handleEnvList)))
+	rr.auth("POST /api/secrets/env/bulk", h.handleEnvBulk)
+	rr.auth("GET /api/secrets/env", h.handleEnvList)
+	// Consolidate the same credential repeated across hosts (admin).
+	rr.role("admin", "GET /api/secrets/consolidation", h.handleConsolidationPlan)
+	rr.role("admin", "POST /api/secrets/consolidation", h.handleConsolidationApply)
 	// Per-secret public sharing was retired in R3: a single-secret share is now
 	// a one-item share bundle (POST /api/share-bundles). The owner-only
 	// management UI lists/revokes via /api/share-bundles?secret_id=.
-	mux.Handle("GET /api/secrets/{id}", wrap(http.HandlerFunc(h.handleGetMetadata)))
-	mux.Handle("GET /api/secrets/{id}/reveal", wrap(http.HandlerFunc(h.handleReveal)))
-	mux.Handle("GET /api/secrets/{id}/history", wrap(http.HandlerFunc(h.handleHistory)))
-	mux.Handle("PUT /api/secrets/{id}", wrap(http.HandlerFunc(h.handleUpdate)))
-	mux.Handle("DELETE /api/secrets/{id}", wrap(http.HandlerFunc(h.handleDelete)))
-	mux.Handle("POST /api/secrets/{id}/restore", wrap(http.HandlerFunc(h.handleRestore)))
+	rr.auth("GET /api/secrets/{id}", h.handleGetMetadata)
+	rr.auth("GET /api/secrets/{id}/reveal", h.handleReveal)
+	rr.auth("GET /api/secrets/{id}/history", h.handleHistory)
+	rr.auth("PUT /api/secrets/{id}", h.handleUpdate)
+	rr.auth("DELETE /api/secrets/{id}", h.handleDelete)
+	rr.auth("POST /api/secrets/{id}/restore", h.handleRestore)
+	// Shared-credential host links: reuse one avulso password credential across
+	// N hosts via host_remote_users.secret_id (secret_host_link_handlers.go).
+	rr.auth("GET /api/secrets/{id}/hosts", h.handleListLinkedHosts)
+	rr.auth("POST /api/secrets/{id}/hosts", h.handleLinkHosts)
+	rr.auth("DELETE /api/secrets/{id}/hosts/{host_id}", h.handleUnlinkHost)
 }
 
 // --- handlers ---------------------------------------------------------------

@@ -438,7 +438,7 @@ func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
 func (h *hostHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/hosts", h.handleList)
 	rr.auth("GET /api/hosts/trash", h.handleListTrash)
-	rr.role("admin", "POST /api/hosts/{id}/restore", h.handleRestore)
+	rr.role("admin", "POST /api/hosts/{slug}/restore", h.handleRestore)
 	rr.role("editor", "POST /api/hosts", h.handleCreate)
 	rr.auth("GET /api/hosts/{slug}", h.handleGet)
 	rr.role("editor", "PUT /api/hosts/{slug}", h.handleUpdate)
@@ -459,7 +459,9 @@ func (h *hostHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *hostHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r, "id")
+	// The param is named slug only to share the router node with /hosts/{slug}
+	// (Echo needs one wildcard name per position); restore takes the numeric id.
+	id, ok := pathID(w, r, "slug")
 	if !ok {
 		return
 	}

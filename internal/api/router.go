@@ -1,17 +1,24 @@
 package api
 
 import (
+	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
+
+	"github.com/labstack/echo/v4"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // NewRouter creates the API mux with all routes and middleware.
 func NewRouter(db *database.DB, configPath string) http.Handler {
-	mux := http.NewServeMux()
+	e := newEcho()
 
 	// Wire the whole graph once (db → registry → deps → handlers), then bind the
 	// short names the route table below uses to the container's handler fields.
@@ -51,7 +58,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	// Self-registering handler groups own their route+role tables next to their
 	// handler (R2). The integration/misc groups further below are not yet
 	// migrated and remain inline.
-	rr := routeRegistrar{mux: mux, db: db}
+	rr := routeRegistrar{e: e, db: db}
 	ah.registerRoutes(rr)  // /api/auth/*, /api/users/*
 	oah.registerRoutes(rr) // /api/auth/oauth/*
 	eth := app.entidade
@@ -71,15 +78,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	// per-row ACL (RBAC for shared, ownership for personal) lives in vault.
 	secretRepo := deps.Secrets
 	secretH := &secretHandlers{db: db, repo: secretRepo}
-	secretH.register(mux, func(next http.Handler) http.Handler { return authenticated(db, next) })
-	// Shared-credential host links: reuse one avulso password credential across
-	// N hosts via host_remote_users.secret_id (secret_host_link_handlers.go).
-	mux.Handle("GET /api/secrets/{id}/hosts", authenticated(db, http.HandlerFunc(secretH.handleListLinkedHosts)))
-	mux.Handle("POST /api/secrets/{id}/hosts", authenticated(db, http.HandlerFunc(secretH.handleLinkHosts)))
-	mux.Handle("DELETE /api/secrets/{id}/hosts/{host_id}", authenticated(db, http.HandlerFunc(secretH.handleUnlinkHost)))
-	// Consolidate the same credential repeated across hosts (admin).
-	rr.role("admin", "GET /api/secrets/consolidation", secretH.handleConsolidationPlan)
-	rr.role("admin", "POST /api/secrets/consolidation", secretH.handleConsolidationApply)
+	secretH.registerRoutes(rr) // /api/secrets/*
 
 	// (Per-secret /api/share/{token} retired in R3 — single-secret shares are
 	// now bundles; redemption is GET /api/share-bundle/{token} below.)
@@ -88,26 +87,21 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	// import/mutate is editor; delete is admin — applied per-route inside
 	// register.
 	apiCatalogH := &apiCatalogHandlers{db: db, allowPrivateFetch: atlasAllowPrivateFetch()}
-	apiCatalogH.register(mux, func(role string, next http.Handler) http.Handler {
-		if role == "" {
-			return authenticated(db, next)
-		}
-		return authedRole(db, role, next)
-	})
+	apiCatalogH.registerRoutes(rr) // /api/api-catalog/*
 
 	// Share bundles (Phase D). Authenticated owner routes + a public,
 	// unwrapped redemption sibling to /api/share/{token}. Bundles reuse the
 	// secret repo for crypto/ACL/reveal.
 	bundleH := &bundleHandlers{repo: secretRepo}
-	mux.Handle("POST /api/share-bundles", authenticated(db, http.HandlerFunc(bundleH.handleCreate)))
-	mux.Handle("POST /api/share-bundles/reissue", authenticated(db, http.HandlerFunc(bundleH.handleReissue)))
-	mux.Handle("GET /api/share-bundles", authenticated(db, http.HandlerFunc(bundleH.handleList)))
-	mux.Handle("PATCH /api/share-bundles/{id}", authenticated(db, http.HandlerFunc(bundleH.handleRenew)))
-	mux.Handle("PUT /api/share-bundles/{id}/items", authenticated(db, http.HandlerFunc(bundleH.handleUpdateItems)))
-	mux.Handle("DELETE /api/share-bundles/{id}", authenticated(db, http.HandlerFunc(bundleH.handleRevoke)))
-	mux.Handle("GET /api/share-bundles/{id}/access-log", authenticated(db, http.HandlerFunc(bundleH.handleAccessLog)))
+	rr.auth("POST /api/share-bundles", bundleH.handleCreate)
+	rr.auth("POST /api/share-bundles/reissue", bundleH.handleReissue)
+	rr.auth("GET /api/share-bundles", bundleH.handleList)
+	rr.auth("PATCH /api/share-bundles/{id}", bundleH.handleRenew)
+	rr.auth("PUT /api/share-bundles/{id}/items", bundleH.handleUpdateItems)
+	rr.auth("DELETE /api/share-bundles/{id}", bundleH.handleRevoke)
+	rr.auth("GET /api/share-bundles/{id}/access-log", bundleH.handleAccessLog)
 	publicBundleH := &publicBundleHandlers{repo: secretRepo}
-	mux.HandleFunc("GET /api/share-bundle/{token}", publicBundleH.handleRedeem)
+	rr.public("GET /api/share-bundle/{token}", publicBundleH.handleRedeem)
 
 	// Orchestrators
 	oh.registerRoutes(rr) // /api/orchestrators/*
@@ -180,7 +174,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	bkh.registerRoutes(rr) // /api/backup, /api/restore
 
 	// Tags
-	mux.Handle("GET /api/tags", authenticated(db, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	rr.auth("GET /api/tags", func(w http.ResponseWriter, r *http.Request) {
 		entityType := r.URL.Query().Get("type")
 		tags := []string{}
 		var err error
@@ -194,11 +188,33 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 			return
 		}
 		jsonOK(w, tags)
-	})))
+	})
 
 	// loggingMiddleware is outermost: it installs the actor sink before auth runs
 	// and times the full request (incl. CORS handling) through to its final status.
-	return loggingMiddleware(corsMiddleware(mux))
+	return loggingMiddleware(corsMiddleware(e))
+}
+
+// newEcho returns the bare Echo router every route mounts on. Its own errors
+// (unknown path 404, wrong method 405) use the canonical {"error": msg} shape
+// instead of Echo's default body; handlers never return errors (see adapt).
+func newEcho() *echo.Echo {
+	e := echo.New()
+	e.HideBanner, e.HidePort = true, true
+	e.HTTPErrorHandler = func(err error, c echo.Context) {
+		if c.Response().Committed {
+			return
+		}
+		code, msg := http.StatusInternalServerError, "internal error"
+		var he *echo.HTTPError
+		if errors.As(err, &he) {
+			code, msg = he.Code, strings.ToLower(fmt.Sprint(he.Message))
+		} else {
+			log.Printf("[api] %s %s: %v", c.Request().Method, scrubPath(c.Request().URL.Path), err)
+		}
+		httpx.WriteError(c.Response(), code, msg)
+	}
+	return e
 }
 
 // authenticated wraps a handler with RequireAuth middleware.

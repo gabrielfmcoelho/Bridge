@@ -44,23 +44,20 @@ func atlasAllowPrivateFetch() bool {
 	}
 }
 
-// register wires the catalog routes. wrap applies auth for the target
-// environment: given a required role ("" = any authenticated user, else a
-// minimum role), it returns the wrapped handler. Production passes a wrap
-// backed by authenticated()/authedRole(); tests pass one that injects a fake
-// identity. Centralising routes here keeps prod + tests in lockstep, and
-// literal sub-paths precede the catch-all /{id} for clarity.
-func (h *apiCatalogHandlers) register(mux *http.ServeMux, wrap func(role string, next http.Handler) http.Handler) {
-	mux.Handle("GET /api/api-catalog", wrap("", http.HandlerFunc(h.handleList)))
-	mux.Handle("GET /api/api-catalog/search", wrap("", http.HandlerFunc(h.handleSearchOperations)))
-	mux.Handle("POST /api/api-catalog/import/upload", wrap("editor", http.HandlerFunc(h.handleImportUpload)))
-	mux.Handle("POST /api/api-catalog/import/url", wrap("editor", http.HandlerFunc(h.handleImportURL)))
-	mux.Handle("GET /api/api-catalog/{id}", wrap("", http.HandlerFunc(h.handleGet)))
-	mux.Handle("GET /api/api-catalog/{id}/spec", wrap("", http.HandlerFunc(h.handleGetSpec)))
-	mux.Handle("POST /api/api-catalog/{id}/spec/filter", wrap("", http.HandlerFunc(h.handleFilterSpec)))
-	mux.Handle("POST /api/api-catalog/{id}/refetch", wrap("editor", http.HandlerFunc(h.handleRefetch)))
-	mux.Handle("PUT /api/api-catalog/{id}", wrap("editor", http.HandlerFunc(h.handleUpdate)))
-	mux.Handle("DELETE /api/api-catalog/{id}", wrap("admin", http.HandlerFunc(h.handleDelete)))
+// registerRoutes wires the catalog routes (self-registration, R2). Browsing is
+// authenticated; import/mutate is editor; delete is admin. Handler tests pass a
+// registrar without a db (no auth middleware) and inject a fixed identity.
+func (h *apiCatalogHandlers) registerRoutes(rr routeRegistrar) {
+	rr.auth("GET /api/api-catalog", h.handleList)
+	rr.auth("GET /api/api-catalog/search", h.handleSearchOperations)
+	rr.role("editor", "POST /api/api-catalog/import/upload", h.handleImportUpload)
+	rr.role("editor", "POST /api/api-catalog/import/url", h.handleImportURL)
+	rr.auth("GET /api/api-catalog/{id}", h.handleGet)
+	rr.auth("GET /api/api-catalog/{id}/spec", h.handleGetSpec)
+	rr.auth("POST /api/api-catalog/{id}/spec/filter", h.handleFilterSpec)
+	rr.role("editor", "POST /api/api-catalog/{id}/refetch", h.handleRefetch)
+	rr.role("editor", "PUT /api/api-catalog/{id}", h.handleUpdate)
+	rr.role("admin", "DELETE /api/api-catalog/{id}", h.handleDelete)
 }
 
 // --- list / search ----------------------------------------------------------

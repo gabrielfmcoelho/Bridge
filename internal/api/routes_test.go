@@ -1,11 +1,15 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // TestSelfRegisteredRoutes_Wired verifies the migrated handler groups' routes
@@ -211,5 +215,51 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		if rec.Code == http.StatusNotFound || rec.Code == http.StatusUnauthorized {
 			t.Errorf("%s %s -> %d, want a non-401/404 (public route)", rt.method, rt.path, rec.Code)
 		}
+	}
+}
+
+// TestRouter_PathValueReachesHandler proves the Echo adapter (routes.go adapt):
+// a request through the real auth middleware reaches a plain net/http handler
+// with r.PathValue set — unescaped, as ServeMux delivered it — and with the
+// session user still on the context. The 401-only table above can't show this.
+func TestRouter_PathValueReachesHandler(t *testing.T) {
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { d.Close() })
+	u := &models.User{Username: "probe", DisplayName: "probe", Role: "viewer", Email: "probe@example.com"}
+	if err := store.NewUserRepo(d.SQL).Create(context.Background(), u); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	token, exp, err := auth.CreateSession(d.SQL, u.ID)
+	if err != nil {
+		t.Fatalf("session: %v", err)
+	}
+
+	e := newEcho()
+	var gotID, gotName, gotUser string
+	routeRegistrar{e: e, db: d}.auth("GET /api/probe/{id}/{name}", func(w http.ResponseWriter, r *http.Request) {
+		gotID, gotName = r.PathValue("id"), r.PathValue("name")
+		if cu := auth.UserFromContext(r.Context()); cu != nil {
+			gotUser = cu.Username
+		}
+		jsonOK(w, nil)
+	})
+
+	req := httptest.NewRequest("GET", "/api/probe/42/a%20b%2Fc", nil)
+	cookies := httptest.NewRecorder()
+	auth.SetSessionCookie(cookies, token, exp)
+	for _, c := range cookies.Result().Cookies() {
+		req.AddCookie(c)
+	}
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, body %s", rec.Code, rec.Body)
+	}
+	if gotID != "42" || gotName != "a b/c" || gotUser != "probe" {
+		t.Errorf("id=%q name=%q user=%q, want 42, \"a b/c\", probe", gotID, gotName, gotUser)
 	}
 }

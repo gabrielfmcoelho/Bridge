@@ -64,11 +64,11 @@ func newCatalogEnvOn(t *testing.T, d *database.DB, name string, entidade int64) 
 		t.Fatalf("create user: %v", err)
 	}
 
-	mux := http.NewServeMux()
+	mux := newEcho()
 	h := &apiCatalogHandlers{db: d}
-	// Identity wrap: ignore the required role (the outer middleware injects a
-	// fixed editor user); production wires authenticated()/authedRole().
-	h.register(mux, func(role string, next http.Handler) http.Handler { return next })
+	// No db on the registrar = no auth middleware (the outer middleware injects
+	// a fixed editor user); production wires authenticated()/authedRole().
+	h.registerRoutes(routeRegistrar{e: mux})
 	wrapped := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := auth.WithUser(r.Context(), u)
 		if entidade != 0 {
