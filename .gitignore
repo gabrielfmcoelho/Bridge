@@ -11,6 +11,9 @@ vendor/
 
 # Internal docs (sensitive)
 docs/
+# ...except the generated Swagger spec: internal/api imports it, so a clean
+# checkout doesn't build without it (regenerate with `make swagger`).
+!internal/api/docs/
 frontend/docs/
 
 # Backups & local data
