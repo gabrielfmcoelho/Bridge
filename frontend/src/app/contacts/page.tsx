@@ -20,11 +20,11 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import Drawer from "@/components/ui/Drawer";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import Card from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import TrashButton from "@/components/inventory/TrashDrawer";
 import ContactForm from "@/components/contacts/ContactForm";
+import ContactCard from "@/components/contacts/ContactCard";
 import ContactDetailDrawer, { usageSummary } from "@/components/contacts/ContactDetailDrawer";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { formatPhone } from "@/lib/phone";
@@ -196,19 +196,9 @@ export default function ContactsPage() {
               ))}
             </SortableTable>
           </div>
-          <div className={viewMode === "table" ? "md:hidden space-y-2" : "space-y-2"}>
+          <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 ${viewMode === "table" ? "md:hidden" : ""}`}>
             {[...visible].sort((a, b) => a.name.localeCompare(b.name, locale)).map((c) => (
-              <Card key={c.id} className="!py-3">
-                <div className="flex items-center gap-3">
-                  <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setDetail(c)}>
-                    {nameCell(c)}
-                    <span className="block text-xs text-[var(--text-muted)] truncate mt-0.5">
-                      {[c.phone && formatPhone(c.phone), usageSummary(c.usage, t)].filter(Boolean).join(" · ") || t("contact.noUseShort")}
-                    </span>
-                  </button>
-                  <RowActions name={c.name} actions={actions(c)} />
-                </div>
-              </Card>
+              <ContactCard key={c.id} contact={c} onOpen={() => setDetail(c)} actions={actions(c)} />
             ))}
           </div>
         </>

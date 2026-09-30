@@ -18,7 +18,7 @@ import type { Project, ProjectResponsavel } from "@/lib/types";
  * how it's run, external company, links, tags — then its responsáveis.
  * Name, situação and description are the page header's; not repeated.
  */
-export default function ProjectProfile({ project, tags, responsaveis }: { project: Project; tags: string[]; responsaveis: ProjectResponsavel[] }) {
+export default function ProjectProfile({ project, tags, responsaveis, onEditResponsaveis }: { project: Project; tags: string[]; responsaveis: ProjectResponsavel[]; onEditResponsaveis?: () => void }) {
   const { t } = useLocale();
   // Same key as the form's GitLabLinksEditor, so the two share one fetch.
   const { data: gitlab } = useQuery({ queryKey: ["project-gitlab-links", project.id], queryFn: () => projectGitlabAPI.listLinks(project.id) });
@@ -58,7 +58,7 @@ export default function ProjectProfile({ project, tags, responsaveis }: { projec
           </div>
         </div>
       </SectionCard>
-      <ResponsaveisSection responsaveis={responsaveis} t={t} compact />
+      <ResponsaveisSection responsaveis={responsaveis} t={t} onEdit={onEditResponsaveis} />
     </>
   );
 }

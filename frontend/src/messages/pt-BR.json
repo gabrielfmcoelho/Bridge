@@ -2173,7 +2173,9 @@
     "createNamed": "Criar contato “{name}”",
     "label": "Pessoas responsáveis",
     "newContact": "Novo contato",
-    "pickerHint": "Busque por nome, cargo ou telefone. A estrela marca o principal, que aparece nas listas."
+    "pickerHint": "Busque por nome, cargo ou telefone. A estrela marca o principal, que aparece nas listas.",
+    "addFirst": "Adicionar responsável",
+    "manage": "Editar responsáveis"
   },
   "entidade": {
     "label": "Entidades",
@@ -2590,7 +2592,10 @@
       "public_key": "Chave pública",
       "private_key_pem": "Chave privada",
       "passphrase": "Frase de acesso"
-    }
+    },
+    "notRepeated": "Valor único",
+    "showMembers": "Ver os {count}",
+    "hideMembers": "Ocultar os {count}"
   },
   "glpi": {
     "createTicketTitle": "Abrir chamado no GLPI",
@@ -2780,7 +2785,8 @@
       "with": "Com responsabilidades",
       "without": "Sem responsabilidades"
     },
-    "sectionVisibility": "Quem vê"
+    "sectionVisibility": "Quem vê",
+    "internal": "Interno"
   },
   "trash": {
     "emptyTitle": "A lixeira está vazia",

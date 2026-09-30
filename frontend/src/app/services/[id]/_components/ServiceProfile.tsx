@@ -15,7 +15,8 @@ import type { EntityResponsavel, Service } from "@/lib/types";
  * origin, stack, where it's deployed, ownership and links — then tags and
  * responsáveis. Every field renders; an empty one is a muted "–".
  */
-export default function ServiceProfile({ service, tags, responsaveis, projectName }: {
+export default function ServiceProfile({ service, tags, responsaveis, projectName, onEditResponsaveis }: {
+  onEditResponsaveis?: () => void;
   service: Service;
   tags: string[];
   responsaveis: EntityResponsavel[];
@@ -69,7 +70,7 @@ export default function ServiceProfile({ service, tags, responsaveis, projectNam
           </div>
         </div>
       </SectionCard>
-      <ResponsaveisSection responsaveis={responsaveis} t={t} compact />
+      <ResponsaveisSection responsaveis={responsaveis} t={t} onEdit={onEditResponsaveis} />
     </>
   );
 }

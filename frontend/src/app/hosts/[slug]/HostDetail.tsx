@@ -183,6 +183,7 @@ export default function HostDetail({ slug }: { slug: string }) {
                   isAdmin={isAdmin}
                   slug={slug}
                   t={t}
+                  onEditResponsaveis={canEdit ? () => setShowEditDrawer(true) : undefined}
                 />
               }
             >

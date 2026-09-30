@@ -14,7 +14,7 @@ import type { DNSRecord, EntityResponsavel } from "@/lib/types";
  * status and description, so they aren't repeated here. Every field renders;
  * an empty one is a muted "–".
  */
-export default function DnsProfile({ dns, tags, responsaveis }: { dns: DNSRecord; tags: string[]; responsaveis: EntityResponsavel[] }) {
+export default function DnsProfile({ dns, tags, responsaveis, onEditResponsaveis }: { dns: DNSRecord; tags: string[]; responsaveis: EntityResponsavel[]; onEditResponsaveis?: () => void }) {
   const { t, formatDateTime } = useLocale();
   return (
     <>
@@ -32,7 +32,7 @@ export default function DnsProfile({ dns, tags, responsaveis }: { dns: DNSRecord
           </div>
         </div>
       </SectionCard>
-      <ResponsaveisSection responsaveis={responsaveis} t={t} compact />
+      <ResponsaveisSection responsaveis={responsaveis} t={t} onEdit={onEditResponsaveis} />
     </>
   );
 }

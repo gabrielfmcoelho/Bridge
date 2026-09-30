@@ -2173,7 +2173,9 @@
     "createNamed": "Create contact “{name}”",
     "label": "Responsible people",
     "newContact": "New contact",
-    "pickerHint": "Search by name, role or phone. The star marks the main one, shown in lists."
+    "pickerHint": "Search by name, role or phone. The star marks the main one, shown in lists.",
+    "addFirst": "Add a responsável",
+    "manage": "Edit responsáveis"
   },
   "entidade": {
     "label": "Entities",
@@ -2590,7 +2592,10 @@
       "public_key": "Public key",
       "private_key_pem": "Private key",
       "passphrase": "Passphrase"
-    }
+    },
+    "notRepeated": "Unique value",
+    "showMembers": "Show all {count}",
+    "hideMembers": "Hide the {count}"
   },
   "glpi": {
     "createTicketTitle": "Open GLPI ticket",
@@ -2780,7 +2785,8 @@
       "with": "With responsibilities",
       "without": "Without responsibilities"
     },
-    "sectionVisibility": "Who sees it"
+    "sectionVisibility": "Who sees it",
+    "internal": "Internal"
   },
   "trash": {
     "emptyTitle": "Trash is empty",

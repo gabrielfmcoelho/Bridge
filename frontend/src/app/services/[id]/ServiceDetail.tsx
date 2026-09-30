@@ -152,7 +152,7 @@ export default function ServiceDetail({ id }: { id: number }) {
           tabs={{ idBase: "service", label: title, active: activeTab, onChange: (k) => setActiveTab(k as TabKey), panelClassName: "space-y-5", items: tabs }}
         >
           {activeTab === "overview" && (
-            <DetailSplit profile={<ServiceProfile service={svc} tags={data.tags || []} responsaveis={data.responsaveis || []} projectName={project?.name} />}>
+            <DetailSplit profile={<ServiceProfile service={svc} tags={data.tags || []} responsaveis={data.responsaveis || []} projectName={project?.name} onEditResponsaveis={canEdit ? () => setShowEditDrawer(true) : undefined} />}>
               <RuntimeCard service={svc} hosts={linkedHosts} />
             </DetailSplit>
           )}

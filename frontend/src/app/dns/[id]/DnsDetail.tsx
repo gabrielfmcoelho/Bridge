@@ -130,7 +130,7 @@ export default function DnsDetail({ id }: { id: number }) {
           >
 
           {activeTab === "overview" && (
-            <DetailSplit profile={<DnsProfile dns={dns} tags={data.tags || []} responsaveis={responsaveis} />}>
+            <DetailSplit profile={<DnsProfile dns={dns} tags={data.tags || []} responsaveis={responsaveis} onEditResponsaveis={canEdit ? () => setShowEditDrawer(true) : undefined} />}>
               <CertificateCard dns={dns} canEdit={canEdit} />
             </DetailSplit>
           )}

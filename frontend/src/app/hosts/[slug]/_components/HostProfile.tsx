@@ -23,7 +23,10 @@ export default function HostProfile({
   isAdmin,
   slug,
   t,
+  onEditResponsaveis,
 }: {
+  /** Opens the edit form (the section's "+"); absent without edit rights. */
+  onEditResponsaveis?: () => void;
   host: Host;
   tags: string[];
   responsaveis: HostResponsavel[];
@@ -80,7 +83,7 @@ export default function HostProfile({
         </div>
       </SectionCard>
 
-      <ResponsaveisSection responsaveis={responsaveis} t={t} compact />
+      <ResponsaveisSection responsaveis={responsaveis} t={t} onEdit={onEditResponsaveis} />
     </div>
   );
 }

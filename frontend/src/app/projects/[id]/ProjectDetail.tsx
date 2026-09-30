@@ -134,7 +134,7 @@ export default function ProjectDetail({ id }: { id: number }) {
             }}
           >
             {activeTab === "overview" && (
-              <DetailSplit profile={<ProjectProfile project={data.project} tags={data.tags || []} responsaveis={data.responsaveis || []} />}>
+              <DetailSplit profile={<ProjectProfile project={data.project} tags={data.tags || []} responsaveis={data.responsaveis || []} onEditResponsaveis={canEdit ? () => setShowEditDrawer(true) : undefined} />}>
                 <ProjectAiAnalysis projectId={id} />
                 <ProjectServices services={data.services || []} />
               </DetailSplit>
