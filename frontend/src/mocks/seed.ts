@@ -293,7 +293,8 @@ function projects(): Project[] {
 
 function apiCatalogs(): ApiCatalog[] {
   const mk = (o: Partial<ApiCatalog> & Pick<ApiCatalog, "id" | "name" | "description" | "title">): ApiCatalog => ({
-    service_ids: [], project_ids: [], source_type: "upload", spec_version: "3.0.0", spec_hash: "",
+    service_ids: [], project_ids: [], key_management: "none", has_admin_key: false, has_api_key: false,
+    source_type: "upload", spec_version: "3.0.0", spec_hash: "",
     version_label: "v1.0.0", owner_user_id: 3, created_by: 3,
     created_at: "2025-12-01T09:00:00Z", updated_at: "2026-04-01T09:00:00Z", operation_count: 0,
     ...o,

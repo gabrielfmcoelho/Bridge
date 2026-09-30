@@ -999,6 +999,52 @@ export const apiCatalogAPI = {
   restore: (id: number) => api.post(`/api/api-catalog/${id}/restore`),
 };
 
+// Access keys of a catalogued API. Plaintext comes back only from issue and
+// rotate (and is also kept in the vault, readable with apis.keys.manage).
+export interface ApiKeyCreatePayload {
+  label: string;
+  owner?: string;
+  owner_contact_id?: number | null;
+  notes?: string;
+  expires_days?: number;
+  rate_limit_per_minute?: number;
+  /** manual mode only */
+  value?: string;
+  header?: string;
+}
+
+export interface KeyManagementPayload {
+  key_management: import("./types").ApiKeyManagement;
+  admin_base_url?: string;
+  admin_key?: string;
+  api_key?: string;
+  clear_admin_key?: boolean;
+  clear_api_key?: boolean;
+}
+
+type ApiKeyWithPlaintext = { key: import("./types").ApiKey; plaintext: string };
+
+export const apiKeysAPI = {
+  list: (apiId: number, includeRevoked = false) =>
+    api.getList<import("./types").ApiKey>(`/api/api-catalog/${apiId}/keys${includeRevoked ? "?include_revoked=true" : ""}`),
+  create: (apiId: number, data: ApiKeyCreatePayload) =>
+    api.post<ApiKeyWithPlaintext>(`/api/api-catalog/${apiId}/keys`, data),
+  update: (apiId: number, keyId: number, data: { owner: string; owner_contact_id?: number | null; notes: string; expires_at?: string | null }) =>
+    api.put<import("./types").ApiKey>(`/api/api-catalog/${apiId}/keys/${keyId}`, data),
+  revoke: (apiId: number, keyId: number) =>
+    api.post<import("./types").ApiKey>(`/api/api-catalog/${apiId}/keys/${keyId}/revoke`, {}),
+  rotate: (apiId: number, keyId: number, graceDays: number) =>
+    api.post<ApiKeyWithPlaintext>(`/api/api-catalog/${apiId}/keys/${keyId}/rotate`, { grace_days: graceDays }),
+  sync: (apiId: number) =>
+    api.post<{ created: number; updated: number; total: number }>(`/api/api-catalog/${apiId}/keys/sync`, {}),
+  usage: (apiId: number, keyId: number, days = 30) =>
+    api.get<import("./types").ApiKeyUsage>(`/api/api-catalog/${apiId}/keys/${keyId}/usage?days=${days}`),
+  setManagement: (apiId: number, data: KeyManagementPayload) =>
+    api.put<import("./types").ApiCatalog>(`/api/api-catalog/${apiId}/key-management`, data),
+  testManagement: (apiId: number, data: Partial<KeyManagementPayload>) =>
+    api.post<{ success: boolean; error?: string; keys?: number }>(`/api/api-catalog/${apiId}/key-management/test`, data),
+};
+
 // Share bundles (Phase D–E). A single public link carrying secrets and/or
 // (whole or partial) API docs. create() emits the raw token ONCE — surface it
 // to the operator immediately (copy-to-clipboard) or it's lost.

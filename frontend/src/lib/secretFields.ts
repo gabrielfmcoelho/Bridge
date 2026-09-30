@@ -13,6 +13,7 @@ const LAYOUT: Record<string, [string, FieldKind][]> = {
   sshkey: [["username", "text"], ["public_key", "key"], ["private_key_pem", "key"], ["passphrase", "secret"]],
   password: [["value", "secret"]],
   env_var: [["value", "secret"]],
+  api_key: [["value", "secret"], ["header", "text"]],
 };
 
 export function secretFields(type: string, raw: string): SecretField[] {

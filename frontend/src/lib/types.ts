@@ -329,8 +329,8 @@ export interface Orchestrator {
 // /api/secrets/{id}/reveal which returns { payload: string } in SecretReveal.
 export interface Secret {
   id: number;
-  type: "cred" | "sshkey" | "password" | "app_login" | "env_var";
-  scope: "service" | "host" | "tool" | "projeto" | "avulso";
+  type: "cred" | "sshkey" | "password" | "app_login" | "env_var" | "api_key";
+  scope: "service" | "host" | "tool" | "projeto" | "avulso" | "api_catalog";
   visibility: "personal" | "shared";
   parent_id?: number | null;
   owner_user_id: number;
@@ -586,6 +586,47 @@ export interface ApiCatalog {
   responsaveis?: EntityResponsavel[];
   /** Detail only: entidade grants, for the edit form. */
   entidades?: AssetGrants;
+  /** How the API's access keys are handled. */
+  key_management: ApiKeyManagement;
+  /** SEAD admin root (sead mode); the credentials themselves never come back. */
+  admin_base_url?: string;
+  has_admin_key: boolean;
+  has_api_key: boolean;
+}
+
+export type ApiKeyManagement = "none" | "manual" | "sead";
+
+/** One access key of a catalogued API. The plaintext lives in the vault (secret_id). */
+export interface ApiKey {
+  id: number;
+  api_id: number;
+  label: string;
+  source: "manual" | "sead";
+  external_label?: string;
+  secret_id?: number;
+  owner: string;
+  owner_contact_id?: number;
+  owner_contact_name?: string;
+  notes: string;
+  scopes: string[];
+  rate_limit_per_minute?: number;
+  expires_at: string | null;
+  revoked_at: string | null;
+  grace_until: string | null;
+  last_used_at: string | null;
+  lifetime_uses: number;
+  synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+  status: "active" | "grace" | "expired" | "revoked";
+}
+
+export interface ApiKeyUsage {
+  label: string;
+  lifetime: number;
+  last_used_at?: string | null;
+  /** "YYYYMMDD" → requests */
+  daily: Record<string, number>;
 }
 
 export interface OperationSearchResult {

@@ -16,7 +16,7 @@ import type { Secret } from "@/lib/types";
 type T = (k: string, v?: Record<string, string>) => string;
 
 /** The type colours the card stripe: host credentials, logins, variables. */
-const TYPE_ACCENT: Record<string, string> = { sshkey: "info", password: "info", cred: "warning", app_login: "cyan", env_var: "success" };
+const TYPE_ACCENT: Record<string, string> = { sshkey: "info", password: "info", cred: "warning", app_login: "cyan", env_var: "success", api_key: "accent" };
 
 /**
  * The vault as inventory cards (header · metadata grid · indicators). A

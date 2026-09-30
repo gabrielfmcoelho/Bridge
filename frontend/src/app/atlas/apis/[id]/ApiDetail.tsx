@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiCatalogAPI, globalIssuesAPI, servicesAPI, projectsAPI } from "@/lib/api";
+import { apiCatalogAPI, apiKeysAPI, globalIssuesAPI, servicesAPI, projectsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFlag } from "@/contexts/FlagContext";
@@ -31,9 +31,9 @@ import { useSpecActions } from "../_components/useSpecActions";
 import { isSpecStale } from "../_components/apiInsights";
 import ApiProfile from "./_components/ApiProfile";
 import EndpointsSummary from "./_components/EndpointsSummary";
+import ApiKeysTab from "./_components/ApiKeysTab";
 
-// Phase 2 adds "keys" (Chaves de acesso) here, after the shared tabs.
-type TabKey = "overview" | "endpoints" | "issues" | "topology";
+type TabKey = "overview" | "endpoints" | "issues" | "topology" | "keys";
 
 export default function ApiDetail({ id }: { id: number }) {
   const { t } = useLocale();
@@ -43,6 +43,7 @@ export default function ApiDetail({ id }: { id: number }) {
   const qc = useQueryClient();
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isAdmin = user?.role === "admin";
+  const canManageKeys = isAdmin || !!user?.permissions?.includes("apis.keys.manage");
 
   const searchParams = useSearchParams();
   const op = searchParams.get("op");
@@ -69,6 +70,12 @@ export default function ApiDetail({ id }: { id: number }) {
   const { data: allProjects = [] } = useQuery({ queryKey: ["projects"], queryFn: projectsAPI.list, enabled: activeTab === "topology" });
   const { graph, loading: graphLoading } = useEntityGraph(api ? `api-${id}` : undefined, activeTab === "topology");
   const specActions = useSpecActions(api);
+  // Same query key as the keys tab, so the badge and the list share one fetch.
+  const { data: liveKeys = [] } = useQuery({
+    queryKey: ["api-keys", id, false],
+    queryFn: () => apiKeysAPI.list(id, false),
+    enabled: !!api && api.key_management !== "none",
+  });
 
   // Best-effort deep-jump to ?op=<op_key>: Scalar owns its DOM and its anchor
   // scheme is version-dependent, so scan for the path text after mount and
@@ -129,7 +136,11 @@ export default function ApiDetail({ id }: { id: number }) {
     { key: "endpoints", label: t("atlas.apis.tabEndpoints"), icon: ICON_PATHS.code, badge: api.operation_count || undefined },
     { key: "issues", label: t("host.tabTracking"), icon: ICON_PATHS.alert, badge: openIssues || undefined },
     { key: "topology", label: t("host.tabTopology"), icon: ICON_PATHS.bolt },
-    // Phase 2: the "keys" tab (Chaves de acesso, keyOutline icon) goes here.
+    // Entity-specific tab last. Admins see it even with key management off,
+    // to switch it on.
+    ...(api.key_management !== "none" || isAdmin
+      ? [{ key: "keys", label: t("atlas.apis.keys.tab"), icon: ICON_PATHS.keyOutline, badge: liveKeys.filter((k) => k.status === "active").length || undefined }]
+      : []),
   ];
   const relationGroups = [
     servicesGroup(allServices.filter((s) => services.includes(s.id)), t),
@@ -201,6 +212,8 @@ export default function ApiDetail({ id }: { id: number }) {
           )}
 
           {activeTab === "issues" && <IssuesBoard entityType="api_catalog" entityId={id} canEdit={canEdit} />}
+
+          {activeTab === "keys" && <ApiKeysTab api={api} canManage={canManageKeys} isAdmin={isAdmin} />}
 
           {activeTab === "topology" && (
             <TopologyPane graph={graph} loading={graphLoading} t={t}

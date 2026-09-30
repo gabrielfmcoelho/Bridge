@@ -39,8 +39,8 @@ import ConsolidateDrawer, { consolidationKey } from "./ConsolidateDrawer";
 // vars by bundle, the same credential repeated across places as one line —
 // cards on phones, filters in the URL, a detail drawer per secret.
 
-const KINDS = ["", "host_cred", "password", "sshkey", "cred", "app_login", "env_var"] as const;
-const SCOPES = ["", "avulso", "projeto", "service", "host", "tool"] as const;
+const KINDS = ["", "host_cred", "password", "sshkey", "cred", "app_login", "env_var", "api_key"] as const;
+const SCOPES = ["", "avulso", "projeto", "service", "host", "tool", "api_catalog"] as const;
 const VISIBILITIES = ["", "shared", "personal"] as const;
 type Filters = { kind: string; scope: string; visibility: string };
 

@@ -17,7 +17,7 @@ type T = (k: string, v?: Record<string, string>) => string;
 
 export const TYPE_ICON: Record<string, string> = {
   sshkey: ICON_PATHS.keyOutline, password: ICON_PATHS.lockOutline, cred: ICON_PATHS.user,
-  app_login: ICON_PATHS.globe, env_var: ICON_PATHS.code,
+  app_login: ICON_PATHS.globe, env_var: ICON_PATHS.code, api_key: ICON_PATHS.keyOutline,
 };
 
 /** What a row says in the "Uso" column. */
