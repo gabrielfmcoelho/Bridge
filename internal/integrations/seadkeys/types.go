@@ -42,6 +42,14 @@ func Time(s *string) *time.Time {
 // ("<label>__rotated__<hash8>"), which the service keeps forever.
 func (k KeySummary) Rotated() bool { return strings.Contains(k.Label, "__rotated__") }
 
+// ScopeInfo is one entry of the service's scope catalogue.
+type ScopeInfo struct {
+	Name        string   `json:"name"`
+	Kind        string   `json:"kind"` // "wildcard" ("*"), "route" or "modifier"
+	Description string   `json:"description"`
+	Routes      []string `json:"routes"` // prefixes, or "=/path" for an exact path
+}
+
 // CreateRequest is the body of POST /admin/keys. ExpiresDays nil or 0 means
 // the key never expires; RateLimitPerMinute 0 means unlimited.
 type CreateRequest struct {

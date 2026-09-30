@@ -100,6 +100,7 @@ func (h *apiKeyHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/api-catalog/{id}/keys", h.handleList)
 	rr.perm("apis.keys.manage", "POST /api/api-catalog/{id}/keys", h.handleCreate)
 	rr.perm("apis.keys.manage", "POST /api/api-catalog/{id}/keys/sync", h.handleSync)
+	rr.auth("GET /api/api-catalog/{id}/keys/scopes", h.handleScopes)
 	rr.perm("apis.keys.manage", "PUT /api/api-catalog/{id}/keys/{keyId}", h.handleUpdate)
 	rr.perm("apis.keys.manage", "POST /api/api-catalog/{id}/keys/{keyId}/revoke", h.handleRevoke)
 	rr.perm("apis.keys.manage", "POST /api/api-catalog/{id}/keys/{keyId}/rotate", h.handleRotate)
@@ -268,7 +269,7 @@ func (h *apiKeyHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 // handleCreate godoc
 //
 //	@Summary		Issue or register an access key
-//	@Description	apis.keys.manage. In sead mode the key is created on the service and its plaintext comes back once here; in manual mode send the existing key as value. Either way the plaintext is also stored in the vault. Label: letters, digits, . _ - (max 64), unique among the API's live keys.
+//	@Description	apis.keys.manage. In sead mode the key is created on the service with the chosen scopes (from GET …/keys/scopes; the service rejects unknown ones) and its plaintext comes back once here; in manual mode send the existing key as value. Either way the plaintext is also stored in the vault. Label: letters, digits, . _ - (max 64), unique among the API's live keys.
 //	@Tags			atlas
 //	@Accept			json
 //	@Produce		json
@@ -663,6 +664,36 @@ func (h *apiKeyHandlers) syncFrom(ctx context.Context, client *seadkeys.Client, 
 	}
 	res.Total = len(remote)
 	return res, nil
+}
+
+// handleScopes godoc
+//
+//	@Summary		Scopes a SEAD key can carry
+//	@Description	Any role that can see the API; sead mode only. The service's catalogue: "*" (everything), route scopes with the route patterns they open, and output modifiers such as "demo". A service without the catalogue endpoint answers 404.
+//	@Tags			atlas
+//	@Produce		json
+//	@Param			id	path		int	true	"API catalog ID"
+//	@Success		200	{array}		seadkeys.ScopeInfo
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/{id}/keys/scopes [get]
+func (h *apiKeyHandlers) handleScopes(w http.ResponseWriter, r *http.Request) {
+	a, ok := h.loadAPI(w, r)
+	if !ok {
+		return
+	}
+	client, ok := h.seadClient(w, r, a)
+	if !ok {
+		return
+	}
+	scopes, err := client.Scopes(r.Context())
+	if err != nil {
+		seadError(w, r, err)
+		return
+	}
+	jsonOK(w, scopes)
 }
 
 // handleUsage godoc

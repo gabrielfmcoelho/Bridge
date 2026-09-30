@@ -56,6 +56,14 @@ func (c *Client) List(ctx context.Context) ([]KeySummary, error) {
 	return out, c.do(ctx, http.MethodGet, "/admin/keys", nil, &out)
 }
 
+// Scopes returns the scope catalogue a key can carry (GET /admin/keys/scopes):
+// "*", the route scopes and output modifiers such as "demo". Services that
+// predate the endpoint answer 404.
+func (c *Client) Scopes(ctx context.Context) ([]ScopeInfo, error) {
+	var out []ScopeInfo
+	return out, c.do(ctx, http.MethodGet, "/admin/keys/scopes", nil, &out)
+}
+
 // Get returns one key by label.
 func (c *Client) Get(ctx context.Context, label string) (*KeySummary, error) {
 	var out KeySummary

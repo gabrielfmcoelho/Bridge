@@ -54,6 +54,10 @@ func (f *fakeSEAD) handler(t *testing.T) http.Handler {
 			return out
 		}
 		switch {
+		case r.Method == http.MethodGet && label == "scopes":
+			fmt.Fprint(w, `[{"name":"*","kind":"wildcard","description":"tudo","routes":[]},`+
+				`{"name":"cadastro","kind":"route","description":"referência","routes":["/api/cadastro"]},`+
+				`{"name":"demo","kind":"modifier","description":"anonimiza","routes":[]}]`)
 		case r.Method == http.MethodGet && label == "":
 			list := []map[string]any{}
 			for _, k := range f.keys {
@@ -61,7 +65,10 @@ func (f *fakeSEAD) handler(t *testing.T) http.Handler {
 			}
 			json.NewEncoder(w).Encode(list)
 		case r.Method == http.MethodPost && label == "":
-			var req struct{ Label, Owner string }
+			var req struct {
+				Label, Owner string
+				Scopes       []string
+			}
 			json.NewDecoder(r.Body).Decode(&req)
 			if _, taken := f.keys[req.Label]; taken {
 				w.WriteHeader(http.StatusBadRequest)
@@ -69,6 +76,9 @@ func (f *fakeSEAD) handler(t *testing.T) http.Handler {
 				return
 			}
 			k := newKey(req.Label, req.Owner)
+			if req.Scopes != nil {
+				k["scopes"] = req.Scopes
+			}
 			f.keys[req.Label] = k
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(k)
@@ -168,7 +178,17 @@ func TestAPIKeys_SEADLifecycle(t *testing.T) {
 	if code, _, _ := do(editor, "POST", base+"/keys", `{"label":"painel"}`); code != http.StatusForbidden {
 		t.Fatalf("editor issues key = %d, want 403", code)
 	}
-	code, obj, raw = do(admin, "POST", base+"/keys", `{"label":"painel","owner":"rh@sead"}`)
+	// The scope catalogue comes from the service, for the form to pick from.
+	req := httptest.NewRequest("GET", base+"/keys/scopes", nil)
+	req.AddCookie(&http.Cookie{Name: "sshcm_session", Value: editor})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	var catalogue []map[string]any
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &catalogue) != nil || len(catalogue) != 3 || catalogue[1]["name"] != "cadastro" {
+		t.Fatalf("scopes = %d %s", rec.Code, rec.Body)
+	}
+
+	code, obj, raw = do(admin, "POST", base+"/keys", `{"label":"painel","owner":"rh@sead","scopes":["cadastro","demo"]}`)
 	if code != http.StatusCreated {
 		t.Fatalf("issue = %d %s", code, raw)
 	}
@@ -177,6 +197,9 @@ func TestAPIKeys_SEADLifecycle(t *testing.T) {
 	keyID, secretID := itoa(int64(key["id"].(float64))), itoa(int64(key["secret_id"].(float64)))
 	if fake.keys["painel"] == nil || key["status"] != "active" || key["external_label"] != "painel" {
 		t.Fatalf("issued key = %v (fake has %v)", key, fake.keys["painel"] != nil)
+	}
+	if got := fmt.Sprint(key["scopes"]); got != "[cadastro demo]" {
+		t.Errorf("issued key scopes = %s, want [cadastro demo]", got)
 	}
 	if code, _, _ := do(editor, "GET", base+"/keys", ""); code != http.StatusOK {
 		t.Errorf("editor lists keys = %d, want 200", code)

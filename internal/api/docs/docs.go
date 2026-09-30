@@ -907,7 +907,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "apis.keys.manage. In sead mode the key is created on the service and its plaintext comes back once here; in manual mode send the existing key as value. Either way the plaintext is also stored in the vault. Label: letters, digits, . _ - (max 64), unique among the API's live keys.",
+                "description": "apis.keys.manage. In sead mode the key is created on the service with the chosen scopes (from GET …/keys/scopes; the service rejects unknown ones) and its plaintext comes back once here; in manual mode send the existing key as value. Either way the plaintext is also stored in the vault. Label: letters, digits, . _ - (max 64), unique among the API's live keys.",
                 "consumes": [
                     "application/json"
                 ],
@@ -969,6 +969,62 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api-catalog/{id}/keys/scopes": {
+            "get": {
+                "description": "Any role that can see the API; sead mode only. The service's catalogue: \"*\" (everything), route scopes with the route patterns they open, and output modifiers such as \"demo\". A service without the catalogue endpoint answers 404.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Scopes a SEAD key can carry",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/seadkeys.ScopeInfo"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -20263,6 +20319,28 @@ const docTemplate = `{
                 },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "seadkeys.ScopeInfo": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "\"wildcard\" (\"*\"), \"route\" or \"modifier\"",
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "routes": {
+                    "description": "prefixes, or \"=/path\" for an exact path",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },

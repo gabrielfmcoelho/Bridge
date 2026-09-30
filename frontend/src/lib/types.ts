@@ -621,6 +621,15 @@ export interface ApiKey {
   status: "active" | "grace" | "expired" | "revoked";
 }
 
+/** One entry of a SEAD service's scope catalogue. */
+export interface ApiKeyScope {
+  name: string;
+  kind: "wildcard" | "route" | "modifier";
+  description: string;
+  /** Route patterns: a prefix, or "=/path" for that exact path. */
+  routes: string[];
+}
+
 export interface ApiKeyUsage {
   label: string;
   lifetime: number;

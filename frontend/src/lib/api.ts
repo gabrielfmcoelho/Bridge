@@ -1008,6 +1008,8 @@ export interface ApiKeyCreatePayload {
   notes?: string;
   expires_days?: number;
   rate_limit_per_minute?: number;
+  /** sead mode: from apiKeysAPI.scopes */
+  scopes?: string[];
   /** manual mode only */
   value?: string;
   header?: string;
@@ -1035,6 +1037,8 @@ export const apiKeysAPI = {
     api.post<import("./types").ApiKey>(`/api/api-catalog/${apiId}/keys/${keyId}/revoke`, {}),
   rotate: (apiId: number, keyId: number, graceDays: number) =>
     api.post<ApiKeyWithPlaintext>(`/api/api-catalog/${apiId}/keys/${keyId}/rotate`, { grace_days: graceDays }),
+  scopes: (apiId: number) =>
+    api.get<import("./types").ApiKeyScope[]>(`/api/api-catalog/${apiId}/keys/scopes`),
   sync: (apiId: number) =>
     api.post<{ created: number; updated: number; total: number }>(`/api/api-catalog/${apiId}/keys/sync`, {}),
   usage: (apiId: number, keyId: number, days = 30) =>

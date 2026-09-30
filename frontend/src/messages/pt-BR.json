@@ -280,7 +280,17 @@
         "revokeConfirm": "Revogar a chave \"{name}\"?",
         "revokeConfirmBody": "Tudo que usa esta chave para de funcionar imediatamente. Não é possível desfazer.",
         "revoked": "Chave revogada",
-        "revokeFailed": "Não foi possível revogar a chave"
+        "revokeFailed": "Não foi possível revogar a chave",
+        "scopes": "Escopos",
+        "scopesHint": "O que esta chave pode chamar. Escolha só o que o consumidor precisa.",
+        "scopesRequired": "Escolha ao menos um escopo.",
+        "scopesLoadFailed": "Não foi possível carregar os escopos do serviço: {error}",
+        "scopeWildcard": "* — acesso total (todas as rotas, inclusive futuras)",
+        "scopeGroup": {
+          "route": "Rotas",
+          "modifier": "Modificadores",
+          "wildcard": "Acesso total"
+        }
       }
     },
     "lineage": {

@@ -280,7 +280,17 @@
         "revokeConfirm": "Revoke key \"{name}\"?",
         "revokeConfirmBody": "Anything using this key stops working immediately. This can't be undone.",
         "revoked": "Key revoked",
-        "revokeFailed": "Could not revoke the key"
+        "revokeFailed": "Could not revoke the key",
+        "scopes": "Scopes",
+        "scopesHint": "What this key may call. Pick only what the consumer needs.",
+        "scopesRequired": "Pick at least one scope.",
+        "scopesLoadFailed": "Could not load the service's scopes: {error}",
+        "scopeWildcard": "* — full access (every route, including future ones)",
+        "scopeGroup": {
+          "route": "Routes",
+          "modifier": "Modifiers",
+          "wildcard": "Full access"
+        }
       }
     },
     "lineage": {

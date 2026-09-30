@@ -152,6 +152,7 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
               k.expires_at ? t("atlas.apis.keys.expiresOn", { date: formatDate(k.expires_at) }) : t("atlas.apis.keys.noExpiry"),
               k.last_used_at ? t("atlas.apis.keys.lastUsedAt", { date: formatDateTime(k.last_used_at) }) : t("atlas.apis.keys.neverUsed"),
               ...(k.source === "sead" ? [t("atlas.apis.keys.uses", { count: String(k.lifetime_uses) })] : []),
+              ...(k.scopes.length > 0 ? [k.scopes.join(", ")] : []),
             ];
             return (
               <ListRow key={k.id}>

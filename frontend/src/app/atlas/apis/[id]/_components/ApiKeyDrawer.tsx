@@ -11,6 +11,7 @@ import FormError from "@/components/ui/FormError";
 import Input from "@/components/ui/Input";
 import NativeSelect from "@/components/ui/NativeSelect";
 import Textarea from "@/components/ui/Textarea";
+import ScopePicker from "./ScopePicker";
 
 const EXPIRY_DAYS = [30, 90, 180, 365, 0]; // 0 = never
 const LABEL_RE = /^[A-Za-z0-9._-]{1,64}$/;
@@ -38,13 +39,16 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
   const [rateLimit, setRateLimit] = useState("");
   const [value, setValue] = useState("");
   const [header, setHeader] = useState("X-API-Key");
+  const [scopes, setScopes] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
+  const pickScopes = !isEdit && !manual;
 
   const { data: contacts = [] } = useQuery({ queryKey: ["contacts"], queryFn: contactsAPI.list, enabled: open });
 
   const labelError = !isEdit && attempted && !LABEL_RE.test(label.trim()) ? t("atlas.apis.keys.labelInvalid") : undefined;
   const valueError = !isEdit && manual && attempted && !value.trim() ? t("atlas.apis.keys.valueRequired") : undefined;
+  const scopesError = pickScopes && attempted && scopes.length === 0 ? t("atlas.apis.keys.scopesRequired") : undefined;
 
   const save = useMutation({
     mutationFn: async () => {
@@ -63,6 +67,7 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
         notes,
         expires_days: expiresDays,
         rate_limit_per_minute: !manual && rateLimit.trim() ? Number(rateLimit) : undefined,
+        scopes: pickScopes ? scopes : undefined,
         value: manual ? value.trim() : undefined,
         header: manual ? header.trim() : undefined,
       });
@@ -79,6 +84,7 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
     setAttempted(true);
     setError("");
     if (!isEdit && (!LABEL_RE.test(label.trim()) || (manual && !value.trim()))) return;
+    if (pickScopes && scopes.length === 0) return;
     save.mutate();
   };
 
@@ -117,6 +123,13 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
             />
             <Input label={t("atlas.apis.keys.header")} value={header} onChange={(e) => setHeader(e.target.value)} />
           </>
+        )}
+        {pickScopes && <ScopePicker apiId={api.id} value={scopes} onChange={setScopes} error={scopesError} />}
+        {isEdit && editing.scopes.length > 0 && (
+          <div>
+            <p className="text-xs text-[var(--text-muted)] mb-1">{t("atlas.apis.keys.scopes")}</p>
+            <p className="text-sm font-mono text-[var(--text-secondary)]">{editing.scopes.join(", ")}</p>
+          </div>
         )}
         <Input label={t("atlas.apis.keys.owner")} hint={t("atlas.apis.keys.ownerHint")} value={owner} onChange={(e) => setOwner(e.target.value)} />
         <NativeSelect
