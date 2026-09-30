@@ -82,7 +82,7 @@ export const NAV_SECTIONS: NavSection[] = [
     key: "serviceCatalog",
     label: "nav.selfService",
     items: [
-      { href: "/catalog", label: "nav.serviceCatalog", icon: "Boxes" },
+      { href: "/catalog", label: "nav.serviceCatalog", icon: "Store" },
       { href: "/requests", label: "nav.requests", icon: "ClipboardList" },
     ],
   },

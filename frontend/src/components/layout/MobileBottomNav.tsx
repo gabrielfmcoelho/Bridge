@@ -4,18 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppearance } from "@/contexts/AppearanceContext";
 import Icon from "@/components/ui/Icon";
-import { ICON_PATHS } from "@/lib/icon-paths";
+import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
 
 interface MobileBottomNavProps {
   onOpenDrawer: () => void;
 }
 
 const navItems = [
-  { href: "/", label: "Painel", icon: "M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" },
-  { href: "/issues", label: "Issues", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
+  { href: "/", label: "Painel", icon: NAV_ICONS.LayoutDashboard },
+  { href: "/issues", label: "Issues", icon: NAV_ICONS.ClipboardList },
   { href: "__drawer__", label: "Menu", icon: "" },
-  { href: "/hosts", label: "Hosts", icon: "M5 3h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm0 10h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2zm2-7a1 1 0 100 2 1 1 0 000-2zm0 10a1 1 0 100 2 1 1 0 000-2z" },
-  { href: "/services", label: "Services", icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" },
+  { href: "/hosts", label: "Hosts", icon: NAV_ICONS.Server },
+  { href: "/services", label: "Services", icon: NAV_ICONS.Boxes },
 ];
 
 export default function MobileBottomNav({ onOpenDrawer }: MobileBottomNavProps) {
