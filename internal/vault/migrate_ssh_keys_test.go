@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
 	"encoding/pem"
 	"testing"
 
@@ -182,4 +183,9 @@ func createSecret(t *testing.T, repo *vault.SecretRepo, actor vault.ActorContext
 		t.Fatalf("create %s: %v", name, err)
 	}
 	return id
+}
+
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }

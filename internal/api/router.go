@@ -78,6 +78,9 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	mux.Handle("GET /api/secrets/{id}/hosts", authenticated(db, http.HandlerFunc(secretH.handleListLinkedHosts)))
 	mux.Handle("POST /api/secrets/{id}/hosts", authenticated(db, http.HandlerFunc(secretH.handleLinkHosts)))
 	mux.Handle("DELETE /api/secrets/{id}/hosts/{host_id}", authenticated(db, http.HandlerFunc(secretH.handleUnlinkHost)))
+	// Consolidate the same credential repeated across hosts (admin).
+	rr.role("admin", "GET /api/secrets/consolidation", secretH.handleConsolidationPlan)
+	rr.role("admin", "POST /api/secrets/consolidation", secretH.handleConsolidationApply)
 
 	// (Per-secret /api/share/{token} retired in R3 — single-secret shares are
 	// now bundles; redemption is GET /api/share-bundle/{token} below.)

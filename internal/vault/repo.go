@@ -2,7 +2,9 @@ package vault
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -38,6 +40,10 @@ type SecretFilter struct {
 	GroupLabel     string
 	IncludeDeleted bool // include soft-deleted rows
 	OnlyDeleted    bool // restrict to soft-deleted rows (trash view)
+	// Query matches name, username, group and the parent's name (ILIKE).
+	Query string
+	// Kind "host_cred" = what a host logs in with: an SSH key or a password.
+	Kind string
 }
 
 // SecretView is a metadata-only projection of a Secret. PayloadCiphertext
@@ -60,6 +66,17 @@ type SecretView struct {
 	UpdatedAt         time.Time               `json:"updated_at"`
 	DeletedAt         *time.Time              `json:"deleted_at,omitempty"`
 	PayloadCiphertext []byte                  `json:"-"` // always nil; sentinel
+	// List-only context, so the vault page needn't fetch every parent list.
+	Username       *string `json:"username,omitempty"`
+	SSHFingerprint *string `json:"ssh_fingerprint,omitempty"`
+	ParentName     *string `json:"parent_name,omitempty"`
+	OwnerName      *string `json:"owner_name,omitempty"`
+	LinkedHosts    int     `json:"linked_hosts"`
+	// DupCount > 1: other secrets you can see hold the same value; DupGroup
+	// (a short, opaque prefix — never the fingerprint) ties them together.
+	DupCount int    `json:"dup_count,omitempty"`
+	DupGroup string `json:"dup_group,omitempty"`
+	valueFP  []byte
 	// Entidades carries the own grants of a shared avulso secret; filled by the
 	// GET handler (best effort), nil otherwise.
 	Entidades *models.AssetGrants `json:"entidades,omitempty"`
@@ -507,16 +524,29 @@ func (r *SecretRepo) runList(ctx context.Context, actor ActorContext, f SecretFi
 		conds = append(conds, "group_label = ?")
 		args = append(args, f.GroupLabel)
 	}
+	if f.Kind == "host_cred" {
+		conds = append(conds, "secrets.type IN ('sshkey', 'password')")
+	}
+	if f.Query != "" {
+		like := "%" + f.Query + "%"
+		conds = append(conds, "(secrets.name ILIKE ? OR secrets.username ILIKE ? OR secrets.group_label ILIKE ? OR "+secretParentNameSQL+" ILIKE ?)")
+		args = append(args, like, like, like, like)
+	}
 
 	vis, vargs := secretVisibleSQL(ctx, "secrets")
 	conds = append(conds, vis)
 	args = append(args, vargs...)
 
 	where := " WHERE " + strings.Join(conds, " AND ")
-	query := `SELECT id, type, scope, visibility, parent_id, owner_user_id, name,
+	query := `SELECT secrets.id, type, scope, visibility, parent_id, owner_user_id, name,
 	                 group_label, description, key_version, created_by,
-	                 created_at, updated_at, deleted_at
-	          FROM secrets` + where + ` ORDER BY id`
+	                 created_at, updated_at, deleted_at,
+	                 secrets.username, ssh_fingerprint, value_fingerprint,
+	                 ` + secretParentNameSQL + `,
+	                 (SELECT COALESCE(NULLIF(u.display_name, ''), u.username) FROM users u WHERE u.id = secrets.owner_user_id),
+	                 (SELECT COUNT(DISTINCT hru.host_id) FROM host_remote_users hru
+	                   WHERE hru.secret_id = secrets.id OR hru.key_secret_id = secrets.id)
+	          FROM secrets` + where + ` ORDER BY secrets.id`
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -532,7 +562,8 @@ func (r *SecretRepo) runList(ctx context.Context, actor ActorContext, f SecretFi
 		)
 		if err := rows.Scan(&v.ID, &typeStr, &scopeStr, &visStr, &v.ParentID,
 			&v.OwnerUserID, &v.Name, &v.GroupLabel, &v.Description, &v.KeyVersion,
-			&v.CreatedBy, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt); err != nil {
+			&v.CreatedBy, &v.CreatedAt, &v.UpdatedAt, &v.DeletedAt,
+			&v.Username, &v.SSHFingerprint, &v.valueFP, &v.ParentName, &v.OwnerName, &v.LinkedHosts); err != nil {
 			return nil, err
 		}
 		v.Type = models.SecretType(typeStr)
@@ -546,9 +577,44 @@ func (r *SecretRepo) runList(ctx context.Context, actor ActorContext, f SecretFi
 		if dec.redactDescription {
 			v.Description = nil
 		}
+		if !dec.canReveal {
+			v.valueFP = nil // an admin browsing someone's personal secret: no grouping
+		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	markDuplicates(out)
+	return out, nil
+}
+
+// secretParentNameSQL names the asset a secret is attached to.
+const secretParentNameSQL = `CASE secrets.scope
+	WHEN 'host' THEN (SELECT nickname FROM hosts WHERE hosts.id = secrets.parent_id)
+	WHEN 'service' THEN (SELECT nickname FROM services WHERE services.id = secrets.parent_id)
+	WHEN 'tool' THEN (SELECT name FROM external_tools WHERE external_tools.id = secrets.parent_id)
+	WHEN 'projeto' THEN (SELECT name FROM projects WHERE projects.id = secrets.parent_id)
+	END`
+
+// markDuplicates flags secrets holding the same value — counted among the
+// rows the caller got, so it never hints at secrets they can't see. Env vars
+// are left out: the same "true" in two bundles isn't a repeated credential.
+func markDuplicates(views []SecretView) {
+	count := map[string]int{}
+	key := func(v SecretView) string { return string(v.Type) + "\x1f" + string(v.valueFP) }
+	for _, v := range views {
+		if v.valueFP != nil && v.Type != models.SecretTypeEnvVar && v.DeletedAt == nil {
+			count[key(v)]++
+		}
+	}
+	for i := range views {
+		v := &views[i]
+		if n := count[key(*v)]; v.valueFP != nil && v.Type != models.SecretTypeEnvVar && n > 1 {
+			sum := sha256.Sum256([]byte(key(*v)))
+			v.DupCount, v.DupGroup = n, hex.EncodeToString(sum[:6])
+		}
+	}
 }
 
 func (r *SecretRepo) loadView(ctx context.Context, id int64, includeDeleted bool) (*SecretView, error) {

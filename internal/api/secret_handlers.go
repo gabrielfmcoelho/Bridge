@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -67,6 +68,8 @@ func (h *secretHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		Type:       models.SecretType(r.URL.Query().Get("type")),
 		Visibility: models.SecretVisibility(r.URL.Query().Get("visibility")),
 		GroupLabel: r.URL.Query().Get("group_label"),
+		Query:      strings.TrimSpace(r.URL.Query().Get("q")),
+		Kind:       r.URL.Query().Get("kind"),
 	}
 	if v := r.URL.Query().Get("parent_id"); v != "" {
 		if pid, err := strconv.ParseInt(v, 10, 64); err == nil {
