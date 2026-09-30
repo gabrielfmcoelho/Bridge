@@ -12,7 +12,7 @@ import type { AssetType, FormField, FormFieldType, FormSchema, OfferingTemplate 
 export type SchemaIssue = { code: string; n?: number; key?: string; value?: string };
 
 const FIELD_TYPES: readonly FormFieldType[] = ["text", "textarea", "number", "select", "checkbox", "date", "tags", "asset_ref"];
-const ASSET_TYPES: readonly AssetType[] = ["host", "dns", "service", "project", "contact", "tool", "ssh_key", "api_catalog", "secret", "offering"];
+const ASSET_TYPES: readonly AssetType[] = ["host", "dns", "service", "project", "contact", "tool", "api_catalog", "secret", "offering"];
 /** Field keys become form_data keys, so they stay identifier-shaped. */
 const FIELD_KEY_RE = /^[a-z][a-z0-9_]*$/;
 /** Template keys are only labels for a preset; kebab-case is fine (and is what the seed uses). */

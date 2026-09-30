@@ -19,7 +19,7 @@ import FormError from "@/components/ui/FormError";
 import Pagination from "@/components/ui/Pagination";
 import EntidadeScopeFields from "@/components/entidades/EntidadeScopeFields";
 
-const ASSET_TYPES: AssetType[] = ["host", "dns", "service", "project", "contact", "tool", "ssh_key", "api_catalog", "secret"];
+const ASSET_TYPES: AssetType[] = ["host", "dns", "service", "project", "contact", "tool", "api_catalog", "secret"];
 
 type EntidadeForm = { id: number | null; name: string; slug: string; parent_id: number | null; description: string };
 const emptyForm: EntidadeForm = { id: null, name: "", slug: "", parent_id: null, description: "" };

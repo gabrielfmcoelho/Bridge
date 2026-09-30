@@ -234,7 +234,6 @@ export default function OverlaysSection() {
             <code>app/{"{hosts,dns,services,projects}"}/FilterDrawer.tsx</code> (4 near-identical)
           </li>
           <li><code>app/hosts/_components/BatchOperationShell.tsx</code></li>
-          <li><code>app/secrets/_components/HistoryDrawer.tsx</code> (guardrailed)</li>
           <li>Confirms: <code>useConfirm()</code> (<code>ResponsiveModal size=&quot;sm&quot;</code>); notices: <code>useFlag()</code></li>
         </ul>
       </div>

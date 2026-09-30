@@ -41,8 +41,8 @@ type legacyKey struct {
 // vault, in one transaction.
 func MigrateSSHKeysToVault(ctx context.Context, db *sql.DB, enc *database.Encryptor, actorUserID int64) (SSHKeyMigrationStats, error) {
 	var st SSHKeyMigrationStats
-	if actorUserID <= 0 {
-		return st, nil // no users yet: nothing can own the secrets; next boot retries
+	if actorUserID <= 0 || !legacyTableExists(ctx, db) {
+		return st, nil // no users yet (next boot retries), or already dropped
 	}
 	rows, err := db.QueryContext(ctx,
 		`SELECT id, name, COALESCE(username, ''), COALESCE(description, ''),
@@ -227,9 +227,52 @@ func migrateOneKey(ctx context.Context, tx *sql.Tx, enc *database.Encryptor, act
 	}
 }
 
-// RunSSHKeyMigration is the startup hook: migrate, then stamp anything left
-// without derived columns. Failures are logged, not fatal — hosts keep
-// resolving through their per-host copies.
+// legacyTableExists reports whether ssh_keys is still there.
+func legacyTableExists(ctx context.Context, db *sql.DB) bool {
+	var exists bool
+	_ = db.QueryRowContext(ctx, `SELECT to_regclass('ssh_keys') IS NOT NULL`).Scan(&exists)
+	return exists
+}
+
+// DropLegacySSHKeys removes the old library once every row holding a key or
+// password has a vault copy: the ssh_keys table, host_remote_users.ssh_key_id
+// and the library's entidade grants. Returns false (nothing dropped) while
+// any row is left to migrate. The mapping for old clients lives on in
+// secrets.legacy_ssh_key_id.
+func DropLegacySSHKeys(ctx context.Context, db *sql.DB) (bool, error) {
+	if !legacyTableExists(ctx, db) {
+		return false, nil
+	}
+	var pending int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM ssh_keys k
+		  WHERE (length(k.priv_key_ciphertext) > 0 OR length(k.pub_key_ciphertext) > 0 OR length(k.password_ciphertext) > 0)
+		    AND NOT EXISTS (SELECT 1 FROM secrets s WHERE s.legacy_ssh_key_id = k.id)`).Scan(&pending); err != nil {
+		return false, err
+	}
+	if pending > 0 {
+		return false, nil
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	for _, q := range []string{
+		`DELETE FROM asset_entidades WHERE asset_type = 'ssh_key'`,
+		`ALTER TABLE host_remote_users DROP COLUMN IF EXISTS ssh_key_id`,
+		`DROP TABLE IF EXISTS ssh_keys`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit()
+}
+
+// RunSSHKeyMigration is the startup hook: stamp derived columns, migrate the
+// old library, then drop it once nothing is left behind. Failures are
+// logged, not fatal — hosts keep resolving through their per-host copies.
 func RunSSHKeyMigration(ctx context.Context, db *database.DB) {
 	// Stamp first: adopting a same-named secret compares value fingerprints.
 	if n, err := BackfillDerived(ctx, db.SQL, db.Encryptor); err != nil {
@@ -238,9 +281,17 @@ func RunSSHKeyMigration(ctx context.Context, db *database.DB) {
 		log.Printf("[vault] stamped %d secret(s) with derived columns", n)
 	}
 	actor := resolveSystemActor(ctx, db)
-	if st, err := MigrateSSHKeysToVault(ctx, db.SQL, db.Encryptor, actor); err != nil {
+	st, err := MigrateSSHKeysToVault(ctx, db.SQL, db.Encryptor, actor)
+	if err != nil {
 		log.Printf("[vault] migrate ssh_keys: %v", err)
-	} else if st.Created+st.Reused > 0 {
+		return
+	}
+	if st.Created+st.Reused > 0 {
 		log.Printf("[vault] ssh_keys → vault: %d created (%d renamed), %d reused, %d host links", st.Created, st.Renamed, st.Reused, st.Links)
+	}
+	if dropped, err := DropLegacySSHKeys(ctx, db.SQL); err != nil {
+		log.Printf("[vault] drop legacy ssh_keys: %v", err)
+	} else if dropped {
+		log.Printf("[vault] legacy ssh_keys table dropped (all rows live in the vault)")
 	}
 }

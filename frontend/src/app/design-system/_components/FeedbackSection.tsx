@@ -296,8 +296,8 @@ export default function FeedbackSection() {
           </li>
           <li>
             Confirms go through <code>useConfirm()</code> (<code>danger</code>, <code>requireText</code>); outcomes of
-            background actions through <code>useFlag()</code> (bottom-left, 8s for success/info, errors stay). One native{" "}
-            <code>prompt()</code> left in <code>secrets/EnvVarBundleEditor.tsx</code> (guardrailed).
+            background actions through <code>useFlag()</code> (bottom-left, 8s for success/info, errors stay). No native{" "}
+            <code>prompt()</code> left.
           </li>
         </ul>
       </div>

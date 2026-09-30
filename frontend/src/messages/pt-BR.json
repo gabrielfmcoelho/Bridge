@@ -2189,7 +2189,7 @@
     "secretTitle": "Segredo compartilhado",
     "secretDesc": "Alguém compartilhou um segredo com você através de um link temporário.",
     "protected": "Este link está protegido. Insira a senha para revelá-lo.",
-    "passphrase": "Senha",
+    "passphrase": "Frase de acesso",
     "incorrectPassphrase": "Senha incorreta. Por favor, tente novamente.",
     "unlock": "Desbloquear",
     "expired": "Este link expirou ou não é mais válido. Peça ao remetente por um novo.",
@@ -2227,7 +2227,38 @@
       "raw": "bruto"
     },
     "switchToLight": "Mudar para tema claro",
-    "switchToDark": "Mudar para tema escuro"
+    "switchToDark": "Mudar para tema escuro",
+    "drawerTitle": "Compartilhar por link",
+    "createLink": "Criar link",
+    "linkCreated": "Link criado",
+    "copyNow": "Copie agora — ele não será mostrado de novo.",
+    "newLink": "Novo link",
+    "nickname": "Apelido",
+    "nicknamePlaceholder": "Para reconhecer este link",
+    "descriptionHint": "Aparece para quem abrir o link.",
+    "expiresAfter": "Expira em",
+    "ttl": {
+      "1h": "1 hora",
+      "24h": "24 horas",
+      "7d": "7 dias",
+      "custom": "Outro"
+    },
+    "customHours": "Horas",
+    "passphraseHint": "Opcional. Quem abrir precisa digitá-la.",
+    "maxViews": "Máximo de aberturas",
+    "maxViewsHint": "Opcional. Em branco, ilimitado até expirar.",
+    "existingLinks": "Links existentes",
+    "noLinks": "Nenhum link criado.",
+    "views": "{count}{max} aberturas",
+    "expiresOn": "expira em {when}",
+    "expiredOn": "expirou em {when}",
+    "withPassphrase": "com frase de acesso",
+    "revoke": "Revogar",
+    "state": {
+      "revoked": "Revogado",
+      "expired": "Expirado",
+      "exhausted": "Esgotado"
+    }
   },
   "entidades": {
     "title": "Entidades",
@@ -2255,7 +2286,6 @@
       "project": "Projetos",
       "contact": "Contatos",
       "tool": "Ferramentas",
-      "ssh_key": "Chaves SSH",
       "api_catalog": "APIs",
       "secret": "Segredos (avulsos)",
       "offering": "Ofertas"

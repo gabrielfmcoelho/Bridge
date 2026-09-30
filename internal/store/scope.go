@@ -18,7 +18,6 @@ const (
 	AssetProject    AssetType = "project"
 	AssetContact    AssetType = "contact"
 	AssetTool       AssetType = "tool"
-	AssetSSHKey     AssetType = "ssh_key"
 	AssetAPICatalog AssetType = "api_catalog"
 	AssetSecret     AssetType = "secret"
 )
@@ -41,7 +40,6 @@ var assetRegistry = map[AssetType]AssetSpec{
 	AssetProject:    {Table: "projects", NameColumn: "name", SoftDelete: true},
 	AssetContact:    {Table: "contacts", NameColumn: "name"},
 	AssetTool:       {Table: "external_tools", NameColumn: "name", SoftDelete: true},
-	AssetSSHKey:     {Table: "ssh_keys", NameColumn: "name"},
 	AssetAPICatalog: {Table: "api_catalog", NameColumn: "name", SoftDelete: true},
 	// Only standalone shared secrets carry their own grants; parented secrets
 	// inherit from host/service/project/tool and personal ones are owner-only.

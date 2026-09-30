@@ -49,7 +49,7 @@ export interface AssetGrantsInput {
 
 export type AssetType =
   | "host" | "dns" | "service" | "project" | "contact"
-  | "tool" | "ssh_key" | "api_catalog" | "secret" | "offering";
+  | "tool" | "api_catalog" | "secret" | "offering";
 
 export interface AuthProviderInfo {
   name: string;

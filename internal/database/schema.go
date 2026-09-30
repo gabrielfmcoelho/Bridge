@@ -20,7 +20,6 @@ var TableCopyOrder = []string{
 	"dns_records",
 	"projects",
 	"external_tools",
-	"ssh_keys",
 	"tags",
 	"oauth_states",
 	"auth_role_mappings",
@@ -94,14 +93,6 @@ var BlobColumns = map[string]map[string]bool{
 		"priv_key_ciphertext": true,
 		"priv_key_nonce":      true,
 	},
-	"ssh_keys": {
-		"pub_key_ciphertext":  true,
-		"pub_key_nonce":       true,
-		"priv_key_ciphertext": true,
-		"priv_key_nonce":      true,
-		"password_ciphertext": true,
-		"password_nonce":      true,
-	},
 	"service_credentials": {
 		"credentials_ciphertext": true,
 		"credentials_nonce":      true,
@@ -131,7 +122,7 @@ var IntColumns = map[string]map[string]bool{
 var SerialTables = []string{
 	"users", "hosts", "orchestrators", "dns_records", "projects",
 	"responsaveis", "services", "service_credentials",
-	"external_tools", "contacts", "ssh_keys", "host_scans",
+	"external_tools", "contacts", "host_scans",
 	"host_chamados", "host_alerts", "issues", "releases",
 	"host_operation_logs", "user_external_identities",
 	"user_gitlab_tokens", "project_gitlab_links", "project_embeds", "auth_role_mappings",

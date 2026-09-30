@@ -8,7 +8,7 @@ import (
 )
 
 // HostRemoteUserRepo owns SQL for host_remote_users (links a remote-user account
-// on a host to the managed ssh_keys row whose pubkey was installed). Referenced
+// on a host to the shared vault credentials it logs in with). Referenced
 // by sshconfig + coolify handlers; built inline until Phase 2 hoists it.
 type HostRemoteUserRepo struct {
 	db *sql.DB
@@ -17,16 +17,12 @@ type HostRemoteUserRepo struct {
 // NewHostRemoteUserRepo constructs a HostRemoteUserRepo over the DB handle.
 func NewHostRemoteUserRepo(db *sql.DB) *HostRemoteUserRepo { return &HostRemoteUserRepo{db: db} }
 
-const hostRemoteUserCols = `id, host_id, username, ssh_key_id, key_secret_id, created_at, updated_at`
+const hostRemoteUserCols = `id, host_id, username, key_secret_id, created_at, updated_at`
 
 func scanHostRemoteUser(scanner interface{ Scan(...any) error }, u *models.HostRemoteUser) error {
-	var keyID, keySecretID sql.NullInt64
-	if err := scanner.Scan(&u.ID, &u.HostID, &u.Username, &keyID, &keySecretID, &u.CreatedAt, &u.UpdatedAt); err != nil {
+	var keySecretID sql.NullInt64
+	if err := scanner.Scan(&u.ID, &u.HostID, &u.Username, &keySecretID, &u.CreatedAt, &u.UpdatedAt); err != nil {
 		return err
-	}
-	if keyID.Valid {
-		id := keyID.Int64
-		u.SSHKeyID = &id
 	}
 	if keySecretID.Valid {
 		id := keySecretID.Int64
@@ -75,7 +71,7 @@ func (r *HostRemoteUserRepo) Delete(ctx context.Context, hostID int64, username 
 // SetSecret links the (host, username) row to a shared password credential
 // (secretID non-nil) or unlinks it (secretID nil → per-host resolution).
 // Upserts so a host with no prior remote-user row still gets the link. The
-// row's ssh_key_id is preserved on update — a host can carry both a shared key
+// row's key_secret_id is preserved on update — a host can carry both a shared key
 // and a shared password.
 func (r *HostRemoteUserRepo) SetSecret(ctx context.Context, hostID int64, username string, secretID *int64) error {
 	var secretArg any

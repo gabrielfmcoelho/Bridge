@@ -84,31 +84,3 @@ func TestExternalToolRepo_Scope(t *testing.T) {
 	}
 }
 
-func TestSSHKeyRepo_Scope(t *testing.T) {
-	d := openDB(t)
-	sga, scoped := miscSGAScope(t, d)
-	repo := store.NewSSHKeyRepo(d.SQL)
-	bg := context.Background()
-
-	mine := &models.SSHKey{Name: "mine"}
-	other := &models.SSHKey{Name: "other"}
-	for _, k := range []*models.SSHKey{mine, other} {
-		if err := repo.Create(bg, k); err != nil {
-			t.Fatalf("create: %v", err)
-		}
-	}
-	miscGrantSGA(t, d, store.AssetSSHKey, mine.ID, sga)
-
-	if got, err := repo.List(scoped); err != nil || len(got) != 1 || got[0].ID != mine.ID {
-		t.Fatalf("scoped list = %+v, %v; want only mine", got, err)
-	}
-	if got, err := repo.Get(scoped, other.ID); err != nil || got != nil {
-		t.Fatalf("scoped get other = %+v, %v; want nil,nil", got, err)
-	}
-	if err := repo.Delete(scoped, other.ID); err != nil {
-		t.Fatalf("scoped delete: %v", err)
-	}
-	if got, err := repo.List(bg); err != nil || len(got) != 2 {
-		t.Fatalf("unscoped list = %+v, %v; want both (scoped delete must be a no-op)", got, err)
-	}
-}

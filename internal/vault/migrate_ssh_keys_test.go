@@ -119,6 +119,35 @@ func TestMigrateSSHKeysToVault(t *testing.T) {
 	if st, err := vault.MigrateSSHKeysToVault(ctx, d.SQL, d.Encryptor, uid); err != nil || st.Created+st.Reused != 0 {
 		t.Fatalf("second run = %+v, %v; want no-op", st, err)
 	}
+
+	// Everything migrated → the old library goes; resolution is unaffected.
+	if dropped, err := vault.DropLegacySSHKeys(ctx, d.SQL); err != nil || !dropped {
+		t.Fatalf("drop = %v, %v; want dropped", dropped, err)
+	}
+	var exists bool
+	d.SQL.QueryRow(`SELECT to_regclass('ssh_keys') IS NOT NULL`).Scan(&exists)
+	if exists {
+		t.Fatal("ssh_keys still exists")
+	}
+	if key, ok, err := vault.HostGetSSHKey(ctx, d, hid); err != nil || !ok || key.PrivateKeyPEM != priv {
+		t.Fatalf("after drop: key=%v ok=%v err=%v", key.PrivateKeyPEM != "", ok, err)
+	}
+	if st, err := vault.MigrateSSHKeysToVault(ctx, d.SQL, d.Encryptor, uid); err != nil || st.Created != 0 {
+		t.Fatalf("migrate after drop = %+v, %v; want no-op", st, err)
+	}
+	if dropped, err := vault.DropLegacySSHKeys(ctx, d.SQL); err != nil || dropped {
+		t.Fatalf("second drop = %v, %v; want no-op", dropped, err)
+	}
+}
+
+// A row that couldn't be migrated keeps the table.
+func TestDropLegacySSHKeysWaitsForPending(t *testing.T) {
+	d, _, _ := newHostSecretFixture(t)
+	priv, _ := testKeyPEM(t)
+	seedSSHKey(t, d, "pending", "u", priv, "")
+	if dropped, err := vault.DropLegacySSHKeys(context.Background(), d.SQL); err != nil || dropped {
+		t.Fatalf("drop with a pending row = %v, %v; want kept", dropped, err)
+	}
 }
 
 // A per-host key write wins over the shared link, as for passwords.

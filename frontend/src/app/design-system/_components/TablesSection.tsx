@@ -172,25 +172,22 @@ export default function TablesSection() {
         <Field label="URL" link href="#tables" value="https://bridge.gov.pi/hosts/web-01" />
         <Field label="Empty" value="" />
         <p className="text-[11px] text-[var(--text-muted)] w-full">
-          Read-only label/value display; not a form field (name collision with the local <code>Field</code> in{" "}
-          <code>app/ssh-keys/page.tsx:469</code>).
+          Read-only label/value display; not a form field.
         </p>
       </Specimen>
 
       <Specimen
         title="Local KV helper"
-        source="app/ssh-keys/page.tsx:469-478"
+        source="app/hosts/_components/BatchDockerLogsModal.tsx:290 Stat"
         alsoIn={[
-          "app/hosts/_components/BatchDockerLogsModal.tsx:290 Stat",
           "components/atlas/pipeline/PipelineNodeDetail.tsx:221 KV",
           "components/atlas/catalog/TableDetailPanel.tsx:135 Stat",
           "components/lineage/TablesPanel.tsx:154 Row",
-          "components/vault/VaultPage.tsx:182 FilterRow",
           "app/hosts/FilterDrawer.tsx:164 FieldLabel",
           "<dl> in components/requests/RequestAnswers.tsx, app/requests/[id]/RequestDetail.tsx:241, app/catalog/_components/RequestFormModal.tsx:54",
         ]}
       >
-        {/* specimen: app/ssh-keys/page.tsx:469-478 */}
+        {/* specimen: a local label/value pair (Stat, KV, Row…) */}
         <div>
           <span className="text-xs text-[var(--text-muted)]">Key type</span>
           <p className="text-sm text-[var(--text-secondary)]" style={{ fontFamily: "var(--font-mono)" }}>
@@ -206,7 +203,7 @@ export default function TablesSection() {
       <Specimen
         title="RequestTimeline"
         source="app/requests/[id]/_components/RequestTimeline.tsx"
-        alsoIn={["app/secrets/_components/HistoryDrawer.tsx (guardrailed path)", "components/glpi/TicketDetailDrawer.tsx", "app/releases/page.tsx"]}
+        alsoIn={["components/glpi/TicketDetailDrawer.tsx", "components/detail/ReleaseTimeline.tsx"]}
         wide
       >
         <RequestTimeline events={REQUEST_EVENTS} />

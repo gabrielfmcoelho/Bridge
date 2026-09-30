@@ -2227,7 +2227,38 @@
       "raw": "raw"
     },
     "switchToLight": "Switch to light theme",
-    "switchToDark": "Switch to dark theme"
+    "switchToDark": "Switch to dark theme",
+    "drawerTitle": "Share by link",
+    "createLink": "Create link",
+    "linkCreated": "Link created",
+    "copyNow": "Copy it now — it won't be shown again.",
+    "newLink": "New link",
+    "nickname": "Nickname",
+    "nicknamePlaceholder": "To recognise this link",
+    "descriptionHint": "Shown to whoever opens the link.",
+    "expiresAfter": "Expires after",
+    "ttl": {
+      "1h": "1 hour",
+      "24h": "24 hours",
+      "7d": "7 days",
+      "custom": "Other"
+    },
+    "customHours": "Hours",
+    "passphraseHint": "Optional. Whoever opens it must type it.",
+    "maxViews": "Maximum opens",
+    "maxViewsHint": "Optional. Blank means unlimited until it expires.",
+    "existingLinks": "Existing links",
+    "noLinks": "No links yet.",
+    "views": "{count}{max} opens",
+    "expiresOn": "expires on {when}",
+    "expiredOn": "expired on {when}",
+    "withPassphrase": "with passphrase",
+    "revoke": "Revoke",
+    "state": {
+      "revoked": "Revoked",
+      "expired": "Expired",
+      "exhausted": "Used up"
+    }
   },
   "entidades": {
     "title": "Entidades",
@@ -2255,7 +2286,6 @@
       "project": "Projects",
       "contact": "Contacts",
       "tool": "Tools",
-      "ssh_key": "SSH Keys",
       "api_catalog": "APIs",
       "secret": "Secrets (avulso)",
       "offering": "Offerings"

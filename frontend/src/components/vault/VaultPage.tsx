@@ -24,12 +24,12 @@ import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import type { RowAction } from "@/components/ui/RowActions";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import ShareLinkModal from "@/app/secrets/_components/ShareLinkModal";
 import { NewSecretDrawer } from "./SecretForm";
 import VaultEntryEditor from "./VaultEntryEditor";
 import SecretDetailDrawer from "./SecretDetailDrawer";
 import VaultTable from "./VaultTable";
 import VaultCards from "./VaultCards";
+import ShareLinkDrawer from "./ShareLinkDrawer";
 import ConsolidateDrawer, { consolidationKey } from "./ConsolidateDrawer";
 
 // The Cofre lives here (outside app/secrets/, which is write-protected) and
@@ -195,7 +195,7 @@ function VaultPageInner() {
         canWrite={!!detail && canWrite(detail)} canDelete={!!detail && canDelete(detail)} />
       <NewSecretDrawer open={newOpen} onClose={() => setNewOpen(false)} />
       <VaultEntryEditor secret={editing} onClose={() => setEditing(null)} />
-      <ShareLinkModal secretID={sharing} onClose={() => setSharing(null)} />
+      <ShareLinkDrawer secretID={sharing} onClose={() => setSharing(null)} />
       {isAdmin && <ConsolidateDrawer open={consolidateOpen} onClose={() => setConsolidateOpen(false)} />}
     </PageShell>
   );

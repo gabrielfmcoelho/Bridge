@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	gossh "golang.org/x/crypto/ssh"
 )
 
 // DB wraps a SQL database connection and an Encryptor for sensitive data.
@@ -71,7 +70,6 @@ func Open(configDir string) (*DB, error) {
 	}
 
 	// Recompute SSH key fingerprints that used the old hex format.
-	d.fixSSHKeyFingerprints()
 
 	return d, nil
 }
@@ -113,7 +111,6 @@ func OpenDSN(dsn, configDir string) (*DB, error) {
 		db.Close()
 		return nil, err
 	}
-	d.fixSSHKeyFingerprints()
 	return d, nil
 }
 
@@ -256,59 +253,6 @@ func envFlag(key string) bool {
 		return true
 	}
 	return false
-}
-
-// fixSSHKeyFingerprints recomputes fingerprints for SSH keys that need it:
-// keys with old truncated-hex fingerprints, or keys with only a private key
-// (no public key stored). For the latter it also derives and stores the public key.
-func (d *DB) fixSSHKeyFingerprints() {
-	rows, err := d.SQL.Query(`SELECT id, fingerprint, pub_key_ciphertext, pub_key_nonce, priv_key_ciphertext, priv_key_nonce FROM ssh_keys`)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id int64
-		var fp string
-		var pubCT, pubNonce, privCT, privNonce []byte
-		if err := rows.Scan(&id, &fp, &pubCT, &pubNonce, &privCT, &privNonce); err != nil {
-			continue
-		}
-		// Skip if already in standard format
-		if strings.HasPrefix(fp, "SHA256:") && len(fp) > 30 {
-			continue
-		}
-
-		// Try from public key first
-		if len(pubCT) > 0 {
-			if pubKeyText, err := d.Encryptor.Decrypt(pubCT, pubNonce); err == nil {
-				if pub, _, _, _, err := gossh.ParseAuthorizedKey([]byte(pubKeyText)); err == nil {
-					d.SQL.Exec(`UPDATE ssh_keys SET fingerprint = ? WHERE id = ?`, gossh.FingerprintSHA256(pub), id)
-					continue
-				}
-			}
-		}
-
-		// Derive from private key if no public key is available
-		if len(privCT) > 0 {
-			privKeyText, err := d.Encryptor.Decrypt(privCT, privNonce)
-			if err != nil {
-				continue
-			}
-			signer, err := gossh.ParsePrivateKey([]byte(privKeyText))
-			if err != nil {
-				continue
-			}
-			pub := signer.PublicKey()
-			newFP := gossh.FingerprintSHA256(pub)
-			// Store derived public key and fingerprint
-			pubKeyStr := string(gossh.MarshalAuthorizedKey(pub))
-			if ct, nonce, err := d.Encryptor.Encrypt(pubKeyStr); err == nil {
-				d.SQL.Exec(`UPDATE ssh_keys SET fingerprint = ?, pub_key_ciphertext = ?, pub_key_nonce = ? WHERE id = ?`, newFP, ct, nonce, id)
-			}
-		}
-	}
 }
 
 // backfillHostKeyBlobs was removed in the column-drop refactor — the legacy

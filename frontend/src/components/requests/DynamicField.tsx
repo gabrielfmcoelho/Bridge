@@ -16,7 +16,7 @@ import type { FormField } from "@/lib/types";
 
 // asset_ref pickers: compose the existing per-asset list() endpoints rather
 // than inventing a generic "search assets by type" API. AssetType values with
-// no obvious pick source (contact, ssh_key, secret, offering) have no entry
+// no obvious pick source (contact, secret, offering) have no entry
 // here and fall through to the plain-Input fallback below.
 const ASSET_PICKERS: Partial<Record<string, () => Promise<{ id: number; label: string }[]>>> = {
   host: () => hostsAPI.list().then((rows) => rows.map((r) => ({ id: r.id, label: r.nickname }))),

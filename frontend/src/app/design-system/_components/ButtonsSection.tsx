@@ -118,7 +118,7 @@ export default function ButtonsSection() {
           <code>CopyButton</code> is Button + the hook for the plain case. Migrated: ssh-config, settings Grafana webhook secret, SSHConfigDrawer (hook, two
           controls share one state), WikiShareModal, ShareBundleModal, ProjectSecretsSheet. Still inline:{" "}
           <code>glpi/DropdownCatalogueEditorModal.tsx:112</code>,{" "}
-          <code>share/[token]/page.tsx:428</code> (keyed multi-copy), <code>secrets/ShareLinkModal.tsx</code> (guardrailed).
+          <code>share/[token]/page.tsx:428</code> (keyed multi-copy).
         </p>
       </Specimen>
 
@@ -134,7 +134,6 @@ export default function ButtonsSection() {
             <code>app/share/[token]/page.tsx</code> (8).
           </li>
           <li>
-            <code>app/releases/page.tsx:146</code> copies <code>PillButton</code>&apos;s class string;{" "}
             <code>components/glpi/FormcreatorFormDrawer.tsx:365</code> hand-rolls a primary button;{" "}
             <code>components/ui/Modal.tsx:47</code> hand-rolls an <code>IconButton</code>.
           </li>

@@ -400,22 +400,13 @@ export default function FormsSection() {
           "app/requests/[id]/_components/RequestEditModal.tsx:117",
           "app/catalog/_components/RequestFormModal.tsx:299",
           "app/catalog/_components/RequestFormModal.tsx:368",
-          "app/secrets/_components/AppLoginForm.tsx:40 (still text-red-400)",
         ]}
       >
         {/* specimen: components/requests/DynamicField.tsx:58 */}
         <label className="block text-xs font-medium text-[var(--text-secondary)] tracking-wide">
           Name<span className="text-[var(--danger)] ml-0.5">*</span>
         </label>
-        {/* specimen: app/secrets/_components/AppLoginForm.tsx:25; copied, NOT imported (guardrailed path) */}
-        <label className="text-xs font-medium text-[var(--text-muted)] block">
-          Name<span className="text-red-400 ml-0.5">*</span>
-        </label>
       </Specimen>
-      <p className="text-xs text-[var(--text-muted)]">
-        The <code>text-red-400</code> site is a private <code>FormRow</code> in <code>AppLoginForm.tsx:25</code>;
-        the token version above is the one that follows the theme.
-      </p>
 
       <Specimen title="Field wrapper + helper text" source="components/requests/DynamicField.tsx:53-63" wide>
         {/* specimen: components/requests/DynamicField.tsx:53-63 */}
@@ -455,7 +446,7 @@ export default function FormsSection() {
           </li>
           <li>
             Code input is <code>&lt;Textarea className=&quot;font-mono&quot;&gt;</code>:{" "}
-            <code>app/ssh-keys/page.tsx:270</code>,{" "}
+            <code>components/vault/SecretForm.tsx</code>,{" "}
             <code>components/atlas/apis/ProjectSecretsSheet.tsx:62</code>.
           </li>
           <li>
@@ -469,11 +460,6 @@ export default function FormsSection() {
             <code>ui/</code>), 12 <code>&lt;textarea&gt;</code>, 22 <code>&lt;select&gt;</code>. Heaviest:{" "}
             <code>components/atlas/apis/ShareBundleModal.tsx</code> (6), <code>app/settings/ImportTab.tsx</code> (1),{" "}
             <code>app/hosts/[slug]/_components/SSHOperations.tsx</code> (4).
-          </li>
-          <li>
-            Name collision: <code>components/ui/Field.tsx</code> is a read-only label/value display (shown in
-            Tables &amp; Lists), not a form field; <code>app/ssh-keys/page.tsx:469</code> defines an unrelated
-            local <code>Field</code>.
           </li>
         </ul>
       </div>
