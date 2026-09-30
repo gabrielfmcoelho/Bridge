@@ -148,49 +148,32 @@ func (h *coolifyHandlers) handleCheckHost(w http.ResponseWriter, r *http.Request
 
 // (resolvePrivateKeyUUID moved to coolify.Client.EnsurePrivateKey — R4b.)
 
-// selectRegistrationKey resolves which sshcm SSH key should be uploaded to
-// Coolify for a given host. Priority: explicit sshKeyID from the caller,
-// then host_remote_users link for `targetUser`, then the host's own
-// connection key (backward compatibility). Returns the decrypted private-key
-// text, the Coolify key name to use, and a description.
-func (h *coolifyHandlers) selectRegistrationKey(host *models.Host, sshKeyID int64, targetUser string) (privKey, keyName, description string, err error) {
-	load := func(id int64) (*models.SSHKey, string, error) {
-		k, gerr := store.NewSSHKeyRepo(h.db.SQL).Get(context.Background(), id)
-		if gerr != nil {
-			return nil, "", gerr
-		}
-		if k == nil {
-			return nil, "", fmt.Errorf("ssh key %d not found", id)
-		}
-		if len(k.PrivKeyCiphertext) == 0 {
-			return nil, "", fmt.Errorf("ssh key %d has no private key stored", id)
-		}
-		plain, derr := h.db.Encryptor.Decrypt(k.PrivKeyCiphertext, k.PrivKeyNonce)
-		if derr != nil {
-			return nil, "", fmt.Errorf("decrypt ssh key %d: %w", id, derr)
-		}
-		return k, plain, nil
-	}
-
-	if sshKeyID > 0 {
-		k, plain, lerr := load(sshKeyID)
+// selectRegistrationKey resolves which SSH key should be uploaded to Coolify
+// for a host. Priority: the vault key the caller picked, then the key the
+// remote user `targetUser` links to (host_remote_users.key_secret_id), then
+// the host's own connection key. Returns the private key, the Coolify key
+// name and a description.
+func (h *coolifyHandlers) selectRegistrationKey(host *models.Host, keySecretID int64, targetUser string) (privKey, keyName, description string, err error) {
+	ctx := context.Background()
+	if keySecretID > 0 {
+		k, lerr := vault.LoadSharedKey(ctx, h.db, keySecretID)
 		if lerr != nil {
 			return "", "", "", lerr
 		}
-		return plain, coolifyManagedKeyName(k), fmt.Sprintf("Managed by SSHCM key %q", k.Name), nil
+		return k.PrivateKeyPEM, coolifyManagedKeyName(k.Name), fmt.Sprintf("Managed by SSHCM key %q", k.Name), nil
 	}
 
 	if targetUser != "" {
-		if link, lerr := store.NewHostRemoteUserRepo(h.db.SQL).GetByUsername(context.Background(), host.ID, targetUser); lerr == nil && link != nil && link.SSHKeyID != nil {
-			k, plain, lderr := load(*link.SSHKeyID)
-			if lderr == nil {
-				return plain, coolifyManagedKeyName(k), fmt.Sprintf("Managed by SSHCM key %q (remote user %s)", k.Name, targetUser), nil
+		if link, lerr := store.NewHostRemoteUserRepo(h.db.SQL).GetByUsername(ctx, host.ID, targetUser); lerr == nil && link != nil && link.KeySecretID != nil {
+			k, kerr := vault.LoadSharedKey(ctx, h.db, *link.KeySecretID)
+			if kerr == nil {
+				return k.PrivateKeyPEM, coolifyManagedKeyName(k.Name), fmt.Sprintf("Managed by SSHCM key %q (remote user %s)", k.Name, targetUser), nil
 			}
-			log.Printf("[coolify] host_remote_users link present for host=%d user=%s key_id=%d but load failed: %v", host.ID, targetUser, *link.SSHKeyID, lderr)
+			log.Printf("[coolify] host_remote_users link present for host=%d user=%s key=%d but load failed: %v", host.ID, targetUser, *link.KeySecretID, kerr)
 		}
 	}
 
-	key, ok, derr := vault.HostGetSSHKey(context.Background(), h.db, host.ID)
+	key, ok, derr := vault.HostGetSSHKey(ctx, h.db, host.ID)
 	if derr != nil {
 		return "", "", "", fmt.Errorf("load host key: %w", derr)
 	}
@@ -200,16 +183,17 @@ func (h *coolifyHandlers) selectRegistrationKey(host *models.Host, sshKeyID int6
 	return key.PrivateKeyPEM, fmt.Sprintf("sshcm-%s", host.OficialSlug), fmt.Sprintf("Managed by SSHCM for host %s", host.Nickname), nil
 }
 
-// coolifyManagedKeyName produces a Coolify-side name for an sshcm key that is
-// shared across hosts. Kept distinct from the per-host `sshcm-<slug>` name so
-// multiple hosts can reference the same uploaded key without colliding.
-func coolifyManagedKeyName(k *models.SSHKey) string {
+// coolifyManagedKeyName produces a Coolify-side name for a key shared across
+// hosts. Kept distinct from the per-host `sshcm-<slug>` name so multiple hosts
+// can reference the same uploaded key without colliding. Keys migrated from
+// ssh_keys kept their names, so the uploaded key is found again.
+func coolifyManagedKeyName(name string) string {
 	safe := strings.Map(func(r rune) rune {
 		if r == ' ' || r == '/' || r == '\\' {
 			return '_'
 		}
 		return r
-	}, k.Name)
+	}, name)
 	return "sshcm-key-" + safe
 }
 
@@ -224,9 +208,14 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 
 	// Optional body; legacy callers POST with no payload.
 	var req struct {
-		SSHKeyID int64 `json:"ssh_key_id"`
+		KeySecretID int64 `json:"key_secret_id"`
+		SSHKeyID    int64 `json:"ssh_key_id"` // pre-v91 clients
 	}
 	_ = decodeJSON(r, &req)
+	keySecretID, ok := resolveKeySecret(w, r, h.db, req.KeySecretID, req.SSHKeyID)
+	if !ok {
+		return
+	}
 
 	client, err := h.getClient()
 	if err != nil {
@@ -240,7 +229,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 		coolifyUser = "root"
 	}
 
-	privKey, keyName, description, err := h.selectRegistrationKey(host, req.SSHKeyID, coolifyUser)
+	privKey, keyName, description, err := h.selectRegistrationKey(host, keySecretID, coolifyUser)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -327,10 +316,15 @@ func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.R
 	}
 
 	var req struct {
-		SSHKeyID int64 `json:"ssh_key_id"`
+		KeySecretID int64 `json:"key_secret_id"`
+		SSHKeyID    int64 `json:"ssh_key_id"` // pre-v91 clients
 	}
-	if err := decodeJSON(r, &req); err != nil || req.SSHKeyID <= 0 {
-		jsonError(w, http.StatusBadRequest, "ssh_key_id is required")
+	if err := decodeJSON(r, &req); err != nil || (req.KeySecretID <= 0 && req.SSHKeyID <= 0) {
+		jsonError(w, http.StatusBadRequest, "key_secret_id is required")
+		return
+	}
+	keySecretID, ok := resolveKeySecret(w, r, h.db, req.KeySecretID, req.SSHKeyID)
+	if !ok {
 		return
 	}
 
@@ -342,7 +336,7 @@ func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.R
 
 	// Pass empty targetUser so selectRegistrationKey uses only the explicit key
 	// (no auto-resolution fallback — the caller asked for a specific key).
-	privKey, keyName, description, err := h.selectRegistrationKey(host, req.SSHKeyID, "")
+	privKey, keyName, description, err := h.selectRegistrationKey(host, keySecretID, "")
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -443,18 +437,28 @@ func (h *coolifyHandlers) handleDeleteHost(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, map[string]any{"success": true})
 }
 
-// handleCheckKey checks if a managed SSH key exists in Coolify by fingerprint.
-func (h *coolifyHandlers) handleCheckKey(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+// pathSharedKey loads the vault key {id} (a shared SSH key the caller may
+// see); writes the error and returns false otherwise.
+func (h *coolifyHandlers) pathSharedKey(w http.ResponseWriter, r *http.Request) (vault.SharedKey, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		jsonBadRequest(w, r, "invalid id", err)
-		return
+		return vault.SharedKey{}, false
 	}
-
-	key, err := store.NewSSHKeyRepo(h.db.SQL).Get(r.Context(), id)
-	if err != nil || key == nil {
+	if id, ok := resolveKeySecret(w, r, h.db, id, 0); !ok {
+		return vault.SharedKey{}, false
+	} else if k, err := vault.LoadSharedKey(r.Context(), h.db, id); err != nil {
 		jsonError(w, http.StatusNotFound, "key not found")
+		return vault.SharedKey{}, false
+	} else {
+		return k, true
+	}
+}
+
+// handleCheckKey checks if a managed SSH key exists in Coolify by fingerprint.
+func (h *coolifyHandlers) handleCheckKey(w http.ResponseWriter, r *http.Request) {
+	key, ok := h.pathSharedKey(w, r)
+	if !ok {
 		return
 	}
 
@@ -464,8 +468,8 @@ func (h *coolifyHandlers) handleCheckKey(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Compute fingerprint without SHA256: prefix to match Coolify format
-	fp := strings.TrimPrefix(key.Fingerprint, "SHA256:")
+	// Coolify lists fingerprints without the SHA256: prefix.
+	fp := strings.TrimPrefix(key.Fingerprint(), "SHA256:")
 
 	coolifyKeys, err := client.ListPrivateKeys()
 	if err != nil {
@@ -485,28 +489,11 @@ func (h *coolifyHandlers) handleCheckKey(w http.ResponseWriter, r *http.Request)
 
 // handleSyncKey uploads or updates a managed SSH key in Coolify.
 func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		jsonBadRequest(w, r, "invalid id", err)
+	key, ok := h.pathSharedKey(w, r)
+	if !ok {
 		return
 	}
-
-	key, err := store.NewSSHKeyRepo(h.db.SQL).Get(r.Context(), id)
-	if err != nil || key == nil {
-		jsonError(w, http.StatusNotFound, "key not found")
-		return
-	}
-	if len(key.PrivKeyCiphertext) == 0 {
-		jsonError(w, http.StatusBadRequest, "key has no private key stored")
-		return
-	}
-
-	privKeyText, err := h.db.Encryptor.Decrypt(key.PrivKeyCiphertext, key.PrivKeyNonce)
-	if err != nil {
-		jsonServerError(w, r, "failed to decrypt key", err)
-		return
-	}
+	privKeyText := key.PrivateKeyPEM
 
 	client, err := h.getClient()
 	if err != nil {
@@ -523,7 +510,7 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 	if createErr != nil {
 		// Already exists — find it by fingerprint
 		if strings.Contains(createErr.Error(), "422") || strings.Contains(createErr.Error(), "already exists") {
-			fp := strings.TrimPrefix(key.Fingerprint, "SHA256:")
+			fp := strings.TrimPrefix(key.Fingerprint(), "SHA256:")
 			coolifyKeys, _ := client.ListPrivateKeys()
 			for _, ck := range coolifyKeys {
 				if fp != "" && ck.Fingerprint == fp {

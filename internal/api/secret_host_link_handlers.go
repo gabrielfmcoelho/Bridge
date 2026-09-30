@@ -7,10 +7,12 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
 // secret_host_link_handlers.go — link/unlink/list the hosts that reuse a shared
-// password credential (an avulso `password` secret) via host_remote_users.secret_id.
+// host credential — an avulso `password` (host_remote_users.secret_id) or
+// `sshkey` (key_secret_id).
 // This is the "create a credential once, reuse across N hosts" surface; per-host
 // passwords stay on the existing scope=host path.
 //
@@ -19,27 +21,27 @@ import (
 //   POST   /api/secrets/{id}/hosts {host_ids} -> handleLinkHosts
 //   DELETE /api/secrets/{id}/hosts/{host_id}  -> handleUnlinkHost
 
-// loadSharedPasswordCredential returns the secret view iff it is an avulso
-// `password` credential (the only kind shareable across hosts). It reuses
-// GetMetadata so the caller's read-ACL is enforced. On failure it writes the
-// response and returns ok=false.
-func (h *secretHandlers) loadSharedPasswordCredential(w http.ResponseWriter, r *http.Request, id int64) bool {
+// loadSharedHostCredential returns the credential's type iff it is an avulso
+// password or SSH key (the kinds hosts can share). It reuses GetMetadata so
+// the caller's read-ACL is enforced. On failure it writes the response and
+// returns ok=false.
+func (h *secretHandlers) loadSharedHostCredential(w http.ResponseWriter, r *http.Request, id int64) (models.SecretType, bool) {
 	actor, ok := actorFrom(r)
 	if !ok {
 		jsonError(w, http.StatusUnauthorized, "authentication required")
-		return false
+		return "", false
 	}
 	v, err := h.repo.GetMetadata(r.Context(), actor, id)
 	if err != nil {
 		writeErr(w, r, err)
-		return false
+		return "", false
 	}
-	if v.Type != models.SecretTypePassword || v.Scope != models.SecretScopeAvulso {
+	if (v.Type != models.SecretTypePassword && v.Type != models.SecretTypeSSHKey) || v.Scope != models.SecretScopeAvulso {
 		jsonError(w, http.StatusBadRequest,
-			"only an avulso password credential can be shared across hosts")
-		return false
+			"only an avulso password or SSH key can be shared across hosts")
+		return "", false
 	}
-	return true
+	return v.Type, true
 }
 
 // requireSharedWriter enforces the shared-secret write ACL (editor/admin),
@@ -78,7 +80,7 @@ func (h *secretHandlers) handleListLinkedHosts(w http.ResponseWriter, r *http.Re
 		jsonBadRequest(w, r, "invalid secret id", err)
 		return
 	}
-	if !h.loadSharedPasswordCredential(w, r, id) {
+	if _, ok := h.loadSharedHostCredential(w, r, id); !ok {
 		return
 	}
 	ids, err := store.NewHostRemoteUserRepo(h.db.SQL).ListHostsBySecret(r.Context(), id)
@@ -101,8 +103,15 @@ func (h *secretHandlers) handleLinkHosts(w http.ResponseWriter, r *http.Request)
 	if !requireSharedWriter(w, r) {
 		return
 	}
-	if !h.loadSharedPasswordCredential(w, r, id) {
+	typ, ok := h.loadSharedHostCredential(w, r, id)
+	if !ok {
 		return
+	}
+	if typ == models.SecretTypeSSHKey {
+		if _, err := vault.LoadSharedKey(r.Context(), h.db, id); err != nil {
+			jsonBadRequest(w, r, err.Error(), nil)
+			return
+		}
 	}
 	var req struct {
 		HostIDs []int64 `json:"host_ids"`
@@ -115,7 +124,6 @@ func (h *secretHandlers) handleLinkHosts(w http.ResponseWriter, r *http.Request)
 		jsonBadRequest(w, r, "host_ids is required", nil)
 		return
 	}
-	repo := store.NewHostRemoteUserRepo(h.db.SQL)
 	linked := 0
 	for _, hostID := range req.HostIDs {
 		sshUser, ok, err := h.hostLoginUser(r, hostID)
@@ -127,9 +135,16 @@ func (h *secretHandlers) handleLinkHosts(w http.ResponseWriter, r *http.Request)
 			jsonBadRequest(w, r, "host not found", nil)
 			return
 		}
-		if err := repo.SetSecret(r.Context(), hostID, sshUser, &id); err != nil {
+		if err := vault.LinkRemoteUserCredential(r.Context(), h.db.SQL, hostID, sshUser, id, typ); err != nil {
 			writeErr(w, r, err)
 			return
+		}
+		if typ == models.SecretTypeSSHKey {
+			// The host now authenticates by key, as when a key is picked in its form.
+			if err := store.NewHostRepo(h.db.SQL).UpdateKeyMeta(r.Context(), hostID, true, "", "yes"); err != nil {
+				writeErr(w, r, err)
+				return
+			}
 		}
 		linked++
 	}
@@ -150,7 +165,8 @@ func (h *secretHandlers) handleUnlinkHost(w http.ResponseWriter, r *http.Request
 	if !requireSharedWriter(w, r) {
 		return
 	}
-	if !h.loadSharedPasswordCredential(w, r, id) {
+	typ, ok := h.loadSharedHostCredential(w, r, id)
+	if !ok {
 		return
 	}
 	sshUser, ok, err := h.hostLoginUser(r, hostID)
@@ -162,7 +178,7 @@ func (h *secretHandlers) handleUnlinkHost(w http.ResponseWriter, r *http.Request
 		jsonBadRequest(w, r, "host not found", nil)
 		return
 	}
-	if err := store.NewHostRemoteUserRepo(h.db.SQL).SetSecret(r.Context(), hostID, sshUser, nil); err != nil {
+	if err := vault.LinkRemoteUserCredential(r.Context(), h.db.SQL, hostID, sshUser, 0, typ); err != nil {
 		writeErr(w, r, err)
 		return
 	}

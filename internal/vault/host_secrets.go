@@ -158,9 +158,12 @@ func HostSetPassword(ctx context.Context, db *database.DB, hostID, actorUserID i
 // envelope under name='ssh-key'. Empty private+public clears the secret.
 func HostSetSSHKey(ctx context.Context, db *database.DB, hostID, actorUserID int64, key HostSSHKey) error {
 	if key.PrivateKeyPEM == "" && key.PublicKey == "" {
-		// Clear path — soft-delete the existing row if any.
-		return upsertHostSecret(ctx, db, hostID, actorUserID,
-			models.SecretTypeSSHKey, hostSSHKeyName, "")
+		// Clear path — soft-delete the host's own key and drop a shared link.
+		if err := upsertHostSecret(ctx, db, hostID, actorUserID,
+			models.SecretTypeSSHKey, hostSSHKeyName, ""); err != nil {
+			return err
+		}
+		return clearHostLink(ctx, db, hostID, "key_secret_id")
 	}
 	payload, err := json.Marshal(key)
 	if err != nil {

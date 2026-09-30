@@ -314,16 +314,13 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		h.logOperation(r, host.ID, "test", &method, "success", "")
 		// Annotate scanned SSH keys with managed status from DB
 		if len(vmInfo.SSHKeys) > 0 {
-			dbKeys, _ := store.NewSSHKeyRepo(h.db.SQL).List(r.Context())
+			dbKeys, _ := vault.SharedKeyNames(r.Context(), h.db.SQL)
 			matched := 0
 			for i, sk := range vmInfo.SSHKeys {
-				for _, dk := range dbKeys {
-					if dk.Fingerprint != "" && dk.Fingerprint == sk.Fingerprint {
-						vmInfo.SSHKeys[i].Managed = true
-						vmInfo.SSHKeys[i].ManagedName = dk.Name
-						matched++
-						break
-					}
+				if name, ok := dbKeys[sk.Fingerprint]; ok && sk.Fingerprint != "" {
+					vmInfo.SSHKeys[i].Managed = true
+					vmInfo.SSHKeys[i].ManagedName = name
+					matched++
 				}
 				if !vmInfo.SSHKeys[i].Managed {
 					log.Printf("[ssh] scan-annotate host=%s unmatched user=%s source=%s fp=%s (no DB key with this fingerprint)",
@@ -817,13 +814,32 @@ func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Requ
 	}
 
 	var req struct {
-		Username string `json:"username"`
-		PubKey   string `json:"pub_key"`
-		SSHKeyID int64  `json:"ssh_key_id"`
-		Force    bool   `json:"force"`
+		Username    string `json:"username"`
+		PubKey      string `json:"pub_key"`
+		KeySecretID int64  `json:"key_secret_id"` // vault key; its public half is installed
+		SSHKeyID    int64  `json:"ssh_key_id"`    // pre-v91 clients
+		Force       bool   `json:"force"`
 	}
-	if err := decodeJSON(r, &req); err != nil || req.Username == "" || req.PubKey == "" {
-		jsonError(w, http.StatusBadRequest, "username and pub_key are required")
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+	keySecretID, ok := resolveKeySecret(w, r, h.db, req.KeySecretID, req.SSHKeyID)
+	if !ok {
+		return
+	}
+	// A vault key: the server reads the public half — the browser never needs
+	// to fetch the private key for this.
+	if keySecretID > 0 && req.PubKey == "" {
+		k, err := vault.LoadSharedKey(r.Context(), h.db, keySecretID)
+		if err != nil {
+			jsonBadRequest(w, r, err.Error(), nil)
+			return
+		}
+		req.PubKey = k.PublicKey
+	}
+	if req.Username == "" || req.PubKey == "" {
+		jsonError(w, http.StatusBadRequest, "username and pub_key (or key_secret_id) are required")
 		return
 	}
 	if !validLinuxUsername.MatchString(req.Username) {
@@ -871,9 +887,8 @@ func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Requ
 	// when registering/syncing the server. Non-fatal on failure: the remote
 	// account was created successfully; only the convenience lookup is lost.
 	var keyIDArg *int64
-	if req.SSHKeyID > 0 {
-		id := req.SSHKeyID
-		keyIDArg = &id
+	if keySecretID > 0 {
+		keyIDArg = &keySecretID
 	}
 	if linkErr := store.NewHostRemoteUserRepo(h.db.SQL).CreateOrUpdate(r.Context(), host.ID, req.Username, keyIDArg); linkErr != nil {
 		log.Printf("[sshcm] create-remote-user host=%d user=%s link-persist error=%v", host.ID, req.Username, linkErr)
@@ -1189,7 +1204,7 @@ var identityFileNameSanitizer = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
 // resolveIdentityFile builds the ~/.ssh/<name> path the user is expected to
 // save the private key at. It matches the host's stored pub key against the
-// centralized ssh_keys table by fingerprint; if no match is found (e.g. a key
+// shared keys in the vault by fingerprint; if no match is found (e.g. a key
 // generated directly on the host), it falls back to a slug-based name.
 func (h *sshHandlers) resolveIdentityFile(host *models.Host) string {
 	fallback := "~/.ssh/id_ed25519_" + identityFileNameSanitizer.ReplaceAllString(host.OficialSlug, "_")
@@ -1204,14 +1219,12 @@ func (h *sshHandlers) resolveIdentityFile(host *models.Host) string {
 	}
 	fp := ssh.FingerprintSHA256(pub)
 
-	keys, err := store.NewSSHKeyRepo(h.db.SQL).List(context.Background())
+	names, err := vault.SharedKeyNames(context.Background(), h.db.SQL)
 	if err != nil {
 		return fallback
 	}
-	for _, k := range keys {
-		if k.Fingerprint != "" && k.Fingerprint == fp && k.Name != "" {
-			return "~/.ssh/" + identityFileNameSanitizer.ReplaceAllString(k.Name, "_")
-		}
+	if name := names[fp]; name != "" {
+		return "~/.ssh/" + identityFileNameSanitizer.ReplaceAllString(name, "_")
 	}
 	return fallback
 }

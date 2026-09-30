@@ -9,10 +9,12 @@ import "time"
 // server's login user. Persistence lives in internal/store.HostRemoteUserRepo —
 // this file is the pure data type only.
 type HostRemoteUser struct {
-	ID        int64     `json:"id"`
-	HostID    int64     `json:"host_id"`
-	Username  string    `json:"username"`
-	SSHKeyID  *int64    `json:"ssh_key_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID       int64  `json:"id"`
+	HostID   int64  `json:"host_id"`
+	Username string `json:"username"`
+	SSHKeyID *int64 `json:"ssh_key_id"` // pre-v91 ssh_keys link; migrated to KeySecretID
+	// KeySecretID is the shared vault key this user logs in with.
+	KeySecretID *int64    `json:"key_secret_id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }

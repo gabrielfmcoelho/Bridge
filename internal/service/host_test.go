@@ -132,19 +132,15 @@ func TestHostService_CreatePersistsVaultAndRelations(t *testing.T) {
 	// Vault secret writes attribute to a user (the system actor); seed one.
 	d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin')`)
 
-	// Seed an ssh_keys row with an encrypted private payload to link.
-	pc, pn, _ := d.Encryptor.Encrypt("-----BEGIN KEY-----priv-----END KEY-----")
-	k := &models.SSHKey{Name: "k1", CredentialType: "key", PrivKeyCiphertext: pc, PrivKeyNonce: pn}
-	if err := store.NewSSHKeyRepo(d.SQL).Create(ctx, k); err != nil {
-		t.Fatalf("seed ssh key: %v", err)
-	}
+	// A shared key in the vault to link.
+	keyID := seedSharedKey(t, d, "k1", "-----BEGIN KEY-----priv-----END KEY-----")
 
 	tags := []string{"t1"}
 	w := &service.HostWrite{
 		Host:     models.Host{Nickname: "web", OficialSlug: "web-01", Hostname: "h", User: "root", HasPassword: true},
 		Password: "pw",
-		Tags:     &tags,
-		SSHKeyID: k.ID,
+		Tags:        &tags,
+		KeySecretID: keyID,
 	}
 	host, err := svc.Create(ctx, 0, w)
 	if err != nil || host == nil || host.ID == 0 {
@@ -156,13 +152,18 @@ func TestHostService_CreatePersistsVaultAndRelations(t *testing.T) {
 	if err != nil || !ok || pw != "pw" {
 		t.Fatalf("vault password = %q ok=%v err=%v", pw, ok, err)
 	}
-	// SSH key link flipped has_key and stored the key in the vault.
+	// Linking flipped has_key; the host reads the shared key (no copy).
 	reread, _ := store.NewHostRepo(d.SQL).GetByID(ctx, host.ID)
 	if !reread.HasKey {
 		t.Fatalf("has_key not set after link: %+v", reread)
 	}
-	if _, ok, _ := vault.HostGetSSHKey(ctx, d, host.ID); !ok {
-		t.Fatal("vault ssh key not stored after link")
+	if key, ok, _ := vault.HostGetSSHKey(ctx, d, host.ID); !ok || key.PrivateKeyPEM == "" {
+		t.Fatal("host doesn't resolve the linked key")
+	}
+	var copies int
+	d.SQL.QueryRow(`SELECT COUNT(*) FROM secrets WHERE scope = 'host' AND parent_id = ?  AND type = 'sshkey'`, host.ID).Scan(&copies)
+	if copies != 0 {
+		t.Fatalf("linking copied the key into %d per-host secret(s)", copies)
 	}
 	// Tags synced.
 	if got, _ := store.NewTagRepo(d.SQL).Get(ctx, "host", host.ID); len(got) != 1 || got[0] != "t1" {
@@ -174,8 +175,8 @@ func TestHostService_CreateKeyLinkFailureIsWrapped(t *testing.T) {
 	ctx := context.Background()
 	svc, _ := newHostService(t)
 	w := &service.HostWrite{
-		Host:     models.Host{Nickname: "x", OficialSlug: "x-01"},
-		SSHKeyID: 9999, // nonexistent → link fails
+		Host:        models.Host{Nickname: "x", OficialSlug: "x-01"},
+		KeySecretID: 9999, // nonexistent → link fails
 	}
 	host, err := svc.Create(ctx, 0, w)
 	if !errors.Is(err, service.ErrHostKeyLink) {
@@ -193,10 +194,8 @@ func TestHostService_UpdateRotatesPasswordAndClearsKey(t *testing.T) {
 	d.SQL.Exec(`INSERT INTO users (username, password_hash, role) VALUES ('u','x','admin')`)
 
 	// Create a host with a password + linked key.
-	pc, pn, _ := d.Encryptor.Encrypt("priv")
-	k := &models.SSHKey{Name: "k", CredentialType: "key", PrivKeyCiphertext: pc, PrivKeyNonce: pn}
-	store.NewSSHKeyRepo(d.SQL).Create(ctx, k)
-	cw := &service.HostWrite{Host: models.Host{Nickname: "h", OficialSlug: "h-01", HasPassword: true}, Password: "old", SSHKeyID: k.ID}
+	keyID := seedSharedKey(t, d, "k", "priv")
+	cw := &service.HostWrite{Host: models.Host{Nickname: "h", OficialSlug: "h-01", HasPassword: true}, Password: "old", KeySecretID: keyID}
 	host, err := svc.Create(ctx, 0, cw)
 	if err != nil {
 		t.Fatalf("create: %v", err)
@@ -297,4 +296,20 @@ func TestHostService_EntidadeScope(t *testing.T) {
 	if got, _ := svc.Get(store.WithScope(bg, store.Scope{EntidadeIDs: []int64{etipi}}), "h-sga"); got == nil || got.Host.Description != "changed" {
 		t.Fatal("after is_global the etipi scope must see the updated host")
 	}
+}
+
+// seedSharedKey stores an avulso shared SSH key in the vault.
+func seedSharedKey(t *testing.T, d *database.DB, name, priv string) int64 {
+	t.Helper()
+	var uid int64
+	d.SQL.QueryRow(`SELECT id FROM users ORDER BY id LIMIT 1`).Scan(&uid)
+	actor := vault.ActorContext{UserID: uid, Role: "admin"}
+	id, err := vault.NewSecretRepo(d).Create(context.Background(), actor, &models.Secret{
+		Type: models.SecretTypeSSHKey, Scope: models.SecretScopeAvulso, Visibility: models.SecretVisibilityShared,
+		OwnerUserID: uid, Name: name, KeyVersion: 1, CreatedBy: uid,
+	}, `{"private_key_pem":"`+priv+`"}`)
+	if err != nil {
+		t.Fatalf("seed shared key: %v", err)
+	}
+	return id
 }

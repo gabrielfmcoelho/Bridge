@@ -134,7 +134,8 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		models.AssetGrantsInput
 		Tags         []string                  `json:"tags"`
 		Password     string                    `json:"password"`
-		SSHKeyID     int64                     `json:"ssh_key_id"`
+		KeySecretID  int64                     `json:"key_secret_id"`
+		SSHKeyID     int64                     `json:"ssh_key_id"` // pre-v91 clients: mapped to its vault key
 		Responsaveis []models.ResponsavelInput `json:"responsaveis"`
 		Chamados     []models.HostChamadoInput `json:"chamados"`
 		DNSIDs       []int64                   `json:"dns_ids"`
@@ -143,6 +144,10 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+	var keyOK bool
+	if req.KeySecretID, keyOK = resolveKeySecret(w, r, h.db, req.KeySecretID, req.SSHKeyID); !keyOK {
 		return
 	}
 	if req.Nickname == "" || req.OficialSlug == "" {
@@ -162,7 +167,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	req.Host.KeyPath = ""
 	req.Host.HasKey = false
 	req.Host.HasPassword = req.Password != ""
-	preferredAuth, prefErr := normalizePreferredAuth(req.Host.HasPassword, req.Host.HasKey || req.SSHKeyID > 0, req.Host.PreferredAuth)
+	preferredAuth, prefErr := normalizePreferredAuth(req.Host.HasPassword, req.Host.HasKey || req.KeySecretID > 0, req.Host.PreferredAuth)
 	if prefErr != nil {
 		jsonError(w, http.StatusBadRequest, prefErr.Error())
 		return
@@ -177,7 +182,7 @@ func (h *hostHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	w2 := &service.HostWrite{
 		Host:         req.Host,
 		Password:     req.Password,
-		SSHKeyID:     req.SSHKeyID,
+		KeySecretID:  req.KeySecretID,
 		Tags:         &req.Tags,
 		Responsaveis: &req.Responsaveis,
 		Chamados:     &req.Chamados,
@@ -236,7 +241,8 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		models.AssetGrantsInput
 		Tags         []string                   `json:"tags"`
 		Password     string                     `json:"password"`
-		SSHKeyID     int64                      `json:"ssh_key_id"`
+		KeySecretID  int64                      `json:"key_secret_id"`
+		SSHKeyID     int64                      `json:"ssh_key_id"` // pre-v91 clients: mapped to its vault key
 		ClearKey     bool                       `json:"clear_key"`
 		Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 		Chamados     *[]models.HostChamadoInput `json:"chamados"`
@@ -249,10 +255,14 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
+	var keyOK bool
+	if req.KeySecretID, keyOK = resolveKeySecret(w, r, h.db, req.KeySecretID, req.SSHKeyID); !keyOK {
+		return
+	}
 
 	// If only ssh_key_id is provided (no host data), just link the key and return.
-	if req.SSHKeyID > 0 && req.Nickname == "" {
-		if linkErr := h.host.LinkSSHKey(r.Context(), existing.ID, req.SSHKeyID, existing.OficialSlug); linkErr != nil {
+	if req.KeySecretID > 0 && req.Nickname == "" {
+		if linkErr := h.host.LinkSharedKey(r.Context(), existing.ID, req.KeySecretID); linkErr != nil {
 			jsonServerError(w, r, "failed to link ssh key: "+linkErr.Error(), linkErr)
 			return
 		}
@@ -312,7 +322,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if req.Host.PreferredAuth == "" {
 		req.Host.PreferredAuth = existing.PreferredAuth
 	}
-	preferredAuth, prefErr := normalizePreferredAuth(req.Host.HasPassword, req.Host.HasKey || req.SSHKeyID > 0, req.Host.PreferredAuth)
+	preferredAuth, prefErr := normalizePreferredAuth(req.Host.HasPassword, req.Host.HasKey || req.KeySecretID > 0, req.Host.PreferredAuth)
 	if prefErr != nil {
 		jsonError(w, http.StatusBadRequest, prefErr.Error())
 		return
@@ -322,7 +332,7 @@ func (h *hostHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	w2 := &service.HostWrite{
 		Host:         req.Host,
 		Password:     req.Password,
-		SSHKeyID:     req.SSHKeyID,
+		KeySecretID:  req.KeySecretID,
 		ClearKey:     req.ClearKey,
 		Responsaveis: req.Responsaveis,
 		Chamados:     req.Chamados,

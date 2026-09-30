@@ -39,7 +39,6 @@ type HostService struct {
 	grants       *store.AssetEntidadeRepo
 	chamados     *store.HostChamadoRepo
 	orch         *store.OrchestratorRepo
-	sshKeys      *store.SSHKeyRepo
 	responsaveis *store.ResponsavelRepo
 }
 
@@ -59,7 +58,6 @@ func NewHostService(db *database.DB) *HostService {
 		grants:       store.NewAssetEntidadeRepo(db.SQL),
 		chamados:     store.NewHostChamadoRepo(db.SQL),
 		orch:         store.NewOrchestratorRepo(db.SQL),
-		sshKeys:      store.NewSSHKeyRepo(db.SQL),
 		responsaveis: store.NewResponsavelRepo(db.SQL),
 	}
 }
@@ -360,7 +358,7 @@ type HostWrite struct {
 	Host         models.Host
 	Tags         *[]string
 	Password     string
-	SSHKeyID     int64
+	KeySecretID  int64 // shared vault key to link (host_remote_users.key_secret_id)
 	ClearKey     bool
 	Responsaveis *[]models.ResponsavelInput
 	Chamados     *[]models.HostChamadoInput
@@ -394,8 +392,8 @@ func (s *HostService) Create(ctx context.Context, actorID int64, w *HostWrite) (
 		}
 	}
 	s.applyMetaRelations(ctx, w.Host.ID, w, true)
-	if w.SSHKeyID > 0 {
-		if err := s.LinkSSHKey(ctx, w.Host.ID, w.SSHKeyID, w.Host.OficialSlug); err != nil {
+	if w.KeySecretID > 0 {
+		if err := s.LinkSharedKey(ctx, w.Host.ID, w.KeySecretID); err != nil {
 			return &w.Host, fmt.Errorf("%w: %w", ErrHostKeyLink, err)
 		}
 	}
@@ -422,8 +420,8 @@ func (s *HostService) Update(ctx context.Context, actorID int64, w *HostWrite) (
 		}
 	}
 	s.applyMetaRelations(ctx, w.Host.ID, w, false)
-	if w.SSHKeyID > 0 {
-		if err := s.LinkSSHKey(ctx, w.Host.ID, w.SSHKeyID, w.Host.OficialSlug); err != nil {
+	if w.KeySecretID > 0 {
+		if err := s.LinkSharedKey(ctx, w.Host.ID, w.KeySecretID); err != nil {
 			return &w.Host, fmt.Errorf("%w: %w", ErrHostKeyLink, err)
 		}
 	}
@@ -440,38 +438,20 @@ func (s *HostService) Delete(ctx context.Context, actor models.ActorContext, hos
 	return store.DeleteParent(ctx, s.sqlDB, actor, models.SecretScopeHost, hostID)
 }
 
-// LinkSSHKey copies the encrypted key blob from the ssh_keys table into the
-// host's vault entry and flips the host's has_key flag. The key is never
-// materialized to the filesystem — key-auth decrypts the vault blob in-memory at
-// connection time. actor_user_id=0 falls through to the vault's system actor
-// (linkSSHKey runs from create/update/coolify-sync where the caller's user
-// isn't threaded down).
-func (s *HostService) LinkSSHKey(ctx context.Context, hostID, sshKeyID int64, slug string) error {
-	k, err := s.sshKeys.Get(ctx, sshKeyID)
-	if err != nil {
-		return fmt.Errorf("load ssh key %d: %w", sshKeyID, err)
+// LinkSharedKey makes the host log in with a shared vault key: its login
+// user links the credential (host_remote_users.key_secret_id) and the host's
+// key flags are set. Nothing is copied — every host using the key reads the
+// one secret, so rotating it rotates them all. The caller checked the actor
+// may see the secret.
+func (s *HostService) LinkSharedKey(ctx context.Context, hostID, secretID int64) error {
+	if _, err := vault.LoadSharedKey(ctx, s.db, secretID); err != nil {
+		return fmt.Errorf("load shared key %d: %w", secretID, err)
 	}
-	if k == nil {
-		return fmt.Errorf("ssh key %d not found", sshKeyID)
-	}
-	if len(k.PrivKeyCiphertext) == 0 {
-		return fmt.Errorf("ssh key %q has no stored private key — add a private key to the entry or pick a different key", k.Name)
+	if err := vault.LinkHostCredential(ctx, s.sqlDB, hostID, secretID, models.SecretTypeSSHKey); err != nil {
+		return fmt.Errorf("link shared key: %w", err)
 	}
 	if err := s.hosts.UpdateKeyMeta(ctx, hostID, true, "", "yes"); err != nil {
 		return fmt.Errorf("update host key flags: %w", err)
-	}
-	priv, perr := s.db.Encryptor.Decrypt(k.PrivKeyCiphertext, k.PrivKeyNonce)
-	if perr != nil {
-		return fmt.Errorf("decrypt ssh key %d private payload: %w", sshKeyID, perr)
-	}
-	pub := ""
-	if len(k.PubKeyCiphertext) > 0 {
-		if p, derr := s.db.Encryptor.Decrypt(k.PubKeyCiphertext, k.PubKeyNonce); derr == nil {
-			pub = p
-		}
-	}
-	if vErr := vault.HostSetSSHKey(ctx, s.db, hostID, 0, vault.HostSSHKey{PrivateKeyPEM: priv, PublicKey: pub}); vErr != nil {
-		return fmt.Errorf("store host ssh key in vault: %w", vErr)
 	}
 	return nil
 }
