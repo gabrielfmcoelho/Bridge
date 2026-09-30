@@ -19,6 +19,9 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${apiUrl}/api/:path*`,
       },
+      // API reference (ReDoc), served by the Go API.
+      { source: "/docs", destination: `${apiUrl}/docs` },
+      { source: "/docs/:path*", destination: `${apiUrl}/docs/:path*` },
     ];
   },
   async redirects() {

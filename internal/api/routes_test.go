@@ -80,8 +80,7 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"PUT", "/api/assets/host/1/entidades"},
 
 		// Swagger UI + spec
-		{"GET", "/api/docs/index.html"},
-		{"GET", "/api/docs/doc.json"},
+		{"GET", "/docs/openapi.json"},
 
 		// Share bundles (owner routes)
 		{"POST", "/api/share-bundles"},
@@ -276,9 +275,9 @@ func TestRouter_PathValueReachesHandler(t *testing.T) {
 	}
 }
 
-// TestRouter_SwaggerSpecServed checks a logged-in user gets the generated
-// spec (the docs package is registered and the route passes auth).
-func TestRouter_SwaggerSpecServed(t *testing.T) {
+// TestRouter_SpecServed checks a logged-in user gets the generated spec (the
+// docs package is registered and the route passes auth).
+func TestRouter_SpecServed(t *testing.T) {
 	d, err := dbtest.Open(t)
 	if err != nil {
 		t.Fatalf("open: %v", err)
@@ -286,7 +285,7 @@ func TestRouter_SwaggerSpecServed(t *testing.T) {
 	t.Cleanup(func() { d.Close() })
 	router := NewRouter(d, "/tmp/sshcm-test-config")
 
-	req := httptest.NewRequest("GET", "/api/docs/doc.json", nil)
+	req := httptest.NewRequest("GET", "/docs/openapi.json", nil)
 	for _, c := range sessionCookies(t, d) {
 		req.AddCookie(c)
 	}

@@ -300,8 +300,8 @@ type importURLRequest struct {
 	ServiceIDs  []int64 `json:"service_ids"`
 	ProjectIDs  []int64 `json:"project_ids"`
 	SourceURL   string  `json:"source_url"`
-	BaseURL     string `json:"base_url"`
-	DocsURL     string `json:"docs_url"`
+	BaseURL     string  `json:"base_url"`
+	DocsURL     string  `json:"docs_url"`
 	models.AssetGrantsInput
 }
 

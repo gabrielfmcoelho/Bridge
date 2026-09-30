@@ -21795,7 +21795,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "Bridge API",
-	Description:      "Infrastructure inventory for SEAD-PI: hosts, services, DNS, projects, secrets, Atlas API catalog and integrations.\nAuth is the session cookie set by POST /api/auth/login. The docs are served same-origin, so \"Try it out\" sends it automatically once you are logged in.\nScripts send a personal API token instead: \"Authorization: Bearer brg_…\" (Configurações → Tokens de API). It acts as its owner, with the same role, permissions and entidades.\nRoles are viewer < editor < admin; each operation's description states the minimum it needs. Assets scoped by entidades answer 404 (never 403) when invisible to the caller.\nLists return {data, meta:{page, per_page, total}}; omit per_page to get every row.",
+	Description:      "Infrastructure inventory for SEAD-PI: hosts, services, DNS, projects, secrets, Atlas API catalog and integrations.\nAuth: the browser session cookie (POST /api/auth/login), or an API token sent as \"Authorization: Bearer brg_…\" (Configurações → Tokens de API; personal or for a service account). A token acts as its owner — same role, permissions and entidades — narrowed to its scopes: each operation below names the scope it needs (x-bridge-scope); a token without it gets 403. GET /api/auth/tokens/scopes lists them.\nRoles are viewer < editor < admin; each operation's description states the minimum it needs. Assets scoped by entidades answer 404 (never 403) when invisible to the caller.\nLists return {data, meta:{page, per_page, total}}; omit per_page to get every row.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -57,6 +57,9 @@ func (rr routeRegistrar) add(pattern string, h http.HandlerFunc, mw func(http.Ha
 	if !ok {
 		panic("route pattern needs a method: " + pattern)
 	}
+	if mw == nil {
+		markPublic(method, path) // the docs label these "Public"
+	}
 	var mws []echo.MiddlewareFunc
 	if mw != nil && rr.db != nil {
 		// Every authenticated route needs a token scope, resolved once here:

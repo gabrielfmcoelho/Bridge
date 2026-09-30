@@ -66,11 +66,18 @@ export default function LoginPage() {
   const { t } = useLocale();
   const { appName, appColor, appLogo } = useAppearance();
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  // ?next= brings the user back after signing in (e.g. /docs). Same-origin
+  // paths only; /docs is served by the API, so it needs a full navigation.
+  const next = searchParams?.get("next") ?? "";
+  const goNext = () => {
+    if (next.startsWith("/") && !next.startsWith("//")) window.location.assign(next);
+    else router.push("/");
+  };
 
   // Handle OAuth callback results.
   useState(() => {
     if (searchParams?.get("auth") === "success") {
-      refresh().then(() => router.push("/"));
+      refresh().then(goNext);
     } else if (searchParams?.get("auth") === "error") {
       setError(searchParams.get("message") || "Authentication failed");
     }
@@ -91,7 +98,7 @@ export default function LoginPage() {
         localStorage.removeItem("sshcm_remember_user");
       }
       await login(username, password, activeProvider);
-      router.push("/");
+      goNext();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-frontend build build-go clean install swagger swagger-check
+.PHONY: dev dev-api dev-frontend build build-go clean install swagger swagger-check redoc
 
 # The root .env reaches the Go side through godotenv (cmd/root.go:29), but Make
 # does not read .env files and Next only reads them from frontend/ — so without
@@ -49,7 +49,7 @@ clean:
 install: build-go
 	cp sshcm $(GOPATH)/bin/sshcm 2>/dev/null || cp sshcm ~/go/bin/sshcm
 
-# Swagger spec from the handlers' swag annotations (served at /api/docs/index.html).
+# OpenAPI spec from the handlers' swag annotations (served as ReDoc at /docs).
 # The generated internal/api/docs is committed so `go build` never needs swag;
 # swagger-check fails when someone changed an annotation without regenerating.
 SWAG := go run github.com/swaggo/swag/cmd/swag@v1.16.4
@@ -60,3 +60,8 @@ swagger:
 
 swagger-check: swagger
 	git diff --exit-code internal/api
+
+# ReDoc bundle for /docs, vendored so the reference works without a CDN.
+REDOC_VERSION := 2.5.0
+redoc:
+	curl -fsSL https://cdn.jsdelivr.net/npm/redoc@$(REDOC_VERSION)/bundles/redoc.standalone.js -o internal/api/redoc/redoc.standalone.js
