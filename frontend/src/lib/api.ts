@@ -661,8 +661,9 @@ export const sshAPI = {
     api.post<{ success: boolean; method?: string; message?: string; daemon_json?: string; error?: string }>(`/api/ssh/docker-logs-rotation/${slug}`, opts),
   setupSudoNopasswd: (slug: string) =>
     api.post<{ success: boolean; message?: string; output?: string; error?: string }>(`/api/ssh/setup-sudo-nopasswd/${slug}`),
-  createRemoteUser: (slug: string, username: string, pubKey: string, force = false, sshKeyId?: number) =>
-    api.post<{ success: boolean; message?: string; output?: string; error?: string; user_exists?: boolean }>(`/api/ssh/create-remote-user/${slug}`, { username, pub_key: pubKey, force, ssh_key_id: sshKeyId }),
+  // keySecretId: a shared vault key — the server installs its public half.
+  createRemoteUser: (slug: string, username: string, pubKey: string, force = false, keySecretId?: number) =>
+    api.post<{ success: boolean; message?: string; output?: string; error?: string; user_exists?: boolean }>(`/api/ssh/create-remote-user/${slug}`, { username, pub_key: pubKey, force, key_secret_id: keySecretId }),
   deleteRemoteUser: (slug: string, username: string, removeHome = false) =>
     api.post<{ success: boolean; message?: string; output?: string; error?: string; user_missing?: boolean; user_protected?: boolean }>(`/api/ssh/delete-remote-user/${slug}`, { username, remove_home: removeHome }),
   setupKey: (slug: string, data: {
@@ -693,27 +694,6 @@ export const sshAPI = {
     api.post<{ success: boolean; error?: string; output?: string; message?: string }>(`/api/ssh/grafana-agent-setup/${slug}`),
 };
 
-// SSH Keys
-export const sshKeysAPI = {
-  list: () => api.getList<import("./types").SSHKeyRecord>("/api/ssh-keys"),
-  get: (id: number) => api.get<{
-    id: number;
-    name: string;
-    credential_type: string;
-    username?: string;
-    description?: string;
-    public_key?: string;
-    private_key?: string;
-    password?: string;
-    fingerprint: string;
-    created_at: string;
-  }>(`/api/ssh-keys/${id}`),
-  create: (data: { name: string; credential_type?: string; username?: string; description?: string; public_key?: string; private_key?: string; password?: string } & import("./types").AssetGrantsInput) =>
-    api.post<{ id: number; name: string; fingerprint: string; created_at: string }>("/api/ssh-keys", data),
-  update: (id: number, data: { name?: string; credential_type?: string; username?: string; description?: string; public_key?: string; private_key?: string; password?: string } & import("./types").AssetGrantsInput) =>
-    api.put<{ id: number; name: string; fingerprint: string; created_at: string }>(`/api/ssh-keys/${id}`, data),
-  delete: (id: number) => api.delete(`/api/ssh-keys/${id}`),
-};
 
 // Graph & Dashboard
 export const graphAPI = {
@@ -833,8 +813,10 @@ export const toolsAPI = {
 // service/tool credential endpoints. Backend: vault.SecretRepo, see spec
 // internal/spec/secrets-manager.md §6 for the full surface.
 export const secretsAPI = {
-  list: (params: { scope?: string; parent_id?: number; type?: string; visibility?: string; group_label?: string; include_deleted?: boolean } = {}) => {
+  list: (params: { scope?: string; parent_id?: number; type?: string; visibility?: string; group_label?: string; include_deleted?: boolean; q?: string; kind?: "host_cred" } = {}) => {
     const q = new URLSearchParams();
+    if (params.q) q.set("q", params.q);
+    if (params.kind) q.set("kind", params.kind);
     if (params.scope) q.set("scope", params.scope);
     if (params.parent_id != null) q.set("parent_id", String(params.parent_id));
     if (params.type) q.set("type", params.type);
@@ -845,6 +827,13 @@ export const secretsAPI = {
     return api.getList<import("./types").Secret>(`/api/secrets${qs ? `?${qs}` : ""}`);
   },
   mine: () => api.getList<import("./types").Secret>("/api/secrets/mine"),
+  // Host credentials hosts can link to: the vault's shared SSH keys (what
+  // the old "Credenciais de host" library held).
+  sharedKeys: () => secretsAPI.list({ scope: "avulso", type: "sshkey", visibility: "shared" }),
+  // The same password/key repeated on many hosts → one shared credential (admin).
+  consolidationPlan: () => api.get<import("./types").ConsolidationGroup[]>("/api/secrets/consolidation"),
+  consolidate: (keys: string[]) =>
+    api.post<{ groups: number; created: number; hosts: number }>("/api/secrets/consolidation", { keys }),
   trash: () => api.getList<import("./types").Secret>("/api/secrets/trash"),
   get: (id: number) => api.get<import("./types").Secret>(`/api/secrets/${id}`),
   reveal: (id: number) => api.get<import("./types").SecretReveal>(`/api/secrets/${id}/reveal`),
@@ -857,6 +846,7 @@ export const secretsAPI = {
     name: string;
     group_label?: string;
     description?: string;
+    username?: string;
     payload: string;
   } & import("./types").AssetGrantsInput) => api.post<{ id: number }>("/api/secrets", data),
   update: (id: number, data: { name?: string; description?: string; group_label?: string; payload?: string }) =>
@@ -883,8 +873,8 @@ export const secretsAPI = {
     const qs = q.toString();
     return api.get<Record<string, import("./types").Secret[]>>(`/api/secrets/env${qs ? `?${qs}` : ""}`);
   },
-  // Shared-credential host links: reuse one avulso password credential across
-  // N hosts (host_remote_users.secret_id). Only valid for avulso password secrets.
+  // Shared-credential host links: reuse one avulso password or SSH key across
+  // N hosts (host_remote_users.secret_id / key_secret_id).
   listLinkedHosts: (secretID: number) =>
     api.get<{ host_ids: number[] }>(`/api/secrets/${secretID}/hosts`),
   linkHosts: (secretID: number, hostIDs: number[]) =>
@@ -1706,10 +1696,11 @@ export const coolifyAPI = {
     api.get<{ server: CoolifyServer }>(`/api/coolify/server-status/${slug}`),
   checkHost: (slug: string) =>
     api.post<{ found: boolean; server?: CoolifyServer }>(`/api/coolify/check/${slug}`),
-  registerHost: (slug: string, sshKeyId?: number) =>
-    api.post<{ uuid: string }>(`/api/coolify/register/${slug}`, sshKeyId ? { ssh_key_id: sshKeyId } : {}),
-  updateServerKey: (slug: string, sshKeyId: number) =>
-    api.post<{ success: boolean; private_key_uuid: string }>(`/api/coolify/server/${slug}/key`, { ssh_key_id: sshKeyId }),
+  // Key ids are shared vault keys (secretsAPI.sharedKeys).
+  registerHost: (slug: string, keySecretId?: number) =>
+    api.post<{ uuid: string }>(`/api/coolify/register/${slug}`, keySecretId ? { key_secret_id: keySecretId } : {}),
+  updateServerKey: (slug: string, keySecretId: number) =>
+    api.post<{ success: boolean; private_key_uuid: string }>(`/api/coolify/server/${slug}/key`, { key_secret_id: keySecretId }),
   validateHost: (slug: string) =>
     api.post<{ message: string }>(`/api/coolify/validate/${slug}`),
   syncHost: (slug: string) =>

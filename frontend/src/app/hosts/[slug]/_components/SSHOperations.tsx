@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { sshAPI, hostsAPI, sshKeysAPI, integrationsAPI } from "@/lib/api";
+import { sshAPI, hostsAPI, secretsAPI, integrationsAPI } from "@/lib/api";
 import { resolveAuthMethod } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { useSSHMutation } from "@/hooks/useSSHMutation";
@@ -93,7 +93,8 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     setRunningOp(null);
   }, []);
 
-  const { data: sshKeysList = [] } = useQuery({ queryKey: ["ssh-keys"], queryFn: sshKeysAPI.list });
+  // Shared SSH keys in the vault (the old "Credenciais de host" library).
+  const { data: sshKeysList = [] } = useQuery({ queryKey: ["secrets-all", "shared-keys"], queryFn: secretsAPI.sharedKeys });
   const { data: integrationsData } = useQuery({
     queryKey: ["integrations"],
     queryFn: integrationsAPI.get,
@@ -176,7 +177,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       invalidateAll();
       setSetupStatus("installing");
       if (setupKeySource === "existing" && setupExistingKeyId) {
-        await hostsAPI.update(slug, { ssh_key_id: parseInt(setupExistingKeyId) } as Record<string, unknown>);
+        await hostsAPI.update(slug, { key_secret_id: parseInt(setupExistingKeyId) } as Record<string, unknown>);
         await sshAPI.setupKey(slug, { mode: "existing", use_saved_password: true });
       } else {
         await sshAPI.setupKey(slug, { mode: "generate", use_saved_password: true });
@@ -248,7 +249,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
   const createRemoteUserMutation = useSSHMutation({
     slug,
-    mutationFn: ({ username, pubKey, force, sshKeyId }: { username: string; pubKey: string; force?: boolean; sshKeyId?: number }) => sshAPI.createRemoteUser(slug, username, pubKey, force, sshKeyId),
+    mutationFn: ({ username, pubKey, force, keySecretId }: { username: string; pubKey: string; force?: boolean; keySecretId?: number }) => sshAPI.createRemoteUser(slug, username, pubKey, force, keySecretId),
     label: t("operation.createRemoteUser"),
     pushConsole,
     onResult: (data) => {
@@ -902,7 +903,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
           {setupKeySource === "existing" && sshKeysList.length > 0 && (
             <select value={setupExistingKeyId} onChange={(e) => setSetupExistingKeyId(e.target.value)} className="w-full bg-[var(--bg-elevated)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-3 py-2 text-sm">
               <option value="">{t("operation.selectKey")}</option>
-              {sshKeysList.map((k) => <option key={k.id} value={k.id.toString()}>{k.name}{k.fingerprint ? ` (${k.fingerprint})` : ""}</option>)}
+              {sshKeysList.map((k) => <option key={k.id} value={k.id.toString()}>{k.name}{k.ssh_fingerprint ? ` (${k.ssh_fingerprint})` : ""}</option>)}
             </select>
           )}
           {setupKeySource === "existing" && sshKeysList.length === 0 && <p className="text-xs text-[var(--text-faint)]">{t("operation.noKeysInDb")}</p>}
@@ -911,7 +912,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
 
       {/* Create remote user wizard (in drawer) */}
       {(() => {
-        const eligibleKeys = sshKeysList.filter(k => k.credential_type === "key" && k.has_public_key);
+        const eligibleKeys = sshKeysList;
         const selectedKey = eligibleKeys.find(k => k.id.toString() === createUserKeyId);
         const nameValid = !!createUserName.trim() && /^[a-z_][a-z0-9_-]{0,31}$/.test(createUserName);
         const canSubmit = nameValid && !!createUserKeyId && eligibleKeys.length > 0;
@@ -919,17 +920,9 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         const runCreate = (force: boolean) => {
           if (!selectedKey) return;
           setRunningOp("create-remote-user");
-          sshKeysAPI.get(selectedKey.id).then(detail => {
-            if (!detail.public_key) {
-              pushConsole(t("operation.createRemoteUser"), "error", t("operation.createRemoteUserNoPubKey"));
-              setRunningOp(null);
-              return;
-            }
-            createRemoteUserMutation.mutate({ username: createUserName.trim(), pubKey: detail.public_key, force, sshKeyId: selectedKey.id });
-          }).catch((err) => {
-            pushConsole(t("operation.createRemoteUser"), "error", err instanceof Error ? err.message : "Failed to load key");
-            setRunningOp(null);
-          });
+          // The server installs the key's public half; the private key never
+          // comes to the browser.
+          createRemoteUserMutation.mutate({ username: createUserName.trim(), pubKey: "", force, keySecretId: selectedKey.id });
         };
 
         return (
@@ -996,7 +989,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                     >
                       <option value="">{t("operation.selectKey")}</option>
                       {eligibleKeys.map((k) => (
-                        <option key={k.id} value={k.id.toString()}>{k.name}{k.fingerprint ? ` (${k.fingerprint})` : ""}</option>
+                        <option key={k.id} value={k.id.toString()}>{k.name}{k.ssh_fingerprint ? ` (${k.ssh_fingerprint})` : ""}</option>
                       ))}
                     </select>
                     <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
@@ -1006,10 +999,10 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                       <div className="px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-2xs">
                         <span className="text-[var(--text-faint)]">{t("operation.createRemoteUserKeyPreview")} </span>
                         <span className="text-[var(--text-primary)] font-mono">{selectedKey.name}</span>
-                        {selectedKey.fingerprint && (
+                        {selectedKey.ssh_fingerprint && (
                           <>
                             <span className="text-[var(--text-faint)]"> · </span>
-                            <span className="text-[var(--text-muted)] font-mono">{selectedKey.fingerprint}</span>
+                            <span className="text-[var(--text-muted)] font-mono">{selectedKey.ssh_fingerprint}</span>
                           </>
                         )}
                       </div>

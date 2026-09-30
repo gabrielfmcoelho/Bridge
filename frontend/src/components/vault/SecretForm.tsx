@@ -86,7 +86,9 @@ export default function SecretForm({ defaultScope, defaultParentId, onDone, onCa
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
 
-  const linking = type === "password" && scope === "avulso";
+  // Host credentials: a shared password or key servers can log in with.
+  const hostCred = type === "password" || type === "sshkey";
+  const linking = hostCred && scope === "avulso";
   const syncing = type === "env_var" && scope === "projeto";
   const options = useRelationOptions([
     ...(scope === "host" || linking ? ["hosts" as const] : []),
@@ -166,6 +168,7 @@ export default function SecretForm({ defaultScope, defaultParentId, onDone, onCa
       }
       const body: Parameters<typeof secretsAPI.create>[0] = {
         type, scope, visibility, name: name.trim(), description: description.trim() || undefined, payload: payload(),
+        ...(type === "password" && f.username.trim() ? { username: f.username.trim() } : {}),
         ...(parent != null ? { parent_id: parent } : {}),
         ...(scope === "avulso" && visibility === "shared" ? grants : {}),
       };
@@ -215,7 +218,8 @@ export default function SecretForm({ defaultScope, defaultParentId, onDone, onCa
     >
       <FormSection id="sec-what" title={t("secretForm.sectionWhat")} description={t("secretForm.sectionWhatHint")} stack>
         <Select label={t("secretForm.type")} value={type} onChange={(e) => e.target.value && setType(e.target.value as SecretType)}
-          options={TYPES.map((x) => ({ value: x, label: t(`secretForm.${TYPE_KEY[x]}`) }))} />
+          options={TYPES.map((x) => ({ value: x, label: t(`secretForm.${TYPE_KEY[x]}`) }))}
+          hint={hostCred ? t("secretForm.hostCredHint") : undefined} />
 
         {type !== "env_var" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -226,8 +230,12 @@ export default function SecretForm({ defaultScope, defaultParentId, onDone, onCa
         )}
 
         {type === "password" && (
-          <Input label={t("secretForm.value")} required type="password" autoComplete="new-password"
-            value={f.value} onChange={(e) => setField("value", e.target.value)} error={err("value")} aria-invalid={!!err("value")} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label={t("share.fields.username")} autoComplete="off" value={f.username} placeholder="deploy"
+              onChange={(e) => setField("username", e.target.value)} hint={t("secretForm.passwordUserHint")} />
+            <Input label={t("secretForm.value")} required type="password" autoComplete="new-password"
+              value={f.value} onChange={(e) => setField("value", e.target.value)} error={err("value")} aria-invalid={!!err("value")} />
+          </div>
         )}
 
         {(type === "cred" || type === "app_login") && (
@@ -349,8 +357,10 @@ export default function SecretForm({ defaultScope, defaultParentId, onDone, onCa
         )}
 
         {linking && (
-          <RelationPicker label={t("secretForm.linkHosts")} options={options.hosts} selected={linkHostIds} onChange={setLinkHostIds}
-            placeholder={t("secretForm.searchHosts")} />
+          <FormField hint={t("secretForm.linkHostsLoginHint")}>
+            <RelationPicker label={t("secretForm.linkHosts")} options={options.hosts} selected={linkHostIds} onChange={setLinkHostIds}
+              placeholder={t("secretForm.searchHosts")} />
+          </FormField>
         )}
       </FormSection>
 

@@ -94,9 +94,9 @@ export const NAV_SECTIONS: NavSection[] = [
     key: "credentials",
     label: "nav.credentials",
     items: [
-      { href: "/ssh-keys", label: "nav.hostCredentials", icon: "Key" },
-      // Unified secrets manager (Phase 1–4). Covers service credentials,
-      // host passwords/keys, env-var bundles, app logins, and share links.
+      // Unified secrets manager. Covers host credentials (the former
+      // /ssh-keys library, which now redirects here), service credentials,
+      // env-var bundles, app logins, and share links.
       // The legacy /service-credentials route 308-redirects here.
       { href: "/secrets", label: "nav.vault", icon: "Lock" },
     ],

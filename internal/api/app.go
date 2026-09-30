@@ -36,7 +36,6 @@ type App struct {
 	tool                *toolHandlers
 	contact             *contactHandlers
 	relation            *relationHandlers
-	sshKey              *sshKeyHandlers
 	importH             *importHandlers
 	backup              *backupHandlers
 	globalIssue         *globalIssueHandlers
@@ -91,7 +90,6 @@ func newApp(db *database.DB, configPath string) *App {
 		tool:                &toolHandlers{db: db},
 		contact:             &contactHandlers{contacts: store.NewContactRepo(db.SQL)},
 		relation:            &relationHandlers{relations: store.NewRelationRepo(db.SQL)},
-		sshKey:              &sshKeyHandlers{db: db},
 		importH:             &importHandlers{db: db},
 		backup:              &backupHandlers{db: db},
 		globalIssue:         &globalIssueHandlers{db: db},

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { coolifyAPI, sshKeysAPI } from "@/lib/api";
+import { coolifyAPI, secretsAPI } from "@/lib/api";
 import type { CoolifyServer } from "@/lib/api";
 import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
@@ -26,12 +26,12 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
   const [selectedKeyId, setSelectedKeyId] = useState<string>("");
 
   const keysQuery = useQuery({
-    queryKey: ["ssh-keys"],
-    queryFn: () => sshKeysAPI.list(),
+    queryKey: ["secrets-all", "shared-keys"],
+    queryFn: secretsAPI.sharedKeys,
     enabled: available,
     staleTime: 60_000,
   });
-  const eligibleKeys = (keysQuery.data ?? []).filter(k => k.credential_type === "key" && k.has_private_key);
+  const eligibleKeys = keysQuery.data ?? [];
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["host", slug] });
 
@@ -119,7 +119,7 @@ export default function CoolifyIntegration({ slug, coolifyUUID, available, t, is
         <option value="">{t("operation.coolifyKeyPickerAuto")}</option>
         {eligibleKeys.map(k => (
           <option key={k.id} value={k.id.toString()}>
-            {k.name}{k.fingerprint ? ` · ${k.fingerprint.slice(0, 24)}…` : ""}
+            {k.name}{k.ssh_fingerprint ? ` · ${k.ssh_fingerprint.slice(0, 24)}…` : ""}
           </option>
         ))}
       </select>

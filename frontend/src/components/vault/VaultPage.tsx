@@ -1,294 +1,202 @@
 "use client";
 
-import { useMemo, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { secretsAPI, projectsAPI } from "@/lib/api";
+import { Suspense, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { secretsAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
+import { useFlag } from "@/contexts/FlagContext";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useDebounce } from "@/hooks/useDebounce";
 import type { Secret } from "@/lib/types";
-import { useSecretReveal } from "@/hooks/useSecretReveal";
+import { groupVault } from "@/lib/vaultGroups";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
-import Card from "@/components/ui/Card";
-import SectionCard from "@/components/ui/SectionCard";
-import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
-import EmptyState from "@/components/ui/EmptyState";
+import ListToolbar from "@/components/ui/ListToolbar";
+import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
 import PillButton from "@/components/ui/PillButton";
+import Drawer from "@/components/ui/Drawer";
+import SectionHeading from "@/components/ui/SectionHeading";
+import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
+import { SkeletonCard } from "@/components/ui/Skeleton";
+import type { RowAction } from "@/components/ui/RowActions";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import ShareLinkModal from "@/app/secrets/_components/ShareLinkModal";
-import HistoryDrawer from "@/app/secrets/_components/HistoryDrawer";
-import { NewSecretDrawer } from "@/components/vault/SecretForm";
-import LinkedHostsModal from "@/app/secrets/_components/LinkedHostsModal";
-import VaultEntryEditor from "@/components/vault/VaultEntryEditor";
+import { NewSecretDrawer } from "./SecretForm";
+import VaultEntryEditor from "./VaultEntryEditor";
+import SecretDetailDrawer from "./SecretDetailDrawer";
+import VaultTable from "./VaultTable";
+import VaultCards from "./VaultCards";
+import ConsolidateDrawer, { consolidationKey } from "./ConsolidateDrawer";
 
-// The Vault page lives here (outside app/secrets/, which is write-protected)
-// and is re-exported by app/secrets/page.tsx. Adds over the original: a
-// search bar, grouping by project, per-row project context, an Edit action,
-// and Share enabled for shared secrets (anyone who can reveal them).
+// The Cofre lives here (outside app/secrets/, which is write-protected) and
+// app/secrets/page.tsx re-exports it. One page for every secret, host
+// credentials included (the old /ssh-keys library): a grouped table — env
+// vars by bundle, the same credential repeated across places as one line —
+// cards on phones, filters in the URL, a detail drawer per secret.
 
-type ScopeFilter = "all" | "service" | "host" | "tool" | "projeto" | "avulso";
-type VisibilityFilter = "all" | "personal" | "shared";
-type TypeFilter = "all" | "cred" | "sshkey" | "password" | "app_login" | "env_var";
-
-const SCOPES: ScopeFilter[] = ["all", "service", "host", "tool", "projeto", "avulso"];
-const VISIBILITIES: VisibilityFilter[] = ["all", "personal", "shared"];
-const TYPES: TypeFilter[] = ["all", "cred", "sshkey", "password", "app_login", "env_var"];
+const KINDS = ["", "host_cred", "password", "sshkey", "cred", "app_login", "env_var"] as const;
+const SCOPES = ["", "avulso", "projeto", "service", "host", "tool"] as const;
+const VISIBILITIES = ["", "shared", "personal"] as const;
+type Filters = { kind: string; scope: string; visibility: string };
 
 export default function VaultPage() {
-  const { t } = useLocale();
   return (
-    <Suspense fallback={<PageShell><div className="text-sm text-[var(--text-muted)]">{t("common.loading")}</div></PageShell>}>
+    <Suspense fallback={<PageShell><SkeletonCard /></PageShell>}>
       <VaultPageInner />
     </Suspense>
   );
 }
 
 function VaultPageInner() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const { user } = useAuth();
+  const router = useRouter();
   const params = useSearchParams();
-  const [scope, setScope] = useState<ScopeFilter>((params.get("scope") || "all") as ScopeFilter);
-  const [visibility, setVisibility] = useState<VisibilityFilter>((params.get("visibility") || "all") as VisibilityFilter);
-  const [typeF, setTypeF] = useState<TypeFilter>((params.get("type") || "all") as TypeFilter);
+  const confirm = useConfirm();
+  const flag = useFlag();
+  const qc = useQueryClient();
+  const isAdmin = user?.role === "admin";
+  const isEditor = isAdmin || user?.role === "editor";
+
+  // Filters live in the URL, so /secrets?kind=host_cred is a link.
+  const pick = (k: string, allowed: readonly string[]) => (allowed.includes(params.get(k) ?? "") ? params.get(k)! : "");
+  const filters: Filters = {
+    kind: pick("kind", KINDS) || pick("type", KINDS), scope: pick("scope", SCOPES), visibility: pick("visibility", VISIBILITIES),
+  };
+  const setFilters = (f: Partial<Filters>) => {
+    const next = { ...filters, ...f };
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(next)) if (v) qs.set(k, v);
+    router.replace(`/secrets${qs.size ? `?${qs}` : ""}`, { scroll: false });
+  };
+  const activeFilterCount = [filters.kind, filters.scope, filters.visibility].filter(Boolean).length;
+
   const [search, setSearch] = useState("");
-  const [shareTarget, setShareTarget] = useState<number | null>(null);
-  const [historyTarget, setHistoryTarget] = useState<number | null>(null);
-  const [editTarget, setEditTarget] = useState<Secret | null>(null);
-  const [manageHostsTarget, setManageHostsTarget] = useState<number | null>(null);
+  const q = useDebounce(search.trim(), 250);
+  const [viewMode, setViewMode] = useLocalStorage<"table" | "cards">("vault.view", "table");
+  const [showFilters, setShowFilters] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
+  const [consolidateOpen, setConsolidateOpen] = useState(false);
+  const [detail, setDetail] = useState<Secret | null>(null);
+  const [editing, setEditing] = useState<Secret | null>(null);
+  const [sharing, setSharing] = useState<number | null>(null);
 
-  const { data: rawSecrets = [], isLoading, refetch } = useQuery({
-    queryKey: ["secrets-all"],
-    queryFn: () => secretsAPI.list({}),
+  const { data: secrets = [], isLoading } = useQuery({
+    queryKey: ["secrets-all", "vault", filters.kind, filters.scope, filters.visibility, q],
+    queryFn: () => secretsAPI.list({
+      kind: filters.kind === "host_cred" ? "host_cred" : undefined,
+      type: filters.kind && filters.kind !== "host_cred" ? filters.kind : undefined,
+      scope: filters.scope || undefined,
+      visibility: filters.visibility || undefined,
+      q: q || undefined,
+    }),
   });
-  const { data: projects = [] } = useQuery({ queryKey: ["projects"], queryFn: () => projectsAPI.list() });
+  const { data: plan = [] } = useQuery({ queryKey: consolidationKey, queryFn: secretsAPI.consolidationPlan, enabled: isAdmin });
+  const rows = useMemo(() => groupVault(secrets), [secrets]);
 
-  const projectName = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const p of projects) m.set(p.id, p.name);
-    return m;
-  }, [projects]);
+  const canWrite = (s: Secret) => (s.visibility === "personal" ? s.owner_user_id === user?.id : isEditor);
+  const canDelete = (s: Secret) => (s.visibility === "personal" ? s.owner_user_id === user?.id : isAdmin);
+  const del = useMutation({
+    mutationFn: (id: number) => secretsAPI.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["secrets-all"] }),
+    onError: (e) => flag({ appearance: "error", title: t("common.delete"), description: e instanceof Error ? e.message : t("form.saveFailed") }),
+  });
+  const actionsFor = (s: Secret): RowAction[] => [
+    { label: t("vault.open"), icon: ICON_PATHS.eye, onClick: () => setDetail(s) },
+    { label: t("common.edit"), icon: ICON_PATHS.editPencil, onClick: () => setEditing(s), hidden: !canWrite(s) },
+    { label: t("common.share"), icon: ICON_PATHS.share, onClick: () => setSharing(s.id) },
+    {
+      label: t("common.delete"), icon: ICON_PATHS.trashOutline, danger: true, hidden: !canDelete(s),
+      onClick: async () => {
+        if (await confirm({ title: t("confirm.deleteTitle", { name: `"${s.name}"` }), message: t("vault.deleteHint"), danger: true, confirmLabel: t("common.delete") })) del.mutate(s.id);
+      },
+    },
+  ];
 
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rawSecrets.filter((s) => {
-      if (scope !== "all" && s.scope !== scope) return false;
-      if (visibility !== "all" && s.visibility !== visibility) return false;
-      if (typeF !== "all" && s.type !== typeF) return false;
-      if (q) {
-        const proj = s.scope === "projeto" && s.parent_id != null ? projectName.get(s.parent_id) ?? "" : "";
-        const hay = `${s.name} ${s.description ?? ""} ${s.group_label ?? ""} ${s.type} ${proj}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [rawSecrets, scope, visibility, typeF, search, projectName]);
-
-  // Group by project: projeto-scoped secrets group under their project name;
-  // everything else falls into a trailing "Other secrets" group.
-  const groups = useMemo(() => {
-    const byKey = new Map<string, { title: string; order: number; items: Secret[] }>();
-    for (const s of visible) {
-      let key: string, title: string, order: number;
-      if (s.scope === "projeto" && s.parent_id != null) {
-        key = `p:${s.parent_id}`;
-        title = projectName.get(s.parent_id) ?? t("vault.projectFallbackTitle", { id: String(s.parent_id) });
-        order = 0;
-      } else {
-        key = "other";
-        title = t("vault.otherSecretsGroup");
-        order = 1;
-      }
-      if (!byKey.has(key)) byKey.set(key, { title, order, items: [] });
-      byKey.get(key)!.items.push(s);
-    }
-    return Array.from(byKey.values()).sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
-  }, [visible, projectName, t]);
+  const filtered = !!(q || activeFilterCount);
+  const pills = (label: string, values: readonly string[], value: string, key: keyof Filters, labelOf: (v: string) => string) => (
+    <section className="space-y-2">
+      <SectionHeading as="h3" className="!mb-0">{label}</SectionHeading>
+      <div className="flex flex-wrap gap-1.5">
+        {values.map((v) => (
+          <PillButton key={v || "all"} size="sm" active={value === v} onClick={() => setFilters({ [key]: v })}>{v ? labelOf(v) : t("common.all")}</PillButton>
+        ))}
+      </div>
+    </section>
+  );
 
   return (
     <PageShell>
-      <PageHeader title={t("nav.vault")} />
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <p className="text-sm text-[var(--text-muted)] flex-1 min-w-[200px]">
-          {t("vault.subtitle")}
-        </p>
-        <div className="flex items-center gap-2">
-          <Link href="/secrets/trash" className="text-xs text-[var(--accent)] hover:underline">
-            {t("vault.viewTrash")}
-          </Link>
-          <Button size="sm" onClick={() => setNewOpen(true)}>
-            {t("vault.newSecretButton")}
-          </Button>
-        </div>
-      </div>
-
-      <Card className="mb-4">
-        <div className="px-1 pb-2">
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("vault.searchPlaceholder")} />
-        </div>
-        <FilterRow label={t("common.scope")}>
-          {SCOPES.map((s) => (
-            <PillButton key={s} active={scope === s} onClick={() => setScope(s)}>{s}</PillButton>
-          ))}
-        </FilterRow>
-        <FilterRow label={t("vault.visibilityLabel")}>
-          {VISIBILITIES.map((v) => (
-            <PillButton key={v} active={visibility === v} onClick={() => setVisibility(v)}>{v}</PillButton>
-          ))}
-        </FilterRow>
-        <FilterRow label={t("common.type")}>
-          {TYPES.map((tf) => (
-            <PillButton key={tf} active={typeF === tf} onClick={() => setTypeF(tf)}>{tf.replace("_", " ")}</PillButton>
-          ))}
-        </FilterRow>
-      </Card>
+      <PageHeader
+        title={t("nav.vault")}
+        description={t("vault.pageDescription")}
+        addLabel={t("vault.newSecretButton")}
+        onAdd={() => setNewOpen(true)}
+        controlsKey="vault"
+        controlsBadge={activeFilterCount}
+        controls={
+          <ListToolbar
+            search={search}
+            onSearchChange={setSearch}
+            onFilterClick={() => setShowFilters(true)}
+            activeFilterCount={activeFilterCount}
+            searchPlaceholder={t("vault.searchPlaceholder")}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            actions={<>
+              <ToolbarActionButton icon={ICON_PATHS.server} label={t("vault.hostCredentials")} hideLabel="md"
+                active={filters.kind === "host_cred"} onClick={() => setFilters({ kind: filters.kind === "host_cred" ? "" : "host_cred" })} />
+              {isAdmin && plan.length > 0 && (
+                <ToolbarActionButton icon={ICON_PATHS.link} label={t("vault.consolidateN", { count: String(plan.length) })} hideLabel="md"
+                  onClick={() => setConsolidateOpen(true)} />
+              )}
+              <ToolbarActionButton icon={ICON_PATHS.trashOutline} label={t("vault.viewTrash")} hideLabel="md" onClick={() => router.push("/secrets/trash")} />
+            </>}
+          />
+        }
+      />
 
       {isLoading ? (
-        <p className="text-sm text-[var(--text-muted)]">{t("common.loading")}</p>
-      ) : visible.length === 0 ? (
-        <EmptyState icon="key" title={t("vault.emptyTitle")} description={t("vault.emptyDescription")} />
+        <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
+      ) : rows.length === 0 ? (
+        filtered ? (
+          <EmptyState icon="search" title={t("common.noResults")} description={t("vault.emptyFiltered")}
+            action={<Button size="sm" variant="secondary" onClick={() => { setSearch(""); setFilters({ kind: "", scope: "", visibility: "" }); }}>{t("vault.clearFilters")}</Button>} />
+        ) : (
+          <EmptyState icon="key" title={t("vault.emptyTitle")} description={t("vault.emptyDescription")}
+            action={<Button size="sm" onClick={() => setNewOpen(true)}>{t("vault.newSecretButton")}</Button>} />
+        )
       ) : (
-        <div className="space-y-6">
-          {groups.map((g) => (
-            <SectionCard key={g.title} variant="plain" title={g.title} count={g.items.length}>
-              <div className="space-y-2">
-                {g.items.map((s) => (
-                  <SecretRow
-                    key={s.id}
-                    secret={s}
-                    projectName={s.scope === "projeto" && s.parent_id != null ? projectName.get(s.parent_id) : undefined}
-                    onShare={() => setShareTarget(s.id)}
-                    onHistory={() => setHistoryTarget(s.id)}
-                    onEdit={() => setEditTarget(s)}
-                    onManageHosts={() => setManageHostsTarget(s.id)}
-                    onDeleted={refetch}
-                  />
-                ))}
-              </div>
-            </SectionCard>
-          ))}
-        </div>
+        <>
+          <div className={viewMode === "table" ? "hidden md:block" : "hidden"}>
+            <VaultTable rows={rows} onOpen={setDetail} actionsFor={actionsFor} t={t} locale={locale} />
+          </div>
+          <div className={viewMode === "table" ? "md:hidden" : ""}>
+            <VaultCards rows={rows} onOpen={setDetail} actionsFor={actionsFor} t={t} />
+          </div>
+        </>
       )}
 
-      <ShareLinkModal secretID={shareTarget} onClose={() => setShareTarget(null)} />
-      <HistoryDrawer secretID={historyTarget} onClose={() => setHistoryTarget(null)} />
+      <Drawer open={showFilters} onClose={() => setShowFilters(false)} title={t("common.filter")}
+        footer={activeFilterCount > 0 ? <Button variant="secondary" className="w-full" onClick={() => setFilters({ kind: "", scope: "", visibility: "" })}>{t("vault.clearFilters")}</Button> : undefined}>
+        <div className="space-y-6">
+          {pills(t("secretForm.type"), KINDS, filters.kind, "kind", (v) => (v === "host_cred" ? t("vault.hostCredentials") : t(`vault.type.${v}`)))}
+          {pills(t("secretForm.scope"), SCOPES, filters.scope, "scope", (v) => t(`vault.scope.${v}`))}
+          {pills(t("secretForm.visibility"), VISIBILITIES, filters.visibility, "visibility", (v) => t(`vault.visibility.${v}`))}
+        </div>
+      </Drawer>
+
+      <SecretDetailDrawer secret={detail} onClose={() => setDetail(null)}
+        onEdit={(s) => { setDetail(null); setEditing(s); }} onShare={(s) => setSharing(s.id)}
+        canWrite={!!detail && canWrite(detail)} canDelete={!!detail && canDelete(detail)} />
       <NewSecretDrawer open={newOpen} onClose={() => setNewOpen(false)} />
-      <LinkedHostsModal secretID={manageHostsTarget} onClose={() => setManageHostsTarget(null)} />
-      <VaultEntryEditor secret={editTarget} onClose={() => setEditTarget(null)} />
+      <VaultEntryEditor secret={editing} onClose={() => setEditing(null)} />
+      <ShareLinkModal secretID={sharing} onClose={() => setSharing(null)} />
+      {isAdmin && <ConsolidateDrawer open={consolidateOpen} onClose={() => setConsolidateOpen(false)} />}
     </PageShell>
-  );
-}
-
-function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 py-1.5">
-      <span className="text-xs font-medium text-[var(--text-muted)] w-20 shrink-0">{label}</span>
-      <div className="flex gap-1.5 flex-wrap">{children}</div>
-    </div>
-  );
-}
-
-
-function SecretRow({
-  secret,
-  projectName,
-  onShare,
-  onHistory,
-  onEdit,
-  onManageHosts,
-  onDeleted,
-}: {
-  secret: Secret;
-  projectName?: string;
-  onShare: () => void;
-  onHistory: () => void;
-  onEdit: () => void;
-  onManageHosts: () => void;
-  onDeleted: () => void;
-}) {
-  const { t } = useLocale();
-  const { user } = useAuth();
-  const reveal = useSecretReveal();
-  const qc = useQueryClient();
-
-  const isOwner = user?.id === secret.owner_user_id;
-  // Personal: owner only. Shared: anyone who can see it (the list already
-  // trims to revealable rows) can now share it externally.
-  const canShare = (secret.visibility === "personal" && isOwner) || secret.visibility === "shared";
-
-  const del = useMutation({
-    mutationFn: () => secretsAPI.delete(secret.id),
-    onSuccess: () => {
-      onDeleted();
-      qc.invalidateQueries({ queryKey: ["secrets-all"] });
-    },
-  });
-
-  const handleToggleReveal = () => {
-    if (reveal.revealed) reveal.hide();
-    else reveal.reveal(secret.id);
-  };
-
-  return (
-    <Card hover>
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          {projectName && (
-            <p className="text-2xs text-[var(--text-faint)] leading-tight">{projectName}</p>
-          )}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm text-[var(--text-primary)]">{secret.name}</span>
-            <Badge>{secret.type}</Badge>
-            <Badge color={secret.visibility === "personal" ? "accent" : "amber"}>{secret.visibility}</Badge>
-            <Badge>{secret.scope}</Badge>
-            {secret.group_label && (
-              <span className="text-2xs text-[var(--text-faint)]">{t("vault.envLabel", { group: secret.group_label })}</span>
-            )}
-          </div>
-          {secret.description && <p className="text-xs text-[var(--text-muted)] mt-1">{secret.description}</p>}
-          {reveal.revealed && (
-            <pre className="mt-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface)] rounded-[var(--radius-sm)] p-2 overflow-x-auto whitespace-pre-wrap break-all border border-[var(--border-subtle)]">
-              {reveal.value}
-            </pre>
-          )}
-          {reveal.error && <p className="text-xs text-[var(--danger)] mt-1">{reveal.error}</p>}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <Button size="sm" variant="secondary" onClick={handleToggleReveal} disabled={reveal.loading}>
-            {reveal.loading
-              ? "..."
-              : reveal.revealed
-              ? `${t("serviceCredentials.hide")} (${Math.ceil(reveal.remainingMs / 1000)}s)`
-              : t("serviceCredentials.reveal")}
-          </Button>
-          {reveal.revealed && (
-            <Button size="sm" variant="secondary" onClick={() => reveal.copy()}>
-              {reveal.copyState === "copied" ? t("vault.copiedLabel") : reveal.copyState === "cleared" ? t("vault.clearedLabel") : t("common.copy")}
-            </Button>
-          )}
-          <Button size="sm" variant="secondary" onClick={onEdit}>
-            {t("common.edit")}
-          </Button>
-          {secret.type === "password" && secret.scope === "avulso" && (
-            <Button size="sm" variant="secondary" onClick={onManageHosts}>
-              {t("nav.hosts")}
-            </Button>
-          )}
-          {canShare && (
-            <Button size="sm" variant="secondary" onClick={onShare}>
-              {t("common.share")}
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" onClick={onHistory}>
-            {t("vault.historyButton")}
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => del.mutate()} disabled={del.isPending}>
-            {t("common.delete")}
-          </Button>
-        </div>
-      </div>
-    </Card>
   );
 }

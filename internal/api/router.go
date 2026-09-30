@@ -32,7 +32,6 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	rh := app.release
 	th := app.tool
 	ch := app.contact
-	skh := app.sshKey
 	imh := app.importH
 	bkh := app.backup
 	gih := app.globalIssue
@@ -171,8 +170,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	ch.registerRoutes(rr)           // /api/contacts/*
 	app.relation.registerRoutes(rr) // /api/relations
 
-	// SSH Keys (managed in DB)
-	skh.registerRoutes(rr) // /api/ssh-keys/*
+	// (/api/ssh-keys retired in v91 — host credentials are vault secrets:
+	// /api/secrets?kind=host_cred.)
 
 	// Bulk import (admin only)
 	imh.registerRoutes(rr) // /api/import/*

@@ -59,7 +59,6 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"POST", "/api/services/1/restore"},
 		{"GET", "/api/projects/trash"},
 		{"POST", "/api/projects/1/restore"},
-		{"GET", "/api/ssh-keys"},
 		{"POST", "/api/import"},
 		{"GET", "/api/backup"},
 		{"GET", "/api/ai/status"},

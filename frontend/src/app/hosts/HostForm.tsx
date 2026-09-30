@@ -4,7 +4,7 @@ import { useSituacao } from "@/hooks/useSituacao";
 import { useDefaultSituacao } from "@/hooks/useDefaultSituacao";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { hostsAPI, enumsAPI, sshKeysAPI, contactsAPI, usersAPI } from "@/lib/api";
+import { hostsAPI, enumsAPI, secretsAPI, contactsAPI, usersAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -70,9 +70,9 @@ export default function HostForm({
   const [formChamados, setFormChamados] = useState<HostChamado[]>(chamados ?? []);
   const [grants, setGrants] = useState<AssetGrantsInput>(entidades ?? defaultGrants(user));
   // selectedKeyId is three-valued:
-  //   - null           → untouched; don't send ssh_key_id OR clear_key
+  //   - null           → untouched; don't send key_secret_id OR clear_key
   //   - "__clear__"    → user explicitly chose to unlink the current key
-  //   - any digit id   → link that ssh_keys row
+  //   - any digit id   → link that shared vault key
   // The plain empty-string state was ambiguous and caused edit-without-key-
   // touch saves to silently wipe the stored key in production.
   const [selectedKeyId, setSelectedKeyId] = useState<string | null>(null);
@@ -103,9 +103,10 @@ export default function HostForm({
     queryFn: contactsAPI.list,
   });
   const contacts = Array.isArray(rawContacts) ? rawContacts : [];
+  // Shared SSH keys in the vault; the host links one (no copy is made).
   const { data: sshKeys = [] } = useQuery({
-    queryKey: ["ssh-keys"],
-    queryFn: sshKeysAPI.list,
+    queryKey: ["secrets-all", "shared-keys"],
+    queryFn: secretsAPI.sharedKeys,
   });
   const { data: rawUsers = [] } = useQuery({
     queryKey: ["users"],
@@ -147,7 +148,7 @@ export default function HostForm({
         project_ids: linkedProjectIds,
       };
       if (willLinkNewKey) {
-        payload.ssh_key_id = parseInt(selectedKeyId as string);
+        payload.key_secret_id = parseInt(selectedKeyId as string);
       } else if (willClearKey) {
         payload.clear_key = true;
       }
@@ -245,7 +246,7 @@ export default function HostForm({
               options={[
                 { value: "", label: isEdit && host?.has_key ? t("host.sshKeyKeepCurrent") : t("host.sshKeyNone") },
                 ...(isEdit && host?.has_key ? [{ value: "__clear__", label: t("host.sshKeyClear") }] : []),
-                ...sshKeys.map((k) => ({ value: k.id.toString(), label: `${k.name}${k.fingerprint ? ` (${k.fingerprint})` : ""}` })),
+                ...sshKeys.map((k) => ({ value: k.id.toString(), label: [k.name, k.username, k.ssh_fingerprint].filter(Boolean).join(" · ") })),
               ]}
             />
             {selectedKeyId === "__clear__" && <p className="mt-1.5 text-xs text-[var(--warning)]">{t("host.sshKeyClearHint")}</p>}

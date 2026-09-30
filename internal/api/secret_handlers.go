@@ -99,7 +99,9 @@ type createSecretRequest struct {
 	Name        string  `json:"name"`
 	GroupLabel  *string `json:"group_label,omitempty"`
 	Description *string `json:"description,omitempty"`
-	Payload     string  `json:"payload"`
+	// Username: the login a password is for (JSON payloads carry their own).
+	Username string `json:"username,omitempty"`
+	Payload  string `json:"payload"`
 	// Entidade grants — honoured only for shared avulso secrets (root assets);
 	// every other scope/visibility inherits from its parent or is owner-only.
 	models.AssetGrantsInput
@@ -139,6 +141,7 @@ func (h *secretHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		Name:        req.Name,
 		GroupLabel:  req.GroupLabel,
 		Description: req.Description,
+		Username:    strings.TrimSpace(req.Username),
 		KeyVersion:  1,
 		CreatedBy:   actor.UserID,
 	}

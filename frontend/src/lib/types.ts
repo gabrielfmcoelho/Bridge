@@ -340,6 +340,27 @@ export interface Secret {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  // List context (GET /api/secrets).
+  username?: string | null;
+  ssh_fingerprint?: string | null;
+  parent_name?: string | null;
+  owner_name?: string | null;
+  /** Hosts logging in with this shared credential. */
+  linked_hosts?: number;
+  /** >1: this many visible secrets hold the same value; dup_group ties them. */
+  dup_count?: number;
+  dup_group?: string;
+}
+
+/** Identical per-host copies of a password/key the admin can consolidate. */
+export interface ConsolidationGroup {
+  key: string;
+  type: "password" | "sshkey";
+  username: string;
+  host_ids: number[];
+  host_names: string[];
+  target_id?: number;
+  target_name?: string;
 }
 
 export interface SecretReveal {
@@ -492,19 +513,6 @@ export interface HostChamado {
   cached_title?: string;
   cached_status?: string;
   cached_at?: string;
-}
-
-export interface SSHKeyRecord {
-  id: number;
-  name: string;
-  credential_type: "key" | "password";
-  username: string;
-  description: string;
-  fingerprint: string;
-  has_public_key: boolean;
-  has_private_key: boolean;
-  has_password: boolean;
-  created_at: string;
 }
 
 export interface DashboardStats {
