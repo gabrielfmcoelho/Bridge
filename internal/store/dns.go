@@ -20,11 +20,14 @@ type DNSRepo struct {
 func NewDNSRepo(db *sql.DB) *DNSRepo { return &DNSRepo{db: db} }
 
 const dnsCols = `id, domain, has_https, situacao, responsavel, observacoes, created_at, updated_at,
-	cert_not_before, cert_expires_at, cert_issuer, cert_subject, cert_sans, cert_error, cert_checked_at`
+	cert_not_before, cert_expires_at, cert_issuer, cert_subject, cert_sans, cert_error, cert_checked_at, deleted_at`
+
+// dnsLive keeps trashed records out of every live read.
+const dnsLive = "dns_records.deleted_at IS NULL"
 
 func scanDNS(scanner interface{ Scan(...any) error }, d *models.DNSRecord) error {
 	return scanner.Scan(&d.ID, &d.Domain, &d.HasHTTPS, &d.Situacao, &d.Responsavel, &d.Observacoes, &d.CreatedAt, &d.UpdatedAt,
-		&d.CertNotBefore, &d.CertExpiresAt, &d.CertIssuer, &d.CertSubject, &d.CertSANs, &d.CertError, &d.CertCheckedAt)
+		&d.CertNotBefore, &d.CertExpiresAt, &d.CertIssuer, &d.CertSubject, &d.CertSANs, &d.CertError, &d.CertCheckedAt, &d.DeletedAt)
 }
 
 // Create inserts a DNS record and sets d.ID.
@@ -45,7 +48,7 @@ func (r *DNSRepo) Create(ctx context.Context, d *models.DNSRecord) error {
 func (r *DNSRepo) Get(ctx context.Context, id int64) (*models.DNSRecord, error) {
 	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
 	d := &models.DNSRecord{}
-	err := scanDNS(r.db.QueryRowContext(ctx, `SELECT `+dnsCols+` FROM dns_records WHERE id = ? AND `+vis, append([]any{id}, vargs...)...), d)
+	err := scanDNS(r.db.QueryRowContext(ctx, `SELECT `+dnsCols+` FROM dns_records WHERE id = ? AND `+dnsLive+` AND `+vis, append([]any{id}, vargs...)...), d)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -55,7 +58,7 @@ func (r *DNSRepo) Get(ctx context.Context, id int64) (*models.DNSRecord, error) 
 // List returns all DNS records ordered by domain.
 func (r *DNSRepo) List(ctx context.Context) ([]models.DNSRecord, error) {
 	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
-	rows, err := r.db.QueryContext(ctx, `SELECT `+dnsCols+` FROM dns_records WHERE `+vis+` ORDER BY domain`, vargs...)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+dnsCols+` FROM dns_records WHERE `+dnsLive+` AND `+vis+` ORDER BY domain`, vargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -72,13 +75,13 @@ func (r *DNSRepo) List(ctx context.Context) ([]models.DNSRecord, error) {
 }
 
 // dnsWhere builds the shared WHERE predicates (and bound args) for the filtered
-// list/count queries. Mirrors projectWhere, minus the soft-delete clause:
-// dns_records has no deleted_at column. Dynamic clauses use `?` placeholders
+// list/count queries. Mirrors projectWhere, including the soft-delete
+// clause. Dynamic clauses use `?` placeholders
 // (the driver rebinds `?`→$N), ILIKE search via database.LikeOp(), and a tag
 // subquery against the unified tags table. Always ends with the entidade
 // visibility predicate for the caller's scope.
 func dnsWhere(ctx context.Context, f models.DNSFilter) ([]string, []any) {
-	var where []string
+	where := []string{dnsLive}
 	var args []any
 
 	if f.Search != "" {
@@ -196,7 +199,7 @@ func (r *DNSRepo) CountFiltered(ctx context.Context, f models.DNSFilter) (int, e
 func (r *DNSRepo) Update(ctx context.Context, d *models.DNSRecord) error {
 	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE dns_records SET domain = ?, has_https = ?, situacao = ?, responsavel = ?, observacoes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND `+vis,
+		`UPDATE dns_records SET domain = ?, has_https = ?, situacao = ?, responsavel = ?, observacoes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND `+dnsLive+` AND `+vis,
 		append([]any{d.Domain, d.HasHTTPS, d.Situacao, d.Responsavel, d.Observacoes, d.ID}, vargs...)...,
 	)
 	return err
@@ -207,17 +210,62 @@ func (r *DNSRepo) Update(ctx context.Context, d *models.DNSRecord) error {
 func (r *DNSRepo) SetCert(ctx context.Context, id int64, c models.DNSCert) error {
 	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE dns_records SET cert_not_before = ?, cert_expires_at = ?, cert_issuer = ?, cert_subject = ?, cert_sans = ?, cert_error = ?, cert_checked_at = ? WHERE id = ? AND `+vis,
+		`UPDATE dns_records SET cert_not_before = ?, cert_expires_at = ?, cert_issuer = ?, cert_subject = ?, cert_sans = ?, cert_error = ?, cert_checked_at = ? WHERE id = ? AND `+dnsLive+` AND `+vis,
 		append([]any{c.CertNotBefore, c.CertExpiresAt, c.CertIssuer, c.CertSubject, c.CertSANs, c.CertError, c.CertCheckedAt, id}, vargs...)...,
 	)
 	return err
 }
 
-// Delete removes a DNS record by id. Invisible rows are untouched.
+// Delete moves a DNS record to the trash (its links, tags and grants stay, so
+// a restore brings it back whole). Invisible rows are untouched.
 func (r *DNSRepo) Delete(ctx context.Context, id int64) error {
 	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
-	_, err := r.db.ExecContext(ctx, `DELETE FROM dns_records WHERE id = ? AND `+vis, append([]any{id}, vargs...)...)
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE dns_records SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND `+dnsLive+` AND `+vis,
+		append([]any{id}, vargs...)...)
 	return err
+}
+
+// ListTrash returns the visible records in the trash, latest first.
+func (r *DNSRepo) ListTrash(ctx context.Context) ([]models.DNSRecord, error) {
+	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT `+dnsCols+` FROM dns_records WHERE deleted_at IS NOT NULL AND `+vis+` ORDER BY deleted_at DESC`, vargs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	records := []models.DNSRecord{}
+	for rows.Next() {
+		var d models.DNSRecord
+		if err := scanDNS(rows, &d); err != nil {
+			return nil, err
+		}
+		records = append(records, d)
+	}
+	return records, rows.Err()
+}
+
+// Restore takes a visible record out of the trash; false when there was none.
+func (r *DNSRepo) Restore(ctx context.Context, id int64) (bool, error) {
+	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE dns_records SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL AND `+vis,
+		append([]any{id}, vargs...)...)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// InTrash reports whether a trashed record holds this domain (a create would
+// hit the UNIQUE key; the caller says "restore it" instead).
+func (r *DNSRepo) InTrash(ctx context.Context, domain string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM dns_records WHERE lower(domain) = lower(?) AND deleted_at IS NOT NULL)`, domain).Scan(&exists)
+	return exists, err
 }
 
 // SetHostLinks replaces all host links for a DNS record (one tx).
@@ -268,14 +316,15 @@ func (r *DNSRepo) AddHostLink(ctx context.Context, dnsID, hostID int64) (bool, e
 }
 
 // IDByDomain finds a record by domain, case-insensitively and unscoped (the
-// Coolify sync must see every row to avoid duplicates).
-func (r *DNSRepo) IDByDomain(ctx context.Context, domain string) (int64, bool, error) {
-	var id int64
-	err := r.db.QueryRowContext(ctx, `SELECT id FROM dns_records WHERE lower(domain) = lower(?) ORDER BY id LIMIT 1`, domain).Scan(&id)
+// Coolify sync must see every row to avoid duplicates). trashed reports a
+// record in the trash: it still owns the domain, but nothing should link to it.
+func (r *DNSRepo) IDByDomain(ctx context.Context, domain string) (id int64, found, trashed bool, err error) {
+	err = r.db.QueryRowContext(ctx,
+		`SELECT id, deleted_at IS NOT NULL FROM dns_records WHERE lower(domain) = lower(?) ORDER BY id LIMIT 1`, domain).Scan(&id, &trashed)
 	if err == sql.ErrNoRows {
-		return 0, false, nil
+		return 0, false, false, nil
 	}
-	return id, err == nil, err
+	return id, err == nil, trashed, err
 }
 
 // SetServiceLinks replaces all service links for a DNS record (one tx).
@@ -321,7 +370,7 @@ func (r *DNSRepo) RecordsByHost(ctx context.Context, hostID int64) ([]models.DNS
 	// dns_host_links has only (dns_id, host_id), so dnsCols stays unambiguous.
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+dnsCols+` FROM dns_records JOIN dns_host_links l ON l.dns_id = dns_records.id
-		 WHERE l.host_id = ? AND `+vis+` ORDER BY domain`, append([]any{hostID}, vargs...)...)
+		 WHERE l.host_id = ? AND `+dnsLive+` AND `+vis+` ORDER BY domain`, append([]any{hostID}, vargs...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -341,13 +390,13 @@ func (r *DNSRepo) RecordsByHost(ctx context.Context, hostID int64) ([]models.DNS
 func (r *DNSRepo) Count(ctx context.Context) (int, error) {
 	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
 	var n int
-	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM dns_records WHERE `+vis, vargs...).Scan(&n)
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM dns_records WHERE `+dnsLive+` AND `+vis, vargs...).Scan(&n)
 	return n, err
 }
 
 // CountsByHost returns host_id → number of linked DNS records.
 func (r *DNSRepo) CountsByHost(ctx context.Context) (map[int64]int, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT host_id, COUNT(*) FROM dns_host_links GROUP BY host_id`)
+	rows, err := r.db.QueryContext(ctx, `SELECT l.host_id, COUNT(*) FROM dns_host_links l JOIN dns_records ON dns_records.id = l.dns_id AND `+dnsLive+` GROUP BY l.host_id`)
 	if err != nil {
 		return nil, err
 	}

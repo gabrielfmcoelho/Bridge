@@ -14,6 +14,8 @@ type DNSRecord struct {
 	Observacoes string    `json:"observacoes"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	// DeletedAt is set while the record sits in the trash.
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	DNSCert
 }
 

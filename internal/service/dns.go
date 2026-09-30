@@ -265,14 +265,23 @@ func (s *DNSService) Update(ctx context.Context, id int64, w *DNSWrite) (bool, e
 	return true, nil
 }
 
-// Delete removes the record and its tags. Absent/invisible records are a no-op
-// (so an out-of-scope caller cannot strip tags off a record it cannot see).
+// Delete moves the record to the trash. Links, tags and grants stay so a
+// restore brings it back whole. Absent/invisible records are a no-op.
 func (s *DNSService) Delete(ctx context.Context, id int64) error {
-	if rec, err := s.dns.Get(ctx, id); err != nil || rec == nil {
-		return err
-	}
-	if err := s.tags.Delete(ctx, "dns", id); err != nil {
-		return err
-	}
 	return s.dns.Delete(ctx, id)
+}
+
+// ListTrash returns the records in the trash the caller can see.
+func (s *DNSService) ListTrash(ctx context.Context) ([]models.DNSRecord, error) {
+	return s.dns.ListTrash(ctx)
+}
+
+// Restore takes a record out of the trash; false when there was none.
+func (s *DNSService) Restore(ctx context.Context, id int64) (bool, error) {
+	return s.dns.Restore(ctx, id)
+}
+
+// DomainInTrash reports whether a trashed record holds the domain.
+func (s *DNSService) DomainInTrash(ctx context.Context, domain string) (bool, error) {
+	return s.dns.InTrash(ctx, domain)
 }

@@ -26,7 +26,7 @@ func (r *ResponsavelRepo) List(ctx context.Context, entityType string, entityID 
 		SELECT rs.id, rs.contact_id, rs.is_main,
 		       c.name, c.phone, c.role, c.entity, c.notes, c.is_external
 		FROM responsaveis rs
-		JOIN contacts c ON c.id = rs.contact_id
+		JOIN contacts c ON c.id = rs.contact_id AND c.deleted_at IS NULL
 		WHERE rs.entity_type = ? AND rs.entity_id = ?
 		ORDER BY rs.is_main DESC, c.name ASC`, entityType, entityID)
 	if err != nil {
@@ -52,7 +52,7 @@ func (r *ResponsavelRepo) MainNamesBulk(ctx context.Context, entityType string) 
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT rs.entity_id, c.name
 		FROM responsaveis rs
-		JOIN contacts c ON c.id = rs.contact_id
+		JOIN contacts c ON c.id = rs.contact_id AND c.deleted_at IS NULL
 		WHERE rs.entity_type = ? AND rs.is_main AND NOT c.is_external`, entityType)
 	if err != nil {
 		return nil, err
@@ -85,9 +85,11 @@ func (r *ResponsavelRepo) Sync(ctx context.Context, entityType string, entityID 
 		if inp.ContactID <= 0 {
 			return fmt.Errorf("contact_id is required for each responsavel")
 		}
+		// A contact in the trash can't be picked; it's skipped.
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main) VALUES (?, ?, ?, ?)`,
-			entityType, entityID, inp.ContactID, inp.IsMain,
+			`INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+			 SELECT ?, ?, id, ? FROM contacts WHERE id = ? AND deleted_at IS NULL`,
+			entityType, entityID, inp.IsMain, inp.ContactID,
 		); err != nil {
 			return err
 		}

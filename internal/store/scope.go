@@ -35,10 +35,10 @@ type AssetSpec struct {
 
 var assetRegistry = map[AssetType]AssetSpec{
 	AssetHost:       {Table: "hosts", NameColumn: "nickname", SoftDelete: true},
-	AssetDNS:        {Table: "dns_records", NameColumn: "domain"},
+	AssetDNS:        {Table: "dns_records", NameColumn: "domain", SoftDelete: true},
 	AssetService:    {Table: "services", NameColumn: "nickname", SoftDelete: true},
 	AssetProject:    {Table: "projects", NameColumn: "name", SoftDelete: true},
-	AssetContact:    {Table: "contacts", NameColumn: "name"},
+	AssetContact:    {Table: "contacts", NameColumn: "name", SoftDelete: true},
 	AssetTool:       {Table: "external_tools", NameColumn: "name", SoftDelete: true},
 	AssetAPICatalog: {Table: "api_catalog", NameColumn: "name", SoftDelete: true},
 	// Only standalone shared secrets carry their own grants; parented secrets

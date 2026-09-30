@@ -23,17 +23,20 @@ func NewContactRepo(db *sql.DB) *ContactRepo { return &ContactRepo{db: db} }
 // this repo) can drive the entidade-grants repo for create/update.
 func (r *ContactRepo) DB() *sql.DB { return r.db }
 
-const contactCols = `contacts.id, contacts.name, contacts.phone, contacts.role, contacts.entity, contacts.notes, contacts.is_external`
+const contactCols = `contacts.id, contacts.name, contacts.phone, contacts.role, contacts.entity, contacts.notes, contacts.is_external, contacts.deleted_at`
+
+// contactLive keeps trashed contacts out of every live read.
+const contactLive = "contacts.deleted_at IS NULL"
 
 func scanContact(scanner interface{ Scan(...any) error }, c *models.Contact) error {
-	return scanner.Scan(&c.ID, &c.Name, &c.Phone, &c.Role, &c.Entity, &c.Notes, &c.IsExternal)
+	return scanner.Scan(&c.ID, &c.Name, &c.Phone, &c.Role, &c.Entity, &c.Notes, &c.IsExternal, &c.DeletedAt)
 }
 
 // List returns all visible contacts ordered by name.
 func (r *ContactRepo) List(ctx context.Context) ([]models.Contact, error) {
 	vis, vargs := VisibleExpr(ctx, AssetContact, "contacts.id")
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT `+contactCols+` FROM contacts WHERE `+vis+` ORDER BY contacts.name`, vargs...)
+		`SELECT `+contactCols+` FROM contacts WHERE `+contactLive+` AND `+vis+` ORDER BY contacts.name`, vargs...)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +58,7 @@ func (r *ContactRepo) Get(ctx context.Context, id int64) (*models.Contact, error
 	vis, vargs := VisibleExpr(ctx, AssetContact, "contacts.id")
 	c := &models.Contact{}
 	err := scanContact(r.db.QueryRowContext(ctx,
-		`SELECT `+contactCols+` FROM contacts WHERE contacts.id = ? AND `+vis, append([]any{id}, vargs...)...), c)
+		`SELECT `+contactCols+` FROM contacts WHERE contacts.id = ? AND `+contactLive+` AND `+vis, append([]any{id}, vargs...)...), c)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -63,13 +66,14 @@ func (r *ContactRepo) Get(ctx context.Context, id int64) (*models.Contact, error
 }
 
 // Create upserts a contact on (name, phone). On conflict it returns the
-// existing row's id so callers can reliably continue. The dummy
+// existing row's id so callers can reliably continue — and takes a trashed
+// one out of the trash: adding the same person again means they're back. The dummy
 // `SET name = EXCLUDED.name` is portable between SQLite and Postgres and
 // guarantees RETURNING id yields a row even on conflict.
 func (r *ContactRepo) Create(ctx context.Context, c *models.Contact) error {
 	id, err := database.InsertReturningID(r.db,
 		`INSERT INTO contacts (name, phone, role, entity, notes, is_external) VALUES (?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(name, phone) DO UPDATE SET name = EXCLUDED.name`,
+		 ON CONFLICT(name, phone) DO UPDATE SET name = EXCLUDED.name, deleted_at = NULL`,
 		c.Name, c.Phone, c.Role, c.Entity, c.Notes, c.IsExternal,
 	)
 	if err != nil {
@@ -83,15 +87,49 @@ func (r *ContactRepo) Create(ctx context.Context, c *models.Contact) error {
 func (r *ContactRepo) Update(ctx context.Context, c *models.Contact) error {
 	vis, vargs := VisibleExpr(ctx, AssetContact, "contacts.id")
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE contacts SET name = ?, phone = ?, role = ?, entity = ?, notes = ?, is_external = ? WHERE id = ? AND `+vis,
+		`UPDATE contacts SET name = ?, phone = ?, role = ?, entity = ?, notes = ?, is_external = ? WHERE id = ? AND `+contactLive+` AND `+vis,
 		append([]any{c.Name, c.Phone, c.Role, c.Entity, c.Notes, c.IsExternal, c.ID}, vargs...)...,
 	)
 	return err
 }
 
-// Delete removes a visible contact by id.
+// Delete moves a visible contact to the trash; the entities it's responsável
+// for keep the link, hidden until a restore.
 func (r *ContactRepo) Delete(ctx context.Context, id int64) error {
 	vis, vargs := VisibleExpr(ctx, AssetContact, "contacts.id")
-	_, err := r.db.ExecContext(ctx, `DELETE FROM contacts WHERE id = ? AND `+vis, append([]any{id}, vargs...)...)
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE contacts SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND `+contactLive+` AND `+vis, append([]any{id}, vargs...)...)
 	return err
+}
+
+// ListTrash returns the visible contacts in the trash, latest first.
+func (r *ContactRepo) ListTrash(ctx context.Context) ([]models.Contact, error) {
+	vis, vargs := VisibleExpr(ctx, AssetContact, "contacts.id")
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT `+contactCols+` FROM contacts WHERE contacts.deleted_at IS NOT NULL AND `+vis+` ORDER BY contacts.deleted_at DESC`, vargs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []models.Contact{}
+	for rows.Next() {
+		var c models.Contact
+		if err := scanContact(rows, &c); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// Restore takes a visible contact out of the trash; false when there was none.
+func (r *ContactRepo) Restore(ctx context.Context, id int64) (bool, error) {
+	vis, vargs := VisibleExpr(ctx, AssetContact, "contacts.id")
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE contacts SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL AND `+vis, append([]any{id}, vargs...)...)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }

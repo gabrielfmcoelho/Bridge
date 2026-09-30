@@ -53,7 +53,7 @@ func TestDNSService_SyncFromCoolify(t *testing.T) {
 
 	dns := store.NewDNSRepo(d.SQL)
 	linked := func(domain string) []int64 {
-		id, ok, err := dns.IDByDomain(ctx, domain)
+		id, ok, _, err := dns.IDByDomain(ctx, domain)
 		if err != nil || !ok {
 			t.Fatalf("IDByDomain(%s) = %v, %v", domain, ok, err)
 		}
@@ -73,7 +73,7 @@ func TestDNSService_SyncFromCoolify(t *testing.T) {
 		t.Fatalf("orphan links = %v, want none", got)
 	}
 
-	aID, _, _ := dns.IDByDomain(ctx, "a.x.gov.br")
+	aID, _, _, _ := dns.IDByDomain(ctx, "a.x.gov.br")
 	detail, err := svc.Get(ctx, aID)
 	if err != nil || detail == nil {
 		t.Fatalf("get: %+v %v", detail, err)

@@ -395,10 +395,10 @@ func (h *aiHandlers) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	// Build context with high-level stats.
 	var hostCount, svcCount, dnsCount, projCount int
-	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM hosts`).Scan(&hostCount)
-	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM services`).Scan(&svcCount)
-	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM dns_records`).Scan(&dnsCount)
-	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM projects`).Scan(&projCount)
+	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM hosts WHERE deleted_at IS NULL`).Scan(&hostCount)
+	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM services WHERE deleted_at IS NULL`).Scan(&svcCount)
+	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM dns_records WHERE deleted_at IS NULL`).Scan(&dnsCount)
+	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM projects WHERE deleted_at IS NULL`).Scan(&projCount)
 	statsContext := "Infrastructure summary: " +
 		strconv.Itoa(hostCount) + " hosts, " +
 		strconv.Itoa(svcCount) + " services, " +

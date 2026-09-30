@@ -1463,4 +1463,13 @@ var migrationsPostgres = []string{
 	CREATE INDEX IF NOT EXISTS idx_secrets_ssh_fp ON secrets (ssh_fingerprint) WHERE ssh_fingerprint IS NOT NULL AND deleted_at IS NULL;
 	ALTER TABLE host_remote_users ADD COLUMN IF NOT EXISTS key_secret_id BIGINT REFERENCES secrets(id) ON DELETE SET NULL;
 	CREATE INDEX IF NOT EXISTS idx_hru_key_secret ON host_remote_users (key_secret_id) WHERE key_secret_id IS NOT NULL;`,
+
+	// Version 92: DNS records and contacts go to a trash like hosts, services
+	// and projects: delete sets deleted_at, restore clears it, and every live
+	// read filters it. The UNIQUE keys stay — a trashed domain or (name,
+	// phone) stays reserved until restored, as a trashed host's slug does.
+	`ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	ALTER TABLE contacts ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+	CREATE INDEX IF NOT EXISTS idx_dns_records_deleted ON dns_records (deleted_at) WHERE deleted_at IS NOT NULL;
+	CREATE INDEX IF NOT EXISTS idx_contacts_deleted ON contacts (deleted_at) WHERE deleted_at IS NOT NULL;`,
 }

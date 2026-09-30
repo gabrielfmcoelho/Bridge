@@ -377,7 +377,7 @@ func (r *ServiceRepo) SetDNSLinks(ctx context.Context, serviceID int64, dnsIDs [
 
 // DNSIDs returns dns ids linked to a service.
 func (r *ServiceRepo) DNSIDs(ctx context.Context, serviceID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT dns_id FROM service_dns_links WHERE service_id = ?`, serviceID)
+	rows, err := r.db.QueryContext(ctx, `SELECT l.dns_id FROM service_dns_links l JOIN dns_records d ON d.id = l.dns_id AND d.deleted_at IS NULL WHERE l.service_id = ?`, serviceID)
 	if err != nil {
 		return nil, err
 	}

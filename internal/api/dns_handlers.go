@@ -101,10 +101,40 @@ func (h *dnsHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 			jsonServerError(w, r, "failed to set entidades", err)
 			return
 		}
+		if trashed, _ := h.dns.DomainInTrash(r.Context(), wr.Record.Domain); trashed {
+			jsonError(w, http.StatusConflict, "domain is in the DNS trash — restore it instead")
+			return
+		}
 		jsonError(w, http.StatusConflict, "domain already exists")
 		return
 	}
 	jsonCreated(w, wr.Record)
+}
+
+func (h *dnsHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
+	items, err := h.dns.ListTrash(r.Context())
+	if err != nil {
+		jsonServerError(w, r, "failed to list DNS trash", err)
+		return
+	}
+	jsonOK(w, items)
+}
+
+func (h *dnsHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	restored, err := h.dns.Restore(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to restore DNS record", err)
+		return
+	}
+	if !restored {
+		jsonError(w, http.StatusNotFound, "DNS record not in trash")
+		return
+	}
+	jsonOK(w, map[string]string{"status": "restored"})
 }
 
 func (h *dnsHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +231,8 @@ func (h *dnsHandlers) handleCertScan(w http.ResponseWriter, r *http.Request) {
 // registerRoutes wires this group's routes (self-registration, R2).
 func (h *dnsHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/dns", h.handleList)
+	rr.auth("GET /api/dns/trash", h.handleListTrash)
+	rr.role("admin", "POST /api/dns/{id}/restore", h.handleRestore)
 	rr.role("editor", "POST /api/dns", h.handleCreate)
 	rr.auth("GET /api/dns/{id}", h.handleGet)
 	rr.role("editor", "PUT /api/dns/{id}", h.handleUpdate)

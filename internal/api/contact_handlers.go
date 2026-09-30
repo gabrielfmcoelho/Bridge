@@ -102,8 +102,36 @@ func (h *contactHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 // registerRoutes wires this group's routes (self-registration, R2).
+func (h *contactHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
+	items, err := h.contacts.ListTrash(r.Context())
+	if err != nil {
+		jsonServerError(w, r, "failed to list contact trash", err)
+		return
+	}
+	jsonOK(w, items)
+}
+
+func (h *contactHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	restored, err := h.contacts.Restore(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to restore contact", err)
+		return
+	}
+	if !restored {
+		jsonError(w, http.StatusNotFound, "contact not in trash")
+		return
+	}
+	jsonOK(w, map[string]string{"status": "restored"})
+}
+
 func (h *contactHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/contacts", h.handleList)
+	rr.auth("GET /api/contacts/trash", h.handleListTrash)
+	rr.role("admin", "POST /api/contacts/{id}/restore", h.handleRestore)
 	rr.role("editor", "POST /api/contacts", h.handleCreate)
 	rr.role("editor", "PUT /api/contacts/{id}", h.handleUpdate)
 	rr.role("admin", "DELETE /api/contacts/{id}", h.handleDelete)

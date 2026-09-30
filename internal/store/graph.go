@@ -56,12 +56,12 @@ func (r *GraphRepo) Links(ctx context.Context) (GraphLinks, error) {
 		dst  *[]LinkPair
 		from string
 	}{
-		{&g.DNSHost, `SELECT dns_id, host_id FROM dns_host_links`},
+		{&g.DNSHost, `SELECT l.dns_id, l.host_id FROM dns_host_links l JOIN dns_records d ON d.id = l.dns_id WHERE d.deleted_at IS NULL`},
 		{&g.ServiceHost, `SELECT service_id, host_id FROM service_host_links`},
-		{&g.ServiceDNS, `SELECT l.service_id, l.dns_id FROM service_dns_links l JOIN services s ON s.id = l.service_id WHERE s.deleted_at IS NULL`},
+		{&g.ServiceDNS, `SELECT l.service_id, l.dns_id FROM service_dns_links l JOIN services s ON s.id = l.service_id JOIN dns_records d ON d.id = l.dns_id WHERE s.deleted_at IS NULL AND d.deleted_at IS NULL`},
 		{&g.ProjectHost, `SELECT project_id, host_id FROM project_host_links`},
 		{&g.ServiceDepends, `SELECT service_id, depends_on_id FROM service_dependencies`},
-		{&g.ProjectDNS, `SELECT l.project_id, l.dns_id FROM project_dns_links l JOIN projects p ON p.id = l.project_id WHERE p.deleted_at IS NULL`},
+		{&g.ProjectDNS, `SELECT l.project_id, l.dns_id FROM project_dns_links l JOIN projects p ON p.id = l.project_id JOIN dns_records d ON d.id = l.dns_id WHERE p.deleted_at IS NULL AND d.deleted_at IS NULL`},
 	} {
 		rows, err := r.db.QueryContext(ctx, q.from)
 		if err != nil {

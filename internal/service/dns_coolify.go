@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/coolify"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -44,9 +45,15 @@ func (s *DNSService) SyncFromCoolify(ctx context.Context, refs []coolify.DomainR
 			sum.NoHost++
 		}
 
-		dnsID, exists, err := s.dns.IDByDomain(ctx, ref.Domain)
+		dnsID, exists, trashed, err := s.dns.IDByDomain(ctx, ref.Domain)
 		if err != nil {
 			return sum, err
+		}
+		if trashed {
+			// Someone deleted it: don't recreate it or link hosts to it.
+			log.Printf("[coolify] dns sync: %s is in the trash, skipped", ref.Domain)
+			sum.Existing++
+			continue
 		}
 		if exists {
 			sum.Existing++

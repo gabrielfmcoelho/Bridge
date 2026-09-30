@@ -262,7 +262,7 @@ func (r *ProjectRepo) HostIDs(ctx context.Context, projectID int64) ([]int64, er
 
 // DirectDNSIDs returns DNS ids linked directly to a project (not via services).
 func (r *ProjectRepo) DirectDNSIDs(ctx context.Context, projectID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT dns_id FROM project_dns_links WHERE project_id = ?`, projectID)
+	rows, err := r.db.QueryContext(ctx, `SELECT l.dns_id FROM project_dns_links l JOIN dns_records d ON d.id = l.dns_id AND d.deleted_at IS NULL WHERE l.project_id = ?`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -368,6 +368,8 @@ func (r *ProjectRepo) replaceVisibleLinks(ctx context.Context, table, col, asset
 		ids = []int64{}
 	}
 	vis, vargs := VisibleExpr(ctx, asset, assetTable+".id")
+	// Live assets only: links to trashed ones are kept for their restore.
+	vis = assetTable + ".deleted_at IS NULL AND " + vis
 	visible := `SELECT id FROM ` + assetTable + ` WHERE ` + vis
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
