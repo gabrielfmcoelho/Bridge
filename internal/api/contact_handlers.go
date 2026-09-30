@@ -16,6 +16,24 @@ type contactHandlers struct {
 	contacts *store.ContactRepo
 }
 
+// contactUpsertRequest is the create/update body: the contact plus its
+// entidade grants (omit the grant fields on update to keep them).
+type contactUpsertRequest struct {
+	models.Contact
+	models.AssetGrantsInput
+}
+
+// handleList godoc
+//
+//	@Summary		List contacts
+//	@Description	Visible contacts, each with its usage counts per asset type. Any role.
+//	@Tags			contacts
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.Contact]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/contacts [get]
 func (h *contactHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	contacts, err := h.contacts.List(r.Context())
 	if err != nil {
@@ -34,6 +52,16 @@ func (h *contactHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUsage lists the assets a contact is responsável for (visible ones).
+//
+//	@Summary		Assets a contact is responsável for
+//	@Description	Only assets visible to the caller. Any role.
+//	@Tags			contacts
+//	@Produce		json
+//	@Param			id	path		int	true	"Contact ID"
+//	@Success		200	{array}		store.ContactUse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/contacts/{id}/usage [get]
 func (h *contactHandlers) handleUsage(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -51,11 +79,22 @@ func (h *contactHandlers) handleUsage(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, uses)
 }
 
+// handleCreate godoc
+//
+//	@Summary		Create a contact
+//	@Description	Editor+. A duplicate answers 409 with error "contact_exists" (or "contact_in_trash") and never touches the existing contact.
+//	@Tags			contacts
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		contactUpsertRequest	true	"Contact and entidade grants"
+//	@Success		201		{object}	models.Contact
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		409		{object}	httpx.ErrorResponse
+//	@Router			/api/contacts [post]
 func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		models.Contact
-		models.AssetGrantsInput
-	}
+	var req contactUpsertRequest
 	if !decodeBody(w, r, &req) {
 		return
 	}
@@ -87,6 +126,21 @@ func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 	jsonCreated(w, req.Contact)
 }
 
+// handleUpdate godoc
+//
+//	@Summary		Update a contact
+//	@Description	Editor+. Grants change only when a grant field is sent.
+//	@Tags			contacts
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int						true	"Contact ID"
+//	@Param			body	body		contactUpsertRequest	true	"Contact and optional entidade grants"
+//	@Success		200		{object}	models.Contact
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/contacts/{id} [put]
 func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -96,10 +150,7 @@ func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, "contact not found")
 		return
 	}
-	var req struct {
-		models.Contact
-		models.AssetGrantsInput
-	}
+	var req contactUpsertRequest
 	if !decodeBody(w, r, &req) {
 		return
 	}
@@ -126,6 +177,17 @@ func (h *contactHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, req.Contact)
 }
 
+// handleDelete godoc
+//
+//	@Summary		Move a contact to the trash
+//	@Description	Admin.
+//	@Tags			contacts
+//	@Produce		json
+//	@Param			id	path		int	true	"Contact ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/contacts/{id} [delete]
 func (h *contactHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -138,7 +200,17 @@ func (h *contactHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
-// registerRoutes wires this group's routes (self-registration, R2).
+// handleListTrash godoc
+//
+//	@Summary		List trashed contacts
+//	@Description	Any role.
+//	@Tags			contacts
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.Contact]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/contacts/trash [get]
 func (h *contactHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
 	items, err := h.contacts.ListTrash(r.Context())
 	if err != nil {
@@ -148,6 +220,18 @@ func (h *contactHandlers) handleListTrash(w http.ResponseWriter, r *http.Request
 	jsonPaged(w, r, items) // list envelope, like every list endpoint
 }
 
+// handleRestore godoc
+//
+//	@Summary		Restore a contact from the trash
+//	@Description	Admin.
+//	@Tags			contacts
+//	@Produce		json
+//	@Param			id	path		int	true	"Contact ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/contacts/{id}/restore [post]
 func (h *contactHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
@@ -165,6 +249,7 @@ func (h *contactHandlers) handleRestore(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, map[string]string{"status": "restored"})
 }
 
+// registerRoutes wires this group's routes (self-registration, R2).
 func (h *contactHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/contacts", h.handleList)
 	rr.auth("GET /api/contacts/trash", h.handleListTrash)

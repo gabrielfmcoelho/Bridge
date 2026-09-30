@@ -78,10 +78,12 @@ func jsonList[T any](w http.ResponseWriter, data []T, meta Meta) {
 	if data == nil {
 		data = []T{}
 	}
-	httpx.WriteJSON(w, http.StatusOK, listEnvelope[T]{Data: data, Meta: meta})
+	httpx.WriteJSON(w, http.StatusOK, ListEnvelope[T]{Data: data, Meta: meta})
 }
 
-type listEnvelope[T any] struct {
+// ListEnvelope is the list response body. Exported so Swagger annotations can
+// name it: {object} ListEnvelope[models.Contact].
+type ListEnvelope[T any] struct {
 	Data []T  `json:"data"`
 	Meta Meta `json:"meta"`
 }

@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -76,6 +78,10 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"DELETE", "/api/entidades/1"},
 		{"GET", "/api/assets/host/1/entidades"},
 		{"PUT", "/api/assets/host/1/entidades"},
+
+		// Swagger UI + spec
+		{"GET", "/api/docs/index.html"},
+		{"GET", "/api/docs/doc.json"},
 
 		// Share bundles (owner routes)
 		{"POST", "/api/share-bundles"},
@@ -218,6 +224,22 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 	}
 }
 
+// sessionCookies creates a viewer and returns the cookies of a live session.
+func sessionCookies(t *testing.T, d *database.DB) []*http.Cookie {
+	t.Helper()
+	u := &models.User{Username: "probe", DisplayName: "probe", Role: "viewer", Email: "probe@example.com"}
+	if err := store.NewUserRepo(d.SQL).Create(context.Background(), u); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	token, exp, err := auth.CreateSession(d.SQL, u.ID)
+	if err != nil {
+		t.Fatalf("session: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	auth.SetSessionCookie(rec, token, exp)
+	return rec.Result().Cookies()
+}
+
 // TestRouter_PathValueReachesHandler proves the Echo adapter (routes.go adapt):
 // a request through the real auth middleware reaches a plain net/http handler
 // with r.PathValue set — unescaped, as ServeMux delivered it — and with the
@@ -228,14 +250,6 @@ func TestRouter_PathValueReachesHandler(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 	t.Cleanup(func() { d.Close() })
-	u := &models.User{Username: "probe", DisplayName: "probe", Role: "viewer", Email: "probe@example.com"}
-	if err := store.NewUserRepo(d.SQL).Create(context.Background(), u); err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	token, exp, err := auth.CreateSession(d.SQL, u.ID)
-	if err != nil {
-		t.Fatalf("session: %v", err)
-	}
 
 	e := newEcho()
 	var gotID, gotName, gotUser string
@@ -248,9 +262,7 @@ func TestRouter_PathValueReachesHandler(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("GET", "/api/probe/42/a%20b%2Fc", nil)
-	cookies := httptest.NewRecorder()
-	auth.SetSessionCookie(cookies, token, exp)
-	for _, c := range cookies.Result().Cookies() {
+	for _, c := range sessionCookies(t, d) {
 		req.AddCookie(c)
 	}
 	rec := httptest.NewRecorder()
@@ -261,5 +273,26 @@ func TestRouter_PathValueReachesHandler(t *testing.T) {
 	}
 	if gotID != "42" || gotName != "a b/c" || gotUser != "probe" {
 		t.Errorf("id=%q name=%q user=%q, want 42, \"a b/c\", probe", gotID, gotName, gotUser)
+	}
+}
+
+// TestRouter_SwaggerSpecServed checks a logged-in user gets the generated
+// spec (the docs package is registered and the route passes auth).
+func TestRouter_SwaggerSpecServed(t *testing.T) {
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { d.Close() })
+	router := NewRouter(d, "/tmp/sshcm-test-config")
+
+	req := httptest.NewRequest("GET", "/api/docs/doc.json", nil)
+	for _, c := range sessionCookies(t, d) {
+		req.AddCookie(c)
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"/api/contacts"`) {
+		t.Fatalf("status %d, body starts %.200s", rec.Code, rec.Body)
 	}
 }

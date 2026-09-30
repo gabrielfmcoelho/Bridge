@@ -24,8 +24,13 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// WriteError writes a {"error": msg} body with the given status. This is the
-// single canonical error shape for the whole HTTP surface.
+// ErrorResponse is the single canonical error shape for the whole HTTP
+// surface: {"error": msg}. Named so the Swagger docs can reference it.
+type ErrorResponse struct {
+	Error string `json:"error" example:"contact not found"`
+}
+
+// WriteError writes an ErrorResponse body with the given status.
 func WriteError(w http.ResponseWriter, status int, msg string) {
-	WriteJSON(w, status, map[string]string{"error": msg})
+	WriteJSON(w, status, ErrorResponse{Error: msg})
 }

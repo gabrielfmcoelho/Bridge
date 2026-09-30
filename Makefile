@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-frontend build build-go clean install
+.PHONY: dev dev-api dev-frontend build build-go clean install swagger swagger-check
 
 # The root .env reaches the Go side through godotenv (cmd/root.go:29), but Make
 # does not read .env files and Next only reads them from frontend/ — so without
@@ -48,3 +48,15 @@ clean:
 
 install: build-go
 	cp sshcm $(GOPATH)/bin/sshcm 2>/dev/null || cp sshcm ~/go/bin/sshcm
+
+# Swagger spec from the handlers' swag annotations (served at /api/docs/index.html).
+# The generated internal/api/docs is committed so `go build` never needs swag;
+# swagger-check fails when someone changed an annotation without regenerating.
+SWAG := go run github.com/swaggo/swag/cmd/swag@v1.16.4
+
+swagger:
+	$(SWAG) fmt -d internal/api
+	$(SWAG) init -q -g doc.go -d internal/api -o internal/api/docs --parseDependency --parseInternal --parseDependencyLevel 1
+
+swagger-check: swagger
+	git diff --exit-code internal/api
