@@ -16,8 +16,9 @@ import UsersTab from "./UsersTab";
 import AppearanceTab from "./AppearanceTab";
 import ImportTab from "./ImportTab";
 import BackupTab from "./BackupTab";
+import ApiTokensTab from "./ApiTokensTab";
 
-type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "import" | "backup" | "integrations" | "permissions" | "role-mappings";
+type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "import" | "backup" | "integrations" | "permissions" | "role-mappings" | "api-tokens";
 
 export default function SettingsPage() {
   const { t } = useLocale();
@@ -35,12 +36,16 @@ export default function SettingsPage() {
       { key: "enums", label: t("settings.enums") },
       ...(isAdmin ? [{ key: "appearance" as Tab, label: t("settings.appearance") }] : []),
     ] },
-    { title: t("settings.groups.access"), items: isAdmin ? [
-      { key: "users", label: t("settings.users") },
-      { key: "entidades", label: t("entidades.title") },
-      { key: "permissions", label: t("settings.permissions.tabLabel") },
-      { key: "role-mappings", label: t("settings.roleMappings.tabLabel") },
-    ] : [] },
+    { title: t("settings.groups.access"), items: [
+      ...(isAdmin ? [
+        { key: "users" as Tab, label: t("settings.users") },
+        { key: "entidades" as Tab, label: t("entidades.title") },
+        { key: "permissions" as Tab, label: t("settings.permissions.tabLabel") },
+        { key: "role-mappings" as Tab, label: t("settings.roleMappings.tabLabel") },
+      ] : []),
+      // Every role manages its own tokens.
+      { key: "api-tokens", label: t("settings.apiTokens.tabLabel") },
+    ] },
     { title: t("settings.groups.catalog"), items: canManageCatalog ? [{ key: "offerings", label: t("settings.offerings.title") }] : [] },
     { title: t("settings.groups.integrations"), items: isAdmin ? [{ key: "integrations", label: t("settings.integrationsTabLabel") }] : [] },
     { title: t("settings.groups.data"), items: isAdmin ? [
@@ -74,6 +79,7 @@ export default function SettingsPage() {
         {activeTab === "integrations" && isAdmin && <IntegrationsTab />}
         {activeTab === "permissions" && isAdmin && <PermissionsTab />}
         {activeTab === "role-mappings" && isAdmin && <RoleMappingsTab />}
+        {activeTab === "api-tokens" && <ApiTokensTab />}
       </PageHeader>
     </PageShell>
   );

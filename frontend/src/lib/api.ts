@@ -1222,6 +1222,27 @@ export const roleMappingsAPI = {
   delete: (id: number) => api.delete(`/api/settings/role-mappings/${id}`),
 };
 
+// Personal API tokens: each acts as its owner. `token` (plaintext) only ever
+// comes back from create.
+export interface APIToken {
+  id: number;
+  user_id: number;
+  username: string;
+  name: string;
+  prefix: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+export const apiTokensAPI = {
+  list: (all = false) => api.getList<APIToken>(`/api/auth/tokens${all ? "?all=true" : ""}`),
+  create: (data: { name: string; expires_in_days: number }) =>
+    api.post<{ token: string; api_token: APIToken }>("/api/auth/tokens", data),
+  revoke: (id: number) => api.delete(`/api/auth/tokens/${id}`),
+};
+
 // AI / LLM integration
 export const aiAPI = {
   status: () => api.get<{ enabled: boolean; configured: boolean; model: string }>("/api/ai/status"),

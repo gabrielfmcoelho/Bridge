@@ -1728,7 +1728,44 @@
       "inactive": "desligado",
       "maintenance": "manutenção"
     },
-    "situacaoRolesHint": "Os papéis entre parênteses dizem ao sistema qual opção significa ativo, desligado e em manutenção (SSH config, sync do Proxmox e do Coolify). Renomear mantém o papel; excluir a opção o remove."
+    "situacaoRolesHint": "Os papéis entre parênteses dizem ao sistema qual opção significa ativo, desligado e em manutenção (SSH config, sync do Proxmox e do Coolify). Renomear mantém o papel; excluir a opção o remove.",
+    "apiTokens": {
+      "tabLabel": "Tokens de API",
+      "title": "Tokens de API pessoais",
+      "intro": "Tokens permitem que scripts e integrações chamem a API do Bridge em seu nome — com a mesma função, permissões e entidades. Trate-os como senhas.",
+      "showAll": "Todos os usuários",
+      "name": "Nome",
+      "namePlaceholder": "ex.: script de sincronização do inventário",
+      "token": "Token",
+      "owner": "Dono",
+      "createdAt": "Criado em",
+      "lastUsed": "Último uso",
+      "expiresAt": "Expira em",
+      "status": "Situação",
+      "expiry": "Validade",
+      "days": "{n} dias",
+      "noExpiry": "Nunca expira",
+      "neverUsed": "Nunca usado",
+      "new": "Novo token",
+      "create": "Criar token",
+      "nameRequired": "Dê um nome ao token.",
+      "createError": "Não foi possível criar o token.",
+      "loadError": "Não foi possível carregar os tokens.",
+      "copyNow": "Token \"{name}\" criado. Copie agora — ele não será exibido novamente.",
+      "usage": "Envie-o em cada requisição como",
+      "done": "Concluído",
+      "empty": "Nenhum token de API ainda.",
+      "revoke": "Revogar",
+      "revokeConfirm": "Revogar o token \"{name}\"?",
+      "revokeConfirmBody": "Tudo que usa este token para de funcionar imediatamente. Não é possível desfazer.",
+      "revoked": "Token revogado",
+      "revokeError": "Não foi possível revogar o token",
+      "state": {
+        "active": "Ativo",
+        "expired": "Expirado",
+        "revoked": "Revogado"
+      }
+    }
   },
   "operation": {
     "builtIn": "Integradas",

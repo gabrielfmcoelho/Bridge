@@ -30,20 +30,34 @@ func WithUser(ctx context.Context, u *models.User) context.Context {
 }
 
 // RequireAuth is middleware that rejects unauthenticated requests with 401.
+// A request authenticates with the session cookie or, for scripts, with
+// "Authorization: Bearer brg_…" — a personal API token that acts as its owner.
 func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := GetSessionToken(r)
-		if token == "" {
-			auditAuthFailure(r, "no session token")
-			httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
-			return
-		}
-
-		userID, err := ValidateSession(db, token)
-		if err != nil {
-			auditAuthFailure(r, "invalid or expired session")
-			httpx.WriteError(w, http.StatusUnauthorized, "invalid or expired session")
-			return
+		var userID, tokenID int64
+		if bearer := bearerAPIToken(r); bearer != "" {
+			var ok bool
+			var err error
+			tokenID, userID, ok, err = store.NewAPITokenRepo(db).Authenticate(r.Context(), HashAPIToken(bearer))
+			if err != nil || !ok {
+				auditAuthFailure(r, "invalid, expired or revoked api token")
+				httpx.WriteError(w, http.StatusUnauthorized, "invalid, expired or revoked api token")
+				return
+			}
+		} else {
+			token := GetSessionToken(r)
+			if token == "" {
+				auditAuthFailure(r, "no session token")
+				httpx.WriteError(w, http.StatusUnauthorized, "authentication required")
+				return
+			}
+			var err error
+			userID, err = ValidateSession(db, token)
+			if err != nil {
+				auditAuthFailure(r, "invalid or expired session")
+				httpx.WriteError(w, http.StatusUnauthorized, "invalid or expired session")
+				return
+			}
 		}
 
 		user, err := store.NewUserRepo(db).GetByID(r.Context(), userID)
@@ -57,6 +71,9 @@ func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 		// the actor (it installed the sink on r's context before us).
 		recordActor(r.Context(), user.Username)
 		ctx := context.WithValue(r.Context(), userContextKey, user)
+		if tokenID != 0 {
+			ctx = WithAPIToken(ctx, tokenID)
+		}
 		// Entidade visibility scope, loaded once per request. Admin bypasses;
 		// everyone else gets their visible set (own entidades + descendants).
 		// On lookup failure fall back to an empty scope (sees only global)

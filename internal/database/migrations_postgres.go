@@ -1512,4 +1512,20 @@ var migrationsPostgres = []string{
 		 WHERE trim(h.responsavel_interno) <> ''
 		   AND NOT EXISTS (SELECT 1 FROM responsaveis r WHERE r.entity_type = 'host' AND r.entity_id = h.id)
 		ON CONFLICT DO NOTHING;`,
+
+	// Version 94: personal API tokens. A token acts as its owner (role,
+	// permissions, entidades); only its SHA-256 hash is stored, plus a short
+	// prefix so the UI can tell tokens apart. Revoke sets revoked_at.
+	`CREATE TABLE IF NOT EXISTS api_tokens (
+		id           BIGSERIAL PRIMARY KEY,
+		user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		name         TEXT NOT NULL,
+		token_hash   BYTEA NOT NULL UNIQUE,
+		prefix       TEXT NOT NULL,
+		expires_at   TIMESTAMPTZ,
+		last_used_at TIMESTAMPTZ,
+		revoked_at   TIMESTAMPTZ,
+		created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens (user_id);`,
 }

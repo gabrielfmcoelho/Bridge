@@ -61,8 +61,9 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	// handler (R2). The integration/misc groups further below are not yet
 	// migrated and remain inline.
 	rr := routeRegistrar{e: e, db: db}
-	ah.registerRoutes(rr)  // /api/auth/*, /api/users/*
-	oah.registerRoutes(rr) // /api/auth/oauth/*
+	ah.registerRoutes(rr)           // /api/auth/*, /api/users/*
+	app.apiToken.registerRoutes(rr) // /api/auth/tokens/*
+	oah.registerRoutes(rr)          // /api/auth/oauth/*
 	eth := app.entidade
 	eth.registerRoutes(rr)         // /api/entidades/*, /api/assets/*
 	hh.registerRoutes(rr)          // /api/hosts/*

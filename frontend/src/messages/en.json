@@ -1728,7 +1728,44 @@
       "inactive": "off",
       "maintenance": "maintenance"
     },
-    "situacaoRolesHint": "The roles in parentheses tell the system which option means active, off and under maintenance (SSH config, Proxmox and Coolify sync). Renaming keeps the role; deleting the option drops it."
+    "situacaoRolesHint": "The roles in parentheses tell the system which option means active, off and under maintenance (SSH config, Proxmox and Coolify sync). Renaming keeps the role; deleting the option drops it.",
+    "apiTokens": {
+      "tabLabel": "API tokens",
+      "title": "Personal API tokens",
+      "intro": "Tokens let scripts and integrations call the Bridge API as you — same role, permissions and entidades. Treat them like passwords.",
+      "showAll": "All users",
+      "name": "Name",
+      "namePlaceholder": "e.g. inventory sync script",
+      "token": "Token",
+      "owner": "Owner",
+      "createdAt": "Created",
+      "lastUsed": "Last used",
+      "expiresAt": "Expires",
+      "status": "Status",
+      "expiry": "Expiration",
+      "days": "{n} days",
+      "noExpiry": "Never expires",
+      "neverUsed": "Never",
+      "new": "New token",
+      "create": "Create token",
+      "nameRequired": "Give the token a name.",
+      "createError": "Could not create the token.",
+      "loadError": "Could not load the tokens.",
+      "copyNow": "Token \"{name}\" created. Copy it now — it will not be shown again.",
+      "usage": "Send it on every request as",
+      "done": "Done",
+      "empty": "No API tokens yet.",
+      "revoke": "Revoke",
+      "revokeConfirm": "Revoke token \"{name}\"?",
+      "revokeConfirmBody": "Anything using this token stops working immediately. This cannot be undone.",
+      "revoked": "Token revoked",
+      "revokeError": "Could not revoke the token",
+      "state": {
+        "active": "Active",
+        "expired": "Expired",
+        "revoked": "Revoked"
+      }
+    }
   },
   "operation": {
     "builtIn": "Built-in",
