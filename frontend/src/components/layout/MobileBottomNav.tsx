@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppearance } from "@/contexts/AppearanceContext";
+import { useLocale } from "@/contexts/LocaleContext";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
 
@@ -11,16 +12,17 @@ interface MobileBottomNavProps {
 }
 
 const navItems = [
-  { href: "/", label: "Painel", icon: NAV_ICONS.LayoutDashboard },
-  { href: "/issues", label: "Issues", icon: NAV_ICONS.ClipboardList },
-  { href: "__drawer__", label: "Menu", icon: "" },
-  { href: "/hosts", label: "Hosts", icon: NAV_ICONS.Server },
-  { href: "/services", label: "Services", icon: NAV_ICONS.Boxes },
+  { href: "/", label: "nav.dashboard", icon: NAV_ICONS.LayoutDashboard },
+  { href: "/issues", label: "nav.issues", icon: NAV_ICONS.ListChecks },
+  { href: "__drawer__", label: "nav.menu", icon: "" },
+  { href: "/hosts", label: "nav.hosts", icon: NAV_ICONS.Server },
+  { href: "/services", label: "nav.services", icon: NAV_ICONS.Boxes },
 ];
 
 export default function MobileBottomNav({ onOpenDrawer }: MobileBottomNavProps) {
   const pathname = usePathname();
   const { appColor } = useAppearance();
+  const { t } = useLocale();
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--bg-surface)] border-t border-[var(--border-subtle)] safe-area-bottom">
@@ -45,7 +47,7 @@ export default function MobileBottomNav({ onOpenDrawer }: MobileBottomNavProps) 
                   <Icon path={ICON_PATHS.menu} className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-2xs font-medium mt-0.5" style={{ color: appColor }}>
-                  {item.label}
+                  {t(item.label)}
                 </span>
               </button>
             );
@@ -59,21 +61,13 @@ export default function MobileBottomNav({ onOpenDrawer }: MobileBottomNavProps) 
               href={item.href}
               className="flex flex-col items-center justify-center py-1 px-2 min-w-[56px] transition-colors"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={isActive ? 2 : 1.5}
-                style={{ color: isActive ? appColor : "var(--text-muted)" }}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
-              </svg>
+              <Icon path={item.icon} className="w-5 h-5" strokeWidth={isActive ? 2 : 1.5}
+                style={{ color: isActive ? appColor : "var(--text-muted)" }} />
               <span
                 className="text-2xs font-medium mt-0.5"
-                style={{ color: isActive ? appColor : "var(--text-faint)" }}
+                style={{ color: isActive ? appColor : "var(--text-muted)" }}
               >
-                {item.label}
+                {t(item.label)}
               </span>
               {isActive && (
                 <span

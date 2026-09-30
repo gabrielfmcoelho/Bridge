@@ -48,7 +48,8 @@
     "chamadosForms": "Forms",
     "designSystem": "Design System",
     "workspace": "Workspace",
-    "selfService": "Self-service"
+    "selfService": "Self-service",
+    "menu": "Menu"
   },
   "atlas": {
     "apis": {

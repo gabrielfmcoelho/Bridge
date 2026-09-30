@@ -59,9 +59,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "nav.workspace",
     items: [
       { href: "/", label: "nav.dashboard", icon: "LayoutDashboard" },
-      { href: "/issues", label: "nav.issues", icon: "ClipboardList", count: "openIssues" },
       { href: "/wiki", label: "nav.wiki", icon: "Book" },
-      { href: "/chamados", label: "nav.chamados", icon: "Ticket" },
     ],
   },
   {
@@ -84,6 +82,8 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/catalog", label: "nav.serviceCatalog", icon: "Store" },
       { href: "/requests", label: "nav.requests", icon: "ClipboardList" },
+      { href: "/issues", label: "nav.issues", icon: "ListChecks", count: "openIssues" },
+      { href: "/chamados", label: "nav.chamados", icon: "Ticket" },
     ],
   },
   {
