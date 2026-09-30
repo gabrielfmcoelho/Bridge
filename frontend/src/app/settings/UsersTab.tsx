@@ -20,6 +20,8 @@ import Select from "@/components/ui/Select";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import FormError from "@/components/ui/FormError";
 import CheckboxList from "@/components/ui/CheckboxList";
+import Checkbox from "@/components/ui/Checkbox";
+import Lozenge from "@/components/ui/Lozenge";
 
 const roleColors = ROLE_COLORS;
 
@@ -50,7 +52,7 @@ export default function UsersTab() {
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [showForm, setShowForm] = useState(false);
   const [editUser, setEditUser] = useState<import("@/lib/types").User | null>(null);
-  const emptyNew = { username: "", password: "", display_name: "", role: "viewer", entidade_ids: [] as number[], primary_entidade_id: null as number | null };
+  const emptyNew = { kind: "person" as "person" | "service", username: "", password: "", display_name: "", role: "viewer", entidade_ids: [] as number[], primary_entidade_id: null as number | null };
   const [newUser, setNewUser] = useState(emptyNew);
   const [editForm, setEditForm] = useState({ display_name: "", role: "", password: "", entidade_ids: [] as number[], primary_entidade_id: null as number | null });
   const [error, setError] = useState("");
@@ -176,6 +178,7 @@ export default function UsersTab() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-[var(--text-primary)] truncate">{u.display_name || u.username}</p>
                         <p className="text-xs text-[var(--text-faint)]">@{u.username}</p>
+                        {u.kind === "service" && <Lozenge appearance="new">{t("settings.serviceAccount")}</Lozenge>}
                       </div>
                     </div>
                   </td>
@@ -223,6 +226,7 @@ export default function UsersTab() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-[var(--text-primary)] truncate">{u.display_name || u.username}</p>
                     <p className="text-xs text-[var(--text-faint)]">@{u.username}</p>
+                    {u.kind === "service" && <Lozenge appearance="new">{t("settings.serviceAccount")}</Lozenge>}
                   </div>
                 </div>
                 <UserActions u={u} onEdit={() => openEdit(u)} onDelete={() => confirmDelete(u)} />
@@ -265,10 +269,20 @@ export default function UsersTab() {
           className="space-y-4"
         >
           <FormError message={error} />
+          <div>
+            <Checkbox
+              label={t("settings.serviceAccount")}
+              checked={newUser.kind === "service"}
+              onChange={(on) => setNewUser({ ...newUser, kind: on ? "service" : "person", password: "" })}
+            />
+            <p className="mt-1 ml-6 text-xs text-[var(--text-muted)]">{t("settings.serviceAccountHint")}</p>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label={t("auth.displayName")} value={newUser.display_name} onChange={(e) => setNewUser({ ...newUser, display_name: e.target.value })} />
             <Input label={t("auth.username")} value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} required />
-            <Input label={t("auth.password")} type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} required />
+            {newUser.kind === "person" && (
+              <Input label={t("auth.password")} type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} required />
+            )}
             <Select
               label={t("settings.role")}
               value={newUser.role}
@@ -312,7 +326,9 @@ export default function UsersTab() {
                   { value: "admin", label: "Admin" },
                 ]}
               />
-              <Input label={t("settings.userPasswordOptional")} type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} placeholder={t("settings.userPasswordKeepCurrent")} />
+              {editUser.kind !== "service" && (
+                <Input label={t("settings.userPasswordOptional")} type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} placeholder={t("settings.userPasswordKeepCurrent")} />
+              )}
             </div>
             <UserEntidadeFields
               nodes={entidadeNodes}

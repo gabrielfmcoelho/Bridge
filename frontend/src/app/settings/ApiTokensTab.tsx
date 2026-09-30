@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiTokensAPI, type APIToken } from "@/lib/api";
+import { apiTokensAPI, usersAPI, type APIToken } from "@/lib/api";
+import type { ApiKeyScope } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
@@ -14,13 +15,17 @@ import CopyButton from "@/components/ui/CopyButton";
 import Input from "@/components/ui/Input";
 import NativeSelect from "@/components/ui/NativeSelect";
 import Lozenge from "@/components/ui/Lozenge";
+import Modal from "@/components/ui/Modal";
 import RowActions from "@/components/ui/RowActions";
 import StatusAlert from "@/components/ui/StatusAlert";
 import FormError from "@/components/ui/FormError";
 import Toggle from "@/components/ui/Toggle";
+import ScopePicker from "@/components/tokens/ScopePicker";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 const EXPIRY_DAYS = [30, 90, 365, 0]; // 0 = never
+const ROLE_RANK: Record<string, number> = { viewer: 0, editor: 1, admin: 2 };
+const NOTICE_KEY = "bridge.tokens.scopesNotice";
 
 function tokenState(tok: APIToken): "active" | "expired" | "revoked" {
   if (tok.revoked_at) return "revoked";
@@ -30,9 +35,13 @@ function tokenState(tok: APIToken): "active" | "expired" | "revoked" {
 
 const STATE_APPEARANCE = { active: "success", expired: "moved", revoked: "removed" } as const;
 
-// Personal API tokens: scripts send "Authorization: Bearer brg_…" and act as
-// the token's owner. Every user manages their own; admins can switch to
-// everyone's to revoke a leaked one.
+function readNotice(): boolean {
+  try { return localStorage.getItem(NOTICE_KEY) !== "dismissed"; } catch { return true; }
+}
+
+// API tokens: scripts send "Authorization: Bearer brg_…" and act as the
+// token's owner, narrowed to the token's scopes. Every user manages their own;
+// admins also see everyone's and issue tokens for service accounts.
 export default function ApiTokensTab() {
   const { t, formatDate, formatDateTime } = useLocale();
   const { user } = useAuth();
@@ -44,20 +53,39 @@ export default function ApiTokensTab() {
   const [showAll, setShowAll] = useState(false);
   const [name, setName] = useState("");
   const [expiresInDays, setExpiresInDays] = useState(90);
+  const [scopes, setScopes] = useState<string[]>([]);
+  const [rateLimit, setRateLimit] = useState("");
+  const [ownerId, setOwnerId] = useState<number | null>(null); // null = me
+  const [attempted, setAttempted] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{ token: string; name: string } | null>(null);
+  const [usageOf, setUsageOf] = useState<APIToken | null>(null);
+  const [notice, setNotice] = useState(readNotice);
 
   const all = isAdmin && showAll;
   const { data: tokens = [], isLoading, error: loadError } = useQuery({
     queryKey: ["api-tokens", all],
     queryFn: () => apiTokensAPI.list(all),
   });
+  const { data: users = [] } = useQuery({ queryKey: ["users"], queryFn: usersAPI.list, enabled: isAdmin });
+  const serviceAccounts = users.filter((u) => u.kind === "service");
+  const owner = ownerId ? serviceAccounts.find((u) => u.id === ownerId) : user;
+
+  // Mirrors the server's check: a token can't get more than its owner has.
+  const isUsable = (s: ApiKeyScope) => {
+    if (!owner) return false;
+    if (s.permission) return owner.role === "admin" || (!ownerId && !!user?.permissions?.includes(s.permission));
+    return (ROLE_RANK[owner.role] ?? 0) >= (ROLE_RANK[s.min_role ?? "viewer"] ?? 0);
+  };
 
   const createMutation = useMutation({
     mutationFn: apiTokensAPI.create,
     onSuccess: (res) => {
       setCreated({ token: res.token, name: res.api_token.name });
       setName("");
+      setScopes([]);
+      setRateLimit("");
+      setAttempted(false);
       setError("");
       queryClient.invalidateQueries({ queryKey: ["api-tokens"] });
     },
@@ -74,11 +102,20 @@ export default function ApiTokensTab() {
   });
 
   const handleCreate = () => {
+    setAttempted(true);
     if (!name.trim()) {
       setError(t("settings.apiTokens.nameRequired"));
       return;
     }
-    createMutation.mutate({ name: name.trim(), expires_in_days: expiresInDays });
+    if (scopes.length === 0) return;
+    setError("");
+    createMutation.mutate({
+      name: name.trim(),
+      expires_in_days: expiresInDays,
+      scopes,
+      rate_limit_per_minute: rateLimit.trim() ? Number(rateLimit) : undefined,
+      user_id: ownerId ?? undefined,
+    });
   };
 
   const handleRevoke = async (tok: APIToken) => {
@@ -89,6 +126,11 @@ export default function ApiTokensTab() {
       confirmLabel: t("settings.apiTokens.revoke"),
     });
     if (ok) revokeMutation.mutate(tok.id);
+  };
+
+  const dismissNotice = () => {
+    setNotice(false);
+    try { localStorage.setItem(NOTICE_KEY, "dismissed"); } catch { /* per-viewer convenience only */ }
   };
 
   return (
@@ -103,6 +145,13 @@ export default function ApiTokensTab() {
         </label>
       ) : undefined}
     >
+      {notice && (
+        <div className="mb-4 space-y-2">
+          <StatusAlert variant="info">{t("settings.apiTokens.scopesNotice")}</StatusAlert>
+          <Button size="sm" variant="ghost" onClick={dismissNotice}>{t("settings.apiTokens.dismiss")}</Button>
+        </div>
+      )}
+
       {created && (
         <div className="mb-4 space-y-3">
           <StatusAlert variant="warning">{t("settings.apiTokens.copyNow", { name: created.name })}</StatusAlert>
@@ -139,7 +188,7 @@ export default function ApiTokensTab() {
                 <th className={tableClasses.compact.th}>{t("settings.apiTokens.name")}</th>
                 <th className={tableClasses.compact.th}>{t("settings.apiTokens.token")}</th>
                 {all && <th className={tableClasses.compact.th}>{t("settings.apiTokens.owner")}</th>}
-                <th className={tableClasses.compact.th}>{t("settings.apiTokens.createdAt")}</th>
+                <th className={tableClasses.compact.th}>{t("settings.apiTokens.scopes")}</th>
                 <th className={tableClasses.compact.th}>{t("settings.apiTokens.lastUsed")}</th>
                 <th className={tableClasses.compact.th}>{t("settings.apiTokens.expiresAt")}</th>
                 <th className={tableClasses.compact.th}>{t("settings.apiTokens.status")}</th>
@@ -151,12 +200,23 @@ export default function ApiTokensTab() {
                 const state = tokenState(tok);
                 return (
                   <tr key={tok.id} className={tableClasses.compact.row}>
-                    <td className={tableClasses.compact.td}>{tok.name}</td>
+                    <td className={tableClasses.compact.td}>
+                      {tok.name}
+                      {tok.owner_kind === "service" && !all && <span className="ml-2"><Lozenge appearance="new">{t("settings.apiTokens.serviceAccount")}</Lozenge></span>}
+                    </td>
                     <td className={`${tableClasses.compact.td} font-mono text-xs text-[var(--text-secondary)]`}>{tok.prefix}…</td>
-                    {all && <td className={tableClasses.compact.td}>{tok.username}</td>}
-                    <td className={`${tableClasses.compact.td} text-[var(--text-secondary)]`}>{formatDate(tok.created_at)}</td>
+                    {all && (
+                      <td className={tableClasses.compact.td}>
+                        {tok.username}
+                        {tok.owner_kind === "service" && <span className="ml-2"><Lozenge appearance="new">{t("settings.apiTokens.serviceAccount")}</Lozenge></span>}
+                      </td>
+                    )}
+                    <td className={`${tableClasses.compact.td} font-mono text-xs text-[var(--text-secondary)] max-w-[16rem] truncate`} title={tok.scopes.join(", ")}>
+                      {tok.scopes.length ? tok.scopes.join(", ") : t("settings.apiTokens.noScopes")}
+                    </td>
                     <td className={`${tableClasses.compact.td} text-[var(--text-secondary)]`}>
                       {tok.last_used_at ? formatDateTime(tok.last_used_at) : t("settings.apiTokens.neverUsed")}
+                      {tok.today_requests > 0 && <span className="block text-2xs text-[var(--text-muted)]">{t("settings.apiTokens.todayRequests", { count: String(tok.today_requests) })}</span>}
                     </td>
                     <td className={`${tableClasses.compact.td} text-[var(--text-secondary)]`}>
                       {tok.expires_at ? formatDate(tok.expires_at) : t("settings.apiTokens.noExpiry")}
@@ -167,13 +227,10 @@ export default function ApiTokensTab() {
                     <td className={tableClasses.compact.td}>
                       <RowActions
                         name={tok.name}
-                        actions={[{
-                          label: t("settings.apiTokens.revoke"),
-                          icon: ICON_PATHS.trash,
-                          danger: true,
-                          hidden: state !== "active",
-                          onClick: () => handleRevoke(tok),
-                        }]}
+                        actions={[
+                          { label: t("settings.apiTokens.usageAction"), icon: ICON_PATHS.clock, onClick: () => setUsageOf(tok) },
+                          { label: t("settings.apiTokens.revoke"), icon: ICON_PATHS.trash, danger: true, hidden: state !== "active", onClick: () => handleRevoke(tok) },
+                        ]}
                       />
                     </td>
                   </tr>
@@ -184,17 +241,27 @@ export default function ApiTokensTab() {
         </div>
       )}
 
-      <div className="border-t border-[var(--border-subtle)] pt-4 space-y-3">
+      <div className="border-t border-[var(--border-subtle)] pt-4 space-y-4">
         <p className="text-xs font-semibold text-[var(--text-muted)]">{t("settings.apiTokens.new")}</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Input
             label={t("settings.apiTokens.name")}
             value={name}
             maxLength={100}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
             placeholder={t("settings.apiTokens.namePlaceholder")}
+            required
           />
+          {isAdmin && (
+            <NativeSelect
+              label={t("settings.apiTokens.owner")}
+              value={ownerId ?? ""}
+              onChange={(e) => { setOwnerId(e.target.value ? Number(e.target.value) : null); setScopes([]); }}
+            >
+              <option value="">{t("settings.apiTokens.ownerMe")}</option>
+              {serviceAccounts.map((u) => <option key={u.id} value={u.id}>{u.display_name || u.username} ({t("settings.apiTokens.serviceAccount")})</option>)}
+            </NativeSelect>
+          )}
           <NativeSelect
             label={t("settings.apiTokens.expiry")}
             value={expiresInDays}
@@ -206,12 +273,73 @@ export default function ApiTokensTab() {
               </option>
             ))}
           </NativeSelect>
+          <Input
+            label={t("settings.apiTokens.rateLimit")}
+            hint={t("settings.apiTokens.rateLimitHint")}
+            type="number"
+            min={0}
+            value={rateLimit}
+            onChange={(e) => setRateLimit(e.target.value)}
+            placeholder="600"
+          />
+        </div>
+        <ScopePicker
+          queryKey={["token-scopes"]}
+          load={apiTokensAPI.scopes}
+          value={scopes}
+          onChange={setScopes}
+          isUsable={isUsable}
+          error={attempted && scopes.length === 0 ? t("settings.apiTokens.scopesRequired") : undefined}
+        />
+        <div className="flex justify-end">
           <Button onClick={handleCreate} loading={createMutation.isPending} disabled={!name.trim()}>
             {t("settings.apiTokens.create")}
           </Button>
         </div>
         <FormError message={error} />
       </div>
+
+      {usageOf && <TokenUsageModal token={usageOf} onClose={() => setUsageOf(null)} />}
     </SectionCard>
+  );
+}
+
+// TokenUsageModal shows a token's requests per day for the last 30 days.
+function TokenUsageModal({ token, onClose }: { token: APIToken; onClose: () => void }) {
+  const { t } = useLocale();
+  const { data, error, isLoading } = useQuery({
+    queryKey: ["api-tokens", "usage", token.id],
+    queryFn: () => apiTokensAPI.usage(token.id, 30),
+    retry: false,
+  });
+  const days = Object.entries(data?.daily ?? {}).sort(([a], [b]) => b.localeCompare(a));
+  const max = Math.max(1, ...days.map(([, n]) => n));
+  return (
+    <Modal open onClose={onClose} title={t("settings.apiTokens.usageTitle", { name: token.name })}>
+      <div className="space-y-3">
+        {isLoading && <p className="text-sm text-[var(--text-muted)]">{t("common.loading")}</p>}
+        {!!error && <StatusAlert variant="error">{(error as Error).message}</StatusAlert>}
+        {data && (
+          <>
+            <p className="text-sm text-[var(--text-secondary)]">{t("settings.apiTokens.usageLifetime", { count: String(data.lifetime) })}</p>
+            {days.length === 0 ? (
+              <p className="text-sm text-[var(--text-muted)]">{t("settings.apiTokens.usageNone")}</p>
+            ) : (
+              <ul className="space-y-1">
+                {days.map(([d, n]) => (
+                  <li key={d} className="flex items-center gap-3 text-xs">
+                    <span className="w-12 shrink-0 font-mono text-[var(--text-muted)]">{`${d.slice(8, 10)}/${d.slice(5, 7)}`}</span>
+                    <span className="flex-1 h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                      <span className="block h-full bg-[var(--accent)]" style={{ width: `${(n / max) * 100}%` }} />
+                    </span>
+                    <span className="w-12 shrink-0 text-right tabular-nums text-[var(--text-secondary)]">{n}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }

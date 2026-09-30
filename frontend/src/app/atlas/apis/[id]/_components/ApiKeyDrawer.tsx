@@ -11,7 +11,7 @@ import FormError from "@/components/ui/FormError";
 import Input from "@/components/ui/Input";
 import NativeSelect from "@/components/ui/NativeSelect";
 import Textarea from "@/components/ui/Textarea";
-import ScopePicker from "./ScopePicker";
+import ScopePicker from "@/components/tokens/ScopePicker";
 
 const EXPIRY_DAYS = [30, 90, 180, 365, 0]; // 0 = never
 const LABEL_RE = /^[A-Za-z0-9._-]{1,64}$/;
@@ -124,7 +124,10 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
             <Input label={t("atlas.apis.keys.header")} value={header} onChange={(e) => setHeader(e.target.value)} />
           </>
         )}
-        {pickScopes && <ScopePicker apiId={api.id} value={scopes} onChange={setScopes} error={scopesError} />}
+        {pickScopes && (
+          <ScopePicker queryKey={["api-keys", api.id, "scopes"]} load={() => apiKeysAPI.scopes(api.id)}
+            value={scopes} onChange={setScopes} error={scopesError} />
+        )}
         {isEdit && editing.scopes.length > 0 && (
           <div>
             <p className="text-xs text-[var(--text-muted)] mb-1">{t("atlas.apis.keys.scopes")}</p>

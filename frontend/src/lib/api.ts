@@ -1291,19 +1291,27 @@ export interface APIToken {
   id: number;
   user_id: number;
   username: string;
+  owner_kind: "person" | "service";
   name: string;
   prefix: string;
   expires_at: string | null;
   last_used_at: string | null;
   revoked_at: string | null;
   created_at: string;
+  /** What the token may call (GET /api/auth/tokens/scopes). */
+  scopes: string[];
+  rate_limit_per_minute?: number;
+  today_requests: number;
 }
 
 export const apiTokensAPI = {
   list: (all = false) => api.getList<APIToken>(`/api/auth/tokens${all ? "?all=true" : ""}`),
-  create: (data: { name: string; expires_in_days: number }) =>
+  create: (data: { name: string; expires_in_days: number; scopes: string[]; rate_limit_per_minute?: number; user_id?: number }) =>
     api.post<{ token: string; api_token: APIToken }>("/api/auth/tokens", data),
   revoke: (id: number) => api.delete(`/api/auth/tokens/${id}`),
+  scopes: () => api.get<import("./types").ApiKeyScope[]>("/api/auth/tokens/scopes"),
+  usage: (id: number, days = 30) =>
+    api.get<{ lifetime: number; daily: Record<string, number> }>(`/api/auth/tokens/${id}/usage?days=${days}`),
 };
 
 // AI / LLM integration
@@ -1827,6 +1835,7 @@ export const proxmoxAPI = {
 export const usersAPI = {
   list: () => api.getList<import("./types").User>("/api/users"),
   create: (data: {
+    kind?: "person" | "service";
     username: string; password: string; display_name: string; role: string;
     entidade_ids?: number[]; primary_entidade_id?: number | null;
   }) => api.post<import("./types").User>("/api/users", data),

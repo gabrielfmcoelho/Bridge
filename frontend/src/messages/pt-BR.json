@@ -1872,7 +1872,7 @@
     "apiTokens": {
       "tabLabel": "Tokens de API",
       "title": "Tokens de API pessoais",
-      "intro": "Tokens permitem que scripts e integrações chamem a API do Bridge em seu nome — com a mesma função, permissões e entidades. Trate-os como senhas.",
+      "intro": "Tokens permitem que scripts e integrações chamem a API do Bridge em nome do dono, limitados aos escopos escolhidos. Trate-os como senhas.",
       "showAll": "Todos os usuários",
       "name": "Nome",
       "namePlaceholder": "ex.: script de sincronização do inventário",
@@ -1904,8 +1904,24 @@
         "active": "Ativo",
         "expired": "Expirado",
         "revoked": "Revogado"
-      }
-    }
+      },
+      "scopes": "Escopos",
+      "scopesRequired": "Escolha ao menos um escopo.",
+      "noScopes": "nenhum",
+      "scopesNotice": "Os tokens agora têm escopos: cada um só alcança o que recebeu. Os tokens criados antes dos escopos foram revogados; crie novos só com os escopos necessários.",
+      "dismiss": "Entendi",
+      "rateLimit": "Requisições por minuto",
+      "rateLimitHint": "Em branco: 600. 0: ilimitado.",
+      "ownerMe": "Eu",
+      "serviceAccount": "Serviço",
+      "todayRequests": "{count} requisições hoje",
+      "usageAction": "Uso",
+      "usageTitle": "Uso de {name}",
+      "usageLifetime": "{count} requisições no total",
+      "usageNone": "Nenhuma requisição nos últimos 30 dias."
+    },
+    "serviceAccount": "Conta de serviço",
+    "serviceAccountHint": "Para uma integração: sem senha, nunca entra no sistema. Um administrador emite os tokens de API dela em Tokens de API."
   },
   "operation": {
     "builtIn": "Integradas",

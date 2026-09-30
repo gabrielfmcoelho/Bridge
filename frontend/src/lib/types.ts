@@ -5,6 +5,8 @@ export interface User {
   role: "admin" | "editor" | "viewer";
   auth_provider: string;
   email: string;
+  /** "service": owns API tokens for an integration, never signs in. */
+  kind: "person" | "service";
   permissions: string[];
   external_identities: { provider: string; external_id: string }[];
   /** Entidade memberships (primary first). Present on /api/auth/me and /api/users. */
@@ -621,10 +623,14 @@ export interface ApiKey {
   status: "active" | "grace" | "expired" | "revoked";
 }
 
-/** One entry of a SEAD service's scope catalogue. */
+/** One scope-catalogue entry: a SEAD service's keys or Bridge's own tokens. */
 export interface ApiKeyScope {
   name: string;
   kind: "wildcard" | "route" | "modifier";
+  /** Bridge tokens: the least role an owner needs to use it. */
+  min_role?: "viewer" | "editor" | "admin";
+  /** Bridge tokens: a permission code needed instead of a role. */
+  permission?: string;
   description: string;
   /** Route patterns: a prefix, or "=/path" for that exact path. */
   routes: string[];

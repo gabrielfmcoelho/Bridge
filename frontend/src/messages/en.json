@@ -1872,7 +1872,7 @@
     "apiTokens": {
       "tabLabel": "API tokens",
       "title": "Personal API tokens",
-      "intro": "Tokens let scripts and integrations call the Bridge API as you — same role, permissions and entidades. Treat them like passwords.",
+      "intro": "Tokens let scripts and integrations call the Bridge API as their owner, limited to the scopes you choose. Treat them like passwords.",
       "showAll": "All users",
       "name": "Name",
       "namePlaceholder": "e.g. inventory sync script",
@@ -1904,8 +1904,24 @@
         "active": "Active",
         "expired": "Expired",
         "revoked": "Revoked"
-      }
-    }
+      },
+      "scopes": "Scopes",
+      "scopesRequired": "Pick at least one scope.",
+      "noScopes": "none",
+      "scopesNotice": "Tokens now carry scopes: each one only reaches what it was given. Tokens created before scopes existed were revoked; create new ones with just the scopes they need.",
+      "dismiss": "Got it",
+      "rateLimit": "Requests per minute",
+      "rateLimitHint": "Blank: 600. 0: unlimited.",
+      "ownerMe": "Me",
+      "serviceAccount": "Service",
+      "todayRequests": "{count} requests today",
+      "usageAction": "Usage",
+      "usageTitle": "Usage of {name}",
+      "usageLifetime": "{count} requests in total",
+      "usageNone": "No requests in the last 30 days."
+    },
+    "serviceAccount": "Service account",
+    "serviceAccountHint": "For an integration: no password, never signs in. An admin issues its API tokens in Tokens de API."
   },
   "operation": {
     "builtIn": "Built-in",

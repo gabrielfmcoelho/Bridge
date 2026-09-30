@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { apiKeysAPI } from "@/lib/api";
 import type { ApiKeyScope } from "@/lib/types";
 import { useLocale } from "@/contexts/LocaleContext";
 import FormField from "@/components/ui/FormField";
@@ -9,19 +8,23 @@ import Checkbox from "@/components/ui/Checkbox";
 import StatusAlert from "@/components/ui/StatusAlert";
 import { Skeleton } from "@/components/ui/Skeleton";
 
-// Picks what a new SEAD key may reach, from the service's own catalogue
-// (GET /admin/keys/scopes). "*" is full access and excludes the route
-// scopes; modifiers ("demo") combine with either. The service enforces it.
-export default function ScopePicker({ apiId, value, onChange, error }: {
-  apiId: number;
+// Picks what a new key or token may reach, from a scope catalogue: a SEAD
+// service's (GET /admin/keys/scopes, via Bridge) or Bridge's own token scopes.
+// "*" is full access and excludes the route scopes; modifiers ("demo")
+// combine with either. isUsable greys out what the owner couldn't use anyway.
+// The server enforces all of it.
+export default function ScopePicker({ queryKey, load, value, onChange, error, isUsable }: {
+  queryKey: unknown[];
+  load: () => Promise<ApiKeyScope[]>;
   value: string[];
   onChange: (scopes: string[]) => void;
   error?: string;
+  isUsable?: (scope: ApiKeyScope) => boolean;
 }) {
   const { t } = useLocale();
   const { data: catalogue = [], isLoading, error: loadError } = useQuery({
-    queryKey: ["api-keys", apiId, "scopes"],
-    queryFn: () => apiKeysAPI.scopes(apiId),
+    queryKey,
+    queryFn: load,
     retry: false,
     staleTime: 5 * 60_000,
   });
@@ -61,7 +64,7 @@ export default function ScopePicker({ apiId, value, onChange, error }: {
                       label={s.kind === "wildcard" ? t("atlas.apis.keys.scopeWildcard") : s.name}
                       checked={has(s.name)}
                       onChange={(on) => toggle(s, on)}
-                      disabled={s.kind === "route" && has("*")}
+                      disabled={(s.kind === "route" && has("*")) || (isUsable ? !isUsable(s) : false)}
                     />
                     <p className="mt-1 ml-6 text-xs text-[var(--text-muted)]">{s.description}</p>
                     {s.routes.length > 0 && (

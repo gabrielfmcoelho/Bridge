@@ -58,6 +58,7 @@ function users(): User[] {
   ): User => ({
     id, username, display_name, role,
     auth_provider: "local",
+    kind: "person",
     email: `${username}@sead.pi.gov.br`,
     permissions: [],
     external_identities: [],
