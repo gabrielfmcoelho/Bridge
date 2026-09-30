@@ -2578,7 +2578,19 @@
     "backToVault": "Back to the vault",
     "trashEmpty": "The trash is empty.",
     "restore": "Restore",
-    "deletedAgo": "deleted {ago}"
+    "deletedAgo": "deleted {ago}",
+    "copyField": "Copy {field}",
+    "field": {
+      "value": "Value",
+      "app_name": "App",
+      "url": "Address",
+      "username": "User",
+      "password": "Password",
+      "notes": "Notes",
+      "public_key": "Public key",
+      "private_key_pem": "Private key",
+      "passphrase": "Passphrase"
+    }
   },
   "glpi": {
     "createTicketTitle": "Open GLPI ticket",

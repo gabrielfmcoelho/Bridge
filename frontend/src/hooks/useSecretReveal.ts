@@ -23,7 +23,9 @@ export interface UseSecretReveal {
   copyState: "idle" | "copied" | "cleared";
   reveal: (secretID: number) => Promise<void>;
   hide: () => void;
-  copy: () => Promise<void>;
+  /** Copies the whole value, or `text` (one field of it); either way the
+   *  clipboard is cleared again when the reveal would auto-hide. */
+  copy: (text?: string) => Promise<void>;
   // remainingMs is the time left on the auto-hide timer, useful for a
   // countdown UI. 0 when not revealed; updates roughly once per second
   // (cheap setInterval — bumped to once a second to avoid render thrash).
@@ -108,10 +110,10 @@ export function useSecretReveal(autoHideMs: number = DEFAULT_AUTO_HIDE_MS): UseS
     [autoHideMs, clearTimers],
   );
 
-  const copy = useCallback(async () => {
+  const copy = useCallback(async (text?: string) => {
     if (value == null) return;
     try {
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard.writeText(text ?? value);
       setCopyState("copied");
       // Schedule clipboard clear at the same horizon as auto-hide so the
       // value doesn't outlive the on-screen display.

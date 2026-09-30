@@ -14,6 +14,7 @@ import IconButton from "@/components/ui/IconButton";
 import Icon from "@/components/ui/Icon";
 import FormError from "@/components/ui/FormError";
 import StatusAlert from "@/components/ui/StatusAlert";
+import SecretValue from "./SecretValue";
 import { RowList, ListRow, RowText } from "@/components/ui/RowList";
 import RelationPicker from "@/components/forms/RelationPicker";
 import { useRelationOptions } from "@/components/forms/useRelationOptions";
@@ -104,18 +105,11 @@ function DetailBody({ secret, canWrite, error, t }: { secret: Secret; canWrite: 
             <Icon path={reveal.revealed ? ICON_PATHS.eyeOff : ICON_PATHS.eye} className="w-3.5 h-3.5" />
             {reveal.revealed ? t("vault.hideIn", { s: String(Math.ceil(reveal.remainingMs / 1000)) }) : t("serviceCredentials.reveal")}
           </Button>
-          {reveal.revealed && (
-            <Button size="sm" variant="secondary" onClick={() => reveal.copy()}>
-              <Icon path={ICON_PATHS.copy} className="w-3.5 h-3.5" />
-              {reveal.copyState === "copied" ? t("vault.copiedLabel") : reveal.copyState === "cleared" ? t("vault.clearedLabel") : t("common.copy")}
-            </Button>
+          {reveal.revealed && reveal.copyState === "cleared" && (
+            <span className="text-xs text-[var(--text-muted)]">{t("vault.clearedLabel")}</span>
           )}
         </div>
-        {reveal.revealed && (
-          <pre className="text-xs font-mono text-[var(--text-secondary)] bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-3 overflow-x-auto whitespace-pre-wrap break-all border border-[var(--border-subtle)]">
-            {reveal.value}
-          </pre>
-        )}
+        <SecretValue type={secret.type} reveal={reveal} />
         {reveal.error && <p className="text-xs text-[var(--danger)]">{reveal.error}</p>}
       </section>
 

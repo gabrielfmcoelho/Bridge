@@ -2578,7 +2578,19 @@
     "backToVault": "Voltar ao Cofre",
     "trashEmpty": "A lixeira está vazia.",
     "restore": "Restaurar",
-    "deletedAgo": "excluído {ago}"
+    "deletedAgo": "excluído {ago}",
+    "copyField": "Copiar {field}",
+    "field": {
+      "value": "Valor",
+      "app_name": "Aplicação",
+      "url": "Endereço",
+      "username": "Usuário",
+      "password": "Senha",
+      "notes": "Notas",
+      "public_key": "Chave pública",
+      "private_key_pem": "Chave privada",
+      "passphrase": "Frase de acesso"
+    }
   },
   "glpi": {
     "createTicketTitle": "Abrir chamado no GLPI",

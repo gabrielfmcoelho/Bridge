@@ -1,5 +1,6 @@
 "use client";
 
+import SecretValue from "@/components/vault/SecretValue";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toolsAPI, servicesAPI, secretsAPI } from "@/lib/api";
@@ -603,7 +604,7 @@ function CredentialRow({ secret }: { secret: Secret }) {
         <div className="flex items-center gap-2">
           {r.revealed && (
             <button
-              onClick={r.copy}
+              onClick={() => r.copy()}
               className="text-xs text-[var(--accent)] hover:underline"
             >
               {r.copyState === "copied" ? t("serviceCredentials.copied") : r.copyState === "cleared" ? t("serviceCredentials.cleared") : t("common.copy")}
@@ -623,9 +624,7 @@ function CredentialRow({ secret }: { secret: Secret }) {
         </div>
       </div>
       {r.revealed && r.value !== null && (
-        <pre className="mt-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface)] rounded-[var(--radius-sm)] p-2 overflow-x-auto whitespace-pre-wrap break-all border border-[var(--border-subtle)]">
-          {r.value}
-        </pre>
+        <div className="mt-2"><SecretValue type={secret.type} reveal={r} /></div>
       )}
       {r.error && (
         <p className="text-xs text-[var(--danger)] mt-1">{r.error}</p>
