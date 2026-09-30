@@ -860,7 +860,8 @@ export const secretsAPI = {
     api.put<{ id: number }>(`/api/secrets/${id}`, data),
   delete: (id: number) => api.delete(`/api/secrets/${id}`),
   restore: (id: number) => api.post(`/api/secrets/${id}/restore`),
-  history: (id: number) => api.get<{ id: number; secret_id: number; action: string; actor_user_id?: number; at: string; metadata?: unknown }[]>(`/api/secrets/${id}/history`),
+  // The audit trail comes in the list envelope ({data, meta}).
+  history: (id: number) => api.getList<{ id: number; secret_id: number; action: string; actor_user_id?: number; at: string; metadata?: unknown }>(`/api/secrets/${id}/history`),
   // Env-var bundle endpoints (Phase 2 — Tasks 2.2/2.3).
   envBulk: (data: {
     // Preferred: fan out one var-set to several targets (project AND service,
