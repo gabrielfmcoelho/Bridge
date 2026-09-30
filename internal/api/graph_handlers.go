@@ -30,7 +30,7 @@ type graphEdge struct {
 // handleGraph godoc
 //
 //	@Summary		Inventory graph
-//	@Description	Any role. {"nodes": [graphNode], "edges": [graphEdge]} over visible hosts, DNS records, projects and services; edges only between visible nodes.
+//	@Description	Any role. {"nodes": [graphNode], "edges": [graphEdge]} over visible hosts, DNS records, projects, services and APIs; edges only between visible nodes.
 //	@Tags			graph
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}
@@ -118,6 +118,24 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 
 	}
 
+	// APIs (the Atlas catalog). Listed through VisibleExpr like the rest, so
+	// only visible APIs become nodes; List already drops trashed ones.
+	apis, _ := store.NewAPICatalogRepo(h.db.SQL).List(r.Context(), models.APICatalogFilter{})
+	apiIDMap := make(map[int64]string)
+	for _, a := range apis {
+		nid := fmt.Sprintf("api-%d", a.ID)
+		apiIDMap[a.ID] = nid
+		nodes = append(nodes, graphNode{
+			ID:    nid,
+			Type:  "api",
+			Label: a.Name,
+			Data: map[string]any{
+				"operation_count": a.OperationCount,
+				"base_url":        a.BaseURL,
+			},
+		})
+	}
+
 	// Link-table edges: one query per table. An edge is drawn only when both
 	// ends are in the scoped node maps above, so invisible assets never leak.
 	links, err := store.NewGraphRepo(h.db.SQL).Links(r.Context())
@@ -146,6 +164,8 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	addEdges(links.ServiceDepends, serviceIDMap, serviceIDMap, "depends on")
+	addEdges(links.APIService, apiIDMap, serviceIDMap, "served by")
+	addEdges(links.APIProject, apiIDMap, projectIDMap, "part of")
 
 	jsonOK(w, map[string]any{
 		"nodes": nodes,

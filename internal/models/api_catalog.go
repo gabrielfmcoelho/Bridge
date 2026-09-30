@@ -6,12 +6,9 @@ import (
 	"time"
 )
 
-// APICatalog scope + source-type domains. Scope mirrors the secrets pattern:
-// 'projeto' attaches the API to a project; 'avulso' is standalone.
+// APICatalog source-type domain. (The old projeto/avulso scope gave way to
+// the api_service_links / api_project_links tables in v95.)
 const (
-	APICatalogScopeProjeto = "projeto"
-	APICatalogScopeAvulso  = "avulso"
-
 	APICatalogSourceUpload = "upload"
 	APICatalogSourceURL    = "url"
 )
@@ -22,8 +19,6 @@ const (
 // the pure data types + validation only.
 type APICatalog struct {
 	ID             int64          `json:"id"`
-	Scope          string         `json:"scope"`
-	ParentID       *int64         `json:"parent_id,omitempty"`
 	Name           string         `json:"name"`
 	Description    string         `json:"description"`
 	SourceType     string         `json:"source_type"`
@@ -41,6 +36,13 @@ type APICatalog struct {
 	UpdatedAt      time.Time      `json:"updated_at"`
 	OperationCount int            `json:"operation_count"`
 	Operations     []APIOperation `json:"operations,omitempty"`
+	// ServiceIDs / ProjectIDs are the direct links (api_service_links,
+	// api_project_links); always set, [] when none — an API with neither is
+	// "avulso".
+	ServiceIDs []int64 `json:"service_ids"`
+	ProjectIDs []int64 `json:"project_ids"`
+	// Responsaveis is loaded on detail responses only.
+	Responsaveis []Responsavel `json:"responsaveis,omitempty"`
 	// Entidades carries the entidade grants on detail responses (edit-form
 	// prefill); nil on list rows.
 	Entidades *AssetGrants `json:"entidades,omitempty"`
@@ -67,9 +69,9 @@ type APIOperation struct {
 
 // APICatalogFilter narrows the repo's List. Empty fields are ignored.
 type APICatalogFilter struct {
-	Scope    string
-	ParentID *int64
-	Query    string // matches name/title/description (case-insensitive)
+	ServiceID int64  // linked to this service
+	ProjectID int64  // linked to this project, directly or through one of its services
+	Query     string // matches name/title/description (case-insensitive)
 }
 
 // OperationSearchResult is a flattened endpoint hit carrying enough API context
@@ -77,7 +79,6 @@ type APICatalogFilter struct {
 type OperationSearchResult struct {
 	APIID       int64    `json:"api_id"`
 	APIName     string   `json:"api_name"`
-	Scope       string   `json:"scope"`
 	Method      string   `json:"method"`
 	Path        string   `json:"path"`
 	OpKey       string   `json:"op_key"`
@@ -86,24 +87,13 @@ type OperationSearchResult struct {
 	Tags        []string `json:"tags"`
 }
 
-// Validate enforces the scope/parent_id and source_type invariants that the DB
-// CHECKs also guard, so the model rejects bad input before any write.
+// Validate enforces the source_type invariant the DB CHECK also guards, so the
+// model rejects bad input before any write.
 func (a *APICatalog) Validate() error {
-	switch a.Scope {
-	case APICatalogScopeProjeto, APICatalogScopeAvulso:
-	default:
-		return fmt.Errorf("invalid scope %q", a.Scope)
-	}
 	switch a.SourceType {
 	case APICatalogSourceUpload, APICatalogSourceURL:
 	default:
 		return fmt.Errorf("invalid source_type %q", a.SourceType)
-	}
-	if a.Scope == APICatalogScopeAvulso && a.ParentID != nil {
-		return fmt.Errorf("avulso api must not have a parent_id")
-	}
-	if a.Scope == APICatalogScopeProjeto && a.ParentID == nil {
-		return fmt.Errorf("projeto api requires a parent_id")
 	}
 	if strings.TrimSpace(a.Name) == "" {
 		return fmt.Errorf("name is required")

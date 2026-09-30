@@ -1299,14 +1299,18 @@ definitions:
         type: boolean
       name:
         type: string
-      parent_id:
-        type: integer
+      project_ids:
+        items:
+          type: integer
+        type: array
       responsible_entidade_ids:
         items:
           type: integer
         type: array
-      scope:
-        type: string
+      service_ids:
+        items:
+          type: integer
+        type: array
       source_url:
         type: string
     type: object
@@ -2013,7 +2017,19 @@ definitions:
         type: boolean
       name:
         type: string
+      project_ids:
+        items:
+          type: integer
+        type: array
+      responsaveis:
+        items:
+          $ref: '#/definitions/models.ResponsavelInput'
+        type: array
       responsible_entidade_ids:
+        items:
+          type: integer
+        type: array
+      service_ids:
         items:
           type: integer
         type: array
@@ -2321,10 +2337,23 @@ definitions:
         type: array
       owner_user_id:
         type: integer
-      parent_id:
-        type: integer
-      scope:
-        type: string
+      project_ids:
+        items:
+          type: integer
+        type: array
+      responsaveis:
+        description: Responsaveis is loaded on detail responses only.
+        items:
+          $ref: '#/definitions/models.Responsavel'
+        type: array
+      service_ids:
+        description: |-
+          ServiceIDs / ProjectIDs are the direct links (api_service_links,
+          api_project_links); always set, [] when none — an API with neither is
+          "avulso".
+        items:
+          type: integer
+        type: array
       source_type:
         type: string
       source_url:
@@ -2855,8 +2884,6 @@ definitions:
       op_key:
         type: string
       path:
-        type: string
-      scope:
         type: string
       summary:
         type: string
@@ -4298,17 +4325,17 @@ paths:
     get:
       description: Any role. Only APIs visible to the caller (entidade scoping).
       parameters:
-      - description: Filter by scope (projeto or avulso)
-        in: query
-        name: scope
-        type: string
       - description: Search text
         in: query
         name: q
         type: string
-      - description: Filter by parent project ID
+      - description: Only APIs linked to this service
         in: query
-        name: parent_id
+        name: service_id
+        type: integer
+      - description: Only APIs linked to this project, directly or through its services
+        in: query
+        name: project_id
         type: integer
       - description: Page (1-based)
         in: query
@@ -4362,7 +4389,8 @@ paths:
       tags:
       - atlas
     get:
-      description: Any role; invisible APIs answer 404. Includes its entidade grants.
+      description: Any role; invisible APIs answer 404. Includes its operations, links,
+        responsáveis and entidade grants.
       parameters:
       - description: API catalog ID
         in: path
@@ -4471,6 +4499,41 @@ paths:
       summary: Re-fetch a URL-imported spec
       tags:
       - atlas
+  /api/api-catalog/{id}/restore:
+    post:
+      description: Admin. The API comes back with its operations and links.
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Restore an API from the trash
+      tags:
+      - atlas
   /api/api-catalog/{id}/spec:
     get:
       description: Any role; invisible APIs answer 404. The canonical OpenAPI/Swagger
@@ -4502,6 +4565,49 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Get an API's spec
+      tags:
+      - atlas
+    post:
+      consumes:
+      - multipart/form-data
+      description: Editor+. Re-parses the file and replaces the stored spec and operation
+        index; metadata, links and keys are kept. Works for APIs imported either way
+        (a URL import keeps its source URL for later refetches).
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: OpenAPI / Swagger document (JSON or YAML)
+        in: formData
+        name: spec
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APICatalog'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Replace an API's spec with an uploaded file
       tags:
       - atlas
   /api/api-catalog/{id}/spec/filter:
@@ -4550,7 +4656,7 @@ paths:
       consumes:
       - multipart/form-data
       description: Editor+. Multipart upload of an OpenAPI/Swagger file; name falls
-        back to the spec's title. projeto scope requires parent_id.
+        back to the spec's title. Linked services/projects must be visible (404 otherwise).
       parameters:
       - description: OpenAPI/Swagger spec file (JSON or YAML)
         in: formData
@@ -4565,14 +4671,14 @@ paths:
         in: formData
         name: description
         type: string
-      - description: projeto or avulso (default avulso)
+      - description: Comma-separated linked service IDs
         in: formData
-        name: scope
+        name: service_ids
         type: string
-      - description: Parent project ID (required for projeto scope)
+      - description: Comma-separated linked project IDs
         in: formData
-        name: parent_id
-        type: integer
+        name: project_ids
+        type: string
       - description: Base URL of the running API
         in: formData
         name: base_url
@@ -4621,7 +4727,7 @@ paths:
       - application/json
       description: Editor+. Fetches source_url (private addresses are allowed unless
         ATLAS_BLOCK_PRIVATE_SPEC_FETCH is set); a fetch or parse failure answers 400.
-        projeto scope requires parent_id.
+        Linked services/projects must be visible (404 otherwise).
       parameters:
       - description: Spec URL, metadata and entidade grants
         in: body
@@ -4659,13 +4765,13 @@ paths:
         in: query
         name: q
         type: string
-      - description: Filter by scope (projeto or avulso)
+      - description: Only APIs linked to this service
         in: query
-        name: scope
-        type: string
-      - description: Filter by parent project ID
+        name: service_id
+        type: integer
+      - description: Only APIs linked to this project, directly or through its services
         in: query
-        name: parent_id
+        name: project_id
         type: integer
       - description: Page (1-based)
         in: query
@@ -4687,6 +4793,32 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Search operations across catalogued APIs
+      tags:
+      - atlas
+  /api/api-catalog/trash:
+    get:
+      description: Any role. Soft-deleted APIs visible to the caller, newest first.
+      parameters:
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_APICatalog'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List trashed APIs
       tags:
       - atlas
   /api/assets/{type}/{id}/entidades:
@@ -7355,7 +7487,8 @@ paths:
   /api/graph:
     get:
       description: 'Any role. {"nodes": [graphNode], "edges": [graphEdge]} over visible
-        hosts, DNS records, projects and services; edges only between visible nodes.'
+        hosts, DNS records, projects, services and APIs; edges only between visible
+        nodes.'
       produces:
       - application/json
       responses:

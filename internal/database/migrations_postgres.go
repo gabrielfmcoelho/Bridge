@@ -1528,4 +1528,33 @@ var migrationsPostgres = []string{
 		created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens (user_id);`,
+
+	// Version 95: APIs (api_catalog) link to services and projects through
+	// link tables instead of the one-project scope/parent_id pair, which is
+	// kept (always 'avulso'/NULL from now on) for one release. Existing
+	// projeto APIs move into api_project_links. APIs can also have
+	// responsáveis now.
+	`CREATE TABLE IF NOT EXISTS api_service_links (
+		api_id     BIGINT NOT NULL REFERENCES api_catalog(id) ON DELETE CASCADE,
+		service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+		PRIMARY KEY (api_id, service_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_api_service_links_service ON api_service_links (service_id);
+	CREATE TABLE IF NOT EXISTS api_project_links (
+		api_id     BIGINT NOT NULL REFERENCES api_catalog(id) ON DELETE CASCADE,
+		project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		PRIMARY KEY (api_id, project_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_api_project_links_project ON api_project_links (project_id);
+	INSERT INTO api_project_links (api_id, project_id)
+		SELECT a.id, a.parent_id FROM api_catalog a JOIN projects p ON p.id = a.parent_id
+		 WHERE a.scope = 'projeto'
+		ON CONFLICT DO NOTHING;
+	ALTER TABLE api_catalog DROP CONSTRAINT IF EXISTS api_catalog_scope_check;
+	ALTER TABLE api_catalog DROP CONSTRAINT IF EXISTS api_catalog_check;
+	ALTER TABLE api_catalog ALTER COLUMN scope SET DEFAULT 'avulso';
+	UPDATE api_catalog SET scope = 'avulso', parent_id = NULL WHERE scope <> 'avulso' OR parent_id IS NOT NULL;
+	ALTER TABLE responsaveis DROP CONSTRAINT IF EXISTS responsaveis_entity_type_check;
+	ALTER TABLE responsaveis ADD CONSTRAINT responsaveis_entity_type_check
+		CHECK (entity_type IN ('host','dns','service','project','api_catalog'));`,
 }

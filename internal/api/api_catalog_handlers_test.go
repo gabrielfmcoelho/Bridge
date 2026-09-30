@@ -112,7 +112,6 @@ func (e *catalogEnv) uploadSpec(spec string) *http.Response {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
 	_ = mw.WriteField("name", "Test API")
-	_ = mw.WriteField("scope", "avulso")
 	fw, err := mw.CreateFormFile("spec", "spec.yaml")
 	if err != nil {
 		e.t.Fatalf("form file: %v", err)
@@ -275,3 +274,76 @@ func decodeArr(t *testing.T, resp *http.Response) []map[string]any {
 }
 
 func itoa(v int64) string { return strings.TrimSpace(strconv.FormatInt(v, 10)) }
+
+// TestCatalog_LinksTrashAndSpecReplace covers the v95 surface: links set and
+// cleared through PUT, the service_id list filter, 404 for a missing linked
+// service or a delete/restore of nothing, trash + restore, and replacing the
+// spec of an uploaded API.
+func TestCatalog_LinksTrashAndSpecReplace(t *testing.T) {
+	e := newCatalogEnv(t)
+	ctx := context.Background()
+	svc := &models.Service{Nickname: "api-servidores"}
+	if err := store.NewServiceRepo(e.d.SQL).Create(ctx, svc); err != nil {
+		t.Fatalf("service: %v", err)
+	}
+	created := decodeObj(t, e.uploadSpec(testOpenAPI30))
+	id := itoa(int64(created["id"].(float64)))
+	if links, ok := created["service_ids"].([]any); !ok || len(links) != 0 {
+		t.Fatalf("new api service_ids = %v, want []", created["service_ids"])
+	}
+
+	body := `{"name":"Test API","service_ids":[` + itoa(svc.ID) + `],"project_ids":[]}`
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, body); resp.StatusCode != http.StatusOK {
+		t.Fatalf("update = %d %s", resp.StatusCode, readBody(resp))
+	}
+	if arr := decodeArr(t, e.do(http.MethodGet, "/api/api-catalog?service_id="+itoa(svc.ID), "")); len(arr) != 1 {
+		t.Fatalf("by service = %d rows, want 1", len(arr))
+	}
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"name":"Test API","service_ids":[999999]}`); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("link to missing service = %d, want 404", resp.StatusCode)
+	}
+	// Omitting service_ids keeps the link.
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"name":"Renamed"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("rename = %d", resp.StatusCode)
+	}
+	got := decodeObj(t, e.do(http.MethodGet, "/api/api-catalog/"+id, ""))
+	if links := got["service_ids"].([]any); len(links) != 1 {
+		t.Errorf("rename dropped the service link: %v", links)
+	}
+
+	// Replace the spec with a one-operation document.
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("spec", "spec.yaml")
+	io.WriteString(fw, "openapi: 3.0.1\ninfo: {title: Test API, version: 2.0.0}\npaths:\n  /only:\n    get: {operationId: only}\n")
+	mw.Close()
+	req, _ := http.NewRequest(http.MethodPost, e.server.URL+"/api/api-catalog/"+id+"/spec", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("replace spec: %v %d", err, resp.StatusCode)
+	}
+	replaced := decodeObj(t, resp)
+	if replaced["operation_count"].(float64) != 1 || replaced["version_label"] != "2.0.0" {
+		t.Errorf("replaced spec = ops %v version %v", replaced["operation_count"], replaced["version_label"])
+	}
+
+	if resp := e.do(http.MethodDelete, "/api/api-catalog/999999", ""); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("delete missing = %d, want 404", resp.StatusCode)
+	}
+	if resp := e.do(http.MethodDelete, "/api/api-catalog/"+id, ""); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete = %d", resp.StatusCode)
+	}
+	if arr := decodeArr(t, e.do(http.MethodGet, "/api/api-catalog/trash", "")); len(arr) != 1 {
+		t.Fatalf("trash = %d rows, want 1", len(arr))
+	}
+	if resp := e.do(http.MethodPost, "/api/api-catalog/"+id+"/restore", ""); resp.StatusCode != http.StatusOK {
+		t.Fatalf("restore = %d", resp.StatusCode)
+	}
+	if resp := e.do(http.MethodPost, "/api/api-catalog/"+id+"/restore", ""); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("restore of a live api = %d, want 404", resp.StatusCode)
+	}
+	if arr := decodeArr(t, e.do(http.MethodGet, "/api/api-catalog?service_id="+itoa(svc.ID), "")); len(arr) != 1 {
+		t.Errorf("restored api lost its link")
+	}
+}

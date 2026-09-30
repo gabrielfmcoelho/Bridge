@@ -16,7 +16,6 @@ import (
 func seedAPI(t *testing.T, env *secretTestEnv, owner int64) int64 {
 	t.Helper()
 	a := &models.APICatalog{
-		Scope:       models.APICatalogScopeAvulso,
 		Name:        "Things API",
 		SourceType:  models.APICatalogSourceUpload,
 		SpecVersion: "openapi-3.0.1",

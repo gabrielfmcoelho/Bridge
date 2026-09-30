@@ -17,7 +17,7 @@ func TestAPICatalogRepo_EntidadeScope(t *testing.T) {
 	}
 	repo := store.NewAPICatalogRepo(d.SQL)
 	mk := func(name string) int64 {
-		a := &models.APICatalog{Scope: models.APICatalogScopeAvulso, Name: name, SourceType: models.APICatalogSourceUpload,
+		a := &models.APICatalog{Name: name, SourceType: models.APICatalogSourceUpload,
 			SpecJSON: `{"openapi":"3.0.0"}`, OwnerUserID: u.ID, CreatedBy: u.ID}
 		if err := repo.Create(ctx, a, nil); err != nil {
 			t.Fatalf("create %s: %v", name, err)
@@ -48,8 +48,8 @@ func TestAPICatalogRepo_EntidadeScope(t *testing.T) {
 	if err := repo.UpdateMeta(scoped, other, "renamed", "", "", ""); err != nil {
 		t.Fatalf("scoped update other: %v", err)
 	}
-	if err := repo.SoftDelete(scoped, other); err != nil {
-		t.Fatalf("scoped delete other: %v", err)
+	if found, err := repo.SoftDelete(scoped, other); err != nil || found {
+		t.Fatalf("scoped delete other: found=%v err=%v; want not found", found, err)
 	}
 	if got, err := repo.Get(ctx, other); err != nil || got == nil || got.Name != "other" {
 		t.Fatalf("unscoped get other after scoped update/delete = %+v, %v; want untouched", got, err)

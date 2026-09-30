@@ -262,20 +262,20 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Filter by scope (projeto or avulso)",
-                        "name": "scope",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
                         "description": "Search text",
                         "name": "q",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Filter by parent project ID",
-                        "name": "parent_id",
+                        "description": "Only APIs linked to this service",
+                        "name": "service_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only APIs linked to this project, directly or through its services",
+                        "name": "project_id",
                         "in": "query"
                     },
                     {
@@ -309,7 +309,7 @@ const docTemplate = `{
         },
         "/api/api-catalog/import/upload": {
             "post": {
-                "description": "Editor+. Multipart upload of an OpenAPI/Swagger file; name falls back to the spec's title. projeto scope requires parent_id.",
+                "description": "Editor+. Multipart upload of an OpenAPI/Swagger file; name falls back to the spec's title. Linked services/projects must be visible (404 otherwise).",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -342,14 +342,14 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "projeto or avulso (default avulso)",
-                        "name": "scope",
+                        "description": "Comma-separated linked service IDs",
+                        "name": "service_ids",
                         "in": "formData"
                     },
                     {
-                        "type": "integer",
-                        "description": "Parent project ID (required for projeto scope)",
-                        "name": "parent_id",
+                        "type": "string",
+                        "description": "Comma-separated linked project IDs",
+                        "name": "project_ids",
                         "in": "formData"
                     },
                     {
@@ -413,7 +413,7 @@ const docTemplate = `{
         },
         "/api/api-catalog/import/url": {
             "post": {
-                "description": "Editor+. Fetches source_url (private addresses are allowed unless ATLAS_BLOCK_PRIVATE_SPEC_FETCH is set); a fetch or parse failure answers 400. projeto scope requires parent_id.",
+                "description": "Editor+. Fetches source_url (private addresses are allowed unless ATLAS_BLOCK_PRIVATE_SPEC_FETCH is set); a fetch or parse failure answers 400. Linked services/projects must be visible (404 otherwise).",
                 "consumes": [
                     "application/json"
                 ],
@@ -481,15 +481,15 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "Filter by scope (projeto or avulso)",
-                        "name": "scope",
+                        "type": "integer",
+                        "description": "Only APIs linked to this service",
+                        "name": "service_id",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Filter by parent project ID",
-                        "name": "parent_id",
+                        "description": "Only APIs linked to this project, directly or through its services",
+                        "name": "project_id",
                         "in": "query"
                     },
                     {
@@ -521,9 +521,49 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/api-catalog/trash": {
+            "get": {
+                "description": "Any role. Soft-deleted APIs visible to the caller, newest first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "List trashed APIs",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200); omit for every row",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_APICatalog"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/api-catalog/{id}": {
             "get": {
-                "description": "Any role; invisible APIs answer 404. Includes its entidade grants.",
+                "description": "Any role; invisible APIs answer 404. Includes its operations, links, responsáveis and entidade grants.",
                 "produces": [
                     "application/json"
                 ],
@@ -726,6 +766,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/api-catalog/{id}/restore": {
+            "post": {
+                "description": "Admin. The API comes back with its operations and links.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Restore an API from the trash",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/api-catalog/{id}/spec": {
             "get": {
                 "description": "Any role; invisible APIs answer 404. The canonical OpenAPI/Swagger JSON document, verbatim.",
@@ -761,6 +854,67 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Editor+. Re-parses the file and replaces the stored spec and operation index; metadata, links and keys are kept. Works for APIs imported either way (a URL import keeps its source URL for later refetches).",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Replace an API's spec with an uploaded file",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "OpenAPI / Swagger document (JSON or YAML)",
+                        "name": "spec",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APICatalog"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -4712,7 +4866,7 @@ const docTemplate = `{
         },
         "/api/graph": {
             "get": {
-                "description": "Any role. {\"nodes\": [graphNode], \"edges\": [graphEdge]} over visible hosts, DNS records, projects and services; edges only between visible nodes.",
+                "description": "Any role. {\"nodes\": [graphNode], \"edges\": [graphEdge]} over visible hosts, DNS records, projects, services and APIs; edges only between visible nodes.",
                 "produces": [
                     "application/json"
                 ],
@@ -16291,8 +16445,11 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "parent_id": {
-                    "type": "integer"
+                "project_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "responsible_entidade_ids": {
                     "type": "array",
@@ -16300,8 +16457,11 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
-                "scope": {
-                    "type": "string"
+                "service_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "source_url": {
                     "type": "string"
@@ -17357,7 +17517,25 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "project_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "responsaveis": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ResponsavelInput"
+                    }
+                },
                 "responsible_entidade_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "service_ids": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -17821,11 +17999,25 @@ const docTemplate = `{
                 "owner_user_id": {
                     "type": "integer"
                 },
-                "parent_id": {
-                    "type": "integer"
+                "project_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
-                "scope": {
-                    "type": "string"
+                "responsaveis": {
+                    "description": "Responsaveis is loaded on detail responses only.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Responsavel"
+                    }
+                },
+                "service_ids": {
+                    "description": "ServiceIDs / ProjectIDs are the direct links (api_service_links,\napi_project_links); always set, [] when none — an API with neither is\n\"avulso\".",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "source_type": {
                     "type": "string"
@@ -18623,9 +18815,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "path": {
-                    "type": "string"
-                },
-                "scope": {
                     "type": "string"
                 },
                 "summary": {

@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,9 +19,10 @@ import (
 
 // apiCatalogHandlers serves the Atlas REST API catalog surface
 // (/api/api-catalog/*). Browsing is authenticated; importing / mutating
-// requires the editor role; deletion requires admin. The catalog's ACL is
-// simple (scope projeto/avulso + owner), so these handlers stay thin: parse →
-// model func → render, following the project_handlers.go convention.
+// requires the editor role; deletion and restore require admin. Visibility is
+// the entidades contract; an API links to services and projects through
+// api_service_links / api_project_links. Handlers stay thin: parse → repo →
+// render, following the project_handlers.go convention.
 type apiCatalogHandlers struct {
 	db *database.DB
 	// allowPrivateFetch controls whether import-from-URL may target private,
@@ -50,6 +53,9 @@ func atlasAllowPrivateFetch() bool {
 func (h *apiCatalogHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/api-catalog", h.handleList)
 	rr.auth("GET /api/api-catalog/search", h.handleSearchOperations)
+	rr.auth("GET /api/api-catalog/trash", h.handleListTrash)
+	rr.role("admin", "POST /api/api-catalog/{id}/restore", h.handleRestore)
+	rr.role("editor", "POST /api/api-catalog/{id}/spec", h.handleReplaceSpec)
 	rr.role("editor", "POST /api/api-catalog/import/upload", h.handleImportUpload)
 	rr.role("editor", "POST /api/api-catalog/import/url", h.handleImportURL)
 	rr.auth("GET /api/api-catalog/{id}", h.handleGet)
@@ -68,24 +74,17 @@ func (h *apiCatalogHandlers) registerRoutes(rr routeRegistrar) {
 //	@Description	Any role. Only APIs visible to the caller (entidade scoping).
 //	@Tags			atlas
 //	@Produce		json
-//	@Param			scope		query		string	false	"Filter by scope (projeto or avulso)"
 //	@Param			q			query		string	false	"Search text"
-//	@Param			parent_id	query		int		false	"Filter by parent project ID"
+//	@Param			service_id	query		int		false	"Only APIs linked to this service"
+//	@Param			project_id	query		int		false	"Only APIs linked to this project, directly or through its services"
 //	@Param			page		query		int		false	"Page (1-based)"
 //	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
 //	@Success		200			{object}	ListEnvelope[models.APICatalog]
 //	@Failure		401			{object}	httpx.ErrorResponse
 //	@Router			/api/api-catalog [get]
 func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) {
-	f := models.APICatalogFilter{
-		Scope: r.URL.Query().Get("scope"),
-		Query: r.URL.Query().Get("q"),
-	}
-	if v := r.URL.Query().Get("parent_id"); v != "" {
-		if pid, err := strconv.ParseInt(v, 10, 64); err == nil {
-			f.ParentID = &pid
-		}
-	}
+	f := models.APICatalogFilter{Query: r.URL.Query().Get("q")}
+	f.ServiceID, f.ProjectID = linkFilterParams(r)
 	list, err := store.NewAPICatalogRepo(h.db.SQL).List(r.Context(), f)
 	if err != nil {
 		jsonServerError(w, r, "list api catalog", err)
@@ -104,21 +103,16 @@ func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) 
 //	@Tags			atlas
 //	@Produce		json
 //	@Param			q			query		string	false	"Search text"
-//	@Param			scope		query		string	false	"Filter by scope (projeto or avulso)"
-//	@Param			parent_id	query		int		false	"Filter by parent project ID"
+//	@Param			service_id	query		int		false	"Only APIs linked to this service"
+//	@Param			project_id	query		int		false	"Only APIs linked to this project, directly or through its services"
 //	@Param			page		query		int		false	"Page (1-based)"
 //	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
 //	@Success		200			{object}	ListEnvelope[models.OperationSearchResult]
 //	@Failure		401			{object}	httpx.ErrorResponse
 //	@Router			/api/api-catalog/search [get]
 func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *http.Request) {
-	var parentID *int64
-	if v := r.URL.Query().Get("parent_id"); v != "" {
-		if pid, err := strconv.ParseInt(v, 10, 64); err == nil {
-			parentID = &pid
-		}
-	}
-	hits, err := store.NewAPICatalogRepo(h.db.SQL).SearchOperations(r.Context(), r.URL.Query().Get("q"), r.URL.Query().Get("scope"), parentID)
+	serviceID, projectID := linkFilterParams(r)
+	hits, err := store.NewAPICatalogRepo(h.db.SQL).SearchOperations(r.Context(), r.URL.Query().Get("q"), serviceID, projectID)
 	if err != nil {
 		jsonServerError(w, r, "search operations", err)
 		return
@@ -134,7 +128,7 @@ func (h *apiCatalogHandlers) handleSearchOperations(w http.ResponseWriter, r *ht
 // handleGet godoc
 //
 //	@Summary		Get a catalogued API
-//	@Description	Any role; invisible APIs answer 404. Includes its entidade grants.
+//	@Description	Any role; invisible APIs answer 404. Includes its operations, links, responsáveis and entidade grants.
 //	@Tags			atlas
 //	@Produce		json
 //	@Param			id	path		int	true	"API catalog ID"
@@ -158,15 +152,19 @@ func (h *apiCatalogHandlers) handleGet(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusNotFound, "api not found")
 		return
 	}
-	h.attachGrants(r.Context(), a)
+	h.attachDetail(r.Context(), a)
 	jsonOK(w, a)
 }
 
-// attachGrants loads the row's entidade grants onto a.Entidades (best effort:
-// a failure leaves it nil).
-func (h *apiCatalogHandlers) attachGrants(ctx context.Context, a *models.APICatalog) {
+// attachDetail loads the row's entidade grants and responsáveis (best effort:
+// a failure leaves them empty).
+func (h *apiCatalogHandlers) attachDetail(ctx context.Context, a *models.APICatalog) {
 	if g, err := store.NewAssetEntidadeRepo(h.db.SQL).Get(ctx, store.AssetAPICatalog, a.ID); err == nil {
 		a.Entidades = &g
+	}
+	a.Responsaveis = []models.Responsavel{}
+	if rs, err := store.NewResponsavelRepo(h.db.SQL).List(ctx, string(store.AssetAPICatalog), a.ID); err == nil && rs != nil {
+		a.Responsaveis = rs
 	}
 }
 
@@ -230,8 +228,7 @@ func (h *apiCatalogHandlers) handleFilterSpec(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var req filterSpecRequest
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
+	if !decodeBody(w, r, &req) {
 		return
 	}
 	spec, err := store.NewAPICatalogRepo(h.db.SQL).GetSpec(r.Context(), id)
@@ -258,15 +255,15 @@ func (h *apiCatalogHandlers) handleFilterSpec(w http.ResponseWriter, r *http.Req
 // handleImportUpload godoc
 //
 //	@Summary		Import an API from an uploaded spec
-//	@Description	Editor+. Multipart upload of an OpenAPI/Swagger file; name falls back to the spec's title. projeto scope requires parent_id.
+//	@Description	Editor+. Multipart upload of an OpenAPI/Swagger file; name falls back to the spec's title. Linked services/projects must be visible (404 otherwise).
 //	@Tags			atlas
 //	@Accept			multipart/form-data
 //	@Produce		json
 //	@Param			spec						formData	file	true	"OpenAPI/Swagger spec file (JSON or YAML)"
 //	@Param			name						formData	string	false	"Name (defaults to the spec title)"
 //	@Param			description					formData	string	false	"Description"
-//	@Param			scope						formData	string	false	"projeto or avulso (default avulso)"
-//	@Param			parent_id					formData	int		false	"Parent project ID (required for projeto scope)"
+//	@Param			service_ids					formData	string	false	"Comma-separated linked service IDs"
+//	@Param			project_ids					formData	string	false	"Comma-separated linked project IDs"
 //	@Param			base_url					formData	string	false	"Base URL of the running API"
 //	@Param			docs_url					formData	string	false	"Human docs URL"
 //	@Param			creator_entidade_id			formData	int		false	"Creator entidade ID"
@@ -284,20 +281,8 @@ func (h *apiCatalogHandlers) handleImportUpload(w http.ResponseWriter, r *http.R
 		return
 	}
 	owner := actor.UserID
-	r.Body = http.MaxBytesReader(w, r.Body, apicatalog.MaxSpecBytes+1<<20)
-	if err := r.ParseMultipartForm(apicatalog.MaxSpecBytes + 1<<20); err != nil {
-		jsonBadRequest(w, r, "spec file too large or malformed form", err)
-		return
-	}
-	file, _, err := r.FormFile("spec")
-	if err != nil {
-		jsonBadRequest(w, r, "missing spec file", err)
-		return
-	}
-	defer file.Close()
-	raw, err := io.ReadAll(io.LimitReader(file, apicatalog.MaxSpecBytes+1))
-	if err != nil {
-		jsonServerError(w, r, "read spec file", err)
+	raw, ok := readSpecUpload(w, r)
+	if !ok {
 		return
 	}
 
@@ -310,11 +295,11 @@ func (h *apiCatalogHandlers) handleImportUpload(w http.ResponseWriter, r *http.R
 }
 
 type importURLRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Scope       string `json:"scope"`
-	ParentID    *int64 `json:"parent_id"`
-	SourceURL   string `json:"source_url"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	ServiceIDs  []int64 `json:"service_ids"`
+	ProjectIDs  []int64 `json:"project_ids"`
+	SourceURL   string  `json:"source_url"`
 	BaseURL     string `json:"base_url"`
 	DocsURL     string `json:"docs_url"`
 	models.AssetGrantsInput
@@ -323,7 +308,7 @@ type importURLRequest struct {
 // handleImportURL godoc
 //
 //	@Summary		Import an API from a spec URL
-//	@Description	Editor+. Fetches source_url (private addresses are allowed unless ATLAS_BLOCK_PRIVATE_SPEC_FETCH is set); a fetch or parse failure answers 400. projeto scope requires parent_id.
+//	@Description	Editor+. Fetches source_url (private addresses are allowed unless ATLAS_BLOCK_PRIVATE_SPEC_FETCH is set); a fetch or parse failure answers 400. Linked services/projects must be visible (404 otherwise).
 //	@Tags			atlas
 //	@Accept			json
 //	@Produce		json
@@ -356,8 +341,8 @@ func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Requ
 	meta := catalogMeta{
 		Name:        req.Name,
 		Description: req.Description,
-		Scope:       defaultScope(req.Scope),
-		ParentID:    req.ParentID,
+		ServiceIDs:  req.ServiceIDs,
+		ProjectIDs:  req.ProjectIDs,
 		SourceType:  models.APICatalogSourceURL,
 		SourceURL:   req.SourceURL,
 		BaseURL:     strings.TrimSpace(req.BaseURL),
@@ -369,11 +354,16 @@ func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Requ
 
 // --- update / refetch / delete ----------------------------------------------
 
+// updateCatalogRequest edits an API's metadata. service_ids, project_ids and
+// responsaveis are replaced when sent (send [] to clear) and kept when omitted.
 type updateCatalogRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	BaseURL     string `json:"base_url"`
-	DocsURL     string `json:"docs_url"`
+	Name         string                     `json:"name"`
+	Description  string                     `json:"description"`
+	BaseURL      string                     `json:"base_url"`
+	DocsURL      string                     `json:"docs_url"`
+	ServiceIDs   *[]int64                   `json:"service_ids"`
+	ProjectIDs   *[]int64                   `json:"project_ids"`
+	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
 	models.AssetGrantsInput
 }
 
@@ -399,22 +389,40 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 		return
 	}
 	var req updateCatalogRequest
-	if err := decodeJSON(r, &req); err != nil {
-		jsonBadRequest(w, r, "invalid request body", err)
+	if !decodeBody(w, r, &req) {
 		return
 	}
-	if err := store.NewAPICatalogRepo(h.db.SQL).UpdateMeta(r.Context(), id, req.Name, req.Description, strings.TrimSpace(req.BaseURL), strings.TrimSpace(req.DocsURL)); err != nil {
+	repo := store.NewAPICatalogRepo(h.db.SQL)
+	if existing, err := repo.Get(r.Context(), id); err != nil {
+		jsonServerError(w, r, "get api catalog", err)
+		return
+	} else if existing == nil {
+		jsonError(w, http.StatusNotFound, "api not found")
+		return
+	}
+	var serviceIDs, projectIDs []int64
+	if req.ServiceIDs != nil {
+		serviceIDs = append([]int64{}, *req.ServiceIDs...)
+	}
+	if req.ProjectIDs != nil {
+		projectIDs = append([]int64{}, *req.ProjectIDs...)
+	}
+	if !h.linksVisible(w, r, serviceIDs, projectIDs) {
+		return
+	}
+	if err := repo.UpdateMeta(r.Context(), id, req.Name, req.Description, strings.TrimSpace(req.BaseURL), strings.TrimSpace(req.DocsURL)); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
-	a, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
-	if err != nil {
-		jsonServerError(w, r, "reload api catalog", err)
+	if err := repo.SetLinks(r.Context(), id, serviceIDs, projectIDs); err != nil {
+		jsonServerError(w, r, "failed to set api links", err)
 		return
 	}
-	if a == nil {
-		jsonError(w, http.StatusNotFound, "api not found")
-		return
+	if req.Responsaveis != nil {
+		if err := store.NewResponsavelRepo(h.db.SQL).Sync(r.Context(), string(store.AssetAPICatalog), id, *req.Responsaveis); err != nil {
+			jsonBadRequest(w, r, err.Error(), err)
+			return
+		}
 	}
 	if req.AssetGrantsInput.Present() {
 		grants := store.NewAssetEntidadeRepo(h.db.SQL)
@@ -428,7 +436,16 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 			return
 		}
 	}
-	h.attachGrants(r.Context(), a)
+	a, err := repo.Get(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "reload api catalog", err)
+		return
+	}
+	if a == nil { // grants just moved it out of the caller's sight
+		jsonError(w, http.StatusNotFound, "api not found")
+		return
+	}
+	h.attachDetail(r.Context(), a)
 	jsonOK(w, a)
 }
 
@@ -475,17 +492,87 @@ func (h *apiCatalogHandlers) handleRefetch(w http.ResponseWriter, r *http.Reques
 		jsonBadRequest(w, r, "could not parse spec: "+err.Error(), err)
 		return
 	}
-	if err := store.NewAPICatalogRepo(h.db.SQL).UpdateSpec(r.Context(), id, string(ps.SpecJSON), ps.SpecHash, ps.SpecVersion,
-		ps.Title, ps.VersionLabel, ps.ExternalURL, toModelOps(ps.Operations)); err != nil {
+	h.storeSpec(w, r, id, ps)
+}
+
+// storeSpec replaces an API's spec + operation index and answers the reloaded
+// API (404 when it vanished or left the caller's sight meanwhile).
+func (h *apiCatalogHandlers) storeSpec(w http.ResponseWriter, r *http.Request, id int64, ps *apicatalog.ParsedSpec) {
+	repo := store.NewAPICatalogRepo(h.db.SQL)
+	err := repo.UpdateSpec(r.Context(), id, string(ps.SpecJSON), ps.SpecHash, ps.SpecVersion,
+		ps.Title, ps.VersionLabel, ps.ExternalURL, toModelOps(ps.Operations))
+	if errors.Is(err, sql.ErrNoRows) {
+		jsonError(w, http.StatusNotFound, "api not found")
+		return
+	}
+	if err != nil {
 		jsonServerError(w, r, "update api spec", err)
 		return
 	}
-	reloaded, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id)
+	reloaded, err := repo.Get(r.Context(), id)
 	if err != nil {
 		jsonServerError(w, r, "reload api catalog", err)
 		return
 	}
+	if reloaded == nil {
+		jsonError(w, http.StatusNotFound, "api not found")
+		return
+	}
+	h.attachDetail(r.Context(), reloaded)
 	jsonOK(w, reloaded)
+}
+
+// handleReplaceSpec godoc
+//
+//	@Summary		Replace an API's spec with an uploaded file
+//	@Description	Editor+. Re-parses the file and replaces the stored spec and operation index; metadata, links and keys are kept. Works for APIs imported either way (a URL import keeps its source URL for later refetches).
+//	@Tags			atlas
+//	@Accept			mpfd
+//	@Produce		json
+//	@Param			id		path		int		true	"API catalog ID"
+//	@Param			spec	formData	file	true	"OpenAPI / Swagger document (JSON or YAML)"
+//	@Success		200		{object}	models.APICatalog
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/{id}/spec [post]
+func (h *apiCatalogHandlers) handleReplaceSpec(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	raw, ok := readSpecUpload(w, r)
+	if !ok {
+		return
+	}
+	ps, err := apicatalog.Parse(raw)
+	if err != nil {
+		jsonBadRequest(w, r, "could not parse spec: "+err.Error(), err)
+		return
+	}
+	h.storeSpec(w, r, id, ps)
+}
+
+// readSpecUpload reads the multipart "spec" file (bounded by MaxSpecBytes).
+func readSpecUpload(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, apicatalog.MaxSpecBytes+1<<20)
+	if err := r.ParseMultipartForm(apicatalog.MaxSpecBytes + 1<<20); err != nil {
+		jsonBadRequest(w, r, "spec file too large or malformed form", err)
+		return nil, false
+	}
+	file, _, err := r.FormFile("spec")
+	if err != nil {
+		jsonBadRequest(w, r, "missing spec file", err)
+		return nil, false
+	}
+	defer file.Close()
+	raw, err := io.ReadAll(io.LimitReader(file, apicatalog.MaxSpecBytes+1))
+	if err != nil {
+		jsonServerError(w, r, "read spec file", err)
+		return nil, false
+	}
+	return raw, true
 }
 
 // handleDelete godoc
@@ -506,11 +593,66 @@ func (h *apiCatalogHandlers) handleDelete(w http.ResponseWriter, r *http.Request
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	if err := store.NewAPICatalogRepo(h.db.SQL).SoftDelete(r.Context(), id); err != nil {
+	found, err := store.NewAPICatalogRepo(h.db.SQL).SoftDelete(r.Context(), id)
+	if err != nil {
 		jsonServerError(w, r, "delete api catalog", err)
 		return
 	}
+	if !found {
+		jsonError(w, http.StatusNotFound, "api not found")
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleListTrash godoc
+//
+//	@Summary		List trashed APIs
+//	@Description	Any role. Soft-deleted APIs visible to the caller, newest first.
+//	@Tags			atlas
+//	@Produce		json
+//	@Param			page		query		int	false	"Page (1-based)"
+//	@Param			per_page	query		int	false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.APICatalog]
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/trash [get]
+func (h *apiCatalogHandlers) handleListTrash(w http.ResponseWriter, r *http.Request) {
+	items, err := store.NewAPICatalogRepo(h.db.SQL).ListTrash(r.Context())
+	if err != nil {
+		jsonServerError(w, r, "failed to list api trash", err)
+		return
+	}
+	jsonPaged(w, r, items)
+}
+
+// handleRestore godoc
+//
+//	@Summary		Restore an API from the trash
+//	@Description	Admin. The API comes back with its operations and links.
+//	@Tags			atlas
+//	@Produce		json
+//	@Param			id	path		int	true	"API catalog ID"
+//	@Success		200	{object}	StatusResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog/{id}/restore [post]
+func (h *apiCatalogHandlers) handleRestore(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	found, err := store.NewAPICatalogRepo(h.db.SQL).Restore(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to restore api", err)
+		return
+	}
+	if !found {
+		jsonError(w, http.StatusNotFound, "api not found in trash")
+		return
+	}
+	jsonOK(w, StatusResponse{Status: "restored"})
 }
 
 // --- helpers ----------------------------------------------------------------
@@ -518,8 +660,8 @@ func (h *apiCatalogHandlers) handleDelete(w http.ResponseWriter, r *http.Request
 type catalogMeta struct {
 	Name        string
 	Description string
-	Scope       string
-	ParentID    *int64
+	ServiceIDs  []int64
+	ProjectIDs  []int64
 	SourceType  string
 	SourceURL   string
 	BaseURL     string
@@ -534,18 +676,17 @@ func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL str
 	m := catalogMeta{
 		Name:        r.FormValue("name"),
 		Description: r.FormValue("description"),
-		Scope:       defaultScope(r.FormValue("scope")),
 		SourceType:  sourceType,
 		SourceURL:   sourceURL,
 		BaseURL:     strings.TrimSpace(r.FormValue("base_url")),
 		DocsURL:     strings.TrimSpace(r.FormValue("docs_url")),
 	}
-	if v := strings.TrimSpace(r.FormValue("parent_id")); v != "" {
-		pid, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			return m, fmt.Errorf("invalid parent_id")
-		}
-		m.ParentID = &pid
+	var err error
+	if m.ServiceIDs, err = formIDList(r, "service_ids"); err != nil {
+		return m, err
+	}
+	if m.ProjectIDs, err = formIDList(r, "project_ids"); err != nil {
+		return m, err
 	}
 	if v := strings.TrimSpace(r.FormValue("creator_entidade_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
@@ -572,11 +713,10 @@ func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL str
 	return m, nil
 }
 
-// createFromSpec parses raw, validates the parent (for projeto scope), and
-// persists the catalog + operation index.
+// createFromSpec parses raw, checks the linked services/projects are
+// visible, and persists the catalog + operation index + links.
 func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Request, raw []byte, meta catalogMeta, owner int64) {
-	if err := h.validateParent(r.Context(), meta.Scope, meta.ParentID); err != nil {
-		jsonBadRequest(w, r, err.Error(), err)
+	if !h.linksVisible(w, r, meta.ServiceIDs, meta.ProjectIDs) {
 		return
 	}
 	ps, err := apicatalog.Parse(raw)
@@ -597,8 +737,6 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	a := &models.APICatalog{
-		Scope:        meta.Scope,
-		ParentID:     meta.ParentID,
 		Name:         name,
 		Description:  meta.Description,
 		SourceType:   meta.SourceType,
@@ -624,39 +762,69 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 		jsonServerError(w, r, "failed to set entidades", err)
 		return
 	}
+	if err := store.NewAPICatalogRepo(h.db.SQL).SetLinks(r.Context(), a.ID, dedupeOrEmpty(meta.ServiceIDs), dedupeOrEmpty(meta.ProjectIDs)); err != nil {
+		jsonServerError(w, r, "failed to set api links", err)
+		return
+	}
 	reloaded, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), a.ID)
 	if err != nil {
 		jsonServerError(w, r, "reload api catalog", err)
 		return
 	}
 	if reloaded != nil {
-		h.attachGrants(r.Context(), reloaded)
+		h.attachDetail(r.Context(), reloaded)
 	}
 	jsonCreated(w, reloaded)
 }
 
-func (h *apiCatalogHandlers) validateParent(ctx context.Context, scope string, parentID *int64) error {
-	if scope != models.APICatalogScopeProjeto {
-		return nil
+// linksVisible rejects links to services or projects the caller can't see,
+// missing or trashed ones included: 404, like the asset itself would answer.
+func (h *apiCatalogHandlers) linksVisible(w http.ResponseWriter, r *http.Request, serviceIDs, projectIDs []int64) bool {
+	for _, id := range serviceIDs {
+		if s, err := store.NewServiceRepo(h.db.SQL).Get(r.Context(), id); err != nil || s == nil {
+			jsonError(w, http.StatusNotFound, fmt.Sprintf("service %d not found", id))
+			return false
+		}
 	}
-	if parentID == nil {
-		return fmt.Errorf("parent_id is required for projeto scope")
+	for _, id := range projectIDs {
+		if p, err := store.NewProjectRepo(h.db.SQL).Get(r.Context(), id); err != nil || p == nil {
+			jsonError(w, http.StatusNotFound, fmt.Sprintf("project %d not found", id))
+			return false
+		}
 	}
-	p, err := store.NewProjectRepo(h.db.SQL).Get(ctx, *parentID)
-	if err != nil {
-		return err
-	}
-	if p == nil {
-		return fmt.Errorf("project %d not found", *parentID)
-	}
-	return nil
+	return true
 }
 
-func defaultScope(s string) string {
-	if s == "" {
-		return models.APICatalogScopeAvulso
+// dedupeOrEmpty turns a nil list into [] so SetLinks writes (clears) it.
+func dedupeOrEmpty(ids []int64) []int64 {
+	if ids == nil {
+		return []int64{}
 	}
-	return s
+	return ids
+}
+
+// linkFilterParams reads the optional service_id / project_id list filters.
+func linkFilterParams(r *http.Request) (serviceID, projectID int64) {
+	serviceID, _ = strconv.ParseInt(r.URL.Query().Get("service_id"), 10, 64)
+	projectID, _ = strconv.ParseInt(r.URL.Query().Get("project_id"), 10, 64)
+	return serviceID, projectID
+}
+
+// formIDList parses a comma-separated id list form field ("" → nil).
+func formIDList(r *http.Request, field string) ([]int64, error) {
+	v := strings.TrimSpace(r.FormValue(field))
+	if v == "" {
+		return nil, nil
+	}
+	ids := []int64{}
+	for _, part := range strings.Split(v, ",") {
+		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s", field)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 func toModelOps(ops []apicatalog.Operation) []models.APIOperation {

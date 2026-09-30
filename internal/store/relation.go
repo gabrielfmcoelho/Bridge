@@ -16,7 +16,7 @@ type Relation struct {
 }
 
 // RelationRepo reads every link between hosts, DNS records, services,
-// projects, contacts and entidades in one query, for list pages that group
+// projects, APIs, contacts and entidades in one query, for list pages that group
 // their items by a related entity.
 type RelationRepo struct{ db *sql.DB }
 
@@ -36,9 +36,12 @@ const relationEdges = `
 	UNION SELECT 'project', s.project_id, 'host', l.host_id FROM services s JOIN service_host_links l ON l.service_id = s.id WHERE s.project_id IS NOT NULL
 	UNION SELECT 'project', project_id, 'dns', dns_id FROM project_dns_links
 	UNION SELECT 'project', s.project_id, 'dns', l.dns_id FROM services s JOIN service_dns_links l ON l.service_id = s.id WHERE s.project_id IS NOT NULL
+	UNION SELECT 'api_catalog', l.api_id, 'service', l.service_id FROM api_service_links l JOIN api_catalog a ON a.id = l.api_id WHERE a.deleted_at IS NULL
+	UNION SELECT 'api_catalog', l.api_id, 'project', l.project_id FROM api_project_links l JOIN api_catalog a ON a.id = l.api_id WHERE a.deleted_at IS NULL
+	UNION SELECT 'project', s.project_id, 'api_catalog', l.api_id FROM services s JOIN api_service_links l ON l.service_id = s.id JOIN api_catalog a ON a.id = l.api_id WHERE s.project_id IS NOT NULL AND a.deleted_at IS NULL
 	UNION SELECT 'contact', contact_id, entity_type, entity_id FROM responsaveis
 	UNION SELECT 'entidade', entidade_id, asset_type, asset_id FROM asset_entidades
-		WHERE relation IN ('creator', 'responsible') AND asset_type IN ('host', 'dns', 'service', 'project')`
+		WHERE relation IN ('creator', 'responsible') AND asset_type IN ('host', 'dns', 'service', 'project', 'api_catalog')`
 
 // All returns every link whose ends the caller can see. Both ends are scoped
 // (an entidade end is an org unit, not an asset, so only its asset end is),
