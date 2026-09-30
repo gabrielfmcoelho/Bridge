@@ -66,7 +66,7 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
               <td className="px-4 py-2.5">
                 <SituacaoText situacao={dns.situacao} />
               </td>
-              <td className="px-4 py-2.5 text-[var(--text-secondary)]">{dns.main_responsavel_name || dns.responsavel || "-"}</td>
+              <td className="px-4 py-2.5 text-[var(--text-secondary)]">{dns.main_responsavel_name || "–"}</td>
               <td className="px-4 py-2.5">
                 <div className="flex flex-wrap gap-1">
                   {(dns.tags || []).slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}

@@ -16,7 +16,7 @@ import FormSection from "@/components/forms/FormSection";
 import RelationPicker from "@/components/forms/RelationPicker";
 import GrafanaUidField from "@/components/forms/GrafanaUidField";
 import { useRelationOptions } from "@/components/forms/useRelationOptions";
-import ResponsavelList from "./_components/ResponsavelList";
+import ResponsavelList from "@/components/inventory/ResponsavelList";
 import ChamadoList from "./_components/ChamadoList";
 import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
 import { useAuth } from "@/contexts/AuthContext";

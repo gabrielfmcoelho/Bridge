@@ -32,7 +32,7 @@ export default function ProjectCard({ project }: { project: Project }) {
 
         <CardMetadataGrid
           items={[
-            { label: t("dns.responsavel"), value: project.main_responsavel_name || project.responsavel || "" },
+            { label: t("dns.responsavel"), value: project.main_responsavel_name || "" },
             { label: t("host.entity"), value: project.main_entidade || "" },
             { label: t("project.externalCompany"), value: project.tem_empresa_externa_responsavel ? project.contato_empresa_responsavel || t("common.yes") : "" },
             { label: t("project.managed"), value: project.is_directly_managed ? t("common.yes") : t("common.no") },

@@ -93,11 +93,11 @@ export default function DNSPage() {
     let result = [...allRecords];
     if (search) {
       const s = search.toLowerCase();
-      result = result.filter(d => d.domain.toLowerCase().includes(s) || d.responsavel?.toLowerCase().includes(s));
+      result = result.filter(d => d.domain.toLowerCase().includes(s) || d.main_responsavel_name?.toLowerCase().includes(s));
     }
     if (filters.situacao) result = result.filter(d => d.situacao === filters.situacao);
     if (filters.tag) result = result.filter(d => d.tags?.includes(filters.tag));
-    if (filters.responsavel) result = result.filter(d => d.responsavel === filters.responsavel);
+    if (filters.responsavel) result = result.filter(d => d.main_responsavel_name === filters.responsavel);
     if (filters.has_https === "yes") result = result.filter(d => d.has_https);
     else if (filters.has_https === "no") result = result.filter(d => !d.has_https);
     if (filters.cert) result = result.filter(d => matchesCertFilter(d, filters.cert));
@@ -106,7 +106,7 @@ export default function DNSPage() {
       let cmp = 0;
       switch (sort.field) {
         case "situacao": cmp = a.situacao.localeCompare(b.situacao); break;
-        case "responsavel": cmp = (a.responsavel || "").localeCompare(b.responsavel || ""); break;
+        case "responsavel": cmp = (a.main_responsavel_name || "").localeCompare(b.main_responsavel_name || ""); break;
         case "cert_expires_at": return compareCertExpiry(a, b, sort.direction); // nulls last both ways
         default: cmp = a.domain.localeCompare(b.domain);
       }

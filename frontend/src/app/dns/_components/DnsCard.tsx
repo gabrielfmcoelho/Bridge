@@ -18,7 +18,7 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
   const { roleOf, colorOf } = useSituacao();
   const situacaoColor = colorOf(dns.situacao);
   const linkedHostsCount = dns.host_ids?.length || 0;
-  const mainResp = dns.main_responsavel_name || dns.responsavel || "";
+  const mainResp = dns.main_responsavel_name || "";
   // Subtitle: where the domain points — its first linked host, "+N" for more.
   const hostNames = useHostNames();
   const firstHost = dns.host_ids?.[0] != null ? hostNames.get(dns.host_ids[0]) : undefined;

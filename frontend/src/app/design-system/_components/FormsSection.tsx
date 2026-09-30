@@ -12,7 +12,8 @@ import Toggle from "@/components/ui/Toggle";
 import DateTimeInput from "@/components/ui/DateTimeInput";
 import TagInput from "@/components/ui/TagInput";
 import AsyncPicker, { type AsyncPickerItem } from "@/components/ui/AsyncPicker";
-import ContactInput from "@/components/ui/ContactInput";
+import ResponsavelList from "@/components/inventory/ResponsavelList";
+import type { EntityResponsavel, Contact } from "@/lib/types";
 import MarkdownEditor from "@/components/ui/MarkdownEditor";
 import FormError from "@/components/ui/FormError";
 import FormField from "@/components/ui/FormField";
@@ -23,6 +24,7 @@ import StepIndicator from "@/components/ui/StepIndicator";
 import EntidadeScopeFields, { defaultGrants } from "@/components/entidades/EntidadeScopeFields";
 import PasswordField from "@/app/hosts/[slug]/_components/PasswordField";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocale } from "@/contexts/LocaleContext";
 import type { AssetGrantsInput } from "@/lib/types";
 
 const noop = () => {};
@@ -72,9 +74,15 @@ const LABEL_CLASSES: [string, number][] = [
   ["block text-xs font-medium text-[var(--text-secondary)] mb-1", 3],
 ];
 
+const SAMPLE_CONTACTS: Contact[] = [
+  { id: 1, name: "Ana Souza", phone: "86999998888", role: "DBA", entity: "Infraestrutura", notes: "", is_external: false },
+  { id: 2, name: "Beto Lima", phone: "8632211234", role: "Suporte", entity: "", notes: "", is_external: true },
+];
+
 export default function FormsSection() {
   const [nativeSel, setNativeSel] = useState("ldap");
   const { user } = useAuth();
+  const { t } = useLocale();
 
   const [select3, setSelect3] = useState("prod");
   const [select7, setSelect7] = useState("");
@@ -91,8 +99,7 @@ export default function FormsSection() {
   const [tags, setTags] = useState<string[]>(["prod"]);
   const [picked, setPicked] = useState<AsyncPickerItem | null>(null);
   const [pickedMany, setPickedMany] = useState<AsyncPickerItem[]>([]);
-  const [contactName, setContactName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+  const [responsaveis, setResponsaveis] = useState<EntityResponsavel[]>([]);
   const [markdown, setMarkdown] = useState("# Runbook\n\nRestart with `systemctl restart nginx`.");
   const [grants, setGrants] = useState<AssetGrantsInput>(() => defaultGrants(user));
   const [grantsCompact, setGrantsCompact] = useState<AssetGrantsInput>(() => defaultGrants(user));
@@ -276,15 +283,11 @@ export default function FormsSection() {
         </p>
       </Specimen>
 
-      <Specimen title="ContactInput" source="components/ui/ContactInput.tsx" wide>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ContactInput type="name" label="Responsible" value={contactName} onChange={setContactName} />
-          <ContactInput type="phone" label="Phone" value={contactPhone} onChange={setContactPhone} />
-        </div>
+      <Specimen title="ResponsavelList" source="components/inventory/ResponsavelList.tsx" wide>
+        <ResponsavelList value={responsaveis} onChange={setResponsaveis} contacts={SAMPLE_CONTACTS} t={t} />
         <p className="text-xs text-[var(--text-muted)] mt-3">
-          Both instances hit <code>contactsAPI.list</code>. Under <code>dev:mock</code> that 404s (three
-          react-query retries in the console) and the field degrades to no suggestions; the mask and validation
-          still work.
+          An asset&apos;s responsáveis: search by name, role or phone; the last option creates a contact in place
+          (needs the API, so it errors under <code>dev:mock</code>). One is the main one.
         </p>
       </Specimen>
 

@@ -2168,7 +2168,12 @@
     "select": "Selecione um contato…",
     "noContacts": "Nenhum contato disponível — crie um na página de Contatos primeiro.",
     "alreadyLinked": "Já vinculado",
-    "searchPlaceholder": "Digite para buscar..."
+    "searchPlaceholder": "Buscar ou criar contato…",
+    "createAndLink": "Criar e vincular",
+    "createNamed": "Criar contato “{name}”",
+    "label": "Pessoas responsáveis",
+    "newContact": "Novo contato",
+    "pickerHint": "Busque por nome, cargo ou telefone. A estrela marca o principal, que aparece nas listas."
   },
   "entidade": {
     "label": "Entidades",
@@ -2717,7 +2722,53 @@
     "searchEmptyHint": "Tente ajustar sua busca",
     "emptyHint": "Adicione contatos para reutilizar entre hosts, projetos e serviços.",
     "editTitle": "Editar Contato",
-    "addTitle": "Adicionar Contato"
+    "addTitle": "Adicionar Contato",
+    "area": "Área",
+    "areaHint": "Setor ou equipe da pessoa — não é a entidade que define quem vê o contato.",
+    "create": "Novo contato",
+    "deleteImpact": "{name} deixa de aparecer como responsável em: {use}. Dá para restaurar pela lixeira de Contatos.",
+    "deleteNoImpact": "Não é responsável por nenhum item. Dá para restaurar pela lixeira de Contatos.",
+    "email": "E-mail",
+    "emailInvalid": "E-mail inválido.",
+    "exists": "Já existe um contato com esse nome e telefone.",
+    "existsInTrash": "Um contato com esse nome e telefone está na lixeira de Contatos — restaure-o.",
+    "externalLabel": "Externo (empresa contratada ou outro órgão)",
+    "filterKind": "Vínculo",
+    "filterUse": "Responsabilidades",
+    "noUse": "Não é responsável por nenhum item que você possa ver.",
+    "noUseShort": "Nenhum item",
+    "open": "Abrir",
+    "pageDescription": "Pessoas que respondem por hosts, DNS, serviços e projetos: como falar com cada uma e pelo que responde.",
+    "phoneHint": "Com DDD. O WhatsApp usa este número.",
+    "responsibleFor": "Responsável por",
+    "rolePlaceholder": "DBA, gestor do sistema…",
+    "searchPlaceholder": "Buscar por nome, cargo, telefone ou e-mail",
+    "sectionReach": "Como falar",
+    "sectionWho": "Quem é",
+    "sendEmail": "Enviar e-mail",
+    "visibilityHint": "Quem pode ver e vincular este contato.",
+    "phoneTooShort": "Telefone incompleto: informe DDD e número.",
+    "use": {
+      "host": "{count} hosts",
+      "dns": "{count} DNS",
+      "service": "{count} serviços",
+      "project": "{count} projetos"
+    },
+    "useGroup": {
+      "host": "Hosts",
+      "dns": "DNS",
+      "service": "Serviços",
+      "project": "Projetos"
+    },
+    "kind": {
+      "internal": "Internos",
+      "external": "Externos"
+    },
+    "useFilter": {
+      "with": "Com responsabilidades",
+      "without": "Sem responsabilidades"
+    },
+    "sectionVisibility": "Quem vê"
   },
   "trash": {
     "emptyTitle": "A lixeira está vazia",

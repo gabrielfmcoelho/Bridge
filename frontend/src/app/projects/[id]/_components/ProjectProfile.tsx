@@ -38,7 +38,6 @@ export default function ProjectProfile({ project, tags, responsaveis }: { projec
       <SectionCard title={t("project.profileTitle")}>
         <div className="grid grid-cols-2 gap-4">
           <Field label={t("project.setorResponsavel")} value={project.setor_responsavel} />
-          <Field label={t("dns.responsavel")} value={project.responsavel} />
           <Field label={t("project.managed")} value={project.is_directly_managed ? t("common.yes") : t("common.no")} />
           <Field label={t("project.isResponsible")} value={project.is_responsible ? t("common.yes") : t("common.no")} />
           <Field className="col-span-2" label={t("project.externalCompany")}

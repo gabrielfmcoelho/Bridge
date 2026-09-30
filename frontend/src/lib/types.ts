@@ -471,6 +471,9 @@ export interface Contact {
   entity: string;
   notes: string;
   is_external: boolean;
+  email?: string;
+  /** List only: asset type (host, dns, service, project) → how many it's responsável for. */
+  usage?: Partial<Record<"host" | "dns" | "service" | "project", number>>;
   /** Set while the contact is in the trash. */
   deleted_at?: string | null;
 }

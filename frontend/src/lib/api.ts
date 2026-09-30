@@ -735,6 +735,7 @@ export const tagsAPI = {
 type ContactPayload = {
   name: string;
   phone?: string;
+  email?: string;
   role?: string;
   entity?: string;
   notes?: string;
@@ -747,6 +748,8 @@ export const contactsAPI = {
   update: (id: number, data: ContactPayload) =>
     api.put<import("./types").Contact>(`/api/contacts/${id}`, data),
   delete: (id: number) => api.delete(`/api/contacts/${id}`),
+  /** The assets this contact is responsável for (the ones you can see). */
+  usage: (id: number) => api.get<{ type: "host" | "dns" | "service" | "project"; id: number; name: string; slug?: string; is_main: boolean }[]>(`/api/contacts/${id}/usage`),
   trash: () => api.getList<import("./types").Contact>("/api/contacts/trash"),
   restore: (id: number) => api.post(`/api/contacts/${id}/restore`),
 };

@@ -2168,7 +2168,12 @@
     "select": "Select a contact…",
     "noContacts": "No contacts available — create one in the Contacts page first.",
     "alreadyLinked": "Already linked",
-    "searchPlaceholder": "Type to search..."
+    "searchPlaceholder": "Search or create a contact…",
+    "createAndLink": "Create and link",
+    "createNamed": "Create contact “{name}”",
+    "label": "Responsible people",
+    "newContact": "New contact",
+    "pickerHint": "Search by name, role or phone. The star marks the main one, shown in lists."
   },
   "entidade": {
     "label": "Entities",
@@ -2717,7 +2722,53 @@
     "searchEmptyHint": "Try adjusting your search",
     "emptyHint": "Add contacts to reuse across hosts, projects, and services.",
     "editTitle": "Edit Contact",
-    "addTitle": "Add Contact"
+    "addTitle": "Add Contact",
+    "area": "Area",
+    "areaHint": "The person's team or department — not the entidade that decides who sees the contact.",
+    "create": "New contact",
+    "deleteImpact": "{name} stops showing as responsável for: {use}. It can be restored from the Contacts trash.",
+    "deleteNoImpact": "Not responsável for anything. It can be restored from the Contacts trash.",
+    "email": "E-mail",
+    "emailInvalid": "Invalid e-mail.",
+    "exists": "A contact with this name and phone already exists.",
+    "existsInTrash": "A contact with this name and phone is in the Contacts trash — restore it.",
+    "externalLabel": "External (contractor or another agency)",
+    "filterKind": "Kind",
+    "filterUse": "Responsibilities",
+    "noUse": "Not responsável for anything you can see.",
+    "noUseShort": "Nothing",
+    "open": "Open",
+    "pageDescription": "People who answer for hosts, DNS, services and projects: how to reach each one and what they're responsible for.",
+    "phoneHint": "With area code. WhatsApp uses this number.",
+    "responsibleFor": "Responsible for",
+    "rolePlaceholder": "DBA, system owner…",
+    "searchPlaceholder": "Search by name, role, phone or e-mail",
+    "sectionReach": "How to reach",
+    "sectionWho": "Who",
+    "sendEmail": "Send e-mail",
+    "visibilityHint": "Who can see and link this contact.",
+    "phoneTooShort": "Incomplete phone: add the area code and number.",
+    "use": {
+      "host": "{count} hosts",
+      "dns": "{count} DNS",
+      "service": "{count} services",
+      "project": "{count} projects"
+    },
+    "useGroup": {
+      "host": "Hosts",
+      "dns": "DNS",
+      "service": "Services",
+      "project": "Projects"
+    },
+    "kind": {
+      "internal": "Internal",
+      "external": "External"
+    },
+    "useFilter": {
+      "with": "With responsibilities",
+      "without": "Without responsibilities"
+    },
+    "sectionVisibility": "Who sees it"
   },
   "trash": {
     "emptyTitle": "Trash is empty",
