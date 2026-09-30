@@ -399,7 +399,7 @@ func (r *SecretRepo) Reveal(ctx context.Context, actor ActorContext, id int64) (
 	if !dec.canSeeMetadata {
 		return "", ErrSecretNotFound
 	}
-	if !dec.canReveal {
+	if !dec.canReveal || !revealPermitted(ctx, r.db, actor, s.Scope) {
 		return "", ErrSecretForbidden
 	}
 
@@ -595,6 +595,7 @@ const secretParentNameSQL = `CASE secrets.scope
 	WHEN 'service' THEN (SELECT nickname FROM services WHERE services.id = secrets.parent_id)
 	WHEN 'tool' THEN (SELECT name FROM external_tools WHERE external_tools.id = secrets.parent_id)
 	WHEN 'projeto' THEN (SELECT name FROM projects WHERE projects.id = secrets.parent_id)
+	WHEN 'api_catalog' THEN (SELECT name FROM api_catalog WHERE api_catalog.id = secrets.parent_id)
 	END`
 
 // markDuplicates flags secrets holding the same value — counted among the

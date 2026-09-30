@@ -9,6 +9,10 @@ import (
 // APICatalog source-type domain. (The old projeto/avulso scope gave way to
 // the api_service_links / api_project_links tables in v95.)
 const (
+	APIKeyManagementNone   = "none"   // no access keys tracked
+	APIKeyManagementManual = "manual" // keys created elsewhere, registered in Bridge
+	APIKeyManagementSEAD   = "sead"   // keys issued through the SEAD built-in /admin/keys API
+
 	APICatalogSourceUpload = "upload"
 	APICatalogSourceURL    = "url"
 )
@@ -43,6 +47,13 @@ type APICatalog struct {
 	ProjectIDs []int64 `json:"project_ids"`
 	// Responsaveis is loaded on detail responses only.
 	Responsaveis []Responsavel `json:"responsaveis,omitempty"`
+
+	// Key management. The SEAD admin credentials are stored encrypted and
+	// never leave the server: responses only say whether they are set.
+	KeyManagement string `json:"key_management"`
+	AdminBaseURL  string `json:"admin_base_url,omitempty"`
+	HasAdminKey   bool   `json:"has_admin_key"`
+	HasAPIKey     bool   `json:"has_api_key"`
 	// Entidades carries the entidade grants on detail responses (edit-form
 	// prefill); nil on list rows.
 	Entidades *AssetGrants `json:"entidades,omitempty"`
@@ -85,6 +96,15 @@ type OperationSearchResult struct {
 	Summary     string   `json:"summary,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags"`
+}
+
+// ValidKeyManagement reports whether m is a known key_management mode.
+func ValidKeyManagement(m string) bool {
+	switch m {
+	case APIKeyManagementNone, APIKeyManagementManual, APIKeyManagementSEAD:
+		return true
+	}
+	return false
 }
 
 // Validate enforces the source_type invariant the DB CHECK also guards, so the

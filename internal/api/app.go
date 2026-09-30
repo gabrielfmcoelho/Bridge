@@ -22,6 +22,7 @@ type App struct {
 	// HTTP handler groups (one field per group; constructed in newApp).
 	auth                *authHandlers
 	apiToken            *apiTokenHandlers
+	apiKey              *apiKeyHandlers
 	host                *hostHandlers
 	dns                 *dnsHandlers
 	project             *projectHandlers
@@ -77,6 +78,7 @@ func newApp(db *database.DB, configPath string) *App {
 		registry:            registry,
 		auth:                ah,
 		apiToken:            &apiTokenHandlers{tokens: store.NewAPITokenRepo(db.SQL)},
+		apiKey:              &apiKeyHandlers{db: db},
 		host:                &hostHandlers{host: deps.Host, db: db},
 		dns:                 &dnsHandlers{dns: deps.DNS},
 		project:             &projectHandlers{project: deps.Project},

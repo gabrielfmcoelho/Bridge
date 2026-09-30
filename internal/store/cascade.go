@@ -37,6 +37,7 @@ func init() {
 	RegisterParent(models.SecretScopeHost, ParentSpec{Table: "hosts", SoftDelete: true})
 	RegisterParent(models.SecretScopeProjeto, ParentSpec{Table: "projects", SoftDelete: true})
 	RegisterParent(models.SecretScopeTool, ParentSpec{Table: "external_tools", SoftDelete: true})
+	RegisterParent(models.SecretScopeAPICatalog, ParentSpec{Table: "api_catalog", SoftDelete: true})
 }
 
 // RegisterParent records that `scope` secrets hang off the given parent table.

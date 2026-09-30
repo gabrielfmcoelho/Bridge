@@ -1557,4 +1557,54 @@ var migrationsPostgres = []string{
 	ALTER TABLE responsaveis DROP CONSTRAINT IF EXISTS responsaveis_entity_type_check;
 	ALTER TABLE responsaveis ADD CONSTRAINT responsaveis_entity_type_check
 		CHECK (entity_type IN ('host','dns','service','project','api_catalog'));`,
+
+	// Version 96: access keys for catalogued APIs. key_management picks how
+	// an API's keys are handled: none, manual (registered by hand) or sead
+	// (issued through the SEAD built-in /admin/keys API, whose master key and
+	// optional X-API-Key are stored encrypted here and never revealed).
+	// api_keys holds one row per key holder; the plaintext of every key
+	// Bridge knows lives in the vault as an api_key secret scoped to the API.
+	// apis.keys.manage gates issuing, revoking, rotating and revealing keys.
+	`ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS key_management TEXT NOT NULL DEFAULT 'none';
+	ALTER TABLE api_catalog DROP CONSTRAINT IF EXISTS api_catalog_key_management_check;
+	ALTER TABLE api_catalog ADD CONSTRAINT api_catalog_key_management_check CHECK (key_management IN ('none','manual','sead'));
+	ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS admin_base_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS admin_key_cipher BYTEA;
+	ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS admin_key_nonce BYTEA;
+	ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS admin_api_key_cipher BYTEA;
+	ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS admin_api_key_nonce BYTEA;
+	ALTER TABLE secrets DROP CONSTRAINT IF EXISTS secrets_scope_check;
+	ALTER TABLE secrets ADD CONSTRAINT secrets_scope_check
+		CHECK (scope IN ('service','host','tool','avulso','projeto','api_catalog'));
+	ALTER TABLE secrets DROP CONSTRAINT IF EXISTS secrets_type_check;
+	ALTER TABLE secrets ADD CONSTRAINT secrets_type_check
+		CHECK (type IN ('cred','sshkey','password','app_login','env_var','api_key'));
+	CREATE TABLE IF NOT EXISTS api_keys (
+		id                    BIGSERIAL PRIMARY KEY,
+		api_id                BIGINT NOT NULL REFERENCES api_catalog(id) ON DELETE CASCADE,
+		label                 TEXT NOT NULL,
+		source                TEXT NOT NULL CHECK (source IN ('manual','sead')),
+		external_label        TEXT,
+		secret_id             BIGINT REFERENCES secrets(id) ON DELETE SET NULL,
+		owner                 TEXT NOT NULL DEFAULT '',
+		owner_contact_id      BIGINT REFERENCES contacts(id) ON DELETE SET NULL,
+		notes                 TEXT NOT NULL DEFAULT '',
+		scopes                TEXT NOT NULL DEFAULT '[]',
+		rate_limit_per_minute INTEGER,
+		expires_at            TIMESTAMPTZ,
+		revoked_at            TIMESTAMPTZ,
+		grace_until           TIMESTAMPTZ,
+		last_used_at          TIMESTAMPTZ,
+		lifetime_uses         BIGINT NOT NULL DEFAULT 0,
+		synced_at             TIMESTAMPTZ,
+		created_by            BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		created_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_api_keys_api ON api_keys (api_id);
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_external ON api_keys (api_id, external_label) WHERE external_label IS NOT NULL;
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_label ON api_keys (api_id, label) WHERE revoked_at IS NULL;
+	INSERT INTO permissions (code, description, category) VALUES
+		('apis.keys.manage', 'Issue, rotate, revoke and reveal API access keys', 'apis')
+	ON CONFLICT DO NOTHING;`,
 }

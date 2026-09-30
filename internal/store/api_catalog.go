@@ -80,10 +80,12 @@ func (r *APICatalogRepo) Get(ctx context.Context, id int64) (*models.APICatalog,
 	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
 	err := r.db.QueryRowContext(ctx,
 		`SELECT id, name, description, source_type, source_url, external_url, base_url, docs_url,
-			spec_version, spec_hash, title, version_label, owner_user_id, created_by, created_at, updated_at
+			spec_version, spec_hash, title, version_label, owner_user_id, created_by, created_at, updated_at,
+			`+apiKeyMgmtCols+`
 		FROM api_catalog WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...,
 	).Scan(&a.ID, &a.Name, &a.Description, &a.SourceType, &a.SourceURL, &a.ExternalURL, &a.BaseURL, &a.DocsURL,
-		&a.SpecVersion, &a.SpecHash, &a.Title, &a.VersionLabel, &a.OwnerUserID, &a.CreatedBy, &a.CreatedAt, &a.UpdatedAt)
+		&a.SpecVersion, &a.SpecHash, &a.Title, &a.VersionLabel, &a.OwnerUserID, &a.CreatedBy, &a.CreatedAt, &a.UpdatedAt,
+		&a.KeyManagement, &a.AdminBaseURL, &a.HasAdminKey, &a.HasAPIKey)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -148,7 +150,8 @@ func (r *APICatalogRepo) listOperations(ctx context.Context, apiID int64) ([]mod
 func (r *APICatalogRepo) List(ctx context.Context, f models.APICatalogFilter) ([]models.APICatalog, error) {
 	q := `SELECT c.id, c.name, c.description, c.source_type, c.source_url, c.external_url, c.base_url, c.docs_url,
 			c.spec_version, c.spec_hash, c.title, c.version_label, c.owner_user_id, c.created_by, c.created_at, c.updated_at,
-			(SELECT COUNT(*) FROM api_operations o WHERE o.api_id = c.id) AS op_count
+			(SELECT COUNT(*) FROM api_operations o WHERE o.api_id = c.id) AS op_count,
+			c.key_management, c.admin_base_url, c.admin_key_cipher IS NOT NULL, c.admin_api_key_cipher IS NOT NULL
 		FROM api_catalog c WHERE c.deleted_at IS NULL`
 	vis, args := VisibleExpr(ctx, AssetAPICatalog, "c.id")
 	q += " AND " + vis
@@ -170,7 +173,8 @@ func (r *APICatalogRepo) List(ctx context.Context, f models.APICatalogFilter) ([
 		var a models.APICatalog
 		if err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.SourceType, &a.SourceURL,
 			&a.ExternalURL, &a.BaseURL, &a.DocsURL, &a.SpecVersion, &a.SpecHash, &a.Title, &a.VersionLabel, &a.OwnerUserID, &a.CreatedBy,
-			&a.CreatedAt, &a.UpdatedAt, &a.OperationCount); err != nil {
+			&a.CreatedAt, &a.UpdatedAt, &a.OperationCount,
+			&a.KeyManagement, &a.AdminBaseURL, &a.HasAdminKey, &a.HasAPIKey); err != nil {
 			return nil, err
 		}
 		out = append(out, a)
@@ -337,6 +341,78 @@ func (r *APICatalogRepo) SearchOperations(ctx context.Context, query string, ser
 		out = append(out, res)
 	}
 	return out, rows.Err()
+}
+
+// apiKeyMgmtCols reads the key-management settings; the SEAD credentials
+// only as "is set" flags.
+const apiKeyMgmtCols = `key_management, admin_base_url, admin_key_cipher IS NOT NULL, admin_api_key_cipher IS NOT NULL`
+
+// EncryptedValue is one encrypted credential (cipher + nonce).
+type EncryptedValue struct{ Cipher, Nonce []byte }
+
+// KeyManagementUpdate changes an API's key-management settings. A nil
+// credential keeps the stored one; Clear* drops it.
+type KeyManagementUpdate struct {
+	Mode          string
+	AdminBaseURL  string
+	AdminKey      *EncryptedValue
+	APIKey        *EncryptedValue
+	ClearAdminKey bool
+	ClearAPIKey   bool
+}
+
+// SetKeyManagement writes the mode, the SEAD admin base URL and (when given)
+// the encrypted credentials. found is false when no live, visible API matched.
+func (r *APICatalogRepo) SetKeyManagement(ctx context.Context, id int64, u KeyManagementUpdate) (found bool, err error) {
+	if !models.ValidKeyManagement(u.Mode) {
+		return false, fmt.Errorf("invalid key_management %q", u.Mode)
+	}
+	sets := []string{"key_management = ?", "admin_base_url = ?", "updated_at = CURRENT_TIMESTAMP"}
+	args := []any{u.Mode, strings.TrimRight(strings.TrimSpace(u.AdminBaseURL), "/")}
+	switch {
+	case u.ClearAdminKey:
+		sets = append(sets, "admin_key_cipher = NULL", "admin_key_nonce = NULL")
+	case u.AdminKey != nil:
+		sets = append(sets, "admin_key_cipher = ?", "admin_key_nonce = ?")
+		args = append(args, u.AdminKey.Cipher, u.AdminKey.Nonce)
+	}
+	switch {
+	case u.ClearAPIKey:
+		sets = append(sets, "admin_api_key_cipher = NULL", "admin_api_key_nonce = NULL")
+	case u.APIKey != nil:
+		sets = append(sets, "admin_api_key_cipher = ?", "admin_api_key_nonce = ?")
+		args = append(args, u.APIKey.Cipher, u.APIKey.Nonce)
+	}
+	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
+	args = append(append(args, id), vargs...)
+	res, err := r.db.ExecContext(ctx, `UPDATE api_catalog SET `+strings.Join(sets, ", ")+
+		` WHERE id = ? AND deleted_at IS NULL AND `+vis, args...)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// AdminCredentials returns the encrypted SEAD admin key and optional X-API-Key
+// of a live, visible API (nil when unset). Handlers decrypt; never serialize.
+func (r *APICatalogRepo) AdminCredentials(ctx context.Context, id int64) (adminKey, apiKey *EncryptedValue, err error) {
+	var kc, kn, ac, an []byte
+	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
+	err = r.db.QueryRowContext(ctx,
+		`SELECT admin_key_cipher, admin_key_nonce, admin_api_key_cipher, admin_api_key_nonce
+		   FROM api_catalog WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...).
+		Scan(&kc, &kn, &ac, &an)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(kc) > 0 {
+		adminKey = &EncryptedValue{kc, kn}
+	}
+	if len(ac) > 0 {
+		apiKey = &EncryptedValue{ac, an}
+	}
+	return adminKey, apiKey, nil
 }
 
 // UpdateMeta renames / re-describes a catalog row and updates base_url + docs_url

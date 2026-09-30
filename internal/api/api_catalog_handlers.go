@@ -593,13 +593,18 @@ func (h *apiCatalogHandlers) handleDelete(w http.ResponseWriter, r *http.Request
 		jsonBadRequest(w, r, "invalid id", err)
 		return
 	}
-	found, err := store.NewAPICatalogRepo(h.db.SQL).SoftDelete(r.Context(), id)
-	if err != nil {
-		jsonServerError(w, r, "delete api catalog", err)
+	if a, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), id); err != nil {
+		jsonServerError(w, r, "get api catalog", err)
+		return
+	} else if a == nil {
+		jsonError(w, http.StatusNotFound, "api not found")
 		return
 	}
-	if !found {
-		jsonError(w, http.StatusNotFound, "api not found")
+	// Soft-deletes the API and its key secrets in one transaction; restore
+	// brings both back.
+	actor, _ := actorFrom(r)
+	if err := store.DeleteParent(r.Context(), h.db.SQL, actor, models.SecretScopeAPICatalog, id); err != nil {
+		jsonServerError(w, r, "delete api catalog", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -628,7 +633,7 @@ func (h *apiCatalogHandlers) handleListTrash(w http.ResponseWriter, r *http.Requ
 // handleRestore godoc
 //
 //	@Summary		Restore an API from the trash
-//	@Description	Admin. The API comes back with its operations and links.
+//	@Description	Admin. The API comes back with its operations, links and key secrets.
 //	@Tags			atlas
 //	@Produce		json
 //	@Param			id	path		int	true	"API catalog ID"
@@ -650,6 +655,11 @@ func (h *apiCatalogHandlers) handleRestore(w http.ResponseWriter, r *http.Reques
 	}
 	if !found {
 		jsonError(w, http.StatusNotFound, "api not found in trash")
+		return
+	}
+	actor, _ := actorFrom(r)
+	if err := store.RestoreParent(r.Context(), h.db.SQL, actor, models.SecretScopeAPICatalog, id); err != nil {
+		jsonServerError(w, r, "failed to restore api keys", err)
 		return
 	}
 	jsonOK(w, StatusResponse{Status: "restored"})

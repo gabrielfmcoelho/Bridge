@@ -340,7 +340,7 @@ func (r *SecretRepo) validateBundleItems(ctx context.Context, actor ActorContext
 			if !dec.canSeeMetadata {
 				return nil, ErrSecretNotFound
 			}
-			if !dec.canReveal {
+			if !dec.canReveal || !revealPermitted(ctx, r.db, actor, v.Scope) {
 				return nil, ErrSecretForbidden
 			}
 			itemViews = append(itemViews, BundleItemView{Type: it.Type, RefID: it.RefID, Label: v.Name})

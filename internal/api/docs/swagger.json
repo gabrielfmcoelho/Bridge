@@ -706,6 +706,616 @@
                 }
             }
         },
+        "/api/api-catalog/{id}/key-management": {
+            "put": {
+                "description": "Admin. key_management none, manual or sead; for sead the admin base URL (the service root, before /admin/keys) and master key (sent as X-Admin-Key) plus an optional X-API-Key. Credentials are write-only: blank keeps the stored one, clear_* removes it.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Set an API's key management",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Mode and SEAD connection",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.keyManagementRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APICatalog"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api-catalog/{id}/key-management/test": {
+            "post": {
+                "description": "Admin. Lists the service's keys with the given (unsaved) values, falling back to the stored ones for anything left blank. Always 200: {success, error | keys}.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Test an API's SEAD connection",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Values to try",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/api.keyManagementRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.keyManagementTestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api-catalog/{id}/keys": {
+            "get": {
+                "description": "Any role that can see the API (404 otherwise). Metadata only; the plaintext is read through the vault and needs apis.keys.manage. Revoked keys and passed grace periods are hidden unless include_revoked=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "List an API's access keys",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Also list revoked keys",
+                        "name": "include_revoked",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200); omit for every row",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_APIKey"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "apis.keys.manage. In sead mode the key is created on the service and its plaintext comes back once here; in manual mode send the existing key as value. Either way the plaintext is also stored in the vault. Label: letters, digits, . _ - (max 64), unique among the API's live keys.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Issue or register an access key",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Key",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.apiKeyCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiKeyCreateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api-catalog/{id}/keys/sync": {
+            "post": {
+                "description": "apis.keys.manage, sead mode only. Imports keys created elsewhere (CLI, other admins) as metadata-only rows and refreshes status, expiry and usage of known ones. Bridge's own owner contact, notes and vault copy are kept.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Sync keys from the SEAD service",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiKeySyncResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api-catalog/{id}/keys/{keyId}": {
+            "put": {
+                "description": "apis.keys.manage. Changes Bridge's owner, contact and notes (and expiry, for manual keys). A SEAD key's expiry, scopes and rate limit can't change on the service: revoke and issue a new key.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Edit an access key's metadata",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Key ID",
+                        "name": "keyId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Metadata",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.apiKeyUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIKey"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api-catalog/{id}/keys/{keyId}/revoke": {
+            "post": {
+                "description": "apis.keys.manage. A SEAD key is revoked on the service first (a key already gone there still counts). The vault copy is renamed so the label can be reused.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Revoke an access key",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Key ID",
+                        "name": "keyId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIKey"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api-catalog/{id}/keys/{keyId}/rotate": {
+            "post": {
+                "description": "apis.keys.manage, sead mode only. The service issues a new key under the same label and keeps the old one working for grace_days; the vault copy gets the new plaintext (its history keeps the old). The new plaintext also comes back once here.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Rotate a SEAD access key",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Key ID",
+                        "name": "keyId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Grace period for the old key",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.apiKeyRotateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiKeyCreateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api-catalog/{id}/keys/{keyId}/usage": {
+            "get": {
+                "description": "Any role that can see the API. Lifetime and per-day counts (\"YYYYMMDD\" → requests) for the last days (default 30), straight from the service.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "A SEAD key's request counts",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Key ID",
+                        "name": "keyId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Days back (1-90, default 30)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/seadkeys.Usage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/api-catalog/{id}/refetch": {
             "post": {
                 "description": "Editor+; invisible APIs answer 404. Replaces the stored spec and operation index; 400 when the API was not imported from a URL or the fetch/parse fails.",
@@ -761,7 +1371,7 @@
         },
         "/api/api-catalog/{id}/restore": {
             "post": {
-                "description": "Admin. The API comes back with its operations and links.",
+                "description": "Admin. The API comes back with its operations, links and key secrets.",
                 "produces": [
                     "application/json"
                 ],
@@ -14537,6 +15147,20 @@
                 }
             }
         },
+        "api.ListEnvelope-models_APIKey": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.APIKey"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
         "api.ListEnvelope-models_APIToken": {
             "type": "object",
             "properties": {
@@ -14928,6 +15552,97 @@
             "properties": {
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "api.apiKeyCreateRequest": {
+            "type": "object",
+            "properties": {
+                "expires_days": {
+                    "description": "nil or 0 = never",
+                    "type": "integer"
+                },
+                "header": {
+                    "description": "manual only: header it goes in (default X-API-Key)",
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string",
+                    "example": "painel-rh"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string",
+                    "example": "rh@sead.pi.gov.br"
+                },
+                "owner_contact_id": {
+                    "type": "integer"
+                },
+                "rate_limit_per_minute": {
+                    "type": "integer"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "value": {
+                    "description": "manual only: the key itself",
+                    "type": "string"
+                }
+            }
+        },
+        "api.apiKeyCreateResponse": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "$ref": "#/definitions/models.APIKey"
+                },
+                "plaintext": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.apiKeyRotateRequest": {
+            "type": "object",
+            "properties": {
+                "grace_days": {
+                    "type": "integer",
+                    "example": 7
+                }
+            }
+        },
+        "api.apiKeySyncResponse": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "updated": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.apiKeyUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "owner_contact_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -16759,6 +17474,45 @@
                 }
             }
         },
+        "api.keyManagementRequest": {
+            "type": "object",
+            "properties": {
+                "admin_base_url": {
+                    "type": "string",
+                    "example": "https://api.folha.sead.gov.br/folha"
+                },
+                "admin_key": {
+                    "type": "string"
+                },
+                "api_key": {
+                    "type": "string"
+                },
+                "clear_admin_key": {
+                    "type": "boolean"
+                },
+                "clear_api_key": {
+                    "type": "boolean"
+                },
+                "key_management": {
+                    "type": "string",
+                    "example": "sead"
+                }
+            }
+        },
+        "api.keyManagementTestResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "keys": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
         "api.linkWithHealth": {
             "type": "object",
             "properties": {
@@ -17945,6 +18699,9 @@
         "models.APICatalog": {
             "type": "object",
             "properties": {
+                "admin_base_url": {
+                    "type": "string"
+                },
                 "base_url": {
                     "description": "explicit API host (Scalar server override)",
                     "type": "string"
@@ -17974,8 +18731,18 @@
                     "description": "server derived from the spec",
                     "type": "string"
                 },
+                "has_admin_key": {
+                    "type": "boolean"
+                },
+                "has_api_key": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "integer"
+                },
+                "key_management": {
+                    "description": "Key management. The SEAD admin credentials are stored encrypted and\nnever leave the server: responses only say whether they are set.",
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -18032,6 +18799,81 @@
                     "type": "string"
                 },
                 "version_label": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.APIKey": {
+            "type": "object",
+            "properties": {
+                "api_id": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "external_label": {
+                    "description": "the key's label in SEAD",
+                    "type": "string"
+                },
+                "grace_until": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "lifetime_uses": {
+                    "type": "integer"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "owner": {
+                    "type": "string"
+                },
+                "owner_contact_id": {
+                    "type": "integer"
+                },
+                "owner_contact_name": {
+                    "type": "string"
+                },
+                "rate_limit_per_minute": {
+                    "type": "integer"
+                },
+                "revoked_at": {
+                    "type": "string"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "secret_id": {
+                    "type": "integer"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "synced_at": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -19134,14 +19976,16 @@
                 "host",
                 "tool",
                 "projeto",
-                "avulso"
+                "avulso",
+                "api_catalog"
             ],
             "x-enum-varnames": [
                 "SecretScopeService",
                 "SecretScopeHost",
                 "SecretScopeTool",
                 "SecretScopeProjeto",
-                "SecretScopeAvulso"
+                "SecretScopeAvulso",
+                "SecretScopeAPICatalog"
             ]
         },
         "models.SecretType": {
@@ -19151,9 +19995,11 @@
                 "sshkey",
                 "password",
                 "app_login",
-                "env_var"
+                "env_var",
+                "api_key"
             ],
             "x-enum-comments": {
+                "SecretTypeAPIKey": "{value, header?} — an access key for a catalogued API",
                 "SecretTypeAppLogin": "{app_name, url?, username, password, notes?}",
                 "SecretTypeCred": "{username, password} against a host",
                 "SecretTypeEnvVar": "{value, description?} — one var per row (D5)",
@@ -19165,7 +20011,8 @@
                 "SecretTypeSSHKey",
                 "SecretTypePassword",
                 "SecretTypeAppLogin",
-                "SecretTypeEnvVar"
+                "SecretTypeEnvVar",
+                "SecretTypeAPIKey"
             ]
         },
         "models.SecretVisibility": {
@@ -19409,6 +20256,26 @@
                 },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "seadkeys.Usage": {
+            "type": "object",
+            "properties": {
+                "daily": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "label": {
+                    "type": "string"
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "lifetime": {
+                    "type": "integer"
                 }
             }
         },

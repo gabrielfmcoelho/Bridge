@@ -45,6 +45,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_APIKey:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.APIKey'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-models_APIToken:
     properties:
       data:
@@ -297,6 +306,67 @@ definitions:
     properties:
       message:
         type: string
+    type: object
+  api.apiKeyCreateRequest:
+    properties:
+      expires_days:
+        description: nil or 0 = never
+        type: integer
+      header:
+        description: 'manual only: header it goes in (default X-API-Key)'
+        type: string
+      label:
+        example: painel-rh
+        type: string
+      notes:
+        type: string
+      owner:
+        example: rh@sead.pi.gov.br
+        type: string
+      owner_contact_id:
+        type: integer
+      rate_limit_per_minute:
+        type: integer
+      scopes:
+        items:
+          type: string
+        type: array
+      value:
+        description: 'manual only: the key itself'
+        type: string
+    type: object
+  api.apiKeyCreateResponse:
+    properties:
+      key:
+        $ref: '#/definitions/models.APIKey'
+      plaintext:
+        type: string
+    type: object
+  api.apiKeyRotateRequest:
+    properties:
+      grace_days:
+        example: 7
+        type: integer
+    type: object
+  api.apiKeySyncResponse:
+    properties:
+      created:
+        type: integer
+      total:
+        type: integer
+      updated:
+        type: integer
+    type: object
+  api.apiKeyUpdateRequest:
+    properties:
+      expires_at:
+        type: string
+      notes:
+        type: string
+      owner:
+        type: string
+      owner_contact_id:
+        type: integer
     type: object
   api.apiTokenCreateRequest:
     properties:
@@ -1510,6 +1580,32 @@ definitions:
       updated_at:
         type: string
     type: object
+  api.keyManagementRequest:
+    properties:
+      admin_base_url:
+        example: https://api.folha.sead.gov.br/folha
+        type: string
+      admin_key:
+        type: string
+      api_key:
+        type: string
+      clear_admin_key:
+        type: boolean
+      clear_api_key:
+        type: boolean
+      key_management:
+        example: sead
+        type: string
+    type: object
+  api.keyManagementTestResponse:
+    properties:
+      error:
+        type: string
+      keys:
+        type: integer
+      success:
+        type: boolean
+    type: object
   api.linkWithHealth:
     properties:
       created_at:
@@ -2304,6 +2400,8 @@ definitions:
     type: object
   models.APICatalog:
     properties:
+      admin_base_url:
+        type: string
       base_url:
         description: explicit API host (Scalar server override)
         type: string
@@ -2325,8 +2423,17 @@ definitions:
       external_url:
         description: server derived from the spec
         type: string
+      has_admin_key:
+        type: boolean
+      has_api_key:
+        type: boolean
       id:
         type: integer
+      key_management:
+        description: |-
+          Key management. The SEAD admin credentials are stored encrypted and
+          never leave the server: responses only say whether they are set.
+        type: string
       name:
         type: string
       operation_count:
@@ -2368,6 +2475,56 @@ definitions:
       updated_at:
         type: string
       version_label:
+        type: string
+    type: object
+  models.APIKey:
+    properties:
+      api_id:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      expires_at:
+        type: string
+      external_label:
+        description: the key's label in SEAD
+        type: string
+      grace_until:
+        type: string
+      id:
+        type: integer
+      label:
+        type: string
+      last_used_at:
+        type: string
+      lifetime_uses:
+        type: integer
+      notes:
+        type: string
+      owner:
+        type: string
+      owner_contact_id:
+        type: integer
+      owner_contact_name:
+        type: string
+      rate_limit_per_minute:
+        type: integer
+      revoked_at:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+      secret_id:
+        type: integer
+      source:
+        type: string
+      status:
+        type: string
+      synced_at:
+        type: string
+      updated_at:
         type: string
     type: object
   models.APIOperation:
@@ -3105,6 +3262,7 @@ definitions:
     - tool
     - projeto
     - avulso
+    - api_catalog
     type: string
     x-enum-varnames:
     - SecretScopeService
@@ -3112,6 +3270,7 @@ definitions:
     - SecretScopeTool
     - SecretScopeProjeto
     - SecretScopeAvulso
+    - SecretScopeAPICatalog
   models.SecretType:
     enum:
     - cred
@@ -3119,8 +3278,10 @@ definitions:
     - password
     - app_login
     - env_var
+    - api_key
     type: string
     x-enum-comments:
+      SecretTypeAPIKey: '{value, header?} — an access key for a catalogued API'
       SecretTypeAppLogin: '{app_name, url?, username, password, notes?}'
       SecretTypeCred: '{username, password} against a host'
       SecretTypeEnvVar: '{value, description?} — one var per row (D5)'
@@ -3132,6 +3293,7 @@ definitions:
     - SecretTypePassword
     - SecretTypeAppLogin
     - SecretTypeEnvVar
+    - SecretTypeAPIKey
   models.SecretVisibility:
     enum:
     - personal
@@ -3303,6 +3465,19 @@ definitions:
         type: string
       url:
         type: string
+    type: object
+  seadkeys.Usage:
+    properties:
+      daily:
+        additionalProperties:
+          type: integer
+        type: object
+      label:
+        type: string
+      last_used_at:
+        type: string
+      lifetime:
+        type: integer
     type: object
   service.AlertView:
     properties:
@@ -4462,6 +4637,432 @@ paths:
       summary: Update a catalogued API's metadata
       tags:
       - atlas
+  /api/api-catalog/{id}/key-management:
+    put:
+      consumes:
+      - application/json
+      description: 'Admin. key_management none, manual or sead; for sead the admin
+        base URL (the service root, before /admin/keys) and master key (sent as X-Admin-Key)
+        plus an optional X-API-Key. Credentials are write-only: blank keeps the stored
+        one, clear_* removes it.'
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Mode and SEAD connection
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.keyManagementRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APICatalog'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Set an API's key management
+      tags:
+      - atlas
+  /api/api-catalog/{id}/key-management/test:
+    post:
+      consumes:
+      - application/json
+      description: 'Admin. Lists the service''s keys with the given (unsaved) values,
+        falling back to the stored ones for anything left blank. Always 200: {success,
+        error | keys}.'
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Values to try
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/api.keyManagementRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.keyManagementTestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Test an API's SEAD connection
+      tags:
+      - atlas
+  /api/api-catalog/{id}/keys:
+    get:
+      description: Any role that can see the API (404 otherwise). Metadata only; the
+        plaintext is read through the vault and needs apis.keys.manage. Revoked keys
+        and passed grace periods are hidden unless include_revoked=true.
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Also list revoked keys
+        in: query
+        name: include_revoked
+        type: boolean
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_APIKey'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List an API's access keys
+      tags:
+      - atlas
+    post:
+      consumes:
+      - application/json
+      description: 'apis.keys.manage. In sead mode the key is created on the service
+        and its plaintext comes back once here; in manual mode send the existing key
+        as value. Either way the plaintext is also stored in the vault. Label: letters,
+        digits, . _ - (max 64), unique among the API''s live keys.'
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Key
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.apiKeyCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.apiKeyCreateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Issue or register an access key
+      tags:
+      - atlas
+  /api/api-catalog/{id}/keys/{keyId}:
+    put:
+      consumes:
+      - application/json
+      description: 'apis.keys.manage. Changes Bridge''s owner, contact and notes (and
+        expiry, for manual keys). A SEAD key''s expiry, scopes and rate limit can''t
+        change on the service: revoke and issue a new key.'
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Key ID
+        in: path
+        name: keyId
+        required: true
+        type: integer
+      - description: Metadata
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.apiKeyUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIKey'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Edit an access key's metadata
+      tags:
+      - atlas
+  /api/api-catalog/{id}/keys/{keyId}/revoke:
+    post:
+      description: apis.keys.manage. A SEAD key is revoked on the service first (a
+        key already gone there still counts). The vault copy is renamed so the label
+        can be reused.
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Key ID
+        in: path
+        name: keyId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIKey'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Revoke an access key
+      tags:
+      - atlas
+  /api/api-catalog/{id}/keys/{keyId}/rotate:
+    post:
+      consumes:
+      - application/json
+      description: apis.keys.manage, sead mode only. The service issues a new key
+        under the same label and keeps the old one working for grace_days; the vault
+        copy gets the new plaintext (its history keeps the old). The new plaintext
+        also comes back once here.
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Key ID
+        in: path
+        name: keyId
+        required: true
+        type: integer
+      - description: Grace period for the old key
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.apiKeyRotateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.apiKeyCreateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Rotate a SEAD access key
+      tags:
+      - atlas
+  /api/api-catalog/{id}/keys/{keyId}/usage:
+    get:
+      description: Any role that can see the API. Lifetime and per-day counts ("YYYYMMDD"
+        → requests) for the last days (default 30), straight from the service.
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Key ID
+        in: path
+        name: keyId
+        required: true
+        type: integer
+      - description: Days back (1-90, default 30)
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/seadkeys.Usage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: A SEAD key's request counts
+      tags:
+      - atlas
+  /api/api-catalog/{id}/keys/sync:
+    post:
+      description: apis.keys.manage, sead mode only. Imports keys created elsewhere
+        (CLI, other admins) as metadata-only rows and refreshes status, expiry and
+        usage of known ones. Bridge's own owner contact, notes and vault copy are
+        kept.
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.apiKeySyncResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Sync keys from the SEAD service
+      tags:
+      - atlas
   /api/api-catalog/{id}/refetch:
     post:
       description: Editor+; invisible APIs answer 404. Replaces the stored spec and
@@ -4501,7 +5102,7 @@ paths:
       - atlas
   /api/api-catalog/{id}/restore:
     post:
-      description: Admin. The API comes back with its operations and links.
+      description: Admin. The API comes back with its operations, links and key secrets.
       parameters:
       - description: API catalog ID
         in: path

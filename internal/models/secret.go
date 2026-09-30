@@ -24,12 +24,13 @@ const (
 	SecretTypePassword SecretType = "password"  // {value} — standalone password
 	SecretTypeAppLogin SecretType = "app_login" // {app_name, url?, username, password, notes?}
 	SecretTypeEnvVar   SecretType = "env_var"   // {value, description?} — one var per row (D5)
+	SecretTypeAPIKey   SecretType = "api_key"   // {value, header?} — an access key for a catalogued API
 )
 
 // Valid reports whether t is one of the known SecretType values.
 func (t SecretType) Valid() bool {
 	switch t {
-	case SecretTypeCred, SecretTypeSSHKey, SecretTypePassword, SecretTypeAppLogin, SecretTypeEnvVar:
+	case SecretTypeCred, SecretTypeSSHKey, SecretTypePassword, SecretTypeAppLogin, SecretTypeEnvVar, SecretTypeAPIKey:
 		return true
 	}
 	return false
@@ -45,12 +46,15 @@ const (
 	SecretScopeTool    SecretScope = "tool"
 	SecretScopeProjeto SecretScope = "projeto"
 	SecretScopeAvulso  SecretScope = "avulso"
+	// SecretScopeAPICatalog holds the access keys of a catalogued API. Named
+	// after the asset type so the vault's entidade visibility maps 1:1.
+	SecretScopeAPICatalog SecretScope = "api_catalog"
 )
 
 // Valid reports whether s is one of the known SecretScope values.
 func (s SecretScope) Valid() bool {
 	switch s {
-	case SecretScopeService, SecretScopeHost, SecretScopeTool, SecretScopeProjeto, SecretScopeAvulso:
+	case SecretScopeService, SecretScopeHost, SecretScopeTool, SecretScopeProjeto, SecretScopeAvulso, SecretScopeAPICatalog:
 		return true
 	}
 	return false
