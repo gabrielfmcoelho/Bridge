@@ -1472,4 +1472,44 @@ var migrationsPostgres = []string{
 	ALTER TABLE contacts ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 	CREATE INDEX IF NOT EXISTS idx_dns_records_deleted ON dns_records (deleted_at) WHERE deleted_at IS NOT NULL;
 	CREATE INDEX IF NOT EXISTS idx_contacts_deleted ON contacts (deleted_at) WHERE deleted_at IS NOT NULL;`,
+
+	// Version 93: contacts get an e-mail, and the free-text responsável still
+	// sitting on DNS records and projects (and hosts edited since v35's copy)
+	// becomes a linked contact — only where the asset has no responsável yet,
+	// matched by name when a contact exists. Idempotent. The text columns stay
+	// (import still reads them) but the UI no longer shows or filters by them.
+	`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
+	INSERT INTO contacts (name, phone)
+		SELECT DISTINCT trim(d.responsavel), '' FROM dns_records d
+		 WHERE trim(d.responsavel) <> ''
+		   AND NOT EXISTS (SELECT 1 FROM contacts c WHERE lower(c.name) = lower(trim(d.responsavel)))
+		ON CONFLICT DO NOTHING;
+	INSERT INTO contacts (name, phone)
+		SELECT DISTINCT trim(p.responsavel), '' FROM projects p
+		 WHERE trim(p.responsavel) <> ''
+		   AND NOT EXISTS (SELECT 1 FROM contacts c WHERE lower(c.name) = lower(trim(p.responsavel)))
+		ON CONFLICT DO NOTHING;
+	INSERT INTO contacts (name, phone)
+		SELECT DISTINCT trim(h.responsavel_interno), trim(h.contato_responsavel_interno) FROM hosts h
+		 WHERE trim(h.responsavel_interno) <> ''
+		   AND NOT EXISTS (SELECT 1 FROM contacts c WHERE lower(c.name) = lower(trim(h.responsavel_interno)))
+		ON CONFLICT DO NOTHING;
+	INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'dns', d.id, (SELECT c.id FROM contacts c WHERE lower(c.name) = lower(trim(d.responsavel)) ORDER BY c.deleted_at NULLS FIRST, c.id LIMIT 1), TRUE
+		  FROM dns_records d
+		 WHERE trim(d.responsavel) <> ''
+		   AND NOT EXISTS (SELECT 1 FROM responsaveis r WHERE r.entity_type = 'dns' AND r.entity_id = d.id)
+		ON CONFLICT DO NOTHING;
+	INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'project', p.id, (SELECT c.id FROM contacts c WHERE lower(c.name) = lower(trim(p.responsavel)) ORDER BY c.deleted_at NULLS FIRST, c.id LIMIT 1), TRUE
+		  FROM projects p
+		 WHERE trim(p.responsavel) <> ''
+		   AND NOT EXISTS (SELECT 1 FROM responsaveis r WHERE r.entity_type = 'project' AND r.entity_id = p.id)
+		ON CONFLICT DO NOTHING;
+	INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main)
+		SELECT 'host', h.id, (SELECT c.id FROM contacts c WHERE lower(c.name) = lower(trim(h.responsavel_interno)) ORDER BY c.deleted_at NULLS FIRST, c.id LIMIT 1), TRUE
+		  FROM hosts h
+		 WHERE trim(h.responsavel_interno) <> ''
+		   AND NOT EXISTS (SELECT 1 FROM responsaveis r WHERE r.entity_type = 'host' AND r.entity_id = h.id)
+		ON CONFLICT DO NOTHING;`,
 }

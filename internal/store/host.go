@@ -174,7 +174,7 @@ func (r *HostRepo) List(ctx context.Context, f models.HostFilter) ([]models.Host
 		args = append(args, f.EntidadeID)
 	}
 	if f.ResponsavelInterno != "" {
-		where = append(where, "responsavel_interno = ?")
+		where = append(where, responsavelNameFilter("host", "id"))
 		args = append(args, f.ResponsavelInterno)
 	}
 	if f.KeyTestStatus == "untested" {

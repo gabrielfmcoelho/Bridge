@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -21,7 +22,33 @@ func (h *contactHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		jsonServerError(w, r, "failed to list contacts", err)
 		return
 	}
+	usage, err := h.contacts.UsageCounts(r.Context())
+	if err != nil {
+		jsonServerError(w, r, "failed to count contact usage", err)
+		return
+	}
+	for i := range contacts {
+		contacts[i].Usage = usage[contacts[i].ID]
+	}
 	jsonPaged(w, r, contacts)
+}
+
+// handleUsage lists the assets a contact is responsável for (visible ones).
+func (h *contactHandlers) handleUsage(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	if c, err := h.contacts.Get(r.Context(), id); err != nil || c == nil {
+		jsonError(w, http.StatusNotFound, "contact not found")
+		return
+	}
+	uses, err := h.contacts.Usage(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to load contact usage", err)
+		return
+	}
+	jsonOK(w, uses)
 }
 
 func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +67,16 @@ func (h *contactHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.contacts.Create(r.Context(), &req.Contact); err != nil {
+		// Never touch the existing contact (its fields or its entidades).
+		var dup store.ErrContactExists
+		if errors.As(err, &dup) {
+			code := "contact_exists"
+			if dup.Trashed {
+				code = "contact_in_trash"
+			}
+			jsonError(w, http.StatusConflict, code)
+			return
+		}
 		jsonServerError(w, r, "failed to create contact", err)
 		return
 	}
@@ -131,6 +168,7 @@ func (h *contactHandlers) handleRestore(w http.ResponseWriter, r *http.Request) 
 func (h *contactHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/contacts", h.handleList)
 	rr.auth("GET /api/contacts/trash", h.handleListTrash)
+	rr.auth("GET /api/contacts/{id}/usage", h.handleUsage)
 	rr.role("admin", "POST /api/contacts/{id}/restore", h.handleRestore)
 	rr.role("editor", "POST /api/contacts", h.handleCreate)
 	rr.role("editor", "PUT /api/contacts/{id}", h.handleUpdate)

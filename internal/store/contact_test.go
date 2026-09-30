@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
@@ -62,9 +63,9 @@ func TestContactRepo_CRUDRoundTrip(t *testing.T) {
 	}
 }
 
-// Create upserts on (name, phone): a second create with the same key must not
-// error and must return the existing id rather than duplicating.
-func TestContactRepo_CreateUpsertsOnConflict(t *testing.T) {
+// A second create with the same (name, phone) is refused with the existing
+// id — never merged into it, never duplicated.
+func TestContactRepo_CreateRefusesDuplicate(t *testing.T) {
 	ctx := context.Background()
 	repo := newContactRepo(t)
 
@@ -73,14 +74,12 @@ func TestContactRepo_CreateUpsertsOnConflict(t *testing.T) {
 		t.Fatalf("create a: %v", err)
 	}
 	b := &models.Contact{Name: "Grace", Phone: "555-9", Role: "admiral"}
-	if err := repo.Create(ctx, b); err != nil {
-		t.Fatalf("create b (conflict): %v", err)
-	}
-	if b.ID != a.ID {
-		t.Fatalf("conflict id = %d, want existing %d", b.ID, a.ID)
+	var dup store.ErrContactExists
+	if err := repo.Create(ctx, b); !errors.As(err, &dup) || dup.ID != a.ID {
+		t.Fatalf("create b = %v; want ErrContactExists{%d}", err, a.ID)
 	}
 	got, _ := repo.List(ctx)
-	if len(got) != 1 {
-		t.Fatalf("len = %d, want 1 (upsert, not duplicate)", len(got))
+	if len(got) != 1 || got[0].Role != "" {
+		t.Fatalf("list = %+v; want the untouched original only", got)
 	}
 }

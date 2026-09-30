@@ -96,3 +96,11 @@ func (r *ResponsavelRepo) Sync(ctx context.Context, entityType string, entityID 
 	}
 	return tx.Commit()
 }
+
+// responsavelNameFilter is a WHERE clause keeping the entities (of type
+// entityType, id column idCol) with a live responsável contact named ? —
+// the list filters that used to match the old free-text responsável.
+func responsavelNameFilter(entityType, idCol string) string {
+	return idCol + ` IN (SELECT rs.entity_id FROM responsaveis rs JOIN contacts c ON c.id = rs.contact_id AND c.deleted_at IS NULL
+		WHERE rs.entity_type = '` + entityType + `' AND c.name = ?)`
+}

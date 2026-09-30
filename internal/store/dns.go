@@ -86,7 +86,7 @@ func dnsWhere(ctx context.Context, f models.DNSFilter) ([]string, []any) {
 
 	if f.Search != "" {
 		op := database.LikeOp()
-		where = append(where, "(domain "+op+" ? OR responsavel "+op+" ?)")
+		where = append(where, "(domain "+op+" ? OR id IN (SELECT rs.entity_id FROM responsaveis rs JOIN contacts c ON c.id = rs.contact_id AND c.deleted_at IS NULL WHERE rs.entity_type = 'dns' AND c.name "+op+" ?))")
 		s := "%" + f.Search + "%"
 		args = append(args, s, s)
 	}
@@ -99,7 +99,7 @@ func dnsWhere(ctx context.Context, f models.DNSFilter) ([]string, []any) {
 		args = append(args, f.Tag)
 	}
 	if f.Responsavel != "" {
-		where = append(where, "responsavel = ?")
+		where = append(where, responsavelNameFilter("dns", "id"))
 		args = append(args, f.Responsavel)
 	}
 	switch f.HasHTTPS {
@@ -139,9 +139,10 @@ func (r *DNSRepo) ListFiltered(ctx context.Context, f models.DNSFilter) ([]model
 	}
 
 	allowedSorts := map[string]string{
-		"domain":          "domain",
-		"situacao":        "situacao",
-		"responsavel":     "responsavel",
+		"domain":   "domain",
+		"situacao": "situacao",
+		// The main responsável contact (the old free-text column is retired).
+		"responsavel":     "(SELECT c.name FROM responsaveis rs JOIN contacts c ON c.id = rs.contact_id AND c.deleted_at IS NULL WHERE rs.entity_type = 'dns' AND rs.entity_id = dns_records.id AND rs.is_main LIMIT 1)",
 		"cert_expires_at": "cert_expires_at",
 	}
 	sortCol := "domain"

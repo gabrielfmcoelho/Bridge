@@ -9,10 +9,13 @@ type Contact struct {
 	ID         int64  `json:"id"`
 	Name       string `json:"name"`
 	Phone      string `json:"phone"`
+	Email      string `json:"email"`
 	Role       string `json:"role"`
 	Entity     string `json:"entity"`
 	Notes      string `json:"notes"`
 	IsExternal bool   `json:"is_external"`
+	// Usage (list only): asset type → how many the contact is responsável for.
+	Usage map[string]int `json:"usage,omitempty"`
 	// DeletedAt is set while the contact sits in the trash.
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 }

@@ -52,6 +52,16 @@ func TestDNSRepo_ListFiltered(t *testing.T) {
 			t.Fatalf("seed %s: %v", s.domain, err)
 		}
 	}
+	// Responsáveis are contacts now: link each record's person as its main one.
+	contactID := map[string]int64{}
+	for i, s := range seeds {
+		if _, ok := contactID[s.responsavel]; !ok {
+			var cid int64
+			d.SQL.QueryRow(`INSERT INTO contacts (name, phone) VALUES (?, '') RETURNING id`, s.responsavel).Scan(&cid)
+			contactID[s.responsavel] = cid
+		}
+		d.SQL.Exec(`INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main) VALUES ('dns', ?, ?, TRUE)`, ids[i], contactID[s.responsavel])
+	}
 	// Tag exactly one record (beta.com) with 'x'.
 	if _, err := d.SQL.Exec(`INSERT INTO tags (entity_type, entity_id, tag) VALUES ('dns', ?, 'x')`, ids[1]); err != nil {
 		t.Fatalf("seed tag: %v", err)

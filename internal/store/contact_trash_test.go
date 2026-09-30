@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -9,7 +10,7 @@ import (
 )
 
 // A deleted contact leaves the list and the responsáveis it held (the link
-// stays for the restore); adding the same name+phone again brings it back.
+// stays for the restore); a duplicate name+phone is refused, never merged.
 func TestContactRepo_TrashAndRestore(t *testing.T) {
 	ctx := context.Background()
 	d := openDB(t)
@@ -44,13 +45,35 @@ func TestContactRepo_TrashAndRestore(t *testing.T) {
 		t.Fatalf("responsável after restore = %+v", rs)
 	}
 
-	// Re-adding a trashed contact takes it out of the trash.
-	contacts.Delete(ctx, c.ID)
-	again := &models.Contact{Name: "Ana", Phone: "86 9"}
-	if err := contacts.Create(ctx, again); err != nil || again.ID != c.ID {
-		t.Fatalf("re-create = %d, %v; want id %d", again.ID, err, c.ID)
+	// Adding the same name+phone again never touches the existing contact.
+	c.Role = "kept"
+	contacts.Update(ctx, c)
+	dup := &models.Contact{Name: "Ana", Phone: "86 9", Role: "overwritten"}
+	var exists store.ErrContactExists
+	if err := contacts.Create(ctx, dup); !errors.As(err, &exists) || exists.ID != c.ID || exists.Trashed {
+		t.Fatalf("duplicate create = %v", err)
 	}
-	if list, _ := contacts.List(ctx); len(list) != 1 {
-		t.Fatalf("list after re-create = %+v", list)
+	contacts.Delete(ctx, c.ID)
+	if err := contacts.Create(ctx, dup); !errors.As(err, &exists) || !exists.Trashed {
+		t.Fatalf("duplicate of trashed = %v; want Trashed", err)
+	}
+	contacts.Restore(ctx, c.ID)
+	if got, _ := contacts.Get(ctx, c.ID); got == nil || got.Role != "kept" {
+		t.Fatalf("existing contact changed: %+v", got)
+	}
+
+	// Usage: the host it's responsável for, only while the host is live.
+	var hid int64
+	d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('web','web-01') RETURNING id`).Scan(&hid)
+	resp.Sync(ctx, "host", hid, []models.ResponsavelInput{{ContactID: c.ID, IsMain: true}})
+	if uses, _ := contacts.Usage(ctx, c.ID); len(uses) != 1 || uses[0].Slug != "web-01" || !uses[0].IsMain {
+		t.Fatalf("usage = %+v", uses)
+	}
+	if counts, _ := contacts.UsageCounts(ctx); counts[c.ID]["host"] != 1 {
+		t.Fatalf("counts = %+v", counts)
+	}
+	d.SQL.Exec(`UPDATE hosts SET deleted_at = now() WHERE id = ?`, hid)
+	if uses, _ := contacts.Usage(ctx, c.ID); len(uses) != 0 {
+		t.Fatalf("usage counts a trashed host: %+v", uses)
 	}
 }
