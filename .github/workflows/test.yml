@@ -24,6 +24,9 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Swagger spec up to date
+        run: make swagger-check
+
       - name: Test
         run: go test -race -buildvcs=false ./...
 
