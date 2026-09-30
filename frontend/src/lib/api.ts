@@ -749,7 +749,7 @@ export const contactsAPI = {
     api.put<import("./types").Contact>(`/api/contacts/${id}`, data),
   delete: (id: number) => api.delete(`/api/contacts/${id}`),
   /** The assets this contact is responsável for (the ones you can see). */
-  usage: (id: number) => api.get<{ type: "host" | "dns" | "service" | "project"; id: number; name: string; slug?: string; is_main: boolean }[]>(`/api/contacts/${id}/usage`),
+  usage: (id: number) => api.get<{ type: "host" | "dns" | "service" | "project" | "api_catalog"; id: number; name: string; slug?: string; is_main: boolean }[]>(`/api/contacts/${id}/usage`),
   trash: () => api.getList<import("./types").Contact>("/api/contacts/trash"),
   restore: (id: number) => api.post(`/api/contacts/${id}/restore`),
 };
@@ -924,66 +924,79 @@ export const secretsAPI = {
 // Atlas REST API catalog (Phase A–C). Mirrors secretsAPI: list/search/get +
 // import (upload or URL) + lifecycle. getSpec/filterSpec return the raw
 // OpenAPI document for the renderer.
+type ApiLinkFilter = { q?: string; service_id?: number; project_id?: number };
+const apiLinkQS = (params: ApiLinkFilter) => {
+  const q = new URLSearchParams();
+  if (params.q) q.set("q", params.q);
+  if (params.service_id != null) q.set("service_id", String(params.service_id));
+  if (params.project_id != null) q.set("project_id", String(params.project_id));
+  const qs = q.toString();
+  return qs ? `?${qs}` : "";
+};
+type ApiImportMeta = {
+  name?: string;
+  description?: string;
+  service_ids: number[];
+  project_ids: number[];
+  base_url?: string;
+  docs_url?: string;
+} & import("./types").AssetGrantsInput;
+
+// Multipart POST for spec uploads (JSON helpers can't carry a file).
+async function postSpecForm<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { method: "POST", credentials: "include", body: form });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    throw new Error(b.error || `Request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 export const apiCatalogAPI = {
-  list: (params: { scope?: string; parent_id?: number; q?: string } = {}) => {
-    const q = new URLSearchParams();
-    if (params.scope) q.set("scope", params.scope);
-    if (params.parent_id != null) q.set("parent_id", String(params.parent_id));
-    if (params.q) q.set("q", params.q);
-    const qs = q.toString();
-    return api.getList<import("./types").ApiCatalog>(`/api/api-catalog${qs ? `?${qs}` : ""}`);
-  },
-  searchOperations: (params: { q?: string; scope?: string; parent_id?: number } = {}) => {
-    const q = new URLSearchParams();
-    if (params.q) q.set("q", params.q);
-    if (params.scope) q.set("scope", params.scope);
-    if (params.parent_id != null) q.set("parent_id", String(params.parent_id));
-    const qs = q.toString();
-    return api.getList<import("./types").OperationSearchResult>(`/api/api-catalog/search${qs ? `?${qs}` : ""}`);
-  },
+  list: (params: ApiLinkFilter = {}) =>
+    api.getList<import("./types").ApiCatalog>(`/api/api-catalog${apiLinkQS(params)}`),
+  searchOperations: (params: ApiLinkFilter = {}) =>
+    api.getList<import("./types").OperationSearchResult>(`/api/api-catalog/search${apiLinkQS(params)}`),
   get: (id: number) => api.get<import("./types").ApiCatalog>(`/api/api-catalog/${id}`),
   getSpec: (id: number) => api.get<Record<string, unknown>>(`/api/api-catalog/${id}/spec`),
   filterSpec: (id: number, body: { mode: string; op_keys?: string[]; tags?: string[] }) =>
     api.post<Record<string, unknown>>(`/api/api-catalog/${id}/spec/filter`, body),
-  importURL: (body: {
-    name?: string;
-    description?: string;
-    scope: string;
-    parent_id?: number;
-    source_url: string;
-    base_url?: string;
-    docs_url?: string;
-  } & import("./types").AssetGrantsInput) => api.post<import("./types").ApiCatalog>("/api/api-catalog/import/url", body),
-  importUpload: async (
-    file: File,
-    meta: { name?: string; description?: string; scope: string; parent_id?: number; base_url?: string; docs_url?: string } & import("./types").AssetGrantsInput
-  ): Promise<import("./types").ApiCatalog> => {
+  importURL: (body: ApiImportMeta & { source_url: string }) =>
+    api.post<import("./types").ApiCatalog>("/api/api-catalog/import/url", body),
+  importUpload: (file: File, meta: ApiImportMeta) => {
     const form = new FormData();
     form.append("spec", file);
     if (meta.name) form.append("name", meta.name);
     if (meta.description) form.append("description", meta.description);
-    form.append("scope", meta.scope);
-    if (meta.parent_id != null) form.append("parent_id", String(meta.parent_id));
     if (meta.base_url) form.append("base_url", meta.base_url);
     if (meta.docs_url) form.append("docs_url", meta.docs_url);
+    form.append("service_ids", meta.service_ids.join(","));
+    form.append("project_ids", meta.project_ids.join(","));
     if (meta.creator_entidade_id != null) form.append("creator_entidade_id", String(meta.creator_entidade_id));
     if (meta.responsible_entidade_ids?.length) form.append("responsible_entidade_ids", meta.responsible_entidade_ids.join(","));
     if (meta.is_global != null) form.append("is_global", String(meta.is_global));
-    const res = await fetch(`${API_BASE}/api/api-catalog/import/upload`, {
-      method: "POST",
-      credentials: "include",
-      body: form,
-    });
-    if (!res.ok) {
-      const b = await res.json().catch(() => ({}));
-      throw new Error(b.error || `Request failed: ${res.status}`);
-    }
-    return res.json();
+    return postSpecForm<import("./types").ApiCatalog>("/api/api-catalog/import/upload", form);
   },
-  update: (id: number, body: { name: string; description?: string; base_url?: string; docs_url?: string } & import("./types").AssetGrantsInput) =>
+  /** Replaces the stored spec in place (same id, links and grants). */
+  replaceSpec: (id: number, file: File) => {
+    const form = new FormData();
+    form.append("spec", file);
+    return postSpecForm<import("./types").ApiCatalog>(`/api/api-catalog/${id}/spec`, form);
+  },
+  update: (id: number, body: {
+    name: string;
+    description?: string;
+    base_url?: string;
+    docs_url?: string;
+    service_ids?: number[];
+    project_ids?: number[];
+    responsaveis?: { contact_id?: number; is_main: boolean }[];
+  } & import("./types").AssetGrantsInput) =>
     api.put<import("./types").ApiCatalog>(`/api/api-catalog/${id}`, body),
   refetch: (id: number) => api.post<import("./types").ApiCatalog>(`/api/api-catalog/${id}/refetch`),
   remove: (id: number) => api.delete(`/api/api-catalog/${id}`),
+  trash: () => api.getList<import("./types").ApiCatalog & { deleted_at?: string | null }>("/api/api-catalog/trash"),
+  restore: (id: number) => api.post(`/api/api-catalog/${id}/restore`),
 };
 
 // Share bundles (Phase D–E). A single public link carrying secrets and/or

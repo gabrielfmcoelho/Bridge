@@ -27,8 +27,10 @@ import ServiceProfile from "./_components/ServiceProfile";
 import RuntimeCard from "./_components/RuntimeCard";
 import CredentialsTab from "./_components/CredentialsTab";
 import MetricsTab from "./_components/MetricsTab";
+import ServiceApisTab from "./_components/ServiceApisTab";
+import { linkedApisQuery } from "@/app/atlas/apis/_components/LinkedApisCard";
 
-type TabKey = "overview" | "issues" | "topology" | "credentials" | "metrics";
+type TabKey = "overview" | "issues" | "topology" | "credentials" | "metrics" | "apis";
 
 const GENERATED = /^Auto-discovered /;
 
@@ -60,6 +62,7 @@ export default function ServiceDetail({ id }: { id: number }) {
   const { data: integrations } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get, retry: false, staleTime: 60_000 });
   const grafanaEnabled = integrations?.grafana?.grafana_enabled === "true";
   const { graph, loading: graphLoading } = useEntityGraph(data ? `service-${id}` : undefined, activeTab === "topology");
+  const { data: linkedApis = [] } = useQuery({ ...linkedApisQuery({ service_id: id }), enabled: !!data });
 
   const dependsOn = allServices.filter((s) => data?.depends_on_ids?.includes(s.id));
   const dependents = allServices.filter((s) => data?.dependent_ids?.includes(s.id));
@@ -86,6 +89,7 @@ export default function ServiceDetail({ id }: { id: number }) {
     { key: "topology", label: t("host.tabTopology"), icon: ICON_PATHS.bolt },
     { key: "credentials", label: t("service.credentials"), icon: ICON_PATHS.lock },
     ...(grafanaEnabled ? [{ key: "metrics", label: t("host.tabMetrics"), icon: ICON_PATHS.layoutGrid }] : []),
+    { key: "apis", label: t("nav.apis"), icon: ICON_PATHS.code, badge: linkedApis.length || undefined },
   ];
 
   if (isLoading) {
@@ -168,6 +172,8 @@ export default function ServiceDetail({ id }: { id: number }) {
           {activeTab === "credentials" && <CredentialsTab serviceId={id} isAdmin={isAdmin} t={t} />}
 
           {activeTab === "metrics" && grafanaEnabled && <MetricsTab serviceId={id} nickname={svc.nickname} />}
+
+          {activeTab === "apis" && <ServiceApisTab serviceId={id} projectId={svc.project_id} dns={linkedDns} canEdit={canEdit} />}
         </PageHeader>
 
         <Drawer open={showEditDrawer} onClose={() => setShowEditDrawer(false)} title={t("form.editTitle", { name: title })} subHeader={formSubHeader} footer={formFooter}>

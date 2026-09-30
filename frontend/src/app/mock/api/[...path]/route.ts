@@ -382,7 +382,11 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     return record ? json(mockCertScan(record)) : notFound("DNS record not found");
   }
   if (method === "GET" && p === "projects") return json(paginate(db.projects, qs.get("page"), qs.get("per_page")));
-  if (method === "GET" && p === "api-catalog") return json(paginate(db.apiCatalogs, qs.get("page"), qs.get("per_page")));
+  if (method === "GET" && p === "api-catalog") {
+    const svc = Number(qs.get("service_id")), proj = Number(qs.get("project_id"));
+    const rows = db.apiCatalogs.filter((a) => (!svc || a.service_ids.includes(svc)) && (!proj || a.project_ids.includes(proj)));
+    return json(paginate(rows, qs.get("page"), qs.get("per_page")));
+  }
   if (method === "GET" && p === "tools") return json(paginate(db.tools, qs.get("page"), qs.get("per_page")));
 
   // ── Catalog search ───────────────────────────────────────────────────

@@ -116,7 +116,7 @@ export default function ButtonsSection() {
         <p className="text-xs text-[var(--text-muted)] mt-2">
           <code>useCopy()</code> owns the clipboard call, the 2 s flash and the non-secure-context fallback;{" "}
           <code>CopyButton</code> is Button + the hook for the plain case. Migrated: ssh-config, settings Grafana webhook secret, SSHConfigDrawer (hook, two
-          controls share one state), WikiShareModal, ShareBundleModal, ProjectSecretsSheet. Still inline:{" "}
+          controls share one state), WikiShareModal, ShareBundleModal. Still inline:{" "}
           <code>glpi/DropdownCatalogueEditorModal.tsx:112</code>,{" "}
           <code>share/[token]/page.tsx:428</code> (keyed multi-copy).
         </p>

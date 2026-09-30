@@ -128,18 +128,23 @@ export default function ShareBundleModal({
     return Array.from(s).sort();
   }, [ops]);
 
-  // Secrets in the same scope/project are the attachable set — both personal
-  // (owner-only) and shared, since shared secrets are now externally
-  // shareable by anyone who can reveal them. The backend re-checks access.
-  const { data: secrets = [] } = useQuery({
-    queryKey: ["secrets", "shareable", api.scope, api.parent_id],
-    queryFn: () =>
-      secretsAPI.list({
-        scope: api.scope,
-        parent_id: api.parent_id ?? undefined,
-      }),
+  // Secrets of the projects and services this API is linked to (standalone
+  // secrets for an unlinked API) are the attachable set — both personal
+  // (owner-only) and shared, since shared secrets are externally shareable by
+  // anyone who can reveal them. The backend re-checks access.
+  const { data: allSecrets = [] } = useQuery({
+    queryKey: ["secrets", "shareable"],
+    queryFn: () => secretsAPI.list(),
     enabled: open,
   });
+  const secrets = useMemo(() => {
+    const projects = api.project_ids ?? [];
+    const services = api.service_ids ?? [];
+    const unlinked = projects.length + services.length === 0;
+    return allSecrets.filter((s) =>
+      s.parent_id != null && ((s.scope === "projeto" && projects.includes(s.parent_id)) || (s.scope === "service" && services.includes(s.parent_id)))
+        || (unlinked && s.scope === "avulso"));
+  }, [allSecrets, api.project_ids, api.service_ids]);
 
   // Outline collections (+ their document trees) available to attach. Soft-fails
   // when the integration is off/unconfigured — the section just stays empty.

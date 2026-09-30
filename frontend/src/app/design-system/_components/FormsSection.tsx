@@ -433,8 +433,8 @@ export default function FormsSection() {
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Gaps (described, not rendered)</h3>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
-            No shared file upload; 5 raw <code>type=&quot;file&quot;</code>:{" "}
-            <code>components/atlas/apis/AddApiModal.tsx:139</code>,{" "}
+            No shared file upload; 6 raw <code>type=&quot;file&quot;</code>:{" "}
+            <code>app/atlas/apis/ApiForm.tsx</code>, <code>app/atlas/apis/_components/useSpecActions.tsx</code>,{" "}
             <code>components/glpi/FormcreatorFileInput.tsx:80</code>, <code>app/settings/AppearanceTab.tsx:174</code>,{" "}
             <code>ImportTab.tsx:158</code>, <code>BackupTab.tsx:117</code>.
           </li>
@@ -449,8 +449,7 @@ export default function FormsSection() {
           </li>
           <li>
             Code input is <code>&lt;Textarea className=&quot;font-mono&quot;&gt;</code>:{" "}
-            <code>components/vault/SecretForm.tsx</code>,{" "}
-            <code>components/atlas/apis/ProjectSecretsSheet.tsx:62</code>.
+            <code>components/vault/SecretForm.tsx</code>.
           </li>
           <li>
             Canonical form wiring: <code>app/dns/DnsForm.tsx</code>; <code>useState</code> per field →{" "}

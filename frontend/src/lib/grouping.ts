@@ -4,6 +4,8 @@
 // to something the caller can't name (deleted, out of scope) is dropped.
 
 export type GroupEntity = "host" | "dns" | "service" | "project" | "contact" | "entidade";
+/** What can be grouped: any GroupEntity, plus assets only ever grouped (APIs). */
+export type GroupItemEntity = GroupEntity | "api_catalog";
 
 export interface Relation {
   a: string;
@@ -27,7 +29,7 @@ export interface ItemGroup<T> {
  */
 export function groupItems<T extends { id: number }>(
   items: T[],
-  entity: GroupEntity,
+  entity: GroupItemEntity,
   by: GroupEntity,
   relations: Relation[],
   names: Map<number, string>,

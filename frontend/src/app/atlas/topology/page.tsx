@@ -14,6 +14,7 @@ const legendItems = [
   { type: "service", color: "bg-[var(--accent)]", label: "Services" },
   { type: "dns", color: "bg-[var(--success)]", label: "DNS" },
   { type: "project", color: "bg-[var(--warning)]", label: "Projects" },
+  { type: "api", color: "bg-[var(--rose)]", label: "APIs" },
 ];
 
 export default function TopologyPage() {

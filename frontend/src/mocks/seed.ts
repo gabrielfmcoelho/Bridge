@@ -293,13 +293,13 @@ function projects(): Project[] {
 
 function apiCatalogs(): ApiCatalog[] {
   const mk = (o: Partial<ApiCatalog> & Pick<ApiCatalog, "id" | "name" | "description" | "title">): ApiCatalog => ({
-    scope: "avulso", parent_id: null, source_type: "upload", spec_version: "3.0.0", spec_hash: "",
+    service_ids: [], project_ids: [], source_type: "upload", spec_version: "3.0.0", spec_hash: "",
     version_label: "v1.0.0", owner_user_id: 3, created_by: 3,
     created_at: "2025-12-01T09:00:00Z", updated_at: "2026-04-01T09:00:00Z", operation_count: 0,
     ...o,
   });
   return [
-    mk({ id: 1, scope: "projeto", parent_id: 1, name: "API do Portal do Servidor", title: "Portal do Servidor API", description: "Endpoints REST usados pelo frontend do Portal do Servidor.", version_label: "v1.3.0" }),
+    mk({ id: 1, project_ids: [1], name: "API do Portal do Servidor", title: "Portal do Servidor API", description: "Endpoints REST usados pelo frontend do Portal do Servidor.", version_label: "v1.3.0" }),
     mk({ id: 2, name: "API de Chamados SGI", title: "Chamados SGI API", description: "Integração de abertura e consulta de chamados técnicos.", version_label: "v2.0.0" }),
   ];
 }

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { relationsAPI, hostsAPI, dnsAPI, servicesAPI, projectsAPI, contactsAPI, entidadesAPI } from "@/lib/api";
-import { groupItems, type GroupEntity, type ItemGroup } from "@/lib/grouping";
+import { groupItems, type GroupEntity, type GroupItemEntity, type ItemGroup } from "@/lib/grouping";
 import { useLocale } from "@/contexts/LocaleContext";
 
 // Each related entity's list, reduced to id → display name.
@@ -20,7 +20,7 @@ const NAME_SOURCES: Record<GroupEntity, () => Promise<{ id: number; name: string
  * `items` (of type `entity`) grouped by `by`, or undefined when not grouping
  * or while the links and names load. Nothing is fetched until `by` is set.
  */
-export function useRelationGroups<T extends { id: number }>(entity: GroupEntity, by: GroupEntity | "", items: T[]) {
+export function useRelationGroups<T extends { id: number }>(entity: GroupItemEntity, by: GroupEntity | "", items: T[]) {
   const { t } = useLocale();
   const relations = useQuery({ queryKey: ["relations"], queryFn: relationsAPI.list, enabled: !!by, staleTime: 30_000 });
   const names = useQuery({

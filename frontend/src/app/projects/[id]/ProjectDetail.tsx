@@ -30,9 +30,11 @@ import ChamadosTab from "./_components/ChamadosTab";
 import ProjectReleases from "./_components/ProjectReleases";
 import ProjectEmbeds, { projectEmbedsKey } from "./_components/ProjectEmbeds";
 import ProjectSecretsTab from "./_components/ProjectSecretsTab";
+import ProjectApisTab from "./_components/ProjectApisTab";
+import { linkedApisQuery } from "@/app/atlas/apis/_components/LinkedApisCard";
 import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
 
-type TabKey = "overview" | "topology" | "issues" | "releases" | "commits" | "wiki" | "chamados" | "observability" | "secrets";
+type TabKey = "overview" | "topology" | "issues" | "releases" | "commits" | "wiki" | "chamados" | "observability" | "secrets" | "apis";
 
 export default function ProjectDetail({ id }: { id: number }) {
   const { t } = useLocale();
@@ -61,6 +63,7 @@ export default function ProjectDetail({ id }: { id: number }) {
   const { data: allDns = [] } = useQuery({ queryKey: ["dns"], queryFn: dnsAPI.list, enabled: activeTab === "topology" });
   // Viewers only get the Observabilidade tab when there's something in it.
   const { data: embeds = [] } = useQuery({ queryKey: projectEmbedsKey(id), queryFn: () => projectEmbedsAPI.list(id), enabled: !!data });
+  const { data: linkedApis = [] } = useQuery({ ...linkedApisQuery({ project_id: id }), enabled: !!data });
 
   // -- Mutations --
   const deleteMutation = useMutation({
@@ -94,6 +97,7 @@ export default function ProjectDetail({ id }: { id: number }) {
     ...(glpiEnabled ? [{ key: "chamados" as TabKey, label: t("nav.chamados"), icon: ICON_PATHS.clipboard }] : []),
     ...(canEdit || embeds.length > 0 ? [{ key: "observability" as TabKey, label: t("embed.title"), icon: ICON_PATHS.layoutGrid }] : []),
     { key: "secrets", label: t("project.tab.secrets"), icon: ICON_PATHS.lock },
+    { key: "apis", label: t("nav.apis"), icon: ICON_PATHS.code, badge: linkedApis.length || undefined },
   ];
 
 
@@ -167,6 +171,7 @@ export default function ProjectDetail({ id }: { id: number }) {
             )}
             {activeTab === "observability" && <ProjectEmbeds projectId={id} canEdit={canEdit} />}
             {activeTab === "secrets" && <ProjectSecretsTab projectId={id} services={data.services || []} canEdit={canEdit} />}
+            {activeTab === "apis" && <ProjectApisTab projectId={id} canEdit={canEdit} />}
           </PageHeader>
 
           <Drawer

@@ -37,7 +37,6 @@ const H1_ALSO_IN = [
   "app/tools/page.tsx:150",
   "components/atlas/pipeline/PipelinePageInner.tsx:82",
   "components/atlas/catalog/CatalogPageInner.tsx:111",
-  "components/atlas/apis/ApiDetailInner.tsx:117",
 ];
 
 export default function TypographySection() {

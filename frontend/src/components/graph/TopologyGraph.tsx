@@ -20,20 +20,24 @@ import HostNode from "./nodes/HostNode";
 import ServiceNode from "./nodes/ServiceNode";
 import DnsNode from "./nodes/DnsNode";
 import ProjectNode from "./nodes/ProjectNode";
+import ApiNode from "./nodes/ApiNode";
 
 const nodeTypes = {
   host: HostNode,
   service: ServiceNode,
   dns: DnsNode,
   project: ProjectNode,
+  api: ApiNode,
 };
 
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 80;
 
-// Desired rank: project at top (0), service below, dns, host at bottom.
+// Desired rank: project at top (0), APIs and services below, dns, host at bottom.
+// An API sits on its services' rank: it is served by them, not above them.
 const RANK_ORDER: Record<string, number> = {
   project: 0,
+  api: 1,
   service: 1,
   dns: 2,
   host: 3,
@@ -119,6 +123,9 @@ export default function TopologyGraph({ data, className }: { data: GraphData; cl
         case "project":
           router.push(`/projects/${id}`);
           break;
+        case "api":
+          router.push(`/atlas/apis/${id}`);
+          break;
       }
     },
     [router]
@@ -150,11 +157,12 @@ export default function TopologyGraph({ data, className }: { data: GraphData; cl
         <MiniMap
           nodeColor={(n) => {
             switch (n.type) {
-              case "host": return "#06b6d4";
-              case "service": return "#a78bfa";
-              case "dns": return "#34d399";
-              case "project": return "#fbbf24";
-              default: return "#5a6a80";
+              case "host": return "var(--cyan)";
+              case "service": return "var(--accent)";
+              case "dns": return "var(--success)";
+              case "project": return "var(--warning)";
+              case "api": return "var(--rose)";
+              default: return "var(--text-faint)";
             }
           }}
           className="hidden md:block"

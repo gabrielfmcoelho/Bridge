@@ -63,9 +63,9 @@ export default function OverlaysSection() {
         </Modal>
         <p className="text-[11px] text-[var(--text-muted)]">
           Hand-rolled (no Radix/vaul), <code>.glass</code> panel, <code>max-w-2xl</code>, sets{" "}
-          <code>document.body.style.overflow</code>; desktop-only; 4 components use it bare and get a cramped
+          <code>document.body.style.overflow</code>; desktop-only; 2 components use it bare and get a cramped
           modal on phones (<code>components/wiki/WikiShareModal.tsx</code>,{" "}
-          <code>components/atlas/apis/{"{AddApiModal,EditApiModal,ShareBundleModal}"}.tsx</code>).
+          <code>components/atlas/apis/ShareBundleModal.tsx</code>).
         </p>
       </Specimen>
 
@@ -224,7 +224,6 @@ export default function OverlaysSection() {
           <li><code>components/ai/AiChatDrawer.tsx</code></li>
           <li><code>components/glpi/{"{FormcreatorFormDrawer,TicketDetailDrawer}"}.tsx</code></li>
           <li><code>components/lineage/DetailDrawer.tsx</code></li>
-          <li><code>components/atlas/apis/ProjectSecretsSheet.tsx</code> (<code>side=&quot;right&quot;</code>)</li>
           <li>
             <code>app/hosts/[slug]/_components/{"{ChamadoDrawer,SSHConfigDrawer,SSHOperations,IssueDrawers}"}.tsx</code>
           </li>

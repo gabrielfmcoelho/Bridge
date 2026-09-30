@@ -26,7 +26,6 @@ export default function TabsSection() {
   const [tab, setTab] = useState("overview");
   const [settingsTab, setSettingsTab] = useState("enums");
   const [shareTab, setShareTab] = useState("secrets");
-  const [sourceTab, setSourceTab] = useState<"upload" | "url">("upload");
   const [view, setView] = useState("cards");
   const [viewMode, setViewMode] = useState<"tree" | "list" | "graph">("tree");
   const [layers, setLayers] = useState<string[]>([]);
@@ -101,26 +100,6 @@ export default function TabsSection() {
           Underline style with a count suffix; the only tab bar in the app that is not the pill/segment look,
           and the only one rendered on the public unauthenticated page.
         </p>
-      </Specimen>
-
-      <Specimen title="AddApiModal source tabs" source="components/atlas/apis/AddApiModal.tsx:117-135">
-        {/* specimen: components/atlas/apis/AddApiModal.tsx:117-135 */}
-        <div className="flex gap-2">
-          {(["upload", "url"] as const).map((tk) => (
-            <button
-              key={tk}
-              type="button"
-              onClick={() => setSourceTab(tk)}
-              className={`px-3 py-1.5 text-sm rounded-[var(--radius-md)] border ${
-                sourceTab === tk
-                  ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10"
-                  : "border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-              }`}
-            >
-              {tk === "upload" ? "Upload" : "From URL"}
-            </button>
-          ))}
-        </div>
       </Specimen>
 
       <Specimen title="ViewToggle" source="components/ui/ViewToggle.tsx">
@@ -215,7 +194,7 @@ export default function TabsSection() {
           </li>
           <li>
             Tab implementations still separate: <code>TabBar</code> (now also settings),{" "}
-            <code>app/share/[token]/page.tsx</code>, <code>components/atlas/apis/AddApiModal.tsx</code>,{" "}
+            <code>app/share/[token]/page.tsx</code>,{" "}
             <code>components/atlas/shared/ViewModeToggle.tsx</code>.
           </li>
           <li>

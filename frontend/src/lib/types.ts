@@ -381,7 +381,7 @@ export interface EnumOption {
 
 export interface GraphNode {
   id: string;
-  type: "host" | "service" | "dns" | "project";
+  type: "host" | "service" | "dns" | "project" | "api";
   label: string;
   status?: string;
   data?: Record<string, unknown>;
@@ -473,7 +473,7 @@ export interface Contact {
   is_external: boolean;
   email?: string;
   /** List only: asset type (host, dns, service, project) → how many it's responsável for. */
-  usage?: Partial<Record<"host" | "dns" | "service" | "project", number>>;
+  usage?: Partial<Record<"host" | "dns" | "service" | "project" | "api_catalog", number>>;
   /** Set while the contact is in the trash. */
   deleted_at?: string | null;
 }
@@ -562,8 +562,6 @@ export interface ApiOperation {
 
 export interface ApiCatalog {
   id: number;
-  scope: string; // "projeto" | "avulso"
-  parent_id?: number | null;
   name: string;
   description: string;
   source_type: string; // "upload" | "url"
@@ -581,12 +579,18 @@ export interface ApiCatalog {
   updated_at: string;
   operation_count: number;
   operations?: ApiOperation[];
+  /** Direct links; [] when none. An API with neither is "avulso". */
+  service_ids: number[];
+  project_ids: number[];
+  /** Detail only. */
+  responsaveis?: EntityResponsavel[];
+  /** Detail only: entidade grants, for the edit form. */
+  entidades?: AssetGrants;
 }
 
 export interface OperationSearchResult {
   api_id: number;
   api_name: string;
-  scope: string;
   method: string;
   path: string;
   op_key: string;
