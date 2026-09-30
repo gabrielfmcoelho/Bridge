@@ -53,7 +53,7 @@ func TestAPIToken_Lifecycle(t *testing.T) {
 		return rec
 	}
 
-	rec := do("POST", "/api/auth/tokens", `{"name":"ci","expires_in_days":90}`, ana, "")
+	rec := do("POST", "/api/auth/tokens", `{"name":"ci","expires_in_days":90,"scopes":["auth:read"]}`, ana, "")
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create = %d %s", rec.Code, rec.Body)
 	}
@@ -97,7 +97,7 @@ func TestAPIToken_Lifecycle(t *testing.T) {
 	}
 
 	// An expired token is refused too.
-	rec = do("POST", "/api/auth/tokens", `{"name":"old","expires_in_days":1}`, ana, "")
+	rec = do("POST", "/api/auth/tokens", `{"name":"old","expires_in_days":1,"scopes":["auth:read"]}`, ana, "")
 	var old apiTokenCreateResponse
 	_ = json.Unmarshal(rec.Body.Bytes(), &old)
 	if _, err := d.SQL.Exec(`UPDATE api_tokens SET expires_at = NOW() - INTERVAL '1 hour' WHERE id = ?`, old.APIToken.ID); err != nil {

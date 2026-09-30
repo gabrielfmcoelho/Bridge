@@ -374,6 +374,17 @@ definitions:
         type: integer
       name:
         type: string
+      rate_limit_per_minute:
+        type: integer
+      scopes:
+        example:
+        - hosts:read
+        - dns:read
+        items:
+          type: string
+        type: array
+      user_id:
+        type: integer
     type: object
   api.apiTokenCreateResponse:
     properties:
@@ -381,6 +392,16 @@ definitions:
         $ref: '#/definitions/models.APIToken'
       token:
         type: string
+    type: object
+  api.apiTokenUsageResponse:
+    properties:
+      daily:
+        additionalProperties:
+          type: integer
+        description: '"YYYY-MM-DD" → requests'
+        type: object
+      lifetime:
+        type: integer
     type: object
   api.authLoginRequest:
     properties:
@@ -2162,6 +2183,9 @@ definitions:
         items:
           type: integer
         type: array
+      kind:
+        example: person
+        type: string
       password:
         type: string
       primary_entidade_id:
@@ -2204,6 +2228,11 @@ definitions:
         type: array
       id:
         type: integer
+      kind:
+        description: |-
+          Kind is "person" or "service": a service account owns API tokens for an
+          integration and can never sign in.
+        type: string
       role:
         type: string
       updated_at:
@@ -2274,6 +2303,27 @@ definitions:
           type: string
         type: array
       tags:
+        items:
+          type: string
+        type: array
+    type: object
+  auth.ScopeInfo:
+    properties:
+      description:
+        type: string
+      kind:
+        description: '"wildcard" or "route"'
+        type: string
+      min_role:
+        description: |-
+          MinRole is the least role that can use it; Permission, when set, is a
+          permission code the owner needs instead of a role.
+        type: string
+      name:
+        type: string
+      permission:
+        type: string
+      routes:
         items:
           type: string
         type: array
@@ -2564,11 +2614,25 @@ definitions:
         type: string
       name:
         type: string
+      owner_kind:
+        description: '"person" or "service"'
+        type: string
       prefix:
         description: first characters of the token, for display
         type: string
+      rate_limit_per_minute:
+        description: RateLimitPerMinute is nil for the default.
+        type: integer
       revoked_at:
         type: string
+      scopes:
+        description: Scopes narrow what the token may call (internal/auth/scopes.go).
+        items:
+          type: string
+        type: array
+      today_requests:
+        description: TodayRequests is filled on list responses.
+        type: integer
       user_id:
         type: integer
       username:
@@ -3403,6 +3467,11 @@ definitions:
         type: string
       id:
         type: integer
+      kind:
+        description: |-
+          Kind is "person" or "service": a service account owns API tokens for an
+          integration and can never sign in.
+        type: string
       role:
         type: string
       updated_at:
@@ -5775,9 +5844,11 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Any role, browser session only. The token acts as the caller (same
-        role, permissions and entidades). Send it as "Authorization: Bearer brg_…".
-        The plaintext is in this response only.'
+      description: 'Any role, browser session only. The token acts as its owner (same
+        role, permissions and entidades) narrowed to its scopes (GET /api/auth/tokens/scopes;
+        at least one, each usable by the owner). Admins may pass user_id to issue
+        it for a service account. Send it as "Authorization: Bearer brg_…". The plaintext
+        is in this response only.'
       parameters:
       - description: Name and lifetime in days (0 = never expires)
         in: body
@@ -5841,6 +5912,68 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Revoke an API token
+      tags:
+      - auth
+  /api/auth/tokens/{id}/usage:
+    get:
+      description: Browser session only; the token's owner or an admin (someone else's
+        token answers 404). Per-day counts for the last days (default 30) and the
+        lifetime total.
+      parameters:
+      - description: Token ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Days back (1-365, default 30)
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.apiTokenUsageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: An API token's request counts
+      tags:
+      - auth
+  /api/auth/tokens/scopes:
+    get:
+      description: Any role. "*" (full access) and one entry per scope, with the route
+        patterns it opens and the least role (or permission) an owner needs to use
+        it.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/auth.ScopeInfo'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Scopes an API token can carry
       tags:
       - auth
   /api/backup:
@@ -14337,8 +14470,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Admin. Local user; role defaults to viewer. 409 when the username
-        exists.
+      description: Admin. Local user; role defaults to viewer. kind "service" makes
+        a service account (no password; it can't sign in and only authenticates with
+        API tokens admins issue for it). 409 when the username exists.
       parameters:
       - description: User, password and optional entidade memberships
         in: body

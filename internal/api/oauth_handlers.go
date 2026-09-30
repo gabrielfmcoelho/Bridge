@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -134,6 +135,10 @@ func (h *oauthHandlers) handleCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Create a local session.
 	token, expiresAt, err := auth.CreateSession(h.db.SQL, user.ID)
+	if errors.Is(err, auth.ErrServiceAccount) {
+		http.Redirect(w, r, "/login?auth=error&message=service+accounts+cannot+sign+in", http.StatusFound)
+		return
+	}
 	if err != nil {
 		http.Redirect(w, r, "/login?auth=error&message=session+creation+failed", http.StatusFound)
 		return

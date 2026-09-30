@@ -253,7 +253,7 @@ func TestRouter_PathValueReachesHandler(t *testing.T) {
 
 	e := newEcho()
 	var gotID, gotName, gotUser string
-	routeRegistrar{e: e, db: d}.auth("GET /api/probe/{id}/{name}", func(w http.ResponseWriter, r *http.Request) {
+	routeRegistrar{e: e, db: d}.auth("GET /api/hosts/{id}/{name}", func(w http.ResponseWriter, r *http.Request) {
 		gotID, gotName = r.PathValue("id"), r.PathValue("name")
 		if cu := auth.UserFromContext(r.Context()); cu != nil {
 			gotUser = cu.Username
@@ -261,7 +261,7 @@ func TestRouter_PathValueReachesHandler(t *testing.T) {
 		jsonOK(w, nil)
 	})
 
-	req := httptest.NewRequest("GET", "/api/probe/42/a%20b%2Fc", nil)
+	req := httptest.NewRequest("GET", "/api/hosts/42/a%20b%2Fc", nil)
 	for _, c := range sessionCookies(t, d) {
 		req.AddCookie(c)
 	}

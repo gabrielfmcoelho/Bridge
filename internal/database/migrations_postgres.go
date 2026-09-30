@@ -1607,4 +1607,22 @@ var migrationsPostgres = []string{
 	INSERT INTO permissions (code, description, category) VALUES
 		('apis.keys.manage', 'Issue, rotate, revoke and reveal API access keys', 'apis')
 	ON CONFLICT DO NOTHING;`,
+
+	// Version 97: token scopes. A token now carries scopes (internal/auth
+	// scopes.go) that narrow what it can call, a per-minute rate limit and
+	// daily usage counts. Tokens issued before scopes existed are expired
+	// (they would otherwise keep their owner's full power). users.kind adds
+	// service accounts: users that own tokens but can never sign in.
+	`ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS scopes TEXT NOT NULL DEFAULT '[]';
+	ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS rate_limit_per_minute INTEGER;
+	UPDATE api_tokens SET revoked_at = CURRENT_TIMESTAMP WHERE revoked_at IS NULL AND scopes = '[]';
+	CREATE TABLE IF NOT EXISTS api_token_usage (
+		token_id BIGINT NOT NULL REFERENCES api_tokens(id) ON DELETE CASCADE,
+		day      DATE NOT NULL,
+		requests BIGINT NOT NULL DEFAULT 0,
+		PRIMARY KEY (token_id, day)
+	);
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'person';
+	ALTER TABLE users DROP CONSTRAINT IF EXISTS users_kind_check;
+	ALTER TABLE users ADD CONSTRAINT users_kind_check CHECK (kind IN ('person','service'));`,
 }

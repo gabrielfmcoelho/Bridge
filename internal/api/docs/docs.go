@@ -2074,7 +2074,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Any role, browser session only. The token acts as the caller (same role, permissions and entidades). Send it as \"Authorization: Bearer brg_…\". The plaintext is in this response only.",
+                "description": "Any role, browser session only. The token acts as its owner (same role, permissions and entidades) narrowed to its scopes (GET /api/auth/tokens/scopes; at least one, each usable by the owner). Admins may pass user_id to issue it for a service account. Send it as \"Authorization: Bearer brg_…\". The plaintext is in this response only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2124,6 +2124,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/auth/tokens/scopes": {
+            "get": {
+                "description": "Any role. \"*\" (full access) and one entry per scope, with the route patterns it opens and the least role (or permission) an owner needs to use it.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Scopes an API token can carry",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/auth.ScopeInfo"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/auth/tokens/{id}": {
             "delete": {
                 "description": "Any role, browser session only. Your own tokens; admins may revoke anyone's. Someone else's token answers 404.",
@@ -2148,6 +2177,65 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/tokens/{id}/usage": {
+            "get": {
+                "description": "Browser session only; the token's owner or an admin (someone else's token answers 404). Per-day counts for the last days (default 30) and the lifetime total.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "An API token's request counts",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Token ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Days back (1-365, default 30)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiTokenUsageResponse"
                         }
                     },
                     "400": {
@@ -14646,7 +14734,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Admin. Local user; role defaults to viewer. 409 when the username exists.",
+                "description": "Admin. Local user; role defaults to viewer. kind \"service\" makes a service account (no password; it can't sign in and only authenticates with API tokens admins issue for it). 409 when the username exists.",
                 "consumes": [
                     "application/json"
                 ],
@@ -15717,6 +15805,22 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "rate_limit_per_minute": {
+                    "type": "integer"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "hosts:read",
+                        "dns:read"
+                    ]
+                },
+                "user_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -15728,6 +15832,21 @@ const docTemplate = `{
                 },
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "api.apiTokenUsageResponse": {
+            "type": "object",
+            "properties": {
+                "daily": {
+                    "description": "\"YYYY-MM-DD\" → requests",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "lifetime": {
+                    "type": "integer"
                 }
             }
         },
@@ -18401,6 +18520,10 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
+                "kind": {
+                    "type": "string",
+                    "example": "person"
+                },
                 "password": {
                     "type": "string"
                 },
@@ -18464,6 +18587,10 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "kind": {
+                    "description": "Kind is \"person\" or \"service\": a service account owns API tokens for an\nintegration and can never sign in.",
+                    "type": "string"
                 },
                 "role": {
                     "type": "string"
@@ -18572,6 +18699,34 @@ const docTemplate = `{
                     }
                 },
                 "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "auth.ScopeInfo": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "\"wildcard\" or \"route\"",
+                    "type": "string"
+                },
+                "min_role": {
+                    "description": "MinRole is the least role that can use it; Permission, when set, is a\npermission code the owner needs instead of a role.",
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permission": {
+                    "type": "string"
+                },
+                "routes": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -18997,12 +19152,31 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "owner_kind": {
+                    "description": "\"person\" or \"service\"",
+                    "type": "string"
+                },
                 "prefix": {
                     "description": "first characters of the token, for display",
                     "type": "string"
                 },
+                "rate_limit_per_minute": {
+                    "description": "RateLimitPerMinute is nil for the default.",
+                    "type": "integer"
+                },
                 "revoked_at": {
                     "type": "string"
+                },
+                "scopes": {
+                    "description": "Scopes narrow what the token may call (internal/auth/scopes.go).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "today_requests": {
+                    "description": "TodayRequests is filled on list responses.",
+                    "type": "integer"
                 },
                 "user_id": {
                     "type": "integer"
@@ -20225,6 +20399,10 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "kind": {
+                    "description": "Kind is \"person\" or \"service\": a service account owns API tokens for an\nintegration and can never sign in.",
+                    "type": "string"
                 },
                 "role": {
                     "type": "string"

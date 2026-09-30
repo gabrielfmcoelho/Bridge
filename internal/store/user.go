@@ -18,10 +18,10 @@ type UserRepo struct {
 // NewUserRepo constructs a UserRepo over the given DB handle.
 func NewUserRepo(db *sql.DB) *UserRepo { return &UserRepo{db: db} }
 
-const userCols = `id, username, password_hash, display_name, role, auth_provider, email, created_at, updated_at`
+const userCols = `id, username, password_hash, display_name, role, auth_provider, email, kind, created_at, updated_at`
 
 func scanUser(scanner interface{ Scan(...any) error }, u *models.User) error {
-	return scanner.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &u.AuthProvider, &u.Email, &u.CreatedAt, &u.UpdatedAt)
+	return scanner.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.Role, &u.AuthProvider, &u.Email, &u.Kind, &u.CreatedAt, &u.UpdatedAt)
 }
 
 // Create inserts a user (defaulting auth_provider to local) and sets u.ID.
@@ -29,9 +29,12 @@ func (r *UserRepo) Create(ctx context.Context, u *models.User) error {
 	if u.AuthProvider == "" {
 		u.AuthProvider = "local"
 	}
+	if u.Kind == "" {
+		u.Kind = models.UserKindPerson
+	}
 	id, err := database.InsertReturningID(r.db,
-		`INSERT INTO users (username, password_hash, display_name, role, auth_provider, email) VALUES (?, ?, ?, ?, ?, ?)`,
-		u.Username, u.PasswordHash, u.DisplayName, u.Role, u.AuthProvider, u.Email,
+		`INSERT INTO users (username, password_hash, display_name, role, auth_provider, email, kind) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		u.Username, u.PasswordHash, u.DisplayName, u.Role, u.AuthProvider, u.Email, u.Kind,
 	)
 	if err != nil {
 		return err
@@ -78,12 +81,18 @@ func (r *UserRepo) List(ctx context.Context) ([]models.User, error) {
 	return users, rows.Err()
 }
 
-// Update writes the editable profile fields (not the password) by id.
+// Update writes the editable profile fields (not the password) by id. An
+// empty Kind keeps the stored one; turning an account into a service account
+// ends its sessions (it can't sign in any more).
 func (r *UserRepo) Update(ctx context.Context, u *models.User) error {
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE users SET username = ?, display_name = ?, role = ?, auth_provider = ?, email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-		u.Username, u.DisplayName, u.Role, u.AuthProvider, u.Email, u.ID,
+		`UPDATE users SET username = ?, display_name = ?, role = ?, auth_provider = ?, email = ?,
+			kind = COALESCE(NULLIF(?, ''), kind), updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		u.Username, u.DisplayName, u.Role, u.AuthProvider, u.Email, u.Kind, u.ID,
 	)
+	if err == nil && u.Kind == models.UserKindService {
+		_, err = r.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, u.ID)
+	}
 	return err
 }
 

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -14,8 +15,21 @@ const (
 	sessionDuration   = 7 * 24 * time.Hour // 7 days
 )
 
+// ErrServiceAccount is returned when a service account tries to sign in: it
+// only ever authenticates with its API tokens.
+var ErrServiceAccount = errors.New("service accounts cannot sign in")
+
 // CreateSession generates a new session token for the user and stores it.
+// Every sign-in path (local, LDAP, OAuth) ends here, so this is where service
+// accounts are turned away.
 func CreateSession(db *sql.DB, userID int64) (string, time.Time, error) {
+	var kind string
+	if err := db.QueryRow(`SELECT kind FROM users WHERE id = ?`, userID).Scan(&kind); err != nil {
+		return "", time.Time{}, fmt.Errorf("load user: %w", err)
+	}
+	if kind == "service" {
+		return "", time.Time{}, ErrServiceAccount
+	}
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return "", time.Time{}, fmt.Errorf("generate token: %w", err)

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -109,6 +110,10 @@ func (h *authHandlers) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token, expiresAt, err := auth.CreateSession(h.db.SQL, user.ID)
+	if errors.Is(err, auth.ErrServiceAccount) {
+		jsonError(w, http.StatusForbidden, "service accounts cannot sign in")
+		return
+	}
 	if err != nil {
 		jsonServerError(w, r, "failed to create session", err)
 		return
@@ -196,6 +201,10 @@ func (h *authHandlers) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token, expiresAt, err := auth.CreateSession(h.db.SQL, user.ID)
+	if errors.Is(err, auth.ErrServiceAccount) {
+		jsonError(w, http.StatusForbidden, "service accounts cannot sign in")
+		return
+	}
 	if err != nil {
 		jsonServerError(w, r, "failed to create session", err)
 		return
@@ -454,7 +463,10 @@ func (h *authHandlers) handleListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 // userCreateRequest is the admin create-user body; role defaults to viewer.
+// kind "service" creates a service account: no password, never signs in, owns
+// API tokens an admin issues for an integration.
 type userCreateRequest struct {
+	Kind              string   `json:"kind" example:"person"`
 	Username          string   `json:"username"`
 	Password          string   `json:"password"`
 	DisplayName       string   `json:"display_name"`
@@ -466,7 +478,7 @@ type userCreateRequest struct {
 // handleCreateUser godoc
 //
 //	@Summary		Create a user
-//	@Description	Admin. Local user; role defaults to viewer. 409 when the username exists.
+//	@Description	Admin. Local user; role defaults to viewer. kind "service" makes a service account (no password; it can't sign in and only authenticates with API tokens admins issue for it). 409 when the username exists.
 //	@Tags			users
 //	@Accept			json
 //	@Produce		json
@@ -483,7 +495,15 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		jsonBadRequest(w, r, "invalid request body", err)
 		return
 	}
-	if req.Username == "" || req.Password == "" {
+	if req.Kind == "" {
+		req.Kind = models.UserKindPerson
+	}
+	if req.Kind != models.UserKindPerson && req.Kind != models.UserKindService {
+		jsonError(w, http.StatusBadRequest, "kind must be person or service")
+		return
+	}
+	service := req.Kind == models.UserKindService
+	if req.Username == "" || (req.Password == "" && !service) {
 		jsonError(w, http.StatusBadRequest, "username and password are required")
 		return
 	}
@@ -491,10 +511,15 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		req.Role = "viewer"
 	}
 
-	hash, err := auth.HashPassword(req.Password)
-	if err != nil {
-		jsonServerError(w, r, "failed to hash password", err)
-		return
+	// A service account keeps an empty hash: no password ever matches it, and
+	// CreateSession refuses it anyway.
+	hash := ""
+	if !service {
+		var err error
+		if hash, err = auth.HashPassword(req.Password); err != nil {
+			jsonServerError(w, r, "failed to hash password", err)
+			return
+		}
 	}
 
 	u := &models.User{
@@ -502,6 +527,7 @@ func (h *authHandlers) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		PasswordHash: hash,
 		DisplayName:  req.DisplayName,
 		Role:         req.Role,
+		Kind:         req.Kind,
 	}
 	if err := store.NewUserRepo(h.db.SQL).Create(r.Context(), u); err != nil {
 		jsonError(w, http.StatusConflict, "username already exists")
@@ -572,7 +598,7 @@ func (h *authHandlers) handleUpdateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if req.Password != "" {
+	if req.Password != "" && user.Kind != models.UserKindService {
 		hash, err := auth.HashPassword(req.Password)
 		if err != nil {
 			jsonServerError(w, r, "failed to hash password", err)

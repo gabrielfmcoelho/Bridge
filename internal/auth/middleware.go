@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -34,16 +36,25 @@ func WithUser(ctx context.Context, u *models.User) context.Context {
 // "Authorization: Bearer brg_…" — a personal API token that acts as its owner.
 func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var userID, tokenID int64
+		var userID int64
+		var token *store.AuthenticatedToken
 		if bearer := bearerAPIToken(r); bearer != "" {
-			var ok bool
-			var err error
-			tokenID, userID, ok, err = store.NewAPITokenRepo(db).Authenticate(r.Context(), HashAPIToken(bearer))
+			tok, ok, err := store.NewAPITokenRepo(db).Authenticate(r.Context(), HashAPIToken(bearer))
 			if err != nil || !ok {
 				auditAuthFailure(r, "invalid, expired or revoked api token")
 				httpx.WriteError(w, http.StatusUnauthorized, "invalid, expired or revoked api token")
 				return
 			}
+			limit := DefaultTokenRateLimit
+			if tok.RateLimitPerMinute != nil {
+				limit = *tok.RateLimitPerMinute
+			}
+			if allowed, retry := meter.allow(tok.ID, limit, time.Now()); !allowed {
+				w.Header().Set("Retry-After", strconv.Itoa(retry))
+				httpx.WriteError(w, http.StatusTooManyRequests, "api token rate limit exceeded")
+				return
+			}
+			userID, token = tok.UserID, &tok
 		} else {
 			token := GetSessionToken(r)
 			if token == "" {
@@ -71,8 +82,8 @@ func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 		// the actor (it installed the sink on r's context before us).
 		recordActor(r.Context(), user.Username)
 		ctx := context.WithValue(r.Context(), userContextKey, user)
-		if tokenID != 0 {
-			ctx = WithAPIToken(ctx, tokenID)
+		if token != nil {
+			ctx = WithAPIToken(ctx, token.ID, token.Scopes)
 		}
 		// Entidade visibility scope, loaded once per request. Admin bypasses;
 		// everyone else gets their visible set (own entidades + descendants).

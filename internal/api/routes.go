@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 )
 
@@ -56,11 +57,21 @@ func (rr routeRegistrar) add(pattern string, h http.HandlerFunc, mw func(http.Ha
 	if !ok {
 		panic("route pattern needs a method: " + pattern)
 	}
-	path = pathParam.ReplaceAllString(path, ":$1")
 	var mws []echo.MiddlewareFunc
 	if mw != nil && rr.db != nil {
-		mws = append(mws, echo.WrapMiddleware(mw))
+		// Every authenticated route needs a token scope, resolved once here:
+		// a route no rule covers stops the server from starting, so nothing
+		// ships unscoped. The scope check runs after auth (it reads the token).
+		scope, ok := auth.ScopeFor(method, path)
+		if !ok {
+			panic("route has no token scope (add a rule in internal/auth/scopes.go): " + pattern)
+		}
+		authMW := mw
+		mws = append(mws, echo.WrapMiddleware(func(next http.Handler) http.Handler {
+			return authMW(auth.RequireScope(scope, next))
+		}))
 	}
+	path = pathParam.ReplaceAllString(path, ":$1")
 	rr.e.Add(method, path, adapt(h), mws...)
 }
 

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/api"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -70,13 +71,17 @@ var webCmd = &cobra.Command{
 		// Background: clean up expired share links every hour (Phase 3 Task 3.4).
 		// Stops when ctx is cancelled (shutdown signal).
 		vault.NewShareLinkJanitor(db.SQL).Start(ctx)
+		// Background: write API token usage counts every minute.
+		auth.StartTokenUsageFlusher(ctx, db.SQL)
 
 		apiRouter := api.NewRouter(db, configPath)
 
 		mux := http.NewServeMux()
 
-		// API routes
+		// API routes, and the API reference (ReDoc) at /docs
 		mux.Handle("/api/", apiRouter)
+		mux.Handle("/docs", apiRouter)
+		mux.Handle("/docs/", apiRouter)
 
 		// Serve embedded static frontend (Next.js export) at /
 		staticFS, err := fs.Sub(staticFS, "static")
