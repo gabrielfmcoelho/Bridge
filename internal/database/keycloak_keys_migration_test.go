@@ -115,9 +115,14 @@ func TestMigrationV99_UniqueScopePrefix(t *testing.T) {
 		t.Fatalf("open: %v", err)
 	}
 	defer d.Close()
-	v99 := migrationsPostgres[len(migrationsPostgres)-1]
-	if !strings.Contains(v99, "api_catalog_scope_prefix_uq") {
-		t.Fatal("v99 is not the last migration")
+	var v99 string
+	for _, m := range migrationsPostgres {
+		if strings.Contains(m, "CREATE UNIQUE INDEX IF NOT EXISTS api_catalog_scope_prefix_uq") {
+			v99 = m
+		}
+	}
+	if v99 == "" {
+		t.Fatal("v99 not found")
 	}
 	mustExec := func(q string, args ...any) {
 		t.Helper()
