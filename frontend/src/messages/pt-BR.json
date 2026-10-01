@@ -289,7 +289,9 @@
         "syncScopesHint": "Cria no Keycloak todo escopo que a API declara, para que as chaves possam recebê-lo.",
         "scopesSynced": "Escopos sincronizados: {created} novos de {total}",
         "syncScopesFailed": "Não foi possível sincronizar os escopos",
-        "keycloakEditHint": "Mudanças de escopos e limite valem para os tokens emitidos a partir de agora."
+        "keycloakEditHint": "Mudanças de escopos e limite valem para os tokens emitidos a partir de agora.",
+        "personalTokensTitle": "Tokens pessoais (brg_)",
+        "personalTokensDesc": "Também autenticam a API do Bridge — Authorization: Bearer brg_… — com os escopos do token, limitados ao papel do dono. As chaves Keycloak acima são para sistemas; estes, para scripts de pessoas e contas de serviço."
       },
       "extraUrls": "URLs adicionais",
       "extraUrlsHint": "Outros endereços desta API — por exemplo, a origem quando a URL base é o gateway. Cada um aparece no perfil, no seletor de servidor da documentação e no menu Abrir.",

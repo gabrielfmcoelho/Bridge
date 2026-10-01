@@ -289,7 +289,9 @@
         "syncScopesHint": "Creates in Keycloak every scope the API declares, so keys can carry it.",
         "scopesSynced": "Scopes synced: {created} new of {total}",
         "syncScopesFailed": "Could not sync the scopes",
-        "keycloakEditHint": "Scope and rate-limit changes apply to tokens issued from now on."
+        "keycloakEditHint": "Scope and rate-limit changes apply to tokens issued from now on.",
+        "personalTokensTitle": "Personal tokens (brg_)",
+        "personalTokensDesc": "They also authenticate Bridge's API — Authorization: Bearer brg_… — with the token's scopes, capped by its owner's role. The Keycloak keys above are for systems; these are for people's scripts and service accounts."
       },
       "extraUrls": "Additional URLs",
       "extraUrlsHint": "Other addresses of this API — e.g. its origin when the base URL is the gateway. Each one shows up on the profile, in the docs server picker and in the Open menu.",

@@ -8,6 +8,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useFlag } from "@/contexts/FlagContext";
 import { useSecretReveal } from "@/hooks/useSecretReveal";
+import ApiTokensPanel from "@/components/tokens/ApiTokensPanel";
 import SectionCard from "@/components/ui/SectionCard";
 import IconButton from "@/components/ui/IconButton";
 import Icon from "@/components/ui/Icon";
@@ -172,6 +173,14 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
           })}
         </RowList>
       </SectionCard>
+
+      {api.scope_prefix === "bridge" && (
+        <ApiTokensPanel
+          title={t("atlas.apis.keys.personalTokensTitle")}
+          description={t("atlas.apis.keys.personalTokensDesc")}
+          scopeDisplayPrefix="bridge:"
+        />
+      )}
 
       {drawer && (
         <ApiKeyDrawer api={api} editing={drawer.editing} open onClose={() => setDrawer(null)}

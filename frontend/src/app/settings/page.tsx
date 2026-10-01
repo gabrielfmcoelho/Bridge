@@ -16,7 +16,7 @@ import UsersTab from "./UsersTab";
 import AppearanceTab from "./AppearanceTab";
 import ImportTab from "./ImportTab";
 import BackupTab from "./BackupTab";
-import ApiTokensTab from "./ApiTokensTab";
+import ApiTokensPanel from "@/components/tokens/ApiTokensPanel";
 
 type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "import" | "backup" | "integrations" | "permissions" | "role-mappings" | "api-tokens";
 
@@ -79,7 +79,7 @@ export default function SettingsPage() {
         {activeTab === "integrations" && isAdmin && <IntegrationsTab />}
         {activeTab === "permissions" && isAdmin && <PermissionsTab />}
         {activeTab === "role-mappings" && isAdmin && <RoleMappingsTab />}
-        {activeTab === "api-tokens" && <ApiTokensTab />}
+        {activeTab === "api-tokens" && <ApiTokensPanel />}
       </PageHeader>
     </PageShell>
   );

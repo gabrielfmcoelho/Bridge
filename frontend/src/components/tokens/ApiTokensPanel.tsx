@@ -39,10 +39,19 @@ function readNotice(): boolean {
   try { return localStorage.getItem(NOTICE_KEY) !== "dismissed"; } catch { return true; }
 }
 
+interface ApiTokensPanelProps {
+  /** Overrides the section title / description (Settings uses the defaults). */
+  title?: string;
+  description?: string;
+  /** Shown before each scope (e.g. "bridge:" on Bridge's API page, to read like its Keycloak scopes). */
+  scopeDisplayPrefix?: string;
+}
+
 // API tokens: scripts send "Authorization: Bearer brg_…" and act as the
 // token's owner, narrowed to the token's scopes. Every user manages their own;
-// admins also see everyone's and issue tokens for service accounts.
-export default function ApiTokensTab() {
+// admins also see everyone's and issue tokens for service accounts. Rendered in
+// Settings → Tokens de API and on Bridge's own API page (Chaves de acesso).
+export default function ApiTokensPanel({ title, description, scopeDisplayPrefix = "" }: ApiTokensPanelProps = {}) {
   const { t, formatDate, formatDateTime } = useLocale();
   const { user } = useAuth();
   const confirm = useConfirm();
@@ -136,8 +145,8 @@ export default function ApiTokensTab() {
   return (
     <SectionCard
       as="h3"
-      title={t("settings.apiTokens.title")}
-      description={t("settings.apiTokens.intro")}
+      title={title ?? t("settings.apiTokens.title")}
+      description={description ?? t("settings.apiTokens.intro")}
       controls={isAdmin ? (
         <label className="inline-flex items-center gap-2 text-xs text-[var(--text-secondary)]">
           <Toggle checked={showAll} onChange={setShowAll} ariaLabel={t("settings.apiTokens.showAll")} />
@@ -211,8 +220,8 @@ export default function ApiTokensTab() {
                         {tok.owner_kind === "service" && <span className="ml-2"><Lozenge appearance="new">{t("settings.apiTokens.serviceAccount")}</Lozenge></span>}
                       </td>
                     )}
-                    <td className={`${tableClasses.compact.td} font-mono text-xs text-[var(--text-secondary)] max-w-[16rem] truncate`} title={tok.scopes.join(", ")}>
-                      {tok.scopes.length ? tok.scopes.join(", ") : t("settings.apiTokens.noScopes")}
+                    <td className={`${tableClasses.compact.td} font-mono text-xs text-[var(--text-secondary)] max-w-[16rem] truncate`} title={tok.scopes.map((s) => scopeDisplayPrefix + s).join(", ")}>
+                      {tok.scopes.length ? tok.scopes.map((s) => scopeDisplayPrefix + s).join(", ") : t("settings.apiTokens.noScopes")}
                     </td>
                     <td className={`${tableClasses.compact.td} text-[var(--text-secondary)]`}>
                       {tok.last_used_at ? formatDateTime(tok.last_used_at) : t("settings.apiTokens.neverUsed")}
