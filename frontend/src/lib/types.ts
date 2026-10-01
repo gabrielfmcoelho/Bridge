@@ -386,6 +386,8 @@ export interface GraphNode {
   type: "host" | "service" | "dns" | "project" | "api";
   label: string;
   status?: string;
+  /** Service nodes may carry container_name, source, coolify_project,
+   *  coolify_environment, coolify_stack, project_id (all optional). */
   data?: Record<string, unknown>;
 }
 
@@ -393,11 +395,15 @@ export interface GraphEdge {
   source: string;
   target: string;
   label: string;
+  /** Inferred (project → host/DNS through its services), not a stored link. */
+  derived?: boolean;
 }
 
 export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  /** Node in focus on a detail page ("service-12"); none = the whole map. */
+  focus?: string;
 }
 
 export interface Issue {
