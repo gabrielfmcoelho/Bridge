@@ -414,3 +414,41 @@ func TestCatalog_ExtraURLs(t *testing.T) {
 		t.Errorf("cleared urls = %s, want []", got)
 	}
 }
+
+func TestCatalog_UpdateIsPartial(t *testing.T) {
+	e := newCatalogEnv(t)
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("name", "Parcial")
+	_ = mw.WriteField("description", "descrição original")
+	_ = mw.WriteField("base_url", "http://gw.example/x")
+	fw, _ := mw.CreateFormFile("spec", "spec.yaml")
+	io.WriteString(fw, testOpenAPI30)
+	mw.Close()
+	req, _ := http.NewRequest(http.MethodPost, e.server.URL+"/api/api-catalog/import/upload", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusCreated {
+		t.Fatalf("upload: %v %d %s", err, resp.StatusCode, readBody(resp))
+	}
+	id := itoa(int64(decodeObj(t, resp)["id"].(float64)))
+	get := func() map[string]any { return decodeObj(t, e.do(http.MethodGet, "/api/api-catalog/"+id, "")) }
+
+	// Só a descrição: nome e base_url ficam (antes viravam vazio / "name is required").
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"description":"nova"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("partial update = %d %s", resp.StatusCode, readBody(resp))
+	}
+	if a := get(); a["name"] != "Parcial" || a["description"] != "nova" || a["base_url"] != "http://gw.example/x" {
+		t.Errorf("after partial update: name=%v description=%v base_url=%v", a["name"], a["description"], a["base_url"])
+	}
+	// Enviado vazio limpa; nome vazio continua proibido.
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"base_url":""}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("clear base_url = %d", resp.StatusCode)
+	}
+	if a := get(); a["base_url"] != nil && a["base_url"] != "" {
+		t.Errorf("base_url not cleared: %v", a["base_url"])
+	}
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"name":"  "}`); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("blank name = %d, want 400", resp.StatusCode)
+	}
+}

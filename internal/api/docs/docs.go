@@ -608,7 +608,7 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "description": "Editor+; invisible APIs answer 404. Grants change only when a grant field is sent.",
+                "description": "Editor+; invisible APIs answer 404. Partial: an omitted field keeps its value (urls/links/responsáveis too); grants change only when a grant field is sent.",
                 "consumes": [
                     "application/json"
                 ],

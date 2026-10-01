@@ -90,6 +90,8 @@ in `internal/database/migrations_postgres.go`, one `// Version N` comment
 per element, currently at **v100**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
+A test about one migration must find it **by its content**, never as "the last
+element" of the slice — the next migration breaks that test (v99's did when v100 landed).
 
 ## Conventions
 
@@ -131,6 +133,15 @@ per element, currently at **v100**. Use idempotent idioms:
   `/design-system` in the app (admin, works under `dev:mock`) shows every
   primitive next to the ad-hoc copies still to migrate;
   `frontend/scripts/ds-counts.sh` reprints the drift tallies.
+- Update endpoints are **partial**: an omitted field keeps its value (pointer
+  fields in the request struct, `nil` = keep), `""`/`[]` clears. `PUT
+  /api/api-catalog/{id}` follows this; new update handlers must too — a plain
+  `string` field silently blanks the column when a caller omits it.
+- Atlas API keys (`internal/api/api_key_handlers.go`, Keycloak integration in
+  `internal/integrations/kcadmin`): the scope prefix `bridge` is reserved for
+  Bridge's own entry; a key's secret is returned **once** (also stored in the
+  vault). Operating the SEAD gateway/Keycloak around it: the `sead-api-gateway`
+  skill.
 - List endpoints return `{data, meta:{page,per_page,total}}`
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.

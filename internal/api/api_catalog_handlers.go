@@ -359,14 +359,15 @@ func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Requ
 
 // --- update / refetch / delete ----------------------------------------------
 
-// updateCatalogRequest edits an API's metadata. service_ids, project_ids,
-// urls and responsaveis are replaced when sent (send [] to clear) and kept
-// when omitted.
+// updateCatalogRequest edits an API's metadata. Every field is optional:
+// omitted keeps the current value, sent replaces it — "" clears a text field
+// (name can't be cleared), [] clears service_ids, project_ids, urls and
+// responsaveis.
 type updateCatalogRequest struct {
-	Name         string                     `json:"name"`
-	Description  string                     `json:"description"`
-	BaseURL      string                     `json:"base_url"`
-	DocsURL      string                     `json:"docs_url"`
+	Name         *string                    `json:"name"`
+	Description  *string                    `json:"description"`
+	BaseURL      *string                    `json:"base_url"`
+	DocsURL      *string                    `json:"docs_url"`
 	URLs         *[]models.APICatalogURL    `json:"urls"`
 	ServiceIDs   *[]int64                   `json:"service_ids"`
 	ProjectIDs   *[]int64                   `json:"project_ids"`
@@ -377,7 +378,7 @@ type updateCatalogRequest struct {
 // handleUpdate godoc
 //
 //	@Summary		Update a catalogued API's metadata
-//	@Description	Editor+; invisible APIs answer 404. Grants change only when a grant field is sent.
+//	@Description	Editor+; invisible APIs answer 404. Partial: an omitted field keeps its value (urls/links/responsáveis too); grants change only when a grant field is sent.
 //	@Tags			atlas
 //	@Accept			json
 //	@Produce		json
@@ -400,7 +401,8 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 		return
 	}
 	repo := store.NewAPICatalogRepo(h.db.SQL)
-	if existing, err := repo.Get(r.Context(), id); err != nil {
+	existing, err := repo.Get(r.Context(), id)
+	if err != nil {
 		jsonServerError(w, r, "get api catalog", err)
 		return
 	} else if existing == nil {
@@ -424,7 +426,14 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 			return
 		}
 	}
-	if err := repo.UpdateMeta(r.Context(), id, req.Name, req.Description, strings.TrimSpace(req.BaseURL), strings.TrimSpace(req.DocsURL)); err != nil {
+	keep := func(v *string, cur string) string {
+		if v == nil {
+			return cur
+		}
+		return *v
+	}
+	if err := repo.UpdateMeta(r.Context(), id, keep(req.Name, existing.Name), keep(req.Description, existing.Description),
+		strings.TrimSpace(keep(req.BaseURL, existing.BaseURL)), strings.TrimSpace(keep(req.DocsURL, existing.DocsURL))); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
