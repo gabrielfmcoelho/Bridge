@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -302,6 +303,9 @@ type importURLRequest struct {
 	SourceURL   string  `json:"source_url"`
 	BaseURL     string  `json:"base_url"`
 	DocsURL     string  `json:"docs_url"`
+	// URLs are the API's other addresses (e.g. its origin when base_url is
+	// the gateway), in display order.
+	URLs []models.APICatalogURL `json:"urls"`
 	models.AssetGrantsInput
 }
 
@@ -347,6 +351,7 @@ func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Requ
 		SourceURL:   req.SourceURL,
 		BaseURL:     strings.TrimSpace(req.BaseURL),
 		DocsURL:     strings.TrimSpace(req.DocsURL),
+		URLs:        req.URLs,
 		Grants:      req.AssetGrantsInput,
 	}
 	h.createFromSpec(w, r, raw, meta, owner)
@@ -354,13 +359,15 @@ func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Requ
 
 // --- update / refetch / delete ----------------------------------------------
 
-// updateCatalogRequest edits an API's metadata. service_ids, project_ids and
-// responsaveis are replaced when sent (send [] to clear) and kept when omitted.
+// updateCatalogRequest edits an API's metadata. service_ids, project_ids,
+// urls and responsaveis are replaced when sent (send [] to clear) and kept
+// when omitted.
 type updateCatalogRequest struct {
 	Name         string                     `json:"name"`
 	Description  string                     `json:"description"`
 	BaseURL      string                     `json:"base_url"`
 	DocsURL      string                     `json:"docs_url"`
+	URLs         *[]models.APICatalogURL    `json:"urls"`
 	ServiceIDs   *[]int64                   `json:"service_ids"`
 	ProjectIDs   *[]int64                   `json:"project_ids"`
 	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
@@ -410,6 +417,13 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 	if !h.linksVisible(w, r, serviceIDs, projectIDs) {
 		return
 	}
+	var urls []models.APICatalogURL
+	if req.URLs != nil {
+		if urls, err = models.NormalizeAPIURLs(*req.URLs); err != nil {
+			jsonBadRequest(w, r, err.Error(), err)
+			return
+		}
+	}
 	if err := repo.UpdateMeta(r.Context(), id, req.Name, req.Description, strings.TrimSpace(req.BaseURL), strings.TrimSpace(req.DocsURL)); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
@@ -417,6 +431,12 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 	if err := repo.SetLinks(r.Context(), id, serviceIDs, projectIDs); err != nil {
 		jsonServerError(w, r, "failed to set api links", err)
 		return
+	}
+	if urls != nil {
+		if err := repo.SetURLs(r.Context(), id, urls); err != nil {
+			jsonServerError(w, r, "failed to set api urls", err)
+			return
+		}
 	}
 	if req.Responsaveis != nil {
 		if err := store.NewResponsavelRepo(h.db.SQL).Sync(r.Context(), string(store.AssetAPICatalog), id, *req.Responsaveis); err != nil {
@@ -676,6 +696,7 @@ type catalogMeta struct {
 	SourceURL   string
 	BaseURL     string
 	DocsURL     string
+	URLs        []models.APICatalogURL
 	Grants      models.AssetGrantsInput
 }
 
@@ -697,6 +718,12 @@ func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL str
 	}
 	if m.ProjectIDs, err = formIDList(r, "project_ids"); err != nil {
 		return m, err
+	}
+	// urls: a JSON array of {label, url} (multipart has no nested fields).
+	if v := strings.TrimSpace(r.FormValue("urls")); v != "" {
+		if err := json.Unmarshal([]byte(v), &m.URLs); err != nil {
+			return m, fmt.Errorf("invalid urls: %v", err)
+		}
 	}
 	if v := strings.TrimSpace(r.FormValue("creator_entidade_id")); v != "" {
 		id, err := strconv.ParseInt(v, 10, 64)
@@ -727,6 +754,11 @@ func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL str
 // visible, and persists the catalog + operation index + links.
 func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Request, raw []byte, meta catalogMeta, owner int64) {
 	if !h.linksVisible(w, r, meta.ServiceIDs, meta.ProjectIDs) {
+		return
+	}
+	urls, err := models.NormalizeAPIURLs(meta.URLs)
+	if err != nil {
+		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
 	ps, err := apicatalog.Parse(raw)
@@ -774,6 +806,10 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 	}
 	if err := store.NewAPICatalogRepo(h.db.SQL).SetLinks(r.Context(), a.ID, dedupeOrEmpty(meta.ServiceIDs), dedupeOrEmpty(meta.ProjectIDs)); err != nil {
 		jsonServerError(w, r, "failed to set api links", err)
+		return
+	}
+	if err := store.NewAPICatalogRepo(h.db.SQL).SetURLs(r.Context(), a.ID, urls); err != nil {
+		jsonServerError(w, r, "failed to set api urls", err)
 		return
 	}
 	reloaded, err := store.NewAPICatalogRepo(h.db.SQL).Get(r.Context(), a.ID)

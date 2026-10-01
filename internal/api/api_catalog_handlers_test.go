@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -345,5 +346,71 @@ func TestCatalog_LinksTrashAndSpecReplace(t *testing.T) {
 	}
 	if arr := decodeArr(t, e.do(http.MethodGet, "/api/api-catalog?service_id="+itoa(svc.ID), "")); len(arr) != 1 {
 		t.Errorf("restored api lost its link")
+	}
+}
+
+// TestCatalog_ExtraURLs covers v100: extra addresses set at upload (form field
+// "urls", JSON), returned in order on detail and list rows, kept when a PUT
+// omits them, cleared with [], and validated (scheme, count).
+func TestCatalog_ExtraURLs(t *testing.T) {
+	e := newCatalogEnv(t)
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("name", "Gateway API")
+	_ = mw.WriteField("base_url", "http://gw.example/datalakehouse/x")
+	_ = mw.WriteField("urls", `[{"label":"Origem","url":" http://origin.example "},{"label":"","url":""},{"label":"Dup","url":"http://origin.example"},{"label":"Docs","url":"https://docs.example"}]`)
+	fw, _ := mw.CreateFormFile("spec", "spec.yaml")
+	io.WriteString(fw, testOpenAPI30)
+	mw.Close()
+	req, _ := http.NewRequest(http.MethodPost, e.server.URL+"/api/api-catalog/import/upload", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusCreated {
+		t.Fatalf("upload: %v %d %s", err, resp.StatusCode, readBody(resp))
+	}
+	created := decodeObj(t, resp)
+	id := itoa(int64(created["id"].(float64)))
+	urls := func(m map[string]any) string {
+		b, _ := json.Marshal(m["urls"])
+		return string(b)
+	}
+	// Trimmed, blank row dropped, duplicate URL dropped, order kept.
+	want := `[{"label":"Origem","url":"http://origin.example"},{"label":"Docs","url":"https://docs.example"}]`
+	if got := urls(created); got != want {
+		t.Fatalf("created urls = %s, want %s", got, want)
+	}
+	if rows := decodeArr(t, e.do(http.MethodGet, "/api/api-catalog", "")); len(rows) != 1 || urls(rows[0]) != want {
+		t.Errorf("list row urls = %v", rows)
+	}
+	// Omitted → kept.
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"name":"Gateway API"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("rename = %d", resp.StatusCode)
+	}
+	if got := urls(decodeObj(t, e.do(http.MethodGet, "/api/api-catalog/"+id, ""))); got != want {
+		t.Errorf("rename changed urls: %s", got)
+	}
+	// Replaced, then validated.
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"name":"Gateway API","urls":[{"label":"Gateway","url":"http://gw.example"}]}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("replace = %d", resp.StatusCode)
+	}
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"name":"Gateway API","urls":[{"label":"X","url":"ftp://x"}]}`); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("ftp url = %d, want 400", resp.StatusCode)
+	}
+	many := make([]string, 11)
+	for i := range many {
+		many[i] = fmt.Sprintf(`{"label":"u%d","url":"http://h%d.example"}`, i, i)
+	}
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"name":"Gateway API","urls":[`+strings.Join(many, ",")+`]}`); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("11 urls = %d, want 400", resp.StatusCode)
+	}
+	if got := urls(decodeObj(t, e.do(http.MethodGet, "/api/api-catalog/"+id, ""))); got != `[{"label":"Gateway","url":"http://gw.example"}]` {
+		t.Errorf("after rejected updates urls = %s", got)
+	}
+	// [] → cleared.
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"name":"Gateway API","urls":[]}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("clear = %d", resp.StatusCode)
+	}
+	if got := urls(decodeObj(t, e.do(http.MethodGet, "/api/api-catalog/"+id, ""))); got != `[]` {
+		t.Errorf("cleared urls = %s, want []", got)
 	}
 }

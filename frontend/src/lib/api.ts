@@ -940,6 +940,7 @@ type ApiImportMeta = {
   project_ids: number[];
   base_url?: string;
   docs_url?: string;
+  urls?: import("./types").ApiCatalogURL[];
 } & import("./types").AssetGrantsInput;
 
 // Multipart POST for spec uploads (JSON helpers can't carry a file).
@@ -970,6 +971,7 @@ export const apiCatalogAPI = {
     if (meta.description) form.append("description", meta.description);
     if (meta.base_url) form.append("base_url", meta.base_url);
     if (meta.docs_url) form.append("docs_url", meta.docs_url);
+    if (meta.urls?.length) form.append("urls", JSON.stringify(meta.urls));
     form.append("service_ids", meta.service_ids.join(","));
     form.append("project_ids", meta.project_ids.join(","));
     if (meta.creator_entidade_id != null) form.append("creator_entidade_id", String(meta.creator_entidade_id));
@@ -988,6 +990,7 @@ export const apiCatalogAPI = {
     description?: string;
     base_url?: string;
     docs_url?: string;
+    urls?: import("./types").ApiCatalogURL[];
     service_ids?: number[];
     project_ids?: number[];
     responsaveis?: { contact_id?: number; is_main: boolean }[];

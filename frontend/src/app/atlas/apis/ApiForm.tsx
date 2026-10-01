@@ -18,7 +18,8 @@ import FormSection from "@/components/forms/FormSection";
 import RelationPicker from "@/components/forms/RelationPicker";
 import { useRelationOptions } from "@/components/forms/useRelationOptions";
 import { SPEC_ACCEPT, useSpecActions } from "./_components/useSpecActions";
-import type { ApiCatalog, AssetGrantsInput, EntityResponsavel } from "@/lib/types";
+import ApiUrlsEditor, { cleanUrls, invalidUrlRows } from "./_components/ApiUrlsEditor";
+import type { ApiCatalog, ApiCatalogURL, AssetGrantsInput, EntityResponsavel } from "@/lib/types";
 
 const URL_RE = /^https?:\/\/\S+$/i;
 
@@ -59,6 +60,7 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
   const [sourceUrl, setSourceUrl] = useState(prefill?.specUrl ?? "");
   const [baseUrl, setBaseUrl] = useState(initial?.base_url ?? prefill?.baseUrl ?? "");
   const [docsUrl, setDocsUrl] = useState(initial?.docs_url ?? "");
+  const [urls, setUrls] = useState<ApiCatalogURL[]>(initial?.urls ?? []);
   const [serviceIds, setServiceIds] = useState<number[]>(initial?.service_ids ?? prefill?.serviceIds ?? []);
   const [projectIds, setProjectIds] = useState<number[]>(initial?.project_ids ?? prefill?.projectIds ?? []);
   const [responsaveis, setResponsaveis] = useState<EntityResponsavel[]>(initial?.responsaveis ?? []);
@@ -79,6 +81,7 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
         description: description.trim(),
         base_url: baseUrl.trim(),
         docs_url: docsUrl.trim(),
+        urls: cleanUrls(urls),
         service_ids: serviceIds,
         project_ids: projectIds,
         ...grants,
@@ -102,6 +105,7 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
   if (!isEdit && sourceMode === "url" && !URL_RE.test(sourceUrl.trim())) errors.sourceUrl = sourceUrl.trim() ? t("form.urlInvalid") : t("form.required");
   if (baseUrl.trim() && baseUrl !== (initial?.base_url ?? "") && !URL_RE.test(baseUrl.trim())) errors.baseUrl = t("form.urlInvalid");
   if (docsUrl.trim() && docsUrl !== (initial?.docs_url ?? "") && !URL_RE.test(docsUrl.trim())) errors.docsUrl = t("form.urlInvalid");
+  if (invalidUrlRows(urls).size) errors.urls = t("form.urlInvalid");
   const err = (k: string) => (attempted ? errors[k] : undefined);
 
   const submit = () => {
@@ -184,6 +188,11 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
           type="url" className="font-mono" placeholder="https://api.example.com" error={err("baseUrl")} aria-invalid={!!err("baseUrl")} />
         <Input label={t("atlas.apis.docsUrl")} hint={t("atlas.apis.docsUrlHint")} value={docsUrl} onChange={(e) => setDocsUrl(e.target.value)}
           type="url" className="font-mono" placeholder="https://api.example.com/docs" error={err("docsUrl")} aria-invalid={!!err("docsUrl")} />
+        <div className="sm:col-span-2">
+          <FormField label={t("atlas.apis.extraUrls")} hint={t("atlas.apis.extraUrlsHint")}>
+            <ApiUrlsEditor value={urls} onChange={setUrls} showErrors={attempted} />
+          </FormField>
+        </div>
       </FormSection>
 
       <FormSection id="api-owners" title={t("form.section.owners")} stack>

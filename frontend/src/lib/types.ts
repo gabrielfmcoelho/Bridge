@@ -571,6 +571,8 @@ export interface ApiCatalog {
   external_url?: string;
   base_url?: string;
   docs_url?: string;
+  /** The API's other addresses (e.g. its origin when base_url is the gateway), in order; [] when none. */
+  urls: ApiCatalogURL[];
   spec_version: string;
   spec_hash: string;
   title: string;
@@ -597,6 +599,11 @@ export interface ApiCatalog {
 }
 
 export type ApiKeyManagement = "none" | "manual" | "keycloak";
+
+export interface ApiCatalogURL {
+  label: string;
+  url: string;
+}
 
 /** One access key of a catalogued API. The plaintext lives in the vault (secret_id). */
 export interface ApiKey {

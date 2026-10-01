@@ -290,7 +290,15 @@
         "scopesSynced": "Scopes synced: {created} new of {total}",
         "syncScopesFailed": "Could not sync the scopes",
         "keycloakEditHint": "Scope and rate-limit changes apply to tokens issued from now on."
-      }
+      },
+      "extraUrls": "Additional URLs",
+      "extraUrlsHint": "Other addresses of this API — e.g. its origin when the base URL is the gateway. Each one shows up on the profile, in the docs server picker and in the Open menu.",
+      "urlLabel": "Label",
+      "urlLabelPlaceholder": "Origin",
+      "addUrl": "Add URL",
+      "primaryUrl": "Primary",
+      "openUrl": "Open {label}",
+      "extraUrl": "Other URL"
     },
     "lineage": {
       "title": "Data Lineage",

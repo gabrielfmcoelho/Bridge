@@ -44,6 +44,9 @@ export default function ApiProfile({ api, onEditResponsaveis }: { api: ApiCatalo
           <SectionHeading as="h3" className="!mb-2">{t("service.links")}</SectionHeading>
           <div className="grid grid-cols-1 gap-4">
             <Field label={t("atlas.apis.baseUrl")} value={api.base_url || ""} link mono />
+            {(api.urls ?? []).map((u) => (
+              <Field key={u.url} label={u.label || t("atlas.apis.extraUrl")} value={u.url} link mono />
+            ))}
             <Field label={t("atlas.apis.docsUrl")} value={api.docs_url || ""} link mono />
             <Field label={t("atlas.apis.sourceUrl")} value={api.source_url || ""} link mono />
             {api.external_url && api.external_url !== api.base_url && <Field label={t("atlas.apis.specServer")} value={api.external_url} link mono />}

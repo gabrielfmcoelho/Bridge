@@ -1412,6 +1412,13 @@ definitions:
         type: array
       source_url:
         type: string
+      urls:
+        description: |-
+          URLs are the API's other addresses (e.g. its origin when base_url is
+          the gateway), in display order.
+        items:
+          $ref: '#/definitions/models.APICatalogURL'
+        type: array
     type: object
   api.integrationTestGitLabCodeRequest:
     properties:
@@ -2155,6 +2162,10 @@ definitions:
         items:
           type: integer
         type: array
+      urls:
+        items:
+          $ref: '#/definitions/models.APICatalogURL'
+        type: array
     type: object
   api.updateSecretRequest:
     properties:
@@ -2556,7 +2567,21 @@ definitions:
         type: string
       updated_at:
         type: string
+      urls:
+        description: |-
+          URLs are the API's other addresses (e.g. its origin when BaseURL is the
+          gateway), in display order; always set, [] when none.
+        items:
+          $ref: '#/definitions/models.APICatalogURL'
+        type: array
       version_label:
+        type: string
+    type: object
+  models.APICatalogURL:
+    properties:
+      label:
+        type: string
+      url:
         type: string
     type: object
   models.APIKey:

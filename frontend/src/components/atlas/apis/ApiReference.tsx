@@ -66,14 +66,15 @@ export default function ApiReference({
   content,
   showSidebar = true,
   hideTestRequest = false,
-  serverUrl,
+  servers,
 }: {
   content: Record<string, unknown>;
   showSidebar?: boolean;
   hideTestRequest?: boolean;
   // When set, overrides the spec's servers so Scalar's "Test Request" targets
   // the real API host instead of falling back to this app's origin.
-  serverUrl?: string;
+  /** Overrides the spec's servers (e.g. the API's primary and extra URLs); shown in Scalar's server picker. */
+  servers?: { url: string; description?: string }[];
 }) {
   const { theme } = useTheme();
   const { locale } = useLocale();
@@ -101,7 +102,7 @@ ${SCALAR_CSS}
 }
 `;
 
-  const doc = serverUrl ? { ...content, servers: [{ url: serverUrl }] } : content;
+  const doc = servers?.length ? { ...content, servers } : content;
   return (
     <ApiReferenceReact
       key={`${theme}-${locale}`}

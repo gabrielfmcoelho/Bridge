@@ -189,6 +189,10 @@ export default function ApiDetail({ id }: { id: number }) {
                     elemBefore={<Icon path={ICON_PATHS.externalLink} className="w-4 h-4" />}>{t("atlas.apis.openDocs")}</DropdownMenuItem>
                   <DropdownMenuItem disabled={!api.base_url} onClick={() => api.base_url && open(api.base_url)}
                     elemBefore={<Icon path={ICON_PATHS.externalLink} className="w-4 h-4" />}>{t("atlas.apis.openBaseUrl")}</DropdownMenuItem>
+                  {(api.urls ?? []).map((u) => (
+                    <DropdownMenuItem key={u.url} onClick={() => open(u.url)}
+                      elemBefore={<Icon path={ICON_PATHS.externalLink} className="w-4 h-4" />}>{t("atlas.apis.openUrl", { label: u.label || u.url })}</DropdownMenuItem>
+                  ))}
                 </DropdownMenuGroup>
               </DropdownMenu>
               {specActions.fileInput}
@@ -207,7 +211,10 @@ export default function ApiDetail({ id }: { id: number }) {
 
           {activeTab === "endpoints" && (
             <div className="min-h-[70vh]">
-              {spec ? <ApiReference content={spec} serverUrl={api.base_url || undefined} /> : <Skeleton className="h-[60vh] w-full rounded-[var(--radius-md)]" />}
+              {spec ? <ApiReference content={spec} servers={[
+                ...(api.base_url ? [{ url: api.base_url, description: t("atlas.apis.primaryUrl") }] : []),
+                ...(api.urls ?? []).map((u) => ({ url: u.url, description: u.label || undefined })),
+              ]} /> : <Skeleton className="h-[60vh] w-full rounded-[var(--radius-md)]" />}
             </div>
           )}
 

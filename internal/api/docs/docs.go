@@ -17437,6 +17437,13 @@ const docTemplate = `{
                 },
                 "source_url": {
                     "type": "string"
+                },
+                "urls": {
+                    "description": "URLs are the API's other addresses (e.g. its origin when base_url is\nthe gateway), in display order.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.APICatalogURL"
+                    }
                 }
             }
         },
@@ -18546,6 +18553,12 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "urls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.APICatalogURL"
+                    }
                 }
             }
         },
@@ -19131,7 +19144,25 @@ const docTemplate = `{
                 "updated_at": {
                     "type": "string"
                 },
+                "urls": {
+                    "description": "URLs are the API's other addresses (e.g. its origin when BaseURL is the\ngateway), in display order; always set, [] when none.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.APICatalogURL"
+                    }
+                },
                 "version_label": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.APICatalogURL": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "url": {
                     "type": "string"
                 }
             }

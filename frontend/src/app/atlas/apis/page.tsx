@@ -75,7 +75,7 @@ export default function ApisPage() {
     const s = search.trim().toLowerCase();
     const filtered = allApis.filter((a) =>
       matchesApiFilters(a, filters) &&
-      (!s || [a.name, a.title, a.description, a.base_url].some((v) => v?.toLowerCase().includes(s))));
+      (!s || [a.name, a.title, a.description, a.base_url, ...(a.urls ?? []).map((u) => u.url)].some((v) => v?.toLowerCase().includes(s))));
     const dir = sort.direction === "desc" ? -1 : 1;
     return filtered.sort((a, b) => {
       if (sort.field === "operation_count") return dir * (a.operation_count - b.operation_count);

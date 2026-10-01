@@ -102,7 +102,7 @@ func (r *APICatalogRepo) Get(ctx context.Context, id int64) (*models.APICatalog,
 	if err != nil {
 		return nil, err
 	}
-	a.ServiceIDs, a.ProjectIDs = links.Services[id], links.Projects[id]
+	a.ServiceIDs, a.ProjectIDs, a.URLs = links.Services[id], links.Projects[id], links.URLs[id]
 	normalizeAPILinks(a)
 	return a, nil
 }
@@ -196,7 +196,7 @@ func (r *APICatalogRepo) withLinks(ctx context.Context, apis []models.APICatalog
 		return nil, err
 	}
 	for i := range apis {
-		apis[i].ServiceIDs, apis[i].ProjectIDs = links.Services[apis[i].ID], links.Projects[apis[i].ID]
+		apis[i].ServiceIDs, apis[i].ProjectIDs, apis[i].URLs = links.Services[apis[i].ID], links.Projects[apis[i].ID], links.URLs[apis[i].ID]
 		normalizeAPILinks(&apis[i])
 	}
 	return apis, nil
@@ -208,6 +208,9 @@ func normalizeAPILinks(a *models.APICatalog) {
 	}
 	if a.ProjectIDs == nil {
 		a.ProjectIDs = []int64{}
+	}
+	if a.URLs == nil {
+		a.URLs = []models.APICatalogURL{}
 	}
 }
 
@@ -228,16 +231,17 @@ func apiLinkFilter(q string, args []any, serviceID, projectID int64) (string, []
 	return q, args
 }
 
-// APILinks maps api id → linked service / project ids.
+// APILinks maps api id → linked service / project ids and extra URLs.
 type APILinks struct {
 	Services map[int64][]int64
 	Projects map[int64][]int64
+	URLs     map[int64][]models.APICatalogURL
 }
 
 // LinksBulk loads the direct links of the given APIs. Links to trashed
 // services or projects are left out.
 func (r *APICatalogRepo) LinksBulk(ctx context.Context, apiIDs []int64) (APILinks, error) {
-	out := APILinks{Services: map[int64][]int64{}, Projects: map[int64][]int64{}}
+	out := APILinks{Services: map[int64][]int64{}, Projects: map[int64][]int64{}, URLs: map[int64][]models.APICatalogURL{}}
 	if len(apiIDs) == 0 {
 		return out, nil
 	}
@@ -272,7 +276,43 @@ func (r *APICatalogRepo) LinksBulk(ctx context.Context, apiIDs []int64) (APILink
 			return out, err
 		}
 	}
-	return out, nil
+	rows, err := r.db.QueryContext(ctx, `SELECT api_id, label, url FROM api_catalog_urls
+		WHERE api_id IN (`+ph+`) ORDER BY api_id, position, id`, args...)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var apiID int64
+		var u models.APICatalogURL
+		if err := rows.Scan(&apiID, &u.Label, &u.URL); err != nil {
+			return out, err
+		}
+		out.URLs[apiID] = append(out.URLs[apiID], u)
+	}
+	return out, rows.Err()
+}
+
+// SetURLs replaces an API's extra URLs (already normalized by
+// models.NormalizeAPIURLs) in one transaction, keeping their order. The caller
+// has checked the API is visible.
+func (r *APICatalogRepo) SetURLs(ctx context.Context, apiID int64, urls []models.APICatalogURL) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM api_catalog_urls WHERE api_id = ?`, apiID); err != nil {
+		return err
+	}
+	for i, u := range urls {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO api_catalog_urls (api_id, label, url, position) VALUES (?, ?, ?, ?)`,
+			apiID, u.Label, u.URL, i); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // SetLinks replaces an API's service and project links. A nil slice leaves

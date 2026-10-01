@@ -45,6 +45,9 @@ type APICatalog struct {
 	// "avulso".
 	ServiceIDs []int64 `json:"service_ids"`
 	ProjectIDs []int64 `json:"project_ids"`
+	// URLs are the API's other addresses (e.g. its origin when BaseURL is the
+	// gateway), in display order; always set, [] when none.
+	URLs []APICatalogURL `json:"urls"`
 	// Responsaveis is loaded on detail responses only.
 	Responsaveis []Responsavel `json:"responsaveis,omitempty"`
 
@@ -110,6 +113,48 @@ func ValidKeyManagement(m string) bool {
 
 // Validate enforces the source_type invariant the DB CHECK also guards, so the
 // model rejects bad input before any write.
+// APICatalogURL is one extra address of an API, with a short label
+// ("Gateway", "Origem").
+type APICatalogURL struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
+}
+
+// MaxAPICatalogURLs caps the extra addresses per API.
+const MaxAPICatalogURLs = 10
+
+// NormalizeAPIURLs trims, validates (http/https, max lengths, at most
+// MaxAPICatalogURLs) and dedupes by URL, keeping the first label. Rows with
+// neither label nor URL are dropped. The result is never nil.
+func NormalizeAPIURLs(in []APICatalogURL) ([]APICatalogURL, error) {
+	out := []APICatalogURL{}
+	seen := map[string]bool{}
+	for _, u := range in {
+		label, raw := strings.TrimSpace(u.Label), strings.TrimSpace(u.URL)
+		if label == "" && raw == "" {
+			continue
+		}
+		if raw == "" {
+			return nil, fmt.Errorf("url is required (label %q)", label)
+		}
+		if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
+			return nil, fmt.Errorf("url must be http(s): %q", raw)
+		}
+		if len(raw) > 2048 || len(label) > 80 {
+			return nil, fmt.Errorf("url or label too long: %q", raw)
+		}
+		if seen[raw] {
+			continue
+		}
+		seen[raw] = true
+		out = append(out, APICatalogURL{Label: label, URL: raw})
+	}
+	if len(out) > MaxAPICatalogURLs {
+		return nil, fmt.Errorf("at most %d extra urls", MaxAPICatalogURLs)
+	}
+	return out, nil
+}
+
 func (a *APICatalog) Validate() error {
 	switch a.SourceType {
 	case APICatalogSourceUpload, APICatalogSourceURL:

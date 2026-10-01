@@ -1663,4 +1663,18 @@ var migrationsPostgres = []string{
 	CREATE UNIQUE INDEX IF NOT EXISTS api_catalog_scope_prefix_uq ON api_catalog (scope_prefix) WHERE scope_prefix <> '';
 	ALTER TABLE api_catalog DROP COLUMN IF EXISTS admin_key_cipher, DROP COLUMN IF EXISTS admin_key_nonce,
 		DROP COLUMN IF EXISTS admin_api_key_cipher, DROP COLUMN IF EXISTS admin_api_key_nonce;`,
+
+	// Version 100: an API can be reached at more than one address (through the
+	// API gateway and at its origin). base_url stays the primary one; these are
+	// the others, labelled and ordered. They live and die with the API row and
+	// follow its visibility (no grants of their own).
+	`CREATE TABLE IF NOT EXISTS api_catalog_urls (
+		id BIGSERIAL PRIMARY KEY,
+		api_id BIGINT NOT NULL REFERENCES api_catalog(id) ON DELETE CASCADE,
+		label TEXT NOT NULL DEFAULT '',
+		url TEXT NOT NULL,
+		position INT NOT NULL DEFAULT 0,
+		UNIQUE (api_id, url)
+	);
+	CREATE INDEX IF NOT EXISTS api_catalog_urls_api_idx ON api_catalog_urls (api_id, position);`,
 }
