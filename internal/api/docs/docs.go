@@ -715,7 +715,7 @@ const docTemplate = `{
         },
         "/api/api-catalog/{id}/key-management": {
             "put": {
-                "description": "Admin. key_management none, manual or sead; for sead the admin base URL (the service root, before /admin/keys) and master key (sent as X-Admin-Key) plus an optional X-API-Key. Credentials are write-only: blank keeps the stored one, clear_* removes it.",
+                "description": "Admin. key_management none, manual or keycloak; for keycloak the API's base URL (its root, where GET /escopos and GET /admin/uso live) and its scope prefix (scopes \"\u003cprefix\u003e:…\", clients \"\u003cprefix\u003e-\u003clabel\u003e\"). The Keycloak connection itself is the keycloak_apis integration setting. \"bridge\" is reserved for Bridge's own entry.",
                 "consumes": [
                     "application/json"
                 ],
@@ -735,7 +735,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Mode and SEAD connection",
+                        "description": "Mode, base URL and scope prefix",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -780,7 +780,7 @@ const docTemplate = `{
         },
         "/api/api-catalog/{id}/key-management/test": {
             "post": {
-                "description": "Admin. Lists the service's keys with the given (unsaved) values, falling back to the stored ones for anything left blank. Always 200: {success, error | keys}.",
+                "description": "Admin. With the given (unsaved) base URL and scope prefix, falling back to the stored ones: reads the API's scope catalogue and lists its Keycloak clients through the keycloak_apis integration. Always 200: {success, error | keys, scopes}.",
                 "consumes": [
                     "application/json"
                 ],
@@ -790,7 +790,7 @@ const docTemplate = `{
                 "tags": [
                     "atlas"
                 ],
-                "summary": "Test an API's SEAD connection",
+                "summary": "Test an API's Keycloak connection",
                 "parameters": [
                     {
                         "type": "integer",
@@ -907,7 +907,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "apis.keys.manage. In sead mode the key is created on the service with the chosen scopes (from GET …/keys/scopes; the service rejects unknown ones) and its plaintext comes back once here; in manual mode send the existing key as value. Either way the plaintext is also stored in the vault. Label: letters, digits, . _ - (max 64), unique among the API's live keys.",
+                "description": "apis.keys.manage. In keycloak mode a Keycloak client \"\u003cscope_prefix\u003e-\u003clabel\u003e\" is created with the chosen scopes (from GET …/keys/scopes) as optional client scopes (every one must carry the API's \"\u003cscope_prefix\u003e:\") and the rate limit as its rate_limit_per_minute claim; its secret comes back once here. The integration's own client ids are refused. On Bridge's own entry the client also gets a service-account user (the least role its scopes need, never above the caller's role nor, for a token caller, its token's scopes). In manual mode send the existing key as value. Either way the plaintext is also stored in the vault. Label: letters, digits, . _ - (max 64), unique among the API's live keys.",
                 "consumes": [
                     "application/json"
                 ],
@@ -984,14 +984,14 @@ const docTemplate = `{
         },
         "/api/api-catalog/{id}/keys/scopes": {
             "get": {
-                "description": "Any role that can see the API; sead mode only. The service's catalogue: \"*\" (everything), route scopes with the route patterns they open, and output modifiers such as \"demo\". A service without the catalogue endpoint answers 404.",
+                "description": "Any role that can see the API; keycloak mode only. The API's catalogue from its GET /escopos (Bridge's own for Bridge): route scopes with the route patterns they open, and output modifiers. Names carry the API's \"\u003cscope_prefix\u003e:\".",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "atlas"
                 ],
-                "summary": "Scopes a SEAD key can carry",
+                "summary": "Scopes a key of this API can carry",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1007,7 +1007,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/seadkeys.ScopeInfo"
+                                "$ref": "#/definitions/kcadmin.ScopeInfo"
                             }
                         }
                     },
@@ -1040,14 +1040,14 @@ const docTemplate = `{
         },
         "/api/api-catalog/{id}/keys/sync": {
             "post": {
-                "description": "apis.keys.manage, sead mode only. Imports keys created elsewhere (CLI, other admins) as metadata-only rows and refreshes status, expiry and usage of known ones. Bridge's own owner contact, notes and vault copy are kept.",
+                "description": "apis.keys.manage, keycloak mode only. Imports the realm's clients named \"\u003cscope_prefix\u003e-…\" created elsewhere (except the integration's own admin and usage clients) as metadata-only rows and refreshes scopes, rate limit and revocation (a disabled client) of known ones. Bridge's own owner, contact, notes and vault copy are kept.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "atlas"
                 ],
-                "summary": "Sync keys from the SEAD service",
+                "summary": "Sync keys from Keycloak",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1097,9 +1097,68 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/api-catalog/{id}/keys/sync-scopes": {
+            "post": {
+                "description": "apis.keys.manage, keycloak mode only. Reads the API's scope catalogue (its GET /escopos; Bridge's own for Bridge) and creates every scope the realm lacks as an OIDC client scope, so Keycloak's scopes follow the API's code. Existing scopes are left as they are.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Create the API's scopes in Keycloak",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiKeyScopeSyncResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/api-catalog/{id}/keys/{keyId}": {
             "put": {
-                "description": "apis.keys.manage. Changes Bridge's owner, contact and notes (and expiry, for manual keys). A SEAD key's expiry, scopes and rate limit can't change on the service: revoke and issue a new key.",
+                "description": "apis.keys.manage. Changes Bridge's owner, contact and notes; a manual key's expiry; an active Keycloak key's scopes and rate limit (applied to the client: tokens issued from then on carry them; scopes null keeps them, rate 0 = the API's default).",
                 "consumes": [
                     "application/json"
                 ],
@@ -1109,7 +1168,7 @@ const docTemplate = `{
                 "tags": [
                     "atlas"
                 ],
-                "summary": "Edit an access key's metadata",
+                "summary": "Edit an access key",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1126,7 +1185,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Metadata",
+                        "description": "Changes",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -1165,13 +1224,19 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
                     }
                 }
             }
         },
         "/api/api-catalog/{id}/keys/{keyId}/revoke": {
             "post": {
-                "description": "apis.keys.manage. A SEAD key is revoked on the service first (a key already gone there still counts). The vault copy is renamed so the label can be reused.",
+                "description": "apis.keys.manage. A Keycloak key's client is disabled first (no new tokens; one already gone there still counts). For Bridge's own entry its service-account link is dropped too, so tokens it already issued stop at once; re-enabling then needs the key's scopes saved again. The vault copy is renamed so the label can be reused for a manual key; a Keycloak client id stays taken.",
                 "produces": [
                     "application/json"
                 ],
@@ -1237,17 +1302,14 @@ const docTemplate = `{
         },
         "/api/api-catalog/{id}/keys/{keyId}/rotate": {
             "post": {
-                "description": "apis.keys.manage, sead mode only. The service issues a new key under the same label and keeps the old one working for grace_days; the vault copy gets the new plaintext (its history keeps the old). The new plaintext also comes back once here.",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "apis.keys.manage, keycloak keys only. Keycloak issues a new client secret and the old one stops working at once (tokens already issued live until they expire). The vault copy gets the new secret (its history keeps the old); it also comes back once here.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "atlas"
                 ],
-                "summary": "Rotate a SEAD access key",
+                "summary": "Rotate a Keycloak key's secret",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1262,15 +1324,6 @@ const docTemplate = `{
                         "name": "keyId",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Grace period for the old key",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.apiKeyRotateRequest"
-                        }
                     }
                 ],
                 "responses": {
@@ -1315,14 +1368,14 @@ const docTemplate = `{
         },
         "/api/api-catalog/{id}/keys/{keyId}/usage": {
             "get": {
-                "description": "Any role that can see the API. Lifetime and per-day counts (\"YYYYMMDD\" → requests) for the last days (default 30), straight from the service.",
+                "description": "Any role that can see the API. Lifetime and per-day counts (\"YYYY-MM-DD\" → requests) straight from the API's GET /admin/uso, read with a token of the integration's usage client (kc_apis_usage_client_id, no realm-management roles) holding \"\u003cscope_prefix\u003e:admin.uso\" — the admin client's token never reaches an API. 400 when the usage client isn't configured. Not available for Bridge's own clients.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "atlas"
                 ],
-                "summary": "A SEAD key's request counts",
+                "summary": "A Keycloak key's request counts",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1337,19 +1390,13 @@ const docTemplate = `{
                         "name": "keyId",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Days back (1-90, default 30)",
-                        "name": "days",
-                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/seadkeys.Usage"
+                            "$ref": "#/definitions/kcadmin.Usage"
                         }
                     },
                     "400": {
@@ -4471,6 +4518,29 @@ const docTemplate = `{
                         "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/escopos": {
+            "get": {
+                "description": "Public. Every token scope with the \"bridge:\" prefix (no \"*\" wildcard) — the same shape the catalogued APIs answer at their GET /escopos, so Bridge's own Keycloak clients are picked and synced like theirs.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Bridge's scopes as Keycloak client scopes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/auth.ScopeInfo"
+                            }
                         }
                     }
                 }
@@ -11423,7 +11493,7 @@ const docTemplate = `{
         },
         "/api/settings/integrations": {
             "get": {
-                "description": "Admin. Every integration group (ldap, gitlab, keycloak, llm, coolify, grafana, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
+                "description": "Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
                 "produces": [
                     "application/json"
                 ],
@@ -12192,7 +12262,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Integration group (ldap, gitlab, keycloak, llm, coolify, grafana, outline, proxmox, glpi, general)",
+                        "description": "Integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, outline, proxmox, glpi, general)",
                         "name": "group",
                         "in": "path",
                         "required": true
@@ -15710,7 +15780,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "expires_days": {
-                    "description": "nil or 0 = never",
+                    "description": "manual only; nil or 0 = never",
                     "type": "integer"
                 },
                 "header": {
@@ -15732,6 +15802,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "rate_limit_per_minute": {
+                    "description": "keycloak: the token claim; nil or 0 = the API's default",
                     "type": "integer"
                 },
                 "scopes": {
@@ -15757,12 +15828,14 @@ const docTemplate = `{
                 }
             }
         },
-        "api.apiKeyRotateRequest": {
+        "api.apiKeyScopeSyncResponse": {
             "type": "object",
             "properties": {
-                "grace_days": {
-                    "type": "integer",
-                    "example": 7
+                "created": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
@@ -15794,6 +15867,15 @@ const docTemplate = `{
                 },
                 "owner_contact_id": {
                     "type": "integer"
+                },
+                "rate_limit_per_minute": {
+                    "type": "integer"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -17661,23 +17743,15 @@ const docTemplate = `{
             "properties": {
                 "admin_base_url": {
                     "type": "string",
-                    "example": "https://api.folha.sead.gov.br/folha"
-                },
-                "admin_key": {
-                    "type": "string"
-                },
-                "api_key": {
-                    "type": "string"
-                },
-                "clear_admin_key": {
-                    "type": "boolean"
-                },
-                "clear_api_key": {
-                    "type": "boolean"
+                    "example": "http://10.0.122.91:8000"
                 },
                 "key_management": {
                     "type": "string",
-                    "example": "sead"
+                    "example": "keycloak"
+                },
+                "scope_prefix": {
+                    "type": "string",
+                    "example": "servidores"
                 }
             }
         },
@@ -17688,6 +17762,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "keys": {
+                    "type": "integer"
+                },
+                "scopes": {
                     "type": "integer"
                 },
                 "success": {
@@ -18914,6 +18991,47 @@ const docTemplate = `{
                 }
             }
         },
+        "kcadmin.ScopeInfo": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "\"route\" or \"modifier\"",
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "routes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "kcadmin.Usage": {
+            "type": "object",
+            "properties": {
+                "cliente": {
+                    "type": "string"
+                },
+                "daily": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "lifetime": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.APICatalog": {
             "type": "object",
             "properties": {
@@ -18949,17 +19067,11 @@ const docTemplate = `{
                     "description": "server derived from the spec",
                     "type": "string"
                 },
-                "has_admin_key": {
-                    "type": "boolean"
-                },
-                "has_api_key": {
-                    "type": "boolean"
-                },
                 "id": {
                     "type": "integer"
                 },
                 "key_management": {
-                    "description": "Key management. The SEAD admin credentials are stored encrypted and\nnever leave the server: responses only say whether they are set.",
+                    "description": "Key management. AdminBaseURL is the API's root, where its GET /escopos\nand GET /admin/uso live (keycloak mode); ScopePrefix names its scopes\nand Keycloak clients (\"servidores\" → \"servidores:cadastro\",\n\"servidores-\u003clabel\u003e\").",
                     "type": "string"
                 },
                 "name": {
@@ -18989,6 +19101,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.Responsavel"
                     }
+                },
+                "scope_prefix": {
+                    "type": "string"
                 },
                 "service_ids": {
                     "description": "ServiceIDs / ProjectIDs are the direct links (api_service_links,\napi_project_links); always set, [] when none — an API with neither is\n\"avulso\".",
@@ -19037,7 +19152,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "external_label": {
-                    "description": "the key's label in SEAD",
+                    "description": "the Keycloak clientId",
                     "type": "string"
                 },
                 "grace_until": {
@@ -20497,48 +20612,6 @@ const docTemplate = `{
                 },
                 "url": {
                     "type": "string"
-                }
-            }
-        },
-        "seadkeys.ScopeInfo": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "kind": {
-                    "description": "\"wildcard\" (\"*\"), \"route\" or \"modifier\"",
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "routes": {
-                    "description": "prefixes, or \"=/path\" for an exact path",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "seadkeys.Usage": {
-            "type": "object",
-            "properties": {
-                "daily": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "label": {
-                    "type": "string"
-                },
-                "last_used_at": {
-                    "type": "string"
-                },
-                "lifetime": {
-                    "type": "integer"
                 }
             }
         },

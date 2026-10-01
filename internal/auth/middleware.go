@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
@@ -33,12 +34,24 @@ func WithUser(ctx context.Context, u *models.User) context.Context {
 
 // RequireAuth is middleware that rejects unauthenticated requests with 401.
 // A request authenticates with the session cookie or, for scripts, with
-// "Authorization: Bearer brg_…" — a personal API token that acts as its owner.
+// "Authorization: Bearer brg_…" — a personal API token that acts as its owner
+// — or with an access token of the keycloak_apis realm (oidcapis.go), which
+// acts as the service account its client maps to.
 func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var userID int64
 		var token *store.AuthenticatedToken
-		if bearer := bearerAPIToken(r); bearer != "" {
+		var kc *apisToken // set for a Keycloak token
+		bearer := bearerToken(r)
+		if bearer != "" && !strings.HasPrefix(bearer, APITokenPrefix) && looksLikeJWT(bearer) {
+			kt, err := authenticateAPIsToken(r.Context(), db, bearer)
+			if err != nil {
+				auditAuthFailure(r, "keycloak token: "+err.Error())
+				httpx.WriteError(w, http.StatusUnauthorized, "invalid or expired keycloak token")
+				return
+			}
+			userID, kc = kt.userID, &kt // rate-limited below, once its user checks out
+		} else if strings.HasPrefix(bearer, APITokenPrefix) {
 			tok, ok, err := store.NewAPITokenRepo(db).Authenticate(r.Context(), HashAPIToken(bearer))
 			if err != nil || !ok {
 				auditAuthFailure(r, "invalid, expired or revoked api token")
@@ -77,6 +90,20 @@ func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 			httpx.WriteError(w, http.StatusUnauthorized, "user not found")
 			return
 		}
+		// A Keycloak client only ever acts as a service account: an identity
+		// pointing at a person must not let a client impersonate them.
+		if kc != nil {
+			if user.Kind != models.UserKindService {
+				auditAuthFailure(r, "keycloak token mapped to a non-service user")
+				httpx.WriteError(w, http.StatusUnauthorized, "invalid or expired keycloak token")
+				return
+			}
+			if allowed, retry := meter.allow(-user.ID, kc.rateLimit, time.Now()); !allowed {
+				w.Header().Set("Retry-After", strconv.Itoa(retry))
+				httpx.WriteError(w, http.StatusTooManyRequests, "api token rate limit exceeded")
+				return
+			}
+		}
 
 		// Record who authenticated so the request-logging middleware can report
 		// the actor (it installed the sink on r's context before us).
@@ -84,6 +111,9 @@ func RequireAuth(db *sql.DB, next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), userContextKey, user)
 		if token != nil {
 			ctx = WithAPIToken(ctx, token.ID, token.Scopes)
+		}
+		if kc != nil {
+			ctx = WithAPIToken(ctx, -user.ID, capScopes(ctx, db, user.Role, kc.scopes))
 		}
 		// Entidade visibility scope, loaded once per request. Admin bypasses;
 		// everyone else gets their visible set (own entidades + descendants).

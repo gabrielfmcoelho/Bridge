@@ -44,8 +44,8 @@ func apiVisible(ctx context.Context) (string, []any) {
 	return `EXISTS (SELECT 1 FROM api_catalog a WHERE a.id = k.api_id AND a.deleted_at IS NULL AND ` + vis + `)`, args
 }
 
-// List returns an API's keys, newest first. Revoked keys (and SEAD's
-// "__rotated__" leftovers) are included only when includeRevoked.
+// List returns an API's keys, newest first. Revoked keys (and passed grace
+// periods) are included only when includeRevoked.
 func (r *APIKeyRepo) List(ctx context.Context, apiID int64, includeRevoked bool) ([]models.APIKey, error) {
 	vis, args := apiVisible(ctx)
 	q := `SELECT ` + apiKeyCols + ` FROM api_keys k WHERE k.api_id = ? AND ` + vis
@@ -131,18 +131,18 @@ func (r *APIKeyRepo) MarkRevoked(ctx context.Context, apiID, id int64) error {
 	return err
 }
 
-// ApplyRemote overwrites the SEAD-owned fields of a key row from a remote
-// summary (sync, rotate). Bridge-owned fields (owner contact, notes, secret)
-// are kept.
+// ApplyRemote overwrites the Keycloak-owned fields of a key row (sync, scope
+// and rate-limit edits): label, client id, scopes, rate limit and whether it
+// is revoked (a disabled client; the first revocation time is kept).
+// Bridge-owned fields (owner, contact, notes, secret) are kept.
 func (r *APIKeyRepo) ApplyRemote(ctx context.Context, id int64, k *models.APIKey) error {
 	scopes, _ := json.Marshal(nonNilStrings(k.Scopes))
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE api_keys SET label = ?, external_label = ?, owner = ?, scopes = ?, rate_limit_per_minute = ?,
-			expires_at = ?, revoked_at = ?, grace_until = ?, last_used_at = ?, lifetime_uses = ?,
+		`UPDATE api_keys SET label = ?, external_label = ?, scopes = ?, rate_limit_per_minute = ?,
+			revoked_at = CASE WHEN ? THEN COALESCE(revoked_at, CURRENT_TIMESTAMP) END,
 			synced_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
 		  WHERE id = ?`,
-		k.Label, k.ExternalLabel, k.Owner, string(scopes), k.RateLimitPerMinute,
-		k.ExpiresAt, k.RevokedAt, k.GraceUntil, k.LastUsedAt, k.LifetimeUses, id)
+		k.Label, k.ExternalLabel, string(scopes), k.RateLimitPerMinute, k.RevokedAt != nil, id)
 	return err
 }
 
@@ -152,7 +152,7 @@ func (r *APIKeyRepo) SetSecret(ctx context.Context, id, secretID int64) error {
 	return err
 }
 
-// ByExternalLabel maps an API's SEAD labels to their key rows' ids.
+// ByExternalLabel maps an API's Keycloak client ids to their key rows' ids.
 func (r *APIKeyRepo) ByExternalLabel(ctx context.Context, apiID int64) (map[string]int64, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT external_label, id FROM api_keys WHERE api_id = ? AND external_label IS NOT NULL`, apiID)
 	if err != nil {

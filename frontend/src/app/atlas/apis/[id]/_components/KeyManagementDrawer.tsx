@@ -13,38 +13,31 @@ import RadioGroup from "@/components/ui/RadioGroup";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import StatusAlert from "@/components/ui/StatusAlert";
-import Checkbox from "@/components/ui/Checkbox";
 
-const MODES: ApiKeyManagement[] = ["none", "manual", "sead"];
+const MODES: ApiKeyManagement[] = ["none", "manual", "keycloak"];
 
-// Admin-only: how an API's keys are handled, and the SEAD connection. The
-// master key and X-API-Key are write-only: the server only says whether they
-// are set, so a blank field keeps the stored value.
+// Admin-only: how an API's keys are handled. In keycloak mode the API's base
+// URL (its /escopos and /admin/uso) and its scope prefix; the Keycloak
+// connection itself is the keycloak_apis integration setting. Bridge's own
+// entry has no base URL: its scopes are local.
 export default function KeyManagementDrawer({ api, open, onClose }: { api: ApiCatalog; open: boolean; onClose: () => void }) {
   const { t } = useLocale();
   const flag = useFlag();
   const qc = useQueryClient();
   const [mode, setMode] = useState<ApiKeyManagement>(api.key_management);
   const [baseUrl, setBaseUrl] = useState(api.admin_base_url ?? "");
-  const [adminKey, setAdminKey] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [clearApiKey, setClearApiKey] = useState(false);
+  const [prefix, setPrefix] = useState(api.scope_prefix ?? "");
   const [error, setError] = useState("");
-  const [test, setTest] = useState<{ success: boolean; error?: string; keys?: number } | null>(null);
+  const [test, setTest] = useState<{ success: boolean; error?: string; keys?: number; scopes?: number } | null>(null);
 
-  const sead = mode === "sead";
-  const payload = () => ({
-    key_management: mode,
-    admin_base_url: baseUrl.trim(),
-    admin_key: adminKey.trim() || undefined,
-    api_key: apiKey.trim() || undefined,
-    clear_api_key: clearApiKey && !apiKey.trim(),
-  });
+  const keycloak = mode === "keycloak";
+  const bridge = api.scope_prefix === "bridge";
+  const payload = () => ({ key_management: mode, admin_base_url: baseUrl.trim(), scope_prefix: prefix.trim() });
 
   const save = useMutation({
     mutationFn: () => {
-      if (sead && !baseUrl.trim()) throw new Error(t("atlas.apis.keys.baseUrlRequired"));
-      if (sead && !adminKey.trim() && !api.has_admin_key) throw new Error(t("atlas.apis.keys.masterKeyRequired"));
+      if (keycloak && !prefix.trim()) throw new Error(t("atlas.apis.keys.scopePrefixRequired"));
+      if (keycloak && !bridge && !baseUrl.trim()) throw new Error(t("atlas.apis.keys.baseUrlRequired"));
       return apiKeysAPI.setManagement(api.id, payload());
     },
     onSuccess: () => {
@@ -59,6 +52,13 @@ export default function KeyManagementDrawer({ api, open, onClose }: { api: ApiCa
     mutationFn: () => apiKeysAPI.testManagement(api.id, payload()),
     onSuccess: setTest,
     onError: (err) => setTest({ success: false, error: err instanceof Error ? err.message : String(err) }),
+  });
+
+  // Saved settings only: the server reads the stored base URL and prefix.
+  const syncScopes = useMutation({
+    mutationFn: () => apiKeysAPI.syncScopes(api.id),
+    onSuccess: (r) => flag({ appearance: "success", title: t("atlas.apis.keys.scopesSynced", { created: String(r.created), total: String(r.total) }) }),
+    onError: (err) => flag({ appearance: "error", title: t("atlas.apis.keys.syncScopesFailed"), description: err instanceof Error ? err.message : undefined }),
   });
 
   return (
@@ -79,46 +79,43 @@ export default function KeyManagementDrawer({ api, open, onClose }: { api: ApiCa
         />
         <p className="text-xs text-[var(--text-muted)]">{t(`atlas.apis.keys.modeHint.${mode}`)}</p>
 
-        {sead && (
+        {keycloak && (
           <div className="space-y-4">
+            {!bridge && (
+              <Input
+                label={t("atlas.apis.keys.adminBaseUrl")}
+                hint={t("atlas.apis.keys.adminBaseUrlHint")}
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="http://10.0.122.91:8000"
+                required
+              />
+            )}
             <Input
-              label={t("atlas.apis.keys.adminBaseUrl")}
-              hint={t("atlas.apis.keys.adminBaseUrlHint")}
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="https://api.folha.sead.gov.br/folha"
+              label={t("atlas.apis.keys.scopePrefix")}
+              hint={t("atlas.apis.keys.scopePrefixHint")}
+              value={prefix}
+              onChange={(e) => setPrefix(e.target.value)}
+              placeholder="servidores"
+              disabled={bridge}
               required
             />
-            <Input
-              label={t("atlas.apis.keys.masterKey")}
-              hint={api.has_admin_key ? t("atlas.apis.keys.storedKeepHint") : t("atlas.apis.keys.masterKeyHint")}
-              type="password"
-              autoComplete="off"
-              value={adminKey}
-              onChange={(e) => setAdminKey(e.target.value)}
-              placeholder={api.has_admin_key ? "••••••••" : ""}
-              required={!api.has_admin_key}
-            />
-            <Input
-              label={t("atlas.apis.keys.xApiKey")}
-              hint={t("atlas.apis.keys.xApiKeyHint")}
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={api.has_api_key ? "••••••••" : ""}
-            />
-            {api.has_api_key && (
-              <Checkbox checked={clearApiKey} onChange={setClearApiKey} label={t("atlas.apis.keys.clearXApiKey")} />
-            )}
-            <div className="flex items-center gap-3">
-              <Button size="sm" variant="secondary" onClick={() => runTest.mutate()} loading={runTest.isPending} disabled={!baseUrl.trim()}>
+            <p className="text-xs text-[var(--text-muted)]">{t("atlas.apis.keys.keycloakSettingsHint")}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button size="sm" variant="secondary" onClick={() => runTest.mutate()} loading={runTest.isPending} disabled={!prefix.trim() || (!bridge && !baseUrl.trim())}>
                 {t("atlas.apis.keys.testConnection")}
               </Button>
+              {api.key_management === "keycloak" && (
+                <Button size="sm" variant="secondary" onClick={() => syncScopes.mutate()} loading={syncScopes.isPending} title={t("atlas.apis.keys.syncScopesHint")}>
+                  {t("atlas.apis.keys.syncScopes")}
+                </Button>
+              )}
             </div>
             {test && (
               <StatusAlert variant={test.success ? "success" : "error"}>
-                {test.success ? t("atlas.apis.keys.testOk", { count: String(test.keys ?? 0) }) : test.error || t("atlas.apis.keys.testFailed")}
+                {test.success
+                  ? t("atlas.apis.keys.testOk", { count: String(test.keys ?? 0), scopes: String(test.scopes ?? 0) })
+                  : test.error || t("atlas.apis.keys.testFailed")}
               </StatusAlert>
             )}
           </div>

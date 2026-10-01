@@ -34,19 +34,17 @@ func HashAPIToken(token string) []byte {
 	return h[:]
 }
 
-// bearerAPIToken returns the Bridge API token from "Authorization: Bearer …",
-// or "" when the header is absent or carries something else.
-func bearerAPIToken(r *http.Request) string {
+// bearerToken returns the value of "Authorization: Bearer …", or "".
+func bearerToken(r *http.Request) string {
 	scheme, tok, ok := strings.Cut(r.Header.Get("Authorization"), " ")
 	if !ok || !strings.EqualFold(scheme, "Bearer") {
 		return ""
 	}
-	tok = strings.TrimSpace(tok)
-	if !strings.HasPrefix(tok, APITokenPrefix) {
-		return ""
-	}
-	return tok
+	return strings.TrimSpace(tok)
 }
+
+// looksLikeJWT: three dot-separated parts.
+func looksLikeJWT(tok string) bool { return strings.Count(tok, ".") == 2 }
 
 const apiTokenContextKey contextKey = "api_token"
 
@@ -57,7 +55,9 @@ type tokenCtx struct {
 }
 
 // APITokenFromContext returns the id of the API token that authenticated the
-// request, or 0 when it came in on a browser session.
+// request, or 0 when it came in on a browser session. A Keycloak token
+// carries a synthetic negative id (minus its service user's id): it has no
+// api_tokens row, so anything that writes per-token data must skip ids <= 0.
 func APITokenFromContext(ctx context.Context) int64 {
 	t, _ := ctx.Value(apiTokenContextKey).(tokenCtx)
 	return t.id

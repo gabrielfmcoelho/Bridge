@@ -36,7 +36,9 @@ var meter = &tokenMeter{windows: map[int64]window{}, pending: map[int64]int64{}}
 func (m *tokenMeter) allow(id int64, limit int, now time.Time) (bool, int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.pending[id]++
+	if id > 0 { // Keycloak tokens meter under a negative id: no api_tokens row to count on
+		m.pending[id]++
+	}
 	w := m.windows[id]
 	if now.Sub(w.start) >= time.Minute {
 		w = window{start: now}

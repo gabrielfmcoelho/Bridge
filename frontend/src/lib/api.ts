@@ -1008,7 +1008,7 @@ export interface ApiKeyCreatePayload {
   notes?: string;
   expires_days?: number;
   rate_limit_per_minute?: number;
-  /** sead mode: from apiKeysAPI.scopes */
+  /** keycloak mode: from apiKeysAPI.scopes */
   scopes?: string[];
   /** manual mode only */
   value?: string;
@@ -1018,10 +1018,18 @@ export interface ApiKeyCreatePayload {
 export interface KeyManagementPayload {
   key_management: import("./types").ApiKeyManagement;
   admin_base_url?: string;
-  admin_key?: string;
-  api_key?: string;
-  clear_admin_key?: boolean;
-  clear_api_key?: boolean;
+  scope_prefix?: string;
+}
+
+export interface ApiKeyUpdatePayload {
+  owner: string;
+  owner_contact_id?: number | null;
+  notes: string;
+  expires_at?: string | null;
+  /** keycloak keys: omitted keeps them */
+  scopes?: string[];
+  /** keycloak keys: omitted keeps it; 0 = the API's default */
+  rate_limit_per_minute?: number;
 }
 
 type ApiKeyWithPlaintext = { key: import("./types").ApiKey; plaintext: string };
@@ -1031,22 +1039,24 @@ export const apiKeysAPI = {
     api.getList<import("./types").ApiKey>(`/api/api-catalog/${apiId}/keys${includeRevoked ? "?include_revoked=true" : ""}`),
   create: (apiId: number, data: ApiKeyCreatePayload) =>
     api.post<ApiKeyWithPlaintext>(`/api/api-catalog/${apiId}/keys`, data),
-  update: (apiId: number, keyId: number, data: { owner: string; owner_contact_id?: number | null; notes: string; expires_at?: string | null }) =>
+  update: (apiId: number, keyId: number, data: ApiKeyUpdatePayload) =>
     api.put<import("./types").ApiKey>(`/api/api-catalog/${apiId}/keys/${keyId}`, data),
   revoke: (apiId: number, keyId: number) =>
     api.post<import("./types").ApiKey>(`/api/api-catalog/${apiId}/keys/${keyId}/revoke`, {}),
-  rotate: (apiId: number, keyId: number, graceDays: number) =>
-    api.post<ApiKeyWithPlaintext>(`/api/api-catalog/${apiId}/keys/${keyId}/rotate`, { grace_days: graceDays }),
+  rotate: (apiId: number, keyId: number) =>
+    api.post<ApiKeyWithPlaintext>(`/api/api-catalog/${apiId}/keys/${keyId}/rotate`, {}),
   scopes: (apiId: number) =>
     api.get<import("./types").ApiKeyScope[]>(`/api/api-catalog/${apiId}/keys/scopes`),
   sync: (apiId: number) =>
     api.post<{ created: number; updated: number; total: number }>(`/api/api-catalog/${apiId}/keys/sync`, {}),
-  usage: (apiId: number, keyId: number, days = 30) =>
-    api.get<import("./types").ApiKeyUsage>(`/api/api-catalog/${apiId}/keys/${keyId}/usage?days=${days}`),
+  syncScopes: (apiId: number) =>
+    api.post<{ created: number; total: number }>(`/api/api-catalog/${apiId}/keys/sync-scopes`, {}),
+  usage: (apiId: number, keyId: number) =>
+    api.get<import("./types").ApiKeyUsage>(`/api/api-catalog/${apiId}/keys/${keyId}/usage`),
   setManagement: (apiId: number, data: KeyManagementPayload) =>
     api.put<import("./types").ApiCatalog>(`/api/api-catalog/${apiId}/key-management`, data),
   testManagement: (apiId: number, data: Partial<KeyManagementPayload>) =>
-    api.post<{ success: boolean; error?: string; keys?: number }>(`/api/api-catalog/${apiId}/key-management/test`, data),
+    api.post<{ success: boolean; error?: string; keys?: number; scopes?: number }>(`/api/api-catalog/${apiId}/key-management/test`, data),
 };
 
 // Share bundles (Phase D–E). A single public link carrying secrets and/or

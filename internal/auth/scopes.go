@@ -185,3 +185,36 @@ func ScopeUsable(role string, hasPerm func(string) bool, scope string) bool {
 	}
 	return false
 }
+
+// KeycloakCatalogue is the catalogue as Keycloak client scopes: every scope
+// with the "bridge:" prefix, minus the "*" wildcard (Keycloak clients carry
+// explicit scopes only).
+func KeycloakCatalogue() []ScopeInfo {
+	out := []ScopeInfo{}
+	for _, s := range Catalogue() {
+		if s.Name == ScopeAll {
+			continue
+		}
+		s.Name = BridgeScopePrefix + ":" + s.Name
+		out = append(out, s)
+	}
+	return out
+}
+
+// LeastRoleFor is the lowest role that can use every scope (unprefixed),
+// or "" when even admin can't (an unknown scope).
+func LeastRoleFor(scopes []string, hasPerm func(role, code string) bool) string {
+	for _, role := range []string{"viewer", "editor", "admin"} {
+		ok := true
+		for _, s := range scopes {
+			if !ScopeUsable(role, func(code string) bool { return hasPerm(role, code) }, s) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return role
+		}
+	}
+	return ""
+}

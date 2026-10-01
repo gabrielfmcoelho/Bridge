@@ -16,8 +16,10 @@ import ScopePicker from "@/components/tokens/ScopePicker";
 const EXPIRY_DAYS = [30, 90, 180, 365, 0]; // 0 = never
 const LABEL_RE = /^[A-Za-z0-9._-]{1,64}$/;
 
-// Issue (sead), register (manual) or edit a key. Editing only touches
-// Bridge's metadata: a SEAD key's expiry and limits can't change remotely.
+// Issue (keycloak), register (manual) or edit a key. A Keycloak key's scopes
+// and rate limit (its rate_limit_per_minute claim) are set on the client and
+// stay editable while it is active; its expiry isn't a Keycloak concept, so
+// only manual keys have one.
 export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: {
   api: ApiCatalog;
   editing: ApiKey | null;
@@ -36,13 +38,14 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
   const [notes, setNotes] = useState(editing?.notes ?? "");
   const [expiresDays, setExpiresDays] = useState(90);
   const [expiresAt, setExpiresAt] = useState(editing?.expires_at?.slice(0, 10) ?? "");
-  const [rateLimit, setRateLimit] = useState("");
+  const [rateLimit, setRateLimit] = useState(editing?.rate_limit_per_minute != null ? String(editing.rate_limit_per_minute) : "");
   const [value, setValue] = useState("");
   const [header, setHeader] = useState("X-API-Key");
-  const [scopes, setScopes] = useState<string[]>([]);
+  const [scopes, setScopes] = useState<string[]>(editing?.scopes ?? []);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
-  const pickScopes = !isEdit && !manual;
+  // Keycloak keys: picked on issue, editable while active.
+  const pickScopes = !manual && (!isEdit || editing.status === "active");
 
   const { data: contacts = [] } = useQuery({ queryKey: ["contacts"], queryFn: contactsAPI.list, enabled: open });
 
@@ -58,6 +61,8 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
           owner_contact_id: contactId,
           notes,
           expires_at: manual ? (expiresAt ? new Date(`${expiresAt}T23:59:59`).toISOString() : null) : editing.expires_at,
+          scopes: pickScopes ? scopes : undefined,
+          rate_limit_per_minute: pickScopes ? Number(rateLimit.trim() || 0) : undefined,
         }).then(() => null);
       }
       return apiKeysAPI.create(api.id, {
@@ -65,7 +70,7 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
         owner: owner.trim(),
         owner_contact_id: contactId,
         notes,
-        expires_days: expiresDays,
+        expires_days: manual ? expiresDays : undefined,
         rate_limit_per_minute: !manual && rateLimit.trim() ? Number(rateLimit) : undefined,
         scopes: pickScopes ? scopes : undefined,
         value: manual ? value.trim() : undefined,
@@ -74,7 +79,7 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
     },
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["api-keys", api.id] });
-      if (res) onIssued(res.key.label, res.plaintext);
+      if (res) onIssued(res.key.external_label ?? res.key.label, res.plaintext);
       onClose();
     },
     onError: (err) => setError(err instanceof Error ? err.message : t("form.saveFailed")),
@@ -128,7 +133,7 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
           <ScopePicker queryKey={["api-keys", api.id, "scopes"]} load={() => apiKeysAPI.scopes(api.id)}
             value={scopes} onChange={setScopes} error={scopesError} />
         )}
-        {isEdit && editing.scopes.length > 0 && (
+        {isEdit && !pickScopes && editing.scopes.length > 0 && (
           <div>
             <p className="text-xs text-[var(--text-muted)] mb-1">{t("atlas.apis.keys.scopes")}</p>
             <p className="text-sm font-mono text-[var(--text-secondary)]">{editing.scopes.join(", ")}</p>
@@ -143,7 +148,7 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
           <option value="">{t("atlas.apis.keys.noContact")}</option>
           {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </NativeSelect>
-        {!isEdit && (
+        {!isEdit && manual && (
           <NativeSelect label={t("atlas.apis.keys.expiry")} value={expiresDays} onChange={(e) => setExpiresDays(Number(e.target.value))}>
             {EXPIRY_DAYS.map((d) => (
               <option key={d} value={d}>{d === 0 ? t("atlas.apis.keys.noExpiry") : t("atlas.apis.keys.days", { n: String(d) })}</option>
@@ -153,7 +158,7 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
         {isEdit && manual && (
           <Input label={t("atlas.apis.keys.expiresAt")} type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
         )}
-        {!isEdit && !manual && (
+        {pickScopes && (
           <Input
             label={t("atlas.apis.keys.rateLimit")}
             hint={t("atlas.apis.keys.rateLimitHint")}
@@ -165,7 +170,7 @@ export default function ApiKeyDrawer({ api, editing, open, onClose, onIssued }: 
           />
         )}
         <Textarea label={t("atlas.apis.keys.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-        {isEdit && !manual && <p className="text-xs text-[var(--text-muted)]">{t("atlas.apis.keys.seadEditHint")}</p>}
+        {isEdit && pickScopes && <p className="text-xs text-[var(--text-muted)]">{t("atlas.apis.keys.keycloakEditHint")}</p>}
         <FormError message={error} />
       </div>
     </Drawer>

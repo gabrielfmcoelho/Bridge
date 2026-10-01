@@ -1625,4 +1625,42 @@ var migrationsPostgres = []string{
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'person';
 	ALTER TABLE users DROP CONSTRAINT IF EXISTS users_kind_check;
 	ALTER TABLE users ADD CONSTRAINT users_kind_check CHECK (kind IN ('person','service'));`,
+
+	// Version 98: Keycloak replaces the SEAD Redis key system. key_management
+	// "sead" becomes "keycloak" (one Keycloak client per key, through the
+	// keycloak_apis integration); scope_prefix names an API's scopes and
+	// clients, backfilled for the two SEAD APIs from their name / base URL.
+	// The Redis keys stop working at the cutover: their rows become revoked
+	// manual keys, kept for history. The SEAD master/X-API-Key credentials
+	// are wiped (columns dropped in v99); admin_base_url stays
+	// as the API root for /escopos and /admin/uso.
+	`ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS scope_prefix TEXT NOT NULL DEFAULT '';
+	UPDATE api_catalog SET scope_prefix = CASE
+			WHEN LOWER(name || ' ' || admin_base_url) LIKE '%servidor%' THEN 'servidores'
+			WHEN LOWER(name || ' ' || admin_base_url) LIKE '%sei%' THEN 'sei'
+			ELSE scope_prefix END
+		WHERE scope_prefix = '' AND key_management = 'sead';
+	ALTER TABLE api_catalog DROP CONSTRAINT IF EXISTS api_catalog_key_management_check;
+	UPDATE api_catalog SET key_management = 'keycloak' WHERE key_management = 'sead';
+	ALTER TABLE api_catalog ADD CONSTRAINT api_catalog_key_management_check CHECK (key_management IN ('none','manual','keycloak'));
+	UPDATE api_catalog SET admin_key_cipher = NULL, admin_key_nonce = NULL, admin_api_key_cipher = NULL, admin_api_key_nonce = NULL
+		WHERE admin_key_cipher IS NOT NULL OR admin_key_nonce IS NOT NULL OR admin_api_key_cipher IS NOT NULL OR admin_api_key_nonce IS NOT NULL;
+	ALTER TABLE api_keys DROP CONSTRAINT IF EXISTS api_keys_source_check;
+	UPDATE api_keys SET source = 'manual', external_label = NULL,
+			revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP),
+			notes = CASE WHEN notes = '' THEN 'chave Redis legada' ELSE 'chave Redis legada. ' || notes END,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE source = 'sead';
+	ALTER TABLE api_keys ADD CONSTRAINT api_keys_source_check CHECK (source IN ('manual','keycloak'));`,
+
+	// Version 99: a scope prefix names one API's scopes and Keycloak clients,
+	// so it is unique (trashed rows included: Bridge's own entry is found by
+	// prefix even in the trash). v98's backfill could give two rows the same
+	// prefix: the lowest id keeps it, the others go back to "" for an admin to
+	// set. The SEAD credential columns, wiped by v98, are dropped.
+	`UPDATE api_catalog a SET scope_prefix = ''
+		WHERE a.scope_prefix <> '' AND EXISTS (SELECT 1 FROM api_catalog b WHERE b.scope_prefix = a.scope_prefix AND b.id < a.id);
+	CREATE UNIQUE INDEX IF NOT EXISTS api_catalog_scope_prefix_uq ON api_catalog (scope_prefix) WHERE scope_prefix <> '';
+	ALTER TABLE api_catalog DROP COLUMN IF EXISTS admin_key_cipher, DROP COLUMN IF EXISTS admin_key_nonce,
+		DROP COLUMN IF EXISTS admin_api_key_cipher, DROP COLUMN IF EXISTS admin_api_key_nonce;`,
 }

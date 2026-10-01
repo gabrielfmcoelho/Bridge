@@ -5,6 +5,7 @@ import { integrationsAPI } from "@/lib/api";
 import GeneralAuthSection from "./integrations/GeneralAuthSection";
 import LDAPSection from "./integrations/LDAPSection";
 import KeycloakSection from "./integrations/KeycloakSection";
+import KeycloakAPIsSection from "./integrations/KeycloakAPIsSection";
 import GitLabIntegrationSection from "./integrations/GitLabIntegrationSection";
 import OutlineIntegrationSection from "./integrations/OutlineIntegrationSection";
 import GLPIIntegrationSection from "./integrations/GLPIIntegrationSection";
@@ -22,6 +23,7 @@ export default function IntegrationsTab() {
       <GeneralAuthSection />
       {activeProvider === "ldap" && <LDAPSection />}
       {activeProvider === "keycloak" && <KeycloakSection />}
+      <KeycloakAPIsSection />
       <GitLabIntegrationSection ssoActive={activeProvider === "gitlab"} />
       <GrafanaIntegrationSection />
       <OutlineIntegrationSection />

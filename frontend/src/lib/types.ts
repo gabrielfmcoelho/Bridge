@@ -590,20 +590,21 @@ export interface ApiCatalog {
   entidades?: AssetGrants;
   /** How the API's access keys are handled. */
   key_management: ApiKeyManagement;
-  /** SEAD admin root (sead mode); the credentials themselves never come back. */
+  /** keycloak mode: the API root, where GET /escopos and GET /admin/uso live. */
   admin_base_url?: string;
-  has_admin_key: boolean;
-  has_api_key: boolean;
+  /** Names the API's scopes ("<prefix>:…") and Keycloak clients ("<prefix>-<label>"); "bridge" is Bridge itself. */
+  scope_prefix: string;
 }
 
-export type ApiKeyManagement = "none" | "manual" | "sead";
+export type ApiKeyManagement = "none" | "manual" | "keycloak";
 
 /** One access key of a catalogued API. The plaintext lives in the vault (secret_id). */
 export interface ApiKey {
   id: number;
   api_id: number;
   label: string;
-  source: "manual" | "sead";
+  source: "manual" | "keycloak";
+  /** keycloak: the client id */
   external_label?: string;
   secret_id?: number;
   owner: string;
@@ -623,7 +624,7 @@ export interface ApiKey {
   status: "active" | "grace" | "expired" | "revoked";
 }
 
-/** One scope-catalogue entry: a SEAD service's keys or Bridge's own tokens. */
+/** One scope-catalogue entry: a catalogued API's (GET /escopos) or Bridge's own tokens. */
 export interface ApiKeyScope {
   name: string;
   kind: "wildcard" | "route" | "modifier";
@@ -637,10 +638,10 @@ export interface ApiKeyScope {
 }
 
 export interface ApiKeyUsage {
-  label: string;
+  cliente: string;
   lifetime: number;
   last_used_at?: string | null;
-  /** "YYYYMMDD" → requests */
+  /** "YYYY-MM-DD" → requests */
   daily: Record<string, number>;
 }
 

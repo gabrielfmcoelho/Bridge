@@ -52,6 +52,13 @@ func (r *UserIdentityRepo) GetByProviderAndExternalID(ctx context.Context, provi
 	return i, err
 }
 
+// DeleteByProviderAndExternalID removes the identity for (provider,
+// external_id); a missing one is not an error.
+func (r *UserIdentityRepo) DeleteByProviderAndExternalID(ctx context.Context, providerName, externalID string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM user_external_identities WHERE provider_name = ? AND external_id = ?`, providerName, externalID)
+	return err
+}
+
 // ListByUser returns all external identities for a user.
 func (r *UserIdentityRepo) ListByUser(ctx context.Context, userID int64) ([]models.UserExternalIdentity, error) {
 	rows, err := r.db.QueryContext(ctx,

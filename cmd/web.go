@@ -68,6 +68,11 @@ var webCmd = &cobra.Command{
 			log.Printf("[services] classified %d service(s) by kind", n)
 		}
 
+		// Bridge's own entry in its API catalogue (Keycloak-managed keys).
+		if err := api.SeedBridgeCatalog(ctx, db); err != nil {
+			log.Printf("[atlas] seed bridge catalogue entry: %v", err)
+		}
+
 		// Background: clean up expired share links every hour (Phase 3 Task 3.4).
 		// Stops when ctx is cancelled (shutdown signal).
 		vault.NewShareLinkJanitor(db.SQL).Start(ctx)

@@ -53,6 +53,20 @@ var integrationGroups = map[string][]string{
 		"auth_keycloak_client_id",
 		"auth_keycloak_client_secret",
 	},
+	// The Keycloak realm that governs SEAD's APIs (and Bridge's own API, for
+	// Keycloak tokens): kcadmin manages its clients as the admin client
+	// (e.g. kc-bridge-admin) and reads usage as a separate usage client
+	// with no realm-management roles (e.g. kc-bridge-usage).
+	"keycloak_apis": {
+		"kc_apis_base_url",
+		"kc_apis_internal_url",
+		"kc_apis_host_header",
+		"kc_apis_realm",
+		"kc_apis_client_id",
+		"kc_apis_client_secret",
+		"kc_apis_usage_client_id",
+		"kc_apis_usage_client_secret",
+	},
 	"llm": {
 		"llm_enabled",
 		"llm_base_url",
@@ -120,12 +134,14 @@ var secretKeys = map[string]bool{
 	"outline_api_token":                  true,
 	"glpi_app_token":                     true,
 	"proxmox_token_secret":               true,
+	"kc_apis_client_secret":              true,
+	"kc_apis_usage_client_secret":        true,
 }
 
 // handleGetIntegrations returns all integration settings grouped by provider.
 //
 //	@Summary		Get integration settings
-//	@Description	Admin. Every integration group (ldap, gitlab, keycloak, llm, coolify, grafana, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read "••••••••" when set, "" otherwise.
+//	@Description	Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read "••••••••" when set, "" otherwise.
 //	@Tags			integration-settings
 //	@Produce		json
 //	@Success		200	{object}	map[string]map[string]string
@@ -162,7 +178,7 @@ func (h *integrationSettingsHandlers) handleGetIntegrations(w http.ResponseWrite
 //	@Tags			integration-settings
 //	@Accept			json
 //	@Produce		json
-//	@Param			group	path		string				true	"Integration group (ldap, gitlab, keycloak, llm, coolify, grafana, outline, proxmox, glpi, general)"
+//	@Param			group	path		string				true	"Integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, outline, proxmox, glpi, general)"
 //	@Param			body	body		map[string]string	true	"Setting key to value"
 //	@Success		200		{object}	StatusResponse
 //	@Failure		400		{object}	httpx.ErrorResponse
@@ -210,6 +226,9 @@ func (h *integrationSettingsHandlers) handleUpdateIntegrationGroup(w http.Respon
 		} else {
 			store.NewAppSettingsRepo(h.db.SQL).Set(r.Context(), key, value)
 		}
+	}
+	if group == "keycloak_apis" {
+		auth.ResetAPIsVerifier() // the issuer or JWKS address may have changed
 	}
 
 	jsonOK(w, map[string]string{"status": "updated"})

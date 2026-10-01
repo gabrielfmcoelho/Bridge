@@ -195,33 +195,25 @@
         "modes": {
           "none": "Off",
           "manual": "Manual registry",
-          "sead": "SEAD built-in"
+          "keycloak": "Keycloak clients"
         },
         "modeHint": {
           "none": "Bridge doesn't track keys for this API.",
           "manual": "Keys are created outside Bridge; register each one here to know who holds it.",
-          "sead": "Bridge issues, rotates and revokes keys through the API's /admin/keys service."
+          "keycloak": "Each key is a Keycloak client (<prefix>-<label>) that Bridge issues, rotates and revokes; the API validates its tokens and scopes itself."
         },
-        "adminBaseUrl": "Admin base URL",
-        "adminBaseUrlHint": "The service root, before /admin/keys (include a path prefix such as /folha).",
-        "masterKey": "Master key (X-Admin-Key)",
-        "masterKeyHint": "The service's ADMIN_MASTER_KEY. Stored encrypted and never shown again.",
-        "storedKeepHint": "A key is stored. Leave blank to keep it.",
-        "xApiKey": "X-API-Key (optional)",
-        "xApiKeyHint": "Only needed when the service sits behind a path prefix and its admin routes also check a consumer key.",
-        "clearXApiKey": "Remove the stored X-API-Key",
+        "adminBaseUrl": "API base URL",
+        "adminBaseUrlHint": "The API root, where GET /escopos and GET /admin/uso live.",
         "testConnection": "Test connection",
-        "testOk": "Connected: the service lists {count} keys.",
-        "testFailed": "Could not reach the key service.",
-        "baseUrlRequired": "Set the admin base URL.",
-        "masterKeyRequired": "Set the master key.",
+        "testOk": "Connected: the API lists {scopes} scopes and Keycloak has {count} clients for it.",
+        "testFailed": "Could not reach the API or Keycloak.",
+        "baseUrlRequired": "Set the API base URL.",
         "managementSaved": "Key management saved",
         "disabledTitle": "Key tracking is off",
         "disabledDesc": "Turn on key management to see who holds a key to this API.",
-        "notConnected": "The SEAD connection is incomplete: an admin must set the master key.",
         "empty": "No keys yet.",
         "showRevoked": "Show revoked",
-        "sync": "Sync from service",
+        "sync": "Sync from Keycloak",
         "synced": "Synced: {created} new of {total} keys",
         "syncFailed": "Sync failed",
         "issue": "Issue key",
@@ -245,19 +237,17 @@
         "days": "{n} days",
         "expiresAt": "Expires on",
         "rateLimit": "Requests per minute",
-        "rateLimitHint": "Blank uses the service default; 0 is unlimited.",
+        "rateLimitHint": "Sets the client's rate_limit_per_minute claim. Blank uses the API's default.",
         "notes": "Notes",
-        "seadEditHint": "Expiry, scopes and rate limit live on the service and can't change: revoke and issue a new key instead.",
         "copyNow": "Key \"{name}\" is ready. Copy it now; it is also kept in the vault.",
         "done": "Done",
         "noOwner": "No holder",
         "expiresOn": "Expires {date}",
         "lastUsedAt": "Last used {date}",
         "neverUsed": "Never used",
-        "uses": "{count} requests",
         "source": {
           "manual": "Manual",
-          "sead": "SEAD"
+          "keycloak": "Keycloak"
         },
         "status": {
           "active": "Active",
@@ -274,7 +264,7 @@
         "usageNone": "No requests in the last 30 days.",
         "rotate": "Rotate",
         "rotateConfirm": "Rotate key \"{name}\"?",
-        "rotateConfirmBody": "A new key replaces it. The old one keeps working for 7 days, then stops.",
+        "rotateConfirmBody": "Keycloak issues a new client secret and the old one stops working at once.",
         "rotateFailed": "Rotation failed",
         "revoke": "Revoke",
         "revokeConfirm": "Revoke key \"{name}\"?",
@@ -284,13 +274,22 @@
         "scopes": "Scopes",
         "scopesHint": "What this key may call. Pick only what the consumer needs.",
         "scopesRequired": "Pick at least one scope.",
-        "scopesLoadFailed": "Could not load the service's scopes: {error}",
+        "scopesLoadFailed": "Could not load the API's scopes: {error}",
         "scopeWildcard": "* — full access (every route, including future ones)",
         "scopeGroup": {
           "route": "Routes",
           "modifier": "Modifiers",
           "wildcard": "Full access"
-        }
+        },
+        "scopePrefix": "Scope prefix",
+        "scopePrefixHint": "Names this API's scopes and clients: servidores → servidores:cadastro and servidores-<label>.",
+        "scopePrefixRequired": "Set the scope prefix.",
+        "keycloakSettingsHint": "The Keycloak connection itself is set in Settings → Integrations (Keycloak — SEAD APIs).",
+        "syncScopes": "Sync scopes",
+        "syncScopesHint": "Creates in Keycloak every scope the API declares, so keys can carry it.",
+        "scopesSynced": "Scopes synced: {created} new of {total}",
+        "syncScopesFailed": "Could not sync the scopes",
+        "keycloakEditHint": "Scope and rate-limit changes apply to tokens issued from now on."
       }
     },
     "lineage": {
@@ -1770,7 +1769,20 @@
         "tokenHint": "Read-only API token (user@realm!name) with the PVEAuditor role on /. Guest IPs also need VM.Monitor (PVE 8) or VM.GuestAgent.Audit (PVE 9) and the QEMU guest agent.",
         "connectedVersion": "Connected — Proxmox VE {version}"
       },
-      "saved": "Saved"
+      "saved": "Saved",
+      "keycloakApis": {
+        "title": "Keycloak — SEAD APIs",
+        "hint": "The realm that governs SEAD's APIs. Bridge manages their access keys as Keycloak clients through this service account, and accepts the realm's tokens on its own API.",
+        "publicUrl": "Public URL (issuer)",
+        "internalUrl": "Internal URL",
+        "internalUrlHint": "Where Bridge reaches Keycloak when the public name doesn't resolve from the servers. Blank uses the public URL.",
+        "hostHeader": "Host header",
+        "hostHeaderHint": "Sent to the internal URL so Keycloak answers as the public name.",
+        "adminClientHint": "Holds manage-clients. Name it outside every scope prefix (e.g. kc-bridge-admin): it is never synced as a key.",
+        "usageClientId": "Usage client ID",
+        "usageClientSecret": "Usage client secret",
+        "usageClientHint": "A separate client with no realm-management roles, holding the <prefix>:admin.uso scopes. Only its token is sent to the APIs; without it, usage is unavailable."
+      }
     },
     "integrationsTabLabel": "Integrations",
     "permissions": {

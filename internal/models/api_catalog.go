@@ -9,9 +9,9 @@ import (
 // APICatalog source-type domain. (The old projeto/avulso scope gave way to
 // the api_service_links / api_project_links tables in v95.)
 const (
-	APIKeyManagementNone   = "none"   // no access keys tracked
-	APIKeyManagementManual = "manual" // keys created elsewhere, registered in Bridge
-	APIKeyManagementSEAD   = "sead"   // keys issued through the SEAD built-in /admin/keys API
+	APIKeyManagementNone     = "none"     // no access keys tracked
+	APIKeyManagementManual   = "manual"   // keys created elsewhere, registered in Bridge
+	APIKeyManagementKeycloak = "keycloak" // one Keycloak client per key, managed through the keycloak_apis integration
 
 	APICatalogSourceUpload = "upload"
 	APICatalogSourceURL    = "url"
@@ -48,12 +48,13 @@ type APICatalog struct {
 	// Responsaveis is loaded on detail responses only.
 	Responsaveis []Responsavel `json:"responsaveis,omitempty"`
 
-	// Key management. The SEAD admin credentials are stored encrypted and
-	// never leave the server: responses only say whether they are set.
+	// Key management. AdminBaseURL is the API's root, where its GET /escopos
+	// and GET /admin/uso live (keycloak mode); ScopePrefix names its scopes
+	// and Keycloak clients ("servidores" → "servidores:cadastro",
+	// "servidores-<label>").
 	KeyManagement string `json:"key_management"`
 	AdminBaseURL  string `json:"admin_base_url,omitempty"`
-	HasAdminKey   bool   `json:"has_admin_key"`
-	HasAPIKey     bool   `json:"has_api_key"`
+	ScopePrefix   string `json:"scope_prefix"`
 	// Entidades carries the entidade grants on detail responses (edit-form
 	// prefill); nil on list rows.
 	Entidades *AssetGrants `json:"entidades,omitempty"`
@@ -101,7 +102,7 @@ type OperationSearchResult struct {
 // ValidKeyManagement reports whether m is a known key_management mode.
 func ValidKeyManagement(m string) bool {
 	switch m {
-	case APIKeyManagementNone, APIKeyManagementManual, APIKeyManagementSEAD:
+	case APIKeyManagementNone, APIKeyManagementManual, APIKeyManagementKeycloak:
 		return true
 	}
 	return false

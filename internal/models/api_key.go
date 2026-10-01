@@ -2,11 +2,11 @@ package models
 
 import "time"
 
-// API key sources: registered by hand, or issued/synced through the SEAD
-// built-in key API.
+// API key sources: registered by hand, or a Keycloak client issued/synced
+// through the keycloak_apis integration.
 const (
-	APIKeySourceManual = "manual"
-	APIKeySourceSEAD   = "sead"
+	APIKeySourceManual   = "manual"
+	APIKeySourceKeycloak = "keycloak"
 )
 
 // API key states, computed on read from the timestamps (never stored).
@@ -19,14 +19,14 @@ const (
 
 // APIKey is one access key of a catalogued API, as Bridge tracks it. The
 // plaintext never sits here: when Bridge knows it, it lives in the vault as
-// an api_key secret (SecretID). Keys synced from SEAD that Bridge didn't issue
-// have no SecretID.
+// an api_key secret (SecretID). Keycloak clients synced that Bridge didn't
+// issue have no SecretID.
 type APIKey struct {
 	ID                 int64      `json:"id"`
 	APIID              int64      `json:"api_id"`
 	Label              string     `json:"label"`
 	Source             string     `json:"source"`
-	ExternalLabel      *string    `json:"external_label,omitempty"` // the key's label in SEAD
+	ExternalLabel      *string    `json:"external_label,omitempty"` // the Keycloak clientId
 	SecretID           *int64     `json:"secret_id,omitempty"`
 	Owner              string     `json:"owner"`
 	OwnerContactID     *int64     `json:"owner_contact_id,omitempty"`

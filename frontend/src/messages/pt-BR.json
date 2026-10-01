@@ -195,33 +195,25 @@
         "modes": {
           "none": "Desligado",
           "manual": "Registro manual",
-          "sead": "SEAD integrado"
+          "keycloak": "Clientes Keycloak"
         },
         "modeHint": {
           "none": "O Bridge não acompanha chaves desta API.",
           "manual": "As chaves são criadas fora do Bridge; registre cada uma aqui para saber quem a possui.",
-          "sead": "O Bridge emite, rotaciona e revoga chaves pelo serviço /admin/keys da própria API."
+          "keycloak": "Cada chave é um cliente Keycloak (<prefixo>-<rótulo>) que o Bridge emite, rotaciona e revoga; a própria API valida os tokens e os escopos."
         },
-        "adminBaseUrl": "URL base de administração",
-        "adminBaseUrlHint": "A raiz do serviço, antes de /admin/keys (inclua o prefixo de caminho, como /folha).",
-        "masterKey": "Chave mestra (X-Admin-Key)",
-        "masterKeyHint": "O ADMIN_MASTER_KEY do serviço. Fica criptografada e nunca é exibida de novo.",
-        "storedKeepHint": "Há uma chave salva. Deixe em branco para mantê-la.",
-        "xApiKey": "X-API-Key (opcional)",
-        "xApiKeyHint": "Só é necessária quando o serviço fica atrás de um prefixo de caminho e as rotas de administração também exigem uma chave de consumidor.",
-        "clearXApiKey": "Remover a X-API-Key salva",
+        "adminBaseUrl": "URL base da API",
+        "adminBaseUrlHint": "A raiz da API, onde ficam GET /escopos e GET /admin/uso.",
         "testConnection": "Testar conexão",
-        "testOk": "Conectado: o serviço lista {count} chaves.",
-        "testFailed": "Não foi possível acessar o serviço de chaves.",
-        "baseUrlRequired": "Informe a URL base de administração.",
-        "masterKeyRequired": "Informe a chave mestra.",
+        "testOk": "Conectado: a API lista {scopes} escopos e o Keycloak tem {count} clientes dela.",
+        "testFailed": "Não foi possível acessar a API ou o Keycloak.",
+        "baseUrlRequired": "Informe a URL base da API.",
         "managementSaved": "Gestão de chaves salva",
         "disabledTitle": "O acompanhamento de chaves está desligado",
         "disabledDesc": "Ligue a gestão de chaves para ver quem possui uma chave desta API.",
-        "notConnected": "A conexão SEAD está incompleta: um administrador precisa informar a chave mestra.",
         "empty": "Nenhuma chave ainda.",
         "showRevoked": "Mostrar revogadas",
-        "sync": "Sincronizar com o serviço",
+        "sync": "Sincronizar com o Keycloak",
         "synced": "Sincronizado: {created} novas de {total} chaves",
         "syncFailed": "Falha na sincronização",
         "issue": "Emitir chave",
@@ -245,19 +237,17 @@
         "days": "{n} dias",
         "expiresAt": "Expira em",
         "rateLimit": "Requisições por minuto",
-        "rateLimitHint": "Em branco usa o padrão do serviço; 0 é ilimitado.",
+        "rateLimitHint": "Define a claim rate_limit_per_minute do cliente. Em branco usa o padrão da API.",
         "notes": "Notas",
-        "seadEditHint": "Validade, escopos e limite ficam no serviço e não podem mudar: revogue e emita uma nova chave.",
         "copyNow": "A chave \"{name}\" está pronta. Copie agora; ela também fica guardada no cofre.",
         "done": "Concluído",
         "noOwner": "Sem portador",
         "expiresOn": "Expira em {date}",
         "lastUsedAt": "Último uso {date}",
         "neverUsed": "Nunca usada",
-        "uses": "{count} requisições",
         "source": {
           "manual": "Manual",
-          "sead": "SEAD"
+          "keycloak": "Keycloak"
         },
         "status": {
           "active": "Ativa",
@@ -274,7 +264,7 @@
         "usageNone": "Nenhuma requisição nos últimos 30 dias.",
         "rotate": "Rotacionar",
         "rotateConfirm": "Rotacionar a chave \"{name}\"?",
-        "rotateConfirmBody": "Uma nova chave a substitui. A antiga continua funcionando por 7 dias e depois para.",
+        "rotateConfirmBody": "O Keycloak emite um novo segredo de cliente e o antigo para de funcionar na hora.",
         "rotateFailed": "Falha na rotação",
         "revoke": "Revogar",
         "revokeConfirm": "Revogar a chave \"{name}\"?",
@@ -284,13 +274,22 @@
         "scopes": "Escopos",
         "scopesHint": "O que esta chave pode chamar. Escolha só o que o consumidor precisa.",
         "scopesRequired": "Escolha ao menos um escopo.",
-        "scopesLoadFailed": "Não foi possível carregar os escopos do serviço: {error}",
+        "scopesLoadFailed": "Não foi possível carregar os escopos da API: {error}",
         "scopeWildcard": "* — acesso total (todas as rotas, inclusive futuras)",
         "scopeGroup": {
           "route": "Rotas",
           "modifier": "Modificadores",
           "wildcard": "Acesso total"
-        }
+        },
+        "scopePrefix": "Prefixo de escopo",
+        "scopePrefixHint": "Dá nome aos escopos e clientes desta API: servidores → servidores:cadastro e servidores-<rótulo>.",
+        "scopePrefixRequired": "Informe o prefixo de escopo.",
+        "keycloakSettingsHint": "A conexão com o Keycloak fica em Configurações → Integrações (Keycloak — APIs da SEAD).",
+        "syncScopes": "Sincronizar escopos",
+        "syncScopesHint": "Cria no Keycloak todo escopo que a API declara, para que as chaves possam recebê-lo.",
+        "scopesSynced": "Escopos sincronizados: {created} novos de {total}",
+        "syncScopesFailed": "Não foi possível sincronizar os escopos",
+        "keycloakEditHint": "Mudanças de escopos e limite valem para os tokens emitidos a partir de agora."
       }
     },
     "lineage": {
@@ -1770,7 +1769,20 @@
         "tokenHint": "Token de API somente leitura (usuario@realm!nome) com o papel PVEAuditor em /. Os IPs dos convidados também exigem VM.Monitor (PVE 8) ou VM.GuestAgent.Audit (PVE 9) e o QEMU guest agent.",
         "connectedVersion": "Conectado — Proxmox VE {version}"
       },
-      "saved": "Salvo"
+      "saved": "Salvo",
+      "keycloakApis": {
+        "title": "Keycloak — APIs da SEAD",
+        "hint": "O realm que governa as APIs da SEAD. O Bridge gerencia as chaves de acesso delas como clientes Keycloak por esta conta de serviço e aceita os tokens do realm na própria API.",
+        "publicUrl": "URL pública (emissor)",
+        "internalUrl": "URL interna",
+        "internalUrlHint": "Por onde o Bridge alcança o Keycloak quando o nome público não resolve nos servidores. Em branco usa a URL pública.",
+        "hostHeader": "Cabeçalho Host",
+        "hostHeaderHint": "Enviado à URL interna para que o Keycloak responda como o nome público.",
+        "adminClientHint": "Tem manage-clients. Dê um nome fora de todo prefixo de escopo (ex.: kc-bridge-admin): ele nunca é sincronizado como chave.",
+        "usageClientId": "ID do cliente de uso",
+        "usageClientSecret": "Segredo do cliente de uso",
+        "usageClientHint": "Um cliente separado, sem papéis de realm-management, com os escopos <prefixo>:admin.uso. Só o token dele é enviado às APIs; sem ele, o uso fica indisponível."
+      }
     },
     "integrationsTabLabel": "Integrações",
     "permissions": {

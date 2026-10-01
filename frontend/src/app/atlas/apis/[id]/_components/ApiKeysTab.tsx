@@ -29,7 +29,7 @@ const STATUS_APPEARANCE = { active: "success", grace: "moved", expired: "moved",
 
 // Chaves de acesso: who holds a key to this API. Listing needs only to see
 // the API; issuing, rotating, revoking and reading a key back need
-// apis.keys.manage; the SEAD connection is admin-only.
+// apis.keys.manage; the mode, base URL and scope prefix are admin-only.
 export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalog; canManage: boolean; isAdmin: boolean }) {
   const { t, formatDate, formatDateTime } = useLocale();
   const confirm = useConfirm();
@@ -43,7 +43,7 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
   const [usageOf, setUsageOf] = useState<ApiKey | null>(null);
 
   const mode = api.key_management;
-  const sead = mode === "sead";
+  const keycloak = mode === "keycloak";
   const { data: keys = [], error: loadError } = useQuery({
     queryKey: ["api-keys", api.id, showRevoked],
     queryFn: () => apiKeysAPI.list(api.id, showRevoked),
@@ -67,8 +67,8 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
     onError: fail(t("atlas.apis.keys.revokeFailed")),
   });
   const rotate = useMutation({
-    mutationFn: (k: ApiKey) => apiKeysAPI.rotate(api.id, k.id, 7),
-    onSuccess: (r) => { refresh(); setIssued({ label: r.key.label, plaintext: r.plaintext }); },
+    mutationFn: (k: ApiKey) => apiKeysAPI.rotate(api.id, k.id),
+    onSuccess: (r) => { refresh(); setIssued({ label: r.key.external_label ?? r.key.label, plaintext: r.plaintext }); },
     onError: fail(t("atlas.apis.keys.rotateFailed")),
   });
 
@@ -119,9 +119,6 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
         </div>
       )}
 
-      {sead && !api.has_admin_key && (
-        <StatusAlert variant="warning">{t("atlas.apis.keys.notConnected")}</StatusAlert>
-      )}
       {!!loadError && <StatusAlert variant="error">{(loadError as Error).message}</StatusAlert>}
 
       <SectionCard
@@ -135,12 +132,12 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
           <span className="inline-flex items-center gap-2">
             <Toggle checked={showRevoked} onChange={setShowRevoked} ariaLabel={t("atlas.apis.keys.showRevoked")} />
             <span className="hidden sm:inline text-xs text-[var(--text-secondary)]">{t("atlas.apis.keys.showRevoked")}</span>
-            {sead && canManage && (
+            {keycloak && canManage && (
               <IconButton label={t("atlas.apis.keys.sync")} onClick={() => sync.mutate()} disabled={sync.isPending}><Icon path={ICON_PATHS.refresh} /></IconButton>
             )}
             {configButton}
             {canManage && (
-              <IconButton label={t(sead ? "atlas.apis.keys.issue" : "atlas.apis.keys.register")} onClick={() => setDrawer({ editing: null })}><Icon path={ICON_PATHS.plus} /></IconButton>
+              <IconButton label={t(keycloak ? "atlas.apis.keys.issue" : "atlas.apis.keys.register")} onClick={() => setDrawer({ editing: null })}><Icon path={ICON_PATHS.plus} /></IconButton>
             )}
           </span>
         }
@@ -151,7 +148,7 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
               k.owner_contact_name || k.owner || t("atlas.apis.keys.noOwner"),
               k.expires_at ? t("atlas.apis.keys.expiresOn", { date: formatDate(k.expires_at) }) : t("atlas.apis.keys.noExpiry"),
               k.last_used_at ? t("atlas.apis.keys.lastUsedAt", { date: formatDateTime(k.last_used_at) }) : t("atlas.apis.keys.neverUsed"),
-              ...(k.source === "sead" ? [t("atlas.apis.keys.uses", { count: String(k.lifetime_uses) })] : []),
+              ...(k.external_label && k.external_label !== k.label ? [k.external_label] : []),
               ...(k.scopes.length > 0 ? [k.scopes.join(", ")] : []),
             ];
             return (
@@ -164,8 +161,8 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
                   name={k.label}
                   actions={[
                     { label: t("atlas.apis.keys.reveal"), icon: ICON_PATHS.eye, hidden: !canManage || !k.secret_id || k.status === "revoked", onClick: () => setRevealing(k) },
-                    { label: t("atlas.apis.keys.usage"), icon: ICON_PATHS.clock, hidden: k.source !== "sead", onClick: () => setUsageOf(k) },
-                    { label: t("atlas.apis.keys.rotate"), icon: ICON_PATHS.refresh, hidden: !canManage || k.source !== "sead" || k.status !== "active", onClick: () => askRotate(k) },
+                    { label: t("atlas.apis.keys.usage"), icon: ICON_PATHS.clock, hidden: k.source !== "keycloak" || api.scope_prefix === "bridge", onClick: () => setUsageOf(k) },
+                    { label: t("atlas.apis.keys.rotate"), icon: ICON_PATHS.refresh, hidden: !canManage || k.source !== "keycloak" || k.status !== "active", onClick: () => askRotate(k) },
                     { label: t("common.edit"), icon: ICON_PATHS.pencil, hidden: !canManage, onClick: () => setDrawer({ editing: k }) },
                     { label: t("atlas.apis.keys.revoke"), icon: ICON_PATHS.trash, danger: true, hidden: !canManage || k.status === "revoked", onClick: () => askRevoke(k) },
                   ]}
@@ -209,17 +206,17 @@ function RevealKeyModal({ apiKey, onClose }: { apiKey: ApiKey; onClose: () => vo
   );
 }
 
-// KeyUsageModal shows a SEAD key's requests per day, straight from the service.
+// KeyUsageModal shows a Keycloak key's requests per day, straight from the API.
 function KeyUsageModal({ api, apiKey, onClose }: { api: ApiCatalog; apiKey: ApiKey; onClose: () => void }) {
   const { t } = useLocale();
   const { data, error, isLoading } = useQuery({
     queryKey: ["api-keys", api.id, "usage", apiKey.id],
-    queryFn: () => apiKeysAPI.usage(api.id, apiKey.id, 30),
+    queryFn: () => apiKeysAPI.usage(api.id, apiKey.id),
     retry: false,
   });
   const days = Object.entries(data?.daily ?? {}).sort(([a], [b]) => b.localeCompare(a));
   const max = Math.max(1, ...days.map(([, n]) => n));
-  const label = (d: string) => `${d.slice(6, 8)}/${d.slice(4, 6)}`;
+  const label = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`; // "YYYY-MM-DD" → dd/mm
   return (
     <Modal open onClose={onClose} title={t("atlas.apis.keys.usageTitle", { name: apiKey.label })}>
       <div className="space-y-3">
