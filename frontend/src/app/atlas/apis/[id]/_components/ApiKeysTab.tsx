@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiKeysAPI } from "@/lib/api";
+import { apiKeysAPI, apiTokensAPI, type APIToken } from "@/lib/api";
 import type { ApiCatalog, ApiKey } from "@/lib/types";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useFlag } from "@/contexts/FlagContext";
 import { useSecretReveal } from "@/hooks/useSecretReveal";
-import ApiTokensPanel from "@/components/tokens/ApiTokensPanel";
+import ApiTokenForm from "@/components/tokens/ApiTokenForm";
+import { TOKEN_STATE_APPEARANCE, TokenUsageModal, tokenState } from "@/components/tokens/tokenUi";
+import Drawer from "@/components/ui/Drawer";
+import DropdownMenu, { DropdownMenuItem } from "@/components/ui/DropdownMenu";
 import SectionCard from "@/components/ui/SectionCard";
 import IconButton from "@/components/ui/IconButton";
 import Icon from "@/components/ui/Icon";
@@ -31,6 +34,8 @@ const STATUS_APPEARANCE = { active: "success", grace: "moved", expired: "moved",
 // Chaves de acesso: who holds a key to this API. Listing needs only to see
 // the API; issuing, rotating, revoking and reading a key back need
 // apis.keys.manage; the mode, base URL and scope prefix are admin-only.
+// On Bridge's own entry the list also carries the personal brg_ tokens (they
+// authenticate the same API), each row tagged service or personal.
 export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalog; canManage: boolean; isAdmin: boolean }) {
   const { t, formatDate, formatDateTime } = useLocale();
   const confirm = useConfirm();
@@ -42,6 +47,8 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
   const [issued, setIssued] = useState<{ label: string; plaintext: string } | null>(null);
   const [revealing, setRevealing] = useState<ApiKey | null>(null);
   const [usageOf, setUsageOf] = useState<ApiKey | null>(null);
+  const [tokenUsageOf, setTokenUsageOf] = useState<APIToken | null>(null);
+  const [issuingToken, setIssuingToken] = useState(false);
 
   const mode = api.key_management;
   const keycloak = mode === "keycloak";
@@ -50,6 +57,31 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
     queryFn: () => apiKeysAPI.list(api.id, showRevoked),
     enabled: mode !== "none",
   });
+  const isBridge = api.scope_prefix === "bridge";
+  // Admins see every user's tokens; others their own (the endpoint enforces it).
+  const { data: allTokens = [] } = useQuery({
+    queryKey: ["api-tokens", isAdmin],
+    queryFn: () => apiTokensAPI.list(isAdmin),
+    enabled: isBridge,
+  });
+  const tokens = showRevoked ? allTokens : allTokens.filter((tok) => tokenState(tok) === "active");
+  const revokeToken = useMutation({
+    mutationFn: apiTokensAPI.revoke,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["api-tokens"] });
+      flag({ appearance: "success", title: t("settings.apiTokens.revoked") });
+    },
+    onError: (err) => flag({ appearance: "error", title: t("settings.apiTokens.revokeError"), description: err instanceof Error ? err.message : undefined }),
+  });
+  const askRevokeToken = async (tok: APIToken) => {
+    const ok = await confirm({
+      title: t("settings.apiTokens.revokeConfirm", { name: tok.name }),
+      message: t("settings.apiTokens.revokeConfirmBody"),
+      danger: true,
+      confirmLabel: t("settings.apiTokens.revoke"),
+    });
+    if (ok) revokeToken.mutate(tok.id);
+  };
   const refresh = () => qc.invalidateQueries({ queryKey: ["api-keys", api.id] });
   const fail = (title: string) => (err: unknown) =>
     flag({ appearance: "error", title, description: err instanceof Error ? err.message : undefined });
@@ -126,9 +158,9 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
         as="h3"
         title={t("atlas.apis.keys.title")}
         description={t(`atlas.apis.keys.modeHint.${mode}`)}
-        count={keys.length}
+        count={keys.length + tokens.length}
         body="flush"
-        empty={keys.length === 0 ? t("atlas.apis.keys.empty") : undefined}
+        empty={keys.length + tokens.length === 0 ? t("atlas.apis.keys.empty") : undefined}
         controls={
           <span className="inline-flex items-center gap-2">
             <Toggle checked={showRevoked} onChange={setShowRevoked} ariaLabel={t("atlas.apis.keys.showRevoked")} />
@@ -137,7 +169,18 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
               <IconButton label={t("atlas.apis.keys.sync")} onClick={() => sync.mutate()} disabled={sync.isPending}><Icon path={ICON_PATHS.refresh} /></IconButton>
             )}
             {configButton}
-            {canManage && (
+            {isBridge ? (
+              <DropdownMenu trigger={<IconButton label={t("atlas.apis.keys.issue")}><Icon path={ICON_PATHS.plus} /></IconButton>}>
+                {canManage && (
+                  <DropdownMenuItem onClick={() => setDrawer({ editing: null })} elemBefore={<Icon path={ICON_PATHS.keyOutline} className="w-4 h-4" />}>
+                    {t("atlas.apis.keys.issueServiceKey")}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => setIssuingToken(true)} elemBefore={<Icon path={ICON_PATHS.keyOutline} className="w-4 h-4" />}>
+                  {t("atlas.apis.keys.issuePersonalToken")}
+                </DropdownMenuItem>
+              </DropdownMenu>
+            ) : canManage && (
               <IconButton label={t(keycloak ? "atlas.apis.keys.issue" : "atlas.apis.keys.register")} onClick={() => setDrawer({ editing: null })}><Icon path={ICON_PATHS.plus} /></IconButton>
             )}
           </span>
@@ -157,6 +200,7 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
                 <Icon path={ICON_PATHS.keyOutline} className="w-3.5 h-3.5 shrink-0 text-[var(--accent)]" />
                 <RowText title={k.label} mono meta={meta.map((m, i) => <span key={i}>{m}</span>)} />
                 <span className="hidden sm:inline text-2xs text-[var(--text-muted)]">{t(`atlas.apis.keys.source.${k.source}`)}</span>
+                {isBridge && <Lozenge appearance="new">{t("atlas.apis.keys.kind.service")}</Lozenge>}
                 <Lozenge appearance={STATUS_APPEARANCE[k.status]}>{t(`atlas.apis.keys.status.${k.status}`)}</Lozenge>
                 <RowActions
                   name={k.label}
@@ -171,17 +215,43 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
               </ListRow>
             );
           })}
+          {tokens.map((tok) => {
+            const state = tokenState(tok);
+            const meta = [
+              tok.username,
+              tok.expires_at ? t("atlas.apis.keys.expiresOn", { date: formatDate(tok.expires_at) }) : t("atlas.apis.keys.noExpiry"),
+              tok.last_used_at ? t("atlas.apis.keys.lastUsedAt", { date: formatDateTime(tok.last_used_at) }) : t("atlas.apis.keys.neverUsed"),
+              `${tok.prefix}…`,
+              ...(tok.scopes.length > 0 ? [tok.scopes.map((s) => `bridge:${s}`).join(", ")] : []),
+            ];
+            return (
+              <ListRow key={`token-${tok.id}`}>
+                <Icon path={ICON_PATHS.keyOutline} className="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)]" />
+                <RowText title={tok.name} mono meta={meta.map((m, i) => <span key={i}>{m}</span>)} />
+                <span className="hidden sm:inline text-2xs text-[var(--text-muted)]">{t("atlas.apis.keys.source.token")}</span>
+                <Lozenge appearance={tok.owner_kind === "service" ? "new" : "default"}>
+                  {t(tok.owner_kind === "service" ? "atlas.apis.keys.kind.service" : "atlas.apis.keys.kind.personal")}
+                </Lozenge>
+                <Lozenge appearance={TOKEN_STATE_APPEARANCE[state]}>{t(`settings.apiTokens.state.${state}`)}</Lozenge>
+                <RowActions
+                  name={tok.name}
+                  actions={[
+                    { label: t("atlas.apis.keys.usage"), icon: ICON_PATHS.clock, onClick: () => setTokenUsageOf(tok) },
+                    { label: t("atlas.apis.keys.revoke"), icon: ICON_PATHS.trash, danger: true, hidden: state !== "active", onClick: () => askRevokeToken(tok) },
+                  ]}
+                />
+              </ListRow>
+            );
+          })}
         </RowList>
       </SectionCard>
 
-      {api.scope_prefix === "bridge" && (
-        <ApiTokensPanel
-          title={t("atlas.apis.keys.personalTokensTitle")}
-          description={t("atlas.apis.keys.personalTokensDesc")}
-          scopeDisplayPrefix="bridge:"
-        />
+      {issuingToken && (
+        <Drawer open onClose={() => setIssuingToken(false)} title={t("atlas.apis.keys.issuePersonalToken")}>
+          <ApiTokenForm onCreated={({ token, name }) => { setIssued({ label: name, plaintext: token }); setIssuingToken(false); }} />
+        </Drawer>
       )}
-
+      {tokenUsageOf && <TokenUsageModal token={tokenUsageOf} onClose={() => setTokenUsageOf(null)} />}
       {drawer && (
         <ApiKeyDrawer api={api} editing={drawer.editing} open onClose={() => setDrawer(null)}
           onIssued={(label, plaintext) => setIssued({ label, plaintext })} />
