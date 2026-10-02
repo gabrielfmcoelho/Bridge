@@ -143,9 +143,9 @@ func serviceWhere(ctx context.Context, f models.ServiceFilter) ([]string, []any)
 
 	if f.Search != "" {
 		op := database.LikeOp()
-		where = append(where, "(nickname "+op+" ? OR description "+op+" ? OR technology_stack "+op+" ?)")
+		where = append(where, "(nickname "+op+" ? OR description "+op+" ? OR technology_stack "+op+" ? OR coolify_stack "+op+" ?)")
 		s := "%" + f.Search + "%"
-		args = append(args, s, s, s)
+		args = append(args, s, s, s, s)
 	}
 	if f.Tag != "" {
 		where = append(where, "id IN (SELECT entity_id FROM tags WHERE entity_type = 'service' AND tag = ?)")
