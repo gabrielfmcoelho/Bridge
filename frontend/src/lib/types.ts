@@ -218,6 +218,15 @@ export interface DNSRecord {
   cert_sans?: string;
   cert_error?: string;
   cert_checked_at?: string | null;
+  // DNS answer and HTTP status from the latest scan. observed_at null = never
+  // probed. obs_target is usually the proxy's public address, not the host's.
+  // Status codes are 0 when the port gave no HTTP answer.
+  obs_record_type?: string;
+  obs_target?: string;
+  obs_http_status?: number;
+  obs_https_status?: number;
+  obs_status?: "" | "online" | "no_content" | "error" | "offline";
+  observed_at?: string | null;
 }
 
 export interface Project {

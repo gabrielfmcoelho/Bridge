@@ -126,7 +126,7 @@ export default function DNSPage() {
     onMutate: () => flag({ appearance: "info", title: t("dns.scanCertsRunning") }),
     onSuccess: (d) => {
       refresh();
-      flag({ appearance: "success", title: t("dns.scanCerts"), description: t("dns.certScanDone", { scanned: String(d.scanned), ok: String(d.ok), failed: String(d.failed) }) });
+      flag({ appearance: "success", title: t("dns.scanCerts"), description: t("dns.certScanDone", { observed: String(d.observed), online: String(d.online), scanned: String(d.scanned), ok: String(d.ok), failed: String(d.failed) }) });
     },
     onError: (err) => flag({ appearance: "error", title: t("dns.scanCerts"), description: err.message }),
   });

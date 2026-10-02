@@ -232,6 +232,13 @@ function mockCertScan(d: DNSRecord): DNSRecord {
     cert_sans: `${d.domain}, www.${d.domain}`,
     cert_error: left < 0 ? "x509: certificate has expired or is not yet valid" : "",
     cert_checked_at: iso(0),
+    // Observation varies on the same id%3: online, no content, offline.
+    obs_record_type: "A",
+    obs_target: "200.23.153.234",
+    obs_http_status: [0, 301, 404][d.id % 3],
+    obs_https_status: [0, 200, 503][d.id % 3],
+    obs_status: (["offline", "online", "no_content"] as const)[d.id % 3],
+    observed_at: iso(0),
   });
 }
 
@@ -316,9 +323,12 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   if (method === "GET" && p === "dns") return json(paginate(db.dns, qs.get("page"), qs.get("per_page")));
   // Literal route first: "cert-scan" must not be read as a dns id.
   if (method === "POST" && p === "dns/cert-scan") {
-    const scanned = db.dns.filter((d) => d.has_https).map(mockCertScan);
+    // ponytail: the mock probes every record's cert too; only has_https ones are counted.
+    const observed = db.dns.map(mockCertScan);
+    const scanned = observed.filter((d) => d.has_https);
     const failed = scanned.filter((d) => d.cert_error).length;
-    return json({ scanned: scanned.length, ok: scanned.length - failed, failed });
+    const online = observed.filter((d) => d.obs_status === "online").length;
+    return json({ scanned: scanned.length, ok: scanned.length - failed, failed, observed: observed.length, online });
   }
   if (method === "GET" && segs[0] === "dns" && segs.length === 2) {
     const record = db.dns.find((d) => d.id === Number(segs[1]));

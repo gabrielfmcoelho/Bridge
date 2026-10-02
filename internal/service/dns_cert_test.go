@@ -13,8 +13,9 @@ import (
 
 // A live self-signed TLS server: the cert is read (dates, names) and the
 // verification error recorded; a dead port is unreachable (error, no dates);
-// a has_https=false record is left alone by the bulk scan but still scanned
-// on demand.
+// a has_https=false record gets no cert probe from the bulk scan (but one on
+// demand). Every record is observed: the live server answers 404 on HTTPS and
+// 400 to plain HTTP on its TLS port (no_content), the dead port nothing.
 func TestDNSService_ScanCerts(t *testing.T) {
 	ctx := context.Background()
 	svc, d := newDNSService(t)
@@ -46,8 +47,8 @@ func TestDNSService_ScanCerts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ScanCerts: %v", err)
 	}
-	if sum != (service.CertScanSummary{Scanned: 2, OK: 0, Failed: 2}) {
-		t.Fatalf("summary = %+v, want {2 0 2}", sum)
+	if sum != (service.CertScanSummary{Scanned: 2, OK: 0, Failed: 2, Observed: 3, Online: 0}) {
+		t.Fatalf("summary = %+v, want {2 0 2 3 0}", sum)
 	}
 
 	got := reload(liveID)
@@ -60,6 +61,16 @@ func TestDNSService_ScanCerts(t *testing.T) {
 	}
 	if got.CertSubject == "" || got.CertIssuer == "" || got.CertNotBefore == nil || got.CertCheckedAt == nil {
 		t.Fatalf("live cert = %+v", got.DNSCert)
+	}
+
+	if o := got.DNSObservation; o.ObsHTTPSStatus != 404 || o.ObsHTTPStatus != 400 || o.ObsStatus != "no_content" || o.ObsRecordType != "" || o.ObservedAt == nil {
+		t.Fatalf("live observation = %+v", o)
+	}
+	if o := reload(deadID).DNSObservation; o.ObsStatus != "offline" || o.ObsHTTPStatus != 0 || o.ObsHTTPSStatus != 0 {
+		t.Fatalf("dead observation = %+v", o)
+	}
+	if o := reload(httpID).DNSObservation; o.ObsRecordType != "A" || !strings.Contains(o.ObsTarget, "127.0.0.1") {
+		t.Fatalf("localhost observation = %+v, want A 127.0.0.1", o)
 	}
 
 	if got := reload(deadID); got.CertError == "" || got.CertExpiresAt != nil || got.CertCheckedAt == nil {

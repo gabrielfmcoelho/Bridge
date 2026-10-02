@@ -722,7 +722,19 @@ definitions:
         type: integer
       is_global:
         type: boolean
+      obs_http_status:
+        type: integer
+      obs_https_status:
+        type: integer
+      obs_record_type:
+        type: string
+      obs_status:
+        type: string
+      obs_target:
+        type: string
       observacoes:
+        type: string
+      observed_at:
         type: string
       project_ids:
         items:
@@ -1279,7 +1291,19 @@ definitions:
         type: integer
       is_global:
         type: boolean
+      obs_http_status:
+        type: integer
+      obs_https_status:
+        type: integer
+      obs_record_type:
+        type: string
+      obs_status:
+        type: string
+      obs_target:
+        type: string
       observacoes:
+        type: string
+      observed_at:
         type: string
       responsavel:
         type: string
@@ -2912,7 +2936,19 @@ definitions:
         type: boolean
       id:
         type: integer
+      obs_http_status:
+        type: integer
+      obs_https_status:
+        type: integer
+      obs_record_type:
+        type: string
+      obs_status:
+        type: string
+      obs_target:
+        type: string
       observacoes:
+        type: string
+      observed_at:
         type: string
       responsavel:
         type: string
@@ -3754,7 +3790,11 @@ definitions:
     properties:
       failed:
         type: integer
+      observed:
+        type: integer
       ok:
+        type: integer
+      online:
         type: integer
       scanned:
         type: integer
@@ -3843,7 +3883,19 @@ definitions:
         type: string
       main_responsavel_name:
         type: string
+      obs_http_status:
+        type: integer
+      obs_https_status:
+        type: integer
+      obs_record_type:
+        type: string
+      obs_status:
+        type: string
+      obs_target:
+        type: string
       observacoes:
+        type: string
+      observed_at:
         type: string
       projects_count:
         type: integer
@@ -7307,7 +7359,7 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
-      summary: Scan one record's certificate
+      summary: Scan one record (DNS, HTTP status, certificate)
       tags:
       - dns
   /api/dns/{id}/restore:
@@ -7347,8 +7399,8 @@ paths:
       - dns
   /api/dns/cert-scan:
     post:
-      description: Editor+. Synchronous (up to 10 minutes) over every visible has_https
-        record.
+      description: 'Editor+. Synchronous (up to 10 minutes): every visible record
+        is observed, has_https ones also get their certificate read.'
       produces:
       - application/json
       responses:
@@ -7364,7 +7416,7 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
-      summary: Scan every HTTPS certificate
+      summary: Scan every record (DNS, HTTP status, certificate)
       tags:
       - dns
   /api/dns/trash:

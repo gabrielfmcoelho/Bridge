@@ -290,11 +290,12 @@ func (h *dnsHandlers) handleDelete(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
-// handleCertScanAll probes the certificate of every visible has_https record.
-// Synchronous: the response is the scan summary.
+// handleCertScanAll observes every visible record (DNS answer, HTTP/HTTPS
+// status) and probes the certificate of the has_https ones. Synchronous: the
+// response is the scan summary.
 //
-//	@Summary		Scan every HTTPS certificate
-//	@Description	Editor+. Synchronous (up to 10 minutes) over every visible has_https record.
+//	@Summary		Scan every record (DNS, HTTP status, certificate)
+//	@Description	Editor+. Synchronous (up to 10 minutes): every visible record is observed, has_https ones also get their certificate read.
 //	@Tags			dns
 //	@Produce		json
 //	@Success		200	{object}	service.CertScanSummary
@@ -315,9 +316,10 @@ func (h *dnsHandlers) handleCertScanAll(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, sum)
 }
 
-// handleCertScan probes one record's certificate and returns the updated record.
+// handleCertScan probes one record (observation and certificate) and returns
+// the updated record.
 //
-//	@Summary		Scan one record's certificate
+//	@Summary		Scan one record (DNS, HTTP status, certificate)
 //	@Description	Editor+. Returns the updated record.
 //	@Tags			dns
 //	@Produce		json

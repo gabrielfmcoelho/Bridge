@@ -966,9 +966,9 @@
     "certSans": "Alternative names (SAN)",
     "certLastScan": "Last scan",
     "certRescan": "Rescan",
-    "scanCerts": "Scan certificates",
-    "scanCertsRunning": "Scanning certificates…",
-    "certScanDone": "{scanned} scanned: {ok} OK, {failed} with errors",
+    "scanCerts": "Scan domains",
+    "scanCertsRunning": "Scanning domains…",
+    "certScanDone": "{observed} observed ({online} online) · {scanned} certificates: {ok} OK, {failed} with errors",
     "linkedProjects": "Linked Projects",
     "syncCoolify": "Sync from Coolify",
     "syncCoolifyRunning": "Syncing domains from Coolify…",
@@ -1005,7 +1005,22 @@
     "certUnscannedHint": "Certificate not checked yet. Use the button beside to check it now.",
     "notFound": "DNS record not found",
     "notFoundDesc": "It was deleted or you don't have access to it.",
-    "backToList": "Back to DNS records"
+    "backToList": "Back to DNS records",
+    "observation": "Resolution and response",
+    "observationHint": "The address is usually the proxy's public IP, not the host's.",
+    "obsUnscannedHint": "Not observed yet. Use the button beside to check it now.",
+    "obsRescan": "Check now",
+    "obsRecordType": "Record type",
+    "obsTarget": "IP / target",
+    "obsNoAnswer": "No answer",
+    "obsUnresolved": "Does not resolve",
+    "obsLastCheck": "Last check",
+    "obsStatus": {
+      "online": "Online",
+      "no_content": "Online, no content",
+      "error": "Online with errors",
+      "offline": "Offline"
+    }
   },
   "project": {
     "title": "Projects",

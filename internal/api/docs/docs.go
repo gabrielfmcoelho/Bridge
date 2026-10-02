@@ -3698,14 +3698,14 @@ const docTemplate = `{
         },
         "/api/dns/cert-scan": {
             "post": {
-                "description": "Editor+. Synchronous (up to 10 minutes) over every visible has_https record.",
+                "description": "Editor+. Synchronous (up to 10 minutes): every visible record is observed, has_https ones also get their certificate read.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "dns"
                 ],
-                "summary": "Scan every HTTPS certificate",
+                "summary": "Scan every record (DNS, HTTP status, certificate)",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -3932,7 +3932,7 @@ const docTemplate = `{
                 "tags": [
                     "dns"
                 ],
-                "summary": "Scan one record's certificate",
+                "summary": "Scan one record (DNS, HTTP status, certificate)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -16530,7 +16530,25 @@ const docTemplate = `{
                 "is_global": {
                     "type": "boolean"
                 },
+                "obs_http_status": {
+                    "type": "integer"
+                },
+                "obs_https_status": {
+                    "type": "integer"
+                },
+                "obs_record_type": {
+                    "type": "string"
+                },
+                "obs_status": {
+                    "type": "string"
+                },
+                "obs_target": {
+                    "type": "string"
+                },
                 "observacoes": {
+                    "type": "string"
+                },
+                "observed_at": {
                     "type": "string"
                 },
                 "project_ids": {
@@ -17369,7 +17387,25 @@ const docTemplate = `{
                 "is_global": {
                     "type": "boolean"
                 },
+                "obs_http_status": {
+                    "type": "integer"
+                },
+                "obs_https_status": {
+                    "type": "integer"
+                },
+                "obs_record_type": {
+                    "type": "string"
+                },
+                "obs_status": {
+                    "type": "string"
+                },
+                "obs_target": {
+                    "type": "string"
+                },
                 "observacoes": {
+                    "type": "string"
+                },
+                "observed_at": {
                     "type": "string"
                 },
                 "responsavel": {
@@ -19772,7 +19808,25 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "obs_http_status": {
+                    "type": "integer"
+                },
+                "obs_https_status": {
+                    "type": "integer"
+                },
+                "obs_record_type": {
+                    "type": "string"
+                },
+                "obs_status": {
+                    "type": "string"
+                },
+                "obs_target": {
+                    "type": "string"
+                },
                 "observacoes": {
+                    "type": "string"
+                },
+                "observed_at": {
                     "type": "string"
                 },
                 "responsavel": {
@@ -20998,7 +21052,13 @@ const docTemplate = `{
                 "failed": {
                     "type": "integer"
                 },
+                "observed": {
+                    "type": "integer"
+                },
                 "ok": {
+                    "type": "integer"
+                },
+                "online": {
                     "type": "integer"
                 },
                 "scanned": {
@@ -21128,7 +21188,25 @@ const docTemplate = `{
                 "main_responsavel_name": {
                     "type": "string"
                 },
+                "obs_http_status": {
+                    "type": "integer"
+                },
+                "obs_https_status": {
+                    "type": "integer"
+                },
+                "obs_record_type": {
+                    "type": "string"
+                },
+                "obs_status": {
+                    "type": "string"
+                },
+                "obs_target": {
+                    "type": "string"
+                },
                 "observacoes": {
+                    "type": "string"
+                },
+                "observed_at": {
                     "type": "string"
                 },
                 "projects_count": {

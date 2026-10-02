@@ -78,33 +78,43 @@ func probeCert(ctx context.Context, domain string, now time.Time) models.DNSCert
 	return c
 }
 
-// ScanCert probes one record's certificate (regardless of has_https) and
-// stores the result. Returns (nil, nil) when the record is absent or invisible.
+// ScanCert probes one record's certificate (regardless of has_https) and its
+// DNS/HTTP observation, and stores both. Returns (nil, nil) when the record is absent or invisible.
 func (s *DNSService) ScanCert(ctx context.Context, id int64) (*models.DNSRecord, error) {
 	rec, err := s.dns.Get(ctx, id)
 	if err != nil || rec == nil {
 		return nil, err
 	}
-	rec.DNSCert = probeCert(ctx, rec.Domain, time.Now())
+	now := time.Now()
+	rec.DNSCert = probeCert(ctx, rec.Domain, now)
+	rec.DNSObservation = probeObservation(ctx, rec.Domain, now)
 	if err := s.dns.SetCert(ctx, id, rec.DNSCert); err != nil {
+		return nil, err
+	}
+	if err := s.dns.SetObservation(ctx, id, rec.DNSObservation); err != nil {
 		return nil, err
 	}
 	return rec, nil
 }
 
-// CertScanSummary is the bulk scan outcome. Failed counts records whose scan
-// left a cert_error (unreachable or not verifying); OK = Scanned - Failed.
+// CertScanSummary is the bulk scan outcome. Scanned/OK/Failed count the cert
+// probes (has_https records): Failed = left a cert_error (unreachable or not
+// verifying), OK = Scanned - Failed. Observed counts every record probed for
+// DNS/HTTP, Online those whose obs_status came out "online".
 type CertScanSummary struct {
-	Scanned int `json:"scanned"`
-	OK      int `json:"ok"`
-	Failed  int `json:"failed"`
+	Scanned  int `json:"scanned"`
+	OK       int `json:"ok"`
+	Failed   int `json:"failed"`
+	Observed int `json:"observed"`
+	Online   int `json:"online"`
 }
 
-// ScanCerts probes every visible has_https record, certScanConcurrency at a
-// time, and stores each result. Store errors don't stop the scan; they are
-// joined and returned with the summary once every probe is done.
+// ScanCerts observes every visible record (DNS/HTTP) and probes the
+// certificate of the has_https ones, certScanConcurrency records at a time,
+// storing each result. Store errors don't stop the scan; they are joined and
+// returned with the summary once every probe is done.
 func (s *DNSService) ScanCerts(ctx context.Context) (CertScanSummary, error) {
-	records, err := s.dns.ListFiltered(ctx, models.DNSFilter{HasHTTPS: "yes"})
+	records, err := s.dns.ListFiltered(ctx, models.DNSFilter{})
 	if err != nil {
 		return CertScanSummary{}, err
 	}
@@ -120,17 +130,29 @@ func (s *DNSService) ScanCerts(ctx context.Context) (CertScanSummary, error) {
 		sem <- struct{}{}
 		wg.Go(func() {
 			defer func() { <-sem }()
-			c := probeCert(ctx, rec.Domain, now)
-			err := s.dns.SetCert(ctx, rec.ID, c)
+			o := probeObservation(ctx, rec.Domain, now)
+			oErr := s.dns.SetObservation(ctx, rec.ID, o)
+			var c models.DNSCert
+			var cErr error
+			if rec.HasHTTPS {
+				c = probeCert(ctx, rec.Domain, now)
+				cErr = s.dns.SetCert(ctx, rec.ID, c)
+			}
 			mu.Lock()
 			defer mu.Unlock()
-			sum.Scanned++
-			if c.CertError != "" {
-				sum.Failed++
-			} else {
-				sum.OK++
+			sum.Observed++
+			if o.ObsStatus == "online" {
+				sum.Online++
 			}
-			if err != nil {
+			if rec.HasHTTPS {
+				sum.Scanned++
+				if c.CertError != "" {
+					sum.Failed++
+				} else {
+					sum.OK++
+				}
+			}
+			if err := errors.Join(oErr, cErr); err != nil {
 				errs = append(errs, err)
 			}
 		})
