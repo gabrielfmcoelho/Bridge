@@ -366,6 +366,7 @@ func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Requ
 type updateCatalogRequest struct {
 	Name         *string                    `json:"name"`
 	Description  *string                    `json:"description"`
+	UseCases     *string                    `json:"use_cases"`
 	BaseURL      *string                    `json:"base_url"`
 	DocsURL      *string                    `json:"docs_url"`
 	URLs         *[]models.APICatalogURL    `json:"urls"`
@@ -433,7 +434,7 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 		return *v
 	}
 	if err := repo.UpdateMeta(r.Context(), id, keep(req.Name, existing.Name), keep(req.Description, existing.Description),
-		strings.TrimSpace(keep(req.BaseURL, existing.BaseURL)), strings.TrimSpace(keep(req.DocsURL, existing.DocsURL))); err != nil {
+		keep(req.UseCases, existing.UseCases), strings.TrimSpace(keep(req.BaseURL, existing.BaseURL)), strings.TrimSpace(keep(req.DocsURL, existing.DocsURL))); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}

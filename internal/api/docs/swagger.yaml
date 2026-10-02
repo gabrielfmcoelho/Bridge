@@ -2234,6 +2234,8 @@ definitions:
         items:
           $ref: '#/definitions/models.APICatalogURL'
         type: array
+      use_cases:
+        type: string
     type: object
   api.updateSecretRequest:
     properties:
@@ -2642,6 +2644,9 @@ definitions:
         items:
           $ref: '#/definitions/models.APICatalogURL'
         type: array
+      use_cases:
+        description: 'Markdown: who calls it and for what'
+        type: string
       version_label:
         type: string
     type: object

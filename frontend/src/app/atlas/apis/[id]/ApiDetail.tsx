@@ -30,7 +30,8 @@ import ApiForm from "../ApiForm";
 import { useSpecActions } from "../_components/useSpecActions";
 import { isSpecStale } from "../_components/apiInsights";
 import ApiProfile from "./_components/ApiProfile";
-import EndpointsSummary from "./_components/EndpointsSummary";
+import SectionCard from "@/components/ui/SectionCard";
+import { MarkdownContent } from "@/components/ui/MarkdownEditor";
 import ApiKeysTab from "./_components/ApiKeysTab";
 
 type TabKey = "overview" | "endpoints" | "issues" | "topology" | "keys";
@@ -152,11 +153,9 @@ export default function ApiDetail({ id }: { id: number }) {
     <PageShell>
       <div className="space-y-5">
         <PageHeader
-          showEmptyDescription
           title={api.name}
           subtitle={[api.title, api.version_label].filter(Boolean).join(" · ") || undefined}
           subtitleFont="display"
-          description={api.description || undefined}
           status={
             <span className="inline-flex items-center gap-2">
               <Badge color="cyan">{api.spec_version ? `OpenAPI ${api.spec_version}` : "–"}</Badge>
@@ -205,7 +204,12 @@ export default function ApiDetail({ id }: { id: number }) {
         >
           {activeTab === "overview" && (
             <DetailSplit profile={<ApiProfile api={api} onEditResponsaveis={canEdit ? () => setShowEditDrawer(true) : undefined} />}>
-              <EndpointsSummary api={api} onOpenEndpoints={() => setActiveTab("endpoints")} />
+              <SectionCard as="h3" title={t("common.description")} empty={api.description ? undefined : t("atlas.apis.noDescription")}>
+                <MarkdownContent content={api.description} />
+              </SectionCard>
+              <SectionCard as="h3" title={t("atlas.apis.useCases")} empty={api.use_cases ? undefined : t("atlas.apis.noUseCases")}>
+                <MarkdownContent content={api.use_cases ?? ""} />
+              </SectionCard>
             </DetailSplit>
           )}
 

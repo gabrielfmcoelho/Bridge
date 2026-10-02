@@ -6,7 +6,7 @@ import { apiCatalogAPI, contactsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import Input from "@/components/ui/Input";
-import Textarea from "@/components/ui/Textarea";
+import MarkdownEditor from "@/components/ui/MarkdownEditor";
 import FormField, { INPUT_CLASS } from "@/components/ui/FormField";
 import PillButton from "@/components/ui/PillButton";
 import Button from "@/components/ui/Button";
@@ -55,6 +55,7 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
   const [grants, setGrants] = useState<AssetGrantsInput>(initial?.entidades ?? defaultGrants(user));
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [useCases, setUseCases] = useState(initial?.use_cases ?? "");
   const [sourceMode, setSourceMode] = useState<"upload" | "url">(prefill?.specUrl ? "url" : "upload");
   const [file, setFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState(prefill?.specUrl ?? "");
@@ -86,14 +87,13 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
         project_ids: projectIds,
         ...grants,
       };
-      if (initial) return apiCatalogAPI.update(initial.id, { ...meta, responsaveis: owners() });
+      if (initial) return apiCatalogAPI.update(initial.id, { ...meta, use_cases: useCases.trim(), responsaveis: owners() });
       const created = sourceMode === "upload"
         ? await apiCatalogAPI.importUpload(file!, { ...meta, name: meta.name || undefined })
         : await apiCatalogAPI.importURL({ ...meta, name: meta.name || undefined, source_url: sourceUrl.trim() });
-      if (owners().length === 0) return created;
-      return apiCatalogAPI.update(created.id, {
-        name: created.name, description: created.description, base_url: created.base_url, docs_url: created.docs_url, responsaveis: owners(),
-      });
+      // Import takes no use cases or responsáveis: they go in a follow-up update.
+      if (owners().length === 0 && !useCases.trim()) return created;
+      return apiCatalogAPI.update(created.id, { name: created.name, use_cases: useCases.trim(), responsaveis: owners() });
     },
     onSuccess: (api) => onSuccess(api),
     onError: (err) => setError(err instanceof Error ? err.message : t("form.saveFailed")),
@@ -143,7 +143,12 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
             placeholder={isEdit ? undefined : t("atlas.apis.namePlaceholder")} error={err("name")} aria-invalid={!!err("name")} />
         </div>
         <div className="sm:col-span-2">
-          <Textarea label={t("common.description")} value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+          <MarkdownEditor label={t("common.description")} value={description} onChange={setDescription} rows={6}
+            placeholder={t("atlas.apis.descriptionPlaceholder")} />
+        </div>
+        <div className="sm:col-span-2">
+          <MarkdownEditor label={t("atlas.apis.useCases")} value={useCases} onChange={setUseCases} rows={5}
+            placeholder={t("atlas.apis.useCasesPlaceholder")} />
         </div>
       </FormSection>
 

@@ -441,6 +441,14 @@ func TestCatalog_UpdateIsPartial(t *testing.T) {
 	if a := get(); a["name"] != "Parcial" || a["description"] != "nova" || a["base_url"] != "http://gw.example/x" {
 		t.Errorf("after partial update: name=%v description=%v base_url=%v", a["name"], a["description"], a["base_url"])
 	}
+	// Casos de uso: gravados, e mantidos por um PUT que não os envia.
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"use_cases":"- Gestor lê a folha"}`); resp.StatusCode != http.StatusOK {
+		t.Fatalf("use_cases update = %d %s", resp.StatusCode, readBody(resp))
+	}
+	e.do(http.MethodPut, "/api/api-catalog/"+id, `{"description":"outra"}`)
+	if a := get(); a["use_cases"] != "- Gestor lê a folha" || a["description"] != "outra" {
+		t.Errorf("use_cases after partial update: %v (description %v)", a["use_cases"], a["description"])
+	}
 	// Enviado vazio limpa; nome vazio continua proibido.
 	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"base_url":""}`); resp.StatusCode != http.StatusOK {
 		t.Fatalf("clear base_url = %d", resp.StatusCode)
