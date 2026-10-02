@@ -1298,7 +1298,16 @@
     "emptyDescription": "Adicione hosts e serviços para ver a topologia",
     "projects": "Projetos",
     "relations": "Relacionamentos",
-    "noRelations": "Nenhum vínculo com hosts, DNS, serviços ou projetos. Vincule pelo formulário de edição."
+    "noRelations": "Nenhum vínculo com hosts, DNS, serviços ou projetos. Vincule pelo formulário de edição.",
+    "moreServices": "+{count} serviços",
+    "collapseServices": "Recolher serviços",
+    "groupBy": "Agrupar por",
+    "groupStack": "Stack",
+    "groupEnvironment": "Ambiente Coolify",
+    "groupCoolifyProject": "Projeto Coolify",
+    "groupNone": "Sem agrupamento",
+    "expandAll": "Expandir todos",
+    "collapseAll": "Recolher hosts grandes"
   },
   "sshConfig": {
     "title": "Config SSH",

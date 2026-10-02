@@ -1298,7 +1298,16 @@
     "emptyDescription": "Add hosts and services to see the topology",
     "projects": "Projects",
     "relations": "Relationships",
-    "noRelations": "No links to hosts, DNS, services or projects. Add them from the edit form."
+    "noRelations": "No links to hosts, DNS, services or projects. Add them from the edit form.",
+    "moreServices": "+{count} services",
+    "collapseServices": "Hide services",
+    "groupBy": "Group by",
+    "groupStack": "Stack",
+    "groupEnvironment": "Coolify environment",
+    "groupCoolifyProject": "Coolify project",
+    "groupNone": "No grouping",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse large hosts"
   },
   "sshConfig": {
     "title": "SSH Config",

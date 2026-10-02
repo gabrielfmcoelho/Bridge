@@ -1,11 +1,18 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { graphAPI } from "@/lib/api";
-import { useFilteredGraph } from "@/hooks/useFilteredGraph";
+import type { GraphData } from "@/lib/types";
 
-/** The topology subgraph around one asset ("host-7", "dns-3", "service-12"),
- *  fetched only while its tab is open, plus whether it is still loading. */
+const EMPTY: GraphData = { nodes: [], edges: [] };
+
+/** The topology around one asset ("host-7", "dns-3", "service-12"), fetched only
+ *  while its tab is open. Returns the whole graph with `focus` set: what is shown
+ *  (related assets, collapsed host siblings, groups) is decided in lib/topology. */
 export function useEntityGraph(nodeId: string | undefined, enabled: boolean) {
   const { data, isLoading } = useQuery({ queryKey: ["graph"], queryFn: graphAPI.get, enabled });
-  const graph = useFilteredGraph(nodeId, data, enabled);
+  const graph = useMemo(
+    () => (enabled && data && nodeId ? { ...data, focus: nodeId } : EMPTY),
+    [data, nodeId, enabled],
+  );
   return { graph, loading: enabled && isLoading };
 }
