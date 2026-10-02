@@ -37,3 +37,12 @@ type ProjectFilter struct {
 	Page     int
 	PerPage  int
 }
+
+// ProjectCoolifyLink maps a Bridge project to a Coolify project and, optionally,
+// one of its environments ("" = every environment). The Coolify sync gives
+// services of that project/environment this Bridge project when they have none.
+type ProjectCoolifyLink struct {
+	ProjectID          int64  `json:"project_id"`
+	CoolifyProject     string `json:"coolify_project"`
+	CoolifyEnvironment string `json:"coolify_environment"`
+}

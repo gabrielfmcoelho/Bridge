@@ -16,11 +16,15 @@ type CoolifySyncSummary struct {
 	Existing   int `json:"existing"`
 	LinksAdded int `json:"links_added"`
 	NoHost     int `json:"no_host"`
+	// ServiceLinksAdded counts DNS→service links: the domain's Coolify
+	// resource (or stack member) matched a service the Coolify sync stamped.
+	ServiceLinksAdded int `json:"service_links_added"`
 }
 
 // SyncFromCoolify upserts one DNS record per Coolify domain and links it to
 // the Bridge host running it (matched by Coolify server UUID, then by IP =
-// hosts.hostname). It only adds: existing records keep their fields and links,
+// hosts.hostname) and to the service running it (the one the Coolify sync
+// stamped with the domain's resource, or stack member). It only adds: existing records keep their fields and links,
 // gaining the host link if missing. New records inherit the host's entidade
 // grants; with no host they have none (admin-only until triaged). Runs
 // unscoped — the caller must be admin.
@@ -77,6 +81,22 @@ func (s *DNSService) SyncFromCoolify(ctx context.Context, refs []coolify.DomainR
 			}
 			if added {
 				sum.LinksAdded++
+			}
+		}
+		if ref.ResourceUUID == "" {
+			continue
+		}
+		svcIDs, err := store.NewServiceRepo(s.db).ServiceIDsForCoolify(ctx, ref.ResourceUUID, ref.Member)
+		if err != nil {
+			return sum, err
+		}
+		for _, sid := range svcIDs {
+			added, err := s.dns.AddServiceLink(ctx, dnsID, sid)
+			if err != nil {
+				return sum, err
+			}
+			if added {
+				sum.ServiceLinksAdded++
 			}
 		}
 	}

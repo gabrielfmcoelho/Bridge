@@ -2730,7 +2730,7 @@
         },
         "/api/coolify/dns-sync": {
             "post": {
-                "description": "Admin. Pulls every application/service domain from Coolify into dns_records, linked to the Bridge host running it. 400 when the integration is disabled or unconfigured.",
+                "description": "Admin. Pulls every application/service domain from Coolify into dns_records, linked to the Bridge host running it and to the service the inventory sync stamped with that resource. 400 when the integration is disabled or unconfigured.",
                 "produces": [
                     "application/json"
                 ],
@@ -2897,6 +2897,47 @@
                     },
                     "503": {
                         "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/coolify/projects": {
+            "get": {
+                "description": "Editor+. Coolify projects with their environment names, for the project ↔ Coolify mapping. 400 when the integration is disabled or unconfigured.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coolify"
+                ],
+                "summary": "List Coolify projects",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.coolifyProjectOption"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -3211,6 +3252,50 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/coolify/sync": {
+            "post": {
+                "description": "Admin. Folds redeploy copies of containers, stamps each Coolify resource's project/environment/stack/repo (credentials stripped) on the services running it, creates offline placeholders for resources no scan has seen, fills hosts' Coolify server uuid, applies the project mapping, links APIs through their URLs' DNS, then syncs DNS (host and service links). 400 when the integration is disabled or unconfigured.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coolify"
+                ],
+                "summary": "Sync the inventory from Coolify",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.coolifySyncResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -16149,6 +16234,66 @@
                 }
             }
         },
+        "api.coolifyProjectOption": {
+            "type": "object",
+            "properties": {
+                "environments": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.coolifySyncResponse": {
+            "type": "object",
+            "properties": {
+                "apis_linked": {
+                    "description": "APIs linked to services through their URL's DNS",
+                    "type": "integer"
+                },
+                "created": {
+                    "description": "placeholders for resources no scan has seen",
+                    "type": "integer"
+                },
+                "dns": {
+                    "$ref": "#/definitions/service.CoolifySyncSummary"
+                },
+                "hosts_uuid_filled": {
+                    "description": "hosts that gained their Coolify server uuid (by IP)",
+                    "type": "integer"
+                },
+                "matched": {
+                    "description": "resources with at least one scanned container",
+                    "type": "integer"
+                },
+                "merged_duplicates": {
+                    "description": "redeploy copies folded into their live row",
+                    "type": "integer"
+                },
+                "projects_set": {
+                    "description": "services given a project by the mapping",
+                    "type": "integer"
+                },
+                "resources": {
+                    "type": "integer"
+                },
+                "unmatched": {
+                    "description": "resources whose server has no Bridge host",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated": {
+                    "description": "services whose Coolify fields changed",
+                    "type": "integer"
+                }
+            }
+        },
         "api.createBundleRequest": {
             "type": "object",
             "properties": {
@@ -17879,6 +18024,13 @@
                 "contato_empresa_responsavel": {
                     "type": "string"
                 },
+                "coolify_links": {
+                    "description": "Coolify projects/environments mapped to this project (environment \"\" =\nall). Absent = leave unchanged; [] = clear.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ProjectCoolifyLink"
+                    }
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -18160,6 +18312,22 @@
                     "description": "ContainerStatus is the online/offline lifecycle flag for both discovery\nkinds (the name predates host-service discovery).",
                     "type": "string"
                 },
+                "coolify_environment": {
+                    "type": "string"
+                },
+                "coolify_project": {
+                    "type": "string"
+                },
+                "coolify_resource_type": {
+                    "type": "string"
+                },
+                "coolify_resource_uuid": {
+                    "description": "Coolify* and Git* come from the Coolify sync only (read-only elsewhere):\nthe resource behind the container, its Coolify project/environment, the\nstack (compose service name, or the application's name) and the repo it\nbuilds from, credentials stripped.",
+                    "type": "string"
+                },
+                "coolify_stack": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -18210,6 +18378,12 @@
                     "type": "string"
                 },
                 "external_url": {
+                    "type": "string"
+                },
+                "git_branch": {
+                    "type": "string"
+                },
+                "git_repository": {
                     "type": "string"
                 },
                 "gitlab_url": {
@@ -20147,6 +20321,20 @@
                 }
             }
         },
+        "models.ProjectCoolifyLink": {
+            "type": "object",
+            "properties": {
+                "coolify_environment": {
+                    "type": "string"
+                },
+                "coolify_project": {
+                    "type": "string"
+                },
+                "project_id": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.ProjectEmbed": {
             "type": "object",
             "properties": {
@@ -20421,6 +20609,22 @@
                     "description": "ContainerStatus is the online/offline lifecycle flag for both discovery\nkinds (the name predates host-service discovery).",
                     "type": "string"
                 },
+                "coolify_environment": {
+                    "type": "string"
+                },
+                "coolify_project": {
+                    "type": "string"
+                },
+                "coolify_resource_type": {
+                    "type": "string"
+                },
+                "coolify_resource_uuid": {
+                    "description": "Coolify* and Git* come from the Coolify sync only (read-only elsewhere):\nthe resource behind the container, its Coolify project/environment, the\nstack (compose service name, or the application's name) and the repo it\nbuilds from, credentials stripped.",
+                    "type": "string"
+                },
+                "coolify_stack": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -20456,6 +20660,12 @@
                     "type": "string"
                 },
                 "external_url": {
+                    "type": "string"
+                },
+                "git_branch": {
+                    "type": "string"
+                },
+                "git_repository": {
                     "type": "string"
                 },
                 "gitlab_url": {
@@ -20698,6 +20908,10 @@
                     "type": "integer"
                 },
                 "no_host": {
+                    "type": "integer"
+                },
+                "service_links_added": {
+                    "description": "ServiceLinksAdded counts DNS→service links: the domain's Coolify\nresource (or stack member) matched a service the Coolify sync stamped.",
                     "type": "integer"
                 }
             }
@@ -21075,6 +21289,13 @@
         "service.ProjectDetail": {
             "type": "object",
             "properties": {
+                "coolify_links": {
+                    "description": "CoolifyLinks maps the project to Coolify projects/environments; the\nCoolify sync gives their unassigned services this project.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ProjectCoolifyLink"
+                    }
+                },
                 "direct_dns_ids": {
                     "type": "array",
                     "items": {
@@ -21336,6 +21557,22 @@
                     "description": "ContainerStatus is the online/offline lifecycle flag for both discovery\nkinds (the name predates host-service discovery).",
                     "type": "string"
                 },
+                "coolify_environment": {
+                    "type": "string"
+                },
+                "coolify_project": {
+                    "type": "string"
+                },
+                "coolify_resource_type": {
+                    "type": "string"
+                },
+                "coolify_resource_uuid": {
+                    "description": "Coolify* and Git* come from the Coolify sync only (read-only elsewhere):\nthe resource behind the container, its Coolify project/environment, the\nstack (compose service name, or the application's name) and the repo it\nbuilds from, credentials stripped.",
+                    "type": "string"
+                },
+                "coolify_stack": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -21383,6 +21620,12 @@
                     "type": "string"
                 },
                 "external_url": {
+                    "type": "string"
+                },
+                "git_branch": {
+                    "type": "string"
+                },
+                "git_repository": {
                     "type": "string"
                 },
                 "gitlab_url": {

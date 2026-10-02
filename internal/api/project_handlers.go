@@ -99,11 +99,14 @@ type projectWriteRequest struct {
 	ServiceIDs *[]int64 `json:"service_ids"`
 	HostIDs    *[]int64 `json:"host_ids"`
 	DNSIDs     *[]int64 `json:"dns_ids"`
+	// Coolify projects/environments mapped to this project (environment "" =
+	// all). Absent = leave unchanged; [] = clear.
+	CoolifyLinks *[]models.ProjectCoolifyLink `json:"coolify_links"`
 }
 
 func (req *projectWriteRequest) toWrite() *service.ProjectWrite {
 	return &service.ProjectWrite{Project: req.Project, Tags: req.Tags, Responsaveis: req.Responsaveis,
-		ServiceIDs: req.ServiceIDs, DirectHostIDs: req.HostIDs, DirectDNSIDs: req.DNSIDs}
+		ServiceIDs: req.ServiceIDs, DirectHostIDs: req.HostIDs, DirectDNSIDs: req.DNSIDs, CoolifyLinks: req.CoolifyLinks}
 }
 
 // handleCreate godoc

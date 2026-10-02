@@ -12,6 +12,10 @@ type DomainRef struct {
 	ServerUUID string
 	ServerIP   string
 	Source     string // app/service name, for the record's observações
+	// ResourceUUID is the application/service the domain routes to; Member is
+	// the stack container (`<name>-<uuid>`) for a compose service's member.
+	ResourceUUID string
+	Member       string
 }
 
 // masterIP is the IP Coolify reports for its own (master) server.
@@ -26,7 +30,7 @@ const masterIP = "host.docker.internal"
 func DomainRefs(apps []Application, svcs []Service, masterHost string) []DomainRef {
 	var out []DomainRef
 	idx := map[string]int{}
-	add := func(fqdn string, srv ServerRef, source string) {
+	add := func(fqdn string, srv ServerRef, source, uuid, member string) {
 		ip := srv.IP
 		if ip == masterIP {
 			ip = masterHost
@@ -50,15 +54,20 @@ func DomainRefs(apps []Application, svcs []Service, masterHost string) []DomainR
 				continue
 			}
 			idx[host] = len(out)
-			out = append(out, DomainRef{Domain: host, HTTPS: https, ServerUUID: srv.UUID, ServerIP: ip, Source: source})
+			out = append(out, DomainRef{Domain: host, HTTPS: https, ServerUUID: srv.UUID, ServerIP: ip, Source: source,
+				ResourceUUID: uuid, Member: member})
 		}
 	}
 	for _, a := range apps {
-		add(a.FQDN, a.Destination.Server, a.Name)
+		add(a.FQDN, a.Destination.Server, a.Name, a.UUID, "")
 	}
 	for _, s := range svcs {
 		for _, a := range s.Applications {
-			add(a.FQDN, s.Server, s.Name)
+			member := ""
+			if s.UUID != "" {
+				member = a.Name + "-" + s.UUID
+			}
+			add(a.FQDN, s.Server, s.Name, s.UUID, member)
 		}
 	}
 	return out

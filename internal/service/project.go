@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -66,6 +67,9 @@ type ProjectDetail struct {
 	DirectHostIDs []int64            `json:"direct_host_ids"`
 	DirectDNSIDs  []int64            `json:"direct_dns_ids"`
 	Entidades     models.AssetGrants `json:"entidades"`
+	// CoolifyLinks maps the project to Coolify projects/environments; the
+	// Coolify sync gives their unassigned services this project.
+	CoolifyLinks []models.ProjectCoolifyLink `json:"coolify_links"`
 }
 
 // ProjectWrite carries the create/update payload (project + relations). For
@@ -80,7 +84,8 @@ type ProjectWrite struct {
 	ServiceIDs    *[]int64
 	DirectHostIDs *[]int64
 	DirectDNSIDs  *[]int64
-	Grants        *models.AssetGrants // nil = leave unchanged
+	CoolifyLinks  *[]models.ProjectCoolifyLink // nil = leave unchanged
+	Grants        *models.AssetGrants          // nil = leave unchanged
 }
 
 // List returns the projects matching the filter (server-side filter/sort/
@@ -196,6 +201,10 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	}
 	hostIDs, dnsIDs := sortedKeys(hostSet), sortedKeys(dnsSet)
 	grants, _ := s.grants.Get(ctx, store.AssetProject, id) // best effort
+	coolifyLinks, err := s.projects.CoolifyLinksFor(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	return &ProjectDetail{
 		Project:       p,
 		Tags:          tags,
@@ -206,6 +215,7 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 		DirectHostIDs: directHosts,
 		DirectDNSIDs:  directDNS,
 		Entidades:     grants,
+		CoolifyLinks:  coolifyLinks,
 	}, nil
 }
 
@@ -296,6 +306,18 @@ func (s *ProjectService) applyLinks(ctx context.Context, id int64, w *ProjectWri
 	}
 	if w.DirectDNSIDs != nil {
 		if err := s.projects.SetDirectDNS(ctx, id, *w.DirectDNSIDs); err != nil {
+			return err
+		}
+	}
+	if w.CoolifyLinks != nil {
+		var links []models.ProjectCoolifyLink
+		for _, l := range *w.CoolifyLinks {
+			l.CoolifyProject, l.CoolifyEnvironment = strings.TrimSpace(l.CoolifyProject), strings.TrimSpace(l.CoolifyEnvironment)
+			if l.CoolifyProject != "" {
+				links = append(links, l)
+			}
+		}
+		if err := s.projects.SetCoolifyLinks(ctx, id, links); err != nil {
 			return err
 		}
 	}

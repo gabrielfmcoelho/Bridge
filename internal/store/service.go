@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/coolify"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
 )
@@ -31,7 +32,9 @@ const serviceCols = `id, nickname, project_id, description, service_type, servic
 	repository_url, gitlab_url, documentation_url,
 	source, discovery_kind, discovery_key,
 	container_status, container_id, container_name, container_image, container_ports,
-	discovered_at, last_seen_at, grafana_dashboard_uid, created_at, updated_at`
+	discovered_at, last_seen_at, grafana_dashboard_uid,
+	coolify_resource_uuid, coolify_resource_type, coolify_project, coolify_environment, coolify_stack,
+	git_repository, git_branch, created_at, updated_at`
 
 // serviceColsS is serviceCols qualified with the `s.` table alias, for joins.
 const serviceColsS = `s.id, s.nickname, s.project_id, s.description, s.service_type, s.service_subtype, s.service_kind,
@@ -41,7 +44,9 @@ const serviceColsS = `s.id, s.nickname, s.project_id, s.description, s.service_t
 	s.repository_url, s.gitlab_url, s.documentation_url,
 	s.source, s.discovery_kind, s.discovery_key,
 	s.container_status, s.container_id, s.container_name, s.container_image, s.container_ports,
-	s.discovered_at, s.last_seen_at, s.grafana_dashboard_uid, s.created_at, s.updated_at`
+	s.discovered_at, s.last_seen_at, s.grafana_dashboard_uid,
+	s.coolify_resource_uuid, s.coolify_resource_type, s.coolify_project, s.coolify_environment, s.coolify_stack,
+	s.git_repository, s.git_branch, s.created_at, s.updated_at`
 
 func scanService(scanner interface{ Scan(...any) error }, s *models.Service) error {
 	return scanner.Scan(&s.ID, &s.Nickname, &s.ProjectID, &s.Description, &s.ServiceType, &s.ServiceSubtype, &s.ServiceKind,
@@ -51,7 +56,9 @@ func scanService(scanner interface{ Scan(...any) error }, s *models.Service) err
 		&s.RepositoryURL, &s.GitlabURL, &s.DocumentationURL,
 		&s.Source, &s.DiscoveryKind, &s.DiscoveryKey,
 		&s.ContainerStatus, &s.ContainerID, &s.ContainerName, &s.ContainerImage, &s.ContainerPorts,
-		&s.DiscoveredAt, &s.LastSeenAt, &s.GrafanaDashboardUID, &s.CreatedAt, &s.UpdatedAt,
+		&s.DiscoveredAt, &s.LastSeenAt, &s.GrafanaDashboardUID,
+		&s.CoolifyResourceUUID, &s.CoolifyResourceType, &s.CoolifyProject, &s.CoolifyEnvironment, &s.CoolifyStack,
+		&s.GitRepository, &s.GitBranch, &s.CreatedAt, &s.UpdatedAt,
 	)
 }
 
@@ -253,13 +260,14 @@ func (r *ServiceRepo) ListByHost(ctx context.Context, hostID int64) ([]models.Se
 }
 
 // ListDiscoveredByHost returns every scan-owned service linked to a host —
-// auto or fixed, container or host kind. Manual services (no discovery_key)
+// auto or fixed, container or host kind, plus Coolify placeholders (adopted
+// by the scan when their container shows up). Manual services (no discovery_key)
 // are excluded so reconciliation can never touch a hand-made row.
 func (r *ServiceRepo) ListDiscoveredByHost(ctx context.Context, hostID int64) ([]models.Service, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT `+serviceColsS+`
 		 FROM services s JOIN service_host_links l ON s.id = l.service_id
-		 WHERE l.host_id = ? AND s.deleted_at IS NULL AND s.source IN ('auto', 'fixed') AND s.discovery_key != ''
+		 WHERE l.host_id = ? AND s.deleted_at IS NULL AND s.source IN ('auto', 'fixed', 'coolify') AND s.discovery_key != ''
 		 ORDER BY s.nickname`, hostID)
 	if err != nil {
 		return nil, err
@@ -463,7 +471,16 @@ type discoveredRow struct {
 // identity is the (kind, key) pair a row reconciles on.
 func (d discoveredRow) identity() string { return d.kind + "\x00" + d.key }
 
-func serviceIdentity(s models.Service) string { return s.DiscoveryKind + "\x00" + s.DiscoveryKey }
+// serviceIdentity is a stored row's (kind, key). Container keys are compared
+// normalized (Coolify's deploy timestamp dropped), so rows keyed before that
+// rule still match the redeployed container instead of spawning a twin.
+func serviceIdentity(s models.Service) string {
+	key := s.DiscoveryKey
+	if s.DiscoveryKind == "container" {
+		key, _ = coolify.ContainerKey(key)
+	}
+	return s.DiscoveryKind + "\x00" + key
+}
 
 // containerRows normalises `docker ps` output.
 func containerRows(containers []sshtest.ContainerInfo) []discoveredRow {
@@ -473,8 +490,11 @@ func containerRows(containers []sshtest.ContainerInfo) []discoveredRow {
 			continue
 		}
 		inf := sshtest.InferFromImage(c.Image, c.Name)
+		// Coolify appends a deploy timestamp to the name on every redeploy:
+		// the key drops it so the redeployed container updates the same row.
+		key, _ := coolify.ContainerKey(c.Name)
 		rows = append(rows, discoveredRow{
-			kind: "container", key: c.Name,
+			kind: "container", key: key,
 			nickname:    inf.Nickname,
 			description: "Auto-discovered from container " + c.Name,
 			serviceType: inf.ServiceType, serviceSubtype: inf.ServiceSubtype, serviceKind: inf.Kind,
@@ -548,7 +568,11 @@ func (r *ServiceRepo) ReconcileDiscovered(ctx context.Context, hostID int64, inv
 	byIdentity := make(map[string]*models.Service, len(existing))
 	byContainerID := make(map[string]*models.Service)
 	for i := range existing {
-		byIdentity[serviceIdentity(existing[i])] = &existing[i]
+		// Several rows can share a normalized identity (copies left by older
+		// redeploys): the online one wins the match, the rest stay offline.
+		if prev := byIdentity[serviceIdentity(existing[i])]; prev == nil || prev.ContainerStatus != "online" {
+			byIdentity[serviceIdentity(existing[i])] = &existing[i]
+		}
 		if existing[i].DiscoveryKind == "container" && existing[i].ContainerID != "" {
 			byContainerID[existing[i].ContainerID] = &existing[i]
 		}
@@ -580,6 +604,7 @@ func (r *ServiceRepo) ReconcileDiscovered(ctx context.Context, hostID int64, inv
 			if _, err := tx.ExecContext(ctx,
 				`UPDATE services SET discovery_key = ?, container_id = ?, container_name = ?,
 					container_image = ?, container_ports = ?, container_status = 'online',
+					source = CASE WHEN source = 'coolify' THEN 'auto' ELSE source END,
 					service_kind = CASE WHEN service_kind = '' THEN ? ELSE service_kind END,
 					last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
 				WHERE id = ?`,

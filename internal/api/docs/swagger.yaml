@@ -559,6 +559,48 @@ definitions:
         description: pre-v91 clients
         type: integer
     type: object
+  api.coolifyProjectOption:
+    properties:
+      environments:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+    type: object
+  api.coolifySyncResponse:
+    properties:
+      apis_linked:
+        description: APIs linked to services through their URL's DNS
+        type: integer
+      created:
+        description: placeholders for resources no scan has seen
+        type: integer
+      dns:
+        $ref: '#/definitions/service.CoolifySyncSummary'
+      hosts_uuid_filled:
+        description: hosts that gained their Coolify server uuid (by IP)
+        type: integer
+      matched:
+        description: resources with at least one scanned container
+        type: integer
+      merged_duplicates:
+        description: redeploy copies folded into their live row
+        type: integer
+      projects_set:
+        description: services given a project by the mapping
+        type: integer
+      resources:
+        type: integer
+      unmatched:
+        description: resources whose server has no Bridge host
+        items:
+          type: string
+        type: array
+      updated:
+        description: services whose Coolify fields changed
+        type: integer
+    type: object
   api.createBundleRequest:
     properties:
       description:
@@ -1710,6 +1752,13 @@ definitions:
     properties:
       contato_empresa_responsavel:
         type: string
+      coolify_links:
+        description: |-
+          Coolify projects/environments mapped to this project (environment "" =
+          all). Absent = leave unchanged; [] = clear.
+        items:
+          $ref: '#/definitions/models.ProjectCoolifyLink'
+        type: array
       created_at:
         type: string
       creator_entidade_id:
@@ -1899,6 +1948,21 @@ definitions:
           ContainerStatus is the online/offline lifecycle flag for both discovery
           kinds (the name predates host-service discovery).
         type: string
+      coolify_environment:
+        type: string
+      coolify_project:
+        type: string
+      coolify_resource_type:
+        type: string
+      coolify_resource_uuid:
+        description: |-
+          Coolify* and Git* come from the Coolify sync only (read-only elsewhere):
+          the resource behind the container, its Coolify project/environment, the
+          stack (compose service name, or the application's name) and the repo it
+          builds from, credentials stripped.
+        type: string
+      coolify_stack:
+        type: string
       created_at:
         type: string
       creator_entidade_id:
@@ -1937,6 +2001,10 @@ definitions:
       external_provider:
         type: string
       external_url:
+        type: string
+      git_branch:
+        type: string
+      git_repository:
         type: string
       gitlab_url:
         type: string
@@ -3241,6 +3309,15 @@ definitions:
       repos_used:
         type: integer
     type: object
+  models.ProjectCoolifyLink:
+    properties:
+      coolify_environment:
+        type: string
+      coolify_project:
+        type: string
+      project_id:
+        type: integer
+    type: object
   models.ProjectEmbed:
     properties:
       created_at:
@@ -3438,6 +3515,21 @@ definitions:
           ContainerStatus is the online/offline lifecycle flag for both discovery
           kinds (the name predates host-service discovery).
         type: string
+      coolify_environment:
+        type: string
+      coolify_project:
+        type: string
+      coolify_resource_type:
+        type: string
+      coolify_resource_uuid:
+        description: |-
+          Coolify* and Git* come from the Coolify sync only (read-only elsewhere):
+          the resource behind the container, its Coolify project/environment, the
+          stack (compose service name, or the application's name) and the repo it
+          builds from, credentials stripped.
+        type: string
+      coolify_stack:
+        type: string
       created_at:
         type: string
       deploy_approach:
@@ -3466,6 +3558,10 @@ definitions:
       external_provider:
         type: string
       external_url:
+        type: string
+      git_branch:
+        type: string
+      git_repository:
         type: string
       gitlab_url:
         type: string
@@ -3631,6 +3727,11 @@ definitions:
       links_added:
         type: integer
       no_host:
+        type: integer
+      service_links_added:
+        description: |-
+          ServiceLinksAdded counts DNS→service links: the domain's Coolify
+          resource (or stack member) matched a service the Coolify sync stamped.
         type: integer
     type: object
   service.DNSDetail:
@@ -3882,6 +3983,13 @@ definitions:
     type: object
   service.ProjectDetail:
     properties:
+      coolify_links:
+        description: |-
+          CoolifyLinks maps the project to Coolify projects/environments; the
+          Coolify sync gives their unassigned services this project.
+        items:
+          $ref: '#/definitions/models.ProjectCoolifyLink'
+        type: array
       direct_dns_ids:
         items:
           type: integer
@@ -4064,6 +4172,21 @@ definitions:
           ContainerStatus is the online/offline lifecycle flag for both discovery
           kinds (the name predates host-service discovery).
         type: string
+      coolify_environment:
+        type: string
+      coolify_project:
+        type: string
+      coolify_resource_type:
+        type: string
+      coolify_resource_uuid:
+        description: |-
+          Coolify* and Git* come from the Coolify sync only (read-only elsewhere):
+          the resource behind the container, its Coolify project/environment, the
+          stack (compose service name, or the application's name) and the repo it
+          builds from, credentials stripped.
+        type: string
+      coolify_stack:
+        type: string
       created_at:
         type: string
       depends_on_ids:
@@ -4100,6 +4223,10 @@ definitions:
       external_provider:
         type: string
       external_url:
+        type: string
+      git_branch:
+        type: string
+      git_repository:
         type: string
       gitlab_url:
         type: string
@@ -6339,8 +6466,8 @@ paths:
   /api/coolify/dns-sync:
     post:
       description: Admin. Pulls every application/service domain from Coolify into
-        dns_records, linked to the Bridge host running it. 400 when the integration
-        is disabled or unconfigured.
+        dns_records, linked to the Bridge host running it and to the service the inventory
+        sync stamped with that resource. 400 when the integration is disabled or unconfigured.
       produces:
       - application/json
       responses:
@@ -6455,6 +6582,34 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Upload a vault SSH key to Coolify
+      tags:
+      - coolify
+  /api/coolify/projects:
+    get:
+      description: Editor+. Coolify projects with their environment names, for the
+        project ↔ Coolify mapping. 400 when the integration is disabled or unconfigured.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.coolifyProjectOption'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List Coolify projects
       tags:
       - coolify
   /api/coolify/register/{slug}:
@@ -6670,6 +6825,40 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Coolify integration status
+      tags:
+      - coolify
+  /api/coolify/sync:
+    post:
+      description: Admin. Folds redeploy copies of containers, stamps each Coolify
+        resource's project/environment/stack/repo (credentials stripped) on the services
+        running it, creates offline placeholders for resources no scan has seen, fills
+        hosts' Coolify server uuid, applies the project mapping, links APIs through
+        their URLs' DNS, then syncs DNS (host and service links). 400 when the integration
+        is disabled or unconfigured.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.coolifySyncResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Sync the inventory from Coolify
       tags:
       - coolify
   /api/coolify/sync/{slug}:

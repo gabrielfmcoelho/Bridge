@@ -48,27 +48,60 @@ type CreateKeyRequest struct {
 	PrivateKey  string `json:"private_key"`
 }
 
-// Application is the subset of a Coolify application the DNS sync reads.
+// Application is the subset of a Coolify application the syncs read.
 // FQDN is nullable and comma-separated ("https://a.x,http://b.x:8080/api").
+// GitRepository can embed credentials (https://user:token@host/…): never log
+// or store it without SanitizeRepoURL.
 type Application struct {
-	UUID        string `json:"uuid"`
-	Name        string `json:"name"`
-	FQDN        string `json:"fqdn"`
-	Destination struct {
+	UUID          string `json:"uuid"`
+	Name          string `json:"name"`
+	FQDN          string `json:"fqdn"`
+	EnvironmentID int64  `json:"environment_id"`
+	GitRepository string `json:"git_repository"`
+	GitBranch     string `json:"git_branch"`
+	Destination   struct {
 		Server ServerRef `json:"server"`
 	} `json:"destination"`
 }
 
-// Service is the subset of a Coolify service (compose stack) the DNS sync
-// reads: its server and each sub-application's fqdn.
+// Service is the subset of a Coolify service (compose stack) the syncs read:
+// its server and each member's name/fqdn. Members run as `<name>-<uuid>`
+// containers, uuid being the service's.
 type Service struct {
-	UUID         string    `json:"uuid"`
-	Name         string    `json:"name"`
-	Server       ServerRef `json:"server"`
-	Applications []struct {
+	UUID          string    `json:"uuid"`
+	Name          string    `json:"name"`
+	EnvironmentID int64     `json:"environment_id"`
+	Server        ServerRef `json:"server"`
+	Applications  []struct {
 		Name string `json:"name"`
 		FQDN string `json:"fqdn"`
 	} `json:"applications"`
+	Databases []struct {
+		Name string `json:"name"`
+	} `json:"databases"`
+}
+
+// Database is a standalone Coolify database (one `<uuid>` container).
+type Database struct {
+	UUID          string `json:"uuid"`
+	Name          string `json:"name"`
+	EnvironmentID int64  `json:"environment_id"`
+	Destination   struct {
+		Server ServerRef `json:"server"`
+	} `json:"destination"`
+}
+
+// Project is a Coolify project with its environments (GET /projects/{uuid}).
+type Project struct {
+	UUID         string        `json:"uuid"`
+	Name         string        `json:"name"`
+	Environments []Environment `json:"environments"`
+}
+
+// Environment is one environment of a Coolify project.
+type Environment struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 // ServerRef is the server embedded in an application/service. Kept to the

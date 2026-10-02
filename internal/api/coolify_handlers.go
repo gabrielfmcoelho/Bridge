@@ -677,7 +677,7 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 // dns_records, linked to the Bridge host running it.
 //
 //	@Summary		Sync DNS records from Coolify
-//	@Description	Admin. Pulls every application/service domain from Coolify into dns_records, linked to the Bridge host running it. 400 when the integration is disabled or unconfigured.
+//	@Description	Admin. Pulls every application/service domain from Coolify into dns_records, linked to the Bridge host running it and to the service the inventory sync stamped with that resource. 400 when the integration is disabled or unconfigured.
 //	@Tags			coolify
 //	@Produce		json
 //	@Success		200	{object}	service.CoolifySyncSummary
@@ -710,12 +710,113 @@ func (h *coolifyHandlers) handleDNSSync(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, sum)
 }
 
+// coolifySyncResponse is the inventory sync plus the DNS sync it runs after.
+type coolifySyncResponse struct {
+	service.CoolifyInventorySummary
+	DNS service.CoolifySyncSummary `json:"dns"`
+}
+
+// handleInventorySync stamps Coolify's resources onto Bridge services, then
+// runs the DNS sync (which now also links each domain to its service).
+//
+//	@Summary		Sync the inventory from Coolify
+//	@Description	Admin. Folds redeploy copies of containers, stamps each Coolify resource's project/environment/stack/repo (credentials stripped) on the services running it, creates offline placeholders for resources no scan has seen, fills hosts' Coolify server uuid, applies the project mapping, links APIs through their URLs' DNS, then syncs DNS (host and service links). 400 when the integration is disabled or unconfigured.
+//	@Tags			coolify
+//	@Produce		json
+//	@Success		200	{object}	coolifySyncResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/sync [post]
+func (h *coolifyHandlers) handleInventorySync(w http.ResponseWriter, r *http.Request) {
+	client, err := h.getClient()
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	apps, err := client.ListApplications()
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to list coolify applications: "+err.Error())
+		return
+	}
+	svcs, err := client.ListServices()
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to list coolify services: "+err.Error())
+		return
+	}
+	dbs, err := client.ListDatabases()
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to list coolify databases: "+err.Error())
+		return
+	}
+	projects, err := client.ListProjects()
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to list coolify projects: "+err.Error())
+		return
+	}
+	inv, err := service.NewCoolifyInventoryService(h.db.SQL).Sync(r.Context(),
+		coolify.Resources(apps, svcs, dbs, projects, client.BaseHost()))
+	if err != nil {
+		jsonServerError(w, r, "failed to sync inventory from coolify", err)
+		return
+	}
+	dnsSum, err := h.dns.SyncFromCoolify(r.Context(), coolify.DomainRefs(apps, svcs, client.BaseHost()))
+	if err != nil {
+		jsonServerError(w, r, "failed to sync DNS from coolify", err)
+		return
+	}
+	jsonOK(w, coolifySyncResponse{CoolifyInventorySummary: inv, DNS: dnsSum})
+}
+
+// coolifyProjectOption is one Coolify project with its environment names.
+type coolifyProjectOption struct {
+	Name         string   `json:"name"`
+	Environments []string `json:"environments"`
+}
+
+// handleListProjects lists Coolify projects and environments — the options of
+// a Bridge project's Coolify mapping.
+//
+//	@Summary		List Coolify projects
+//	@Description	Editor+. Coolify projects with their environment names, for the project ↔ Coolify mapping. 400 when the integration is disabled or unconfigured.
+//	@Tags			coolify
+//	@Produce		json
+//	@Success		200	{array}		coolifyProjectOption
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/coolify/projects [get]
+func (h *coolifyHandlers) handleListProjects(w http.ResponseWriter, r *http.Request) {
+	client, err := h.getClient()
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	projects, err := client.ListProjects()
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to list coolify projects: "+err.Error())
+		return
+	}
+	out := make([]coolifyProjectOption, 0, len(projects))
+	for _, p := range projects {
+		o := coolifyProjectOption{Name: p.Name, Environments: []string{}}
+		for _, e := range p.Environments {
+			o.Environments = append(o.Environments, e.Name)
+		}
+		out = append(out, o)
+	}
+	jsonOK(w, out)
+}
+
 // registerRoutes binds the Coolify integration: status/test plus the per-host
 // and per-key check/register/sync operations.
 func (h *coolifyHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/coolify/status", h.handleStatus)
 	rr.role("admin", "POST /api/coolify/test", h.handleTestConnection)
 	rr.role("admin", "POST /api/coolify/dns-sync", h.handleDNSSync)
+	rr.role("admin", "POST /api/coolify/sync", h.handleInventorySync)
+	rr.role("editor", "GET /api/coolify/projects", h.handleListProjects)
 	rr.role("editor", "GET /api/coolify/server-status/{slug}", h.handleGetServerStatus)
 	rr.role("editor", "POST /api/coolify/check/{slug}", h.handleCheckHost)
 	rr.role("admin", "POST /api/coolify/register/{slug}", h.handleRegisterHost)

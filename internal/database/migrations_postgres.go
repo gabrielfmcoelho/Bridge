@@ -1677,4 +1677,26 @@ var migrationsPostgres = []string{
 		UNIQUE (api_id, url)
 	);
 	CREATE INDEX IF NOT EXISTS api_catalog_urls_api_idx ON api_catalog_urls (api_id, position);`,
+
+	// Version 101: what Coolify says about a service it runs — the resource
+	// (application, compose service or database) behind the container, its
+	// Coolify project/environment, the stack it belongs to and the repository
+	// it builds from (credentials stripped). Written only by the Coolify sync.
+	// project_coolify_links maps a Bridge project to Coolify projects/
+	// environments ('' = every environment), so the sync can give unassigned
+	// services their project; a project chosen by hand always wins.
+	`ALTER TABLE services ADD COLUMN IF NOT EXISTS coolify_resource_uuid TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS coolify_resource_type TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS coolify_project TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS coolify_environment TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS coolify_stack TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS git_repository TEXT NOT NULL DEFAULT '';
+	ALTER TABLE services ADD COLUMN IF NOT EXISTS git_branch TEXT NOT NULL DEFAULT '';
+	CREATE INDEX IF NOT EXISTS idx_services_coolify_resource ON services (coolify_resource_uuid) WHERE coolify_resource_uuid <> '';
+	CREATE TABLE IF NOT EXISTS project_coolify_links (
+		project_id          BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		coolify_project     TEXT NOT NULL,
+		coolify_environment TEXT NOT NULL DEFAULT '',
+		PRIMARY KEY (project_id, coolify_project, coolify_environment)
+	);`,
 }

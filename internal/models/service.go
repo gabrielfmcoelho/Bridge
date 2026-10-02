@@ -52,8 +52,19 @@ type Service struct {
 	DiscoveredAt        *time.Time `json:"discovered_at"`
 	LastSeenAt          *time.Time `json:"last_seen_at"`
 	GrafanaDashboardUID string     `json:"grafana_dashboard_uid"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	// Coolify* and Git* come from the Coolify sync only (read-only elsewhere):
+	// the resource behind the container, its Coolify project/environment, the
+	// stack (compose service name, or the application's name) and the repo it
+	// builds from, credentials stripped.
+	CoolifyResourceUUID string    `json:"coolify_resource_uuid"`
+	CoolifyResourceType string    `json:"coolify_resource_type"`
+	CoolifyProject      string    `json:"coolify_project"`
+	CoolifyEnvironment  string    `json:"coolify_environment"`
+	CoolifyStack        string    `json:"coolify_stack"`
+	GitRepository       string    `json:"git_repository"`
+	GitBranch           string    `json:"git_branch"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // ServiceFilter is the value object describing list/count predicates, sort, and

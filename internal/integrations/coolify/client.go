@@ -96,6 +96,39 @@ func (c *Client) ListServices() ([]Service, error) {
 	return svcs, json.Unmarshal(data, &svcs)
 }
 
+// ListDatabases returns all standalone databases.
+func (c *Client) ListDatabases() ([]Database, error) {
+	data, _, err := c.do("GET", "/databases", nil)
+	if err != nil {
+		return nil, err
+	}
+	var dbs []Database
+	return dbs, json.Unmarshal(data, &dbs)
+}
+
+// ListProjects returns every project with its environments: GET /projects
+// lists only names, so each project is read once more for its environments.
+func (c *Client) ListProjects() ([]Project, error) {
+	data, _, err := c.do("GET", "/projects", nil)
+	if err != nil {
+		return nil, err
+	}
+	var list []Project
+	if err := json.Unmarshal(data, &list); err != nil {
+		return nil, err
+	}
+	for i := range list {
+		data, _, err := c.do("GET", "/projects/"+list[i].UUID, nil)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(data, &list[i]); err != nil {
+			return nil, err
+		}
+	}
+	return list, nil
+}
+
 // BaseHost is the hostname of the configured base URL — the master server's
 // address, which Coolify itself reports as host.docker.internal.
 func (c *Client) BaseHost() string {
