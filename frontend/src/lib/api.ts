@@ -491,7 +491,7 @@ export const dnsAPI = {
   trash: () => api.getList<import("./types").DNSRecord>("/api/dns/trash"),
   restore: (id: number) => api.post(`/api/dns/${id}/restore`),
   // Probes every visible https record synchronously — can outlive the 120s default.
-  scanCerts: () => request<{ scanned: number; ok: number; failed: number }>("/api/dns/cert-scan", { method: "POST" }, 10 * 60_000),
+  scanCerts: () => request<{ scanned: number; ok: number; failed: number; observed: number; online: number }>("/api/dns/cert-scan", { method: "POST" }, 10 * 60_000),
   scanCert: (id: number) => api.post<import("./types").DNSRecord>(`/api/dns/${id}/cert-scan`),
 };
 

@@ -966,9 +966,9 @@
     "certSans": "Nomes alternativos (SAN)",
     "certLastScan": "Última verificação",
     "certRescan": "Verificar novamente",
-    "scanCerts": "Verificar certificados",
-    "scanCertsRunning": "Verificando certificados…",
-    "certScanDone": "{scanned} verificados: {ok} OK, {failed} com erro",
+    "scanCerts": "Verificar domínios",
+    "scanCertsRunning": "Verificando domínios…",
+    "certScanDone": "{observed} observados ({online} online) · {scanned} certificados: {ok} OK, {failed} com erro",
     "linkedProjects": "Projetos vinculados",
     "syncCoolify": "Sincronizar do Coolify",
     "syncCoolifyRunning": "Sincronizando domínios do Coolify…",
@@ -1005,7 +1005,22 @@
     "certUnscannedHint": "Certificado ainda não verificado. Use o botão ao lado para verificar agora.",
     "notFound": "Registro DNS não encontrado",
     "notFoundDesc": "Ele foi excluído ou você não tem acesso a ele.",
-    "backToList": "Voltar para Registros DNS"
+    "backToList": "Voltar para Registros DNS",
+    "observation": "Resolução e resposta",
+    "observationHint": "O endereço costuma ser o IP público do proxy, não o do host.",
+    "obsUnscannedHint": "Ainda não observado. Use o botão ao lado para verificar agora.",
+    "obsRescan": "Verificar agora",
+    "obsRecordType": "Tipo de registro",
+    "obsTarget": "IP / alvo",
+    "obsNoAnswer": "Sem resposta",
+    "obsUnresolved": "Não resolve",
+    "obsLastCheck": "Última verificação",
+    "obsStatus": {
+      "online": "Online",
+      "no_content": "Online sem conteúdo",
+      "error": "Online com erro",
+      "offline": "Offline"
+    }
   },
   "project": {
     "title": "Projetos",

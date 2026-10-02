@@ -1723,4 +1723,16 @@ var migrationsPostgres = []string{
 		PRIMARY KEY (api_id, service_id)
 	);
 	CREATE INDEX IF NOT EXISTS idx_api_consumer_links_service ON api_consumer_links (service_id);`,
+
+	// Version 104: what the domain looks like from outside, as last probed —
+	// its DNS answer (A or CNAME and the address/target, usually a proxy's
+	// public IP rather than the host's) and the HTTP status on ports 80 and
+	// 443 (0 = no response). obs_status sums both up: online, no_content,
+	// error, offline. The TLS side stays in the cert_* columns.
+	`ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS obs_record_type TEXT NOT NULL DEFAULT '';
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS obs_target TEXT NOT NULL DEFAULT '';
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS obs_http_status INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS obs_https_status INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS obs_status TEXT NOT NULL DEFAULT '';
+	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS observed_at TIMESTAMPTZ;`,
 }

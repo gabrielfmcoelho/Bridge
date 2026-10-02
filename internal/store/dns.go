@@ -20,14 +20,16 @@ type DNSRepo struct {
 func NewDNSRepo(db *sql.DB) *DNSRepo { return &DNSRepo{db: db} }
 
 const dnsCols = `id, domain, has_https, situacao, responsavel, observacoes, created_at, updated_at,
-	cert_not_before, cert_expires_at, cert_issuer, cert_subject, cert_sans, cert_error, cert_checked_at, deleted_at`
+	cert_not_before, cert_expires_at, cert_issuer, cert_subject, cert_sans, cert_error, cert_checked_at, deleted_at,
+	obs_record_type, obs_target, obs_http_status, obs_https_status, obs_status, observed_at`
 
 // dnsLive keeps trashed records out of every live read.
 const dnsLive = "dns_records.deleted_at IS NULL"
 
 func scanDNS(scanner interface{ Scan(...any) error }, d *models.DNSRecord) error {
 	return scanner.Scan(&d.ID, &d.Domain, &d.HasHTTPS, &d.Situacao, &d.Responsavel, &d.Observacoes, &d.CreatedAt, &d.UpdatedAt,
-		&d.CertNotBefore, &d.CertExpiresAt, &d.CertIssuer, &d.CertSubject, &d.CertSANs, &d.CertError, &d.CertCheckedAt, &d.DeletedAt)
+		&d.CertNotBefore, &d.CertExpiresAt, &d.CertIssuer, &d.CertSubject, &d.CertSANs, &d.CertError, &d.CertCheckedAt, &d.DeletedAt,
+		&d.ObsRecordType, &d.ObsTarget, &d.ObsHTTPStatus, &d.ObsHTTPSStatus, &d.ObsStatus, &d.ObservedAt)
 }
 
 // Create inserts a DNS record and sets d.ID.
@@ -213,6 +215,17 @@ func (r *DNSRepo) SetCert(ctx context.Context, id int64, c models.DNSCert) error
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE dns_records SET cert_not_before = ?, cert_expires_at = ?, cert_issuer = ?, cert_subject = ?, cert_sans = ?, cert_error = ?, cert_checked_at = ? WHERE id = ? AND `+dnsLive+` AND `+vis,
 		append([]any{c.CertNotBefore, c.CertExpiresAt, c.CertIssuer, c.CertSubject, c.CertSANs, c.CertError, c.CertCheckedAt, id}, vargs...)...,
+	)
+	return err
+}
+
+// SetObservation stores the latest DNS/HTTP probe of a record. Like SetCert,
+// invisible rows are untouched and updated_at is left alone.
+func (r *DNSRepo) SetObservation(ctx context.Context, id int64, o models.DNSObservation) error {
+	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE dns_records SET obs_record_type = ?, obs_target = ?, obs_http_status = ?, obs_https_status = ?, obs_status = ?, observed_at = ? WHERE id = ? AND `+dnsLive+` AND `+vis,
+		append([]any{o.ObsRecordType, o.ObsTarget, o.ObsHTTPStatus, o.ObsHTTPSStatus, o.ObsStatus, o.ObservedAt, id}, vargs...)...,
 	)
 	return err
 }

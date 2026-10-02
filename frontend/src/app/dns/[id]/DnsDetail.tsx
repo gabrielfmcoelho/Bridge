@@ -17,6 +17,7 @@ import Button from "@/components/ui/Button";
 import DnsForm from "../DnsForm";
 import DnsProfile from "./_components/DnsProfile";
 import CertificateCard from "./_components/CertificateCard";
+import ObservationCard from "./_components/ObservationCard";
 import DetailSplit from "@/components/detail/DetailSplit";
 import TopologyPane from "@/components/detail/TopologyPane";
 import RelationsCard, { hostsGroup, servicesGroup, projectsGroup } from "@/components/detail/RelationsCard";
@@ -131,6 +132,7 @@ export default function DnsDetail({ id }: { id: number }) {
 
           {activeTab === "overview" && (
             <DetailSplit profile={<DnsProfile dns={dns} tags={data.tags || []} responsaveis={responsaveis} onEditResponsaveis={canEdit ? () => setShowEditDrawer(true) : undefined} />}>
+              <ObservationCard dns={dns} canEdit={canEdit} />
               <CertificateCard dns={dns} canEdit={canEdit} />
             </DetailSplit>
           )}

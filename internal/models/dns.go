@@ -17,6 +17,22 @@ type DNSRecord struct {
 	// DeletedAt is set while the record sits in the trash.
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
 	DNSCert
+	DNSObservation
+}
+
+// DNSObservation is the domain as last seen from outside (embedded, flat
+// JSON). ObsRecordType is "A" or "CNAME" ("" = did not resolve or is an IP
+// literal); ObsTarget is the addresses (", "-joined) or the CNAME target —
+// usually a proxy's public address, so it need not match the linked host's
+// IP. Status codes are 0 when the port gave no HTTP answer. ObsStatus is one
+// of online / no_content / error / offline. ObservedAt nil = never probed.
+type DNSObservation struct {
+	ObsRecordType  string     `json:"obs_record_type"`
+	ObsTarget      string     `json:"obs_target"`
+	ObsHTTPStatus  int        `json:"obs_http_status"`
+	ObsHTTPSStatus int        `json:"obs_https_status"`
+	ObsStatus      string     `json:"obs_status"`
+	ObservedAt     *time.Time `json:"observed_at"`
 }
 
 // DNSCert is the domain's TLS certificate as last read by the cert scan
