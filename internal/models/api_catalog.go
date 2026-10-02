@@ -25,6 +25,7 @@ type APICatalog struct {
 	ID             int64          `json:"id"`
 	Name           string         `json:"name"`
 	Description    string         `json:"description"`
+	UseCases       string         `json:"use_cases"` // Markdown: who calls it and for what
 	SourceType     string         `json:"source_type"`
 	SourceURL      string         `json:"source_url,omitempty"`   // where the spec was fetched (json/yaml)
 	ExternalURL    string         `json:"external_url,omitempty"` // server derived from the spec

@@ -1699,4 +1699,8 @@ var migrationsPostgres = []string{
 		coolify_environment TEXT NOT NULL DEFAULT '',
 		PRIMARY KEY (project_id, coolify_project, coolify_environment)
 	);`,
+
+	// Version 102: an API's use cases (Markdown), apart from its description —
+	// who calls it and for what. Shown with the description in "Visão geral".
+	`ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS use_cases TEXT NOT NULL DEFAULT '';`,
 }

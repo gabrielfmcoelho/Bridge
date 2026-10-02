@@ -580,6 +580,8 @@ export interface ApiCatalog {
   id: number;
   name: string;
   description: string;
+  /** Markdown: who calls the API and for what. Only on GET /api-catalog/{id}. */
+  use_cases?: string;
   source_type: string; // "upload" | "url"
   source_url?: string;
   external_url?: string;

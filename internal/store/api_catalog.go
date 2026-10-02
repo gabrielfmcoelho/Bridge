@@ -79,11 +79,11 @@ func (r *APICatalogRepo) Get(ctx context.Context, id int64) (*models.APICatalog,
 	a := &models.APICatalog{}
 	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, name, description, source_type, source_url, external_url, base_url, docs_url,
+		`SELECT id, name, description, use_cases, source_type, source_url, external_url, base_url, docs_url,
 			spec_version, spec_hash, title, version_label, owner_user_id, created_by, created_at, updated_at,
 			`+apiKeyMgmtCols+`
 		FROM api_catalog WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...,
-	).Scan(&a.ID, &a.Name, &a.Description, &a.SourceType, &a.SourceURL, &a.ExternalURL, &a.BaseURL, &a.DocsURL,
+	).Scan(&a.ID, &a.Name, &a.Description, &a.UseCases, &a.SourceType, &a.SourceURL, &a.ExternalURL, &a.BaseURL, &a.DocsURL,
 		&a.SpecVersion, &a.SpecHash, &a.Title, &a.VersionLabel, &a.OwnerUserID, &a.CreatedBy, &a.CreatedAt, &a.UpdatedAt,
 		&a.KeyManagement, &a.AdminBaseURL, &a.ScopePrefix)
 	if err == sql.ErrNoRows {
@@ -158,8 +158,8 @@ func (r *APICatalogRepo) List(ctx context.Context, f models.APICatalogFilter) ([
 	q, args = apiLinkFilter(q, args, f.ServiceID, f.ProjectID)
 	if f.Query != "" {
 		like := "%" + strings.ToLower(f.Query) + "%"
-		q += " AND (LOWER(c.name) LIKE ? OR LOWER(c.title) LIKE ? OR LOWER(c.description) LIKE ?)"
-		args = append(args, like, like, like)
+		q += " AND (LOWER(c.name) LIKE ? OR LOWER(c.title) LIKE ? OR LOWER(c.description) LIKE ? OR LOWER(c.use_cases) LIKE ?)"
+		args = append(args, like, like, like, like)
 	}
 	q += " ORDER BY c.name"
 
@@ -423,14 +423,14 @@ func (r *APICatalogRepo) ByScopePrefix(ctx context.Context, prefix string) (id i
 
 // UpdateMeta renames / re-describes a catalog row and updates base_url + docs_url
 // (the spec itself is untouched — use UpdateSpec for that).
-func (r *APICatalogRepo) UpdateMeta(ctx context.Context, id int64, name, description, baseURL, docsURL string) error {
+func (r *APICatalogRepo) UpdateMeta(ctx context.Context, id int64, name, description, useCases, baseURL, docsURL string) error {
 	if strings.TrimSpace(name) == "" {
 		return fmt.Errorf("name is required")
 	}
 	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE api_catalog SET name = ?, description = ?, base_url = ?, docs_url = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{name, description, baseURL, docsURL, id}, vargs...)...)
+		`UPDATE api_catalog SET name = ?, description = ?, use_cases = ?, base_url = ?, docs_url = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{name, description, useCases, baseURL, docsURL, id}, vargs...)...)
 	return err
 }
 

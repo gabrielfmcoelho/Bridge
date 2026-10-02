@@ -990,6 +990,7 @@ export const apiCatalogAPI = {
   update: (id: number, body: {
     name: string;
     description?: string;
+    use_cases?: string;
     base_url?: string;
     docs_url?: string;
     urls?: import("./types").ApiCatalogURL[];

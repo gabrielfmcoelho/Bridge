@@ -18733,6 +18733,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.APICatalogURL"
                     }
+                },
+                "use_cases": {
+                    "type": "string"
                 }
             }
         },
@@ -19324,6 +19327,10 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.APICatalogURL"
                     }
+                },
+                "use_cases": {
+                    "description": "Markdown: who calls it and for what",
+                    "type": "string"
                 },
                 "version_label": {
                     "type": "string"
