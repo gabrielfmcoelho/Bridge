@@ -111,11 +111,27 @@ func SanitizeRepoURL(raw string) string {
 // containerName: optional role prefix, the 24-char resource uuid, optional deploy timestamp.
 var containerName = regexp.MustCompile(`^(?:(.+)-)?([a-z0-9]{24})(?:-(\d{12}))?$`)
 
+// dbProxy: the container Coolify runs to expose a database's public port.
+var dbProxy = regexp.MustCompile(`^([a-z0-9]{24})-proxy$`)
+
+// swarmTask: a Docker Swarm task container, "<stack>_<service>.<slot>.<task id>";
+// the 25-char task id is new on every redeploy.
+var swarmTask = regexp.MustCompile(`^(.+\.[a-z0-9]+)\.[a-z0-9]{25}$`)
+
 // ContainerKey is the stable identity of a Coolify-managed container: its name
 // without the deploy timestamp Coolify appends on every redeploy
 // ("app-<uuid>-143303502430" → "app-<uuid>"), plus the resource uuid inside.
-// Names that aren't Coolify's come back unchanged with uuid "".
+// A database's public-port proxy ("<uuid>-proxy") keeps its name as key (its
+// own row, not the database's) but carries the database's uuid. A Swarm task
+// container drops its task id the same way ("sead_mrea.1.<task>" →
+// "sead_mrea.1"), uuid "". Other names come back unchanged with uuid "".
 func ContainerKey(name string) (key, uuid string) {
+	if m := dbProxy.FindStringSubmatch(name); m != nil {
+		return name, m[1]
+	}
+	if m := swarmTask.FindStringSubmatch(name); m != nil {
+		return m[1], ""
+	}
 	m := containerName.FindStringSubmatch(name)
 	if m == nil {
 		return name, ""
