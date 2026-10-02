@@ -887,7 +887,11 @@
     "declared": "Declared",
     "declaredHint": "What was registered for this host; the last scan shows what is actually there.",
     "tabMetrics": "Metrics",
-    "authPickDefault": "With both a password and a key, pick the default auth method."
+    "authPickDefault": "With both a password and a key, pick the default auth method.",
+    "syncCoolify": "Sync from Coolify",
+    "syncCoolifyRunning": "Reading Coolify applications, stacks and databases…",
+    "coolifySyncDone": "{resources} resources: {matched} matched to containers, {created} created offline, {merged} redeploy copies merged, {projects} services got a project, {dns} domains linked to services, {apis} APIs linked",
+    "coolifyUnmatched": "No Bridge host for: {names}"
   },
   "dns": {
     "title": "DNS Records",
@@ -1116,7 +1120,14 @@
     "secretsTitle": "Project secrets",
     "secretsHint": "Shared with whoever sees the project. Each service's are listed below.",
     "noSecrets": "No secrets in this project.",
-    "serviceSecretsTitle": "Service secrets"
+    "serviceSecretsTitle": "Service secrets",
+    "coolifyMapping": "Coolify projects",
+    "coolifyMappingHint": "The Coolify sync gives services of these projects/environments this project when they have none.",
+    "coolifyProject": "Coolify project",
+    "coolifyEnvironment": "Environment",
+    "coolifyAllEnvironments": "All environments",
+    "coolifyAddMapping": "Add Coolify project",
+    "coolifyUnavailable": "Couldn't list Coolify projects."
   },
   "service": {
     "title": "Services",
@@ -1270,7 +1281,10 @@
     "dependsOn": "Depends on",
     "notFound": "Service not found",
     "backToList": "Back to Services",
-    "fixateHint": "Confirms the service as yours: it stops counting as automatic to review and can be rebound to another container. The scan keeps updating its runtime."
+    "fixateHint": "Confirms the service as yours: it stops counting as automatic to review and can be rebound to another container. The scan keeps updating its runtime.",
+    "coolifyProject": "Coolify project",
+    "coolifyStack": "Stack",
+    "coolifyRepo": "Repository"
   },
   "topology": {
     "title": "Architecture Topology",

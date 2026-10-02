@@ -55,6 +55,14 @@ export default function RuntimeCard({ service, hosts }: { service: Service; host
           ) : (
             <Field className="sm:col-span-2" label={t("service.catalogName")} value={service.discovery_key} mono />
           )}
+          {service.coolify_resource_uuid && (
+            <>
+              <Field label={t("service.coolifyProject")} value={[service.coolify_project, service.coolify_environment].filter(Boolean).join(" · ")} />
+              <Field label={t("service.coolifyStack")} value={service.coolify_stack ?? ""} />
+              <Field className="sm:col-span-2" label={t("service.coolifyRepo")}
+                value={[service.git_repository, service.git_branch].filter(Boolean).join(" @ ")} mono />
+            </>
+          )}
           <Field label={t("service.discoveredAt")} value={service.discovered_at ? formatDateTime(service.discovered_at) : ""} />
           <Field label={t("service.lastSeen")} value={service.last_seen_at ? formatDateTime(service.last_seen_at) : ""} />
         </div>

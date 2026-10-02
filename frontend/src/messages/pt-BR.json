@@ -887,7 +887,11 @@
     "declared": "Declarado",
     "declaredHint": "O que foi cadastrado para este host; o último scan mostra o que existe de fato.",
     "tabMetrics": "Métricas",
-    "authPickDefault": "Com senha e chave configuradas, escolha o método de autenticação padrão."
+    "authPickDefault": "Com senha e chave configuradas, escolha o método de autenticação padrão.",
+    "syncCoolify": "Sincronizar do Coolify",
+    "syncCoolifyRunning": "Lendo aplicações, stacks e bancos do Coolify…",
+    "coolifySyncDone": "{resources} recursos: {matched} casados com containers, {created} criados offline, {merged} cópias de redeploy fundidas, {projects} serviços ganharam projeto, {dns} domínios ligados a serviços, {apis} APIs vinculadas",
+    "coolifyUnmatched": "Sem host no Bridge: {names}"
   },
   "dns": {
     "title": "Registros DNS",
@@ -1116,7 +1120,14 @@
     "secretsTitle": "Segredos do projeto",
     "secretsHint": "Compartilhados com quem vê o projeto. Os de cada serviço aparecem abaixo.",
     "noSecrets": "Nenhum segredo no projeto.",
-    "serviceSecretsTitle": "Segredos dos serviços"
+    "serviceSecretsTitle": "Segredos dos serviços",
+    "coolifyMapping": "Projetos no Coolify",
+    "coolifyMappingHint": "O sync do Coolify dá este projeto aos serviços desses projetos/ambientes que ainda não têm projeto.",
+    "coolifyProject": "Projeto no Coolify",
+    "coolifyEnvironment": "Ambiente",
+    "coolifyAllEnvironments": "Todos os ambientes",
+    "coolifyAddMapping": "Adicionar projeto do Coolify",
+    "coolifyUnavailable": "Não foi possível listar os projetos do Coolify."
   },
   "service": {
     "title": "Serviços",
@@ -1270,7 +1281,10 @@
     "dependsOn": "Depende de",
     "notFound": "Serviço não encontrado",
     "backToList": "Voltar para Serviços",
-    "fixateHint": "Confirma o serviço como seu: deixa de contar como automático a revisar e pode ser religado a outro contêiner. O scan continua atualizando a execução."
+    "fixateHint": "Confirma o serviço como seu: deixa de contar como automático a revisar e pode ser religado a outro contêiner. O scan continua atualizando a execução.",
+    "coolifyProject": "Projeto no Coolify",
+    "coolifyStack": "Stack",
+    "coolifyRepo": "Repositório"
   },
   "topology": {
     "title": "Topologia da Arquitetura",

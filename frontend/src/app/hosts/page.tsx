@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { hostsAPI, sshAPI, proxmoxAPI } from "@/lib/api";
+import { hostsAPI, sshAPI, proxmoxAPI, coolifyAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useFlag } from "@/contexts/FlagContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -399,6 +399,32 @@ export default function HostsPage() {
     onError: (err) => flag({ appearance: "error", title: t("host.syncProxmox"), description: err.message }),
   });
 
+  // Coolify inventory: stamps resources on the scanned containers, creates the
+  // unseen ones offline, folds redeploy copies, then links DNS → service.
+  const coolifySync = useMutation({
+    mutationFn: coolifyAPI.sync,
+    onMutate: () => flag({ appearance: "info", title: t("host.syncCoolifyRunning") }),
+    onSuccess: (d) => {
+      queryClient.invalidateQueries({ queryKey: ["hosts"] });
+      queryClient.invalidateQueries({ queryKey: ["hosts-table"] });
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      queryClient.invalidateQueries({ queryKey: ["graph"] });
+      flag({
+        appearance: d.unmatched.length ? "warning" : "success",
+        title: t("host.syncCoolify"),
+        description: [
+          t("host.coolifySyncDone", {
+            resources: String(d.resources), matched: String(d.matched), created: String(d.created),
+            merged: String(d.merged_duplicates), projects: String(d.projects_set),
+            dns: String(d.dns.service_links_added ?? 0), apis: String(d.apis_linked),
+          }),
+          ...(d.unmatched.length ? [t("host.coolifyUnmatched", { names: d.unmatched.join(", ") })] : []),
+        ].join("\n"),
+      });
+    },
+    onError: (err) => flag({ appearance: "error", title: t("host.syncCoolify"), description: err.message }),
+  });
+
   const scanCounts = Object.values(scanProgress);
   const scannedCount = scanCounts.filter(s => s.status === "success" || s.status === "failed").length;
   const successCount = scanCounts.filter(s => s.status === "success").length;
@@ -420,6 +446,7 @@ export default function HostsPage() {
     ] : []),
     ...(user?.role === "admin" ? [
       { label: t("host.syncProxmox"), icon: ICON_PATHS.refresh, color: "var(--info)", onClick: () => proxmoxSync.mutate(), disabled: proxmoxSync.isPending, group: "sync" },
+      { label: t("host.syncCoolify"), icon: ICON_PATHS.refresh, color: "var(--accent)", onClick: () => coolifySync.mutate(), disabled: coolifySync.isPending, group: "sync" },
     ] : []),
   ];
 

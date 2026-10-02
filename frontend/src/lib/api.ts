@@ -567,6 +567,7 @@ type ProjectWrite = Partial<import("./types").Project> & {
   service_ids?: number[];
   host_ids?: number[];
   dns_ids?: number[];
+  coolify_links?: import("./types").ProjectCoolifyLink[];
 };
 
 export const projectsAPI = {
@@ -587,6 +588,7 @@ export const projectsAPI = {
       direct_host_ids?: number[];
       direct_dns_ids?: number[];
       entidades?: import("./types").AssetGrants;
+      coolify_links?: import("./types").ProjectCoolifyLink[];
     }>(`/api/projects/${id}`),
   create: (data: ProjectWrite) =>
     api.post<import("./types").Project>("/api/projects", data),
@@ -1825,8 +1827,18 @@ export const coolifyAPI = {
   syncKey: (id: number) =>
     api.post<{ uuid: string; name: string; already_existed: boolean }>(`/api/coolify/keys/${id}/sync`),
   // Pulls every Coolify app/service FQDN into dns_records synchronously — can outlive the 120s default.
-  syncDNS: () => request<{ found: number; created: number; existing: number; links_added: number; no_host: number }>("/api/coolify/dns-sync", { method: "POST" }, 10 * 60_000),
+  syncDNS: () => request<CoolifyDNSSyncSummary>("/api/coolify/dns-sync", { method: "POST" }, 10 * 60_000),
+  // Inventory sync: stamps Coolify resources on services, then runs the DNS sync.
+  sync: () => request<CoolifyInventorySummary>("/api/coolify/sync", { method: "POST" }, 10 * 60_000),
+  projects: () => api.get<{ name: string; environments: string[] }[]>("/api/coolify/projects"),
 };
+
+export interface CoolifyDNSSyncSummary { found: number; created: number; existing: number; links_added: number; no_host: number; service_links_added?: number }
+export interface CoolifyInventorySummary {
+  resources: number; matched: number; created: number; updated: number; merged_duplicates: number;
+  projects_set: number; hosts_uuid_filled: number; apis_linked: number; unmatched: string[];
+  dns: CoolifyDNSSyncSummary;
+}
 
 // Links between hosts, DNS, services, projects, contacts and entidades, scoped
 // to what the caller can see — list pages group their items by them.

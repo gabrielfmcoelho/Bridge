@@ -292,7 +292,7 @@ export interface Service {
   gitlab_url: string;
   documentation_url: string;
   grafana_dashboard_uid?: string;
-  source: "manual" | "auto" | "fixed";
+  source: "manual" | "auto" | "fixed" | "coolify";
   /** How the scan found this service; "" for manual services. */
   discovery_kind: "container" | "host" | "";
   /** Per-host identity the scan reconciles on: container name or catalog name. */
@@ -304,6 +304,14 @@ export interface Service {
   container_ports: string;
   discovered_at: string | null;
   last_seen_at: string | null;
+  /** Written by the Coolify sync only. */
+  coolify_resource_uuid?: string;
+  coolify_resource_type?: string;
+  coolify_project?: string;
+  coolify_environment?: string;
+  coolify_stack?: string;
+  git_repository?: string;
+  git_branch?: string;
   created_at: string;
   updated_at: string;
   tags?: string[];
@@ -935,4 +943,10 @@ export interface CatalogHit {
   href: string;
   entidade_name?: string;
   slug?: string;
+}
+
+/** A Bridge project mapped to a Coolify project (and environment; "" = all). */
+export interface ProjectCoolifyLink {
+  coolify_project: string;
+  coolify_environment: string;
 }

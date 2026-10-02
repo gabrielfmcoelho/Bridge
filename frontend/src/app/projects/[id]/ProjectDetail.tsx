@@ -189,6 +189,7 @@ export default function ProjectDetail({ id }: { id: number }) {
               initialServiceIds={(data.services ?? []).map((s) => s.id)}
               initialHostIds={data.direct_host_ids}
               initialDnsIds={data.direct_dns_ids}
+              initialCoolifyLinks={data.coolify_links}
               onClose={() => setShowEditDrawer(false)}
               onSubHeaderChange={setFormSubHeader}
               onFooterChange={setFormFooter}

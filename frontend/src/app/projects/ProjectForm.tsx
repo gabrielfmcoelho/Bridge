@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { projectsAPI, enumsAPI, contactsAPI, integrationsAPI, glpiAPI } from "@/lib/api";
+import { projectsAPI, enumsAPI, contactsAPI, integrationsAPI, glpiAPI, coolifyAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSituacao } from "@/hooks/useSituacao";
@@ -19,7 +19,8 @@ import FormSection from "@/components/forms/FormSection";
 import RelationPicker from "@/components/forms/RelationPicker";
 import { useRelationOptions } from "@/components/forms/useRelationOptions";
 import GitLabLinksEditor from "./[id]/_components/GitLabLinksEditor";
-import type { Project, EntityResponsavel, AssetGrants, AssetGrantsInput } from "@/lib/types";
+import CoolifyLinksEditor from "./[id]/_components/CoolifyLinksEditor";
+import type { Project, EntityResponsavel, AssetGrants, AssetGrantsInput, ProjectCoolifyLink } from "@/lib/types";
 
 const URL_RE = /^https?:\/\/\S+$/i;
 
@@ -33,6 +34,7 @@ interface ProjectFormProps {
   /** Linked to the project itself, not through one of its services. */
   initialHostIds?: number[];
   initialDnsIds?: number[];
+  initialCoolifyLinks?: ProjectCoolifyLink[];
   onSuccess: () => void;
   onClose?: () => void;
   onSubHeaderChange?: (subHeader: React.ReactNode) => void;
@@ -46,7 +48,7 @@ interface ProjectFormProps {
  * anything else not shown here are kept.
  */
 export default function ProjectForm({
-  initial, initialGrants, initialTags, initialResponsaveis, initialServiceIds, initialHostIds, initialDnsIds, onSuccess, onClose, onSubHeaderChange, onFooterChange,
+  initial, initialGrants, initialTags, initialResponsaveis, initialServiceIds, initialHostIds, initialDnsIds, initialCoolifyLinks, onSuccess, onClose, onSubHeaderChange, onFooterChange,
 }: ProjectFormProps) {
   const { t } = useLocale();
   const { user } = useAuth();
@@ -73,6 +75,7 @@ export default function ProjectForm({
   const [serviceIds, setServiceIds] = useState<number[]>(initialServiceIds ?? []);
   const [hostIds, setHostIds] = useState<number[]>(initialHostIds ?? []);
   const [dnsIds, setDnsIds] = useState<number[]>(initialDnsIds ?? []);
+  const [coolifyLinks, setCoolifyLinks] = useState<ProjectCoolifyLink[]>(initialCoolifyLinks ?? []);
   const relationOptions = useRelationOptions(["services", "hosts", "dns"]);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
@@ -87,6 +90,7 @@ export default function ProjectForm({
   const outlineEnabled = integrations?.outline?.outline_enabled === "true";
   const glpiEnabled = integrations?.glpi?.glpi_enabled === "true";
   const { data: glpiProfiles = [] } = useQuery({ queryKey: ["glpi-profiles"], queryFn: glpiAPI.listProfiles, enabled: glpiEnabled, retry: false });
+  const { data: coolifyStatus } = useQuery({ queryKey: ["coolify-status"], queryFn: coolifyAPI.status, staleTime: 60_000, retry: false });
 
   const set = (key: keyof typeof form, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
   useDefaultSituacao(form.situacao, (v) => set("situacao", v), !isEdit);
@@ -101,6 +105,9 @@ export default function ProjectForm({
         service_ids: serviceIds,
         host_ids: hostIds,
         dns_ids: dnsIds,
+        // Only sent when the integration is on, so a project's mapping isn't
+        // wiped by a form that couldn't show it.
+        ...(coolifyStatus?.enabled ? { coolify_links: coolifyLinks.filter((l) => l.coolify_project) } : {}),
         ...grants,
       };
       return initial ? projectsAPI.update(initial.id, payload) : projectsAPI.create(payload);
@@ -177,6 +184,11 @@ export default function ProjectForm({
         {outlineEnabled && (
           <Input label={t("project.outlineCollectionIdLabel")} value={form.outline_collection_id} onChange={(e) => set("outline_collection_id", e.target.value)}
             placeholder={t("project.outlineCollectionIdPlaceholder")} hint={t("project.outlineCollectionIdHint")} />
+        )}
+        {coolifyStatus?.enabled && (
+          <FormField label={t("project.coolifyMapping")} hint={t("project.coolifyMappingHint")}>
+            <CoolifyLinksEditor value={coolifyLinks} onChange={setCoolifyLinks} />
+          </FormField>
         )}
         {glpiEnabled && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
