@@ -755,8 +755,8 @@ func (h *coolifyHandlers) handleInventorySync(w http.ResponseWriter, r *http.Req
 		jsonError(w, http.StatusBadGateway, "failed to list coolify projects: "+err.Error())
 		return
 	}
-	inv, err := service.NewCoolifyInventoryService(h.db.SQL).Sync(r.Context(),
-		coolify.Resources(apps, svcs, dbs, projects, client.BaseHost()))
+	invSvc := service.NewCoolifyInventoryService(h.db.SQL)
+	inv, err := invSvc.Sync(r.Context(), coolify.Resources(apps, svcs, dbs, projects, client.BaseHost()))
 	if err != nil {
 		jsonServerError(w, r, "failed to sync inventory from coolify", err)
 		return
@@ -764,6 +764,10 @@ func (h *coolifyHandlers) handleInventorySync(w http.ResponseWriter, r *http.Req
 	dnsSum, err := h.dns.SyncFromCoolify(r.Context(), coolify.DomainRefs(apps, svcs, client.BaseHost()))
 	if err != nil {
 		jsonServerError(w, r, "failed to sync DNS from coolify", err)
+		return
+	}
+	if inv.APIsLinked, err = invSvc.LinkAPIs(r.Context()); err != nil {
+		jsonServerError(w, r, "failed to link APIs to services", err)
 		return
 	}
 	jsonOK(w, coolifySyncResponse{CoolifyInventorySummary: inv, DNS: dnsSum})
