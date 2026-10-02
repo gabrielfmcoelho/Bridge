@@ -50,11 +50,11 @@ func NewCoolifyInventoryService(db *sql.DB) *CoolifyInventoryService {
 //     the real row once a scan finds the container;
 //  3. fills hosts' Coolify server uuid found by IP;
 //  4. gives unassigned services the Bridge project mapped to their Coolify
-//     project/environment (exact environment first, then "every environment");
-//  5. links APIs with no services to the services behind their URLs' DNS.
+//     project/environment (exact environment first, then "every environment").
 //
 // DNS→service links are the DNS sync's job (SyncFromCoolify), run after this
-// so it finds the stamped services.
+// so it finds the stamped services; LinkAPIs runs after that, so it finds
+// the DNS→service links.
 func (s *CoolifyInventoryService) Sync(ctx context.Context, resources []coolify.Resource) (CoolifyInventorySummary, error) {
 	sum := CoolifyInventorySummary{Resources: len(resources), Unmatched: []string{}}
 	merged, err := s.services.MergeContainerDuplicates(ctx)
@@ -174,11 +174,6 @@ func (s *CoolifyInventoryService) Sync(ctx context.Context, resources []coolify.
 		}
 	}
 
-	linked, err := s.linkAPIs(ctx)
-	if err != nil {
-		return sum, err
-	}
-	sum.APIsLinked = linked
 	return sum, nil
 }
 
@@ -201,35 +196,26 @@ func mappedProject(links []models.ProjectCoolifyLink, project, env string) int64
 	return wide
 }
 
-// linkAPIs links each API that has no services to the services behind its
+// LinkAPIs links each API that has no services to the services behind its
 // addresses (URL host → DNS record → linked services) and, when it has no
-// project, to those services' projects.
-func (s *CoolifyInventoryService) linkAPIs(ctx context.Context) (int, error) {
+// project, to those services' projects. The extra urls win over base_url:
+// base_url is usually the gateway, whose DNS leads to the gateway container
+// shared by every API, while the extras name the origin. base_url counts only
+// when no extra resolves. Run it after the DNS sync.
+func (s *CoolifyInventoryService) LinkAPIs(ctx context.Context) (int, error) {
 	unlinked, err := s.apis.UnlinkedAPIs(ctx)
 	if err != nil {
 		return 0, err
 	}
 	n := 0
-	for apiID, urls := range unlinked {
-		svcSet := map[int64]bool{}
-		for _, raw := range urls {
-			host := urlHost(raw)
-			if host == "" {
-				continue
-			}
-			dnsID, found, trashed, err := s.dns.IDByDomain(ctx, host)
-			if err != nil {
+	for apiID, addrs := range unlinked {
+		svcSet, err := s.servicesBehind(ctx, addrs.Extras)
+		if err != nil {
+			return n, err
+		}
+		if len(svcSet) == 0 {
+			if svcSet, err = s.servicesBehind(ctx, []string{addrs.Base}); err != nil {
 				return n, err
-			}
-			if !found || trashed {
-				continue
-			}
-			ids, err := s.dns.ServiceIDs(ctx, dnsID)
-			if err != nil {
-				return n, err
-			}
-			for _, id := range ids {
-				svcSet[id] = true
 			}
 		}
 		if len(svcSet) == 0 {
@@ -273,4 +259,30 @@ func urlHost(raw string) string {
 		return ""
 	}
 	return strings.ToLower(u.Hostname())
+}
+
+// servicesBehind is the set of services linked to the DNS records of urls' hosts.
+func (s *CoolifyInventoryService) servicesBehind(ctx context.Context, urls []string) (map[int64]bool, error) {
+	svcSet := map[int64]bool{}
+	for _, raw := range urls {
+		host := urlHost(raw)
+		if host == "" {
+			continue
+		}
+		dnsID, found, trashed, err := s.dns.IDByDomain(ctx, host)
+		if err != nil {
+			return nil, err
+		}
+		if !found || trashed {
+			continue
+		}
+		ids, err := s.dns.ServiceIDs(ctx, dnsID)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			svcSet[id] = true
+		}
+	}
+	return svcSet, nil
 }

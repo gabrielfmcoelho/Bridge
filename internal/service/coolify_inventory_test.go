@@ -58,7 +58,8 @@ func TestCoolifyInventorySync(t *testing.T) {
 	if _, err := d.SQL.Exec(`UPDATE services SET project_id = ? WHERE id = ?`, manualProject, ids["apisix-"+stackUUID]); err != nil {
 		t.Fatal(err)
 	}
-	// An API whose URL is the app's domain, not linked to anything yet.
+	// An API reached through the gateway (base_url) and at the app's own domain
+	// (extra url), not linked to anything yet.
 	var apiID, userID int64
 	if err := d.SQL.QueryRow(`SELECT id FROM users ORDER BY id LIMIT 1`).Scan(&userID); err != nil {
 		if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES ('t', 'x', 'admin') RETURNING id`).Scan(&userID); err != nil {
@@ -66,7 +67,10 @@ func TestCoolifyInventorySync(t *testing.T) {
 		}
 	}
 	if err := d.SQL.QueryRow(`INSERT INTO api_catalog (scope, name, source_type, spec_json, owner_user_id, created_by, base_url)
-		VALUES ('avulso', 'Bridge', 'url', '{}', ?, ?, 'https://bridge.x/api') RETURNING id`, userID, userID).Scan(&apiID); err != nil {
+		VALUES ('avulso', 'Bridge', 'url', '{}', ?, ?, 'https://gw.x/bridge') RETURNING id`, userID, userID).Scan(&apiID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.SQL.Exec(`INSERT INTO api_catalog_urls (api_id, label, url) VALUES (?, 'Origem', 'https://bridge.x/api')`, apiID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,26 +110,38 @@ func TestCoolifyInventorySync(t *testing.T) {
 		t.Errorf("placeholder project = %d, want the project-wide mapping %d", ghostProject, mappedProject)
 	}
 
-	// DNS sync after the inventory: the domain links to the app's service.
-	dsum, err := dnsSvc.SyncFromCoolify(ctx, []coolify.DomainRef{{Domain: "bridge.x", HTTPS: true, ServerUUID: "srv-91", ResourceUUID: appUUID, Source: "Bridge - API"}})
+	// DNS sync after the inventory: each domain links to its resource's service.
+	dsum, err := dnsSvc.SyncFromCoolify(ctx, []coolify.DomainRef{
+		{Domain: "bridge.x", HTTPS: true, ServerUUID: "srv-91", ResourceUUID: appUUID, Source: "Bridge - API"},
+		{Domain: "gw.x", HTTPS: true, ServerUUID: "srv-91", ResourceUUID: stackUUID, Source: "gateway"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dsum.ServiceLinksAdded != 1 {
-		t.Fatalf("dns summary = %+v, want one service link", dsum)
+	if dsum.ServiceLinksAdded != 2 {
+		t.Fatalf("dns summary = %+v, want two service links", dsum)
 	}
-	// Second inventory sync: idempotent, and now the API links through the DNS.
+	// Then the API links through its origin's DNS — not the gateway's.
+	linked, err := inv.LinkAPIs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if linked != 1 {
+		t.Fatalf("LinkAPIs = %d, want 1", linked)
+	}
+	var apiSvc, apiGw, apiProj int64
+	d.SQL.QueryRow(`SELECT COUNT(*) FROM api_service_links WHERE api_id = ? AND service_id = ?`, apiID, ids[appUUID]).Scan(&apiSvc)
+	d.SQL.QueryRow(`SELECT COUNT(*) FROM api_service_links WHERE api_id = ? AND service_id = ?`, apiID, ids["apisix-"+stackUUID]).Scan(&apiGw)
+	d.SQL.QueryRow(`SELECT COUNT(*) FROM api_project_links WHERE api_id = ? AND project_id = ?`, apiID, envProject).Scan(&apiProj)
+	if apiSvc != 1 || apiGw != 0 || apiProj != 1 {
+		t.Errorf("api links: origin service=%d gateway=%d project=%d", apiSvc, apiGw, apiProj)
+	}
+	// Second inventory sync: idempotent.
 	sum2, err := inv.Sync(ctx, resources)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sum2.Created != 0 || sum2.Updated != 0 || sum2.ProjectsSet != 0 || sum2.APIsLinked != 1 {
-		t.Fatalf("second sync = %+v, want only the API linked", sum2)
-	}
-	var apiSvc, apiProj int64
-	d.SQL.QueryRow(`SELECT COUNT(*) FROM api_service_links WHERE api_id = ? AND service_id = ?`, apiID, ids[appUUID]).Scan(&apiSvc)
-	d.SQL.QueryRow(`SELECT COUNT(*) FROM api_project_links WHERE api_id = ? AND project_id = ?`, apiID, envProject).Scan(&apiProj)
-	if apiSvc != 1 || apiProj != 1 {
-		t.Errorf("api links: service=%d project=%d", apiSvc, apiProj)
+	if sum2.Created != 0 || sum2.Updated != 0 || sum2.ProjectsSet != 0 {
+		t.Fatalf("second sync = %+v, want no changes", sum2)
 	}
 }

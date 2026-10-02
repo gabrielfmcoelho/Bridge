@@ -336,27 +336,41 @@ func (r *ProjectRepo) SetCoolifyLinks(ctx context.Context, projectID int64, link
 	return tx.Commit()
 }
 
+// APIAddresses is what an API declares: its main base_url (often the gateway)
+// and its extra labelled urls (often the origin).
+type APIAddresses struct {
+	Base   string
+	Extras []string
+}
+
 // UnlinkedAPIs lists live APIs with no service links, with every address they
-// declare (base_url + extra urls) — the API auto-link candidates.
-func (r *APICatalogRepo) UnlinkedAPIs(ctx context.Context) (map[int64][]string, error) {
+// declare — the API auto-link candidates.
+func (r *APICatalogRepo) UnlinkedAPIs(ctx context.Context) (map[int64]APIAddresses, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT a.id, a.base_url FROM api_catalog a
+		SELECT a.id, a.base_url, TRUE FROM api_catalog a
 		WHERE a.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM api_service_links l WHERE l.api_id = a.id)
 		UNION ALL
-		SELECT u.api_id, u.url FROM api_catalog_urls u JOIN api_catalog a ON a.id = u.api_id
+		SELECT u.api_id, u.url, FALSE FROM api_catalog_urls u JOIN api_catalog a ON a.id = u.api_id
 		WHERE a.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM api_service_links l WHERE l.api_id = a.id)`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := map[int64][]string{}
+	out := map[int64]APIAddresses{}
 	for rows.Next() {
 		var id int64
 		var u sql.NullString
-		if err := rows.Scan(&id, &u); err != nil {
+		var base bool
+		if err := rows.Scan(&id, &u, &base); err != nil {
 			return nil, err
 		}
-		out[id] = append(out[id], u.String)
+		a := out[id]
+		if base {
+			a.Base = u.String
+		} else {
+			a.Extras = append(a.Extras, u.String)
+		}
+		out[id] = a
 	}
 	return out, rows.Err()
 }
