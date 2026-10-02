@@ -938,6 +938,10 @@ const apiLinkQS = (params: ApiLinkFilter) => {
 type ApiImportMeta = {
   name?: string;
   description?: string;
+  use_cases?: string;
+  origem?: import("./types").ApiOrigem;
+  fornecedor?: string;
+  consumer_service_ids?: number[];
   service_ids: number[];
   project_ids: number[];
   base_url?: string;
@@ -966,6 +970,9 @@ export const apiCatalogAPI = {
     api.post<Record<string, unknown>>(`/api/api-catalog/${id}/spec/filter`, body),
   importURL: (body: ApiImportMeta & { source_url: string }) =>
     api.post<import("./types").ApiCatalog>("/api/api-catalog/import/url", body),
+  /** Registers an API without an OpenAPI spec (source_type "manual"). */
+  createManual: (body: ApiImportMeta & { name: string }) =>
+    api.post<import("./types").ApiCatalog>("/api/api-catalog", body),
   importUpload: (file: File, meta: ApiImportMeta) => {
     const form = new FormData();
     form.append("spec", file);
@@ -974,6 +981,10 @@ export const apiCatalogAPI = {
     if (meta.base_url) form.append("base_url", meta.base_url);
     if (meta.docs_url) form.append("docs_url", meta.docs_url);
     if (meta.urls?.length) form.append("urls", JSON.stringify(meta.urls));
+    if (meta.use_cases) form.append("use_cases", meta.use_cases);
+    if (meta.origem) form.append("origem", meta.origem);
+    if (meta.fornecedor) form.append("fornecedor", meta.fornecedor);
+    if (meta.consumer_service_ids?.length) form.append("consumer_service_ids", meta.consumer_service_ids.join(","));
     form.append("service_ids", meta.service_ids.join(","));
     form.append("project_ids", meta.project_ids.join(","));
     if (meta.creator_entidade_id != null) form.append("creator_entidade_id", String(meta.creator_entidade_id));
@@ -991,6 +1002,9 @@ export const apiCatalogAPI = {
     name: string;
     description?: string;
     use_cases?: string;
+    origem?: import("./types").ApiOrigem;
+    fornecedor?: string;
+    consumer_service_ids?: number[];
     base_url?: string;
     docs_url?: string;
     urls?: import("./types").ApiCatalogURL[];

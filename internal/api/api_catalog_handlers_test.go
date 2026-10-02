@@ -460,3 +460,60 @@ func TestCatalog_UpdateIsPartial(t *testing.T) {
 		t.Errorf("blank name = %d, want 400", resp.StatusCode)
 	}
 }
+
+// An API without an OpenAPI spec (externa, SOAP…): registered by hand, with
+// its origin, provider and the services that consume it; a spec uploaded
+// later turns it into an upload. Origin is validated; consumers are kept by
+// a PUT that omits them.
+func TestCatalog_ManualKindAndConsumers(t *testing.T) {
+	e := newCatalogEnv(t)
+	ctx := context.Background()
+	svc := &models.Service{Nickname: "visualizador-api"}
+	if err := store.NewServiceRepo(e.d.SQL).Create(ctx, svc); err != nil {
+		t.Fatalf("service: %v", err)
+	}
+	if resp := e.do(http.MethodPost, "/api/api-catalog", `{"description":"sem nome"}`); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("manual without name = %d, want 400", resp.StatusCode)
+	}
+	if resp := e.do(http.MethodPost, "/api/api-catalog", `{"name":"X","origem":"nossa"}`); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("bad origem = %d, want 400", resp.StatusCode)
+	}
+	resp := e.do(http.MethodPost, "/api/api-catalog", `{"name":"SEI (nativa)","origem":"externa","fornecedor":"ATI-PI",
+		"docs_url":"https://sei.pi.gov.br/docs","use_cases":"- Visualizador lê processos","consumer_service_ids":[`+itoa(svc.ID)+`]}`)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("manual create = %d %s", resp.StatusCode, readBody(resp))
+	}
+	a := decodeObj(t, resp)
+	id := itoa(int64(a["id"].(float64)))
+	if a["source_type"] != "manual" || a["origem"] != "externa" || a["fornecedor"] != "ATI-PI" || a["operation_count"] != float64(0) ||
+		a["use_cases"] != "- Visualizador lê processos" {
+		t.Errorf("manual api = %+v", a)
+	}
+	if c := a["consumer_service_ids"].([]any); len(c) != 1 || a["service_ids"].([]any) == nil || len(a["service_ids"].([]any)) != 0 {
+		t.Errorf("consumers=%v servers=%v, want [svc] / []", a["consumer_service_ids"], a["service_ids"])
+	}
+	// Partial PUT keeps origem, fornecedor and consumers; a bad origem is refused.
+	e.do(http.MethodPut, "/api/api-catalog/"+id, `{"description":"nova"}`)
+	got := decodeObj(t, e.do(http.MethodGet, "/api/api-catalog/"+id, ""))
+	if got["origem"] != "externa" || got["fornecedor"] != "ATI-PI" || len(got["consumer_service_ids"].([]any)) != 1 {
+		t.Errorf("after partial PUT: origem=%v fornecedor=%v consumers=%v", got["origem"], got["fornecedor"], got["consumer_service_ids"])
+	}
+	if resp := e.do(http.MethodPut, "/api/api-catalog/"+id, `{"origem":"x"}`); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("PUT bad origem = %d, want 400", resp.StatusCode)
+	}
+	// A spec uploaded later makes it an upload with operations.
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("spec", "spec.yaml")
+	io.WriteString(fw, testOpenAPI30)
+	mw.Close()
+	req, _ := http.NewRequest(http.MethodPost, e.server.URL+"/api/api-catalog/"+id+"/spec", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("spec upload: %v %d", err, resp.StatusCode)
+	}
+	got = decodeObj(t, e.do(http.MethodGet, "/api/api-catalog/"+id, ""))
+	if got["source_type"] != "upload" || got["operation_count"].(float64) == 0 {
+		t.Errorf("after spec upload: source_type=%v operation_count=%v", got["source_type"], got["operation_count"])
+	}
+}

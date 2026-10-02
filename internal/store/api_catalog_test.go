@@ -107,10 +107,10 @@ func TestAPICatalogRepo_LinksAndTrash(t *testing.T) {
 			t.Fatalf("create: %v", err)
 		}
 	}
-	if err := repo.SetLinks(ctx, viaService.ID, []int64{svc.ID, svc.ID}, []int64{}); err != nil {
+	if err := repo.SetLinks(ctx, viaService.ID, []int64{svc.ID, svc.ID}, []int64{}, nil); err != nil {
 		t.Fatalf("set links: %v", err)
 	}
-	if err := repo.SetLinks(ctx, direct.ID, nil, []int64{other.ID}); err != nil {
+	if err := repo.SetLinks(ctx, direct.ID, nil, []int64{other.ID}, nil); err != nil {
 		t.Fatalf("set links: %v", err)
 	}
 

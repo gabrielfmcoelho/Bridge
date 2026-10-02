@@ -139,7 +139,8 @@
       "sourceLabel": "Origem",
       "sourceType": {
         "upload": "Arquivo enviado",
-        "url": "URL da especificação"
+        "url": "URL da especificação",
+        "manual": "Sem especificação"
       },
       "specTitle": "Título da especificação",
       "specVersion": "Versão da especificação",
@@ -170,6 +171,30 @@
       "descriptionPlaceholder": "O que a API faz, como autenticar, limites e cuidados. Markdown.",
       "noDescription": "Sem descrição ainda.",
       "noUseCases": "Sem casos de uso ainda.",
+      "origemLabel": "Origem",
+      "fornecedor": "Fornecedor",
+      "fornecedorHint": "Quem desenvolve ou fornece: fabricante, outro órgão (ETIPI, ATI-PI…).",
+      "keycloakKeys": "Chaves Keycloak",
+      "mainResponsavel": "Responsável principal",
+      "servedBy": "Servida por",
+      "consumedBy": "Consumida por",
+      "noServedBy": "Nenhum serviço nosso serve esta API ainda.",
+      "noConsumers": "Nenhum serviço consome esta API ainda.",
+      "aboutToggle": "Sobre a API",
+      "noSpec": "Sem especificação",
+      "noSpecDesc": "Esta API foi cadastrada sem especificação OpenAPI (SOAP, ou o fornecedor não publica uma). Envie uma em \"Substituir especificação\" para listar os endpoints.",
+      "noSpecHint": "Cadastre a API só com endereços, documentação e vínculos. Dá para enviar a especificação depois.",
+      "register": "Cadastrar API",
+      "origem": {
+        "propria": "Própria",
+        "terceiro": "Terceiro, hospedada por nós",
+        "externa": "Externa"
+      },
+      "origemHint": {
+        "propria": "Desenvolvida e hospedada por nós: serviços, repositório e chaves do Keycloak.",
+        "terceiro": "Software de terceiro que hospedamos (Outline, Airflow, Keycloak…): serviços e host, documentação do fabricante.",
+        "externa": "Hospedada por outro órgão ou empresa (SEI nativo, GLPI): sem serviço nem host nosso; registre quem fornece e quais serviços nossos a consomem."
+      },
       "backToList": "Voltar para APIs",
       "deleteHint": "Ela vai para a lixeira de APIs e um admin pode restaurá-la.",
       "noneLinked": "Nenhuma API vinculada ainda.",

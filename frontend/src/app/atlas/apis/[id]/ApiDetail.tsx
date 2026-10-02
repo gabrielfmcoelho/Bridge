@@ -28,7 +28,9 @@ import ShareBundleModal from "@/components/atlas/apis/ShareBundleModal";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import ApiForm from "../ApiForm";
 import { useSpecActions } from "../_components/useSpecActions";
-import { isSpecStale } from "../_components/apiInsights";
+import { isSpecStale, ORIGEM_COLOR } from "../_components/apiInsights";
+import { useApiLinkNames } from "../_components/apiDisplay";
+import Link from "next/link";
 import ApiProfile from "./_components/ApiProfile";
 import SectionCard from "@/components/ui/SectionCard";
 import { MarkdownContent } from "@/components/ui/MarkdownEditor";
@@ -60,7 +62,7 @@ export default function ApiDetail({ id }: { id: number }) {
   const { data: spec } = useQuery({
     queryKey: ["api-catalog", id, "spec"],
     queryFn: () => apiCatalogAPI.getSpec(id),
-    enabled: !!api && activeTab === "endpoints",
+    enabled: !!api && api.source_type !== "manual" && activeTab === "endpoints",
   });
   const { data: issues = [] } = useQuery({
     queryKey: ["issues", "api_catalog", id],
@@ -130,7 +132,10 @@ export default function ApiDetail({ id }: { id: number }) {
 
   const openIssues = issues.filter((i) => !i.archived && i.status !== "done").length;
   const services = api.service_ids ?? [];
+  const consumers = api.consumer_service_ids ?? [];
   const projects = api.project_ids ?? [];
+  const origem = api.origem ?? "propria";
+  const manual = api.source_type === "manual";
   const stale = isSpecStale(api);
   const tabs = [
     { key: "overview", label: t("host.tabOverview"), icon: ICON_PATHS.home },
@@ -144,7 +149,7 @@ export default function ApiDetail({ id }: { id: number }) {
       : []),
   ];
   const relationGroups = [
-    servicesGroup(allServices.filter((s) => services.includes(s.id)), t),
+    servicesGroup(allServices.filter((s) => services.includes(s.id) || consumers.includes(s.id)), t),
     projectsGroup(allProjects.filter((p) => projects.includes(p.id)), t),
   ];
   const open = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
@@ -154,18 +159,21 @@ export default function ApiDetail({ id }: { id: number }) {
       <div className="space-y-5">
         <PageHeader
           title={api.name}
-          subtitle={[api.title, api.version_label].filter(Boolean).join(" · ") || undefined}
+          subtitle={manual ? t("atlas.apis.noSpec") : [api.title, api.version_label].filter(Boolean).join(" · ") || undefined}
           subtitleFont="display"
           status={
             <span className="inline-flex items-center gap-2">
-              <Badge color="cyan">{api.spec_version ? `OpenAPI ${api.spec_version}` : "–"}</Badge>
+              <Badge color={ORIGEM_COLOR[origem]}>{t(`atlas.apis.origem.${origem}`)}</Badge>
+              {api.fornecedor && <span className="text-xs text-[var(--text-muted)]">{api.fornecedor}</span>}
+              {!manual && <Badge color="cyan">{api.spec_version ? `OpenAPI ${api.spec_version}` : "–"}</Badge>}
               <span className="text-xs text-[var(--text-muted)]">{t(`atlas.apis.sourceType.${api.source_type}`)}</span>
               {stale && <Badge color="amber">{t("atlas.apis.kpi.specStale")}</Badge>}
             </span>
           }
           indicators={<>
             <CardIndicator icon={ICON_PATHS.code} count={api.operation_count} color="info" title={t("atlas.apis.endpointsCount", { count: String(api.operation_count) })} />
-            <CardIndicator icon={ICON_PATHS.serverStack} count={services.length} color="warning" title={t("topology.services")} />
+            <CardIndicator icon={ICON_PATHS.serverStack} count={services.length} color="warning" title={t("atlas.apis.servedBy")} />
+            <CardIndicator icon={ICON_PATHS.link} count={consumers.length} color="accent" title={t("atlas.apis.consumedBy")} />
             <CardIndicator icon={ICON_PATHS.folder} count={projects.length} color="accent" title={t("topology.projects")} />
             <CardIndicator icon={ICON_PATHS.clipboard} count={openIssues} color="accent" title={`${openIssues} ${t("nav.issues").toLowerCase()}`} />
           </>}
@@ -202,18 +210,33 @@ export default function ApiDetail({ id }: { id: number }) {
           deleteConfirmMessage={`${t("confirm.deleteTitle", { name: `"${api.name}"` })} ${t("atlas.apis.deleteHint")}`}
           tabs={{ idBase: "api", label: api.name, active: activeTab, onChange: (k) => setActiveTab(k as TabKey), panelClassName: "space-y-5", items: tabs }}
         >
+          <SectionCard as="h2" title={t("atlas.apis.aboutToggle")} collapsible defaultOpen={false}
+            empty={api.description?.trim() || api.use_cases?.trim() ? undefined : t("atlas.apis.noDescription")}>
+            <div className="space-y-4">
+              {api.description?.trim() && <MarkdownContent content={api.description} />}
+              {api.use_cases?.trim() && (
+                <div>
+                  <p className="text-xs font-medium text-[var(--text-secondary)] mb-1">{t("atlas.apis.useCases")}</p>
+                  <MarkdownContent content={api.use_cases} />
+                </div>
+              )}
+            </div>
+          </SectionCard>
+
           {activeTab === "overview" && (
             <DetailSplit profile={<ApiProfile api={api} onEditResponsaveis={canEdit ? () => setShowEditDrawer(true) : undefined} />}>
-              <SectionCard as="h3" title={t("common.description")} empty={api.description ? undefined : t("atlas.apis.noDescription")}>
-                <MarkdownContent content={api.description} />
-              </SectionCard>
-              <SectionCard as="h3" title={t("atlas.apis.useCases")} empty={api.use_cases ? undefined : t("atlas.apis.noUseCases")}>
-                <MarkdownContent content={api.use_cases ?? ""} />
-              </SectionCard>
+              {origem !== "externa" && (
+                <ServiceLinks title={t("atlas.apis.servedBy")} ids={services} empty={t("atlas.apis.noServedBy")} />
+              )}
+              <ServiceLinks title={t("atlas.apis.consumedBy")} ids={consumers} empty={t("atlas.apis.noConsumers")} />
             </DetailSplit>
           )}
 
-          {activeTab === "endpoints" && (
+          {activeTab === "endpoints" && manual && (
+            <EmptyState icon="box" title={t("atlas.apis.noSpec")} description={t("atlas.apis.noSpecDesc")}
+              action={api.docs_url ? <Button size="sm" variant="secondary" onClick={() => open(api.docs_url!)}>{t("atlas.apis.openDocs")}</Button> : undefined} />
+          )}
+          {activeTab === "endpoints" && !manual && (
             <div className="min-h-[70vh]">
               {spec ? <ApiReference content={spec} servers={[
                 ...(api.base_url ? [{ url: api.base_url, description: t("atlas.apis.primaryUrl") }] : []),
@@ -250,5 +273,19 @@ export default function ApiDetail({ id }: { id: number }) {
         <ShareBundleModal open={sharing} onClose={() => setSharing(false)} api={api} />
       </div>
     </PageShell>
+  );
+}
+
+/** A list of linked services (served by / consumed by), each opening its page. */
+function ServiceLinks({ title, ids, empty }: { title: string; ids: number[]; empty: string }) {
+  const names = useApiLinkNames();
+  return (
+    <SectionCard as="h3" title={title} count={ids.length} empty={ids.length ? undefined : empty}>
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
+        {ids.map((id) => (
+          <Link key={id} href={`/services/${id}`} className="text-sm text-[var(--accent)] hover:underline">{names.service.get(id) ?? `#${id}`}</Link>
+        ))}
+      </div>
+    </SectionCard>
   );
 }

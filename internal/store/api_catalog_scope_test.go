@@ -45,7 +45,7 @@ func TestAPICatalogRepo_EntidadeScope(t *testing.T) {
 	if spec, err := repo.GetSpec(scoped, other); err != nil || spec != "" {
 		t.Fatalf("scoped getspec other = %q, %v; want empty", spec, err)
 	}
-	if err := repo.UpdateMeta(scoped, other, "renamed", "", "", "", ""); err != nil {
+	if err := repo.UpdateMeta(scoped, other, store.APIMeta{Name: "renamed", Origem: models.APIOrigemPropria}); err != nil {
 		t.Fatalf("scoped update other: %v", err)
 	}
 	if found, err := repo.SoftDelete(scoped, other); err != nil || found {

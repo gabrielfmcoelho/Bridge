@@ -24,6 +24,9 @@ func NewAPICatalogRepo(db *sql.DB) *APICatalogRepo { return &APICatalogRepo{db: 
 // Create inserts the catalog row and its operation index in one transaction.
 // a.SpecJSON must be set (canonical JSON from apicatalog.Parse).
 func (r *APICatalogRepo) Create(ctx context.Context, a *models.APICatalog, ops []models.APIOperation) error {
+	if a.Origem == "" {
+		a.Origem = models.APIOrigemPropria // the column's default
+	}
 	if err := a.Validate(); err != nil {
 		return err
 	}
@@ -35,10 +38,10 @@ func (r *APICatalogRepo) Create(ctx context.Context, a *models.APICatalog, ops [
 
 	id, err := database.InsertReturningID(tx,
 		`INSERT INTO api_catalog
-			(name, description, source_type, source_url, external_url, base_url, docs_url,
+			(name, description, use_cases, origem, fornecedor, source_type, source_url, external_url, base_url, docs_url,
 			 spec_version, spec_json, spec_hash, title, version_label, owner_user_id, created_by)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.Name, a.Description, a.SourceType, a.SourceURL, a.ExternalURL, a.BaseURL, a.DocsURL,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.Name, a.Description, a.UseCases, a.Origem, a.Fornecedor, a.SourceType, a.SourceURL, a.ExternalURL, a.BaseURL, a.DocsURL,
 		a.SpecVersion, a.SpecJSON, a.SpecHash, a.Title, a.VersionLabel, a.OwnerUserID, a.CreatedBy,
 	)
 	if err != nil {
@@ -79,11 +82,11 @@ func (r *APICatalogRepo) Get(ctx context.Context, id int64) (*models.APICatalog,
 	a := &models.APICatalog{}
 	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, name, description, use_cases, source_type, source_url, external_url, base_url, docs_url,
+		`SELECT id, name, description, use_cases, origem, fornecedor, source_type, source_url, external_url, base_url, docs_url,
 			spec_version, spec_hash, title, version_label, owner_user_id, created_by, created_at, updated_at,
 			`+apiKeyMgmtCols+`
 		FROM api_catalog WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...,
-	).Scan(&a.ID, &a.Name, &a.Description, &a.UseCases, &a.SourceType, &a.SourceURL, &a.ExternalURL, &a.BaseURL, &a.DocsURL,
+	).Scan(&a.ID, &a.Name, &a.Description, &a.UseCases, &a.Origem, &a.Fornecedor, &a.SourceType, &a.SourceURL, &a.ExternalURL, &a.BaseURL, &a.DocsURL,
 		&a.SpecVersion, &a.SpecHash, &a.Title, &a.VersionLabel, &a.OwnerUserID, &a.CreatedBy, &a.CreatedAt, &a.UpdatedAt,
 		&a.KeyManagement, &a.AdminBaseURL, &a.ScopePrefix)
 	if err == sql.ErrNoRows {
@@ -103,6 +106,7 @@ func (r *APICatalogRepo) Get(ctx context.Context, id int64) (*models.APICatalog,
 		return nil, err
 	}
 	a.ServiceIDs, a.ProjectIDs, a.URLs = links.Services[id], links.Projects[id], links.URLs[id]
+	a.ConsumerServiceIDs = links.Consumers[id]
 	normalizeAPILinks(a)
 	return a, nil
 }
@@ -148,7 +152,7 @@ func (r *APICatalogRepo) listOperations(ctx context.Context, apiID int64) ([]mod
 // List returns live catalog rows (no operations, no SpecJSON) with an
 // OperationCount, filtered + searched per f.
 func (r *APICatalogRepo) List(ctx context.Context, f models.APICatalogFilter) ([]models.APICatalog, error) {
-	q := `SELECT c.id, c.name, c.description, c.source_type, c.source_url, c.external_url, c.base_url, c.docs_url,
+	q := `SELECT c.id, c.name, c.description, c.use_cases, c.origem, c.fornecedor, c.source_type, c.source_url, c.external_url, c.base_url, c.docs_url,
 			c.spec_version, c.spec_hash, c.title, c.version_label, c.owner_user_id, c.created_by, c.created_at, c.updated_at,
 			(SELECT COUNT(*) FROM api_operations o WHERE o.api_id = c.id) AS op_count,
 			c.key_management, c.admin_base_url, c.scope_prefix
@@ -171,7 +175,7 @@ func (r *APICatalogRepo) List(ctx context.Context, f models.APICatalogFilter) ([
 	var out []models.APICatalog
 	for rows.Next() {
 		var a models.APICatalog
-		if err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.SourceType, &a.SourceURL,
+		if err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.UseCases, &a.Origem, &a.Fornecedor, &a.SourceType, &a.SourceURL,
 			&a.ExternalURL, &a.BaseURL, &a.DocsURL, &a.SpecVersion, &a.SpecHash, &a.Title, &a.VersionLabel, &a.OwnerUserID, &a.CreatedBy,
 			&a.CreatedAt, &a.UpdatedAt, &a.OperationCount,
 			&a.KeyManagement, &a.AdminBaseURL, &a.ScopePrefix); err != nil {
@@ -197,6 +201,7 @@ func (r *APICatalogRepo) withLinks(ctx context.Context, apis []models.APICatalog
 	}
 	for i := range apis {
 		apis[i].ServiceIDs, apis[i].ProjectIDs, apis[i].URLs = links.Services[apis[i].ID], links.Projects[apis[i].ID], links.URLs[apis[i].ID]
+		apis[i].ConsumerServiceIDs = links.Consumers[apis[i].ID]
 		normalizeAPILinks(&apis[i])
 	}
 	return apis, nil
@@ -211,6 +216,9 @@ func normalizeAPILinks(a *models.APICatalog) {
 	}
 	if a.URLs == nil {
 		a.URLs = []models.APICatalogURL{}
+	}
+	if a.ConsumerServiceIDs == nil {
+		a.ConsumerServiceIDs = []int64{}
 	}
 }
 
@@ -233,15 +241,16 @@ func apiLinkFilter(q string, args []any, serviceID, projectID int64) (string, []
 
 // APILinks maps api id → linked service / project ids and extra URLs.
 type APILinks struct {
-	Services map[int64][]int64
-	Projects map[int64][]int64
-	URLs     map[int64][]models.APICatalogURL
+	Services  map[int64][]int64
+	Consumers map[int64][]int64 // services that call the API
+	Projects  map[int64][]int64
+	URLs      map[int64][]models.APICatalogURL
 }
 
 // LinksBulk loads the direct links of the given APIs. Links to trashed
 // services or projects are left out.
 func (r *APICatalogRepo) LinksBulk(ctx context.Context, apiIDs []int64) (APILinks, error) {
-	out := APILinks{Services: map[int64][]int64{}, Projects: map[int64][]int64{}, URLs: map[int64][]models.APICatalogURL{}}
+	out := APILinks{Services: map[int64][]int64{}, Consumers: map[int64][]int64{}, Projects: map[int64][]int64{}, URLs: map[int64][]models.APICatalogURL{}}
 	if len(apiIDs) == 0 {
 		return out, nil
 	}
@@ -255,6 +264,8 @@ func (r *APICatalogRepo) LinksBulk(ctx context.Context, apiIDs []int64) (APILink
 		sql string
 	}{
 		{out.Services, `SELECT l.api_id, l.service_id FROM api_service_links l JOIN services s ON s.id = l.service_id
+			WHERE s.deleted_at IS NULL AND l.api_id IN (` + ph + `) ORDER BY l.service_id`},
+		{out.Consumers, `SELECT l.api_id, l.service_id FROM api_consumer_links l JOIN services s ON s.id = l.service_id
 			WHERE s.deleted_at IS NULL AND l.api_id IN (` + ph + `) ORDER BY l.service_id`},
 		{out.Projects, `SELECT l.api_id, l.project_id FROM api_project_links l JOIN projects p ON p.id = l.project_id
 			WHERE p.deleted_at IS NULL AND l.api_id IN (` + ph + `) ORDER BY l.project_id`},
@@ -315,11 +326,16 @@ func (r *APICatalogRepo) SetURLs(ctx context.Context, apiID int64, urls []models
 	return tx.Commit()
 }
 
-// SetLinks replaces an API's service and project links. A nil slice leaves
-// that side untouched; an empty one clears it.
-func (r *APICatalogRepo) SetLinks(ctx context.Context, apiID int64, serviceIDs, projectIDs []int64) error {
+// SetLinks replaces an API's serving services, project links and consumer
+// services. A nil slice leaves that side untouched; an empty one clears it.
+func (r *APICatalogRepo) SetLinks(ctx context.Context, apiID int64, serviceIDs, projectIDs, consumerIDs []int64) error {
 	if serviceIDs != nil {
 		if err := replaceLinks(ctx, r.db, `api_service_links`, `api_id`, `service_id`, apiID, dedupeIDs(serviceIDs)); err != nil {
+			return err
+		}
+	}
+	if consumerIDs != nil {
+		if err := replaceLinks(ctx, r.db, `api_consumer_links`, `api_id`, `service_id`, apiID, dedupeIDs(consumerIDs)); err != nil {
 			return err
 		}
 	}
@@ -423,14 +439,23 @@ func (r *APICatalogRepo) ByScopePrefix(ctx context.Context, prefix string) (id i
 
 // UpdateMeta renames / re-describes a catalog row and updates base_url + docs_url
 // (the spec itself is untouched — use UpdateSpec for that).
-func (r *APICatalogRepo) UpdateMeta(ctx context.Context, id int64, name, description, useCases, baseURL, docsURL string) error {
-	if strings.TrimSpace(name) == "" {
+// APIMeta is the editable metadata UpdateMeta writes, every field at once.
+type APIMeta struct {
+	Name, Description, UseCases, Origem, Fornecedor, BaseURL, DocsURL string
+}
+
+func (r *APICatalogRepo) UpdateMeta(ctx context.Context, id int64, m APIMeta) error {
+	if strings.TrimSpace(m.Name) == "" {
 		return fmt.Errorf("name is required")
+	}
+	if !models.ValidAPIOrigem(m.Origem) {
+		return fmt.Errorf("invalid origem %q", m.Origem)
 	}
 	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE api_catalog SET name = ?, description = ?, use_cases = ?, base_url = ?, docs_url = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{name, description, useCases, baseURL, docsURL, id}, vargs...)...)
+		`UPDATE api_catalog SET name = ?, description = ?, use_cases = ?, origem = ?, fornecedor = ?, base_url = ?, docs_url = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND deleted_at IS NULL AND `+vis,
+		append([]any{m.Name, m.Description, m.UseCases, m.Origem, m.Fornecedor, m.BaseURL, m.DocsURL, id}, vargs...)...)
 	return err
 }
 
@@ -446,7 +471,8 @@ func (r *APICatalogRepo) UpdateSpec(ctx context.Context, id int64, specJSON, spe
 	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
 	res, err := tx.ExecContext(ctx,
 		`UPDATE api_catalog SET spec_json = ?, spec_hash = ?, spec_version = ?, title = ?,
-			version_label = ?, external_url = ?, updated_at = CURRENT_TIMESTAMP
+			version_label = ?, external_url = ?, updated_at = CURRENT_TIMESTAMP,
+			source_type = CASE WHEN source_type = 'manual' THEN 'upload' ELSE source_type END
 		WHERE id = ? AND deleted_at IS NULL AND `+vis,
 		append([]any{specJSON, specHash, specVersion, title, versionLabel, externalURL, id}, vargs...)...)
 	if err != nil {

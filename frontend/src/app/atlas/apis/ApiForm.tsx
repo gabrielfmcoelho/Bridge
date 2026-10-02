@@ -19,7 +19,7 @@ import RelationPicker from "@/components/forms/RelationPicker";
 import { useRelationOptions } from "@/components/forms/useRelationOptions";
 import { SPEC_ACCEPT, useSpecActions } from "./_components/useSpecActions";
 import ApiUrlsEditor, { cleanUrls, invalidUrlRows } from "./_components/ApiUrlsEditor";
-import type { ApiCatalog, ApiCatalogURL, AssetGrantsInput, EntityResponsavel } from "@/lib/types";
+import type { ApiCatalog, ApiCatalogURL, ApiOrigem, AssetGrantsInput, EntityResponsavel } from "@/lib/types";
 
 const URL_RE = /^https?:\/\/\S+$/i;
 
@@ -56,7 +56,10 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [useCases, setUseCases] = useState(initial?.use_cases ?? "");
-  const [sourceMode, setSourceMode] = useState<"upload" | "url">(prefill?.specUrl ? "url" : "upload");
+  const [origem, setOrigem] = useState<ApiOrigem>(initial?.origem ?? "propria");
+  const [fornecedor, setFornecedor] = useState(initial?.fornecedor ?? "");
+  // "manual": registered without an OpenAPI spec (SOAP, vendors that publish none).
+  const [sourceMode, setSourceMode] = useState<"upload" | "url" | "manual">(prefill?.specUrl ? "url" : "upload");
   const [file, setFile] = useState<File | null>(null);
   const [sourceUrl, setSourceUrl] = useState(prefill?.specUrl ?? "");
   const [baseUrl, setBaseUrl] = useState(initial?.base_url ?? prefill?.baseUrl ?? "");
@@ -64,6 +67,7 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
   const [urls, setUrls] = useState<ApiCatalogURL[]>(initial?.urls ?? []);
   const [serviceIds, setServiceIds] = useState<number[]>(initial?.service_ids ?? prefill?.serviceIds ?? []);
   const [projectIds, setProjectIds] = useState<number[]>(initial?.project_ids ?? prefill?.projectIds ?? []);
+  const [consumerIds, setConsumerIds] = useState<number[]>(initial?.consumer_service_ids ?? []);
   const [responsaveis, setResponsaveis] = useState<EntityResponsavel[]>(initial?.responsaveis ?? []);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
@@ -80,27 +84,34 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
       const meta = {
         name: name.trim(),
         description: description.trim(),
+        use_cases: useCases.trim(),
+        origem,
+        fornecedor: fornecedor.trim(),
         base_url: baseUrl.trim(),
         docs_url: docsUrl.trim(),
         urls: cleanUrls(urls),
-        service_ids: serviceIds,
+        // Nobody here serves an external API: its serving links are dropped.
+        service_ids: origem === "externa" ? [] : serviceIds,
         project_ids: projectIds,
+        consumer_service_ids: consumerIds,
         ...grants,
       };
-      if (initial) return apiCatalogAPI.update(initial.id, { ...meta, use_cases: useCases.trim(), responsaveis: owners() });
-      const created = sourceMode === "upload"
-        ? await apiCatalogAPI.importUpload(file!, { ...meta, name: meta.name || undefined })
-        : await apiCatalogAPI.importURL({ ...meta, name: meta.name || undefined, source_url: sourceUrl.trim() });
-      // Import takes no use cases or responsáveis: they go in a follow-up update.
-      if (owners().length === 0 && !useCases.trim()) return created;
-      return apiCatalogAPI.update(created.id, { name: created.name, use_cases: useCases.trim(), responsaveis: owners() });
+      if (initial) return apiCatalogAPI.update(initial.id, { ...meta, responsaveis: owners() });
+      const created = sourceMode === "manual"
+        ? await apiCatalogAPI.createManual(meta)
+        : sourceMode === "upload"
+          ? await apiCatalogAPI.importUpload(file!, { ...meta, name: meta.name || undefined })
+          : await apiCatalogAPI.importURL({ ...meta, name: meta.name || undefined, source_url: sourceUrl.trim() });
+      // Creation takes no responsáveis: they go in a follow-up update.
+      if (owners().length === 0) return created;
+      return apiCatalogAPI.update(created.id, { name: created.name, responsaveis: owners() });
     },
     onSuccess: (api) => onSuccess(api),
     onError: (err) => setError(err instanceof Error ? err.message : t("form.saveFailed")),
   });
 
   const errors: Record<string, string> = {};
-  if (isEdit && !name.trim()) errors.name = t("form.required");
+  if ((isEdit || sourceMode === "manual") && !name.trim()) errors.name = t("form.required");
   if (!isEdit && sourceMode === "upload" && !file) errors.file = t("form.required");
   if (!isEdit && sourceMode === "url" && !URL_RE.test(sourceUrl.trim())) errors.sourceUrl = sourceUrl.trim() ? t("form.urlInvalid") : t("form.required");
   if (baseUrl.trim() && baseUrl !== (initial?.base_url ?? "") && !URL_RE.test(baseUrl.trim())) errors.baseUrl = t("form.urlInvalid");
@@ -130,7 +141,7 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
       sections={sections}
       isEdit={isEdit}
       isPending={mutation.isPending}
-      submitLabel={isEdit ? t("form.saveChanges") : t("atlas.apis.import")}
+      submitLabel={isEdit ? t("form.saveChanges") : sourceMode === "manual" ? t("atlas.apis.register") : t("atlas.apis.import")}
       error={error}
       onSubmit={submit}
       onCancel={onClose}
@@ -139,7 +150,21 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
     >
       <FormSection id="api-identity" title={t("form.section.identity")}>
         <div className="sm:col-span-2">
-          <Input label={t("atlas.apis.name")} value={name} onChange={(e) => setName(e.target.value)} required={isEdit}
+          <FormField label={t("atlas.apis.origemLabel")} hint={t(`atlas.apis.origemHint.${origem}`)}>
+            <div className="flex flex-wrap gap-1.5">
+              {(["propria", "terceiro", "externa"] as const).map((o) => (
+                <PillButton key={o} active={origem === o} onClick={() => setOrigem(o)}>{t(`atlas.apis.origem.${o}`)}</PillButton>
+              ))}
+            </div>
+          </FormField>
+        </div>
+        {origem !== "propria" && (
+          <div className="sm:col-span-2">
+            <Input label={t("atlas.apis.fornecedor")} hint={t("atlas.apis.fornecedorHint")} value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
+          </div>
+        )}
+        <div className="sm:col-span-2">
+          <Input label={t("atlas.apis.name")} value={name} onChange={(e) => setName(e.target.value)} required={isEdit || sourceMode === "manual"}
             placeholder={isEdit ? undefined : t("atlas.apis.namePlaceholder")} error={err("name")} aria-invalid={!!err("name")} />
         </div>
         <div className="sm:col-span-2">
@@ -171,9 +196,12 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
             <div className="sm:col-span-2 flex gap-1.5">
               <PillButton active={sourceMode === "upload"} onClick={() => setSourceMode("upload")}>{t("atlas.apis.importUpload")}</PillButton>
               <PillButton active={sourceMode === "url"} onClick={() => setSourceMode("url")}>{t("atlas.apis.importUrl")}</PillButton>
+              <PillButton active={sourceMode === "manual"} onClick={() => setSourceMode("manual")}>{t("atlas.apis.noSpec")}</PillButton>
             </div>
             <div className="sm:col-span-2">
-              {sourceMode === "upload" ? (
+              {sourceMode === "manual" ? (
+                <p className="text-xs text-[var(--text-muted)]">{t("atlas.apis.noSpecHint")}</p>
+              ) : sourceMode === "upload" ? (
                 <FormField label={t("atlas.apis.specFile")} htmlFor={fileId} required error={err("file")}>
                   <input id={fileId} type="file" accept={SPEC_ACCEPT} aria-invalid={!!err("file")}
                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
@@ -205,7 +233,10 @@ export default function ApiForm({ initial, prefill, onSuccess, onClose, onSubHea
       </FormSection>
 
       <FormSection id="api-links" title={t("form.section.links")} description={t("atlas.apis.linksHint")} stack>
-        <RelationPicker label={t("topology.services")} options={relationOptions.services} selected={serviceIds} onChange={setServiceIds} />
+        {origem !== "externa" && (
+          <RelationPicker label={t("atlas.apis.servedBy")} options={relationOptions.services} selected={serviceIds} onChange={setServiceIds} />
+        )}
+        <RelationPicker label={t("atlas.apis.consumedBy")} options={relationOptions.services} selected={consumerIds} onChange={setConsumerIds} />
         <RelationPicker label={t("topology.projects")} options={relationOptions.projects} selected={projectIds} onChange={setProjectIds} />
       </FormSection>
 

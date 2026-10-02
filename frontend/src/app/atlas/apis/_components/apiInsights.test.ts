@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { apiInsights, apiBreakdowns, isSpecStale, matchesApiFilters, emptyApiFilters } from "./apiInsights.ts";
+import { apiInsights, apiBreakdowns, isSpecStale, matchesApiFilters, emptyApiFilters, plainText } from "./apiInsights.ts";
 import type { ApiCatalog } from "@/lib/types";
 
 const t = (k: string, v?: Record<string, string>) => (v ? `${k}(${Object.values(v).join(",")})` : k);
@@ -52,4 +52,11 @@ test("link filters and breakdowns", () => {
   assert.deepEqual(b.services.map((r) => [r.label, r.count]), [["#3", 1], ["atlas.apis.dash.unlinked", 2]]);
   assert.deepEqual(b.source.map((r) => [r.key, r.count]), [["url", 2], ["upload", 1]]);
   assert.deepEqual(b.source[0].filter, { source: "url" });
+});
+
+test("plainText: a card line from Markdown", () => {
+  assert.equal(plainText("A API do próprio **Bridge**, o `inventário`.\n\n### O que expõe\n- hosts"), "A API do próprio Bridge, o inventário.");
+  assert.equal(plainText("## Título\nVeja [a doc](https://x/docs) e _isto_."), "Título Veja a doc e isto.");
+  assert.equal(plainText("- primeiro\n- segundo"), "primeiro segundo");
+  assert.equal(plainText(undefined), "");
 });
