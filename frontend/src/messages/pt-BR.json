@@ -1094,7 +1094,8 @@
       "noOwner": "Sem responsável",
       "noServices": "Sem serviços",
       "external": "Empresa externa",
-      "noRepo": "Sem repositório"
+      "noRepo": "Sem repositório",
+      "noDescription": "Sem descrição"
     },
     "dash": {
       "bySetor": "Por setor",
@@ -1259,6 +1260,7 @@
       "offline": "Offline",
       "autoReview": "A revisar",
       "autoReviewHint": "Encontrados pelo scan, ainda não fixados",
+      "noProject": "Sem projeto",
       "noResponsavel": "Sem responsável",
       "stale": "Sem sinal",
       "staleHint": "Scan não os vê há mais de {days} dias"

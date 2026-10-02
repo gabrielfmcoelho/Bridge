@@ -8,6 +8,9 @@ func TestContainerKey(t *testing.T) {
 		{"airflow-scheduler-rtb37u69bbkepzukr9vclrd7-123344967269", "airflow-scheduler-rtb37u69bbkepzukr9vclrd7", "rtb37u69bbkepzukr9vclrd7"},
 		{"keycloak-rsul83d5es2xd6dxdvup5d98", "keycloak-rsul83d5es2xd6dxdvup5d98", "rsul83d5es2xd6dxdvup5d98"},
 		{"zwkg80s48g4gogko44o8gg4g", "zwkg80s48g4gogko44o8gg4g", "zwkg80s48g4gogko44o8gg4g"},
+		{"uvhib9msgy3z86l3ujdt20s9-proxy", "uvhib9msgy3z86l3ujdt20s9-proxy", "uvhib9msgy3z86l3ujdt20s9"},
+		{"sead_mrea-db.1.881ppi27hh9nfzfjl9dhjpze3", "sead_mrea-db.1", ""},
+		{"easypanel-traefik.1.jmekntcm1fpr4ah8ux5tzx7sn", "easypanel-traefik.1", ""},
 		{"coolify-proxy", "coolify-proxy", ""},
 		{"postgres-15", "postgres-15", ""},
 	}

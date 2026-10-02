@@ -23,7 +23,8 @@ const COOLIFY_CONTAINER = /^(?:(.+)-)?[a-z0-9]{24}(?:-\d{12})?$/;
 /** The name Coolify shows for a container: its resource ("Gestor - API"),
  *  plus the compose role for a stack member ("Infra - Airflow · flower"). */
 export function coolifyName(stack: string, containerName: string): string {
-  const role = COOLIFY_CONTAINER.exec(containerName)?.[1];
+  // "<uuid>-proxy": the container exposing a database's public port.
+  const role = /^[a-z0-9]{24}-proxy$/.test(containerName) ? "proxy" : COOLIFY_CONTAINER.exec(containerName)?.[1];
   return role ? `${stack} · ${role}` : stack;
 }
 

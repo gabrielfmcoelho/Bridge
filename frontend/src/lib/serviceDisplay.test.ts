@@ -7,6 +7,7 @@ test("coolifyName: application, stack member, database", () => {
   assert.equal(coolifyName("Infra - Airflow", "airflow-scheduler-rtb37u69bbkepzukr9vclrd7-123344967269"), "Infra - Airflow · airflow-scheduler");
   assert.equal(coolifyName("gateway", "keycloak-db-kefmb9um8tyct5itlwaml1tp"), "gateway · keycloak-db");
   assert.equal(coolifyName("Gestor - DB - Postgres", "jcog8ow0c0wcgw08k8k8s0cs"), "Gestor - DB - Postgres");
+  assert.equal(coolifyName("Bridge - DB - Postgres", "uvhib9msgy3z86l3ujdt20s9-proxy"), "Bridge - DB - Postgres · proxy");
 });
 
 test("serviceTitle: Coolify name over the hash, edited nickname wins", () => {
