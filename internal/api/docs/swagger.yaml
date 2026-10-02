@@ -1430,15 +1430,26 @@ definitions:
     properties:
       base_url:
         type: string
+      consumer_service_ids:
+        description: 'ConsumerServiceIDs: the services that call the API.'
+        items:
+          type: integer
+        type: array
       creator_entidade_id:
         type: integer
       description:
         type: string
       docs_url:
         type: string
+      fornecedor:
+        description: who builds/provides it
+        type: string
       is_global:
         type: boolean
       name:
+        type: string
+      origem:
+        description: propria (default) | terceiro | externa
         type: string
       project_ids:
         items:
@@ -1461,6 +1472,8 @@ definitions:
         items:
           $ref: '#/definitions/models.APICatalogURL'
         type: array
+      use_cases:
+        type: string
     type: object
   api.integrationTestGitLabCodeRequest:
     properties:
@@ -2204,15 +2217,24 @@ definitions:
     properties:
       base_url:
         type: string
+      consumer_service_ids:
+        description: 'ConsumerServiceIDs: the services that call the API.'
+        items:
+          type: integer
+        type: array
       creator_entidade_id:
         type: integer
       description:
         type: string
       docs_url:
         type: string
+      fornecedor:
+        type: string
       is_global:
         type: boolean
       name:
+        type: string
+      origem:
         type: string
       project_ids:
         items:
@@ -2568,6 +2590,13 @@ definitions:
       base_url:
         description: explicit API host (Scalar server override)
         type: string
+      consumer_service_ids:
+        description: |-
+          ConsumerServiceIDs are the services that call the API
+          (api_consumer_links); always set, [] when none.
+        items:
+          type: integer
+        type: array
       created_at:
         type: string
       created_by:
@@ -2586,6 +2615,9 @@ definitions:
       external_url:
         description: server derived from the spec
         type: string
+      fornecedor:
+        description: who builds/provides it (vendor, other org)
+        type: string
       id:
         type: integer
       key_management:
@@ -2595,6 +2627,9 @@ definitions:
           and Keycloak clients ("servidores" → "servidores:cadastro",
           "servidores-<label>").
         type: string
+      main_responsavel_name:
+        description: MainResponsavelName is the main internal responsável (list responses).
+        type: string
       name:
         type: string
       operation_count:
@@ -2603,6 +2638,9 @@ definitions:
         items:
           $ref: '#/definitions/models.APIOperation'
         type: array
+      origem:
+        description: propria | terceiro | externa
+        type: string
       owner_user_id:
         type: integer
       project_ids:
@@ -4776,6 +4814,42 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: List catalogued APIs
+      tags:
+      - atlas
+    post:
+      consumes:
+      - application/json
+      description: 'Editor+. For APIs with no OpenAPI spec to import (SOAP, vendors
+        that publish none): source_type "manual", no operations; a spec uploaded later
+        (POST /{id}/spec) turns it into an upload. name is required; source_url is
+        ignored. Linked services/projects must be visible (404 otherwise).'
+      parameters:
+      - description: Metadata, links and entidade grants
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.importURLRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.APICatalog'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Register an API without an OpenAPI spec
       tags:
       - atlas
   /api/api-catalog/{id}:

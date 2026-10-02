@@ -576,12 +576,22 @@ export interface ApiOperation {
   sort_order: number;
 }
 
+export type ApiOrigem = "propria" | "terceiro" | "externa";
+
 export interface ApiCatalog {
   id: number;
   name: string;
   description: string;
-  /** Markdown: who calls the API and for what. Only on GET /api-catalog/{id}. */
+  /** Markdown: who calls the API and for what. */
   use_cases?: string;
+  /** propria: we build and host it · terceiro: third-party software we host · externa: hosted elsewhere. */
+  origem?: ApiOrigem;
+  /** Who builds/provides it (vendor, another organization). */
+  fornecedor?: string;
+  /** Services that call this API (service_ids are the ones that serve it). */
+  consumer_service_ids?: number[];
+  /** Main internal responsável (list responses). */
+  main_responsavel_name?: string;
   source_type: string; // "upload" | "url"
   source_url?: string;
   external_url?: string;

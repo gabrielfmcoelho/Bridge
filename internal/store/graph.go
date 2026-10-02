@@ -19,6 +19,7 @@ type GraphLinks struct {
 	ServiceDepends []LinkPair // service_id -> depends_on_id
 	ProjectDNS     []LinkPair // project_id -> dns_id
 	APIService     []LinkPair // api_id -> service_id
+	APIConsumer    []LinkPair // api_id -> consumer service_id
 	APIProject     []LinkPair // api_id -> project_id
 }
 
@@ -65,6 +66,7 @@ func (r *GraphRepo) Links(ctx context.Context) (GraphLinks, error) {
 		{&g.ServiceDepends, `SELECT service_id, depends_on_id FROM service_dependencies`},
 		{&g.ProjectDNS, `SELECT l.project_id, l.dns_id FROM project_dns_links l JOIN projects p ON p.id = l.project_id JOIN dns_records d ON d.id = l.dns_id WHERE p.deleted_at IS NULL AND d.deleted_at IS NULL`},
 		{&g.APIService, `SELECT api_id, service_id FROM api_service_links`},
+		{&g.APIConsumer, `SELECT api_id, service_id FROM api_consumer_links`},
 		{&g.APIProject, `SELECT api_id, project_id FROM api_project_links`},
 	} {
 		rows, err := r.db.QueryContext(ctx, q.from)

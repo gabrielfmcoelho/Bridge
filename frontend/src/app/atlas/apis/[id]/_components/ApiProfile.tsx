@@ -34,6 +34,8 @@ export default function ApiProfile({ api, onEditResponsaveis }: { api: ApiCatalo
     <>
       <SectionCard title={t("atlas.apis.profileTitle")}>
         <div className="grid grid-cols-2 gap-4">
+          <Field label={t("atlas.apis.origemLabel")} value={t(`atlas.apis.origem.${api.origem ?? "propria"}`)} />
+          <Field label={t("atlas.apis.fornecedor")} value={api.fornecedor ?? ""} />
           <Field label={t("atlas.apis.specTitle")} value={api.title} />
           <Field label={t("atlas.apis.version")} value={api.version_label} mono />
           <Field label={t("atlas.apis.specVersion")} value={api.spec_version} mono />
@@ -56,10 +58,6 @@ export default function ApiProfile({ api, onEditResponsaveis }: { api: ApiCatalo
         <div className={block}>
           <SectionHeading as="h3" className="!mb-2">{t("atlas.apis.links")}</SectionHeading>
           <div className="grid grid-cols-1 gap-4">
-            <div>
-              <span className="text-[var(--text-muted)] text-xs font-medium block mb-0.5">{t("topology.services")}</span>
-              {linkList(api.service_ids ?? [], names.service, "/services")}
-            </div>
             <div>
               <span className="text-[var(--text-muted)] text-xs font-medium block mb-0.5">{t("topology.projects")}</span>
               {linkList(api.project_ids ?? [], names.project, "/projects")}

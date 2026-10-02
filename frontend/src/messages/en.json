@@ -139,7 +139,8 @@
       "sourceLabel": "Source",
       "sourceType": {
         "upload": "Uploaded file",
-        "url": "Spec URL"
+        "url": "Spec URL",
+        "manual": "No spec"
       },
       "specTitle": "Spec title",
       "specVersion": "Spec version",
@@ -170,6 +171,30 @@
       "descriptionPlaceholder": "What the API does, how to authenticate, limits and caveats. Markdown.",
       "noDescription": "No description yet.",
       "noUseCases": "No use cases yet.",
+      "origemLabel": "Origin",
+      "fornecedor": "Provider",
+      "fornecedorHint": "Who builds or provides it: vendor, another organization (ETIPI, ATI-PI…).",
+      "keycloakKeys": "Keycloak keys",
+      "mainResponsavel": "Main owner",
+      "servedBy": "Served by",
+      "consumedBy": "Consumed by",
+      "noServedBy": "No service of ours serves this API yet.",
+      "noConsumers": "No service consumes this API yet.",
+      "aboutToggle": "About the API",
+      "noSpec": "No specification",
+      "noSpecDesc": "This API was registered without an OpenAPI spec (SOAP, or the vendor publishes none). Upload one through \"Replace spec\" to list its endpoints.",
+      "noSpecHint": "Register the API with just its addresses, docs and links. A spec can be uploaded later.",
+      "register": "Register API",
+      "origem": {
+        "propria": "Own",
+        "terceiro": "Third-party, hosted by us",
+        "externa": "External"
+      },
+      "origemHint": {
+        "propria": "Built and hosted by us: services, repository and Keycloak keys.",
+        "terceiro": "Third-party software we host (Outline, Airflow, Keycloak…): services and host, the vendor's docs.",
+        "externa": "Hosted by someone else (native SEI, GLPI): no service or host of ours; record who provides it and which of our services consume it."
+      },
       "backToList": "Back to APIs",
       "deleteHint": "It goes to the APIs trash and can be restored by an admin.",
       "noneLinked": "No APIs linked yet.",

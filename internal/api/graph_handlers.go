@@ -182,6 +182,7 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	}
 	addEdges(links.ServiceDepends, serviceIDMap, serviceIDMap, "depends on")
 	addEdges(links.APIService, apiIDMap, serviceIDMap, "served by")
+	addEdges(links.APIConsumer, apiIDMap, serviceIDMap, "consumed by")
 	addEdges(links.APIProject, apiIDMap, projectIDMap, "part of")
 	edges = append(edges, derivedProjectEdges(services, links, hostIDMap, dnsIDMap, projectIDMap)...)
 

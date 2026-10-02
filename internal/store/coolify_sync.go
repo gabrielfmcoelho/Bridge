@@ -218,6 +218,7 @@ func (r *ServiceRepo) MergeInto(ctx context.Context, survivor int64, dups []int6
 			`INSERT INTO service_host_links (service_id, host_id) SELECT ?, host_id FROM service_host_links WHERE service_id = ? ON CONFLICT DO NOTHING`,
 			`INSERT INTO service_dns_links (service_id, dns_id) SELECT ?, dns_id FROM service_dns_links WHERE service_id = ? ON CONFLICT DO NOTHING`,
 			`INSERT INTO api_service_links (service_id, api_id) SELECT ?, api_id FROM api_service_links WHERE service_id = ? ON CONFLICT DO NOTHING`,
+			`INSERT INTO api_consumer_links (service_id, api_id) SELECT ?, api_id FROM api_consumer_links WHERE service_id = ? ON CONFLICT DO NOTHING`,
 			`INSERT INTO responsaveis (entity_type, entity_id, contact_id, is_main)
 				SELECT 'service', ?, contact_id, is_main FROM responsaveis WHERE entity_type = 'service' AND entity_id = ? ON CONFLICT DO NOTHING`,
 		} {
@@ -344,14 +345,15 @@ type APIAddresses struct {
 }
 
 // UnlinkedAPIs lists live APIs with no service links, with every address they
-// declare — the API auto-link candidates.
+// declare — the API auto-link candidates. An 'externa' API is never one: no
+// service of ours serves it.
 func (r *APICatalogRepo) UnlinkedAPIs(ctx context.Context) (map[int64]APIAddresses, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT a.id, a.base_url, TRUE FROM api_catalog a
-		WHERE a.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM api_service_links l WHERE l.api_id = a.id)
+		WHERE a.deleted_at IS NULL AND a.origem <> 'externa' AND NOT EXISTS (SELECT 1 FROM api_service_links l WHERE l.api_id = a.id)
 		UNION ALL
 		SELECT u.api_id, u.url, FALSE FROM api_catalog_urls u JOIN api_catalog a ON a.id = u.api_id
-		WHERE a.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM api_service_links l WHERE l.api_id = a.id)`)
+		WHERE a.deleted_at IS NULL AND a.origem <> 'externa' AND NOT EXISTS (SELECT 1 FROM api_service_links l WHERE l.api_id = a.id)`)
 	if err != nil {
 		return nil, err
 	}

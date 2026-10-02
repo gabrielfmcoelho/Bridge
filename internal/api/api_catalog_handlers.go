@@ -59,6 +59,7 @@ func (h *apiCatalogHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("editor", "POST /api/api-catalog/{id}/spec", h.handleReplaceSpec)
 	rr.role("editor", "POST /api/api-catalog/import/upload", h.handleImportUpload)
 	rr.role("editor", "POST /api/api-catalog/import/url", h.handleImportURL)
+	rr.role("editor", "POST /api/api-catalog", h.handleCreate)
 	rr.auth("GET /api/api-catalog/{id}", h.handleGet)
 	rr.auth("GET /api/api-catalog/{id}/spec", h.handleGetSpec)
 	rr.auth("POST /api/api-catalog/{id}/spec/filter", h.handleFilterSpec)
@@ -93,6 +94,11 @@ func (h *apiCatalogHandlers) handleList(w http.ResponseWriter, r *http.Request) 
 	}
 	if list == nil {
 		list = []models.APICatalog{}
+	}
+	if names, err := store.NewResponsavelRepo(h.db.SQL).MainNamesBulk(r.Context(), string(store.AssetAPICatalog)); err == nil {
+		for i := range list {
+			list[i].MainResponsavelName = names[list[i].ID]
+		}
 	}
 	jsonPaged(w, r, list)
 }
@@ -303,6 +309,11 @@ type importURLRequest struct {
 	SourceURL   string  `json:"source_url"`
 	BaseURL     string  `json:"base_url"`
 	DocsURL     string  `json:"docs_url"`
+	UseCases    string  `json:"use_cases"`
+	Origem      string  `json:"origem"`     // propria (default) | terceiro | externa
+	Fornecedor  string  `json:"fornecedor"` // who builds/provides it
+	// ConsumerServiceIDs: the services that call the API.
+	ConsumerServiceIDs []int64 `json:"consumer_service_ids"`
 	// URLs are the API's other addresses (e.g. its origin when base_url is
 	// the gateway), in display order.
 	URLs []models.APICatalogURL `json:"urls"`
@@ -354,6 +365,7 @@ func (h *apiCatalogHandlers) handleImportURL(w http.ResponseWriter, r *http.Requ
 		URLs:        req.URLs,
 		Grants:      req.AssetGrantsInput,
 	}
+	meta.withKind(req)
 	h.createFromSpec(w, r, raw, meta, owner)
 }
 
@@ -367,12 +379,16 @@ type updateCatalogRequest struct {
 	Name         *string                    `json:"name"`
 	Description  *string                    `json:"description"`
 	UseCases     *string                    `json:"use_cases"`
+	Origem       *string                    `json:"origem"`
+	Fornecedor   *string                    `json:"fornecedor"`
 	BaseURL      *string                    `json:"base_url"`
 	DocsURL      *string                    `json:"docs_url"`
 	URLs         *[]models.APICatalogURL    `json:"urls"`
 	ServiceIDs   *[]int64                   `json:"service_ids"`
 	ProjectIDs   *[]int64                   `json:"project_ids"`
-	Responsaveis *[]models.ResponsavelInput `json:"responsaveis"`
+	// ConsumerServiceIDs: the services that call the API.
+	ConsumerServiceIDs *[]int64                   `json:"consumer_service_ids"`
+	Responsaveis       *[]models.ResponsavelInput `json:"responsaveis"`
 	models.AssetGrantsInput
 }
 
@@ -417,7 +433,11 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 	if req.ProjectIDs != nil {
 		projectIDs = append([]int64{}, *req.ProjectIDs...)
 	}
-	if !h.linksVisible(w, r, serviceIDs, projectIDs) {
+	var consumerIDs []int64
+	if req.ConsumerServiceIDs != nil {
+		consumerIDs = append([]int64{}, *req.ConsumerServiceIDs...)
+	}
+	if !h.linksVisible(w, r, append(append([]int64{}, serviceIDs...), consumerIDs...), projectIDs) {
 		return
 	}
 	var urls []models.APICatalogURL
@@ -433,12 +453,16 @@ func (h *apiCatalogHandlers) handleUpdate(w http.ResponseWriter, r *http.Request
 		}
 		return *v
 	}
-	if err := repo.UpdateMeta(r.Context(), id, keep(req.Name, existing.Name), keep(req.Description, existing.Description),
-		keep(req.UseCases, existing.UseCases), strings.TrimSpace(keep(req.BaseURL, existing.BaseURL)), strings.TrimSpace(keep(req.DocsURL, existing.DocsURL))); err != nil {
+	if err := repo.UpdateMeta(r.Context(), id, store.APIMeta{
+		Name: keep(req.Name, existing.Name), Description: keep(req.Description, existing.Description),
+		UseCases: keep(req.UseCases, existing.UseCases), Origem: keep(req.Origem, existing.Origem),
+		Fornecedor: strings.TrimSpace(keep(req.Fornecedor, existing.Fornecedor)),
+		BaseURL:    strings.TrimSpace(keep(req.BaseURL, existing.BaseURL)), DocsURL: strings.TrimSpace(keep(req.DocsURL, existing.DocsURL)),
+	}); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
-	if err := repo.SetLinks(r.Context(), id, serviceIDs, projectIDs); err != nil {
+	if err := repo.SetLinks(r.Context(), id, serviceIDs, projectIDs, consumerIDs); err != nil {
 		jsonServerError(w, r, "failed to set api links", err)
 		return
 	}
@@ -695,13 +719,58 @@ func (h *apiCatalogHandlers) handleRestore(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, StatusResponse{Status: "restored"})
 }
 
+// withKind copies the origin, provider, use cases and consumers of a JSON
+// create request onto the metadata.
+func (m *catalogMeta) withKind(req importURLRequest) {
+	m.UseCases, m.Origem, m.Fornecedor, m.ConsumerIDs = req.UseCases, strings.TrimSpace(req.Origem), strings.TrimSpace(req.Fornecedor), req.ConsumerServiceIDs
+}
+
+// handleCreate godoc
+//
+//	@Summary		Register an API without an OpenAPI spec
+//	@Description	Editor+. For APIs with no OpenAPI spec to import (SOAP, vendors that publish none): source_type "manual", no operations; a spec uploaded later (POST /{id}/spec) turns it into an upload. name is required; source_url is ignored. Linked services/projects must be visible (404 otherwise).
+//	@Tags			atlas
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		importURLRequest	true	"Metadata, links and entidade grants"
+//	@Success		201		{object}	models.APICatalog
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/api-catalog [post]
+func (h *apiCatalogHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFrom(r)
+	if !ok {
+		jsonError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	var req importURLRequest
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	if !requireFields(w, map[string]string{"name": strings.TrimSpace(req.Name)}) {
+		return
+	}
+	meta := catalogMeta{
+		Name: req.Name, Description: req.Description, ServiceIDs: req.ServiceIDs, ProjectIDs: req.ProjectIDs,
+		SourceType: models.APICatalogSourceManual, BaseURL: strings.TrimSpace(req.BaseURL),
+		DocsURL: strings.TrimSpace(req.DocsURL), URLs: req.URLs, Grants: req.AssetGrantsInput,
+	}
+	meta.withKind(req)
+	h.createFromSpec(w, r, nil, meta, actor.UserID)
+}
+
 // --- helpers ----------------------------------------------------------------
 
 type catalogMeta struct {
 	Name        string
 	Description string
+	UseCases    string
+	Origem      string
+	Fornecedor  string
 	ServiceIDs  []int64
 	ProjectIDs  []int64
+	ConsumerIDs []int64
 	SourceType  string
 	SourceURL   string
 	BaseURL     string
@@ -721,8 +790,14 @@ func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL str
 		SourceURL:   sourceURL,
 		BaseURL:     strings.TrimSpace(r.FormValue("base_url")),
 		DocsURL:     strings.TrimSpace(r.FormValue("docs_url")),
+		UseCases:    r.FormValue("use_cases"),
+		Origem:      strings.TrimSpace(r.FormValue("origem")),
+		Fornecedor:  strings.TrimSpace(r.FormValue("fornecedor")),
 	}
 	var err error
+	if m.ConsumerIDs, err = formIDList(r, "consumer_service_ids"); err != nil {
+		return m, err
+	}
 	if m.ServiceIDs, err = formIDList(r, "service_ids"); err != nil {
 		return m, err
 	}
@@ -762,8 +837,17 @@ func (h *apiCatalogHandlers) formMeta(r *http.Request, sourceType, sourceURL str
 
 // createFromSpec parses raw, checks the linked services/projects are
 // visible, and persists the catalog + operation index + links.
+// A manual entry (meta.SourceType "manual", raw nil) skips parsing: no spec,
+// no operations, and the name must be given.
 func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Request, raw []byte, meta catalogMeta, owner int64) {
-	if !h.linksVisible(w, r, meta.ServiceIDs, meta.ProjectIDs) {
+	if meta.Origem == "" {
+		meta.Origem = models.APIOrigemPropria
+	}
+	if !models.ValidAPIOrigem(meta.Origem) {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("invalid origem %q (propria, terceiro or externa)", meta.Origem))
+		return
+	}
+	if !h.linksVisible(w, r, append(append([]int64{}, meta.ServiceIDs...), meta.ConsumerIDs...), meta.ProjectIDs) {
 		return
 	}
 	urls, err := models.NormalizeAPIURLs(meta.URLs)
@@ -771,10 +855,12 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
-	ps, err := apicatalog.Parse(raw)
-	if err != nil {
-		jsonBadRequest(w, r, "could not parse spec: "+err.Error(), err)
-		return
+	ps := &apicatalog.ParsedSpec{}
+	if meta.SourceType != models.APICatalogSourceManual {
+		if ps, err = apicatalog.Parse(raw); err != nil {
+			jsonBadRequest(w, r, "could not parse spec: "+err.Error(), err)
+			return
+		}
 	}
 	name := strings.TrimSpace(meta.Name)
 	if name == "" {
@@ -791,6 +877,9 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 	a := &models.APICatalog{
 		Name:         name,
 		Description:  meta.Description,
+		UseCases:     meta.UseCases,
+		Origem:       meta.Origem,
+		Fornecedor:   meta.Fornecedor,
 		SourceType:   meta.SourceType,
 		SourceURL:    meta.SourceURL,
 		ExternalURL:  ps.ExternalURL,
@@ -814,7 +903,7 @@ func (h *apiCatalogHandlers) createFromSpec(w http.ResponseWriter, r *http.Reque
 		jsonServerError(w, r, "failed to set entidades", err)
 		return
 	}
-	if err := store.NewAPICatalogRepo(h.db.SQL).SetLinks(r.Context(), a.ID, dedupeOrEmpty(meta.ServiceIDs), dedupeOrEmpty(meta.ProjectIDs)); err != nil {
+	if err := store.NewAPICatalogRepo(h.db.SQL).SetLinks(r.Context(), a.ID, dedupeOrEmpty(meta.ServiceIDs), dedupeOrEmpty(meta.ProjectIDs), dedupeOrEmpty(meta.ConsumerIDs)); err != nil {
 		jsonServerError(w, r, "failed to set api links", err)
 		return
 	}

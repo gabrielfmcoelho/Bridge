@@ -305,6 +305,56 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "post": {
+                "description": "Editor+. For APIs with no OpenAPI spec to import (SOAP, vendors that publish none): source_type \"manual\", no operations; a spec uploaded later (POST /{id}/spec) turns it into an upload. name is required; source_url is ignored. Linked services/projects must be visible (404 otherwise).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Register an API without an OpenAPI spec",
+                "parameters": [
+                    {
+                        "description": "Metadata, links and entidade grants",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.importURLRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.APICatalog"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/api/api-catalog/import/upload": {
@@ -17547,6 +17597,13 @@ const docTemplate = `{
                 "base_url": {
                     "type": "string"
                 },
+                "consumer_service_ids": {
+                    "description": "ConsumerServiceIDs: the services that call the API.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
                 "creator_entidade_id": {
                     "type": "integer"
                 },
@@ -17556,10 +17613,18 @@ const docTemplate = `{
                 "docs_url": {
                     "type": "string"
                 },
+                "fornecedor": {
+                    "description": "who builds/provides it",
+                    "type": "string"
+                },
                 "is_global": {
                     "type": "boolean"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "origem": {
+                    "description": "propria (default) | terceiro | externa",
                     "type": "string"
                 },
                 "project_ids": {
@@ -17589,6 +17654,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.APICatalogURL"
                     }
+                },
+                "use_cases": {
+                    "type": "string"
                 }
             }
         },
@@ -18689,6 +18757,13 @@ const docTemplate = `{
                 "base_url": {
                     "type": "string"
                 },
+                "consumer_service_ids": {
+                    "description": "ConsumerServiceIDs: the services that call the API.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
                 "creator_entidade_id": {
                     "type": "integer"
                 },
@@ -18698,10 +18773,16 @@ const docTemplate = `{
                 "docs_url": {
                     "type": "string"
                 },
+                "fornecedor": {
+                    "type": "string"
+                },
                 "is_global": {
                     "type": "boolean"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "origem": {
                     "type": "string"
                 },
                 "project_ids": {
@@ -19232,6 +19313,13 @@ const docTemplate = `{
                     "description": "explicit API host (Scalar server override)",
                     "type": "string"
                 },
+                "consumer_service_ids": {
+                    "description": "ConsumerServiceIDs are the services that call the API\n(api_consumer_links); always set, [] when none.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -19257,11 +19345,19 @@ const docTemplate = `{
                     "description": "server derived from the spec",
                     "type": "string"
                 },
+                "fornecedor": {
+                    "description": "who builds/provides it (vendor, other org)",
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
                 "key_management": {
                     "description": "Key management. AdminBaseURL is the API's root, where its GET /escopos\nand GET /admin/uso live (keycloak mode); ScopePrefix names its scopes\nand Keycloak clients (\"servidores\" → \"servidores:cadastro\",\n\"servidores-\u003clabel\u003e\").",
+                    "type": "string"
+                },
+                "main_responsavel_name": {
+                    "description": "MainResponsavelName is the main internal responsável (list responses).",
                     "type": "string"
                 },
                 "name": {
@@ -19275,6 +19371,10 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.APIOperation"
                     }
+                },
+                "origem": {
+                    "description": "propria | terceiro | externa",
+                    "type": "string"
                 },
                 "owner_user_id": {
                     "type": "integer"

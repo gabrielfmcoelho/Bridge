@@ -135,3 +135,18 @@ export function apiBreakdowns(
     spec: countBy(apis, (a) => a.spec_version, "inventory.dash.none", (v) => ({ spec: v })),
   };
 }
+
+/** Card colour of each API origin (Card accent / Badge color names). */
+export const ORIGEM_COLOR = { propria: "rose", terceiro: "cyan", externa: "sky" } as const;
+
+/** Markdown as one plain line for a card: the first paragraph, without
+ *  heading/list/emphasis/code marks, links reduced to their text. */
+export function plainText(md: string | undefined): string {
+  const para = (md ?? "").trim().split(/\n\s*\n/)[0] ?? "";
+  return para
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^\s{0,3}(#{1,6}\s+|[-*+]\s+|\d+\.\s+|>\s?)/gm, "")
+    .replace(/(\*\*|__|\*|_|`)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}

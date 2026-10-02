@@ -15,6 +15,8 @@ const (
 
 	APICatalogSourceUpload = "upload"
 	APICatalogSourceURL    = "url"
+	// APICatalogSourceManual: registered without an OpenAPI spec (no operations).
+	APICatalogSourceManual = "manual"
 )
 
 // APICatalog is a single imported REST API specification. SpecJSON is loaded
@@ -25,7 +27,9 @@ type APICatalog struct {
 	ID             int64          `json:"id"`
 	Name           string         `json:"name"`
 	Description    string         `json:"description"`
-	UseCases       string         `json:"use_cases"` // Markdown: who calls it and for what
+	UseCases       string         `json:"use_cases"`  // Markdown: who calls it and for what
+	Origem         string         `json:"origem"`     // propria | terceiro | externa
+	Fornecedor     string         `json:"fornecedor"` // who builds/provides it (vendor, other org)
 	SourceType     string         `json:"source_type"`
 	SourceURL      string         `json:"source_url,omitempty"`   // where the spec was fetched (json/yaml)
 	ExternalURL    string         `json:"external_url,omitempty"` // server derived from the spec
@@ -46,6 +50,11 @@ type APICatalog struct {
 	// "avulso".
 	ServiceIDs []int64 `json:"service_ids"`
 	ProjectIDs []int64 `json:"project_ids"`
+	// ConsumerServiceIDs are the services that call the API
+	// (api_consumer_links); always set, [] when none.
+	ConsumerServiceIDs []int64 `json:"consumer_service_ids"`
+	// MainResponsavelName is the main internal responsável (list responses).
+	MainResponsavelName string `json:"main_responsavel_name,omitempty"`
 	// URLs are the API's other addresses (e.g. its origin when BaseURL is the
 	// gateway), in display order; always set, [] when none.
 	URLs []APICatalogURL `json:"urls"`
@@ -158,15 +167,31 @@ func NormalizeAPIURLs(in []APICatalogURL) ([]APICatalogURL, error) {
 
 func (a *APICatalog) Validate() error {
 	switch a.SourceType {
-	case APICatalogSourceUpload, APICatalogSourceURL:
+	case APICatalogSourceUpload, APICatalogSourceURL, APICatalogSourceManual:
 	default:
 		return fmt.Errorf("invalid source_type %q", a.SourceType)
+	}
+	if !ValidAPIOrigem(a.Origem) {
+		return fmt.Errorf("invalid origem %q", a.Origem)
 	}
 	if strings.TrimSpace(a.Name) == "" {
 		return fmt.Errorf("name is required")
 	}
-	if strings.TrimSpace(a.SpecJSON) == "" {
+	if a.SourceType != APICatalogSourceManual && strings.TrimSpace(a.SpecJSON) == "" {
 		return fmt.Errorf("spec_json is required")
 	}
 	return nil
+}
+
+// API origins: built and hosted by us, third-party software we host, or
+// hosted elsewhere.
+const (
+	APIOrigemPropria  = "propria"
+	APIOrigemTerceiro = "terceiro"
+	APIOrigemExterna  = "externa"
+)
+
+// ValidAPIOrigem reports whether o is one of the API origins.
+func ValidAPIOrigem(o string) bool {
+	return o == APIOrigemPropria || o == APIOrigemTerceiro || o == APIOrigemExterna
 }

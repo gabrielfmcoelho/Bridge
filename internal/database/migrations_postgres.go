@@ -1703,4 +1703,24 @@ var migrationsPostgres = []string{
 	// Version 102: an API's use cases (Markdown), apart from its description —
 	// who calls it and for what. Shown with the description in "Visão geral".
 	`ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS use_cases TEXT NOT NULL DEFAULT '';`,
+
+	// Version 103: where an API comes from — 'propria' (we build and host it),
+	// 'terceiro' (third-party software we host: Outline, Airflow…) or
+	// 'externa' (someone else hosts it: native SEI, GLPI) — and who provides
+	// it. source_type 'manual' registers an API without an OpenAPI spec (SEI
+	// is SOAP; vendors may publish none). api_consumer_links records the
+	// services that CALL an API, apart from api_service_links (those that
+	// serve it).
+	`ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS origem TEXT NOT NULL DEFAULT 'propria';
+	ALTER TABLE api_catalog ADD COLUMN IF NOT EXISTS fornecedor TEXT NOT NULL DEFAULT '';
+	ALTER TABLE api_catalog DROP CONSTRAINT IF EXISTS api_catalog_origem_check;
+	ALTER TABLE api_catalog ADD CONSTRAINT api_catalog_origem_check CHECK (origem IN ('propria','terceiro','externa'));
+	ALTER TABLE api_catalog DROP CONSTRAINT IF EXISTS api_catalog_source_type_check;
+	ALTER TABLE api_catalog ADD CONSTRAINT api_catalog_source_type_check CHECK (source_type IN ('upload','url','manual'));
+	CREATE TABLE IF NOT EXISTS api_consumer_links (
+		api_id     BIGINT NOT NULL REFERENCES api_catalog(id) ON DELETE CASCADE,
+		service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+		PRIMARY KEY (api_id, service_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_api_consumer_links_service ON api_consumer_links (service_id);`,
 }
