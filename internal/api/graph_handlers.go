@@ -25,6 +25,9 @@ type graphEdge struct {
 	Source string `json:"source"`
 	Target string `json:"target"`
 	Label  string `json:"label"`
+	// Derived edges are not stored: host/DNS → project reached through one of
+	// the project's services (the same rule the project page uses).
+	Derived bool `json:"derived,omitempty"`
 }
 
 // handleGraph godoc
@@ -106,6 +109,12 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 				"technology_stack":       svc.TechnologyStack,
 				"developed_by":           svc.DevelopedBy,
 				"is_external_dependency": svc.IsExternalDependency,
+				"container_name":         svc.ContainerName,
+				"source":                 svc.Source,
+				"coolify_project":        svc.CoolifyProject,
+				"coolify_environment":    svc.CoolifyEnvironment,
+				"coolify_stack":          svc.CoolifyStack,
+				"project_id":             svc.ProjectID,
 			},
 		})
 
@@ -163,14 +172,63 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 			edges = append(edges, graphEdge{Source: src, Target: dst, Label: "part of"})
 		}
 	}
+	// Stored project -> dns; drawn dns -> project, like hosts.
+	for _, p := range links.ProjectDNS {
+		src, ok1 := dnsIDMap[p.To]
+		dst, ok2 := projectIDMap[p.From]
+		if ok1 && ok2 {
+			edges = append(edges, graphEdge{Source: src, Target: dst, Label: "part of"})
+		}
+	}
 	addEdges(links.ServiceDepends, serviceIDMap, serviceIDMap, "depends on")
 	addEdges(links.APIService, apiIDMap, serviceIDMap, "served by")
 	addEdges(links.APIProject, apiIDMap, projectIDMap, "part of")
+	edges = append(edges, derivedProjectEdges(services, links, hostIDMap, dnsIDMap, projectIDMap)...)
 
 	jsonOK(w, map[string]any{
 		"nodes": nodes,
 		"edges": edges,
 	})
+}
+
+// derivedProjectEdges draws host → project and dns → project for the hosts
+// and DNS records of a project's services that have no direct link to it —
+// what the project page already lists as the project's hosts/DNS.
+func derivedProjectEdges(services []models.Service, links store.GraphLinks, hostIDs, dnsIDs, projectIDs map[int64]string) []graphEdge {
+	direct := map[[2]string]bool{}
+	for _, p := range links.ProjectHost {
+		direct[[2]string{hostIDs[p.To], projectIDs[p.From]}] = true
+	}
+	for _, p := range links.ProjectDNS {
+		direct[[2]string{dnsIDs[p.To], projectIDs[p.From]}] = true
+	}
+	svcHosts, svcDNS := store.ByFrom(links.ServiceHost), store.ByFrom(links.ServiceDNS)
+	var out []graphEdge
+	add := func(src string, ok bool, dst string) {
+		if !ok || direct[[2]string{src, dst}] {
+			return
+		}
+		direct[[2]string{src, dst}] = true
+		out = append(out, graphEdge{Source: src, Target: dst, Label: "via service", Derived: true})
+	}
+	for _, svc := range services {
+		if svc.ProjectID == nil {
+			continue
+		}
+		dst, ok := projectIDs[*svc.ProjectID]
+		if !ok {
+			continue
+		}
+		for _, h := range svcHosts[svc.ID] {
+			src, okh := hostIDs[h]
+			add(src, okh, dst)
+		}
+		for _, d := range svcDNS[svc.ID] {
+			src, okd := dnsIDs[d]
+			add(src, okd, dst)
+		}
+	}
+	return out
 }
 
 // registerRoutes wires this group's routes (self-registration, R2).
