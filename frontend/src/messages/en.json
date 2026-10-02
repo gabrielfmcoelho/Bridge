@@ -1094,7 +1094,8 @@
       "noOwner": "No owner",
       "noServices": "No services",
       "external": "External company",
-      "noRepo": "No repository"
+      "noRepo": "No repository",
+      "noDescription": "No description"
     },
     "dash": {
       "bySetor": "By department",
@@ -1259,6 +1260,7 @@
       "offline": "Offline",
       "autoReview": "To review",
       "autoReviewHint": "Found by the scan, not fixed yet",
+      "noProject": "No project",
       "noResponsavel": "No owner",
       "stale": "No signal",
       "staleHint": "Not seen by the scan for over {days} days"

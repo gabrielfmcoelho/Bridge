@@ -36,7 +36,9 @@ export function projectInsights(projects: Project[], t: T): ProjectInsight[] {
     { key: "noOwner", label: t("project.kpi.noOwner"), icon: "user", color: "warning", value: n((p) => !p.main_responsavel_name), hint: pct(n((p) => !p.main_responsavel_name)) },
     { key: "noServices", label: t("project.kpi.noServices"), icon: "serverStack", color: "info", value: n((p) => !p.services_count), hint: pct(n((p) => !p.services_count)) },
     { key: "external", label: t("project.kpi.external"), icon: "building", color: "warning", value: n((p) => !!p.tem_empresa_externa_responsavel) },
-    { key: "noRepo", label: t("project.kpi.noRepo"), icon: "code", color: "info", value: n((p) => !p.repos_count), hint: pct(n((p) => !p.repos_count)) },
+    // A repo is a linked GitLab project or, failing that, the repository URL field.
+    { key: "noRepo", label: t("project.kpi.noRepo"), icon: "code", color: "info", value: n((p) => !p.repos_count && !p.gitlab_url), hint: pct(n((p) => !p.repos_count && !p.gitlab_url)) },
+    { key: "noDescription", label: t("project.kpi.noDescription"), icon: "document", color: "info", value: n((p) => !p.description?.trim()), hint: pct(n((p) => !p.description?.trim())) },
   ];
 
   const situacoes: ProjectInsight[] = countBy(projects, (p) => p.situacao, "")

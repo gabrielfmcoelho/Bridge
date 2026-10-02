@@ -8,7 +8,7 @@ type T = (key: string, vars?: Record<string, string>) => string;
 export type ServiceInsight = Insight<ServiceFilters>;
 export type BreakdownRow = BreakdownRowOf<ServiceFilters>;
 
-export const DEFAULT_SERVICE_INSIGHTS = ["total", "offline", "kind:database", "autoReview", "noResponsavel"];
+export const DEFAULT_SERVICE_INSIGHTS = ["total", "offline", "kind:database", "noProject", "noResponsavel"];
 
 /** A service the scan has not heard from in this long counts as stale. */
 export const STALE_DAYS = 7;
@@ -48,6 +48,7 @@ export function serviceInsights(services: Service[], t: T): ServiceInsight[] {
     },
     { key: "offline", label: t("service.kpi.offline"), icon: "alert", color: "danger", value: offline, hint: pct(offline), filter: { status: "offline" } },
     { key: "autoReview", label: t("service.kpi.autoReview"), icon: "scan", color: "info", value: auto, hint: t("service.kpi.autoReviewHint"), filter: { origin: "auto" } },
+    { key: "noProject", label: t("service.kpi.noProject"), icon: "folder", color: "warning", value: n((s) => s.project_id == null), hint: pct(n((s) => s.project_id == null)) },
     { key: "noResponsavel", label: t("service.kpi.noResponsavel"), icon: "user", color: "warning", value: n((s) => !s.main_responsavel_name), hint: pct(n((s) => !s.main_responsavel_name)) },
     { key: "external", label: t("service.isExternalDependency"), icon: "link", color: "warning", value: n((s) => !!s.is_external_dependency), filter: { is_external_dependency: "yes" } },
     { key: "stale", label: t("service.kpi.stale"), icon: "clock", color: "warning", value: n((s) => isStale(s)), hint: t("service.kpi.staleHint", { days: String(STALE_DAYS) }) },
