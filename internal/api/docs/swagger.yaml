@@ -371,6 +371,7 @@ definitions:
   api.apiKeyUpdateRequest:
     properties:
       expires_at:
+        format: date-time
         type: string
       notes:
         type: string
@@ -5309,10 +5310,10 @@ paths:
     put:
       consumes:
       - application/json
-      description: 'apis.keys.manage. Changes Bridge''s owner, contact and notes;
-        a manual key''s expiry; an active Keycloak key''s scopes and rate limit (applied
-        to the client: tokens issued from then on carry them; scopes null keeps them,
-        rate 0 = the API''s default).'
+      description: 'apis.keys.manage. Partial: an omitted field keeps its value. Changes
+        Bridge''s owner, contact and notes; a manual key''s expiry; an active Keycloak
+        key''s scopes and rate limit (applied to the client: tokens issued from then
+        on carry them; scopes null keeps them, rate 0 = the API''s default).'
       parameters:
       - description: API catalog ID
         in: path

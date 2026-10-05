@@ -170,6 +170,16 @@ func TestAPIKeys_KeycloakLifecycle(t *testing.T) {
 	}
 	fake.Mu.Unlock()
 
+	// Partial edit: omitted owner/notes keep their values; "" clears one.
+	if code, obj, raw := do(admin, "PUT", base+"/keys/"+keyID, `{"scopes":["servidores:cadastro"]}`); code != http.StatusOK ||
+		obj["owner"] != "rh" || obj["notes"] != "n" {
+		t.Fatalf("scopes-only edit blanked Bridge's fields = %d %s", code, raw)
+	}
+	if code, obj, raw := do(admin, "PUT", base+"/keys/"+keyID, `{"notes":""}`); code != http.StatusOK ||
+		obj["owner"] != "rh" || obj["notes"] != "" {
+		t.Fatalf("notes clear = %d %s", code, raw)
+	}
+
 	// Rotate: a new secret on the client and in the vault.
 	code, obj, raw = do(admin, "POST", base+"/keys/"+keyID+"/rotate", "")
 	if code != http.StatusOK || obj["plaintext"] == secret {
@@ -400,4 +410,19 @@ func TestAPIKeys_KeycloakLifecycle(t *testing.T) {
 		t.Errorf("admin client touched: %+v", c)
 	}
 	fake.Mu.Unlock()
+}
+
+func TestOptional_AbsentNullValue(t *testing.T) {
+	var req apiKeyUpdateRequest
+	if err := json.Unmarshal([]byte(`{"notes":"x"}`), &req); err != nil || req.OwnerContactID.Set {
+		t.Fatalf("absent contact must not be Set: %+v %v", req.OwnerContactID, err)
+	}
+	req = apiKeyUpdateRequest{}
+	if err := json.Unmarshal([]byte(`{"owner_contact_id":null}`), &req); err != nil || !req.OwnerContactID.Set || req.OwnerContactID.Value != nil {
+		t.Fatalf("null contact must be Set with nil Value: %+v %v", req.OwnerContactID, err)
+	}
+	req = apiKeyUpdateRequest{}
+	if err := json.Unmarshal([]byte(`{"owner_contact_id":7}`), &req); err != nil || req.OwnerContactID.Value == nil || *req.OwnerContactID.Value != 7 {
+		t.Fatalf("contact 7: %+v %v", req.OwnerContactID, err)
+	}
 }
