@@ -1208,7 +1208,7 @@ const docTemplate = `{
         },
         "/api/api-catalog/{id}/keys/{keyId}": {
             "put": {
-                "description": "apis.keys.manage. Changes Bridge's owner, contact and notes; a manual key's expiry; an active Keycloak key's scopes and rate limit (applied to the client: tokens issued from then on carry them; scopes null keeps them, rate 0 = the API's default).",
+                "description": "apis.keys.manage. Partial: an omitted field keeps its value. Changes Bridge's owner, contact and notes; a manual key's expiry; an active Keycloak key's scopes and rate limit (applied to the client: tokens issued from then on carry them; scopes null keeps them, rate 0 = the API's default).",
                 "consumes": [
                     "application/json"
                 ],
@@ -16313,7 +16313,8 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "expires_at": {
-                    "type": "string"
+                    "type": "string",
+                    "format": "date-time"
                 },
                 "notes": {
                     "type": "string"

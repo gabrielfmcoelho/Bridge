@@ -75,16 +75,38 @@ type apiKeyCreateResponse struct {
 	Plaintext string        `json:"plaintext"`
 }
 
-// apiKeyUpdateRequest edits a key. owner, contact and notes are Bridge's;
-// expires_at applies to manual keys; scopes and rate_limit_per_minute to
-// active Keycloak keys (nil keeps them; rate 0 = the API's default).
+// apiKeyUpdateRequest edits a key, partially: an omitted field keeps its value.
+// owner, contact and notes are Bridge's ("" / null clears); expires_at applies
+// to manual keys (null clears); scopes and rate_limit_per_minute to active
+// Keycloak keys (rate 0 = the API's default).
 type apiKeyUpdateRequest struct {
-	Owner              string     `json:"owner"`
-	OwnerContactID     *int64     `json:"owner_contact_id"`
-	Notes              string     `json:"notes"`
-	ExpiresAt          *time.Time `json:"expires_at"`
-	Scopes             []string   `json:"scopes"`
-	RateLimitPerMinute *int       `json:"rate_limit_per_minute"`
+	Owner              *string             `json:"owner"`
+	OwnerContactID     optional[int64]     `json:"owner_contact_id" swaggertype:"integer"`
+	Notes              *string             `json:"notes"`
+	ExpiresAt          optional[time.Time] `json:"expires_at" swaggertype:"string" format:"date-time"`
+	Scopes             []string            `json:"scopes"`
+	RateLimitPerMinute *int                `json:"rate_limit_per_minute"`
+}
+
+// optional tells an omitted JSON field (Set false: keep) from an explicit null
+// (Set true, Value nil: clear) — a plain pointer can't.
+type optional[T any] struct {
+	Set   bool
+	Value *T
+}
+
+func (o *optional[T]) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	if string(b) == "null" {
+		o.Value = nil
+		return nil
+	}
+	var v T
+	if err := json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	o.Value = &v
+	return nil
 }
 
 // keyManagementRequest sets an API's key mode, its base URL (the root where
@@ -623,7 +645,7 @@ func (h *apiKeyHandlers) contactVisible(w http.ResponseWriter, r *http.Request, 
 // handleUpdate godoc
 //
 //	@Summary		Edit an access key
-//	@Description	apis.keys.manage. Changes Bridge's owner, contact and notes; a manual key's expiry; an active Keycloak key's scopes and rate limit (applied to the client: tokens issued from then on carry them; scopes null keeps them, rate 0 = the API's default).
+//	@Description	apis.keys.manage. Partial: an omitted field keeps its value. Changes Bridge's owner, contact and notes; a manual key's expiry; an active Keycloak key's scopes and rate limit (applied to the client: tokens issued from then on carry them; scopes null keeps them, rate 0 = the API's default).
 //	@Tags			atlas
 //	@Accept			json
 //	@Produce		json
@@ -646,7 +668,7 @@ func (h *apiKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &req) {
 		return
 	}
-	if !h.contactVisible(w, r, req.OwnerContactID) || h.reservedKey(w, r, k) {
+	if !h.contactVisible(w, r, req.OwnerContactID.Value) || h.reservedKey(w, r, k) {
 		return
 	}
 	keys := store.NewAPIKeyRepo(h.db.SQL)
@@ -714,9 +736,17 @@ func (h *apiKeyHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	k.Owner, k.OwnerContactID, k.Notes = strings.TrimSpace(req.Owner), req.OwnerContactID, req.Notes
-	if k.Source == models.APIKeySourceManual {
-		k.ExpiresAt = req.ExpiresAt
+	if req.Owner != nil {
+		k.Owner = strings.TrimSpace(*req.Owner)
+	}
+	if req.OwnerContactID.Set {
+		k.OwnerContactID = req.OwnerContactID.Value
+	}
+	if req.Notes != nil {
+		k.Notes = *req.Notes
+	}
+	if k.Source == models.APIKeySourceManual && req.ExpiresAt.Set {
+		k.ExpiresAt = req.ExpiresAt.Value
 	}
 	if _, err := keys.UpdateMeta(r.Context(), k); err != nil {
 		jsonServerError(w, r, "update api key", err)
