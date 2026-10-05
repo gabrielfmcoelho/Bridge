@@ -9372,21 +9372,79 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/proxmox/sync": {
-            "post": {
-                "description": "Admin. Reads the whole cluster and upserts its nodes and guests as hosts; synchronous (up to 10 minutes). 409 while another sync runs, 400 when the integration is disabled or unconfigured, 502 when Proxmox fails.",
+        "/api/proxmox/servers": {
+            "get": {
+                "description": "Admin. Token secrets are never returned, only has_token.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "proxmox"
                 ],
-                "summary": "Sync hosts from Proxmox",
+                "summary": "List Proxmox servers",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200); omit for every row",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/service.ProxmoxSyncSummary"
+                            "$ref": "#/definitions/api.ListEnvelope-models_ProxmoxServer"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Admin. name, base_url, token_id and token_secret are required; the secret is stored encrypted. enabled defaults to true.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "proxmox"
+                ],
+                "summary": "Add a Proxmox server",
+                "parameters": [
+                    {
+                        "description": "Server",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ProxmoxServerInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProxmoxServer"
                         }
                     },
                     "400": {
@@ -9412,19 +9470,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
-                    },
-                    "502": {
-                        "description": "Bad Gateway",
-                        "schema": {
-                            "$ref": "#/definitions/httpx.ErrorResponse"
-                        }
                     }
                 }
             }
         },
-        "/api/proxmox/test": {
-            "post": {
-                "description": "Admin. Calls GET /version with the body values over the stored settings; nothing is persisted. Always 200: {\"success\": bool, \"version\"?: ..., \"error\"?: string}. The body is optional.",
+        "/api/proxmox/servers/{id}": {
+            "put": {
+                "description": "Admin. Partial: an omitted field keeps its value; an empty or masked token_secret keeps the stored one.",
                 "consumes": [
                     "application/json"
                 ],
@@ -9434,12 +9486,173 @@ const docTemplate = `{
                 "tags": [
                     "proxmox"
                 ],
-                "summary": "Test the Proxmox connection",
+                "summary": "Update a Proxmox server",
                 "parameters": [
                     {
-                        "description": "Unsaved settings to test",
+                        "type": "integer",
+                        "description": "Server ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
                         "name": "body",
                         "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ProxmoxServerInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProxmoxServer"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Admin. Its hosts stay, unlinked; a later sync may re-link them by IP or name.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "proxmox"
+                ],
+                "summary": "Delete a Proxmox server",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Server ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/proxmox/sync": {
+            "post": {
+                "description": "Admin. Reads every enabled Proxmox server in turn and upserts its nodes and guests as hosts; synchronous (up to 30 minutes). One server failing doesn't stop the others: its entry carries error. 409 while another sync runs, 400 when the integration is disabled or no server is enabled.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "proxmox"
+                ],
+                "summary": "Sync hosts from Proxmox",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.proxmoxSyncResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/proxmox/test": {
+            "post": {
+                "description": "Admin. Calls GET /version with the body values over the stored server's (server_id, optional); nothing is persisted. The stored secret is only ever sent to the stored URL. Always 200: {\"success\": bool, \"version\"?: ..., \"error\"?: string}.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "proxmox"
+                ],
+                "summary": "Test a Proxmox server connection",
+                "parameters": [
+                    {
+                        "description": "Server to test and/or unsaved values",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
                         "schema": {
                             "$ref": "#/definitions/api.proxmoxTestRequest"
                         }
@@ -12767,14 +12980,14 @@ const docTemplate = `{
         },
         "/api/share-bundles": {
             "get": {
-                "description": "Any role. The caller's bundles. item_type with ref_id (or ref_key for wiki items) returns every bundle containing that item; secret_id returns only single-secret bundles for that secret.",
+                "description": "Any role. The caller's bundles; an admin gets every bundle. item_type with ref_id (or ref_key for wiki items) returns every bundle containing that item; secret_id returns only single-secret bundles for that secret.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "share-bundles"
                 ],
-                "summary": "List my share bundles",
+                "summary": "List share bundles",
                 "parameters": [
                     {
                         "type": "string",
@@ -12968,9 +13181,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/share-bundles/revoke-all": {
+            "post": {
+                "description": "Admin. Revokes every bundle not yet revoked, whoever created it; answers how many were revoked.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "share-bundles"
+                ],
+                "summary": "Revoke every share bundle",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/share-bundles/{id}": {
             "delete": {
-                "description": "Any role; owner only (others get 404).",
+                "description": "Any role; owner or admin (others get 404).",
                 "produces": [
                     "application/json"
                 ],
@@ -13012,7 +13260,7 @@ const docTemplate = `{
                 }
             },
             "patch": {
-                "description": "Any role; owner only (others get 404). Extends expiry from now (ttl_seconds \u003c 0 = never expires, 0 = 24h) and reactivates a revoked bundle, keeping the token. max_views \u003e 0 sets the cap, \u003c= 0 clears it, omitted keeps it.",
+                "description": "Any role; owner or admin (others get 404). Extends expiry from now (ttl_seconds \u003c 0 = never expires, 0 = 24h) and reactivates a revoked bundle, keeping the token. max_views \u003e 0 sets the cap, \u003c= 0 clears it, omitted keeps it.",
                 "consumes": [
                     "application/json"
                 ],
@@ -13071,7 +13319,7 @@ const docTemplate = `{
         },
         "/api/share-bundles/{id}/access-log": {
             "get": {
-                "description": "Any role; owner only (others get 404). Anonymous redemptions, newest first: time, best-effort IP, user agent, whether a passphrase was used.",
+                "description": "Any role; owner or admin (others get 404). Newest first. action \"redeem\" is an anonymous guest opening (time, best-effort IP, user agent, whether a passphrase was used); action \"reveal\" is an admin reading the link back (actor_name).",
                 "produces": [
                     "application/json"
                 ],
@@ -13130,7 +13378,7 @@ const docTemplate = `{
         },
         "/api/share-bundles/{id}/items": {
             "put": {
-                "description": "Any role; owner only (others get 404). Same token and URL; expiry, passphrase and view count are kept. Every item is re-validated for access.",
+                "description": "Any role; owner or admin (others get 404). Same token and URL; expiry, passphrase and view count are kept. Every item is re-validated for access.",
                 "consumes": [
                     "application/json"
                 ],
@@ -13192,6 +13440,65 @@ const docTemplate = `{
                     },
                     "502": {
                         "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/share-bundles/{id}/reveal": {
+            "post": {
+                "description": "Admin. Decrypts the bundle's token and passphrase (\"\" when it has none) and records the reveal in its access log. 409 when the bundle predates encrypted storage and cannot be recovered.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "share-bundles"
+                ],
+                "summary": "Reveal a share bundle's link and passphrase",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Bundle ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.bundleRevealResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -15699,6 +16006,20 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ListEnvelope-models_ProxmoxServer": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ProxmoxServer"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
         "api.ListEnvelope-models_SecretAuditLog": {
             "type": "object",
             "properties": {
@@ -16095,6 +16416,20 @@ const docTemplate = `{
                 }
             }
         },
+        "api.bundleRevealResponse": {
+            "type": "object",
+            "properties": {
+                "passphrase": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
         "api.catalogueOption": {
             "type": "object",
             "properties": {
@@ -16367,6 +16702,13 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "passphrase": {
+                    "type": "string"
+                },
+                "recipient_contact_id": {
+                    "description": "Who the link is for: a contact id, or free text. Both optional.",
+                    "type": "integer"
+                },
+                "recipient_label": {
                     "type": "string"
                 },
                 "title": {
@@ -18238,11 +18580,61 @@ const docTemplate = `{
                 }
             }
         },
+        "api.proxmoxServerSyncResult": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "integer"
+                },
+                "deactivated": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "found": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "no_ip": {
+                    "type": "integer"
+                },
+                "no_ip_reasons": {
+                    "description": "NoIPReasons groups the IP-less machines: \"reason: name, name\", sorted.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "server_id": {
+                    "type": "integer"
+                },
+                "updated": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.proxmoxSyncResponse": {
+            "type": "object",
+            "properties": {
+                "servers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.proxmoxServerSyncResult"
+                    }
+                }
+            }
+        },
         "api.proxmoxTestRequest": {
             "type": "object",
             "properties": {
                 "base_url": {
                     "type": "string"
+                },
+                "server_id": {
+                    "type": "integer"
                 },
                 "skip_verify": {
                     "type": "boolean"
@@ -18271,6 +18663,13 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "passphrase": {
+                    "type": "string"
+                },
+                "recipient_contact_id": {
+                    "description": "Who the link is for: a contact id, or free text. Both optional.",
+                    "type": "integer"
+                },
+                "recipient_label": {
                     "type": "string"
                 },
                 "title": {
@@ -20570,6 +20969,61 @@ const docTemplate = `{
                 }
             }
         },
+        "models.ProxmoxServer": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "has_token": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "skip_verify": {
+                    "type": "boolean"
+                },
+                "token_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ProxmoxServerInput": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "skip_verify": {
+                    "type": "boolean"
+                },
+                "token_id": {
+                    "type": "string"
+                },
+                "token_secret": {
+                    "type": "string"
+                }
+            }
+        },
         "models.Release": {
             "type": "object",
             "properties": {
@@ -21633,33 +22087,6 @@ const docTemplate = `{
                 }
             }
         },
-        "service.ProxmoxSyncSummary": {
-            "type": "object",
-            "properties": {
-                "created": {
-                    "type": "integer"
-                },
-                "deactivated": {
-                    "type": "integer"
-                },
-                "found": {
-                    "type": "integer"
-                },
-                "no_ip": {
-                    "type": "integer"
-                },
-                "no_ip_reasons": {
-                    "description": "NoIPReasons groups the IP-less machines: \"reason: name, name\", sorted.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "updated": {
-                    "type": "integer"
-                }
-            }
-        },
         "service.ScanResources": {
             "type": "object",
             "properties": {
@@ -21987,6 +22414,12 @@ const docTemplate = `{
                 "accessed_at": {
                     "type": "string"
                 },
+                "action": {
+                    "type": "string"
+                },
+                "actor_name": {
+                    "type": "string"
+                },
                 "remote_ip": {
                     "type": "string"
                 },
@@ -22089,6 +22522,9 @@ const docTemplate = `{
                 "created_by": {
                     "type": "integer"
                 },
+                "created_by_name": {
+                    "type": "string"
+                },
                 "deleted_at": {
                     "type": "string"
                 },
@@ -22111,8 +22547,26 @@ const docTemplate = `{
                         "$ref": "#/definitions/vault.BundleItemView"
                     }
                 },
+                "last_access_at": {
+                    "description": "last guest redemption",
+                    "type": "string"
+                },
                 "max_views": {
                     "type": "integer"
+                },
+                "recipient_contact_id": {
+                    "description": "RecipientContactID / RecipientName come from the linked contact;\nRecipientLabel is the free-text recipient.",
+                    "type": "integer"
+                },
+                "recipient_label": {
+                    "type": "string"
+                },
+                "recipient_name": {
+                    "type": "string"
+                },
+                "recoverable": {
+                    "description": "Recoverable is true when the token (and passphrase) are stored encrypted,\nso an admin can reveal the link again.",
+                    "type": "boolean"
                 },
                 "revoked_at": {
                     "type": "string"

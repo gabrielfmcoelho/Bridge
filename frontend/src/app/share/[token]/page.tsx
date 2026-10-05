@@ -16,17 +16,13 @@ import Divider from "@/components/ui/Divider";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
-// Public reveal page. Reached for BOTH kinds of share link:
-//   - a single secret  (ShareLinkModal → GET /api/share/{token})
-//   - a heterogeneous bundle (ShareBundleModal → GET /api/share-bundle/{token})
-// The URL is identical (/share/{token}), so we probe the bundle endpoint
-// first and fall back to the secret endpoint on 404. The token IS the
-// credential; an optional passphrase gates the reveal on top of it.
+// Public reveal page for a share bundle (GET /api/share-bundle/{token}); a
+// single-secret share is a one-item bundle too. The token IS the credential;
+// an optional passphrase gates the reveal on top of it.
 //
-// Both endpoints return:
 //   200 { ... }   -> reveal
 //   401 { error } -> passphrase required or incorrect
-//   404 { error } -> expired / revoked / exhausted / unknown / wrong-kind
+//   404 { error } -> expired / revoked / exhausted / unknown
 // We branch on HTTP status, never message text.
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -34,7 +30,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 type ViewState =
   | { kind: "loading" }
   | { kind: "needsPassphrase"; incorrect: boolean }
-  | { kind: "revealed"; payload: string }
   | { kind: "bundle"; payload: BundlePayload }
   | { kind: "gone" }
   | { kind: "error"; message: string };
@@ -49,54 +44,20 @@ function withPass(path: string, passphrase?: string): string {
 }
 
 async function redeem(token: string, passphrase?: string): Promise<ViewState> {
-  const enc = encodeURIComponent(token);
-
-  // 1) Try the bundle endpoint first.
-  let bundleRes: Response;
-  try {
-    bundleRes = await fetch(withPass(`/api/share-bundle/${enc}`, passphrase));
-  } catch {
-    return { kind: "error", message: "share.connectionError" };
-  }
-  if (bundleRes.ok) {
-    const data = (await bundleRes.json().catch(() => null)) as BundlePayload | null;
-    if (data) return { kind: "bundle", payload: data };
-  } else if (bundleRes.status === 401) {
-    return { kind: "needsPassphrase", incorrect: Boolean(passphrase) };
-  } else if (bundleRes.status !== 404) {
-    const body = await bundleRes.json().catch(() => ({}));
-    return { kind: "error", message: body.error || `share.requestFailed:${bundleRes.status}` };
-  }
-
-  // 2) Not a bundle (404) — fall back to a single-secret link.
   let res: Response;
   try {
-    res = await fetch(withPass(`/api/share/${enc}`, passphrase));
+    res = await fetch(withPass(`/api/share-bundle/${encodeURIComponent(token)}`, passphrase));
   } catch {
     return { kind: "error", message: "share.connectionError" };
   }
   if (res.ok) {
-    const data = await res.json().catch(() => ({}));
-    return { kind: "revealed", payload: typeof data.payload === "string" ? data.payload : "" };
+    const data = (await res.json().catch(() => null)) as BundlePayload | null;
+    return data ? { kind: "bundle", payload: data } : { kind: "error", message: "share.connectionError" };
   }
   if (res.status === 401) return { kind: "needsPassphrase", incorrect: Boolean(passphrase) };
   if (res.status === 404) return { kind: "gone" };
   const body = await res.json().catch(() => ({}));
   return { kind: "error", message: body.error || `share.requestFailed:${res.status}` };
-}
-
-// Some payloads are JSON (env-var bundles, app logins). Pretty-print those so
-// they're readable; otherwise show the raw string.
-function prettyPayload(payload: string): string {
-  const trimmed = payload.trim();
-  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    try {
-      return JSON.stringify(JSON.parse(trimmed), null, 2);
-    } catch {
-      /* not JSON — fall through */
-    }
-  }
-  return payload;
 }
 
 interface ParsedPayloadField {
@@ -691,30 +652,6 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                 {t("share.unlock")}
               </Button>
             </form>
-          )}
-
-          {state.kind === "revealed" && (
-            <div className="space-y-4">
-              <SecretPayloadViewer
-                payload={state.payload}
-                onCopy={handleCopy}
-                copiedKeyPrefix="secret"
-                copiedKey={copied}
-              />
-              <div className={`flex gap-2.5 items-start p-3 rounded-[var(--radius-md)] border text-xs ${
-                theme === "light"
-                  ? "bg-[var(--info)]/50 border-[var(--info)]/80 text-[var(--info)]"
-                  : "bg-[var(--info)]/10 border-[var(--info)]/20 text-[var(--text-muted)]"
-              }`}>
-                <Icon path={ICON_PATHS.alert} className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${theme === "light" ? "text-[var(--info)]" : "text-[var(--info)]"}`} />
-                <div>
-                  <strong className={`font-semibold block mb-0.5 ${theme === "light" ? "text-[var(--info)]" : "text-[var(--text-secondary)]"}`}>
-                    {t("share.securityNotice")}
-                  </strong>
-                  {t("share.securityNoticeDescSingle")}
-                </div>
-              </div>
-            </div>
           )}
 
           {state.kind === "gone" && (

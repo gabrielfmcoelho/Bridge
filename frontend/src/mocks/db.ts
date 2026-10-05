@@ -22,8 +22,12 @@ import type {
   RequestEvent,
   RequestAbilities,
   RequestStatus,
+  Contact,
+  ShareBundleView,
+  ShareBundleAccessEntry,
 } from "@/lib/types";
 import { seed } from "./seed";
+import type { ProxmoxServer } from "@/lib/api";
 // The visibility + ability predicates live in ./scope.ts, which is
 // deliberately free of cross-directory value imports so scope.test.ts can
 // load it directly under plain `node --test` — see that file's header
@@ -47,6 +51,12 @@ export interface Seed {
   offerings: Offering[];
   requests: ServiceRequest[];
   events: RequestEvent[];
+  contacts: Contact[];
+  /** token/passphrase stand in for the encrypted columns; absent = not recoverable. */
+  shareBundles: (ShareBundleView & { token?: string; passphrase?: string })[];
+  shareAccessLog: (ShareBundleAccessEntry & { bundle_id: number })[];
+  /** token stands in for the encrypted secret. */
+  proxmoxServers: (ProxmoxServer & { token?: string })[];
 }
 
 // ponytail: dev-singleton pin on globalThis — Fast Refresh re-evaluates this

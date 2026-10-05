@@ -49,7 +49,8 @@
     "designSystem": "Design System",
     "workspace": "Workspace",
     "selfService": "Self-service",
-    "menu": "Menu"
+    "menu": "Menu",
+    "shares": "Shares"
   },
   "atlas": {
     "apis": {
@@ -100,7 +101,7 @@
       "linkCreated": "Link created",
       "copyLink": "Copy link",
       "copied": "Copied!",
-      "tokenOnce": "This link is shown only once — copy it now.",
+      "tokenOnce": "Copy this link now. Later, only an admin can reveal it again (Shares page).",
       "selectSomething": "Select at least one endpoint or tag.",
       "existingLinks": "Existing links",
       "noLinks": "No share links emitted yet.",
@@ -875,8 +876,9 @@
     "none": "none",
     "situacaoUpdateFailed": "Update failed",
     "syncProxmox": "Sync from Proxmox",
-    "syncProxmoxRunning": "Reading the Proxmox cluster…",
+    "syncProxmoxRunning": "Reading the Proxmox servers…",
     "proxmoxSyncDone": "{found} found: {created} new, {updated} updated, {deactivated} marked inactive, {no_ip} without IP",
+    "proxmoxSyncFailed": "failed: {error}",
     "runsOn": "Runs on",
     "bulkActions": "Bulk actions",
     "idleNoWorkloads": "Host has no detected workloads or containers.",
@@ -1847,12 +1849,21 @@
         "sshUserHint": "SSH User is used when registering servers in Coolify. Coolify does not accept dots in usernames. Defaults to \"root\"."
       },
       "proxmox": {
-        "hint": "Proxmox VE cluster — syncs nodes, VMs and containers into Hosts.",
+        "hint": "Proxmox VE clusters — syncs nodes, VMs and containers into Hosts. One server per independent cluster.",
         "ariaEnable": "Enable Proxmox",
         "tokenId": "Token ID",
         "tokenSecret": "Token secret",
         "tokenHint": "Read-only API token (user@realm!name) with the PVEAuditor role on /. Guest IPs also need VM.Monitor (PVE 8) or VM.GuestAgent.Audit (PVE 9) and the QEMU guest agent.",
-        "connectedVersion": "Connected — Proxmox VE {version}"
+        "connectedVersion": "Connected — Proxmox VE {version}",
+        "serversTitle": "Servers",
+        "emptyServers": "No Proxmox server yet — add one per cluster.",
+        "addServer": "Add server",
+        "serverNamePlaceholder": "e.g. SEAD cluster 1",
+        "keepSecret": "Leave blank to keep the stored secret",
+        "tokenStored": "Token stored",
+        "noToken": "No token stored",
+        "ariaEnableServer": "Enable {name}",
+        "confirmDeleteServer": "Its hosts stay, unlinked; a later sync re-links them by IP or name."
       },
       "saved": "Saved",
       "keycloakApis": {
@@ -2481,7 +2492,6 @@
     "noContent": "This link no longer has any available content.",
     "securityNotice": "Security Notice",
     "securityNoticeDesc": "This is a temporary sharing link. Copy the necessary credentials and close this tab when finished.",
-    "securityNoticeDescSingle": "This link is temporary. Make sure to copy the credentials and close this tab.",
     "secretTitle": "Shared secret",
     "secretDesc": "Someone shared a secret with you through a short-lived link.",
     "protected": "This link is protected. Enter the passphrase to reveal it.",
@@ -2528,7 +2538,7 @@
     "drawerTitle": "Share by link",
     "createLink": "Create link",
     "linkCreated": "Link created",
-    "copyNow": "Copy it now — it won't be shown again.",
+    "copyNow": "Copy it now. Later, only an admin can reveal it again.",
     "newLink": "New link",
     "nickname": "Nickname",
     "nicknamePlaceholder": "To recognise this link",
@@ -2556,6 +2566,67 @@
       "expired": "Expired",
       "exhausted": "Used up"
     }
+  },
+  "shares": {
+    "title": "Shares",
+    "description": "Links you shared: what they carry, who they are for, and how they are being used.",
+    "descriptionAdmin": "Every share link: what it carries, who it is for, and how it is being used. Admins can reveal a link and its passphrase — each reveal is logged.",
+    "recipientContact": "Recipient (contact)",
+    "noContact": "No contact",
+    "recipientLabel": "Recipient (free text)",
+    "recipientLabelPlaceholder": "e.g. PGE team",
+    "filterStatus": "Status",
+    "filterType": "Content",
+    "filterRecipient": "Recipient",
+    "group": {
+      "api": "API docs",
+      "wiki": "Wiki",
+      "secret": "Secrets"
+    },
+    "status": {
+      "live": "Live",
+      "revoked": "Revoked",
+      "archived": "Archived",
+      "expired": "Expired",
+      "exhausted": "View limit reached"
+    },
+    "col": {
+      "title": "Title",
+      "recipient": "Recipient",
+      "items": "Content",
+      "createdBy": "Created by",
+      "created": "Created",
+      "expires": "Expires",
+      "status": "Status",
+      "views": "Views",
+      "lastAccess": "Last access"
+    },
+    "never": "Never",
+    "hasPassphrase": "Protected by a passphrase",
+    "empty": "No shares",
+    "emptyHint": "Links created from an API, a wiki page or a secret show up here.",
+    "reveal": "Reveal link and passphrase",
+    "revealConfirmTitle": "Reveal this link and its passphrase?",
+    "revealConfirmMessage": "The reveal is recorded in the link's access log under your name.",
+    "revealTitle": "Link: {title}",
+    "revealAudited": "This reveal was recorded in the access log.",
+    "notRecoverable": "This link was created before links were stored, so it cannot be recovered. Renew or recreate it instead.",
+    "link": "Link",
+    "passphrase": "Passphrase",
+    "noPassphrase": "This link has no passphrase.",
+    "renew": "Renew for 30 days",
+    "renewed": "Link renewed for 30 days",
+    "revoke": "Revoke",
+    "revoked": "Link revoked",
+    "revokeConfirmTitle": "Revoke \"{title}\"?",
+    "revokeAll": "Revoke all",
+    "revokeAllWord": "REVOKE",
+    "revokeAllConfirmTitle": "Revoke every share link?",
+    "revokeAllConfirmMessage": "Every live link stops opening at once, whoever created it. Each one can be renewed later.",
+    "revokeAllDone": "{n} links revoked",
+    "accessLog": "Access log",
+    "hideLog": "Hide access log",
+    "revealedBy": "Link revealed by {name}"
   },
   "entidades": {
     "title": "Entidades",

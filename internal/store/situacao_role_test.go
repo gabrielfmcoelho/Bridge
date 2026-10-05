@@ -64,10 +64,14 @@ func TestSituacaoRoles_FollowRenamedOptions(t *testing.T) {
 	}
 
 	// Proxmox writes the renamed value, and never over a manual maintenance.
-	if err := hosts.SetProxmoxSync(ctx, renamed, store.ProxmoxState{ProxmoxID: "qemu/1", SituacaoRole: store.SituacaoInactive}); err != nil {
+	pve := &models.ProxmoxServer{Name: "pve", Enabled: true}
+	if err := store.NewProxmoxServerRepo(d.SQL).Create(ctx, pve); err != nil {
+		t.Fatalf("server: %v", err)
+	}
+	if err := hosts.SetProxmoxSync(ctx, renamed, store.ProxmoxState{ServerID: pve.ID, ProxmoxID: "qemu/1", SituacaoRole: store.SituacaoInactive}); err != nil {
 		t.Fatalf("proxmox sync: %v", err)
 	}
-	if err := hosts.SetProxmoxSync(ctx, maint, store.ProxmoxState{ProxmoxID: "qemu/2", SituacaoRole: store.SituacaoActive}); err != nil {
+	if err := hosts.SetProxmoxSync(ctx, maint, store.ProxmoxState{ServerID: pve.ID, ProxmoxID: "qemu/2", SituacaoRole: store.SituacaoActive}); err != nil {
 		t.Fatalf("proxmox sync maint: %v", err)
 	}
 	if h, _ := hosts.GetByID(ctx, renamed); h.Situacao != "Desligada" {
@@ -76,7 +80,7 @@ func TestSituacaoRoles_FollowRenamedOptions(t *testing.T) {
 	if h, _ := hosts.GetByID(ctx, maint); h.Situacao != "Em manutenção" {
 		t.Fatalf("maintenance overwritten: %q", h.Situacao)
 	}
-	if n, err := hosts.DeactivateMissingProxmox(ctx, []string{"qemu/1"}); err != nil || n != 0 {
+	if n, err := hosts.DeactivateMissingProxmox(ctx, pve.ID, []string{"qemu/1"}); err != nil || n != 0 {
 		t.Fatalf("DeactivateMissingProxmox = %d, %v; want 0 (qemu/2 is in maintenance)", n, err)
 	}
 }

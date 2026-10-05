@@ -41,6 +41,10 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"POST", "/api/coolify/dns-sync"},
 		{"POST", "/api/proxmox/sync"},
 		{"POST", "/api/proxmox/test"},
+		{"GET", "/api/proxmox/servers"},
+		{"POST", "/api/proxmox/servers"},
+		{"PUT", "/api/proxmox/servers/1"},
+		{"DELETE", "/api/proxmox/servers/1"},
 		{"GET", "/api/relations"},
 		{"GET", "/api/projects"},
 		{"GET", "/api/services"},
@@ -89,6 +93,8 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"PATCH", "/api/share-bundles/1"},
 		{"DELETE", "/api/share-bundles/1"},
 		{"GET", "/api/share-bundles/1/access-log"},
+		{"POST", "/api/share-bundles/revoke-all"},
+		{"POST", "/api/share-bundles/1/reveal"},
 
 		// SSH operations
 		{"GET", "/api/ssh/preview-config"},

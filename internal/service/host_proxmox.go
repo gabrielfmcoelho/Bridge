@@ -26,18 +26,20 @@ type ProxmoxSyncSummary struct {
 // (v82: every VM is created by ETIPI).
 const proxmoxDefaultEntidade = "etipi"
 
-// SyncFromProxmox upserts one host per Proxmox node / guest. A machine matches
-// a host by proxmox_id, then by IP or name (= hosts.hostname, or its first DNS
-// label); each host is claimed by one machine at most. The match is linked and
-// gets its resources, situacao and parent node refreshed, nothing else. New
+// SyncFromProxmox upserts one host per node / guest of Proxmox server
+// serverID. A machine matches a host by proxmox_id on that server, then by IP
+// or name (= hosts.hostname, or its first DNS label) among hosts no server
+// owns; each host is claimed by one machine at most, and another server's
+// hosts are never matched nor deactivated. The match is linked and gets its
+// resources, situacao and parent node refreshed, nothing else. New
 // hosts inherit their node host's entidade grants, else ETIPI's. Linked hosts
 // whose machine is gone become inactive — skipped when ms is empty, so a
 // broken fetch can't retire the fleet. Nodes must precede guests in ms
 // (proxmox.Machines does). Runs unscoped — the caller must be admin.
-func (s *HostService) SyncFromProxmox(ctx context.Context, ms []proxmox.Machine) (ProxmoxSyncSummary, error) {
+func (s *HostService) SyncFromProxmox(ctx context.Context, serverID int64, ms []proxmox.Machine) (ProxmoxSyncSummary, error) {
 	ctx = store.WithSystemScope(ctx)
 	sum := ProxmoxSyncSummary{Found: len(ms)}
-	byPID, byHostname, byLabel, err := s.hosts.ProxmoxIndex(ctx)
+	byPID, byHostname, byLabel, err := s.hosts.ProxmoxIndex(ctx, serverID)
 	if err != nil {
 		return sum, err
 	}
@@ -56,7 +58,7 @@ func (s *HostService) SyncFromProxmox(ctx context.Context, ms []proxmox.Machine)
 			noIP[reason] = append(noIP[reason], m.Name)
 		}
 		st := store.ProxmoxState{
-			ProxmoxID: m.ProxmoxID, IP: m.IP,
+			ServerID: serverID, ProxmoxID: m.ProxmoxID, IP: m.IP,
 			RecursoCPU: m.CPU, RecursoRAM: m.RAM, RecursoArmazenamento: m.Disk,
 			SituacaoRole: store.SituacaoInactive,
 		}
@@ -101,7 +103,7 @@ func (s *HostService) SyncFromProxmox(ctx context.Context, ms []proxmox.Machine)
 	}
 	sort.Strings(sum.NoIPReasons)
 	if len(seen) > 0 {
-		if sum.Deactivated, err = s.hosts.DeactivateMissingProxmox(ctx, seen); err != nil {
+		if sum.Deactivated, err = s.hosts.DeactivateMissingProxmox(ctx, serverID, seen); err != nil {
 			return sum, err
 		}
 	}

@@ -10,6 +10,7 @@ import FormError from "@/components/ui/FormError";
 import { shareBundlesAPI, secretsAPI, outlineAPI, type OutlineDocumentNode } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { ApiCatalog } from "@/lib/types";
+import RecipientField, { EMPTY_RECIPIENT, recipientPayload } from "@/components/share/RecipientField";
 
 type Mode = "all" | "tags" | "operations";
 
@@ -45,9 +46,10 @@ function WikiPickerNodes({
 }
 
 // AccessLogPanel lazily loads (only when expanded) and renders a bundle's
-// anonymous access log: time / IP / browser, with a lock when a passphrase
-// gated the reveal. Network metadata only — the links are anonymous.
-function AccessLogPanel({ bundleId }: { bundleId: number }) {
+// access log: guest openings (time / IP / browser, with a lock when a
+// passphrase gated them — network metadata only, the links are anonymous) and
+// admin reveals of the link (who). Also used by the /shares page.
+export function AccessLogPanel({ bundleId }: { bundleId: number }) {
   const { t } = useLocale();
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["share-bundle-access-log", bundleId],
@@ -62,7 +64,14 @@ function AccessLogPanel({ bundleId }: { bundleId: number }) {
         <p className="text-2xs text-[var(--text-muted)]">{t("atlas.apis.accessLogEmpty")}</p>
       ) : (
         <ul className="space-y-1 max-h-32 overflow-y-auto">
-          {entries.map((e, i) => (
+          {entries.map((e, i) => e.action === "reveal" ? (
+            <li key={i} className="flex items-center gap-2 text-2xs text-[var(--warning)]">
+              <span className="text-[var(--text-faint)] shrink-0">
+                {new Date(e.accessed_at).toLocaleString()}
+              </span>
+              <span>{t("shares.revealedBy", { name: e.actor_name || "—" })}</span>
+            </li>
+          ) : (
             <li key={i} className="flex items-center gap-2 text-2xs text-[var(--text-secondary)]">
               <span className="text-[var(--text-faint)] shrink-0">
                 {new Date(e.accessed_at).toLocaleString()}
@@ -113,6 +122,7 @@ export default function ShareBundleModal({
   // Optional: paste a token from a lost /share URL to rebuild that exact link.
   const [reuseToken, setReuseToken] = useState("");
   const [neverExpiry, setNeverExpiry] = useState(false);
+  const [recipient, setRecipient] = useState(EMPTY_RECIPIENT);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -194,6 +204,7 @@ export default function ShareBundleModal({
     setPassphrase("");
     setReuseToken("");
     setNeverExpiry(false);
+    setRecipient(EMPTY_RECIPIENT);
     setError(null);
     setSubmitting(false);
     setResult(null);
@@ -306,6 +317,7 @@ export default function ShareBundleModal({
           description: bundleDescription,
           ttl_seconds: ttlSeconds,
           passphrase: passphrase.trim() || undefined,
+          ...recipientPayload(recipient),
           items,
         });
         setResult(`${window.location.origin}/share/${token}`);
@@ -315,6 +327,7 @@ export default function ShareBundleModal({
           description: bundleDescription,
           ttl_seconds: ttlSeconds,
           passphrase: passphrase.trim() || undefined,
+          ...recipientPayload(recipient),
           items,
         });
         setResult(`${window.location.origin}${res.url}`);
@@ -449,6 +462,8 @@ export default function ShareBundleModal({
             onChange={(e) => setTitle(e.target.value)}
             placeholder={api.name}
           />
+
+          {editingId == null && <RecipientField value={recipient} onChange={setRecipient} enabled={open} />}
 
           <div>
             <label className="block text-sm mb-1.5 text-[var(--text-secondary)]">

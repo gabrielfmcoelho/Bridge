@@ -29,7 +29,7 @@ and contacts. Access is scoped by a hierarchical org-unit tree called
 | Frontend build | `cd frontend && npm run build` |
 | Frontend dev | `cd frontend && npm run dev` |
 | Frontend dev, no Go backend | `cd frontend && npm run dev:mock` — sets `NEXT_PUBLIC_USE_MOCK_API=1`, which repoints `API_BASE` at the in-app mock (`src/app/mock/api/[...path]/route.ts` + `src/mocks/`). **Required for `/catalog` and `/requests`**: those routes have no Go backend yet, so plain `npm run dev` proxies them to Go and gets 404. `POST /mock/api/__user {role, entidade_slug}` switches persona, `POST /mock/api/__reset` re-seeds. |
-| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts` (insight modules stay runtime-import free so Node can run them) |
+| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases,shareBundles}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts` (insight modules stay runtime-import free so Node can run them) |
 
 ## Architecture
 
@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v104**. Use idempotent idioms:
+per element, currently at **v106**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last

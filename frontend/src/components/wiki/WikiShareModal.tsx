@@ -9,6 +9,7 @@ import Input from "@/components/ui/Input";
 import FormError from "@/components/ui/FormError";
 import { shareBundlesAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
+import RecipientField, { EMPTY_RECIPIENT, recipientPayload } from "@/components/share/RecipientField";
 
 // A standalone share flow for wiki content — create a public share bundle that
 // carries a single Outline document or collection (no API/secret involved).
@@ -35,6 +36,7 @@ export default function WikiShareModal({
   const [ttlHours, setTtlHours] = useState("24");
   const [passphrase, setPassphrase] = useState("");
   const [neverExpiry, setNeverExpiry] = useState(false);
+  const [recipient, setRecipient] = useState(EMPTY_RECIPIENT);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -62,6 +64,7 @@ export default function WikiShareModal({
     setTtlHours("24");
     setPassphrase("");
     setNeverExpiry(false);
+    setRecipient(EMPTY_RECIPIENT);
     setError(null);
     setSubmitting(false);
     setResult(null);
@@ -83,6 +86,7 @@ export default function WikiShareModal({
         title: title.trim() || target.title,
         ttl_seconds: ttlSeconds,
         passphrase: passphrase.trim() || undefined,
+        ...recipientPayload(recipient),
         items: [{ type: target.kind, ref_key: target.refKey }],
       });
       setResult(`${window.location.origin}${res.url}`);
@@ -127,6 +131,8 @@ export default function WikiShareModal({
             onChange={(e) => setTitle(e.target.value)}
             placeholder={target?.title}
           />
+
+          <RecipientField value={recipient} onChange={setRecipient} enabled={open} />
 
           <div className="grid grid-cols-2 gap-3">
             <Input

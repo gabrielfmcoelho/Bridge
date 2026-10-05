@@ -104,6 +104,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/ssh-config", label: "nav.sshConfig", icon: "Terminal" },
       { href: "/tools", label: "nav.tools", icon: "Wrench" },
+      { href: "/shares", label: "nav.shares", icon: "Share" },
       { href: "/settings", label: "nav.settings", icon: "Settings" },
       { href: "/design-system", label: "nav.designSystem", icon: "LayoutDashboard", role: "admin" },
     ],

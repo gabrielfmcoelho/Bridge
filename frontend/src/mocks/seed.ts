@@ -14,6 +14,7 @@ import type {
   Offering,
   ServiceRequest,
   RequestEvent,
+  Contact,
 } from "@/lib/types";
 import type { Seed } from "./db";
 
@@ -910,5 +911,52 @@ export function seed(): Seed {
     offerings: offeringList,
     requests: requests(offeringList),
     events: events(userList),
+    ...shares(),
+    proxmoxServers: [
+      { id: 1, name: "Cluster SEAD 1", base_url: "https://pve1.sead.pi.gov.br:8006", token_id: "bridge@pve!sync", has_token: true, token: "mock", skip_verify: true, enabled: true, created_at: "2026-09-01T10:00:00Z", updated_at: "2026-09-01T10:00:00Z" },
+      { id: 2, name: "Cluster SEAD 2", base_url: "https://pve2.sead.pi.gov.br:8006", token_id: "bridge@pve!sync", has_token: true, token: "mock", skip_verify: true, enabled: false, created_at: "2026-09-02T10:00:00Z", updated_at: "2026-09-02T10:00:00Z" },
+    ],
+  };
+}
+
+// Share bundles for /shares: a recoverable live link with a passphrase, a
+// legacy one (no stored token — reveal answers 409) and a revoked one.
+function shares(): Pick<Seed, "contacts" | "shareBundles" | "shareAccessLog"> {
+  const contact = (id: number, name: string, entity: string): Contact => ({
+    id, name, phone: "", role: "", entity, notes: "", is_external: true,
+  });
+  const base = { description: "", max_views: null, view_count: 0, created_by: 1, created_by_name: "Marcos Vinícius Rêgo Sousa", revoked_at: null, deleted_at: null, recipient_label: "" };
+  return {
+    contacts: [contact(1, "Paulo Maneco", "PGE"), contact(2, "Linara Moura", "Vobys")],
+    shareBundles: [
+      {
+        ...base, id: 1, title: "PGE — Servidores e SEI", created_at: "2026-09-20T10:00:00Z", expires_at: "2026-11-01T00:00:00Z",
+        has_passphrase: true, recoverable: true, recipient_contact_id: 1, recipient_name: "Paulo Maneco", recipient_label: "PGE",
+        view_count: 3, last_access_at: "2026-09-28T14:12:00Z",
+        items: [
+          { type: "api_doc", ref_id: 1, label: "API Servidores" },
+          { type: "wiki_doc", ref_id: 0, ref_key: "w-1", label: "Gateway: como obter token" },
+          { type: "secret", ref_id: 9, label: "servidores-integracao-pge" },
+        ],
+        token: "mock-token-pge", passphrase: "pge-2026",
+      },
+      {
+        ...base, id: 2, title: "IAPEP (antigo)", created_at: "2026-03-02T09:00:00Z", expires_at: null,
+        has_passphrase: false, recoverable: false, view_count: 41, last_access_at: "2026-09-30T08:00:00Z",
+        recipient_label: "IAPEP",
+        items: [{ type: "api_doc", ref_id: 1, label: "API Servidores" }],
+      },
+      {
+        ...base, id: 3, title: "Vobys", created_at: "2026-05-10T09:00:00Z", expires_at: "2026-06-10T09:00:00Z",
+        has_passphrase: true, recoverable: true, revoked_at: "2026-06-01T09:00:00Z",
+        recipient_contact_id: 2, recipient_name: "Linara Moura",
+        items: [{ type: "wiki_collection", ref_id: 0, ref_key: "c-1", label: "Integrações" }],
+        token: "mock-token-vobys", passphrase: "vobys",
+      },
+    ],
+    shareAccessLog: [
+      { bundle_id: 1, accessed_at: "2026-09-28T14:12:00Z", remote_ip: "200.137.1.10", user_agent: "Mozilla/5.0", used_passphrase: true, action: "redeem" },
+      { bundle_id: 2, accessed_at: "2026-09-30T08:00:00Z", remote_ip: "10.0.0.5", user_agent: "curl/8.5", used_passphrase: false, action: "redeem" },
+    ],
   };
 }

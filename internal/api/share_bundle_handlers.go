@@ -35,6 +35,9 @@ type createBundleRequest struct {
 	MaxViews    int                     `json:"max_views"`
 	Passphrase  string                  `json:"passphrase"`
 	Items       []vault.BundleItemInput `json:"items"`
+	// Who the link is for: a contact id, or free text. Both optional.
+	RecipientContactID *int64 `json:"recipient_contact_id"`
+	RecipientLabel     string `json:"recipient_label"`
 }
 
 // handleCreate godoc
@@ -70,19 +73,25 @@ func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		MaxViews:    req.MaxViews,
 		Passphrase:  req.Passphrase,
 		NoExpiry:    req.TTLSeconds < 0,
+
+		RecipientContactID: req.RecipientContactID,
+		RecipientLabel:     req.RecipientLabel,
 	})
 	switch {
 	case err == nil:
 		jsonCreated(w, map[string]any{
-			"id":             view.ID,
-			"title":          view.Title,
-			"description":    view.Description,
-			"expires_at":     view.ExpiresAt,
-			"max_views":      view.MaxViews,
-			"has_passphrase": view.HasPassphrase,
-			"items":          view.Items,
-			"token":          tok,
-			"url":            fmt.Sprintf("/share/%s", tok),
+			"id":                   view.ID,
+			"title":                view.Title,
+			"description":          view.Description,
+			"expires_at":           view.ExpiresAt,
+			"max_views":            view.MaxViews,
+			"has_passphrase":       view.HasPassphrase,
+			"items":                view.Items,
+			"recipient_contact_id": view.RecipientContactID,
+			"recipient_label":      view.RecipientLabel,
+			"recoverable":          view.Recoverable,
+			"token":                tok,
+			"url":                  fmt.Sprintf("/share/%s", tok),
 		})
 	case errors.Is(err, vault.ErrBundleEmpty):
 		jsonError(w, http.StatusBadRequest, "a share bundle must contain at least one item")
@@ -90,6 +99,8 @@ func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "only personal secrets may be shared")
 	case errors.Is(err, vault.ErrBundleInvalidItem):
 		jsonError(w, http.StatusBadRequest, "invalid bundle item type")
+	case errors.Is(err, vault.ErrBundleRecipientInvalid):
+		jsonError(w, http.StatusBadRequest, "recipient contact not found")
 	case errors.Is(err, vault.ErrSecretNotFound), errors.Is(err, vault.ErrBundleItemNotFound):
 		jsonError(w, http.StatusNotFound, "bundle item not found")
 	case errors.Is(err, vault.ErrSecretForbidden), errors.Is(err, vault.ErrBundleItemForbidden):
@@ -103,8 +114,8 @@ func (h *bundleHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 // handleList godoc
 //
-//	@Summary		List my share bundles
-//	@Description	Any role. The caller's bundles. item_type with ref_id (or ref_key for wiki items) returns every bundle containing that item; secret_id returns only single-secret bundles for that secret.
+//	@Summary		List share bundles
+//	@Description	Any role. The caller's bundles; an admin gets every bundle. item_type with ref_id (or ref_key for wiki items) returns every bundle containing that item; secret_id returns only single-secret bundles for that secret.
 //	@Tags			share-bundles
 //	@Produce		json
 //	@Param			item_type	query		string	false	"Item type to filter by (with ref_id or ref_key)"
@@ -185,6 +196,9 @@ type reissueBundleRequest struct {
 	MaxViews    int                     `json:"max_views"`
 	Passphrase  string                  `json:"passphrase"`
 	Items       []vault.BundleItemInput `json:"items"`
+	// Who the link is for: a contact id, or free text. Both optional.
+	RecipientContactID *int64 `json:"recipient_contact_id"`
+	RecipientLabel     string `json:"recipient_label"`
 }
 
 // handleReissue rebuilds a bundle under a caller-supplied raw token, reviving a
@@ -223,6 +237,9 @@ func (h *bundleHandlers) handleReissue(w http.ResponseWriter, r *http.Request) {
 		MaxViews:    req.MaxViews,
 		Passphrase:  req.Passphrase,
 		NoExpiry:    req.TTLSeconds < 0,
+
+		RecipientContactID: req.RecipientContactID,
+		RecipientLabel:     req.RecipientLabel,
 	})
 	switch {
 	case err == nil:
@@ -237,6 +254,8 @@ func (h *bundleHandlers) handleReissue(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusBadRequest, "only personal secrets may be shared")
 	case errors.Is(err, vault.ErrBundleInvalidItem):
 		jsonError(w, http.StatusBadRequest, "invalid bundle item type")
+	case errors.Is(err, vault.ErrBundleRecipientInvalid):
+		jsonError(w, http.StatusBadRequest, "recipient contact not found")
 	case errors.Is(err, vault.ErrSecretNotFound), errors.Is(err, vault.ErrBundleItemNotFound):
 		jsonError(w, http.StatusNotFound, "bundle item not found")
 	case errors.Is(err, vault.ErrSecretForbidden), errors.Is(err, vault.ErrBundleItemForbidden):
@@ -258,7 +277,7 @@ type renewBundleRequest struct {
 // optionally adjusts max_views.
 //
 //	@Summary		Renew a share bundle
-//	@Description	Any role; owner only (others get 404). Extends expiry from now (ttl_seconds < 0 = never expires, 0 = 24h) and reactivates a revoked bundle, keeping the token. max_views > 0 sets the cap, <= 0 clears it, omitted keeps it.
+//	@Description	Any role; owner or admin (others get 404). Extends expiry from now (ttl_seconds < 0 = never expires, 0 = 24h) and reactivates a revoked bundle, keeping the token. max_views > 0 sets the cap, <= 0 clears it, omitted keeps it.
 //	@Tags			share-bundles
 //	@Accept			json
 //	@Produce		json
@@ -310,7 +329,7 @@ type updateBundleItemsRequest struct {
 // re-validated for access; expiry/passphrase/view_count are preserved.
 //
 //	@Summary		Replace a share bundle's items
-//	@Description	Any role; owner only (others get 404). Same token and URL; expiry, passphrase and view count are kept. Every item is re-validated for access.
+//	@Description	Any role; owner or admin (others get 404). Same token and URL; expiry, passphrase and view count are kept. Every item is re-validated for access.
 //	@Tags			share-bundles
 //	@Accept			json
 //	@Produce		json
@@ -349,6 +368,8 @@ func (h *bundleHandlers) handleUpdateItems(w http.ResponseWriter, r *http.Reques
 		jsonError(w, http.StatusBadRequest, "a share bundle must contain at least one item")
 	case errors.Is(err, vault.ErrBundleInvalidItem):
 		jsonError(w, http.StatusBadRequest, "invalid bundle item type")
+	case errors.Is(err, vault.ErrBundleRecipientInvalid):
+		jsonError(w, http.StatusBadRequest, "recipient contact not found")
 	case errors.Is(err, vault.ErrSecretNotFound), errors.Is(err, vault.ErrBundleItemNotFound):
 		jsonError(w, http.StatusNotFound, "bundle item not found")
 	case errors.Is(err, vault.ErrSecretForbidden), errors.Is(err, vault.ErrBundleItemForbidden):
@@ -363,7 +384,7 @@ func (h *bundleHandlers) handleUpdateItems(w http.ResponseWriter, r *http.Reques
 // handleRevoke godoc
 //
 //	@Summary		Revoke a share bundle
-//	@Description	Any role; owner only (others get 404).
+//	@Description	Any role; owner or admin (others get 404).
 //	@Tags			share-bundles
 //	@Produce		json
 //	@Param			id	path	int	true	"Bundle ID"
@@ -398,7 +419,7 @@ func (h *bundleHandlers) handleRevoke(w http.ResponseWriter, r *http.Request) {
 // so a caller can't probe another owner's link state.
 //
 //	@Summary		A share bundle's access log
-//	@Description	Any role; owner only (others get 404). Anonymous redemptions, newest first: time, best-effort IP, user agent, whether a passphrase was used.
+//	@Description	Any role; owner or admin (others get 404). Newest first. action "redeem" is an anonymous guest opening (time, best-effort IP, user agent, whether a passphrase was used); action "reveal" is an admin reading the link back (actor_name).
 //	@Tags			share-bundles
 //	@Produce		json
 //	@Param			id			path		int	true	"Bundle ID"
@@ -428,6 +449,78 @@ func (h *bundleHandlers) handleAccessLog(w http.ResponseWriter, r *http.Request)
 		jsonError(w, http.StatusNotFound, "share bundle not found")
 	default:
 		jsonServerError(w, r, "share bundle access log", err)
+	}
+}
+
+type bundleRevealResponse struct {
+	Token      string `json:"token"`
+	URL        string `json:"url"`
+	Passphrase string `json:"passphrase"`
+}
+
+// handleReveal godoc
+//
+//	@Summary		Reveal a share bundle's link and passphrase
+//	@Description	Admin. Decrypts the bundle's token and passphrase ("" when it has none) and records the reveal in its access log. 409 when the bundle predates encrypted storage and cannot be recovered.
+//	@Tags			share-bundles
+//	@Produce		json
+//	@Param			id	path		int	true	"Bundle ID"
+//	@Success		200	{object}	bundleRevealResponse
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Failure		409	{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles/{id}/reveal [post]
+func (h *bundleHandlers) handleReveal(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFrom(r)
+	if !ok {
+		jsonError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	id, err := pathInt64(r, "id")
+	if err != nil {
+		jsonBadRequest(w, r, "invalid bundle id", err)
+		return
+	}
+	sec, err := h.repo.RevealBundle(r.Context(), actor, id)
+	switch {
+	case err == nil:
+		w.Header().Set("Cache-Control", "no-store")
+		jsonOK(w, bundleRevealResponse{Token: sec.Token, URL: "/share/" + sec.Token, Passphrase: sec.Passphrase})
+	case errors.Is(err, vault.ErrBundleNotFound):
+		jsonError(w, http.StatusNotFound, "share bundle not found")
+	case errors.Is(err, vault.ErrBundleNotRecoverable):
+		jsonError(w, http.StatusConflict, "this link was created before links were stored and cannot be recovered")
+	default:
+		jsonServerError(w, r, "reveal share bundle", err)
+	}
+}
+
+// handleRevokeAll godoc
+//
+//	@Summary		Revoke every share bundle
+//	@Description	Admin. Revokes every bundle not yet revoked, whoever created it; answers how many were revoked.
+//	@Tags			share-bundles
+//	@Produce		json
+//	@Success		200	{object}	map[string]int64
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles/revoke-all [post]
+func (h *bundleHandlers) handleRevokeAll(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFrom(r)
+	if !ok {
+		jsonError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	n, err := h.repo.RevokeAllBundles(r.Context(), actor)
+	switch {
+	case err == nil:
+		jsonOK(w, map[string]int64{"revoked": n})
+	case errors.Is(err, vault.ErrSecretForbidden):
+		jsonError(w, http.StatusForbidden, "forbidden")
+	default:
+		jsonServerError(w, r, "revoke all share bundles", err)
 	}
 }
 

@@ -171,6 +171,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_ProxmoxServer:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.ProxmoxServer'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-models_SecretAuditLog:
     properties:
       data:
@@ -429,6 +438,15 @@ definitions:
       username:
         type: string
     type: object
+  api.bundleRevealResponse:
+    properties:
+      passphrase:
+        type: string
+      token:
+        type: string
+      url:
+        type: string
+    type: object
   api.catalogueOption:
     properties:
       completename:
@@ -612,6 +630,11 @@ definitions:
       max_views:
         type: integer
       passphrase:
+        type: string
+      recipient_contact_id:
+        description: 'Who the link is for: a contact id, or free text. Both optional.'
+        type: integer
+      recipient_label:
         type: string
       title:
         type: string
@@ -1862,10 +1885,44 @@ definitions:
       updated_at:
         type: string
     type: object
+  api.proxmoxServerSyncResult:
+    properties:
+      created:
+        type: integer
+      deactivated:
+        type: integer
+      error:
+        type: string
+      found:
+        type: integer
+      name:
+        type: string
+      no_ip:
+        type: integer
+      no_ip_reasons:
+        description: 'NoIPReasons groups the IP-less machines: "reason: name, name",
+          sorted.'
+        items:
+          type: string
+        type: array
+      server_id:
+        type: integer
+      updated:
+        type: integer
+    type: object
+  api.proxmoxSyncResponse:
+    properties:
+      servers:
+        items:
+          $ref: '#/definitions/api.proxmoxServerSyncResult'
+        type: array
+    type: object
   api.proxmoxTestRequest:
     properties:
       base_url:
         type: string
+      server_id:
+        type: integer
       skip_verify:
         type: boolean
       token_id:
@@ -1884,6 +1941,11 @@ definitions:
       max_views:
         type: integer
       passphrase:
+        type: string
+      recipient_contact_id:
+        description: 'Who the link is for: a contact id, or free text. Both optional.'
+        type: integer
+      recipient_label:
         type: string
       title:
         type: string
@@ -3441,6 +3503,42 @@ definitions:
       sync_issues:
         type: boolean
     type: object
+  models.ProxmoxServer:
+    properties:
+      base_url:
+        type: string
+      created_at:
+        type: string
+      enabled:
+        type: boolean
+      has_token:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      skip_verify:
+        type: boolean
+      token_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.ProxmoxServerInput:
+    properties:
+      base_url:
+        type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+      skip_verify:
+        type: boolean
+      token_id:
+        type: string
+      token_secret:
+        type: string
+    type: object
   models.Release:
     properties:
       created_at:
@@ -4187,25 +4285,6 @@ definitions:
       updated_at:
         type: string
     type: object
-  service.ProxmoxSyncSummary:
-    properties:
-      created:
-        type: integer
-      deactivated:
-        type: integer
-      found:
-        type: integer
-      no_ip:
-        type: integer
-      no_ip_reasons:
-        description: 'NoIPReasons groups the IP-less machines: "reason: name, name",
-          sorted.'
-        items:
-          type: string
-        type: array
-      updated:
-        type: integer
-    type: object
   service.ScanResources:
     properties:
       cpu:
@@ -4437,6 +4516,10 @@ definitions:
     properties:
       accessed_at:
         type: string
+      action:
+        type: string
+      actor_name:
+        type: string
       remote_ip:
         type: string
       used_passphrase:
@@ -4504,6 +4587,8 @@ definitions:
         type: string
       created_by:
         type: integer
+      created_by_name:
+        type: string
       deleted_at:
         type: string
       description:
@@ -4519,8 +4604,25 @@ definitions:
         items:
           $ref: '#/definitions/vault.BundleItemView'
         type: array
+      last_access_at:
+        description: last guest redemption
+        type: string
       max_views:
         type: integer
+      recipient_contact_id:
+        description: |-
+          RecipientContactID / RecipientName come from the linked contact;
+          RecipientLabel is the free-text recipient.
+        type: integer
+      recipient_label:
+        type: string
+      recipient_name:
+        type: string
+      recoverable:
+        description: |-
+          Recoverable is true when the token (and passphrase) are stored encrypted,
+          so an admin can reveal the link again.
+        type: boolean
       revoked_at:
         type: string
       title:
@@ -11091,18 +11193,55 @@ paths:
       summary: List trashed projects
       tags:
       - projects
-  /api/proxmox/sync:
-    post:
-      description: Admin. Reads the whole cluster and upserts its nodes and guests
-        as hosts; synchronous (up to 10 minutes). 409 while another sync runs, 400
-        when the integration is disabled or unconfigured, 502 when Proxmox fails.
+  /api/proxmox/servers:
+    get:
+      description: Admin. Token secrets are never returned, only has_token.
+      parameters:
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/service.ProxmoxSyncSummary'
+            $ref: '#/definitions/api.ListEnvelope-models_ProxmoxServer'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List Proxmox servers
+      tags:
+      - proxmox
+    post:
+      consumes:
+      - application/json
+      description: Admin. name, base_url, token_id and token_secret are required;
+        the secret is stored encrypted. enabled defaults to true.
+      parameters:
+      - description: Server
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ProxmoxServerInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ProxmoxServer'
         "400":
           description: Bad Request
           schema:
@@ -11119,8 +11258,115 @@ paths:
           description: Conflict
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
-        "502":
-          description: Bad Gateway
+      summary: Add a Proxmox server
+      tags:
+      - proxmox
+  /api/proxmox/servers/{id}:
+    delete:
+      description: Admin. Its hosts stay, unlinked; a later sync may re-link them
+        by IP or name.
+      parameters:
+      - description: Server ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Delete a Proxmox server
+      tags:
+      - proxmox
+    put:
+      consumes:
+      - application/json
+      description: 'Admin. Partial: an omitted field keeps its value; an empty or
+        masked token_secret keeps the stored one.'
+      parameters:
+      - description: Server ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ProxmoxServerInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProxmoxServer'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Update a Proxmox server
+      tags:
+      - proxmox
+  /api/proxmox/sync:
+    post:
+      description: 'Admin. Reads every enabled Proxmox server in turn and upserts
+        its nodes and guests as hosts; synchronous (up to 30 minutes). One server
+        failing doesn''t stop the others: its entry carries error. 409 while another
+        sync runs, 400 when the integration is disabled or no server is enabled.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.proxmoxSyncResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Sync hosts from Proxmox
@@ -11131,12 +11377,14 @@ paths:
       consumes:
       - application/json
       description: 'Admin. Calls GET /version with the body values over the stored
-        settings; nothing is persisted. Always 200: {"success": bool, "version"?:
-        ..., "error"?: string}. The body is optional.'
+        server''s (server_id, optional); nothing is persisted. The stored secret is
+        only ever sent to the stored URL. Always 200: {"success": bool, "version"?:
+        ..., "error"?: string}.'
       parameters:
-      - description: Unsaved settings to test
+      - description: Server to test and/or unsaved values
         in: body
         name: body
+        required: true
         schema:
           $ref: '#/definitions/api.proxmoxTestRequest'
       produces:
@@ -11155,7 +11403,7 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
-      summary: Test the Proxmox connection
+      summary: Test a Proxmox server connection
       tags:
       - proxmox
   /api/relations:
@@ -13414,9 +13662,9 @@ paths:
       - share-bundles
   /api/share-bundles:
     get:
-      description: Any role. The caller's bundles. item_type with ref_id (or ref_key
-        for wiki items) returns every bundle containing that item; secret_id returns
-        only single-secret bundles for that secret.
+      description: Any role. The caller's bundles; an admin gets every bundle. item_type
+        with ref_id (or ref_key for wiki items) returns every bundle containing that
+        item; secret_id returns only single-secret bundles for that secret.
       parameters:
       - description: Item type to filter by (with ref_id or ref_key)
         in: query
@@ -13457,7 +13705,7 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
-      summary: List my share bundles
+      summary: List share bundles
       tags:
       - share-bundles
     post:
@@ -13507,7 +13755,7 @@ paths:
       - share-bundles
   /api/share-bundles/{id}:
     delete:
-      description: Any role; owner only (others get 404).
+      description: Any role; owner or admin (others get 404).
       parameters:
       - description: Bundle ID
         in: path
@@ -13537,8 +13785,8 @@ paths:
     patch:
       consumes:
       - application/json
-      description: Any role; owner only (others get 404). Extends expiry from now
-        (ttl_seconds < 0 = never expires, 0 = 24h) and reactivates a revoked bundle,
+      description: Any role; owner or admin (others get 404). Extends expiry from
+        now (ttl_seconds < 0 = never expires, 0 = 24h) and reactivates a revoked bundle,
         keeping the token. max_views > 0 sets the cap, <= 0 clears it, omitted keeps
         it.
       parameters:
@@ -13577,8 +13825,10 @@ paths:
       - share-bundles
   /api/share-bundles/{id}/access-log:
     get:
-      description: 'Any role; owner only (others get 404). Anonymous redemptions,
-        newest first: time, best-effort IP, user agent, whether a passphrase was used.'
+      description: Any role; owner or admin (others get 404). Newest first. action
+        "redeem" is an anonymous guest opening (time, best-effort IP, user agent,
+        whether a passphrase was used); action "reveal" is an admin reading the link
+        back (actor_name).
       parameters:
       - description: Bundle ID
         in: path
@@ -13619,8 +13869,9 @@ paths:
     put:
       consumes:
       - application/json
-      description: Any role; owner only (others get 404). Same token and URL; expiry,
-        passphrase and view count are kept. Every item is re-validated for access.
+      description: Any role; owner or admin (others get 404). Same token and URL;
+        expiry, passphrase and view count are kept. Every item is re-validated for
+        access.
       parameters:
       - description: Bundle ID
         in: path
@@ -13661,6 +13912,47 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Replace a share bundle's items
+      tags:
+      - share-bundles
+  /api/share-bundles/{id}/reveal:
+    post:
+      description: Admin. Decrypts the bundle's token and passphrase ("" when it has
+        none) and records the reveal in its access log. 409 when the bundle predates
+        encrypted storage and cannot be recovered.
+      parameters:
+      - description: Bundle ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.bundleRevealResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Reveal a share bundle's link and passphrase
       tags:
       - share-bundles
   /api/share-bundles/reissue:
@@ -13709,6 +14001,30 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Reissue a share bundle under an existing token
+      tags:
+      - share-bundles
+  /api/share-bundles/revoke-all:
+    post:
+      description: Admin. Revokes every bundle not yet revoked, whoever created it;
+        answers how many were revoked.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Revoke every share bundle
       tags:
       - share-bundles
   /api/ssh/create-remote-user/{slug}:

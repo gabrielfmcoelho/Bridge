@@ -97,6 +97,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	bundleH := &bundleHandlers{repo: secretRepo}
 	rr.auth("POST /api/share-bundles", bundleH.handleCreate)
 	rr.auth("POST /api/share-bundles/reissue", bundleH.handleReissue)
+	rr.role("admin", "POST /api/share-bundles/revoke-all", bundleH.handleRevokeAll)
+	rr.role("admin", "POST /api/share-bundles/{id}/reveal", bundleH.handleReveal)
 	rr.auth("GET /api/share-bundles", bundleH.handleList)
 	rr.auth("PATCH /api/share-bundles/{id}", bundleH.handleRenew)
 	rr.auth("PUT /api/share-bundles/{id}/items", bundleH.handleUpdateItems)

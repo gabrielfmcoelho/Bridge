@@ -381,20 +381,20 @@ export default function HostsPage() {
     onSuccess: (d) => {
       queryClient.invalidateQueries({ queryKey: ["hosts"] });
       queryClient.invalidateQueries({ queryKey: ["hosts-table"] });
-      // Reasons for missing IPs are actionable (agent, token privilege), so
-      // a warning, which stays until dismissed.
-      const reasons = d.no_ip_reasons ?? [];
-      flag({
-        appearance: reasons.length ? "warning" : "success",
-        title: t("host.syncProxmox"),
-        description: [
-          t("host.proxmoxSyncDone", {
-            found: String(d.found), created: String(d.created), updated: String(d.updated),
-            deactivated: String(d.deactivated), no_ip: String(d.no_ip),
-          }),
-          ...reasons.map((r) => `• ${r}`),
-        ].join("\n"),
-      });
+      // One line per server. A failed server or reasons for missing IPs are
+      // actionable (URL, agent, token privilege), so a warning, which stays
+      // until dismissed.
+      const lines = d.servers.flatMap((s) => [
+        `${s.name} — ${s.error
+          ? t("host.proxmoxSyncFailed", { error: s.error })
+          : t("host.proxmoxSyncDone", {
+            found: String(s.found), created: String(s.created), updated: String(s.updated),
+            deactivated: String(s.deactivated), no_ip: String(s.no_ip),
+          })}`,
+        ...(s.no_ip_reasons ?? []).map((r) => `  • ${r}`),
+      ]);
+      const warn = d.servers.some((s) => s.error || s.no_ip_reasons?.length);
+      flag({ appearance: warn ? "warning" : "success", title: t("host.syncProxmox"), description: lines.join("\n") });
     },
     onError: (err) => flag({ appearance: "error", title: t("host.syncProxmox"), description: err.message }),
   });

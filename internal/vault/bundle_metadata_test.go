@@ -177,7 +177,7 @@ func TestBundle_AccessLogOwnerScopedNewestFirst(t *testing.T) {
 	}
 
 	// A non-owner cannot read the log — collapses to not-found.
-	if _, err := env.repo.BundleAccessLog(ctx, env.alice, view.ID); err != vault.ErrBundleNotFound {
+	if _, err := env.repo.BundleAccessLog(ctx, env.carol, view.ID); err != vault.ErrBundleNotFound {
 		t.Errorf("expected ErrBundleNotFound for non-owner, got %v", err)
 	}
 }
