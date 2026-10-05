@@ -37,7 +37,7 @@ func TestBundle_UpdateItems_SameTokenReplacesItems(t *testing.T) {
 	}
 
 	// Foreign actor cannot edit — must collapse to not-found.
-	if _, err := env.repo.UpdateBundleItems(ctx, env.alice, view.ID, []vault.BundleItemInput{
+	if _, err := env.repo.UpdateBundleItems(ctx, env.carol, view.ID, []vault.BundleItemInput{
 		{Type: vault.BundleItemAPIDoc, RefID: apiID},
 	}); !errors.Is(err, vault.ErrBundleNotFound) {
 		t.Fatalf("foreign edit: want ErrBundleNotFound, got %v", err)

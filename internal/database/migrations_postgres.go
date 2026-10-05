@@ -1735,4 +1735,20 @@ var migrationsPostgres = []string{
 	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS obs_https_status INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS obs_status TEXT NOT NULL DEFAULT '';
 	ALTER TABLE dns_records ADD COLUMN IF NOT EXISTS observed_at TIMESTAMPTZ;`,
+
+	// Version 105: share bundles keep their link token and passphrase encrypted
+	// with the vault's master key, so an admin can reveal them again (audited).
+	// Rows from before keep NULL ciphers = not recoverable. A bundle may name
+	// who it is for (a contact, or free text). The access log tells guest
+	// redemptions ('redeem') from admin reveals ('reveal', with the actor).
+	`ALTER TABLE share_bundles ADD COLUMN IF NOT EXISTS token_cipher BYTEA;
+	ALTER TABLE share_bundles ADD COLUMN IF NOT EXISTS token_nonce BYTEA;
+	ALTER TABLE share_bundles ADD COLUMN IF NOT EXISTS passphrase_cipher BYTEA;
+	ALTER TABLE share_bundles ADD COLUMN IF NOT EXISTS passphrase_nonce BYTEA;
+	ALTER TABLE share_bundles ADD COLUMN IF NOT EXISTS recipient_contact_id BIGINT REFERENCES contacts(id) ON DELETE SET NULL;
+	ALTER TABLE share_bundles ADD COLUMN IF NOT EXISTS recipient_label TEXT NOT NULL DEFAULT '';
+	ALTER TABLE share_bundle_access_log ADD COLUMN IF NOT EXISTS action TEXT NOT NULL DEFAULT 'redeem';
+	ALTER TABLE share_bundle_access_log DROP CONSTRAINT IF EXISTS share_bundle_access_log_action_check;
+	ALTER TABLE share_bundle_access_log ADD CONSTRAINT share_bundle_access_log_action_check CHECK (action IN ('redeem','reveal'));
+	ALTER TABLE share_bundle_access_log ADD COLUMN IF NOT EXISTS actor_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL;`,
 }

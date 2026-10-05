@@ -89,6 +89,8 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"PATCH", "/api/share-bundles/1"},
 		{"DELETE", "/api/share-bundles/1"},
 		{"GET", "/api/share-bundles/1/access-log"},
+		{"POST", "/api/share-bundles/revoke-all"},
+		{"POST", "/api/share-bundles/1/reveal"},
 
 		// SSH operations
 		{"GET", "/api/ssh/preview-config"},

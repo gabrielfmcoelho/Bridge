@@ -12767,14 +12767,14 @@ const docTemplate = `{
         },
         "/api/share-bundles": {
             "get": {
-                "description": "Any role. The caller's bundles. item_type with ref_id (or ref_key for wiki items) returns every bundle containing that item; secret_id returns only single-secret bundles for that secret.",
+                "description": "Any role. The caller's bundles; an admin gets every bundle. item_type with ref_id (or ref_key for wiki items) returns every bundle containing that item; secret_id returns only single-secret bundles for that secret.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "share-bundles"
                 ],
-                "summary": "List my share bundles",
+                "summary": "List share bundles",
                 "parameters": [
                     {
                         "type": "string",
@@ -12968,9 +12968,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/share-bundles/revoke-all": {
+            "post": {
+                "description": "Admin. Revokes every bundle not yet revoked, whoever created it; answers how many were revoked.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "share-bundles"
+                ],
+                "summary": "Revoke every share bundle",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/share-bundles/{id}": {
             "delete": {
-                "description": "Any role; owner only (others get 404).",
+                "description": "Any role; owner or admin (others get 404).",
                 "produces": [
                     "application/json"
                 ],
@@ -13012,7 +13047,7 @@ const docTemplate = `{
                 }
             },
             "patch": {
-                "description": "Any role; owner only (others get 404). Extends expiry from now (ttl_seconds \u003c 0 = never expires, 0 = 24h) and reactivates a revoked bundle, keeping the token. max_views \u003e 0 sets the cap, \u003c= 0 clears it, omitted keeps it.",
+                "description": "Any role; owner or admin (others get 404). Extends expiry from now (ttl_seconds \u003c 0 = never expires, 0 = 24h) and reactivates a revoked bundle, keeping the token. max_views \u003e 0 sets the cap, \u003c= 0 clears it, omitted keeps it.",
                 "consumes": [
                     "application/json"
                 ],
@@ -13071,7 +13106,7 @@ const docTemplate = `{
         },
         "/api/share-bundles/{id}/access-log": {
             "get": {
-                "description": "Any role; owner only (others get 404). Anonymous redemptions, newest first: time, best-effort IP, user agent, whether a passphrase was used.",
+                "description": "Any role; owner or admin (others get 404). Newest first. action \"redeem\" is an anonymous guest opening (time, best-effort IP, user agent, whether a passphrase was used); action \"reveal\" is an admin reading the link back (actor_name).",
                 "produces": [
                     "application/json"
                 ],
@@ -13130,7 +13165,7 @@ const docTemplate = `{
         },
         "/api/share-bundles/{id}/items": {
             "put": {
-                "description": "Any role; owner only (others get 404). Same token and URL; expiry, passphrase and view count are kept. Every item is re-validated for access.",
+                "description": "Any role; owner or admin (others get 404). Same token and URL; expiry, passphrase and view count are kept. Every item is re-validated for access.",
                 "consumes": [
                     "application/json"
                 ],
@@ -13192,6 +13227,65 @@ const docTemplate = `{
                     },
                     "502": {
                         "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/share-bundles/{id}/reveal": {
+            "post": {
+                "description": "Admin. Decrypts the bundle's token and passphrase (\"\" when it has none) and records the reveal in its access log. 409 when the bundle predates encrypted storage and cannot be recovered.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "share-bundles"
+                ],
+                "summary": "Reveal a share bundle's link and passphrase",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Bundle ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.bundleRevealResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -16095,6 +16189,20 @@ const docTemplate = `{
                 }
             }
         },
+        "api.bundleRevealResponse": {
+            "type": "object",
+            "properties": {
+                "passphrase": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
         "api.catalogueOption": {
             "type": "object",
             "properties": {
@@ -16367,6 +16475,13 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "passphrase": {
+                    "type": "string"
+                },
+                "recipient_contact_id": {
+                    "description": "Who the link is for: a contact id, or free text. Both optional.",
+                    "type": "integer"
+                },
+                "recipient_label": {
                     "type": "string"
                 },
                 "title": {
@@ -18271,6 +18386,13 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "passphrase": {
+                    "type": "string"
+                },
+                "recipient_contact_id": {
+                    "description": "Who the link is for: a contact id, or free text. Both optional.",
+                    "type": "integer"
+                },
+                "recipient_label": {
                     "type": "string"
                 },
                 "title": {
@@ -21987,6 +22109,12 @@ const docTemplate = `{
                 "accessed_at": {
                     "type": "string"
                 },
+                "action": {
+                    "type": "string"
+                },
+                "actor_name": {
+                    "type": "string"
+                },
                 "remote_ip": {
                     "type": "string"
                 },
@@ -22089,6 +22217,9 @@ const docTemplate = `{
                 "created_by": {
                     "type": "integer"
                 },
+                "created_by_name": {
+                    "type": "string"
+                },
                 "deleted_at": {
                     "type": "string"
                 },
@@ -22111,8 +22242,26 @@ const docTemplate = `{
                         "$ref": "#/definitions/vault.BundleItemView"
                     }
                 },
+                "last_access_at": {
+                    "description": "last guest redemption",
+                    "type": "string"
+                },
                 "max_views": {
                     "type": "integer"
+                },
+                "recipient_contact_id": {
+                    "description": "RecipientContactID / RecipientName come from the linked contact;\nRecipientLabel is the free-text recipient.",
+                    "type": "integer"
+                },
+                "recipient_label": {
+                    "type": "string"
+                },
+                "recipient_name": {
+                    "type": "string"
+                },
+                "recoverable": {
+                    "description": "Recoverable is true when the token (and passphrase) are stored encrypted,\nso an admin can reveal the link again.",
+                    "type": "boolean"
                 },
                 "revoked_at": {
                     "type": "string"

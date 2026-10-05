@@ -60,12 +60,12 @@ func TestBundle_ListForItem(t *testing.T) {
 	}
 
 	// Owner-scoped: a different user sees none of bob's bundles.
-	gotAlice, err := env.repo.ListBundlesForItem(ctx, env.alice, vault.BundleItemAPIDoc, apiID)
+	gotCarol, err := env.repo.ListBundlesForItem(ctx, env.carol, vault.BundleItemAPIDoc, apiID)
 	if err != nil {
 		t.Fatalf("list as alice: %v", err)
 	}
-	if len(gotAlice) != 0 {
-		t.Errorf("owner-scoping broken: alice sees %d of bob's bundles", len(gotAlice))
+	if len(gotCarol) != 0 {
+		t.Errorf("owner-scoping broken: alice sees %d of bob's bundles", len(gotCarol))
 	}
 	_ = viewB
 }
@@ -129,7 +129,7 @@ func TestBundle_Renew(t *testing.T) {
 	}
 
 	// Owner-only: a different user cannot renew bob's bundle.
-	if _, err := env.repo.RenewBundle(ctx, env.alice, view.ID, vault.RenewBundleOpts{TTL: time.Hour}); err != vault.ErrBundleNotFound {
+	if _, err := env.repo.RenewBundle(ctx, env.carol, view.ID, vault.RenewBundleOpts{TTL: time.Hour}); err != vault.ErrBundleNotFound {
 		t.Errorf("expected ErrBundleNotFound for non-owner renew, got %v", err)
 	}
 }
@@ -200,6 +200,13 @@ func TestBundle_Reissue(t *testing.T) {
 	if view.ID == 0 || len(view.Items) != 1 {
 		t.Fatalf("unexpected reissued view: %+v", view)
 	}
+	// A reissued link is stored encrypted, so an admin can reveal it back.
+	if !view.Recoverable {
+		t.Errorf("reissued bundle should be recoverable")
+	}
+	if sec, err := env.repo.RevealBundle(ctx, env.alice, view.ID); err != nil || sec.Token != rawToken {
+		t.Errorf("reveal reissued: token match=%v err=%v", sec != nil && sec.Token == rawToken, err)
+	}
 
 	// The SAME raw token now redeems.
 	payload, err := env.repo.RedeemBundle(ctx, rawToken, "", vault.RedeemMeta{})
@@ -260,5 +267,112 @@ func TestBundle_NeverExpires(t *testing.T) {
 	}
 	if upd2.ExpiresAt != nil {
 		t.Errorf("never renew should clear the expiry, got %v", *upd2.ExpiresAt)
+	}
+}
+
+// TestBundle_RevealAdminOnlyAudited verifies RevealBundle hands an admin the
+// raw token and passphrase, writes a 'reveal' row naming the admin (without
+// counting a view), hides the bundle from non-admins (ErrBundleNotFound), and
+// refuses a bundle with no stored cipher (ErrBundleNotRecoverable).
+func TestBundle_RevealAdminOnlyAudited(t *testing.T) {
+	env := newSecretTestEnv(t)
+	ctx := context.Background()
+	apiID := seedAPI(t, env, env.bob.UserID)
+
+	tok, view, err := env.repo.CreateBundle(ctx, env.bob,
+		[]vault.BundleItemInput{{Type: vault.BundleItemAPIDoc, RefID: apiID}},
+		vault.CreateBundleOpts{Title: "reveal-me", TTL: time.Hour, Passphrase: "open sesame"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if !view.Recoverable {
+		t.Fatalf("new bundle should be recoverable")
+	}
+
+	// The owner is not an admin: not found, like any foreign bundle.
+	if _, err := env.repo.RevealBundle(ctx, env.bob, view.ID); err != vault.ErrBundleNotFound {
+		t.Fatalf("non-admin reveal: want ErrBundleNotFound, got %v", err)
+	}
+
+	sec, err := env.repo.RevealBundle(ctx, env.alice, view.ID)
+	if err != nil {
+		t.Fatalf("admin reveal: %v", err)
+	}
+	if sec.Token != tok || sec.Passphrase != "open sesame" {
+		t.Errorf("reveal mismatch: token ok=%v passphrase ok=%v", sec.Token == tok, sec.Passphrase == "open sesame")
+	}
+
+	entries, err := env.repo.BundleAccessLog(ctx, env.bob, view.ID)
+	if err != nil {
+		t.Fatalf("access log: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Action != "reveal" || entries[0].ActorName != "alice" {
+		t.Fatalf("expected one reveal row by alice, got %+v", entries)
+	}
+	got, _ := env.repo.ListBundles(ctx, env.bob)
+	if len(got) != 1 || got[0].ViewCount != 0 || got[0].LastAccessAt != nil {
+		t.Errorf("a reveal must not count as a view or a last access, got %+v", got)
+	}
+
+	// Pre-v105 rows have no cipher.
+	if _, err := env.d.SQL.Exec(`UPDATE share_bundles SET token_cipher = NULL, token_nonce = NULL WHERE id = ?`, view.ID); err != nil {
+		t.Fatalf("strip cipher: %v", err)
+	}
+	if _, err := env.repo.RevealBundle(ctx, env.alice, view.ID); err != vault.ErrBundleNotRecoverable {
+		t.Errorf("want ErrBundleNotRecoverable, got %v", err)
+	}
+	if _, err := env.repo.RevealBundle(ctx, env.alice, 999999); err != vault.ErrBundleNotFound {
+		t.Errorf("missing bundle: want ErrBundleNotFound, got %v", err)
+	}
+}
+
+// TestBundle_AdminSeesAndRevokesAll verifies the admin ownerScope: an admin
+// lists, renews and revokes other users' bundles, everyone else only their
+// own, and RevokeAllBundles (admin only) revokes every live bundle.
+func TestBundle_AdminSeesAndRevokesAll(t *testing.T) {
+	env := newSecretTestEnv(t)
+	ctx := context.Background()
+	apiID := seedAPI(t, env, env.bob.UserID)
+	items := []vault.BundleItemInput{{Type: vault.BundleItemAPIDoc, RefID: apiID}}
+
+	tokBob, viewBob, err := env.repo.CreateBundle(ctx, env.bob, items, vault.CreateBundleOpts{Title: "bob", TTL: time.Hour})
+	if err != nil {
+		t.Fatalf("create bob: %v", err)
+	}
+	if _, _, err := env.repo.CreateBundle(ctx, env.carol, items, vault.CreateBundleOpts{Title: "carol", TTL: time.Hour}); err != nil {
+		t.Fatalf("create carol: %v", err)
+	}
+
+	all, err := env.repo.ListBundles(ctx, env.alice)
+	if err != nil || len(all) != 2 {
+		t.Fatalf("admin should list 2 bundles, got %d (%v)", len(all), err)
+	}
+	own, _ := env.repo.ListBundles(ctx, env.bob)
+	if len(own) != 1 || own[0].ID != viewBob.ID || own[0].CreatedByName != "bob" {
+		t.Fatalf("bob should list only his bundle, got %+v", own)
+	}
+
+	if _, err := env.repo.RenewBundle(ctx, env.alice, viewBob.ID, vault.RenewBundleOpts{TTL: 2 * time.Hour}); err != nil {
+		t.Errorf("admin renew of bob's bundle: %v", err)
+	}
+	if err := env.repo.RevokeBundle(ctx, env.alice, viewBob.ID); err != nil {
+		t.Errorf("admin revoke of bob's bundle: %v", err)
+	}
+	if _, err := env.repo.RedeemBundle(ctx, tokBob, "", vault.RedeemMeta{}); err != vault.ErrShareLinkRevoked {
+		t.Errorf("revoked by admin should not redeem, got %v", err)
+	}
+
+	if _, err := env.repo.RevokeAllBundles(ctx, env.bob); err != vault.ErrSecretForbidden {
+		t.Errorf("non-admin revoke-all: want ErrSecretForbidden, got %v", err)
+	}
+	n, err := env.repo.RevokeAllBundles(ctx, env.alice)
+	if err != nil || n != 1 {
+		t.Fatalf("revoke-all: want 1 (carol's; bob's already revoked), got %d (%v)", n, err)
+	}
+	all, _ = env.repo.ListBundles(ctx, env.alice)
+	for _, b := range all {
+		if b.RevokedAt == nil {
+			t.Errorf("bundle %d still live after revoke-all", b.ID)
+		}
 	}
 }

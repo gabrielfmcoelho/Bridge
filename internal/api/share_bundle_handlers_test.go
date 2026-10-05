@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
@@ -22,6 +23,9 @@ import (
 type bundleHandlerFixture struct {
 	repo         *vault.SecretRepo
 	owner, other *models.User
+	admin        *models.User
+	contactID    int64
+	d            *database.DB
 	actor        vault.ActorContext
 	secretID     int64
 }
@@ -45,6 +49,11 @@ func newBundleHandlerFixture(t *testing.T) *bundleHandlerFixture {
 	}
 	owner := seed("owner", "editor")
 	other := seed("other", "editor")
+	admin := seed("admin", "admin")
+	var contactID int64
+	if err := d.SQL.QueryRow(`INSERT INTO contacts (name, phone) VALUES (?, '') RETURNING id`, "Fulano").Scan(&contactID); err != nil {
+		t.Fatalf("seed contact: %v", err)
+	}
 
 	repo := vault.NewSecretRepo(d)
 	actor := vault.ActorContext{UserID: owner.ID, Role: owner.Role}
@@ -60,7 +69,7 @@ func newBundleHandlerFixture(t *testing.T) *bundleHandlerFixture {
 	if err != nil {
 		t.Fatalf("seed secret: %v", err)
 	}
-	return &bundleHandlerFixture{repo: repo, owner: owner, other: other, actor: actor, secretID: secretID}
+	return &bundleHandlerFixture{repo: repo, owner: owner, other: other, admin: admin, contactID: contactID, d: d, actor: actor, secretID: secretID}
 }
 
 func (f *bundleHandlerFixture) as(u *models.User, r *http.Request) *http.Request {
@@ -221,6 +230,116 @@ func TestBundleHandlers_AccessLog(t *testing.T) {
 	h.handleAccessLog(rec2, req2)
 	if rec2.Code != http.StatusNotFound {
 		t.Errorf("non-owner access-log status = %d, want 404", rec2.Code)
+	}
+}
+
+// TestBundleHandlers_RevealAndRevokeAll covers the admin routes: reveal answers
+// the token, URL and passphrase (404 for a non-admin, 409 for a bundle without
+// a stored cipher) and is logged; revoke-all reports how many it revoked. Also
+// checks create's recipient fields: a known contact is kept, an unknown one is 400.
+func TestBundleHandlers_RevealAndRevokeAll(t *testing.T) {
+	f := newBundleHandlerFixture(t)
+	h := &bundleHandlers{repo: f.repo}
+	secretRef := strconv.FormatInt(f.secretID, 10)
+
+	// Create with a recipient contact and a passphrase.
+	body := `{"title":"for fulano","ttl_seconds":3600,"passphrase":"pw-123","recipient_contact_id":` +
+		strconv.FormatInt(f.contactID, 10) + `,"recipient_label":"Equipe X","items":[{"type":"secret","ref_id":` + secretRef + `}]}`
+	rec := httptest.NewRecorder()
+	h.handleCreate(rec, f.as(f.owner, httptest.NewRequest(http.MethodPost, "/api/share-bundles", strings.NewReader(body))))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID    int64  `json:"id"`
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("decode create: %v", err)
+	}
+	idStr := strconv.FormatInt(created.ID, 10)
+
+	// Unknown recipient contact -> 400.
+	bad := `{"ttl_seconds":3600,"recipient_contact_id":999999,"items":[{"type":"secret","ref_id":` + secretRef + `}]}`
+	recBad := httptest.NewRecorder()
+	h.handleCreate(recBad, f.as(f.owner, httptest.NewRequest(http.MethodPost, "/api/share-bundles", strings.NewReader(bad))))
+	if recBad.Code != http.StatusBadRequest {
+		t.Errorf("unknown recipient status = %d, want 400", recBad.Code)
+	}
+
+	// The admin's list carries the recipient and recoverability.
+	recList := httptest.NewRecorder()
+	h.handleList(recList, f.as(f.admin, httptest.NewRequest(http.MethodGet, "/api/share-bundles", nil)))
+	rows := decodeEnvelopeData(t, recList)
+	if len(rows) != 1 || rows[0]["recipient_name"] != "Fulano" || rows[0]["recipient_label"] != "Equipe X" ||
+		rows[0]["recoverable"] != true || rows[0]["created_by_name"] != "owner" {
+		t.Fatalf("admin list row = %+v", rows)
+	}
+
+	reveal := func(u *models.User, id string) *httptest.ResponseRecorder {
+		req := f.as(u, httptest.NewRequest(http.MethodPost, "/api/share-bundles/"+id+"/reveal", nil))
+		req.SetPathValue("id", id)
+		rec := httptest.NewRecorder()
+		h.handleReveal(rec, req)
+		return rec
+	}
+	recRev := reveal(f.admin, idStr)
+	if recRev.Code != http.StatusOK {
+		t.Fatalf("reveal status = %d, body=%s", recRev.Code, recRev.Body.String())
+	}
+	var got bundleRevealResponse
+	if err := json.Unmarshal(recRev.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode reveal: %v", err)
+	}
+	if got.Token != created.Token || got.URL != "/share/"+created.Token || got.Passphrase != "pw-123" {
+		t.Errorf("reveal = %+v, want token %q and passphrase", got, created.Token)
+	}
+	if c := reveal(f.owner, idStr).Code; c != http.StatusNotFound {
+		t.Errorf("non-admin reveal status = %d, want 404", c)
+	}
+
+	// A bundle without a stored cipher (pre-v105) -> 409.
+	_, legacy, err := f.repo.CreateBundle(context.Background(), f.actor,
+		[]vault.BundleItemInput{{Type: vault.BundleItemSecret, RefID: f.secretID}},
+		vault.CreateBundleOpts{Title: "legacy", TTL: time.Hour})
+	if err != nil {
+		t.Fatalf("create legacy: %v", err)
+	}
+	if _, err := f.d.SQL.Exec(`UPDATE share_bundles SET token_cipher = NULL, token_nonce = NULL WHERE id = ?`, legacy.ID); err != nil {
+		t.Fatalf("strip cipher: %v", err)
+	}
+	if c := reveal(f.admin, strconv.FormatInt(legacy.ID, 10)).Code; c != http.StatusConflict {
+		t.Errorf("legacy reveal status = %d, want 409", c)
+	}
+
+	// The reveal shows up in the access log with the admin's name.
+	reqLog := f.as(f.admin, httptest.NewRequest(http.MethodGet, "/api/share-bundles/"+idStr+"/access-log", nil))
+	reqLog.SetPathValue("id", idStr)
+	recLog := httptest.NewRecorder()
+	h.handleAccessLog(recLog, reqLog)
+	logRows := decodeEnvelopeData(t, recLog)
+	if len(logRows) != 1 || logRows[0]["action"] != "reveal" || logRows[0]["actor_name"] != "admin" {
+		t.Errorf("access log = %+v, want one reveal by admin", logRows)
+	}
+
+	// revoke-all revokes both live bundles; a second call finds none.
+	revokeAll := func() int64 {
+		rec := httptest.NewRecorder()
+		h.handleRevokeAll(rec, f.as(f.admin, httptest.NewRequest(http.MethodPost, "/api/share-bundles/revoke-all", nil)))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("revoke-all status = %d, body=%s", rec.Code, rec.Body.String())
+		}
+		var out struct {
+			Revoked int64 `json:"revoked"`
+		}
+		_ = json.Unmarshal(rec.Body.Bytes(), &out)
+		return out.Revoked
+	}
+	if n := revokeAll(); n != 2 {
+		t.Errorf("revoke-all revoked %d, want 2", n)
+	}
+	if n := revokeAll(); n != 0 {
+		t.Errorf("second revoke-all revoked %d, want 0", n)
 	}
 }
 
