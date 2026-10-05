@@ -876,8 +876,9 @@
     "none": "nenhuma",
     "situacaoUpdateFailed": "Falha ao atualizar",
     "syncProxmox": "Sincronizar do Proxmox",
-    "syncProxmoxRunning": "Lendo o cluster Proxmox…",
+    "syncProxmoxRunning": "Lendo os servidores Proxmox…",
     "proxmoxSyncDone": "{found} encontrados: {created} novos, {updated} atualizados, {deactivated} marcados inativos, {no_ip} sem IP",
+    "proxmoxSyncFailed": "falhou: {error}",
     "runsOn": "Roda em",
     "bulkActions": "Ações em lote",
     "idleNoWorkloads": "Nenhuma carga de trabalho ou container detectado no host.",
@@ -1848,12 +1849,21 @@
         "sshUserHint": "O usuário SSH é usado ao registrar servidores no Coolify. O Coolify não aceita pontos em nomes de usuário. O padrão é \"root\"."
       },
       "proxmox": {
-        "hint": "Cluster Proxmox VE — sincroniza nós, VMs e containers em Hosts.",
+        "hint": "Clusters Proxmox VE — sincroniza nós, VMs e containers em Hosts. Um servidor por cluster independente.",
         "ariaEnable": "Habilitar Proxmox",
         "tokenId": "ID do token",
         "tokenSecret": "Segredo do token",
         "tokenHint": "Token de API somente leitura (usuario@realm!nome) com o papel PVEAuditor em /. Os IPs dos convidados também exigem VM.Monitor (PVE 8) ou VM.GuestAgent.Audit (PVE 9) e o QEMU guest agent.",
-        "connectedVersion": "Conectado — Proxmox VE {version}"
+        "connectedVersion": "Conectado — Proxmox VE {version}",
+        "serversTitle": "Servidores",
+        "emptyServers": "Nenhum servidor Proxmox ainda — adicione um por cluster.",
+        "addServer": "Adicionar servidor",
+        "serverNamePlaceholder": "ex.: cluster SEAD 1",
+        "keepSecret": "Deixe em branco para manter o segredo armazenado",
+        "tokenStored": "Token armazenado",
+        "noToken": "Nenhum token armazenado",
+        "ariaEnableServer": "Habilitar {name}",
+        "confirmDeleteServer": "Os hosts dele ficam, desvinculados; uma sincronização posterior os revincula por IP ou nome."
       },
       "saved": "Salvo",
       "keycloakApis": {

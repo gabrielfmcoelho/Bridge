@@ -876,8 +876,9 @@
     "none": "none",
     "situacaoUpdateFailed": "Update failed",
     "syncProxmox": "Sync from Proxmox",
-    "syncProxmoxRunning": "Reading the Proxmox cluster…",
+    "syncProxmoxRunning": "Reading the Proxmox servers…",
     "proxmoxSyncDone": "{found} found: {created} new, {updated} updated, {deactivated} marked inactive, {no_ip} without IP",
+    "proxmoxSyncFailed": "failed: {error}",
     "runsOn": "Runs on",
     "bulkActions": "Bulk actions",
     "idleNoWorkloads": "Host has no detected workloads or containers.",
@@ -1848,12 +1849,21 @@
         "sshUserHint": "SSH User is used when registering servers in Coolify. Coolify does not accept dots in usernames. Defaults to \"root\"."
       },
       "proxmox": {
-        "hint": "Proxmox VE cluster — syncs nodes, VMs and containers into Hosts.",
+        "hint": "Proxmox VE clusters — syncs nodes, VMs and containers into Hosts. One server per independent cluster.",
         "ariaEnable": "Enable Proxmox",
         "tokenId": "Token ID",
         "tokenSecret": "Token secret",
         "tokenHint": "Read-only API token (user@realm!name) with the PVEAuditor role on /. Guest IPs also need VM.Monitor (PVE 8) or VM.GuestAgent.Audit (PVE 9) and the QEMU guest agent.",
-        "connectedVersion": "Connected — Proxmox VE {version}"
+        "connectedVersion": "Connected — Proxmox VE {version}",
+        "serversTitle": "Servers",
+        "emptyServers": "No Proxmox server yet — add one per cluster.",
+        "addServer": "Add server",
+        "serverNamePlaceholder": "e.g. SEAD cluster 1",
+        "keepSecret": "Leave blank to keep the stored secret",
+        "tokenStored": "Token stored",
+        "noToken": "No token stored",
+        "ariaEnableServer": "Enable {name}",
+        "confirmDeleteServer": "Its hosts stay, unlinked; a later sync re-links them by IP or name."
       },
       "saved": "Saved",
       "keycloakApis": {

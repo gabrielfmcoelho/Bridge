@@ -1873,12 +1873,24 @@ export const relationsAPI = {
 
 // Proxmox VE integration
 export interface ProxmoxSyncSummary { found: number; created: number; updated: number; deactivated: number; no_ip: number; no_ip_reasons?: string[] }
+// One server's outcome; error set = that server failed (counts are what it did before).
+export interface ProxmoxServerSyncResult extends ProxmoxSyncSummary { server_id: number; name: string; error?: string }
+export interface ProxmoxServer {
+  id: number; name: string; base_url: string; token_id: string; has_token: boolean;
+  skip_verify: boolean; enabled: boolean; created_at: string; updated_at: string;
+}
+// Partial: an omitted field keeps its value; an empty token_secret keeps the stored one.
+export type ProxmoxServerInput = Partial<Pick<ProxmoxServer, "name" | "base_url" | "token_id" | "skip_verify" | "enabled">> & { token_secret?: string };
 export const proxmoxAPI = {
-  // Unsaved form values win over stored settings; empty/masked ones fall back.
-  test: (body: { base_url?: string; token_id?: string; token_secret?: string; skip_verify?: boolean }) =>
+  listServers: () => api.getList<ProxmoxServer>("/api/proxmox/servers"),
+  createServer: (body: ProxmoxServerInput) => api.post<ProxmoxServer>("/api/proxmox/servers", body),
+  updateServer: (id: number, body: ProxmoxServerInput) => api.put<ProxmoxServer>(`/api/proxmox/servers/${id}`, body),
+  deleteServer: (id: number) => api.delete<{ status: string }>(`/api/proxmox/servers/${id}`),
+  // A stored server (server_id) and/or unsaved values, which win; nothing is persisted.
+  test: (body: { server_id?: number; base_url?: string; token_id?: string; token_secret?: string; skip_verify?: boolean }) =>
     api.post<{ success: boolean; version?: string; error?: string }>("/api/proxmox/test", body),
-  // Reads the whole cluster and upserts every node/guest as a host — can outlive the 120s default.
-  sync: () => request<ProxmoxSyncSummary>("/api/proxmox/sync", { method: "POST" }, 10 * 60_000),
+  // Reads every enabled server in turn and upserts its nodes/guests as hosts — can outlive the 120s default.
+  sync: () => request<{ servers: ProxmoxServerSyncResult[] }>("/api/proxmox/sync", { method: "POST" }, 30 * 60_000),
 };
 
 // Users (admin)

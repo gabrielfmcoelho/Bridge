@@ -400,12 +400,46 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     Object.assign(record, pickDNS(await readJSON<Partial<DNSRecord>>(request)), { updated_at: new Date().toISOString() });
     return json(record);
   }
-  // Mirrors POST /api/proxmox/{test,sync}. ponytail: static summary, no mock
+  // Mirrors /api/proxmox/*. ponytail: static per-server summary, no mock
   // cluster — seed Proxmox guests into db.hosts if the UI ever needs them.
-  if (method === "POST" && (p === "proxmox/test" || p === "proxmox/sync")) {
+  if (segs[0] === "proxmox") {
     if (currentUser().role !== "admin") return json({ error: "forbidden" }, 403);
-    if (p === "proxmox/test") return json({ success: true, version: "8.2.4" });
-    return json({ found: db.hosts.length, created: 0, updated: db.hosts.length, deactivated: 0, no_ip: 0 });
+    const view = ({ token, ...s }: (typeof db.proxmoxServers)[number]) => ({ ...s, has_token: !!token });
+    type Body = Partial<{ name: string; base_url: string; token_id: string; token_secret: string; skip_verify: boolean; enabled: boolean }>;
+    const apply = (s: (typeof db.proxmoxServers)[number], b: Body) => {
+      const { token_secret, ...rest } = b;
+      Object.assign(s, rest, { updated_at: new Date().toISOString() });
+      if (token_secret?.trim() && token_secret !== "••••••••") s.token = token_secret;
+    };
+    if (method === "POST" && p === "proxmox/test") return json({ success: true, version: "8.2.4" });
+    if (method === "POST" && p === "proxmox/sync") {
+      const servers = db.proxmoxServers.filter((s) => s.enabled);
+      if (!servers.length) return json({ error: "no Proxmox server enabled" }, 400);
+      return json({ servers: servers.map((s) => ({ server_id: s.id, name: s.name, found: db.hosts.length, created: 0, updated: db.hosts.length, deactivated: 0, no_ip: 0 })) });
+    }
+    if (p === "proxmox/servers" && method === "GET") return json(paginate(db.proxmoxServers.map(view), qs.get("page"), qs.get("per_page")));
+    if (p === "proxmox/servers" && method === "POST") {
+      const b = await readJSON<Body>(request);
+      if (!b.name?.trim() || !b.base_url?.trim() || !b.token_id?.trim() || !b.token_secret?.trim()) return json({ error: "name, base_url, token_id and token_secret are required" }, 400);
+      if (db.proxmoxServers.some((s) => s.name === b.name)) return json({ error: "could not add the Proxmox server (name already in use?)" }, 409);
+      const now = new Date().toISOString();
+      const s = { id: Math.max(0, ...db.proxmoxServers.map((x) => x.id)) + 1, name: "", base_url: "", token_id: "", has_token: true, skip_verify: false, enabled: true, created_at: now, updated_at: now };
+      apply(s, b);
+      db.proxmoxServers.push(s);
+      return json(view(s), 201);
+    }
+    if (segs[1] === "servers" && segs.length === 3) {
+      const s = db.proxmoxServers.find((x) => x.id === Number(segs[2]));
+      if (method === "DELETE") {
+        db.proxmoxServers = db.proxmoxServers.filter((x) => x !== s);
+        return json({ status: "deleted" });
+      }
+      if (!s) return notFound("Proxmox server not found");
+      if (method === "PUT") {
+        apply(s, await readJSON<Body>(request));
+        return json(view(s));
+      }
+    }
   }
   // Mirrors POST /api/coolify/dns-sync: idempotent — a second run creates nothing.
   if (method === "POST" && p === "coolify/dns-sync") {
