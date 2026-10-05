@@ -729,6 +729,22 @@ export interface ShareBundleView {
   deleted_at?: string | null;
   has_passphrase: boolean;
   items: ShareBundleItemView[];
+  /** Who the link is for: a contact (recipient_name is its name) and/or free text. */
+  recipient_contact_id?: number | null;
+  recipient_name?: string;
+  recipient_label?: string;
+  created_by_name?: string;
+  /** Last guest redemption (admin reveals don't count). */
+  last_access_at?: string | null;
+  /** The link and passphrase are stored encrypted, so an admin can reveal them. */
+  recoverable?: boolean;
+}
+
+/** What an admin gets back from POST /api/share-bundles/{id}/reveal. */
+export interface ShareBundleReveal {
+  token: string;
+  url: string;
+  passphrase: string;
 }
 
 // BundlePayload is the resolved, guest-facing content returned by the public
@@ -783,13 +799,16 @@ export interface BundlePayload {
   wiki: BundleWikiItem[];
 }
 
-// ShareBundleAccessEntry is one anonymous access-log row (network metadata only)
-// returned by GET /api/share-bundles/{id}/access-log.
+// ShareBundleAccessEntry is one access-log row returned by
+// GET /api/share-bundles/{id}/access-log: an anonymous guest redemption
+// (network metadata only) or an admin reveal (actor_name says who).
 export interface ShareBundleAccessEntry {
   accessed_at: string;
   remote_ip: string;
   user_agent: string;
   used_passphrase: boolean;
+  action?: "redeem" | "reveal";
+  actor_name?: string;
 }
 
 // ── Service Catalog & Requests ──────────────────────────────────────────────

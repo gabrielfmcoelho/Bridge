@@ -14,6 +14,7 @@ import FormError from "@/components/ui/FormError";
 import StatusAlert from "@/components/ui/StatusAlert";
 import SectionHeading from "@/components/ui/SectionHeading";
 import { RowList, ListRow, RowText } from "@/components/ui/RowList";
+import RecipientField, { EMPTY_RECIPIENT, recipientPayload } from "@/components/share/RecipientField";
 
 type TTL = "1h" | "24h" | "7d" | "custom";
 const TTL_SECONDS: Record<Exclude<TTL, "custom">, number> = { "1h": 3600, "24h": 86400, "7d": 604800 };
@@ -24,8 +25,9 @@ const shareOrigin = () => process.env.NEXT_PUBLIC_BASE_URL || window.location.or
 
 /**
  * External share links for one secret: create one (expiry, optional
- * passphrase and view limit) and see or revoke the existing ones. The URL is
- * shown once, right after creating — the token isn't stored readable.
+ * passphrase, view limit and recipient) and see or revoke the existing ones.
+ * The URL is shown right after creating; later only an admin can reveal it
+ * again (on /shares, audited).
  */
 export default function ShareLinkDrawer({ secretID, onClose }: { secretID: number | null; onClose: () => void }) {
   const { t, locale } = useLocale();
@@ -37,6 +39,7 @@ export default function ShareLinkDrawer({ secretID, onClose }: { secretID: numbe
   const [maxViews, setMaxViews] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [recipient, setRecipient] = useState(EMPTY_RECIPIENT);
   const [created, setCreated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
@@ -52,12 +55,13 @@ export default function ShareLinkDrawer({ secretID, onClose }: { secretID: numbe
       passphrase: passphrase || undefined,
       title: title.trim() || undefined,
       description: description.trim() || undefined,
+      ...recipientPayload(recipient),
     }),
     onSuccess: (res) => {
       setCreated(shareOrigin() + res.url);
       setCopied(false);
       setError("");
-      setPassphrase(""); setMaxViews(""); setTitle(""); setDescription("");
+      setPassphrase(""); setMaxViews(""); setTitle(""); setDescription(""); setRecipient(EMPTY_RECIPIENT);
       qc.invalidateQueries({ queryKey: key });
     },
     onError,
@@ -93,6 +97,7 @@ export default function ShareLinkDrawer({ secretID, onClose }: { secretID: numbe
         <section className="space-y-4">
           <SectionHeading as="h3" className="!mb-0">{t("share.newLink")}</SectionHeading>
           <Input label={t("share.nickname")} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t("share.nicknamePlaceholder")} />
+          <RecipientField value={recipient} onChange={setRecipient} enabled={open} />
           <Textarea label={t("common.description")} rows={2} value={description} onChange={(e) => setDescription(e.target.value)} hint={t("share.descriptionHint")} />
           <FormField label={t("share.expiresAfter")}>
             <div className="flex flex-wrap gap-1.5">

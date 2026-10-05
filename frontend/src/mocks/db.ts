@@ -22,6 +22,9 @@ import type {
   RequestEvent,
   RequestAbilities,
   RequestStatus,
+  Contact,
+  ShareBundleView,
+  ShareBundleAccessEntry,
 } from "@/lib/types";
 import { seed } from "./seed";
 // The visibility + ability predicates live in ./scope.ts, which is
@@ -47,6 +50,10 @@ export interface Seed {
   offerings: Offering[];
   requests: ServiceRequest[];
   events: RequestEvent[];
+  contacts: Contact[];
+  /** token/passphrase stand in for the encrypted columns; absent = not recoverable. */
+  shareBundles: (ShareBundleView & { token?: string; passphrase?: string })[];
+  shareAccessLog: (ShareBundleAccessEntry & { bundle_id: number })[];
 }
 
 // ponytail: dev-singleton pin on globalThis — Fast Refresh re-evaluates this

@@ -49,7 +49,8 @@
     "designSystem": "Design System",
     "workspace": "Área de trabalho",
     "selfService": "Autoatendimento",
-    "menu": "Menu"
+    "menu": "Menu",
+    "shares": "Compartilhamentos"
   },
   "atlas": {
     "apis": {
@@ -100,7 +101,7 @@
       "linkCreated": "Link criado",
       "copyLink": "Copiar link",
       "copied": "Copiado!",
-      "tokenOnce": "Este link é exibido apenas uma vez — copie agora.",
+      "tokenOnce": "Copie este link agora. Depois, só um administrador consegue revelá-lo de novo (página Compartilhamentos).",
       "selectSomething": "Selecione ao menos um endpoint ou tag.",
       "existingLinks": "Links existentes",
       "noLinks": "Nenhum link de compartilhamento emitido ainda.",
@@ -2481,7 +2482,6 @@
     "noContent": "Este link não possui mais nenhum conteúdo disponível.",
     "securityNotice": "Aviso de Segurança",
     "securityNoticeDesc": "Este é um link de compartilhamento temporário. Copie as credenciais necessárias e feche esta aba quando terminar.",
-    "securityNoticeDescSingle": "Este link é temporário. Certifique-se de copiar as credenciais e fechar esta aba.",
     "secretTitle": "Segredo compartilhado",
     "secretDesc": "Alguém compartilhou um segredo com você através de um link temporário.",
     "protected": "Este link está protegido. Insira a senha para revelá-lo.",
@@ -2528,7 +2528,7 @@
     "drawerTitle": "Compartilhar por link",
     "createLink": "Criar link",
     "linkCreated": "Link criado",
-    "copyNow": "Copie agora — ele não será mostrado de novo.",
+    "copyNow": "Copie agora. Depois, só um administrador consegue revelá-lo de novo.",
     "newLink": "Novo link",
     "nickname": "Apelido",
     "nicknamePlaceholder": "Para reconhecer este link",
@@ -2556,6 +2556,67 @@
       "expired": "Expirado",
       "exhausted": "Esgotado"
     }
+  },
+  "shares": {
+    "title": "Compartilhamentos",
+    "description": "Os links que você compartilhou: o que levam, para quem são e como estão sendo usados.",
+    "descriptionAdmin": "Todos os links de compartilhamento: o que levam, para quem são e como estão sendo usados. Administradores podem revelar o link e a senha — cada revelação fica registrada.",
+    "recipientContact": "Destinatário (contato)",
+    "noContact": "Nenhum contato",
+    "recipientLabel": "Destinatário (texto livre)",
+    "recipientLabelPlaceholder": "ex.: equipe da PGE",
+    "filterStatus": "Situação",
+    "filterType": "Conteúdo",
+    "filterRecipient": "Destinatário",
+    "group": {
+      "api": "Docs de API",
+      "wiki": "Wiki",
+      "secret": "Segredos"
+    },
+    "status": {
+      "live": "Ativo",
+      "revoked": "Revogado",
+      "archived": "Arquivado",
+      "expired": "Expirado",
+      "exhausted": "Limite de acessos atingido"
+    },
+    "col": {
+      "title": "Título",
+      "recipient": "Destinatário",
+      "items": "Conteúdo",
+      "createdBy": "Criado por",
+      "created": "Criado em",
+      "expires": "Expira em",
+      "status": "Situação",
+      "views": "Acessos",
+      "lastAccess": "Último acesso"
+    },
+    "never": "Nunca",
+    "hasPassphrase": "Protegido por senha",
+    "empty": "Nenhum compartilhamento",
+    "emptyHint": "Links criados a partir de uma API, de uma página da wiki ou de um segredo aparecem aqui.",
+    "reveal": "Revelar link e senha",
+    "revealConfirmTitle": "Revelar este link e a senha?",
+    "revealConfirmMessage": "A revelação fica registrada no histórico de acessos do link, com o seu nome.",
+    "revealTitle": "Link de {title}",
+    "revealAudited": "Esta revelação foi registrada no histórico de acessos.",
+    "notRecoverable": "Este link foi criado antes de os links serem guardados e não pode ser recuperado. Renove-o ou crie outro.",
+    "link": "Link",
+    "passphrase": "Senha",
+    "noPassphrase": "Este link não tem senha.",
+    "renew": "Renovar por 30 dias",
+    "renewed": "Link renovado por 30 dias",
+    "revoke": "Revogar",
+    "revoked": "Link revogado",
+    "revokeConfirmTitle": "Revogar \"{title}\"?",
+    "revokeAll": "Revogar todos",
+    "revokeAllWord": "REVOGAR",
+    "revokeAllConfirmTitle": "Revogar todos os links de compartilhamento?",
+    "revokeAllConfirmMessage": "Todos os links ativos param de abrir na hora, de quem quer que os tenha criado. Cada um pode ser renovado depois.",
+    "revokeAllDone": "{n} links revogados",
+    "accessLog": "Histórico de acessos",
+    "hideLog": "Ocultar histórico de acessos",
+    "revealedBy": "Link revelado por {name}"
   },
   "entidades": {
     "title": "Entidades",

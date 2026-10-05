@@ -317,6 +317,49 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     return json(type ? (TAGS_BY_TYPE[type] ?? []) : ALL_TAGS);
   }
 
+  // ── Contacts + share bundles (the /shares page) ─────────────────────
+  // Mirrors internal/vault/bundle.go: admins see and act on every bundle, the
+  // rest only on their own (others 404); reveal/revoke-all are admin-only.
+  // ponytail: no create/edit here — those forms talk to the real backend.
+  if (method === "GET" && p === "contacts") return json(paginate(db.contacts, qs.get("page"), qs.get("per_page")));
+  if (segs[0] === "share-bundles") {
+    const actor = currentUser();
+    const admin = actor.role === "admin";
+    const mine = db.shareBundles.filter((b) => admin || b.created_by === actor.id);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const view = ({ token, passphrase, ...b }: (typeof db.shareBundles)[number]) => b;
+    if (method === "GET" && segs.length === 1) return json(paginate(mine.map(view), qs.get("page"), qs.get("per_page")));
+    if (method === "POST" && p === "share-bundles/revoke-all") {
+      if (!admin) return json({ error: "forbidden" }, 403);
+      const now = new Date().toISOString();
+      const live = db.shareBundles.filter((b) => !b.revoked_at);
+      live.forEach((b) => { b.revoked_at = now; });
+      return json({ revoked: live.length });
+    }
+    const b = mine.find((x) => x.id === Number(segs[1]));
+    if (!b) return notFound("share bundle not found");
+    if (method === "PATCH" && segs.length === 2) {
+      const body = await readJSON<{ ttl_seconds?: number }>(request);
+      const ttl = body.ttl_seconds ?? 86400;
+      Object.assign(b, { revoked_at: null, deleted_at: null, expires_at: ttl < 0 ? null : new Date(Date.now() + ttl * 1000).toISOString() });
+      return json(view(b));
+    }
+    if (method === "DELETE" && segs.length === 2) {
+      b.revoked_at = new Date().toISOString();
+      return new Response(null, { status: 204 });
+    }
+    if (method === "GET" && segs[2] === "access-log") {
+      const rows = db.shareAccessLog.filter((e) => e.bundle_id === b.id).sort((x, y) => y.accessed_at.localeCompare(x.accessed_at));
+      return json(paginate(rows, qs.get("page"), qs.get("per_page")));
+    }
+    if (method === "POST" && segs[2] === "reveal") {
+      if (!admin) return notFound("share bundle not found");
+      if (!b.token) return json({ error: "this link was created before links were stored and cannot be recovered" }, 409);
+      db.shareAccessLog.push({ bundle_id: b.id, accessed_at: new Date().toISOString(), remote_ip: "", user_agent: "", used_passphrase: false, action: "reveal", actor_name: actor.display_name });
+      return json({ token: b.token, url: `/share/${b.token}`, passphrase: b.passphrase ?? "" });
+    }
+  }
+
   // ── Discovery fixtures ──────────────────────────────────────────────
   if (method === "GET" && p === "hosts") return json(paginate(db.hosts, qs.get("page"), qs.get("per_page")));
   if (method === "GET" && p === "services") return json(paginate(db.services, qs.get("page"), qs.get("per_page")));
