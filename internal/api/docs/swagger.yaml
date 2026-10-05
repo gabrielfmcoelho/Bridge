@@ -171,6 +171,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_ProxmoxServer:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.ProxmoxServer'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-models_SecretAuditLog:
     properties:
       data:
@@ -1876,10 +1885,44 @@ definitions:
       updated_at:
         type: string
     type: object
+  api.proxmoxServerSyncResult:
+    properties:
+      created:
+        type: integer
+      deactivated:
+        type: integer
+      error:
+        type: string
+      found:
+        type: integer
+      name:
+        type: string
+      no_ip:
+        type: integer
+      no_ip_reasons:
+        description: 'NoIPReasons groups the IP-less machines: "reason: name, name",
+          sorted.'
+        items:
+          type: string
+        type: array
+      server_id:
+        type: integer
+      updated:
+        type: integer
+    type: object
+  api.proxmoxSyncResponse:
+    properties:
+      servers:
+        items:
+          $ref: '#/definitions/api.proxmoxServerSyncResult'
+        type: array
+    type: object
   api.proxmoxTestRequest:
     properties:
       base_url:
         type: string
+      server_id:
+        type: integer
       skip_verify:
         type: boolean
       token_id:
@@ -3460,6 +3503,42 @@ definitions:
       sync_issues:
         type: boolean
     type: object
+  models.ProxmoxServer:
+    properties:
+      base_url:
+        type: string
+      created_at:
+        type: string
+      enabled:
+        type: boolean
+      has_token:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      skip_verify:
+        type: boolean
+      token_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.ProxmoxServerInput:
+    properties:
+      base_url:
+        type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+      skip_verify:
+        type: boolean
+      token_id:
+        type: string
+      token_secret:
+        type: string
+    type: object
   models.Release:
     properties:
       created_at:
@@ -4205,25 +4284,6 @@ definitions:
         type: boolean
       updated_at:
         type: string
-    type: object
-  service.ProxmoxSyncSummary:
-    properties:
-      created:
-        type: integer
-      deactivated:
-        type: integer
-      found:
-        type: integer
-      no_ip:
-        type: integer
-      no_ip_reasons:
-        description: 'NoIPReasons groups the IP-less machines: "reason: name, name",
-          sorted.'
-        items:
-          type: string
-        type: array
-      updated:
-        type: integer
     type: object
   service.ScanResources:
     properties:
@@ -11133,18 +11193,55 @@ paths:
       summary: List trashed projects
       tags:
       - projects
-  /api/proxmox/sync:
-    post:
-      description: Admin. Reads the whole cluster and upserts its nodes and guests
-        as hosts; synchronous (up to 10 minutes). 409 while another sync runs, 400
-        when the integration is disabled or unconfigured, 502 when Proxmox fails.
+  /api/proxmox/servers:
+    get:
+      description: Admin. Token secrets are never returned, only has_token.
+      parameters:
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/service.ProxmoxSyncSummary'
+            $ref: '#/definitions/api.ListEnvelope-models_ProxmoxServer'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List Proxmox servers
+      tags:
+      - proxmox
+    post:
+      consumes:
+      - application/json
+      description: Admin. name, base_url, token_id and token_secret are required;
+        the secret is stored encrypted. enabled defaults to true.
+      parameters:
+      - description: Server
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ProxmoxServerInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ProxmoxServer'
         "400":
           description: Bad Request
           schema:
@@ -11161,8 +11258,115 @@ paths:
           description: Conflict
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
-        "502":
-          description: Bad Gateway
+      summary: Add a Proxmox server
+      tags:
+      - proxmox
+  /api/proxmox/servers/{id}:
+    delete:
+      description: Admin. Its hosts stay, unlinked; a later sync may re-link them
+        by IP or name.
+      parameters:
+      - description: Server ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Delete a Proxmox server
+      tags:
+      - proxmox
+    put:
+      consumes:
+      - application/json
+      description: 'Admin. Partial: an omitted field keeps its value; an empty or
+        masked token_secret keeps the stored one.'
+      parameters:
+      - description: Server ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.ProxmoxServerInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ProxmoxServer'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Update a Proxmox server
+      tags:
+      - proxmox
+  /api/proxmox/sync:
+    post:
+      description: 'Admin. Reads every enabled Proxmox server in turn and upserts
+        its nodes and guests as hosts; synchronous (up to 30 minutes). One server
+        failing doesn''t stop the others: its entry carries error. 409 while another
+        sync runs, 400 when the integration is disabled or no server is enabled.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.proxmoxSyncResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Sync hosts from Proxmox
@@ -11173,12 +11377,14 @@ paths:
       consumes:
       - application/json
       description: 'Admin. Calls GET /version with the body values over the stored
-        settings; nothing is persisted. Always 200: {"success": bool, "version"?:
-        ..., "error"?: string}. The body is optional.'
+        server''s (server_id, optional); nothing is persisted. The stored secret is
+        only ever sent to the stored URL. Always 200: {"success": bool, "version"?:
+        ..., "error"?: string}.'
       parameters:
-      - description: Unsaved settings to test
+      - description: Server to test and/or unsaved values
         in: body
         name: body
+        required: true
         schema:
           $ref: '#/definitions/api.proxmoxTestRequest'
       produces:
@@ -11197,7 +11403,7 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
-      summary: Test the Proxmox connection
+      summary: Test a Proxmox server connection
       tags:
       - proxmox
   /api/relations:

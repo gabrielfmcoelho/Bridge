@@ -400,13 +400,16 @@ func (r *HostRepo) CoolifyIndex(ctx context.Context) (byUUID, byHostname map[str
 	return byUUID, byHostname, rows.Err()
 }
 
-// ProxmoxIndex maps non-deleted hosts by proxmox_id and, for the not-yet-linked
-// ones, by lowercased hostname (an IP or a DNS name; first host wins) and by a
-// DNS hostname's first label ("portal.sead.pi.gov.br" → "portal"; a label two
-// hosts share maps to 0 and never matches). Unscoped — the Proxmox sync
-// resolves machines globally.
-func (r *HostRepo) ProxmoxIndex(ctx context.Context) (byPID, byHostname, byLabel map[string]int64, err error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, COALESCE(proxmox_id, ''), hostname FROM hosts WHERE deleted_at IS NULL ORDER BY id`)
+// ProxmoxIndex maps the non-deleted hosts linked to Proxmox server serverID by
+// proxmox_id and, for the not-yet-linked ones, by lowercased hostname (an IP
+// or a DNS name; first host wins) and by a DNS hostname's first label
+// ("portal.sead.pi.gov.br" → "portal"; a label two hosts share maps to 0 and
+// never matches). Hosts linked to another server are left out entirely: each
+// cluster has its own "qemu/101". Hosts orphaned by a deleted server count as
+// not linked. Unscoped — the Proxmox sync resolves machines globally.
+func (r *HostRepo) ProxmoxIndex(ctx context.Context, serverID int64) (byPID, byHostname, byLabel map[string]int64, err error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT id, CASE WHEN proxmox_server_id = ? THEN COALESCE(proxmox_id, '') ELSE '' END, hostname
+		FROM hosts WHERE deleted_at IS NULL AND (proxmox_server_id IS NULL OR proxmox_server_id = ?) ORDER BY id`, serverID, serverID)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -445,6 +448,7 @@ func (r *HostRepo) ProxmoxIndex(ctx context.Context) (byPID, byHostname, byLabel
 
 // ProxmoxState is what the Proxmox sync owns on a linked host.
 type ProxmoxState struct {
+	ServerID             int64 // proxmox_servers.id the machine was read from
 	ProxmoxID            string
 	ParentHostID         *int64
 	IP                   string // replaces hostname only when that is empty or an IPv4
@@ -463,27 +467,28 @@ type ProxmoxState struct {
 // is kept, and an empty st.IP (agent down) changes nothing.
 func (r *HostRepo) SetProxmoxSync(ctx context.Context, hostID int64, st ProxmoxState) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE hosts SET
-			proxmox_id = ?, parent_host_id = ?,
+			proxmox_server_id = ?, proxmox_id = ?, parent_host_id = ?,
 			hostname = CASE WHEN ? <> '' AND (hostname = '' OR hostname ~ '^[0-9]{1,3}(\.[0-9]{1,3}){3}$') THEN ? ELSE hostname END,
 			recurso_cpu = ?, recurso_ram = ?, recurso_armazenamento = ?,
 			situacao = CASE WHEN `+SituacaoInRoleSQL("situacao")+` THEN situacao ELSE `+SituacaoValueSQL+` END,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`,
-		st.ProxmoxID, st.ParentHostID, st.IP, st.IP,
+		st.ServerID, st.ProxmoxID, st.ParentHostID, st.IP, st.IP,
 		st.RecursoCPU, st.RecursoRAM, st.RecursoArmazenamento,
 		SituacaoMaintenance, SituacaoMaintenance, st.SituacaoRole, st.SituacaoRole, hostID)
 	return err
 }
 
-// DeactivateMissingProxmox marks inactive every live Proxmox-linked host whose
-// proxmox_id is not in seen (a manual 'maintenance' is kept, as in
-// SetProxmoxSync), returning how many changed.
-func (r *HostRepo) DeactivateMissingProxmox(ctx context.Context, seen []string) (int, error) {
+// DeactivateMissingProxmox marks inactive every live host linked to server
+// serverID whose proxmox_id is not in seen (a manual 'maintenance' is kept,
+// as in SetProxmoxSync), returning how many changed. Other servers' hosts are
+// never touched.
+func (r *HostRepo) DeactivateMissingProxmox(ctx context.Context, serverID int64, seen []string) (int, error) {
 	res, err := r.db.ExecContext(ctx, `UPDATE hosts SET situacao = `+SituacaoValueSQL+`, updated_at = CURRENT_TIMESTAMP
-		WHERE proxmox_id IS NOT NULL AND deleted_at IS NULL
+		WHERE proxmox_server_id = ? AND proxmox_id IS NOT NULL AND deleted_at IS NULL
 			AND NOT `+SituacaoInRoleSQL("situacao")+` AND NOT `+SituacaoInRoleSQL("situacao")+`
 			AND NOT (proxmox_id = ANY(?))`,
-		SituacaoInactive, SituacaoInactive, SituacaoInactive, SituacaoInactive, SituacaoMaintenance, SituacaoMaintenance, seen)
+		SituacaoInactive, SituacaoInactive, serverID, SituacaoInactive, SituacaoInactive, SituacaoMaintenance, SituacaoMaintenance, seen)
 	if err != nil {
 		return 0, err
 	}

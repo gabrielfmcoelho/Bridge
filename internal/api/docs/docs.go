@@ -9372,21 +9372,79 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/proxmox/sync": {
-            "post": {
-                "description": "Admin. Reads the whole cluster and upserts its nodes and guests as hosts; synchronous (up to 10 minutes). 409 while another sync runs, 400 when the integration is disabled or unconfigured, 502 when Proxmox fails.",
+        "/api/proxmox/servers": {
+            "get": {
+                "description": "Admin. Token secrets are never returned, only has_token.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "proxmox"
                 ],
-                "summary": "Sync hosts from Proxmox",
+                "summary": "List Proxmox servers",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200); omit for every row",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/service.ProxmoxSyncSummary"
+                            "$ref": "#/definitions/api.ListEnvelope-models_ProxmoxServer"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Admin. name, base_url, token_id and token_secret are required; the secret is stored encrypted. enabled defaults to true.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "proxmox"
+                ],
+                "summary": "Add a Proxmox server",
+                "parameters": [
+                    {
+                        "description": "Server",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ProxmoxServerInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProxmoxServer"
                         }
                     },
                     "400": {
@@ -9412,19 +9470,13 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
-                    },
-                    "502": {
-                        "description": "Bad Gateway",
-                        "schema": {
-                            "$ref": "#/definitions/httpx.ErrorResponse"
-                        }
                     }
                 }
             }
         },
-        "/api/proxmox/test": {
-            "post": {
-                "description": "Admin. Calls GET /version with the body values over the stored settings; nothing is persisted. Always 200: {\"success\": bool, \"version\"?: ..., \"error\"?: string}. The body is optional.",
+        "/api/proxmox/servers/{id}": {
+            "put": {
+                "description": "Admin. Partial: an omitted field keeps its value; an empty or masked token_secret keeps the stored one.",
                 "consumes": [
                     "application/json"
                 ],
@@ -9434,12 +9486,173 @@ const docTemplate = `{
                 "tags": [
                     "proxmox"
                 ],
-                "summary": "Test the Proxmox connection",
+                "summary": "Update a Proxmox server",
                 "parameters": [
                     {
-                        "description": "Unsaved settings to test",
+                        "type": "integer",
+                        "description": "Server ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
                         "name": "body",
                         "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ProxmoxServerInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ProxmoxServer"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Admin. Its hosts stay, unlinked; a later sync may re-link them by IP or name.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "proxmox"
+                ],
+                "summary": "Delete a Proxmox server",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Server ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/proxmox/sync": {
+            "post": {
+                "description": "Admin. Reads every enabled Proxmox server in turn and upserts its nodes and guests as hosts; synchronous (up to 30 minutes). One server failing doesn't stop the others: its entry carries error. 409 while another sync runs, 400 when the integration is disabled or no server is enabled.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "proxmox"
+                ],
+                "summary": "Sync hosts from Proxmox",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.proxmoxSyncResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/proxmox/test": {
+            "post": {
+                "description": "Admin. Calls GET /version with the body values over the stored server's (server_id, optional); nothing is persisted. The stored secret is only ever sent to the stored URL. Always 200: {\"success\": bool, \"version\"?: ..., \"error\"?: string}.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "proxmox"
+                ],
+                "summary": "Test a Proxmox server connection",
+                "parameters": [
+                    {
+                        "description": "Server to test and/or unsaved values",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
                         "schema": {
                             "$ref": "#/definitions/api.proxmoxTestRequest"
                         }
@@ -15793,6 +16006,20 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ListEnvelope-models_ProxmoxServer": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ProxmoxServer"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
         "api.ListEnvelope-models_SecretAuditLog": {
             "type": "object",
             "properties": {
@@ -18353,11 +18580,61 @@ const docTemplate = `{
                 }
             }
         },
+        "api.proxmoxServerSyncResult": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "integer"
+                },
+                "deactivated": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "found": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "no_ip": {
+                    "type": "integer"
+                },
+                "no_ip_reasons": {
+                    "description": "NoIPReasons groups the IP-less machines: \"reason: name, name\", sorted.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "server_id": {
+                    "type": "integer"
+                },
+                "updated": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.proxmoxSyncResponse": {
+            "type": "object",
+            "properties": {
+                "servers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.proxmoxServerSyncResult"
+                    }
+                }
+            }
+        },
         "api.proxmoxTestRequest": {
             "type": "object",
             "properties": {
                 "base_url": {
                     "type": "string"
+                },
+                "server_id": {
+                    "type": "integer"
                 },
                 "skip_verify": {
                     "type": "boolean"
@@ -20692,6 +20969,61 @@ const docTemplate = `{
                 }
             }
         },
+        "models.ProxmoxServer": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "has_token": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "skip_verify": {
+                    "type": "boolean"
+                },
+                "token_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ProxmoxServerInput": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "skip_verify": {
+                    "type": "boolean"
+                },
+                "token_id": {
+                    "type": "string"
+                },
+                "token_secret": {
+                    "type": "string"
+                }
+            }
+        },
         "models.Release": {
             "type": "object",
             "properties": {
@@ -21752,33 +22084,6 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
-                }
-            }
-        },
-        "service.ProxmoxSyncSummary": {
-            "type": "object",
-            "properties": {
-                "created": {
-                    "type": "integer"
-                },
-                "deactivated": {
-                    "type": "integer"
-                },
-                "found": {
-                    "type": "integer"
-                },
-                "no_ip": {
-                    "type": "integer"
-                },
-                "no_ip_reasons": {
-                    "description": "NoIPReasons groups the IP-less machines: \"reason: name, name\", sorted.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "updated": {
-                    "type": "integer"
                 }
             }
         },

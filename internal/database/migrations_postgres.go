@@ -1751,4 +1751,41 @@ var migrationsPostgres = []string{
 	ALTER TABLE share_bundle_access_log DROP CONSTRAINT IF EXISTS share_bundle_access_log_action_check;
 	ALTER TABLE share_bundle_access_log ADD CONSTRAINT share_bundle_access_log_action_check CHECK (action IN ('redeem','reveal'));
 	ALTER TABLE share_bundle_access_log ADD COLUMN IF NOT EXISTS actor_user_id BIGINT REFERENCES users(id) ON DELETE SET NULL;`,
+
+	// Version 106: more than one Proxmox VE server (independent clusters, so
+	// "qemu/101" can exist on each). The single app_settings config becomes
+	// row #1 (its app_secrets hex cipher decoded into BYTEA, same AEAD), and
+	// its keys go away; proxmox_enabled stays as the master switch. A host's
+	// proxmox_id is unique per server; deleting a server orphans its hosts
+	// (SET NULL) instead of deleting them.
+	`CREATE TABLE IF NOT EXISTS proxmox_servers (
+		id           BIGSERIAL PRIMARY KEY,
+		name         TEXT NOT NULL UNIQUE,
+		base_url     TEXT NOT NULL DEFAULT '',
+		token_id     TEXT NOT NULL DEFAULT '',
+		token_cipher BYTEA,
+		token_nonce  BYTEA,
+		skip_verify  BOOLEAN NOT NULL DEFAULT FALSE,
+		enabled      BOOLEAN NOT NULL DEFAULT TRUE,
+		created_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at   TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+	INSERT INTO proxmox_servers (name, base_url, token_id, token_cipher, token_nonce, skip_verify)
+		SELECT 'Proxmox', rtrim(trim(u.value), '/'), COALESCE(trim(t.value), ''),
+			decode(NULLIF(s.cipher, ''), 'hex'), decode(NULLIF(s.nonce, ''), 'hex'),
+			COALESCE(v.value, 'false') = 'true'
+		FROM app_settings u
+		LEFT JOIN app_settings t ON t.key = 'proxmox_token_id'
+		LEFT JOIN app_settings v ON v.key = 'proxmox_skip_verify'
+		LEFT JOIN app_secrets s ON s.key = 'proxmox_token_secret'
+		WHERE u.key = 'proxmox_base_url' AND trim(u.value) <> ''
+			AND NOT EXISTS (SELECT 1 FROM proxmox_servers);
+	ALTER TABLE hosts ADD COLUMN IF NOT EXISTS proxmox_server_id BIGINT REFERENCES proxmox_servers(id) ON DELETE SET NULL;
+	UPDATE hosts SET proxmox_server_id = (SELECT MIN(id) FROM proxmox_servers)
+		WHERE proxmox_id IS NOT NULL AND proxmox_server_id IS NULL;
+	DROP INDEX IF EXISTS idx_hosts_proxmox_id;
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_hosts_proxmox_server_pid ON hosts(proxmox_server_id, proxmox_id)
+		WHERE proxmox_id IS NOT NULL AND deleted_at IS NULL;
+	DELETE FROM app_settings WHERE key IN ('proxmox_base_url', 'proxmox_token_id', 'proxmox_skip_verify');
+	DELETE FROM app_secrets WHERE key = 'proxmox_token_secret';`,
 }
