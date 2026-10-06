@@ -153,6 +153,10 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"POST", "/api/hosts/x/grafana/provision"},
 		{"POST", "/api/services/1/grafana/provision"},
 
+		// SigNoz request telemetry
+		{"GET", "/api/telemetry/status"},
+		{"GET", "/api/telemetry/requests"},
+
 		// GLPI integration
 		{"GET", "/api/settings/integrations/glpi/tokens"},
 		{"POST", "/api/settings/integrations/glpi/tokens"},

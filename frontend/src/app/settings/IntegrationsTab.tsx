@@ -10,6 +10,7 @@ import GitLabIntegrationSection from "./integrations/GitLabIntegrationSection";
 import OutlineIntegrationSection from "./integrations/OutlineIntegrationSection";
 import GLPIIntegrationSection from "./integrations/GLPIIntegrationSection";
 import GrafanaIntegrationSection from "./integrations/GrafanaIntegrationSection";
+import SignozIntegrationSection from "./integrations/SignozIntegrationSection";
 import LLMSection from "./integrations/LLMSection";
 import CoolifySection from "./integrations/CoolifySection";
 import ProxmoxSection from "./integrations/ProxmoxSection";
@@ -26,6 +27,7 @@ export default function IntegrationsTab() {
       <KeycloakAPIsSection />
       <GitLabIntegrationSection ssoActive={activeProvider === "gitlab"} />
       <GrafanaIntegrationSection />
+      <SignozIntegrationSection />
       <OutlineIntegrationSection />
       <GLPIIntegrationSection />
       <LLMSection />

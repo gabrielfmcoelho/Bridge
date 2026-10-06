@@ -1883,6 +1883,15 @@
         "usageClientId": "ID do cliente de uso",
         "usageClientSecret": "Segredo do cliente de uso",
         "usageClientHint": "Um cliente separado, sem papéis de realm-management, com os escopos <prefixo>:admin.uso. Só o token dele é enviado às APIs; sem ele, o uso fica indisponível."
+      },
+      "signoz": {
+        "hint": "Contagem de requisições, erros e p50/p95/p99 por API, serviço e host, lidos do ClickHouse do SigNoz.",
+        "ariaEnableIntegration": "Habilitar integração com o SigNoz",
+        "chUrl": "URL do ClickHouse (HTTP, porta 8123)",
+        "uiUrl": "URL do SigNoz (link)",
+        "chUser": "Usuário do ClickHouse",
+        "chPassword": "Senha do ClickHouse",
+        "chHint": "Use um usuário somente leitura do ClickHouse (readonly=1), acessível só a partir da VM do Bridge."
       }
     },
     "integrationsTabLabel": "Integrações",
@@ -2584,7 +2593,9 @@
       "revoked": "Revogado",
       "expired": "Expirado",
       "exhausted": "Esgotado"
-    }
+    },
+    "usage": "Uso",
+    "usageWindow": "últimos 30 dias, só as requisições desta chave"
   },
   "shares": {
     "title": "Compartilhamentos",
@@ -3386,5 +3397,34 @@
     "hostCredHint": "Credencial de host: servidores podem entrar com ela. Vincule-os em “Onde fica”.",
     "passwordUserHint": "Com que usuário esta senha entra (opcional).",
     "linkHostsLoginHint": "Cada servidor entra com o próprio usuário de login e passa a usar esta credencial."
+  },
+  "telemetry": {
+    "tab": "Requisições",
+    "range": {
+      "1h": "1 h",
+      "24h": "24 h",
+      "7d": "7 dias",
+      "30d": "30 dias"
+    },
+    "groupBy": {
+      "route": "Rota",
+      "key": "Chave",
+      "status": "Situação HTTP",
+      "service": "Serviço"
+    },
+    "requests": "Requisições",
+    "errors": "Erros (5xx)",
+    "overTime": "Requisições no tempo",
+    "top": "As 20 mais frequentes",
+    "unknown": "(nenhum)",
+    "openSignoz": "Abrir no SigNoz",
+    "loadError": "Não foi possível ler a telemetria do SigNoz.",
+    "emptyTitle": "Nenhuma requisição no período",
+    "emptyHint": "Nada passou pelo gateway ou pelo Traefik para este item na janela escolhida.",
+    "reason": {
+      "not_configured": "A telemetria de requisições precisa da integração com o SigNoz (Configurações → Integrações).",
+      "no_gateway_url": "Esta API não tem URL base com o caminho do gateway, então as requisições dela não podem ser identificadas.",
+      "no_coolify_uuid": "Nenhum recurso do Coolify está vinculado aqui, então as requisições do Traefik não podem ser identificadas."
+    }
   }
 }

@@ -11841,7 +11841,7 @@ const docTemplate = `{
         },
         "/api/settings/integrations": {
             "get": {
-                "description": "Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
+                "description": "Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
                 "produces": [
                     "application/json"
                 ],
@@ -12610,7 +12610,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, outline, proxmox, glpi, general)",
+                        "description": "Integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, general)",
                         "name": "group",
                         "in": "path",
                         "required": true
@@ -12933,7 +12933,7 @@ const docTemplate = `{
         },
         "/api/share-bundle/{token}": {
             "get": {
-                "description": "Public, no auth; the token is the capability. Returns the resolved contents, including decrypted secret payloads, and counts a view. Unknown, expired, revoked and exhausted links all answer 404; a missing or wrong passphrase answers 401. Sent with Cache-Control: no-store and Referrer-Policy: no-referrer.",
+                "description": "Public, no auth; the token is the capability. Returns the resolved contents, including decrypted secret payloads, and counts a view. usage holds, per shared Keycloak key, its own last-30-days requests from SigNoz (absent when SigNoz is off). Unknown, expired, revoked and exhausted links all answer 404; a missing or wrong passphrase answers 401. Sent with Cache-Control: no-store and Referrer-Policy: no-referrer.",
                 "produces": [
                     "application/json"
                 ],
@@ -12960,7 +12960,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/vault.BundlePayload"
+                            "$ref": "#/definitions/api.sharePayload"
                         }
                     },
                     "401": {
@@ -14786,6 +14786,114 @@ const docTemplate = `{
                         "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/telemetry/requests": {
+            "get": {
+                "description": "Any role that can see the asset (404 otherwise). Reads SigNoz: an API's spans come from the APISIX gateway (filtered by the path of its base_url), a service's and a host's from Coolify's Traefik (by Coolify resource uuid; a host = its services). group_by key (APIs only) labels each Keycloak client with its Bridge key and owner; service (hosts) with the service nickname. {available:false, reason} when SigNoz isn't configured or the asset has nothing to match on. Latencies in ms; errors = 5xx.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "telemetry"
+                ],
+                "summary": "Request telemetry (count, errors, p50/p95/p99)",
+                "parameters": [
+                    {
+                        "enum": [
+                            "api",
+                            "service",
+                            "host"
+                        ],
+                        "type": "string",
+                        "description": "Asset kind",
+                        "name": "kind",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "API or service id, or host slug",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "1h",
+                            "24h",
+                            "7d",
+                            "30d"
+                        ],
+                        "type": "string",
+                        "default": "24h",
+                        "description": "Window",
+                        "name": "range",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "route",
+                            "key",
+                            "status",
+                            "service"
+                        ],
+                        "type": "string",
+                        "default": "route",
+                        "description": "Top groups",
+                        "name": "group_by",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.telemetryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/telemetry/status": {
+            "get": {
+                "description": "Any role. {enabled: true} when the SigNoz integration is on and has a ClickHouse URL.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "telemetry"
+                ],
+                "summary": "Request telemetry availability",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "boolean"
+                            }
                         }
                     }
                 }
@@ -18987,6 +19095,68 @@ const docTemplate = `{
                 }
             }
         },
+        "api.shareKeyUsage": {
+            "type": "object",
+            "properties": {
+                "api_name": {
+                    "type": "string"
+                },
+                "secret": {
+                    "description": "the shared secret's name, as the page lists it",
+                    "type": "string"
+                },
+                "series": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/signoz.Bucket"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/signoz.Stats"
+                },
+                "top": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/signoz.Row"
+                    }
+                }
+            }
+        },
+        "api.sharePayload": {
+            "type": "object",
+            "properties": {
+                "api_docs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/vault.BundleAPIDocItem"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "secrets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/vault.BundleSecretItem"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "usage": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.shareKeyUsage"
+                    }
+                },
+                "wiki": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/vault.BundleWikiItem"
+                    }
+                }
+            }
+        },
         "api.sshCreateRemoteUserRequest": {
             "type": "object",
             "properties": {
@@ -19097,6 +19267,62 @@ const docTemplate = `{
                 "method": {
                     "description": "\"password\" or \"key\"",
                     "type": "string"
+                }
+            }
+        },
+        "api.telemetryResponse": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "description": "not_configured | no_gateway_url | no_coolify_uuid",
+                    "type": "string"
+                },
+                "series": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/signoz.Bucket"
+                    }
+                },
+                "signoz_url": {
+                    "type": "string"
+                },
+                "summary": {
+                    "$ref": "#/definitions/signoz.Stats"
+                },
+                "top": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.telemetryRow"
+                    }
+                }
+            }
+        },
+        "api.telemetryRow": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "errors": {
+                    "type": "integer"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "p50": {
+                    "type": "number"
+                },
+                "p95": {
+                    "type": "number"
+                },
+                "p99": {
+                    "type": "number"
                 }
             }
         },
@@ -22330,6 +22556,72 @@ const docTemplate = `{
                 }
             }
         },
+        "signoz.Bucket": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "errors": {
+                    "type": "integer"
+                },
+                "p50": {
+                    "type": "number"
+                },
+                "p95": {
+                    "type": "number"
+                },
+                "p99": {
+                    "type": "number"
+                },
+                "t": {
+                    "type": "string"
+                }
+            }
+        },
+        "signoz.Row": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "errors": {
+                    "type": "integer"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "p50": {
+                    "type": "number"
+                },
+                "p95": {
+                    "type": "number"
+                },
+                "p99": {
+                    "type": "number"
+                }
+            }
+        },
+        "signoz.Stats": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "errors": {
+                    "type": "integer"
+                },
+                "p50": {
+                    "type": "number"
+                },
+                "p95": {
+                    "type": "number"
+                },
+                "p99": {
+                    "type": "number"
+                }
+            }
+        },
         "sshkeys.KeyInfo": {
             "type": "object",
             "properties": {
@@ -22494,35 +22786,6 @@ const docTemplate = `{
                 },
                 "token_url": {
                     "type": "string"
-                }
-            }
-        },
-        "vault.BundlePayload": {
-            "type": "object",
-            "properties": {
-                "api_docs": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/vault.BundleAPIDocItem"
-                    }
-                },
-                "description": {
-                    "type": "string"
-                },
-                "secrets": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/vault.BundleSecretItem"
-                    }
-                },
-                "title": {
-                    "type": "string"
-                },
-                "wiki": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/vault.BundleWikiItem"
-                    }
                 }
             }
         },

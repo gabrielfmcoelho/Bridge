@@ -35,8 +35,9 @@ import ApiProfile from "./_components/ApiProfile";
 import SectionCard from "@/components/ui/SectionCard";
 import { MarkdownContent } from "@/components/ui/MarkdownEditor";
 import ApiKeysTab from "./_components/ApiKeysTab";
+import RequestsTab, { useTelemetryEnabled } from "@/components/telemetry/RequestsTab";
 
-type TabKey = "overview" | "endpoints" | "issues" | "topology" | "keys";
+type TabKey = "overview" | "endpoints" | "issues" | "topology" | "keys" | "requests";
 
 export default function ApiDetail({ id }: { id: number }) {
   const { t } = useLocale();
@@ -52,6 +53,7 @@ export default function ApiDetail({ id }: { id: number }) {
   const op = searchParams.get("op");
   // An endpoint-search hit (?op=) lands on the reference.
   const [activeTab, setActiveTab] = useState<TabKey>(op ? "endpoints" : "overview");
+  const telemetryEnabled = useTelemetryEnabled();
   const [sharing, setSharing] = useState(false);
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
@@ -142,6 +144,7 @@ export default function ApiDetail({ id }: { id: number }) {
     { key: "endpoints", label: t("atlas.apis.tabEndpoints"), icon: ICON_PATHS.code, badge: api.operation_count || undefined },
     { key: "issues", label: t("host.tabTracking"), icon: ICON_PATHS.alert, badge: openIssues || undefined },
     { key: "topology", label: t("host.tabTopology"), icon: ICON_PATHS.bolt },
+    ...(telemetryEnabled ? [{ key: "requests", label: t("telemetry.tab"), icon: ICON_PATHS.clock }] : []),
     // Entity-specific tab last. Admins see it even with key management off,
     // to switch it on.
     ...(api.key_management !== "none" || isAdmin
@@ -247,6 +250,7 @@ export default function ApiDetail({ id }: { id: number }) {
 
           {activeTab === "issues" && <IssuesBoard entityType="api_catalog" entityId={id} canEdit={canEdit} />}
 
+          {activeTab === "requests" && telemetryEnabled && <RequestsTab kind="api" id={id} />}
           {activeTab === "keys" && <ApiKeysTab api={api} canManage={canManageKeys} isAdmin={isAdmin} />}
 
           {activeTab === "topology" && (

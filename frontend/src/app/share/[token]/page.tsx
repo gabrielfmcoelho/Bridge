@@ -9,6 +9,7 @@ import ApiReference from "@/components/atlas/apis/ApiReference";
 import ShareIndexSidebar from "@/components/share/ShareIndexSidebar";
 import ShareWikiSection from "@/components/share/ShareWikiSection";
 import ShareKeyScopes from "@/components/share/ShareKeyScopes";
+import { RequestsPanel } from "@/components/telemetry/RequestsTab";
 import type { BundlePayload } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
@@ -39,7 +40,7 @@ type ViewState =
 
 // The bundle content is organized into category tabs (Secrets / API / Wiki);
 // only categories with content get a tab.
-type BundleTab = "secrets" | "api" | "wiki";
+type BundleTab = "secrets" | "api" | "wiki" | "usage";
 
 function withPass(path: string, passphrase?: string): string {
   const qs = passphrase ? `?passphrase=${encodeURIComponent(passphrase)}` : "";
@@ -409,6 +410,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
     if (b.secrets.length) tabs.push({ key: "secrets", label: t("share.secrets"), count: b.secrets.length });
     if (b.api_docs.length) tabs.push({ key: "api", label: t("share.apis"), count: b.api_docs.length });
     if (b.wiki.length) tabs.push({ key: "wiki", label: t("share.wiki"), count: b.wiki.length });
+    if (b.usage?.length) tabs.push({ key: "usage", label: t("share.usage"), count: b.usage.length });
     const effectiveTab: BundleTab | null =
       activeTab && tabs.some((x) => x.key === activeTab) ? activeTab : tabs[0]?.key ?? null;
     return (
@@ -532,6 +534,16 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                         </SectionCard>
                       </div>
                     ))}
+
+                  {effectiveTab === "usage" && (
+                    <div className="space-y-5">
+                      {b.usage?.map((u, i) => (
+                        <SectionCard key={i} title={u.secret} description={`${u.api_name} · ${t("share.usageWindow")}`}>
+                          <RequestsPanel data={u} groupBy="route" />
+                        </SectionCard>
+                      ))}
+                    </div>
+                  )}
 
                   {effectiveTab === "wiki" && (
                     <div className="space-y-5">

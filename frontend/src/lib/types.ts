@@ -815,6 +815,17 @@ export interface BundlePayload {
   secrets: BundleSecretItem[];
   api_docs: BundleApiDocItem[];
   wiki: BundleWikiItem[];
+  /** Last 30 days of each shared Keycloak key's own requests (absent when SigNoz is off). */
+  usage?: BundleKeyUsage[];
+}
+
+/** One shared key's usage; secret is the shared secret's name. Latencies in ms. */
+export interface BundleKeyUsage {
+  secret: string;
+  api_name: string;
+  summary: { count: number; errors: number; p50: number; p95: number; p99: number };
+  series: { t: string; count: number; errors: number; p50: number; p95: number; p99: number }[];
+  top: { key: string; count: number; errors: number; p50: number; p95: number; p99: number }[];
 }
 
 // ShareBundleAccessEntry is one access-log row returned by

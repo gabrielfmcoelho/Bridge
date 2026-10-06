@@ -538,12 +538,12 @@ type publicBundleHandlers struct {
 // handleRedeem godoc
 //
 //	@Summary		Redeem a share bundle
-//	@Description	Public, no auth; the token is the capability. Returns the resolved contents, including decrypted secret payloads, and counts a view. Unknown, expired, revoked and exhausted links all answer 404; a missing or wrong passphrase answers 401. Sent with Cache-Control: no-store and Referrer-Policy: no-referrer.
+//	@Description	Public, no auth; the token is the capability. Returns the resolved contents, including decrypted secret payloads, and counts a view. usage holds, per shared Keycloak key, its own last-30-days requests from SigNoz (absent when SigNoz is off). Unknown, expired, revoked and exhausted links all answer 404; a missing or wrong passphrase answers 401. Sent with Cache-Control: no-store and Referrer-Policy: no-referrer.
 //	@Tags			share-bundles
 //	@Produce		json
 //	@Param			token		path		string	true	"Raw bundle token"
 //	@Param			passphrase	query		string	false	"Passphrase, when the bundle has one"
-//	@Success		200			{object}	vault.BundlePayload
+//	@Success		200			{object}	sharePayload
 //	@Failure		401			{object}	httpx.ErrorResponse
 //	@Failure		404			{object}	httpx.ErrorResponse
 //	@Router			/api/share-bundle/{token} [get]
@@ -563,7 +563,7 @@ func (h *publicBundleHandlers) handleRedeem(w http.ResponseWriter, r *http.Reque
 	switch {
 	case err == nil:
 		h.enrichKeys(r.Context(), payload)
-		jsonOK(w, payload)
+		jsonOK(w, sharePayload{BundlePayload: payload, Usage: h.keyUsage(r.Context(), payload)})
 	case errors.Is(err, vault.ErrShareLinkPassphraseBad):
 		jsonError(w, http.StatusUnauthorized, "passphrase required or incorrect")
 	case errors.Is(err, vault.ErrShareLinkNotFound),

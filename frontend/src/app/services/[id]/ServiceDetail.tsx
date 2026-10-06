@@ -27,10 +27,11 @@ import ServiceProfile from "./_components/ServiceProfile";
 import RuntimeCard from "./_components/RuntimeCard";
 import CredentialsTab from "./_components/CredentialsTab";
 import MetricsTab from "./_components/MetricsTab";
+import RequestsTab, { useTelemetryEnabled } from "@/components/telemetry/RequestsTab";
 import ServiceApisTab from "./_components/ServiceApisTab";
 import { linkedApisQuery } from "@/app/atlas/apis/_components/LinkedApisCard";
 
-type TabKey = "overview" | "issues" | "topology" | "credentials" | "metrics" | "apis";
+type TabKey = "overview" | "issues" | "topology" | "credentials" | "metrics" | "apis" | "requests";
 
 const GENERATED = /^Auto-discovered /;
 
@@ -61,6 +62,7 @@ export default function ServiceDetail({ id }: { id: number }) {
   });
   const { data: integrations } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get, retry: false, staleTime: 60_000 });
   const grafanaEnabled = integrations?.grafana?.grafana_enabled === "true";
+  const telemetryEnabled = useTelemetryEnabled();
   const { graph, loading: graphLoading } = useEntityGraph(data ? `service-${id}` : undefined, activeTab === "topology");
   const { data: linkedApis = [] } = useQuery({ ...linkedApisQuery({ service_id: id }), enabled: !!data });
 
@@ -90,6 +92,7 @@ export default function ServiceDetail({ id }: { id: number }) {
     { key: "credentials", label: t("service.credentials"), icon: ICON_PATHS.lock },
     ...(grafanaEnabled ? [{ key: "metrics", label: t("host.tabMetrics"), icon: ICON_PATHS.layoutGrid }] : []),
     { key: "apis", label: t("nav.apis"), icon: ICON_PATHS.code, badge: linkedApis.length || undefined },
+    ...(telemetryEnabled ? [{ key: "requests", label: t("telemetry.tab"), icon: ICON_PATHS.clock }] : []),
   ];
 
   if (isLoading) {
@@ -173,6 +176,7 @@ export default function ServiceDetail({ id }: { id: number }) {
 
           {activeTab === "metrics" && grafanaEnabled && <MetricsTab serviceId={id} nickname={svc.nickname} />}
 
+          {activeTab === "requests" && telemetryEnabled && <RequestsTab kind="service" id={id} />}
           {activeTab === "apis" && <ServiceApisTab serviceId={id} projectId={svc.project_id} dns={linkedDns} canEdit={canEdit} />}
         </PageHeader>
 

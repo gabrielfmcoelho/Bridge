@@ -1883,6 +1883,15 @@
         "usageClientId": "Usage client ID",
         "usageClientSecret": "Usage client secret",
         "usageClientHint": "A separate client with no realm-management roles, holding the <prefix>:admin.uso scopes. Only its token is sent to the APIs; without it, usage is unavailable."
+      },
+      "signoz": {
+        "hint": "Request count, errors and p50/p95/p99 per API, service and host, read from SigNoz's ClickHouse.",
+        "ariaEnableIntegration": "Enable the SigNoz integration",
+        "chUrl": "ClickHouse URL (HTTP, port 8123)",
+        "uiUrl": "SigNoz URL (link)",
+        "chUser": "ClickHouse user",
+        "chPassword": "ClickHouse password",
+        "chHint": "Use a read-only ClickHouse user (readonly=1) reachable only from Bridge's VM."
       }
     },
     "integrationsTabLabel": "Integrations",
@@ -2584,7 +2593,9 @@
       "revoked": "Revoked",
       "expired": "Expired",
       "exhausted": "Used up"
-    }
+    },
+    "usage": "Usage",
+    "usageWindow": "last 30 days, this key's requests only"
   },
   "shares": {
     "title": "Shares",
@@ -3386,5 +3397,34 @@
     "hostCredHint": "Host credential: servers can log in with it. Link them under “Where it lives”.",
     "passwordUserHint": "The user this password logs in as (optional).",
     "linkHostsLoginHint": "Each server logs in with its own login user and starts using this credential."
+  },
+  "telemetry": {
+    "tab": "Requests",
+    "range": {
+      "1h": "1 h",
+      "24h": "24 h",
+      "7d": "7 days",
+      "30d": "30 days"
+    },
+    "groupBy": {
+      "route": "Route",
+      "key": "Key",
+      "status": "Status",
+      "service": "Service"
+    },
+    "requests": "Requests",
+    "errors": "Errors (5xx)",
+    "overTime": "Requests over time",
+    "top": "Top 20",
+    "unknown": "(none)",
+    "openSignoz": "Open in SigNoz",
+    "loadError": "Could not read the telemetry from SigNoz.",
+    "emptyTitle": "No requests in this period",
+    "emptyHint": "Nothing passed through the gateway or Traefik for this item in the selected window.",
+    "reason": {
+      "not_configured": "Request telemetry needs the SigNoz integration (Settings → Integrations).",
+      "no_gateway_url": "This API has no base URL with a gateway path, so its requests can't be matched.",
+      "no_coolify_uuid": "No Coolify resource is linked here, so Traefik's requests can't be matched."
+    }
   }
 }
