@@ -150,7 +150,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	aih.registerRoutes(rr) // /api/ai/*, /api/projects/{id}/ai/analyze
 
 	// Grafana integration
-	grh.registerRoutes(rr) // /api/grafana/*, /api/hosts/{slug}/metrics/live, host/service grafana provision
+	grh.registerRoutes(rr)           // /api/grafana/*, /api/hosts/{slug}/metrics/live, host/service grafana provision
+	app.telemetry.registerRoutes(rr) // /api/telemetry/requests (SigNoz)
 
 	// Public webhook — no auth middleware; HMAC-signed by Grafana and verified in the handler.
 	gwh.registerRoutes(rr) // POST /api/webhooks/grafana/alerts

@@ -110,6 +110,34 @@ func TestPublicBundle_KeyScopes(t *testing.T) {
 	if k == nil || len(k.Scopes) != 2 || k.Scopes[0] != (vault.BundleScopeInfo{Name: "servidores:cadastro"}) {
 		t.Fatalf("scopes without /escopos = %+v", k)
 	}
+
+	// SigNoz on: usage lists the shared key only, read for its own client on
+	// its API's gateway path. The plain secret gets none.
+	var clients, prefix, step string
+	ch := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clients, prefix, step = r.URL.Query().Get("param_clients"), r.URL.Query().Get("param_prefix"), r.URL.Query().Get("param_step")
+		_, _ = w.Write([]byte(`{"data":[{"count":4,"errors":0,"p50":1,"p95":2,"p99":3}]}`))
+	}))
+	defer ch.Close()
+	settings := store.NewAppSettingsRepo(f.d.SQL)
+	settings.Set(ctx, "signoz_enabled", "true")
+	settings.Set(ctx, "signoz_ch_url", ch.URL)
+	req := httptest.NewRequest(http.MethodGet, "/api/share-bundle/"+tok, nil)
+	req.SetPathValue("token", tok)
+	rec := httptest.NewRecorder()
+	h.handleRedeem(rec, req)
+	var withUsage struct {
+		Usage []shareKeyUsage `json:"usage"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &withUsage); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("redeem with usage = %d %v", rec.Code, err)
+	}
+	if len(withUsage.Usage) != 1 || withUsage.Usage[0].Secret != "servidores-painel" || withUsage.Usage[0].Summary.Count != 4 {
+		t.Fatalf("usage = %+v", withUsage.Usage)
+	}
+	if clients != "['servidores-painel']" || prefix != "/servidores" || step != "86400" {
+		t.Errorf("signoz filter clients=%s prefix=%s step=%s (want the 30d window's daily buckets)", clients, prefix, step)
+	}
 }
 
 func TestTokenURL_GatewayOriginFirst(t *testing.T) {

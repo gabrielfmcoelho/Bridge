@@ -1828,6 +1828,29 @@ export const grafanaAPI = {
     api.post<{ uid: string; message: string }>(`/api/services/${serviceId}/grafana/provision`),
 };
 
+export type TelemetryKind = "api" | "service" | "host";
+export type TelemetryRange = "1h" | "24h" | "7d" | "30d";
+export type TelemetryGroupBy = "route" | "key" | "status" | "service";
+/** Latencies in ms; errors = 5xx. */
+export type TelemetryStats = { count: number; errors: number; p50: number; p95: number; p99: number };
+export type TelemetryRequests = {
+  available: boolean;
+  reason?: "not_configured" | "no_gateway_url" | "no_coolify_uuid";
+  summary?: TelemetryStats;
+  series?: (TelemetryStats & { t: string })[];
+  /** label: the Bridge key (and owner) for a Keycloak client, or the service nickname for a Coolify uuid. */
+  top?: (TelemetryStats & { key: string; label?: string })[];
+  signoz_url?: string;
+};
+
+export const telemetryAPI = {
+  status: () => api.get<{ enabled: boolean }>("/api/telemetry/status"),
+  requests: (kind: TelemetryKind, id: string | number, range: TelemetryRange, groupBy: TelemetryGroupBy) =>
+    api.get<TelemetryRequests>(
+      `/api/telemetry/requests?kind=${kind}&id=${encodeURIComponent(String(id))}&range=${range}&group_by=${groupBy}`,
+    ),
+};
+
 // Coolify integration
 export const coolifyAPI = {
   status: () => api.get<{ enabled: boolean; configured: boolean }>("/api/coolify/status"),

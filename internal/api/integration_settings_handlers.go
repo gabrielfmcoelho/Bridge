@@ -93,6 +93,13 @@ var integrationGroups = map[string][]string{
 		"grafana_prom_remote_write_password",
 		"grafana_datasource_uid",
 	},
+	"signoz": {
+		"signoz_enabled",
+		"signoz_ch_url",
+		"signoz_ch_user",
+		"signoz_ch_password",
+		"signoz_ui_url",
+	},
 	"outline": {
 		"outline_enabled",
 		"outline_base_url",
@@ -128,6 +135,7 @@ var secretKeys = map[string]bool{
 	"grafana_webhook_secret":             true,
 	"grafana_prom_remote_write_password": true,
 	"outline_api_token":                  true,
+	"signoz_ch_password":                 true,
 	"glpi_app_token":                     true,
 	"kc_apis_client_secret":              true,
 	"kc_apis_usage_client_secret":        true,
@@ -136,7 +144,7 @@ var secretKeys = map[string]bool{
 // handleGetIntegrations returns all integration settings grouped by provider.
 //
 //	@Summary		Get integration settings
-//	@Description	Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read "••••••••" when set, "" otherwise.
+//	@Description	Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read "••••••••" when set, "" otherwise.
 //	@Tags			integration-settings
 //	@Produce		json
 //	@Success		200	{object}	map[string]map[string]string
@@ -173,7 +181,7 @@ func (h *integrationSettingsHandlers) handleGetIntegrations(w http.ResponseWrite
 //	@Tags			integration-settings
 //	@Accept			json
 //	@Produce		json
-//	@Param			group	path		string				true	"Integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, outline, proxmox, glpi, general)"
+//	@Param			group	path		string				true	"Integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, general)"
 //	@Param			body	body		map[string]string	true	"Setting key to value"
 //	@Success		200		{object}	StatusResponse
 //	@Failure		400		{object}	httpx.ErrorResponse

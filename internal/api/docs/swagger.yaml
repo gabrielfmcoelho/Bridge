@@ -2169,6 +2169,47 @@ definitions:
       version:
         type: string
     type: object
+  api.shareKeyUsage:
+    properties:
+      api_name:
+        type: string
+      secret:
+        description: the shared secret's name, as the page lists it
+        type: string
+      series:
+        items:
+          $ref: '#/definitions/signoz.Bucket'
+        type: array
+      summary:
+        $ref: '#/definitions/signoz.Stats'
+      top:
+        items:
+          $ref: '#/definitions/signoz.Row'
+        type: array
+    type: object
+  api.sharePayload:
+    properties:
+      api_docs:
+        items:
+          $ref: '#/definitions/vault.BundleAPIDocItem'
+        type: array
+      description:
+        type: string
+      secrets:
+        items:
+          $ref: '#/definitions/vault.BundleSecretItem'
+        type: array
+      title:
+        type: string
+      usage:
+        items:
+          $ref: '#/definitions/api.shareKeyUsage'
+        type: array
+      wiki:
+        items:
+          $ref: '#/definitions/vault.BundleWikiItem'
+        type: array
+    type: object
   api.sshCreateRemoteUserRequest:
     properties:
       force:
@@ -2242,6 +2283,43 @@ definitions:
       method:
         description: '"password" or "key"'
         type: string
+    type: object
+  api.telemetryResponse:
+    properties:
+      available:
+        type: boolean
+      reason:
+        description: not_configured | no_gateway_url | no_coolify_uuid
+        type: string
+      series:
+        items:
+          $ref: '#/definitions/signoz.Bucket'
+        type: array
+      signoz_url:
+        type: string
+      summary:
+        $ref: '#/definitions/signoz.Stats'
+      top:
+        items:
+          $ref: '#/definitions/api.telemetryRow'
+        type: array
+    type: object
+  api.telemetryRow:
+    properties:
+      count:
+        type: integer
+      errors:
+        type: integer
+      key:
+        type: string
+      label:
+        type: string
+      p50:
+        type: number
+      p95:
+        type: number
+      p99:
+        type: number
     type: object
   api.toolSyncServiceRequest:
     properties:
@@ -4461,6 +4539,49 @@ definitions:
       version:
         type: string
     type: object
+  signoz.Bucket:
+    properties:
+      count:
+        type: integer
+      errors:
+        type: integer
+      p50:
+        type: number
+      p95:
+        type: number
+      p99:
+        type: number
+      t:
+        type: string
+    type: object
+  signoz.Row:
+    properties:
+      count:
+        type: integer
+      errors:
+        type: integer
+      key:
+        type: string
+      p50:
+        type: number
+      p95:
+        type: number
+      p99:
+        type: number
+    type: object
+  signoz.Stats:
+    properties:
+      count:
+        type: integer
+      errors:
+        type: integer
+      p50:
+        type: number
+      p95:
+        type: number
+      p99:
+        type: number
+    type: object
   sshkeys.KeyInfo:
     properties:
       privatePath:
@@ -4570,25 +4691,6 @@ definitions:
         type: array
       token_url:
         type: string
-    type: object
-  vault.BundlePayload:
-    properties:
-      api_docs:
-        items:
-          $ref: '#/definitions/vault.BundleAPIDocItem'
-        type: array
-      description:
-        type: string
-      secrets:
-        items:
-          $ref: '#/definitions/vault.BundleSecretItem'
-        type: array
-      title:
-        type: string
-      wiki:
-        items:
-          $ref: '#/definitions/vault.BundleWikiItem'
-        type: array
     type: object
   vault.BundleScopeInfo:
     properties:
@@ -12903,9 +13005,9 @@ paths:
   /api/settings/integrations:
     get:
       description: 'Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis,
-        llm, coolify, grafana, outline, proxmox, glpi, general) mapped to its key/value
-        settings. Secret keys are never returned: they read "••••••••" when set, ""
-        otherwise.'
+        llm, coolify, grafana, signoz, outline, proxmox, glpi, general) mapped to
+        its key/value settings. Secret keys are never returned: they read "••••••••"
+        when set, "" otherwise.'
       produces:
       - application/json
       responses:
@@ -12937,7 +13039,7 @@ paths:
         values are encrypted.
       parameters:
       - description: Integration group (ldap, gitlab, keycloak, keycloak_apis, llm,
-          coolify, grafana, outline, proxmox, glpi, general)
+          coolify, grafana, signoz, outline, proxmox, glpi, general)
         in: path
         name: group
         required: true
@@ -13662,9 +13764,11 @@ paths:
   /api/share-bundle/{token}:
     get:
       description: 'Public, no auth; the token is the capability. Returns the resolved
-        contents, including decrypted secret payloads, and counts a view. Unknown,
-        expired, revoked and exhausted links all answer 404; a missing or wrong passphrase
-        answers 401. Sent with Cache-Control: no-store and Referrer-Policy: no-referrer.'
+        contents, including decrypted secret payloads, and counts a view. usage holds,
+        per shared Keycloak key, its own last-30-days requests from SigNoz (absent
+        when SigNoz is off). Unknown, expired, revoked and exhausted links all answer
+        404; a missing or wrong passphrase answers 401. Sent with Cache-Control: no-store
+        and Referrer-Policy: no-referrer.'
       parameters:
       - description: Raw bundle token
         in: path
@@ -13681,7 +13785,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/vault.BundlePayload'
+            $ref: '#/definitions/api.sharePayload'
         "401":
           description: Unauthorized
           schema:
@@ -14928,6 +15032,88 @@ paths:
       summary: List distinct tags
       tags:
       - tags
+  /api/telemetry/requests:
+    get:
+      description: 'Any role that can see the asset (404 otherwise). Reads SigNoz:
+        an API''s spans come from the APISIX gateway (filtered by the path of its
+        base_url), a service''s and a host''s from Coolify''s Traefik (by Coolify
+        resource uuid; a host = its services). group_by key (APIs only) labels each
+        Keycloak client with its Bridge key and owner; service (hosts) with the service
+        nickname. {available:false, reason} when SigNoz isn''t configured or the asset
+        has nothing to match on. Latencies in ms; errors = 5xx.'
+      parameters:
+      - description: Asset kind
+        enum:
+        - api
+        - service
+        - host
+        in: query
+        name: kind
+        required: true
+        type: string
+      - description: API or service id, or host slug
+        in: query
+        name: id
+        required: true
+        type: string
+      - default: 24h
+        description: Window
+        enum:
+        - 1h
+        - 24h
+        - 7d
+        - 30d
+        in: query
+        name: range
+        type: string
+      - default: route
+        description: Top groups
+        enum:
+        - route
+        - key
+        - status
+        - service
+        in: query
+        name: group_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.telemetryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Request telemetry (count, errors, p50/p95/p99)
+      tags:
+      - telemetry
+  /api/telemetry/status:
+    get:
+      description: 'Any role. {enabled: true} when the SigNoz integration is on and
+        has a ClickHouse URL.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+      summary: Request telemetry availability
+      tags:
+      - telemetry
   /api/tools:
     get:
       description: Visible tools. Any role.

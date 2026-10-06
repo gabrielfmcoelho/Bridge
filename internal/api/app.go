@@ -53,6 +53,7 @@ type App struct {
 	proxmox             *proxmoxHandlers
 	grafana             *grafanaHandlers
 	grafanaWebhook      *grafanaWebhookHandlers
+	telemetry           *telemetryHandlers
 	outline             *outlineHandlers
 	glpi                *glpiHandlers
 	entidade            *entidadeHandlers
@@ -109,6 +110,7 @@ func newApp(db *database.DB, configPath string) *App {
 		proxmox:             &proxmoxHandlers{db: db, hosts: deps.Host},
 		grafana:             &grafanaHandlers{db: db},
 		grafanaWebhook:      &grafanaWebhookHandlers{db: db},
+		telemetry:           &telemetryHandlers{db: db},
 		outline:             &outlineHandlers{db: db},
 		glpi:                &glpiHandlers{db: db, cache: glpiclient.NewSessionCache(30 * time.Minute)},
 		entidade:            newEntidadeHandlers(db),
