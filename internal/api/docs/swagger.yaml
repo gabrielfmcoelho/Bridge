@@ -2173,12 +2173,18 @@ definitions:
     properties:
       api_name:
         type: string
+      facets:
+        $ref: '#/definitions/signoz.Facets'
       secret:
         description: the shared secret's name, as the page lists it
         type: string
       series:
         items:
           $ref: '#/definitions/signoz.Bucket'
+        type: array
+      series_by_key:
+        items:
+          $ref: '#/definitions/signoz.KeySeries'
         type: array
       summary:
         $ref: '#/definitions/signoz.Stats'
@@ -2284,16 +2290,51 @@ definitions:
         description: '"password" or "key"'
         type: string
     type: object
+  api.telemetryFacets:
+    properties:
+      keys:
+        items:
+          $ref: '#/definitions/api.telemetryKeyOption'
+        type: array
+      routes:
+        items:
+          type: string
+        type: array
+    type: object
+  api.telemetryKeyOption:
+    properties:
+      key:
+        type: string
+      label:
+        type: string
+    type: object
+  api.telemetryKeySeries:
+    properties:
+      key:
+        type: string
+      label:
+        type: string
+      points:
+        items:
+          $ref: '#/definitions/signoz.Bucket'
+        type: array
+    type: object
   api.telemetryResponse:
     properties:
       available:
         type: boolean
+      facets:
+        $ref: '#/definitions/api.telemetryFacets'
       reason:
         description: not_configured | no_gateway_url | no_coolify_uuid
         type: string
       series:
         items:
           $ref: '#/definitions/signoz.Bucket'
+        type: array
+      series_by_key:
+        items:
+          $ref: '#/definitions/api.telemetryKeySeries'
         type: array
       signoz_url:
         type: string
@@ -2320,6 +2361,58 @@ definitions:
         type: number
       p99:
         type: number
+    type: object
+  api.telemetrySpan:
+    properties:
+      client:
+        type: string
+      duration_ms:
+        type: number
+      label:
+        type: string
+      method:
+        type: string
+      path:
+        type: string
+      route:
+        type: string
+      span_id:
+        type: string
+      status:
+        type: string
+      time:
+        type: string
+      trace_id:
+        type: string
+    type: object
+  api.telemetrySpansResponse:
+    properties:
+      available:
+        type: boolean
+      reason:
+        type: string
+      spans:
+        items:
+          $ref: '#/definitions/api.telemetrySpan'
+        type: array
+    type: object
+  api.telemetryTraceResponse:
+    properties:
+      cut:
+        description: longer than signoz.MaxTraceSpans
+        type: boolean
+      redacted:
+        description: query values hidden (not admin)
+        type: boolean
+      signoz_url:
+        description: the trace in SigNoz
+        type: string
+      spans:
+        items:
+          $ref: '#/definitions/signoz.TraceSpan'
+        type: array
+      trace_id:
+        type: string
     type: object
   api.toolSyncServiceRequest:
     properties:
@@ -4554,6 +4647,26 @@ definitions:
       t:
         type: string
     type: object
+  signoz.Facets:
+    properties:
+      keys:
+        items:
+          type: string
+        type: array
+      routes:
+        items:
+          type: string
+        type: array
+    type: object
+  signoz.KeySeries:
+    properties:
+      key:
+        type: string
+      points:
+        items:
+          $ref: '#/definitions/signoz.Bucket'
+        type: array
+    type: object
   signoz.Row:
     properties:
       count:
@@ -4581,6 +4694,31 @@ definitions:
         type: number
       p99:
         type: number
+    type: object
+  signoz.TraceSpan:
+    properties:
+      attributes:
+        additionalProperties:
+          type: string
+        type: object
+      duration_ms:
+        type: number
+      error:
+        type: boolean
+      kind:
+        type: string
+      name:
+        type: string
+      parent_id:
+        type: string
+      service:
+        type: string
+      span_id:
+        type: string
+      start_ms:
+        type: number
+      status:
+        type: string
     type: object
   sshkeys.KeyInfo:
     properties:
@@ -15037,8 +15175,11 @@ paths:
       description: 'Any role that can see the asset (404 otherwise). Reads SigNoz:
         an API''s spans come from the APISIX gateway (filtered by the path of its
         base_url), a service''s and a host''s from Coolify''s Traefik (by Coolify
-        resource uuid; a host = its services). group_by key (APIs only) labels each
-        Keycloak client with its Bridge key and owner; service (hosts) with the service
+        resource uuid; a host = its services). Optional filters route (normalized,
+        as group_by=route reports it), key (Keycloak client; APIs only) and status.
+        series_by=key adds one line per top-5 key plus "__outros__" (APIs only). facets
+        lists the window''s top routes and keys, ignoring the route/key/status filters.
+        Keys are labelled with their Bridge key and owner; host services with their
         nickname. {available:false, reason} when SigNoz isn''t configured or the asset
         has nothing to match on. Latencies in ms; errors = 5xx.'
       parameters:
@@ -15076,6 +15217,24 @@ paths:
         in: query
         name: group_by
         type: string
+      - description: Only this normalized route
+        in: query
+        name: route
+        type: string
+      - description: Only this Keycloak client (APIs)
+        in: query
+        name: key
+        type: string
+      - description: Only this HTTP status
+        in: query
+        name: status
+        type: string
+      - description: Extra series per key (APIs)
+        enum:
+        - key
+        in: query
+        name: series_by
+        type: string
       produces:
       - application/json
       responses:
@@ -15098,6 +15257,77 @@ paths:
       summary: Request telemetry (count, errors, p50/p95/p99)
       tags:
       - telemetry
+  /api/telemetry/spans:
+    get:
+      description: 'Any role that can see the asset (404 otherwise). The newest gateway
+        (APIs) or Traefik (services, hosts) spans in the window, filtered like /api/telemetry/requests
+        (route, key, status): time, trace and span ids, method, normalized route,
+        path, status, duration and, for APIs, the Keycloak client with its Bridge
+        label. Paths never carry the query string. limit 1–100 (default 50).'
+      parameters:
+      - description: Asset kind
+        enum:
+        - api
+        - service
+        - host
+        in: query
+        name: kind
+        required: true
+        type: string
+      - description: API or service id, or host slug
+        in: query
+        name: id
+        required: true
+        type: string
+      - default: 24h
+        description: Window
+        enum:
+        - 1h
+        - 24h
+        - 7d
+        - 30d
+        in: query
+        name: range
+        type: string
+      - description: Only this normalized route
+        in: query
+        name: route
+        type: string
+      - description: Only this Keycloak client (APIs)
+        in: query
+        name: key
+        type: string
+      - description: Only this HTTP status
+        in: query
+        name: status
+        type: string
+      - default: 50
+        description: Rows (1–100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.telemetrySpansResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Recent requests of an asset
+      tags:
+      - telemetry
   /api/telemetry/status:
     get:
       description: 'Any role. {enabled: true} when the SigNoz integration is on and
@@ -15112,6 +15342,57 @@ paths:
               type: boolean
             type: object
       summary: Request telemetry availability
+      tags:
+      - telemetry
+  /api/telemetry/traces/{trace_id}:
+    get:
+      description: Any role that can see the asset (kind/id), and only when the trace
+        holds a span of that asset in the last 30 days — 404 otherwise, so a trace
+        id alone opens nothing. Every span of the trace, any service (gateway, the
+        API's own spans, its downstream calls), ordered by start, with offsets and
+        durations in ms. Authorization and cookie attributes are dropped for everyone.
+        Query values (url.query, http.target, http.url, url.full) are shown to admins
+        only; others get the parameter names. At most 500 spans (cut:true beyond).
+      parameters:
+      - description: Trace id (32 hex)
+        in: path
+        name: trace_id
+        required: true
+        type: string
+      - description: Asset kind
+        enum:
+        - api
+        - service
+        - host
+        in: query
+        name: kind
+        required: true
+        type: string
+      - description: API or service id, or host slug
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.telemetryTraceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: One request's whole trace
       tags:
       - telemetry
   /api/tools:

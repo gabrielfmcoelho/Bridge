@@ -156,6 +156,8 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		// SigNoz request telemetry
 		{"GET", "/api/telemetry/status"},
 		{"GET", "/api/telemetry/requests"},
+		{"GET", "/api/telemetry/spans"},
+		{"GET", "/api/telemetry/traces/x"},
 
 		// GLPI integration
 		{"GET", "/api/settings/integrations/glpi/tokens"},

@@ -1833,22 +1833,66 @@ export type TelemetryRange = "1h" | "24h" | "7d" | "30d";
 export type TelemetryGroupBy = "route" | "key" | "status" | "service";
 /** Latencies in ms; errors = 5xx. */
 export type TelemetryStats = { count: number; errors: number; p50: number; p95: number; p99: number };
+export type TelemetryPoint = TelemetryStats & { t: string };
+/** The viewer's own filters (route as group_by=route reports it; key = Keycloak client, APIs only). */
+export type TelemetryFilters = { route?: string; key?: string; status?: string };
 export type TelemetryRequests = {
   available: boolean;
   reason?: "not_configured" | "no_gateway_url" | "no_coolify_uuid";
   summary?: TelemetryStats;
-  series?: (TelemetryStats & { t: string })[];
+  series?: TelemetryPoint[];
   /** label: the Bridge key (and owner) for a Keycloak client, or the service nickname for a Coolify uuid. */
   top?: (TelemetryStats & { key: string; label?: string })[];
+  /** One line per top key; key "__outros__" folds the rest (APIs, series_by=key). */
+  series_by_key?: { key: string; label?: string; points: TelemetryPoint[] }[];
+  /** Filter options of the window, ignoring the route/key/status filters. */
+  facets?: { routes: string[]; keys?: { key: string; label?: string }[] };
   signoz_url?: string;
+};
+export type TelemetrySpan = {
+  time: string;
+  trace_id: string;
+  span_id: string;
+  method: string;
+  route: string;
+  path: string;
+  status: string;
+  duration_ms: number;
+  client?: string;
+  label?: string;
+};
+export type TelemetrySpans = { available: boolean; reason?: TelemetryRequests["reason"]; spans?: TelemetrySpan[] };
+export type TelemetryTraceSpan = {
+  span_id: string;
+  parent_id?: string;
+  service: string;
+  name: string;
+  kind: string;
+  start_ms: number;
+  duration_ms: number;
+  status?: string;
+  error?: boolean;
+  attributes: Record<string, string>;
+};
+/** redacted: query values replaced by parameter names (viewer isn't admin). */
+export type TelemetryTrace = { trace_id: string; spans: TelemetryTraceSpan[]; cut?: boolean; redacted?: boolean; signoz_url?: string };
+
+const telemetryQuery = (kind: TelemetryKind, id: string | number, extra: Record<string, string | undefined>) => {
+  const q = new URLSearchParams({ kind, id: String(id) });
+  for (const [k, v] of Object.entries(extra)) if (v) q.set(k, v);
+  return q.toString();
 };
 
 export const telemetryAPI = {
   status: () => api.get<{ enabled: boolean }>("/api/telemetry/status"),
-  requests: (kind: TelemetryKind, id: string | number, range: TelemetryRange, groupBy: TelemetryGroupBy) =>
+  requests: (kind: TelemetryKind, id: string | number, range: TelemetryRange, groupBy: TelemetryGroupBy, f: TelemetryFilters = {}, seriesByKey = false) =>
     api.get<TelemetryRequests>(
-      `/api/telemetry/requests?kind=${kind}&id=${encodeURIComponent(String(id))}&range=${range}&group_by=${groupBy}`,
+      `/api/telemetry/requests?${telemetryQuery(kind, id, { range, group_by: groupBy, ...f, series_by: seriesByKey ? "key" : undefined })}`,
     ),
+  spans: (kind: TelemetryKind, id: string | number, range: TelemetryRange, f: TelemetryFilters = {}) =>
+    api.get<TelemetrySpans>(`/api/telemetry/spans?${telemetryQuery(kind, id, { range, ...f })}`),
+  trace: (kind: TelemetryKind, id: string | number, traceId: string) =>
+    api.get<TelemetryTrace>(`/api/telemetry/traces/${encodeURIComponent(traceId)}?${telemetryQuery(kind, id, {})}`),
 };
 
 // Coolify integration

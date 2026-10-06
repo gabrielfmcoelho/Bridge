@@ -36,6 +36,15 @@
   --danger-muted: rgba(248, 113, 113, 0.15);
   --info: #38bdf8;
   --info-muted: rgba(56, 189, 248, 0.15);
+  /* Chart series (categorical, fixed order — never status colors). Validated with
+     the dataviz skill's validate_palette.js on --bg-surface: CVD ΔE ≥ 8.4,
+     normal-vision ≥ 19.3, all ≥ 3:1. --chart-other is the neutral "outros". */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-other: #64748b;
 
   /* Categorical hues for entity identity (hosts=cyan, ...). Derive tints with
      Tailwind opacity modifiers: bg-[var(--cyan)]/15, border-[var(--cyan)]/30.
@@ -117,6 +126,14 @@
      #fb7185) all sit under 3:1 on white. */
   --info: #0369a1;
   --info-muted: rgba(14, 165, 233, 0.14);
+  /* Chart series, light steps (same hues). CVD ΔE ≥ 9.1, normal-vision ≥ 19.6;
+     3–5 are under 3:1 on white, so charts keep a legend and a table view. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-other: #94a3b8;
   --cyan: #0e7490;
   --rose: #be123c;
 
