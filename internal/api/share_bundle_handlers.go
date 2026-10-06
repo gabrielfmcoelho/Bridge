@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -531,6 +532,7 @@ func (h *bundleHandlers) handleRevokeAll(w http.ResponseWriter, r *http.Request)
 // can prompt for a retry.
 type publicBundleHandlers struct {
 	repo *vault.SecretRepo
+	db   *database.DB // keycloak_apis settings + API catalog for key enrichment
 }
 
 // handleRedeem godoc
@@ -560,6 +562,7 @@ func (h *publicBundleHandlers) handleRedeem(w http.ResponseWriter, r *http.Reque
 	})
 	switch {
 	case err == nil:
+		h.enrichKeys(r.Context(), payload)
 		jsonOK(w, payload)
 	case errors.Is(err, vault.ErrShareLinkPassphraseBad):
 		jsonError(w, http.StatusUnauthorized, "passphrase required or incorrect")

@@ -322,6 +322,33 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   // rest only on their own (others 404); reveal/revoke-all are admin-only.
   // ponytail: no create/edit here — those forms talk to the real backend.
   if (method === "GET" && p === "contacts") return json(paginate(db.contacts, qs.get("page"), qs.get("per_page")));
+  // Public redeem (the /share/{token} guest page). ponytail: resolves secret
+  // items only, each as a Keycloak API key with its scopes; api docs and wiki
+  // stay empty here.
+  if (method === "GET" && segs[0] === "share-bundle" && segs.length === 2) {
+    const b = db.shareBundles.find((x) => x.token === segs[1]);
+    if (!b || b.revoked_at || b.deleted_at) return notFound("share bundle not found");
+    if (b.passphrase && qs.get("passphrase") !== b.passphrase) return json({ error: "passphrase required or incorrect" }, 401);
+    const secrets = b.items.filter((it) => it.type === "secret").map((it) => ({
+      name: it.label,
+      type: "api_key",
+      payload: JSON.stringify({ value: "mock-client-secret", client_id: it.label }),
+      key: {
+        client_id: it.label,
+        api_name: "API Servidores",
+        api_base_url: "https://gateway.sead.pi.gov.br/servidores",
+        rate_limit_per_minute: 60,
+        token_url: "https://gateway.sead.pi.gov.br/realms/apis/protocol/openid-connect/token",
+        scopes: [
+          { name: "servidores:cadastro", kind: "route", description: "Dados cadastrais dos servidores (/api/cadastro)." },
+          { name: "servidores:lotacao", kind: "route", description: "Lotação e vínculo atual." },
+          { name: "servidores:demo", kind: "modifier", description: "Anonimiza CPF e nome nas respostas." },
+          { name: "servidores:legado" },
+        ],
+      },
+    }));
+    return json({ title: b.title, description: b.description, secrets, api_docs: [], wiki: [] });
+  }
   if (segs[0] === "share-bundles") {
     const actor = currentUser();
     const admin = actor.role === "admin";

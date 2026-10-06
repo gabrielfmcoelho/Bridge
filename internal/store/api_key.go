@@ -152,6 +152,31 @@ func (r *APIKeyRepo) SetSecret(ctx context.Context, id, secretID int64) error {
 	return err
 }
 
+// BySecret returns the usable (active or in grace) key whose vault secret is
+// secretID, or (nil, nil) when none. No visibility filter: it serves the
+// public bundle redeem, where the share token is the capability; the API
+// must still be live.
+func (r *APIKeyRepo) BySecret(ctx context.Context, secretID int64) (*models.APIKey, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+apiKeyCols+` FROM api_keys k
+		WHERE k.secret_id = ? AND k.revoked_at IS NULL
+		  AND EXISTS (SELECT 1 FROM api_catalog a WHERE a.id = k.api_id AND a.deleted_at IS NULL)
+		ORDER BY k.created_at DESC, k.id DESC`, secretID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		k := &models.APIKey{}
+		if err := scanAPIKey(rows, k); err != nil {
+			return nil, err
+		}
+		if k.Status == models.APIKeyStatusActive || k.Status == models.APIKeyStatusGrace {
+			return k, nil
+		}
+	}
+	return nil, rows.Err()
+}
+
 // ByExternalLabel maps an API's Keycloak client ids to their key rows' ids.
 func (r *APIKeyRepo) ByExternalLabel(ctx context.Context, apiID int64) (map[string]int64, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT external_label, id FROM api_keys WHERE api_id = ? AND external_label IS NOT NULL`, apiID)

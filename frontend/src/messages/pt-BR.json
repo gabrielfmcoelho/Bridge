@@ -2533,6 +2533,20 @@
       "raw": "bruto",
       "api_key": "chave de acesso"
     },
+    "key": {
+      "title": "Escopos desta chave",
+      "hint": "Peça exatamente estes escopos ao gerar o token (client credentials).",
+      "clientId": "Client ID",
+      "api": "API",
+      "baseUrl": "Endereço da API",
+      "tokenUrl": "URL do token",
+      "rateLimit": "Limite de requisições",
+      "rateLimitValue": "{count} por minuto",
+      "scopeParam": "Parâmetro scope",
+      "kindRoute": "rota",
+      "kindModifier": "modificador",
+      "noDescription": "Sem descrição disponível."
+    },
     "switchToLight": "Mudar para tema claro",
     "switchToDark": "Mudar para tema escuro",
     "drawerTitle": "Compartilhar por link",
