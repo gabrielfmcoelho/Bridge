@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/kcadmin"
@@ -14,20 +15,21 @@ const bundleScopesTimeout = 5 * time.Second
 
 // enrichKeys fills, for every shared API key in p, each scope's kind and
 // description from its API's catalogue (one GET /escopos per distinct API)
-// and the realm's public token URL from the keycloak_apis settings.
+// and where to ask for a token (see tokenURL).
 // Best-effort: any failure leaves the names alone and never fails the redeem.
 func (h *publicBundleHandlers) enrichKeys(ctx context.Context, p *vault.BundlePayload) {
-	var tokenURL string
+	var cfg *kcadmin.Config
 	catalogues := map[int64]map[string]kcadmin.ScopeInfo{}
 	for i := range p.Secrets {
 		k := p.Secrets[i].Key
 		if k == nil {
 			continue
 		}
-		if tokenURL == "" {
-			tokenURL = h.tokenURL(ctx)
+		if cfg == nil {
+			c := h.kcConfig(ctx)
+			cfg = &c
 		}
-		k.TokenURL = tokenURL
+		k.TokenURL = tokenURL(*cfg, k.APIBaseURL)
 		byName, seen := catalogues[k.APIID]
 		if !seen {
 			byName = h.scopeCatalogue(ctx, k.APIID)
@@ -60,17 +62,27 @@ func (h *publicBundleHandlers) scopeCatalogue(ctx context.Context, apiID int64) 
 	return out
 }
 
-// tokenURL is the realm's public token endpoint (issuer + OIDC path), or ""
-// when the keycloak_apis integration has no base URL. Only plain settings
-// are read — never the client secrets.
-func (h *publicBundleHandlers) tokenURL(ctx context.Context) string {
+// kcConfig reads the keycloak_apis integration's plain settings — never the
+// client secrets.
+func (h *publicBundleHandlers) kcConfig(ctx context.Context) kcadmin.Config {
 	settings := store.NewAppSettingsRepo(h.db.SQL)
-	cfg := kcadmin.FromSettings(func(key string) string {
+	return kcadmin.FromSettings(func(key string) string {
 		if key == kcadmin.SettingClientSecret || key == kcadmin.SettingUsageSecret {
 			return ""
 		}
 		return settings.Value(ctx, key)
 	})
+}
+
+// tokenURL is where the key's consumer asks for a token: the gateway in front
+// of its API (same origin as the API's base URL), which exposes the realm's
+// token endpoint publicly. Falls back to the configured issuer — Bridge's own
+// address for Keycloak, often internal — when the API has no absolute base
+// URL; "" when neither is known.
+func tokenURL(cfg kcadmin.Config, apiBaseURL string) string {
+	if u, err := url.Parse(apiBaseURL); err == nil && u.Scheme != "" && u.Host != "" && cfg.Realm != "" {
+		return u.Scheme + "://" + u.Host + "/realms/" + cfg.Realm + "/protocol/openid-connect/token"
+	}
 	if cfg.BaseURL == "" {
 		return ""
 	}

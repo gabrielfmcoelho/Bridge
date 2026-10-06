@@ -111,3 +111,16 @@ func TestPublicBundle_KeyScopes(t *testing.T) {
 		t.Fatalf("scopes without /escopos = %+v", k)
 	}
 }
+
+func TestTokenURL_GatewayOriginFirst(t *testing.T) {
+	cfg := kcadmin.Config{BaseURL: "http://keycloak.10.0.122.89.sslip.io", Realm: "apis"}
+	if got := tokenURL(cfg, "https://gateway.sead.pi.gov.br/datalakehouse/servidores"); got != "https://gateway.sead.pi.gov.br/realms/apis/protocol/openid-connect/token" {
+		t.Errorf("api behind the gateway: %q", got)
+	}
+	if got := tokenURL(cfg, ""); got != "http://keycloak.10.0.122.89.sslip.io/realms/apis/protocol/openid-connect/token" {
+		t.Errorf("no base url falls back to the issuer: %q", got)
+	}
+	if got := tokenURL(kcadmin.Config{Realm: "apis"}, ""); got != "" {
+		t.Errorf("nothing known: %q", got)
+	}
+}
