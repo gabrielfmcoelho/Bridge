@@ -31,7 +31,7 @@ func fakeCH(t *testing.T) (*httptest.Server, *[]string, *[]map[string]string) {
 		const stats = `"count":10,"errors":1,"p50":12.5,"p95":80,"p99":120.25`
 		switch {
 		case strings.Contains(q, "GROUP BY t"):
-			io.WriteString(w, `{"data":[{"t":1700000000,`+stats+`}]}`)
+			io.WriteString(w, `{"data":[{"t":1699999200,`+stats+`}]}`)
 		case strings.Contains(q, "GROUP BY key"):
 			io.WriteString(w, `{"data":[{"key":"servidores-painel",`+stats+`}]}`)
 		default:
@@ -51,11 +51,27 @@ func TestRequestsGateway(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Summary.Count != 10 || res.Summary.P99 != 120.25 || len(res.Series) != 1 || res.Top[0].Key != "servidores-painel" {
+	if res.Summary.Count != 10 || res.Summary.P99 != 120.25 || res.Top[0].Key != "servidores-painel" {
 		t.Fatalf("result = %+v", res)
 	}
-	if !res.Series[0].T.Equal(time.Unix(1700000000, 0)) {
-		t.Fatalf("bucket time = %v", res.Series[0].T)
+	// 24h in 1h slots, empty ones filled: the slot the fake answered keeps its numbers.
+	if len(res.Series) != 25 {
+		t.Fatalf("%d slots, want 25 (24h of 1h, both ends)", len(res.Series))
+	}
+	var hit int
+	for _, b := range res.Series {
+		if b.T.Unix()%3600 != 0 {
+			t.Fatalf("slot %v not aligned to the hour", b.T)
+		}
+		if b.Count > 0 {
+			hit++
+			if !b.T.Equal(time.Unix(1699999200, 0)) {
+				t.Errorf("data landed in slot %v", b.T)
+			}
+		}
+	}
+	if hit != 1 {
+		t.Errorf("%d slots with data, want 1", hit)
 	}
 	if len(*queries) != 3 {
 		t.Fatalf("%d queries, want 3", len(*queries))

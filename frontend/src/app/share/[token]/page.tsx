@@ -497,7 +497,9 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                 </div>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-5 items-start">
+              {/* Usage has no index rail: without this the sidebar renders nothing and the
+                  panel would land in its 220px column. */}
+              <div className={`grid grid-cols-1 gap-5 items-start ${effectiveTab === "usage" ? "" : "lg:grid-cols-[220px_minmax(0,1fr)]"}`}>
                 {/* Index rail — scoped to the active tab (with its own search). */}
                 <ShareIndexSidebar
                   secrets={effectiveTab === "secrets" ? b.secrets : []}
