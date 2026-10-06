@@ -83,10 +83,10 @@ func TestRequestsTraefik(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := (*queries)[2]
-	if !strings.Contains(q, "'traefik'") || !strings.Contains(q, "multiSearchAny(") || strings.Contains(q, "parent_span_id") {
+	if !strings.Contains(q, "'traefik'") || !strings.Contains(q, "arrayExists(u -> position(") || strings.Contains(q, "Array(String)") || strings.Contains(q, "parent_span_id") {
 		t.Errorf("traefik query:\n%s", q)
 	}
-	if got := (*params)[0]["param_uuids"]; got != `['abc123','o\'q']` {
+	if got := (*params)[0]["param_uuids"]; got != "abc123,o'q" {
 		t.Errorf("uuids param = %s", got)
 	}
 }
@@ -97,10 +97,10 @@ func TestRequestsClients(t *testing.T) {
 	if _, err := c.Requests(context.Background(), Filter{PathPrefix: "/sei", Clients: []string{"sei-painel"}}, "7d", "route"); err != nil {
 		t.Fatal(err)
 	}
-	if q := (*queries)[0]; !strings.Contains(q, "has({clients:Array(String)}, attributes_string['bridge.client'])") {
+	if q := (*queries)[0]; !strings.Contains(q, "has(splitByChar(',', {clients:String}), attributes_string['bridge.client'])") {
 		t.Errorf("summary query does not filter clients:\n%s", q)
 	}
-	if got := (*params)[0]["param_clients"]; got != "['sei-painel']" {
+	if got := (*params)[0]["param_clients"]; got != "sei-painel" {
 		t.Errorf("clients param = %s", got)
 	}
 }
@@ -116,6 +116,8 @@ func TestRequestsRejects(t *testing.T) {
 		{Filter{}, "1h", "route"},
 		{Filter{PathPrefix: "/x", RouterUUIDs: []string{"a"}}, "1h", "route"},
 		{Filter{RouterUUIDs: []string{"a"}, Clients: []string{"c"}}, "1h", "route"},
+		{Filter{RouterUUIDs: []string{"a,b"}}, "1h", "route"},
+		{Filter{PathPrefix: "/x", Clients: []string{""}}, "1h", "route"},
 	} {
 		if _, err := c.Requests(context.Background(), tc.f, tc.rng, tc.grp); err == nil {
 			t.Errorf("%+v accepted", tc)
@@ -125,11 +127,12 @@ func TestRequestsRejects(t *testing.T) {
 
 func TestRequestsServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "Code: 60. Table does not exist", http.StatusNotFound)
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "{\n\t\"meta\":\n\t[\n\t],\n\t\"data\":\n\t[\nCode: 60. Table does not exist")
 	}))
 	defer srv.Close()
 	_, err := NewClient(srv.URL, "", "").Requests(context.Background(), Filter{PathPrefix: "/x"}, "1h", "route")
-	if err == nil || !strings.Contains(err.Error(), "Table does not exist") {
+	if err == nil || !strings.Contains(err.Error(), "500 Code: 60. Table does not exist") {
 		t.Fatalf("err = %v", err)
 	}
 }
