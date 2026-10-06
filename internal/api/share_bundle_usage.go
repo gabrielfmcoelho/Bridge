@@ -42,7 +42,7 @@ func (h *publicBundleHandlers) keyUsage(ctx context.Context, p *vault.BundlePayl
 		if k == nil || k.ClientID == "" || gatewayPath(k.APIBaseURL) == "" {
 			continue
 		}
-		res, err := client.Requests(ctx, signoz.Filter{PathPrefix: gatewayPath(k.APIBaseURL), Clients: []string{k.ClientID}}, "30d", "route")
+		res, err := client.Requests(ctx, signoz.Filter{PathPrefix: gatewayPath(k.APIBaseURL), Clients: []string{k.ClientID}}, "30d", "route", false)
 		if err != nil {
 			continue
 		}

@@ -14786,7 +14786,7 @@
         },
         "/api/telemetry/requests": {
             "get": {
-                "description": "Any role that can see the asset (404 otherwise). Reads SigNoz: an API's spans come from the APISIX gateway (filtered by the path of its base_url), a service's and a host's from Coolify's Traefik (by Coolify resource uuid; a host = its services). group_by key (APIs only) labels each Keycloak client with its Bridge key and owner; service (hosts) with the service nickname. {available:false, reason} when SigNoz isn't configured or the asset has nothing to match on. Latencies in ms; errors = 5xx.",
+                "description": "Any role that can see the asset (404 otherwise). Reads SigNoz: an API's spans come from the APISIX gateway (filtered by the path of its base_url), a service's and a host's from Coolify's Traefik (by Coolify resource uuid; a host = its services). Optional filters route (normalized, as group_by=route reports it), key (Keycloak client; APIs only) and status. series_by=key adds one line per top-5 key plus \"__outros__\" (APIs only). facets lists the window's top routes and keys, ignoring the route/key/status filters. Keys are labelled with their Bridge key and owner; host services with their nickname. {available:false, reason} when SigNoz isn't configured or the asset has nothing to match on. Latencies in ms; errors = 5xx.",
                 "produces": [
                     "application/json"
                 ],
@@ -14839,6 +14839,33 @@
                         "description": "Top groups",
                         "name": "group_by",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only this normalized route",
+                        "name": "route",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only this Keycloak client (APIs)",
+                        "name": "key",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only this HTTP status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "key"
+                        ],
+                        "type": "string",
+                        "description": "Extra series per key (APIs)",
+                        "name": "series_by",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -14846,6 +14873,103 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/api.telemetryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/telemetry/spans": {
+            "get": {
+                "description": "Any role that can see the asset (404 otherwise). The newest gateway (APIs) or Traefik (services, hosts) spans in the window, filtered like /api/telemetry/requests (route, key, status): time, trace and span ids, method, normalized route, path, status, duration and, for APIs, the Keycloak client with its Bridge label. Paths never carry the query string. limit 1–100 (default 50).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "telemetry"
+                ],
+                "summary": "Recent requests of an asset",
+                "parameters": [
+                    {
+                        "enum": [
+                            "api",
+                            "service",
+                            "host"
+                        ],
+                        "type": "string",
+                        "description": "Asset kind",
+                        "name": "kind",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "API or service id, or host slug",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "1h",
+                            "24h",
+                            "7d",
+                            "30d"
+                        ],
+                        "type": "string",
+                        "default": "24h",
+                        "description": "Window",
+                        "name": "range",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only this normalized route",
+                        "name": "route",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only this Keycloak client (APIs)",
+                        "name": "key",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Only this HTTP status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Rows (1–100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.telemetrySpansResponse"
                         }
                     },
                     "400": {
@@ -14887,6 +15011,72 @@
                             "additionalProperties": {
                                 "type": "boolean"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/telemetry/traces/{trace_id}": {
+            "get": {
+                "description": "Any role that can see the asset (kind/id), and only when the trace holds a span of that asset in the last 30 days — 404 otherwise, so a trace id alone opens nothing. Every span of the trace, any service (gateway, the API's own spans, its downstream calls), ordered by start, with offsets and durations in ms. Authorization and cookie attributes are dropped for everyone. Query values (url.query, http.target, http.url, url.full) are shown to admins only; others get the parameter names. At most 500 spans (cut:true beyond).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "telemetry"
+                ],
+                "summary": "One request's whole trace",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Trace id (32 hex)",
+                        "name": "trace_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "api",
+                            "service",
+                            "host"
+                        ],
+                        "type": "string",
+                        "description": "Asset kind",
+                        "name": "kind",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "API or service id, or host slug",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.telemetryTraceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
                         }
                     }
                 }
@@ -19094,6 +19284,9 @@
                 "api_name": {
                     "type": "string"
                 },
+                "facets": {
+                    "$ref": "#/definitions/signoz.Facets"
+                },
                 "secret": {
                     "description": "the shared secret's name, as the page lists it",
                     "type": "string"
@@ -19102,6 +19295,12 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/signoz.Bucket"
+                    }
+                },
+                "series_by_key": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/signoz.KeySeries"
                     }
                 },
                 "summary": {
@@ -19263,11 +19462,59 @@
                 }
             }
         },
+        "api.telemetryFacets": {
+            "type": "object",
+            "properties": {
+                "keys": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.telemetryKeyOption"
+                    }
+                },
+                "routes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.telemetryKeyOption": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.telemetryKeySeries": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/signoz.Bucket"
+                    }
+                }
+            }
+        },
         "api.telemetryResponse": {
             "type": "object",
             "properties": {
                 "available": {
                     "type": "boolean"
+                },
+                "facets": {
+                    "$ref": "#/definitions/api.telemetryFacets"
                 },
                 "reason": {
                     "description": "not_configured | no_gateway_url | no_coolify_uuid",
@@ -19277,6 +19524,12 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/signoz.Bucket"
+                    }
+                },
+                "series_by_key": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.telemetryKeySeries"
                     }
                 },
                 "signoz_url": {
@@ -19316,6 +19569,84 @@
                 },
                 "p99": {
                     "type": "number"
+                }
+            }
+        },
+        "api.telemetrySpan": {
+            "type": "object",
+            "properties": {
+                "client": {
+                    "type": "string"
+                },
+                "duration_ms": {
+                    "type": "number"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "route": {
+                    "type": "string"
+                },
+                "span_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                },
+                "trace_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.telemetrySpansResponse": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "spans": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.telemetrySpan"
+                    }
+                }
+            }
+        },
+        "api.telemetryTraceResponse": {
+            "type": "object",
+            "properties": {
+                "cut": {
+                    "description": "longer than signoz.MaxTraceSpans",
+                    "type": "boolean"
+                },
+                "redacted": {
+                    "description": "query values hidden (not admin)",
+                    "type": "boolean"
+                },
+                "signoz_url": {
+                    "description": "the trace in SigNoz",
+                    "type": "string"
+                },
+                "spans": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/signoz.TraceSpan"
+                    }
+                },
+                "trace_id": {
+                    "type": "string"
                 }
             }
         },
@@ -22572,6 +22903,37 @@
                 }
             }
         },
+        "signoz.Facets": {
+            "type": "object",
+            "properties": {
+                "keys": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "routes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "signoz.KeySeries": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/signoz.Bucket"
+                    }
+                }
+            }
+        },
         "signoz.Row": {
             "type": "object",
             "properties": {
@@ -22612,6 +22974,44 @@
                 },
                 "p99": {
                     "type": "number"
+                }
+            }
+        },
+        "signoz.TraceSpan": {
+            "type": "object",
+            "properties": {
+                "attributes": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "duration_ms": {
+                    "type": "number"
+                },
+                "error": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "string"
+                },
+                "service": {
+                    "type": "string"
+                },
+                "span_id": {
+                    "type": "string"
+                },
+                "start_ms": {
+                    "type": "number"
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         },

@@ -1,7 +1,7 @@
-// Package signoz reads request telemetry (count, errors, p50/p95/p99) from
-// SigNoz's ClickHouse. Two span sources feed it (see the plan in the Bridge
-// telemetry docs): the APISIX gateway (APIs, with the caller's Keycloak azp)
-// and Coolify's Traefik (apps, by Coolify resource uuid).
+// Package signoz reads request telemetry (count, errors, p50/p95/p99, recent
+// requests, whole traces) from SigNoz's ClickHouse. Two span sources feed it:
+// the APISIX gateway (APIs, with the caller's Keycloak azp) and Coolify's
+// Traefik (apps, by Coolify resource uuid).
 //
 // Every SigNoz schema detail lives in the constants below: when SigNoz
 // changes its trace table, this is the one place to update.
@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -23,7 +24,7 @@ const (
 	spansTable = "signoz_traces.distributed_signoz_index_v3"
 	svcCol     = "resource_string_service$$name"
 
-	gatewayService = "apisix-gateway" // resource.service.name set in APISIX's plugin_attr
+	gatewayService = "apisix-gateway" // resource.service.name set in APISIX's plugin_metadata
 	traefikService = "traefik"
 
 	// APISIX opentelemetry span attributes. bridge.client is the caller's azp:
@@ -36,16 +37,34 @@ const (
 	// the resource uuid (e.g. "https-0-<uuid>@docker").
 	attrTraefikRouter = "attributes_string['traefik.router.name']"
 	attrTraefikPath   = "attributes_string['url.path']"
+	// APISIX writes http.method; Traefik (new semconv) http.request.method.
+	attrMethod = "if(attributes_string['http.method'] != '', attributes_string['http.method'], attributes_string['http.request.method'])"
+
+	// The aggregate every stats query selects.
+	agg = `count() AS count,
+		countIf(has_error OR toUInt16OrZero(response_status_code) >= 500) AS errors,
+		quantile(0.5)(duration_nano) / 1e6 AS p50,
+		quantile(0.95)(duration_nano) / 1e6 AS p95,
+		quantile(0.99)(duration_nano) / 1e6 AS p99`
+
+	// Lines drawn per key over time; the rest is folded into OtherKey.
+	seriesKeys = 5
+	OtherKey   = "__outros__"
 )
 
 // Filter picks the spans of one asset. Exactly one of PathPrefix (an API
 // behind the gateway) or RouterUUIDs (Coolify resources behind Traefik).
-// Clients narrows an API to those Keycloak clients (azp) — a share link
-// shows only the keys it shares.
+//
+// Clients is a restriction (a share link sees only the keys it shares): it
+// applies to everything, facets included. Route, Key and Status are the
+// viewer's own filters: facets ignore them, so the options stay complete.
 type Filter struct {
 	PathPrefix  string
 	RouterUUIDs []string
 	Clients     []string
+	Route       string // normalized route, as group_by=route reports it
+	Key         string // one Keycloak client (azp); APIs only
+	Status      string // HTTP status code, e.g. "404"
 }
 
 // Stats is one aggregate; latencies in milliseconds. Errors = 5xx or span error.
@@ -69,11 +88,53 @@ type Row struct {
 	Stats
 }
 
+// KeySeries is one key's line over time (Key OtherKey = every other key).
+type KeySeries struct {
+	Key    string   `json:"key"`
+	Points []Bucket `json:"points"`
+}
+
+// Facets are the filter options of the window: top routes and, for APIs, keys.
+type Facets struct {
+	Routes []string `json:"routes"`
+	Keys   []string `json:"keys,omitempty"`
+}
+
 // Result is what Requests returns.
 type Result struct {
-	Summary Stats    `json:"summary"`
-	Series  []Bucket `json:"series"`
-	Top     []Row    `json:"top"`
+	Summary     Stats       `json:"summary"`
+	Series      []Bucket    `json:"series"`
+	Top         []Row       `json:"top"`
+	SeriesByKey []KeySeries `json:"series_by_key,omitempty"`
+	Facets      Facets      `json:"facets"`
+}
+
+// Span is one request: the gateway's (or Traefik's) span for it.
+type Span struct {
+	Time       time.Time `json:"time"`
+	TraceID    string    `json:"trace_id"`
+	SpanID     string    `json:"span_id"`
+	Method     string    `json:"method"`
+	Route      string    `json:"route"`
+	Path       string    `json:"path"`
+	Status     string    `json:"status"`
+	DurationMS float64   `json:"duration_ms"`
+	Client     string    `json:"client,omitempty"`
+}
+
+// TraceSpan is one span of a whole trace, any service. StartMS is the offset
+// from the trace's first span.
+type TraceSpan struct {
+	SpanID     string            `json:"span_id"`
+	ParentID   string            `json:"parent_id,omitempty"`
+	Service    string            `json:"service"`
+	Name       string            `json:"name"`
+	Kind       string            `json:"kind"`
+	StartMS    float64           `json:"start_ms"`
+	DurationMS float64           `json:"duration_ms"`
+	Status     string            `json:"status,omitempty"`
+	Error      bool              `json:"error,omitempty"`
+	Attributes map[string]string `json:"attributes"`
 }
 
 // Ranges maps the accepted range names to (window, bucket width).
@@ -87,6 +148,11 @@ var Ranges = map[string][2]time.Duration{
 // GroupBys are the accepted group_by values.
 var GroupBys = map[string]bool{"route": true, "key": true, "status": true, "service": true}
 
+// MaxTraceSpans bounds one trace; longer traces come back cut (Trace's bool).
+const MaxTraceSpans = 500
+
+var traceIDRe = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
 type Client struct {
 	url, user, pass string
 	http            *http.Client
@@ -97,53 +163,99 @@ func NewClient(chURL, user, pass string) *Client {
 	return &Client{url: chURL, user: user, pass: pass, http: &http.Client{Timeout: 20 * time.Second}, now: time.Now}
 }
 
-// Requests runs the summary, the time series and the top-20 groups for f
-// over the last rng ("1h", "24h", "7d", "30d").
-func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string) (*Result, error) {
+// scope is a filter turned into SQL over one window: the WHERE clause, its
+// bound parameters and the asset's path/route expressions.
+type scope struct {
+	where      string
+	params     url.Values
+	route      string // normalized-route expression
+	path       string // path expression (gateway: without the API prefix)
+	from, step int64
+	gateway    bool
+}
+
+func (c *Client) scope(f Filter, rng string) (*scope, error) {
 	win, ok := Ranges[rng]
 	if !ok {
 		return nil, fmt.Errorf("invalid range %q", rng)
 	}
-	if !GroupBys[groupBy] {
-		return nil, fmt.Errorf("invalid group_by %q", groupBy)
-	}
 	if (f.PathPrefix == "") == (len(f.RouterUUIDs) == 0) {
 		return nil, errors.New("filter needs a path prefix or router uuids")
 	}
-	if len(f.Clients) > 0 && f.PathPrefix == "" {
-		return nil, errors.New("clients only filter an API")
+	if (len(f.Clients) > 0 || f.Key != "") && f.PathPrefix == "" {
+		return nil, errors.New("clients and keys only filter an API")
 	}
 	for _, v := range append(append([]string{}, f.RouterUUIDs...), f.Clients...) {
 		if v == "" || strings.Contains(v, ",") {
 			return nil, fmt.Errorf("invalid uuid or client %q", v)
 		}
 	}
-	from := c.now().Add(-win[0]).Unix()
-	params := url.Values{"param_from": {fmt.Sprint(from)}, "param_step": {fmt.Sprint(int64(win[1].Seconds()))}}
-
-	where := "timestamp >= toDateTime64({from:Int64}, 9) AND ts_bucket_start >= {from:Int64} - 1800"
-	path, key := attrGatewayPath, ""
-	if f.PathPrefix != "" {
+	s := &scope{from: c.now().Add(-win[0]).Unix(), step: int64(win[1].Seconds()), gateway: f.PathPrefix != ""}
+	s.params = url.Values{"param_from": {fmt.Sprint(s.from)}, "param_step": {fmt.Sprint(s.step)}}
+	s.where = "timestamp >= toDateTime64({from:Int64}, 9) AND ts_bucket_start >= {from:Int64} - 1800"
+	if s.gateway {
 		// The gateway's own Server span, root or not: callers that are traced
 		// themselves (visualizador-front) make it a child of their span.
-		where += fmt.Sprintf(" AND kind_string = 'Server' AND %s = '%s' AND startsWith(%s, {prefix:String})", svcCol, gatewayService, attrGatewayPath)
-		params.Set("param_prefix", f.PathPrefix)
+		s.where += fmt.Sprintf(" AND kind_string = 'Server' AND %s = '%s' AND startsWith(%s, {prefix:String})", svcCol, gatewayService, attrGatewayPath)
+		s.params.Set("param_prefix", f.PathPrefix)
 		if len(f.Clients) > 0 {
-			where += fmt.Sprintf(" AND has(%s, %s)", csvParam("clients"), attrGatewayClient)
-			params.Set("param_clients", strings.Join(f.Clients, ","))
+			s.where += fmt.Sprintf(" AND has(%s, %s)", csvParam("clients"), attrGatewayClient)
+			s.params.Set("param_clients", strings.Join(f.Clients, ","))
 		}
-		path = fmt.Sprintf("substring(%s, %d)", attrGatewayPath, len(f.PathPrefix)+1)
+		s.path = fmt.Sprintf("substring(%s, %d)", attrGatewayPath, len(f.PathPrefix)+1)
 	} else {
 		// Traefik's router span is a child of the entrypoint span: no root filter.
-		where += fmt.Sprintf(" AND %s = '%s' AND arrayExists(u -> position(%s, u) > 0, %s)", svcCol, traefikService, attrTraefikRouter, csvParam("uuids"))
-		params.Set("param_uuids", strings.Join(f.RouterUUIDs, ","))
-		path = attrTraefikPath
+		s.where += fmt.Sprintf(" AND %s = '%s' AND arrayExists(u -> position(%s, u) > 0, %s)", svcCol, traefikService, attrTraefikRouter, csvParam("uuids"))
+		s.params.Set("param_uuids", strings.Join(f.RouterUUIDs, ","))
+		s.path = attrTraefikPath
 	}
+	// ponytail: ids are collapsed by pattern (digits, uuids); true route
+	// templates need OTel inside each app (http.route).
+	s.route = fmt.Sprintf(`replaceRegexpAll(replaceRegexpAll(%s, '/[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}', '/:id'), '/[0-9]+', '/:id')`, s.path)
+	if f.Route != "" {
+		s.where += fmt.Sprintf(" AND %s = {route:String}", s.route)
+		s.params.Set("param_route", f.Route)
+	}
+	if f.Key != "" {
+		s.where += fmt.Sprintf(" AND %s = {key:String}", attrGatewayClient)
+		s.params.Set("param_key", f.Key)
+	}
+	if f.Status != "" {
+		s.where += " AND response_status_code = {status:String}"
+		s.params.Set("param_status", f.Status)
+	}
+	return s, nil
+}
+
+// slots fills a series to every slot of the window, empty ones as zero:
+// ClickHouse only returns slots with spans. Slots start at multiples of step
+// since the epoch, as toStartOfInterval's.
+func (c *Client) slots(s *scope, got map[int64]Stats) []Bucket {
+	out := []Bucket{}
+	for t := s.from - s.from%s.step; t <= c.now().Unix(); t += s.step {
+		out = append(out, Bucket{T: time.Unix(t, 0).UTC(), Stats: got[t]})
+	}
+	return out
+}
+
+// Requests runs the summary, the time series, the top-20 groups and the
+// facets for f over the last rng ("1h", "24h", "7d", "30d"). byKey adds one
+// line per top key (APIs only).
+func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string, byKey bool) (*Result, error) {
+	if !GroupBys[groupBy] {
+		return nil, fmt.Errorf("invalid group_by %q", groupBy)
+	}
+	s, err := c.scope(f, rng)
+	if err != nil {
+		return nil, err
+	}
+	if byKey && !s.gateway {
+		return nil, errors.New("series by key is for APIs")
+	}
+	var key string
 	switch groupBy {
 	case "route":
-		// ponytail: ids are collapsed by pattern (digits, uuids); true route
-		// templates need OTel inside each app (http.route).
-		key = fmt.Sprintf(`replaceRegexpAll(replaceRegexpAll(%s, '/[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}', '/:id'), '/[0-9]+', '/:id')`, path)
+		key = s.route
 	case "key":
 		key = attrGatewayClient
 	case "status":
@@ -152,15 +264,9 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string) (*
 		key = fmt.Sprintf("arrayFirst(u -> position(%s, u) > 0, %s)", attrTraefikRouter, csvParam("uuids"))
 	}
 
-	const agg = `count() AS count,
-		countIf(has_error OR toUInt16OrZero(response_status_code) >= 500) AS errors,
-		quantile(0.5)(duration_nano) / 1e6 AS p50,
-		quantile(0.95)(duration_nano) / 1e6 AS p95,
-		quantile(0.99)(duration_nano) / 1e6 AS p99`
-
-	res := &Result{Series: []Bucket{}, Top: []Row{}}
+	res := &Result{Top: []Row{}, Facets: Facets{Routes: []string{}}}
 	var sum []Stats
-	if err := c.query(ctx, fmt.Sprintf("SELECT %s FROM %s WHERE %s", agg, spansTable, where), params, &sum); err != nil {
+	if err := c.query(ctx, fmt.Sprintf("SELECT %s FROM %s WHERE %s", agg, spansTable, s.where), s.params, &sum); err != nil {
 		return nil, err
 	}
 	if len(sum) > 0 {
@@ -170,26 +276,198 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string) (*
 		T int64 `json:"t"`
 		Stats
 	}
-	q := fmt.Sprintf("SELECT toUnixTimestamp(toStartOfInterval(timestamp, toIntervalSecond({step:Int64}))) AS t, %s FROM %s WHERE %s GROUP BY t ORDER BY t", agg, spansTable, where)
-	if err := c.query(ctx, q, params, &series); err != nil {
+	q := fmt.Sprintf("SELECT toUnixTimestamp(toStartOfInterval(timestamp, toIntervalSecond({step:Int64}))) AS t, %s FROM %s WHERE %s GROUP BY t ORDER BY t", agg, spansTable, s.where)
+	if err := c.query(ctx, q, s.params, &series); err != nil {
 		return nil, err
 	}
-	// Every slot of the window, empty ones as zero: ClickHouse only returns
-	// slots with spans, and one busy day would otherwise fill the whole chart.
-	// Slots start at multiples of step since the epoch, as toStartOfInterval's.
 	got := make(map[int64]Stats, len(series))
 	for _, b := range series {
 		got[b.T] = b.Stats
 	}
-	step := int64(win[1].Seconds())
-	for t := from - from%step; t <= c.now().Unix(); t += step {
-		res.Series = append(res.Series, Bucket{T: time.Unix(t, 0).UTC(), Stats: got[t]})
-	}
-	q = fmt.Sprintf("SELECT %s AS key, %s FROM %s WHERE %s GROUP BY key ORDER BY count DESC LIMIT 20", key, agg, spansTable, where)
-	if err := c.query(ctx, q, params, &res.Top); err != nil {
+	res.Series = c.slots(s, got)
+	q = fmt.Sprintf("SELECT %s AS key, %s FROM %s WHERE %s GROUP BY key ORDER BY count DESC LIMIT 20", key, agg, spansTable, s.where)
+	if err := c.query(ctx, q, s.params, &res.Top); err != nil {
 		return nil, err
 	}
+
+	// Facets: the same asset and window without the viewer's own filters.
+	base := f
+	base.Route, base.Key, base.Status = "", "", ""
+	bs, _ := c.scope(base, rng)
+	if res.Facets.Routes, err = c.topKeys(ctx, bs, bs.route, 20); err != nil {
+		return nil, err
+	}
+	if bs.gateway {
+		if res.Facets.Keys, err = c.topKeys(ctx, bs, attrGatewayClient, 20); err != nil {
+			return nil, err
+		}
+	}
+
+	if byKey {
+		if res.SeriesByKey, err = c.seriesByKey(ctx, s); err != nil {
+			return nil, err
+		}
+	}
 	return res, nil
+}
+
+// topKeys is the n most frequent values of expr in s.
+func (c *Client) topKeys(ctx context.Context, s *scope, expr string, n int) ([]string, error) {
+	var rows []struct {
+		K string `json:"k"`
+	}
+	q := fmt.Sprintf("SELECT %s AS k FROM %s WHERE %s GROUP BY k ORDER BY count() DESC LIMIT %d", expr, spansTable, s.where, n)
+	if err := c.query(ctx, q, s.params, &rows); err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.K)
+	}
+	return out, nil
+}
+
+// seriesByKey draws the top seriesKeys keys as their own lines and folds the
+// rest into OtherKey. Keys with a comma can't travel in the csv parameter;
+// they fall into OtherKey.
+func (c *Client) seriesByKey(ctx context.Context, s *scope) ([]KeySeries, error) {
+	top, err := c.topKeys(ctx, s, attrGatewayClient, seriesKeys)
+	if err != nil {
+		return nil, err
+	}
+	keep := []string{}
+	for _, k := range top {
+		if !strings.Contains(k, ",") {
+			keep = append(keep, k)
+		}
+	}
+	params := url.Values{}
+	for k, v := range s.params {
+		params[k] = v
+	}
+	// A leading comma marks the csv as present even when every key is "".
+	params.Set("param_topkeys", ","+strings.Join(keep, ","))
+	var rows []struct {
+		T int64  `json:"t"`
+		K string `json:"k"`
+		Stats
+	}
+	q := fmt.Sprintf(`SELECT toUnixTimestamp(toStartOfInterval(timestamp, toIntervalSecond({step:Int64}))) AS t,
+		if(has(arraySlice(%s, 2), %s), %s, '%s') AS k, %s
+		FROM %s WHERE %s GROUP BY t, k ORDER BY t`,
+		csvParam("topkeys"), attrGatewayClient, attrGatewayClient, OtherKey, agg, spansTable, s.where)
+	if err := c.query(ctx, q, params, &rows); err != nil {
+		return nil, err
+	}
+	by := map[string]map[int64]Stats{}
+	for _, r := range rows {
+		if by[r.K] == nil {
+			by[r.K] = map[int64]Stats{}
+		}
+		by[r.K][r.T] = r.Stats
+	}
+	out := []KeySeries{}
+	for _, k := range append(keep, OtherKey) {
+		if by[k] != nil {
+			out = append(out, KeySeries{Key: k, Points: c.slots(s, by[k])})
+		}
+	}
+	return out, nil
+}
+
+// Spans lists the most recent requests matching f (newest first), at most limit.
+func (c *Client) Spans(ctx context.Context, f Filter, rng string, limit int) ([]Span, error) {
+	s, err := c.scope(f, rng)
+	if err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	client := "''"
+	if s.gateway {
+		client = attrGatewayClient
+	}
+	var rows []struct {
+		MS int64 `json:"ms"`
+		Span
+	}
+	q := fmt.Sprintf(`SELECT toUnixTimestamp64Milli(timestamp) AS ms, trace_id, span_id, %s AS method,
+		%s AS route, %s AS path, response_status_code AS status, duration_nano / 1e6 AS duration_ms, %s AS client
+		FROM %s WHERE %s ORDER BY timestamp DESC LIMIT %d`,
+		attrMethod, s.route, s.path, client, spansTable, s.where, limit)
+	if err := c.query(ctx, q, s.params, &rows); err != nil {
+		return nil, err
+	}
+	out := make([]Span, len(rows))
+	for i, r := range rows {
+		out[i] = r.Span
+		out[i].Time = time.UnixMilli(r.MS).UTC()
+	}
+	return out, nil
+}
+
+// TraceMatches says whether trace traceID holds a span of f's asset within
+// the last 30 days — what lets an asset's viewer open that trace.
+func (c *Client) TraceMatches(ctx context.Context, f Filter, traceID string) (bool, error) {
+	if !traceIDRe.MatchString(traceID) {
+		return false, nil
+	}
+	s, err := c.scope(f, "30d")
+	if err != nil {
+		return false, err
+	}
+	s.params.Set("param_trace", traceID)
+	var rows []struct {
+		N int64 `json:"n"`
+	}
+	q := fmt.Sprintf("SELECT count() AS n FROM %s WHERE trace_id = {trace:String} AND %s", spansTable, s.where)
+	if err := c.query(ctx, q, s.params, &rows); err != nil {
+		return false, err
+	}
+	return len(rows) > 0 && rows[0].N > 0, nil
+}
+
+// Trace returns every span of traceID (any service, last 30 days) ordered by
+// start, at most MaxTraceSpans; cut reports a longer trace. Attributes are
+// raw: the caller decides what each viewer may see.
+func (c *Client) Trace(ctx context.Context, traceID string) (spans []TraceSpan, cut bool, err error) {
+	if !traceIDRe.MatchString(traceID) {
+		return nil, false, fmt.Errorf("invalid trace id %q", traceID)
+	}
+	from := c.now().Add(-30 * 24 * time.Hour).Unix()
+	params := url.Values{"param_trace": {traceID}, "param_from": {fmt.Sprint(from)}}
+	var rows []struct {
+		StartNS int64              `json:"start_ns"`
+		Str     map[string]string  `json:"attrs"`
+		Num     map[string]float64 `json:"nums"`
+		TraceSpan
+	}
+	q := fmt.Sprintf(`SELECT span_id, parent_span_id AS parent_id, %s AS service, name, kind_string AS kind,
+		toUnixTimestamp64Nano(timestamp) AS start_ns, duration_nano / 1e6 AS duration_ms,
+		response_status_code AS status, has_error AS error, attributes_string AS attrs, attributes_number AS nums
+		FROM %s WHERE trace_id = {trace:String} AND timestamp >= toDateTime64({from:Int64}, 9)
+		ORDER BY timestamp LIMIT %d`, svcCol, spansTable, MaxTraceSpans+1)
+	if err := c.query(ctx, q, params, &rows); err != nil {
+		return nil, false, err
+	}
+	if len(rows) > MaxTraceSpans {
+		rows, cut = rows[:MaxTraceSpans], true
+	}
+	spans = make([]TraceSpan, len(rows))
+	for i, r := range rows {
+		sp := r.TraceSpan
+		sp.StartMS = float64(r.StartNS-rows[0].StartNS) / 1e6
+		sp.Attributes = make(map[string]string, len(r.Str)+len(r.Num))
+		for k, v := range r.Str {
+			sp.Attributes[k] = v
+		}
+		for k, v := range r.Num {
+			sp.Attributes[k] = fmt.Sprint(v)
+		}
+		spans[i] = sp
+	}
+	return spans, cut, nil
 }
 
 // query POSTs sql (FORMAT JSON appended) and decodes its data rows into out.

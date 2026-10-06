@@ -12,6 +12,7 @@ import CatalogSection from "./_components/CatalogSection";
 import FeedbackSection from "./_components/FeedbackSection";
 import CardsSection from "./_components/CardsSection";
 import TablesSection from "./_components/TablesSection";
+import ChartsSection from "./_components/ChartsSection";
 import TabsSection from "./_components/TabsSection";
 import OverlaysSection from "./_components/OverlaysSection";
 import NavSection from "./_components/NavSection";
@@ -29,6 +30,7 @@ const SECTIONS = [
   ["feedback", "Feedback"],
   ["cards", "Cards"],
   ["tables", "Tables & Lists"],
+  ["charts", "Charts"],
   ["tabs", "Tabs & Toggles"],
   ["overlays", "Overlays"],
   ["nav", "Navigation & Toolbars"],
@@ -110,6 +112,7 @@ export default function DesignSystemPage() {
         <FeedbackSection />
         <CardsSection />
         <TablesSection />
+        <ChartsSection />
         <TabsSection />
         <OverlaysSection />
         <NavSection />

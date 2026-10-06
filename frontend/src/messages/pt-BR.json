@@ -3425,6 +3425,36 @@
       "not_configured": "A telemetria de requisições precisa da integração com o SigNoz (Configurações → Integrações).",
       "no_gateway_url": "Esta API não tem URL base com o caminho do gateway, então as requisições dela não podem ser identificadas.",
       "no_coolify_uuid": "Nenhum recurso do Coolify está vinculado aqui, então as requisições do Traefik não podem ser identificadas."
+    },
+    "others": "outros",
+    "byKey": "Por chave",
+    "metric": {
+      "count": "Requisições",
+      "p95": "p95"
+    },
+    "filters": {
+      "route": "Rota",
+      "key": "Chave",
+      "status": "Situação",
+      "all": "Todas",
+      "pick": "Filtrar por este",
+      "remove": "Remover filtro"
+    },
+    "recent": {
+      "title": "Requisições recentes",
+      "hint": "Clique numa para ver o rastro",
+      "time": "Quando",
+      "request": "Requisição",
+      "status": "Situação",
+      "duration": "Duração",
+      "open": "Abrir o rastro desta requisição"
+    },
+    "trace": {
+      "title": "Requisição",
+      "loadError": "Não foi possível ler este rastro do SigNoz.",
+      "cut": "Rastro longo: só os primeiros 500 spans aparecem.",
+      "waterfall": "Rastro",
+      "redacted": "Os valores dos parâmetros são visíveis só para administradores; você vê os nomes."
     }
   }
 }
