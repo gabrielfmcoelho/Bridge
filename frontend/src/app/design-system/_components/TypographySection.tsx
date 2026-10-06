@@ -177,7 +177,10 @@ export default function TypographySection() {
       <Specimen title="Markdown prose" source="components/ui/MarkdownEditor.tsx" wide>
         <div className="space-y-2">
           <MarkdownContent
-            content={"# Heading\n\nParagraph with **bold**, _italic_ and `code`.\n\n- item one\n- item two"}
+            content={
+              "# Heading\n\nParagraph with **bold**, _italic_ and `code`.\n\n- item one\n- item two\n\n" +
+              "```mermaidjs\ngraph LR\n  Guest --> Share[/share/token/] --> Wiki\n```"
+            }
           />
           <p className="text-xs text-[var(--text-muted)]">
             Scoped by <code>.markdown-preview</code>. <code>.wiki-doc .markdown-preview</code> restyles it for
