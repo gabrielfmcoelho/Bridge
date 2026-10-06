@@ -113,6 +113,11 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string) (*
 	if len(f.Clients) > 0 && f.PathPrefix == "" {
 		return nil, errors.New("clients only filter an API")
 	}
+	for _, v := range append(append([]string{}, f.RouterUUIDs...), f.Clients...) {
+		if v == "" || strings.Contains(v, ",") {
+			return nil, fmt.Errorf("invalid uuid or client %q", v)
+		}
+	}
 	from := c.now().Add(-win[0]).Unix()
 	params := url.Values{"param_from": {fmt.Sprint(from)}, "param_step": {fmt.Sprint(int64(win[1].Seconds()))}}
 
@@ -122,14 +127,14 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string) (*
 		where += fmt.Sprintf(" AND parent_span_id = '' AND %s = '%s' AND startsWith(%s, {prefix:String})", svcCol, gatewayService, attrGatewayPath)
 		params.Set("param_prefix", f.PathPrefix)
 		if len(f.Clients) > 0 {
-			where += fmt.Sprintf(" AND has({clients:Array(String)}, %s)", attrGatewayClient)
-			params.Set("param_clients", chArray(f.Clients))
+			where += fmt.Sprintf(" AND has(%s, %s)", csvParam("clients"), attrGatewayClient)
+			params.Set("param_clients", strings.Join(f.Clients, ","))
 		}
 		path = fmt.Sprintf("substring(%s, %d)", attrGatewayPath, len(f.PathPrefix)+1)
 	} else {
 		// Traefik's router span is a child of the entrypoint span: no root filter.
-		where += fmt.Sprintf(" AND %s = '%s' AND multiSearchAny(%s, {uuids:Array(String)})", svcCol, traefikService, attrTraefikRouter)
-		params.Set("param_uuids", chArray(f.RouterUUIDs))
+		where += fmt.Sprintf(" AND %s = '%s' AND arrayExists(u -> position(%s, u) > 0, %s)", svcCol, traefikService, attrTraefikRouter, csvParam("uuids"))
+		params.Set("param_uuids", strings.Join(f.RouterUUIDs, ","))
 		path = attrTraefikPath
 	}
 	switch groupBy {
@@ -142,7 +147,7 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string) (*
 	case "status":
 		key = "response_status_code"
 	case "service":
-		key = fmt.Sprintf("arrayFirst(u -> position(%s, u) > 0, {uuids:Array(String)})", attrTraefikRouter)
+		key = fmt.Sprintf("arrayFirst(u -> position(%s, u) > 0, %s)", attrTraefikRouter, csvParam("uuids"))
 	}
 
 	const agg = `count() AS count,
@@ -197,7 +202,13 @@ func (c *Client) query(ctx context.Context, sql string, params url.Values, out a
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("signoz clickhouse: %d %s", resp.StatusCode, strings.TrimSpace(string(body[:min(len(body), 300)])))
+		// A failure mid-stream comes after a partial JSON body: keep the
+		// exception ("Code: …"), not the opening braces.
+		msg := string(body)
+		if i := strings.Index(msg, "Code: "); i >= 0 {
+			msg = msg[i:]
+		}
+		return fmt.Errorf("signoz clickhouse: %d %s", resp.StatusCode, strings.TrimSpace(msg[:min(len(msg), 400)]))
 	}
 	var env struct {
 		Data json.RawMessage `json:"data"`
@@ -208,11 +219,10 @@ func (c *Client) query(ctx context.Context, sql string, params url.Values, out a
 	return json.Unmarshal(env.Data, out)
 }
 
-// chArray renders a ClickHouse Array(String) parameter literal.
-func chArray(vs []string) string {
-	q := make([]string, len(vs))
-	for i, v := range vs {
-		q[i] = "'" + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(v) + "'"
-	}
-	return "[" + strings.Join(q, ",") + "]"
+// csvParam is a list bound as one comma-joined String parameter, split in
+// SQL. Not Array(String): on SigNoz's Distributed table an Array parameter
+// reaches the shard as a String ("Bad get: has String, requested Array"),
+// while String and Int64 parameters survive.
+func csvParam(name string) string {
+	return fmt.Sprintf("splitByChar(',', {%s:String})", name)
 }

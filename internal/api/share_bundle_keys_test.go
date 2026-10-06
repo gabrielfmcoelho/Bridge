@@ -135,7 +135,7 @@ func TestPublicBundle_KeyScopes(t *testing.T) {
 	if len(withUsage.Usage) != 1 || withUsage.Usage[0].Secret != "servidores-painel" || withUsage.Usage[0].Summary.Count != 4 {
 		t.Fatalf("usage = %+v", withUsage.Usage)
 	}
-	if clients != "['servidores-painel']" || prefix != "/servidores" || step != "86400" {
+	if clients != "servidores-painel" || prefix != "/servidores" || step != "86400" {
 		t.Errorf("signoz filter clients=%s prefix=%s step=%s (want the 30d window's daily buckets)", clients, prefix, step)
 	}
 }
