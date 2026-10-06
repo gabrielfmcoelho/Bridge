@@ -22471,6 +22471,32 @@ const docTemplate = `{
                 }
             }
         },
+        "vault.BundleKeyInfo": {
+            "type": "object",
+            "properties": {
+                "api_base_url": {
+                    "type": "string"
+                },
+                "api_name": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "rate_limit_per_minute": {
+                    "type": "integer"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/vault.BundleScopeInfo"
+                    }
+                },
+                "token_url": {
+                    "type": "string"
+                }
+            }
+        },
         "vault.BundlePayload": {
             "type": "object",
             "properties": {
@@ -22500,9 +22526,31 @@ const docTemplate = `{
                 }
             }
         },
+        "vault.BundleScopeInfo": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "vault.BundleSecretItem": {
             "type": "object",
             "properties": {
+                "key": {
+                    "description": "Key is set when the secret is an API access key's (api_keys.secret_id):\nwhat the guest needs to use it — client id, API, scopes, token URL.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/vault.BundleKeyInfo"
+                        }
+                    ]
+                },
                 "name": {
                     "type": "string"
                 },

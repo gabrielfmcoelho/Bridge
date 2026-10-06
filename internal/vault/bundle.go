@@ -158,6 +158,31 @@ type BundleSecretItem struct {
 	Name    string `json:"name"`
 	Type    string `json:"type"`
 	Payload string `json:"payload"`
+	// Key is set when the secret is an API access key's (api_keys.secret_id):
+	// what the guest needs to use it — client id, API, scopes, token URL.
+	Key *BundleKeyInfo `json:"key,omitempty"`
+}
+
+// BundleKeyInfo describes the API key behind a shared secret. Scopes carry
+// the key's names; the public redeem handler fills Kind/Description from the
+// API's GET /escopos and TokenURL from the keycloak_apis settings
+// (best-effort, both may stay empty).
+type BundleKeyInfo struct {
+	APIID              int64             `json:"-"`
+	ClientID           string            `json:"client_id,omitempty"`
+	APIName            string            `json:"api_name"`
+	APIBaseURL         string            `json:"api_base_url,omitempty"`
+	Scopes             []BundleScopeInfo `json:"scopes"`
+	RateLimitPerMinute *int              `json:"rate_limit_per_minute,omitempty"`
+	TokenURL           string            `json:"token_url,omitempty"`
+}
+
+// BundleScopeInfo is one scope a shared key carries. Kind is "route" or
+// "modifier" (empty when the API's catalogue couldn't be read).
+type BundleScopeInfo struct {
+	Name        string `json:"name"`
+	Kind        string `json:"kind,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 type BundleAPIDocItem struct {
@@ -598,7 +623,7 @@ func (r *SecretRepo) RedeemBundle(ctx context.Context, token, passphrase string,
 				continue
 			}
 			payload.Secrets = append(payload.Secrets, BundleSecretItem{
-				Name: v.Name, Type: string(v.Type), Payload: plain,
+				Name: v.Name, Type: string(v.Type), Payload: plain, Key: r.bundleKeyInfo(ctx, it.refID),
 			})
 		case BundleItemAPIDoc:
 			a, err := store.NewAPICatalogRepo(r.db).Get(ctx, it.refID)
@@ -1036,4 +1061,26 @@ func (r *SecretRepo) BundleAccessLog(ctx context.Context, actor ActorContext, bu
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+// bundleKeyInfo is the API key behind secretID, or nil when it isn't one (or
+// the lookup fails — the secret is still shared, just without key details).
+func (r *SecretRepo) bundleKeyInfo(ctx context.Context, secretID int64) *BundleKeyInfo {
+	k, err := store.NewAPIKeyRepo(r.db).BySecret(ctx, secretID)
+	if err != nil || k == nil {
+		return nil
+	}
+	a, err := store.NewAPICatalogRepo(r.db).Get(ctx, k.APIID)
+	if err != nil || a == nil {
+		return nil
+	}
+	info := &BundleKeyInfo{APIID: a.ID, APIName: a.Name, APIBaseURL: a.BaseURL,
+		Scopes: make([]BundleScopeInfo, 0, len(k.Scopes)), RateLimitPerMinute: k.RateLimitPerMinute}
+	if k.ExternalLabel != nil {
+		info.ClientID = *k.ExternalLabel
+	}
+	for _, s := range k.Scopes {
+		info.Scopes = append(info.Scopes, BundleScopeInfo{Name: s})
+	}
+	return info
 }

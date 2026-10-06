@@ -753,6 +753,24 @@ export interface BundleSecretItem {
   name: string;
   type: string;
   payload: string;
+  /** Set when the secret is an API access key's: what the guest needs to use it. */
+  key?: BundleKeyInfo;
+}
+
+export interface BundleKeyInfo {
+  client_id?: string;
+  api_name: string;
+  api_base_url?: string;
+  scopes: BundleScopeInfo[];
+  rate_limit_per_minute?: number;
+  token_url?: string;
+}
+
+/** kind/description are empty when the API's /escopos couldn't be read. */
+export interface BundleScopeInfo {
+  name: string;
+  kind?: "route" | "modifier";
+  description?: string;
 }
 
 export interface BundleApiDocItem {

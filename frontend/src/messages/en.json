@@ -2533,6 +2533,20 @@
       "raw": "raw",
       "api_key": "access key"
     },
+    "key": {
+      "title": "Scopes of this key",
+      "hint": "Request exactly these scopes when getting the token (client credentials).",
+      "clientId": "Client ID",
+      "api": "API",
+      "baseUrl": "API address",
+      "tokenUrl": "Token URL",
+      "rateLimit": "Rate limit",
+      "rateLimitValue": "{count} per minute",
+      "scopeParam": "scope parameter",
+      "kindRoute": "route",
+      "kindModifier": "modifier",
+      "noDescription": "No description available."
+    },
     "switchToLight": "Switch to light theme",
     "switchToDark": "Switch to dark theme",
     "drawerTitle": "Share by link",

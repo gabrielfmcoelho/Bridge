@@ -104,7 +104,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	rr.auth("PUT /api/share-bundles/{id}/items", bundleH.handleUpdateItems)
 	rr.auth("DELETE /api/share-bundles/{id}", bundleH.handleRevoke)
 	rr.auth("GET /api/share-bundles/{id}/access-log", bundleH.handleAccessLog)
-	publicBundleH := &publicBundleHandlers{repo: secretRepo}
+	publicBundleH := &publicBundleHandlers{repo: secretRepo, db: db}
 	rr.public("GET /api/share-bundle/{token}", publicBundleH.handleRedeem)
 
 	// Orchestrators

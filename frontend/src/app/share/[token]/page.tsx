@@ -8,6 +8,7 @@ import SectionCard from "@/components/ui/SectionCard";
 import ApiReference from "@/components/atlas/apis/ApiReference";
 import ShareIndexSidebar from "@/components/share/ShareIndexSidebar";
 import ShareWikiSection from "@/components/share/ShareWikiSection";
+import ShareKeyScopes from "@/components/share/ShareKeyScopes";
 import type { BundlePayload } from "@/lib/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
@@ -25,7 +26,9 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 //   404 { error } -> expired / revoked / exhausted / unknown
 // We branch on HTTP status, never message text.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+// Same switch as lib/api.ts: `npm run dev:mock` serves the redeem from /mock.
+const API_BASE =
+  process.env.NEXT_PUBLIC_USE_MOCK_API === "1" ? "/mock" : process.env.NEXT_PUBLIC_API_URL || "";
 
 type ViewState =
   | { kind: "loading" }
@@ -514,6 +517,7 @@ export default function SharedSecretPage(props: { params: Promise<{ token: strin
                               copiedKeyPrefix={`s-${i}`}
                               copiedKey={copied}
                             />
+                            {s.key && <ShareKeyScopes info={s.key} />}
                           </SectionCard>
                         </div>
                       ))}
