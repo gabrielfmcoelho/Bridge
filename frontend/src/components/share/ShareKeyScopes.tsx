@@ -24,10 +24,10 @@ export default function ShareKeyScopes({ info }: { info: BundleKeyInfo }) {
           <Field label={t("share.key.rateLimit")} value={t("share.key.rateLimitValue", { count: String(info.rate_limit_per_minute) })} />
         ) : null}
       </div>
-      {[
+      {([
         [t("share.key.baseUrl"), info.api_base_url],
         [t("share.key.tokenUrl"), info.token_url],
-      ].map(([label, url]) =>
+      ] as [string, string | undefined][]).map(([label, url]) =>
         url ? (
           <div key={label} className="flex items-end gap-2">
             <Field label={label} value={url} mono wrap className="min-w-0 flex-1" />
