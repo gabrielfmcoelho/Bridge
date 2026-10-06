@@ -61,7 +61,7 @@ func TestRequestsGateway(t *testing.T) {
 		t.Fatalf("%d queries, want 3", len(*queries))
 	}
 	top := (*queries)[2]
-	for _, want := range []string{"'apisix-gateway'", "startsWith(", "parent_span_id = ''", "bridge.client", "FORMAT JSON"} {
+	for _, want := range []string{"'apisix-gateway'", "startsWith(", "kind_string = 'Server'", "bridge.client", "FORMAT JSON"} {
 		if !strings.Contains(top, want) {
 			t.Errorf("top query lacks %q:\n%s", want, top)
 		}
@@ -83,7 +83,7 @@ func TestRequestsTraefik(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := (*queries)[2]
-	if !strings.Contains(q, "'traefik'") || !strings.Contains(q, "arrayExists(u -> position(") || strings.Contains(q, "Array(String)") || strings.Contains(q, "parent_span_id") {
+	if !strings.Contains(q, "'traefik'") || !strings.Contains(q, "arrayExists(u -> position(") || strings.Contains(q, "Array(String)") || strings.Contains(q, "kind_string") {
 		t.Errorf("traefik query:\n%s", q)
 	}
 	if got := (*params)[0]["param_uuids"]; got != "abc123,o'q" {

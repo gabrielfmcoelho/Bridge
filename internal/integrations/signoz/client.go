@@ -124,7 +124,9 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string) (*
 	where := "timestamp >= toDateTime64({from:Int64}, 9) AND ts_bucket_start >= {from:Int64} - 1800"
 	path, key := attrGatewayPath, ""
 	if f.PathPrefix != "" {
-		where += fmt.Sprintf(" AND parent_span_id = '' AND %s = '%s' AND startsWith(%s, {prefix:String})", svcCol, gatewayService, attrGatewayPath)
+		// The gateway's own Server span, root or not: callers that are traced
+		// themselves (visualizador-front) make it a child of their span.
+		where += fmt.Sprintf(" AND kind_string = 'Server' AND %s = '%s' AND startsWith(%s, {prefix:String})", svcCol, gatewayService, attrGatewayPath)
 		params.Set("param_prefix", f.PathPrefix)
 		if len(f.Clients) > 0 {
 			where += fmt.Sprintf(" AND has(%s, %s)", csvParam("clients"), attrGatewayClient)
