@@ -4,6 +4,7 @@ export default function Field({
   mono,
   link,
   href,
+  wrap,
   className = "",
 }: {
   label: string;
@@ -11,9 +12,11 @@ export default function Field({
   mono?: boolean;
   link?: boolean;
   href?: string;
+  /** Break long values (URLs, tokens) across lines instead of truncating. */
+  wrap?: boolean;
   className?: string;
 }) {
-  const mono_ = mono ? " font-mono" : "";
+  const mono_ = (mono ? " font-mono" : "") + (wrap ? " break-all" : " truncate");
   const displayValue = value;
   const url = href || (link ? value : undefined);
 
@@ -25,12 +28,12 @@ export default function Field({
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className={`text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] truncate block transition-colors${mono_}`}
+          className={`text-sm text-[var(--accent)] hover:text-[var(--accent-hover)] block transition-colors${mono_}`}
         >
           {displayValue}
         </a>
       ) : value ? (
-        <p className={`text-sm text-[var(--text-primary)] truncate${mono_}`} title={value}>
+        <p className={`text-sm text-[var(--text-primary)]${mono_}`} title={value}>
           {value}
         </p>
       ) : (

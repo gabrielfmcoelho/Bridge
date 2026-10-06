@@ -20,16 +20,20 @@ export default function ShareKeyScopes({ info }: { info: BundleKeyInfo }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label={t("share.key.clientId")} value={info.client_id ?? ""} mono />
         <Field label={t("share.key.api")} value={info.api_name} />
-        {info.api_base_url && <Field label={t("share.key.baseUrl")} value={info.api_base_url} mono />}
         {info.rate_limit_per_minute ? (
           <Field label={t("share.key.rateLimit")} value={t("share.key.rateLimitValue", { count: String(info.rate_limit_per_minute) })} />
         ) : null}
       </div>
-      {info.token_url && (
-        <div className="flex items-end gap-2">
-          <Field label={t("share.key.tokenUrl")} value={info.token_url} mono className="min-w-0 flex-1" />
-          <CopyButton value={info.token_url} size="sm" icon />
-        </div>
+      {[
+        [t("share.key.baseUrl"), info.api_base_url],
+        [t("share.key.tokenUrl"), info.token_url],
+      ].map(([label, url]) =>
+        url ? (
+          <div key={label} className="flex items-end gap-2">
+            <Field label={label} value={url} mono wrap className="min-w-0 flex-1" />
+            <CopyButton value={url} size="sm" icon />
+          </div>
+        ) : null,
       )}
       {info.scopes.length > 0 && (
         <div>
@@ -52,7 +56,7 @@ export default function ShareKeyScopes({ info }: { info: BundleKeyInfo }) {
             ))}
           </ul>
           <div className="mt-3 flex items-end gap-2">
-            <Field label={t("share.key.scopeParam")} value={scopeParam} mono className="min-w-0 flex-1" />
+            <Field label={t("share.key.scopeParam")} value={scopeParam} mono wrap className="min-w-0 flex-1" />
             <CopyButton value={scopeParam} size="sm" icon />
           </div>
         </div>
