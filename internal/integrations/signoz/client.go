@@ -174,8 +174,16 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string) (*
 	if err := c.query(ctx, q, params, &series); err != nil {
 		return nil, err
 	}
+	// Every slot of the window, empty ones as zero: ClickHouse only returns
+	// slots with spans, and one busy day would otherwise fill the whole chart.
+	// Slots start at multiples of step since the epoch, as toStartOfInterval's.
+	got := make(map[int64]Stats, len(series))
 	for _, b := range series {
-		res.Series = append(res.Series, Bucket{T: time.Unix(b.T, 0).UTC(), Stats: b.Stats})
+		got[b.T] = b.Stats
+	}
+	step := int64(win[1].Seconds())
+	for t := from - from%step; t <= c.now().Unix(); t += step {
+		res.Series = append(res.Series, Bucket{T: time.Unix(t, 0).UTC(), Stats: got[t]})
 	}
 	q = fmt.Sprintf("SELECT %s AS key, %s FROM %s WHERE %s GROUP BY key ORDER BY count DESC LIMIT 20", key, agg, spansTable, where)
 	if err := c.query(ctx, q, params, &res.Top); err != nil {
