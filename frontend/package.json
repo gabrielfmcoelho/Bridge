@@ -20,6 +20,7 @@
     "@xyflow/react": "^12.10.2",
     "isomorphic-dompurify": "^3.18.0",
     "marked": "^17.0.5",
+    "mermaid": "^12.1.0",
     "next": "^16.2.3",
     "next-intl": "^4.8.3",
     "react": "19.2.4",
