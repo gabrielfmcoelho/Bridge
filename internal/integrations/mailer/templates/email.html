@@ -1,0 +1,98 @@
+{{/*
+  Bridge's email layout. Email-client HTML: tables, inline styles, hex colours
+  (no CSS variables or web fonts reach a mail client). Colours follow the
+  app's light theme in globals.css; the header band is the dark --bg-base.
+  templates.go gives each message its own set where "content" calls that
+  message's block ("share-content", "test-content"), then runs "layout".
+*/}}
+{{define "layout"}}<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{{.Subject}}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f6fa;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f4f6fa;font-size:1px;line-height:1px;">{{.Preheader}}&#8203;&zwnj;&#8203;&zwnj;&#8203;&zwnj;&#8203;&zwnj;&#8203;&zwnj;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f6fa;">
+<tr><td align="center" style="padding:32px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+    <tr><td style="background-color:#080c14;border-radius:12px 12px 0 0;padding:22px 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="font-family:'Plus Jakarta Sans',Segoe UI,Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;letter-spacing:-0.2px;color:#e8ecf2;">
+          <span style="color:#06b6d4;">&#9679;</span>&nbsp;Bridge
+        </td>
+        <td align="right" style="font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;color:#8593a8;">SEAD &middot; Governo do Piau&iacute;</td>
+      </tr></table>
+    </td></tr>
+    <tr><td style="background-color:#06b6d4;height:3px;line-height:3px;font-size:3px;">&nbsp;</td></tr>
+    <tr><td style="background-color:#ffffff;border:1px solid #e2e8f0;border-top:0;border-radius:0 0 12px 12px;padding:32px;font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#334155;">
+      {{template "content" .}}
+    </td></tr>
+    <tr><td align="center" style="padding:20px 24px 0;font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.5;color:#5a6b82;">
+      Mensagem autom&aacute;tica enviada pelo Bridge, invent&aacute;rio de infraestrutura da SEAD-PI.<br>N&atilde;o responda a este e-mail.
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>{{end}}
+
+{{define "share-content"}}
+<p style="margin:0 0 16px;font-size:15px;color:#0f172a;">Ol&aacute;{{if .Name}}, <strong>{{.Name}}</strong>{{end}},</p>
+<p style="margin:0 0 20px;"><strong style="color:#0f172a;">{{.Sender}}</strong> compartilhou um conte&uacute;do com voc&ecirc; pelo Bridge.</p>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+<tr><td style="border-left:4px solid #06b6d4;background-color:#f4f6fa;border-radius:0 8px 8px 0;padding:14px 18px;">
+  <div style="font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:#5a6b82;">Compartilhamento</div>
+  <div style="font-size:17px;font-weight:700;color:#0f172a;margin-top:2px;">{{.Title}}</div>
+  {{if .Description}}<div style="font-size:14px;color:#334155;margin-top:6px;white-space:pre-line;">{{.Description}}</div>{{end}}
+</td></tr>
+</table>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
+<tr><td align="center" bgcolor="#0e7490" style="border-radius:8px;">
+  <a href="{{.URL}}" target="_blank" style="display:inline-block;padding:13px 28px;font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">Abrir compartilhamento &rarr;</a>
+</td></tr>
+</table>
+
+{{if .Passphrase}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;">
+<tr><td style="border:1px dashed #94a3b8;border-radius:8px;padding:14px 18px;">
+  <div style="font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:#5a6b82;">Senha de acesso</div>
+  <div style="font-family:'JetBrains Mono',Consolas,Menlo,monospace;font-size:18px;font-weight:700;letter-spacing:1px;color:#0f172a;margin-top:4px;word-break:break-all;">{{.Passphrase}}</div>
+  <div style="font-size:12px;color:#5a6b82;margin-top:4px;">Digite-a na p&aacute;gina do link para ver o conte&uacute;do.</div>
+</td></tr>
+</table>
+{{end}}
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;font-size:14px;">
+<tr>
+  <td style="padding:8px 0;border-top:1px solid #e2e8f0;color:#5a6b82;width:110px;vertical-align:top;">Validade</td>
+  <td style="padding:8px 0;border-top:1px solid #e2e8f0;color:#0f172a;">{{if .ExpiresAt}}at&eacute; {{.ExpiresAt}} <span style="color:#5a6b82;">(hor&aacute;rio de Bras&iacute;lia)</span>{{else}}sem data de expira&ccedil;&atilde;o{{end}}</td>
+</tr>
+<tr>
+  <td style="padding:8px 0;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;color:#5a6b82;vertical-align:top;">Endere&ccedil;o</td>
+  <td style="padding:8px 0;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;font-family:'JetBrains Mono',Consolas,Menlo,monospace;font-size:12px;word-break:break-all;"><a href="{{.URL}}" style="color:#0e7490;text-decoration:none;">{{.URL}}</a></td>
+</tr>
+</table>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;font-size:13px;line-height:1.5;color:#92400e;">
+  <strong>N&atilde;o encaminhe este e-mail.</strong> Quem tiver o link{{if .Passphrase}} e a senha{{end}} acessa o conte&uacute;do. Se voc&ecirc; n&atilde;o esperava esta mensagem, avise quem a enviou.
+</td></tr>
+</table>
+{{end}}
+
+{{define "test-content"}}
+<p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#0f172a;">&#10003; O envio de e-mail est&aacute; funcionando</p>
+<p style="margin:0 0 20px;">Este &eacute; um teste da configura&ccedil;&atilde;o de SMTP do Bridge. Se voc&ecirc; recebeu esta mensagem, os links de compartilhamento j&aacute; podem ser enviados por e-mail.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;">
+<tr>
+  <td style="padding:8px 0;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;color:#5a6b82;width:150px;">Links usar&atilde;o</td>
+  <td style="padding:8px 0;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;font-family:'JetBrains Mono',Consolas,Menlo,monospace;font-size:12px;color:#0f172a;word-break:break-all;">{{.LinkBaseURL}}/share/&hellip;</td>
+</tr>
+</table>
+{{end}}

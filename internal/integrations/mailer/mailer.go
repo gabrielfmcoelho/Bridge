@@ -1,4 +1,4 @@
-// Package mailer sends plain-text email over SMTP (net/smtp), configured from
+// Package mailer sends email (plain text, plus HTML from templates/) over SMTP (net/smtp), configured from
 // the smtp_* integration settings. One message, one recipient per Send: share
 // links go to each address separately, so recipients never see each other.
 package mailer
@@ -10,11 +10,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
+	"mime/multipart"
 	"mime/quotedprintable"
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strings"
 	"time"
 
@@ -64,11 +67,13 @@ func LoadSettings(ctx context.Context, db *sql.DB, enc *database.Encryptor) (Set
 	return s, nil
 }
 
-// Message is one plain-text email to one address.
+// Message is one email to one address: Body is the plain text; HTML, when
+// set, is sent alongside it (multipart/alternative) for clients that render it.
 type Message struct {
 	To      string
 	Subject string
 	Body    string
+	HTML    string
 }
 
 // Send delivers m through the configured server.
@@ -81,7 +86,7 @@ func Send(ctx context.Context, s Settings, m Message) error {
 	if err != nil {
 		return fmt.Errorf("recipient: %w", err)
 	}
-	raw, err := buildMessage(from, to, m.Subject, m.Body)
+	raw, err := buildMessage(from, to, m)
 	if err != nil {
 		return err
 	}
@@ -141,24 +146,50 @@ func Send(ctx context.Context, s Settings, m Message) error {
 	return c.Quit()
 }
 
-// buildMessage renders headers + a quoted-printable UTF-8 body. The subject
-// goes through mime.QEncoding, which encodes any CR/LF, so a bundle title
-// can't inject headers; addresses come from mail.ParseAddress.
-func buildMessage(from, to *mail.Address, subject, body string) ([]byte, error) {
+// buildMessage renders headers and the quoted-printable UTF-8 body: plain
+// text alone, or text + HTML as multipart/alternative (text first, so a
+// client prefers the HTML). The subject goes through mime.QEncoding, which
+// encodes any CR/LF, so a bundle title can't inject headers; addresses come
+// from mail.ParseAddress.
+func buildMessage(from, to *mail.Address, m Message) ([]byte, error) {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "From: %s\r\n", from.String())
 	fmt.Fprintf(&b, "To: %s\r\n", to.String())
-	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject))
+	fmt.Fprintf(&b, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", m.Subject))
 	fmt.Fprintf(&b, "Date: %s\r\n", time.Now().Format(time.RFC1123Z))
 	b.WriteString("MIME-Version: 1.0\r\n")
-	b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
-	b.WriteString("Content-Transfer-Encoding: quoted-printable\r\n\r\n")
-	qp := quotedprintable.NewWriter(&b)
-	if _, err := qp.Write([]byte(body)); err != nil {
-		return nil, err
+	if m.HTML == "" {
+		b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+		b.WriteString("Content-Transfer-Encoding: quoted-printable\r\n\r\n")
+		if err := writeQP(&b, m.Body); err != nil {
+			return nil, err
+		}
+		return b.Bytes(), nil
 	}
-	if err := qp.Close(); err != nil {
+	mw := multipart.NewWriter(&b)
+	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=%q\r\n\r\n", mw.Boundary())
+	for _, part := range []struct{ ctype, body string }{{"text/plain", m.Body}, {"text/html", m.HTML}} {
+		w, err := mw.CreatePart(textproto.MIMEHeader{
+			"Content-Type":              {part.ctype + "; charset=UTF-8"},
+			"Content-Transfer-Encoding": {"quoted-printable"},
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := writeQP(w, part.body); err != nil {
+			return nil, err
+		}
+	}
+	if err := mw.Close(); err != nil {
 		return nil, err
 	}
 	return b.Bytes(), nil
+}
+
+func writeQP(w io.Writer, s string) error {
+	qp := quotedprintable.NewWriter(w)
+	if _, err := qp.Write([]byte(s)); err != nil {
+		return err
+	}
+	return qp.Close()
 }
