@@ -123,7 +123,18 @@ func (h *bundleHandlers) handleSend(w http.ResponseWriter, r *http.Request) {
 		if strings.EqualFold(a.Address, d.RecipientEmail) {
 			name = d.RecipientName
 		}
-		msg := shareEmail(d, settings.LinkBaseURL, sender, name)
+		data := mailer.ShareData{
+			Name: name, Sender: sender, Title: cmp.Or(d.Title, "Compartilhamento"), Description: strings.TrimSpace(d.Description),
+			URL: settings.LinkBaseURL + "/share/" + d.Token, Passphrase: d.Passphrase,
+		}
+		if d.ExpiresAt != nil {
+			data.ExpiresAt = d.ExpiresAt.In(brt).Format("02/01/2006 15:04")
+		}
+		msg, err := mailer.ShareEmail(data)
+		if err != nil {
+			jsonServerError(w, r, "render share email", err)
+			return
+		}
 		msg.To = a.String()
 		if err := send(r.Context(), settings, msg); err != nil {
 			log.Printf("[share-send] bundle %d to %s: %v", id, a.Address, err)
@@ -164,36 +175,4 @@ func parseRecipients(raw []string) ([]*mail.Address, error) {
 		return nil, fmt.Errorf("at most %d addresses per send", maxSendRecipients)
 	}
 	return out, nil
-}
-
-// shareEmail renders the pt-BR message (recipients are outside Bridge, so it
-// isn't localised to the sender's UI language). Link and passphrase travel
-// together by design; the warning says why the mail must not be forwarded.
-func shareEmail(d *vault.BundleDelivery, baseURL, sender, name string) mailer.Message {
-	var b strings.Builder
-	if name != "" {
-		fmt.Fprintf(&b, "Olá, %s,\n\n", name)
-	} else {
-		b.WriteString("Olá,\n\n")
-	}
-	title := cmp.Or(d.Title, "Compartilhamento")
-	fmt.Fprintf(&b, "%s compartilhou com você \"%s\" pelo Bridge (SEAD-PI).\n\n", sender, title)
-	if s := strings.TrimSpace(d.Description); s != "" {
-		b.WriteString(s + "\n\n")
-	}
-	fmt.Fprintf(&b, "Link de acesso: %s/share/%s\n", baseURL, d.Token)
-	if d.Passphrase != "" {
-		fmt.Fprintf(&b, "Senha: %s\n", d.Passphrase)
-	}
-	if d.ExpiresAt != nil {
-		fmt.Fprintf(&b, "Válido até: %s (horário de Brasília)\n", d.ExpiresAt.In(brt).Format("02/01/2006 15:04"))
-	} else {
-		b.WriteString("Validade: sem data de expiração\n")
-	}
-	b.WriteString("\nNão encaminhe este e-mail: quem tiver o link")
-	if d.Passphrase != "" {
-		b.WriteString(" e a senha")
-	}
-	b.WriteString(" acessa o conteúdo.\nMensagem automática, não responda.\n")
-	return mailer.Message{Subject: "Compartilhamento: " + title, Body: b.String()}
 }

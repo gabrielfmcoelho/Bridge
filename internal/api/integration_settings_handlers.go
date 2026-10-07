@@ -325,12 +325,13 @@ func (h *integrationSettingsHandlers) handleTestSMTP(w http.ResponseWriter, r *h
 		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
 		return
 	}
-	err = mailer.Send(r.Context(), s, mailer.Message{
-		To:      to,
-		Subject: "Bridge: teste de e-mail",
-		Body:    "Este é um teste da configuração de SMTP do Bridge.\nLinks de compartilhamento usarão: " + s.LinkBaseURL + "\n",
-	})
+	msg, err := mailer.TestEmail(s.LinkBaseURL)
 	if err != nil {
+		jsonServerError(w, r, "render test email", err)
+		return
+	}
+	msg.To = to
+	if err := mailer.Send(r.Context(), s, msg); err != nil {
 		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
 		return
 	}
