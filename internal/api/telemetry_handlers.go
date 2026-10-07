@@ -153,10 +153,12 @@ func (h *telemetryHandlers) asset(w http.ResponseWriter, r *http.Request) (*tele
 			return nil, false
 		}
 		// A host's domains: the DNS records pointing at it, plus its services'
-		// own; a domain that belongs to a service is labelled with it.
+		// own; a domain that belongs to a service is labelled with it. The
+		// telemetry collector's own traffic (apps exporting OTLP through
+		// Traefik) stays out: it would outnumber the apps it measures.
 		seen := map[string]bool{}
 		add := func(d string) {
-			if d = cleanDomain(d); d != "" && !seen[d] {
+			if d = cleanDomain(d); d != "" && !seen[d] && !isCollectorDomain(d) {
 				seen[d] = true
 				a.filter.Domains = append(a.filter.Domains, d)
 			}
@@ -495,6 +497,13 @@ func (h *telemetryHandlers) serviceDomains(ctx context.Context, serviceID int64,
 		add(u.Hostname())
 	}
 	return out, nil
+}
+
+// isCollectorDomain spots the OpenTelemetry collector's domains (SigNoz's
+// otel-collector container name or its otelcollectorhttp… URL).
+// ponytail: name pattern; a per-domain "not app traffic" flag if more appear.
+func isCollectorDomain(d string) bool {
+	return strings.HasPrefix(d, "otel-collector") || strings.HasPrefix(d, "otelcollector")
 }
 
 // cleanDomain lower-cases a domain and drops scheme, port and path; "" when
