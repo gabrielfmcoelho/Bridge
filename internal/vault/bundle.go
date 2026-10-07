@@ -137,6 +137,7 @@ type BundleView struct {
 	// RecipientLabel is the free-text recipient.
 	RecipientContactID *int64     `json:"recipient_contact_id,omitempty"`
 	RecipientName      string     `json:"recipient_name,omitempty"`
+	RecipientEmail     string     `json:"recipient_email,omitempty"` // the contact's, default for a send
 	RecipientLabel     string     `json:"recipient_label"`
 	CreatedByName      string     `json:"created_by_name"`
 	LastAccessAt       *time.Time `json:"last_access_at,omitempty"` // last guest redemption
@@ -251,6 +252,7 @@ type BundleAccessEntry struct {
 	UsedPassphrase bool      `json:"used_passphrase"`
 	Action         string    `json:"action"`
 	ActorName      string    `json:"actor_name,omitempty"`
+	SentTo         string    `json:"sent_to,omitempty"` // action 'send': the address mailed
 }
 
 // ownerScope is the WHERE fragment limiting share_bundles rows to the ones
@@ -730,6 +732,7 @@ const bundleViewColumns = `b.id, b.title, b.description, b.expires_at, b.passphr
 	b.created_by, b.created_at, b.revoked_at, b.deleted_at,
 	b.recipient_contact_id, b.recipient_label,
 	COALESCE((SELECT c.name FROM contacts c WHERE c.id = b.recipient_contact_id), ''),
+	COALESCE((SELECT c.email FROM contacts c WHERE c.id = b.recipient_contact_id), ''),
 	COALESCE((SELECT COALESCE(NULLIF(u.display_name, ''), u.username) FROM users u WHERE u.id = b.created_by), ''),
 	(SELECT MAX(l.accessed_at) FROM share_bundle_access_log l WHERE l.bundle_id = b.id AND l.action = 'redeem'),
 	(b.token_cipher IS NOT NULL)`
@@ -753,7 +756,7 @@ func (r *SecretRepo) scanBundleViews(ctx context.Context, rows *sql.Rows) ([]Bun
 		)
 		if err := rows.Scan(&v.ID, &v.Title, &v.Description, &expires, &passHash, &maxViews,
 			&v.ViewCount, &v.CreatedBy, &created, &revoked, &deleted,
-			&recID, &v.RecipientLabel, &v.RecipientName, &v.CreatedByName, &lastAcc, &v.Recoverable); err != nil {
+			&recID, &v.RecipientLabel, &v.RecipientName, &v.RecipientEmail, &v.CreatedByName, &lastAcc, &v.Recoverable); err != nil {
 			return nil, err
 		}
 		if recID.Valid {
@@ -1083,17 +1086,9 @@ func (r *SecretRepo) RevealBundle(ctx context.Context, actor ActorContext, bundl
 	if err != nil {
 		return nil, err
 	}
-	if len(tokCT) == 0 {
-		return nil, ErrBundleNotRecoverable
-	}
-	out := &BundleSecrets{}
-	if out.Token, err = r.enc.Decrypt(tokCT, tokNonce); err != nil {
-		return nil, fmt.Errorf("decrypt token: %w", err)
-	}
-	if len(passCT) > 0 {
-		if out.Passphrase, err = r.enc.Decrypt(passCT, passNonce); err != nil {
-			return nil, fmt.Errorf("decrypt passphrase: %w", err)
-		}
+	out, err := r.decryptBundleSecrets(tokCT, tokNonce, passCT, passNonce)
+	if err != nil {
+		return nil, err
 	}
 	// The audit row is not best-effort: no row, no reveal.
 	if _, err := r.db.ExecContext(ctx,
@@ -1104,17 +1099,18 @@ func (r *SecretRepo) RevealBundle(ctx context.Context, actor ActorContext, bundl
 	return out, nil
 }
 
-// BundleAccessLog returns a bundle's access-log rows (guest redemptions and
-// admin reveals), newest-first, hard-capped at the 500 most-recent. Scoped by
-// ownerScope: a missing or out-of-scope bundle yields ErrBundleNotFound.
-// Redemptions carry only network metadata; reveals name the admin.
+// BundleAccessLog returns a bundle's access-log rows (guest redemptions, admin
+// reveals and email sends), newest-first, hard-capped at the 500 most-recent.
+// Scoped by ownerScope: a missing or out-of-scope bundle yields
+// ErrBundleNotFound. Redemptions carry only network metadata; reveals and
+// sends name the actor, sends also the address.
 func (r *SecretRepo) BundleAccessLog(ctx context.Context, actor ActorContext, bundleID int64) ([]BundleAccessEntry, error) {
 	if err := r.checkBundleScope(ctx, actor, bundleID); err != nil {
 		return nil, err
 	}
 
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT l.accessed_at, l.remote_ip, l.user_agent, l.used_passphrase, l.action,
+		`SELECT l.accessed_at, l.remote_ip, l.user_agent, l.used_passphrase, l.action, l.sent_to,
 		        COALESCE(NULLIF(u.display_name, ''), u.username, '')
 		   FROM share_bundle_access_log l
 		   LEFT JOIN users u ON u.id = l.actor_user_id
@@ -1128,7 +1124,7 @@ func (r *SecretRepo) BundleAccessLog(ctx context.Context, actor ActorContext, bu
 	out := []BundleAccessEntry{}
 	for rows.Next() {
 		var e BundleAccessEntry
-		if err := rows.Scan(&e.AccessedAt, &e.RemoteIP, &e.UserAgent, &e.UsedPassphrase, &e.Action, &e.ActorName); err != nil {
+		if err := rows.Scan(&e.AccessedAt, &e.RemoteIP, &e.UserAgent, &e.UsedPassphrase, &e.Action, &e.SentTo, &e.ActorName); err != nil {
 			return nil, err
 		}
 		out = append(out, e)

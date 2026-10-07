@@ -414,6 +414,20 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
       db.shareAccessLog.push({ bundle_id: b.id, accessed_at: new Date().toISOString(), remote_ip: "", user_agent: "", used_passphrase: false, action: "reveal", actor_name: actor.display_name });
       return json({ token: b.token, url: `/share/${b.token}`, passphrase: b.passphrase ?? "" });
     }
+    if (method === "POST" && segs[2] === "send") {
+      // Nothing is mailed in the mock; addresses ending in "@fail.test" fail, to show the per-address error.
+      const body = await readJSON<{ emails?: string[] }>(request);
+      const contactEmail = db.contacts.find((c) => c.id === b.recipient_contact_id)?.email;
+      const emails = body.emails?.length ? body.emails : contactEmail ? [contactEmail] : [];
+      if (!emails.length) return json({ error: "no email address: pass emails or link a recipient contact that has one" }, 400);
+      const results = emails.map((raw) => {
+        const email = raw.match(/<([^>]+)>/)?.[1] ?? raw.trim();
+        const sent = !email.endsWith("@fail.test");
+        if (sent) db.shareAccessLog.push({ bundle_id: b.id, accessed_at: new Date().toISOString(), remote_ip: "", user_agent: "", used_passphrase: false, action: "send", actor_name: actor.display_name, sent_to: email });
+        return { email, sent, error: sent ? undefined : "550 mailbox unavailable" };
+      });
+      return json({ results });
+    }
   }
 
   // ── Discovery fixtures ──────────────────────────────────────────────

@@ -1553,6 +1553,11 @@ definitions:
       token:
         type: string
     type: object
+  api.integrationTestSMTPRequest:
+    properties:
+      to:
+        type: string
+    type: object
   api.issueCreateRequest:
     properties:
       alert_id:
@@ -2025,6 +2030,24 @@ definitions:
         items:
           type: integer
         type: array
+    type: object
+  api.sendBundleRequest:
+    properties:
+      emails:
+        description: Emails are the addresses to mail; empty = the recipient contact's
+          email.
+        items:
+          type: string
+        type: array
+    type: object
+  api.sendBundleResult:
+    properties:
+      email:
+        type: string
+      error:
+        type: string
+      sent:
+        type: boolean
     type: object
   api.serviceUpdateContainerRequest:
     properties:
@@ -4803,6 +4826,9 @@ definitions:
         type: string
       remote_ip:
         type: string
+      sent_to:
+        description: 'action ''send'': the address mailed'
+        type: string
       used_passphrase:
         type: boolean
       user_agent:
@@ -4908,6 +4934,9 @@ definitions:
           RecipientContactID / RecipientName come from the linked contact;
           RecipientLabel is the free-text recipient.
         type: integer
+      recipient_email:
+        description: the contact's, default for a send
+        type: string
       recipient_label:
         type: string
       recipient_name:
@@ -13164,8 +13193,8 @@ paths:
   /api/settings/integrations:
     get:
       description: 'Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis,
-        llm, coolify, grafana, signoz, outline, proxmox, glpi, general) mapped to
-        its key/value settings. Secret keys are never returned: they read "••••••••"
+        llm, coolify, grafana, signoz, outline, proxmox, glpi, smtp, general) mapped
+        to its key/value settings. Secret keys are never returned: they read "••••••••"
         when set, "" otherwise.'
       produces:
       - application/json
@@ -13772,6 +13801,38 @@ paths:
       summary: Test the Outline integration
       tags:
       - integration-settings
+  /api/settings/integrations/test/smtp:
+    post:
+      consumes:
+      - application/json
+      description: 'Admin. Uses the saved settings and mails "to", or the caller''s
+        own email when omitted. A failed test still answers 200: {"success": false,
+        "error": "..."}; success is {"success": true, "to"}.'
+      parameters:
+      - description: Address to mail
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/api.integrationTestSMTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Test the SMTP settings
+      tags:
+      - integration-settings
   /api/settings/permissions:
     get:
       description: 'Admin. Answers {"permissions": [models.Permission], "matrix":
@@ -14292,6 +14353,61 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Reveal a share bundle's link and passphrase
+      tags:
+      - share-bundles
+  /api/share-bundles/{id}/send:
+    post:
+      consumes:
+      - application/json
+      description: Any role; owner or admin (others get 404). Mails the link and its
+        passphrase, one message per address, to "emails" or, when omitted, the recipient
+        contact's email. Each address mailed is recorded in the access log (action
+        "send"). Always 200 once sending starts, with a per-address {email, sent,
+        error?}. 400 when no valid address; 409 when the link is not live or predates
+        stored links; 503 when SMTP is not configured.
+      parameters:
+      - description: Bundle ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Addresses (optional)
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/api.sendBundleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/api.sendBundleResult'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Email a share bundle's link and passphrase
       tags:
       - share-bundles
   /api/share-bundles/reissue:

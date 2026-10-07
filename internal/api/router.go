@@ -94,7 +94,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	// Share bundles (Phase D). Authenticated owner routes + a public,
 	// unwrapped redemption sibling to /api/share/{token}. Bundles reuse the
 	// secret repo for crypto/ACL/reveal.
-	bundleH := &bundleHandlers{repo: secretRepo}
+	bundleH := &bundleHandlers{repo: secretRepo, db: db}
 	rr.auth("POST /api/share-bundles", bundleH.handleCreate)
 	rr.auth("POST /api/share-bundles/reissue", bundleH.handleReissue)
 	rr.role("admin", "POST /api/share-bundles/revoke-all", bundleH.handleRevokeAll)
@@ -104,6 +104,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	rr.auth("PUT /api/share-bundles/{id}/items", bundleH.handleUpdateItems)
 	rr.auth("PUT /api/share-bundles/{id}/details", bundleH.handleUpdateDetails)
 	rr.auth("DELETE /api/share-bundles/{id}", bundleH.handleRevoke)
+	rr.auth("POST /api/share-bundles/{id}/send", bundleH.handleSend)
 	rr.auth("GET /api/share-bundles/{id}/access-log", bundleH.handleAccessLog)
 	publicBundleH := &publicBundleHandlers{repo: secretRepo, db: db}
 	rr.public("GET /api/share-bundle/{token}", publicBundleH.handleRedeem)

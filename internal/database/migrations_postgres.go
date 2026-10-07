@@ -1788,4 +1788,11 @@ var migrationsPostgres = []string{
 		WHERE proxmox_id IS NOT NULL AND deleted_at IS NULL;
 	DELETE FROM app_settings WHERE key IN ('proxmox_base_url', 'proxmox_token_id', 'proxmox_skip_verify');
 	DELETE FROM app_secrets WHERE key = 'proxmox_token_secret';`,
+
+	// Version 107: a share bundle can be emailed (link + passphrase) over SMTP.
+	// Each send is an access-log row (action 'send', with the actor) naming the
+	// address it went to, since mailing the link is as good as revealing it.
+	`ALTER TABLE share_bundle_access_log ADD COLUMN IF NOT EXISTS sent_to TEXT NOT NULL DEFAULT '';
+	ALTER TABLE share_bundle_access_log DROP CONSTRAINT IF EXISTS share_bundle_access_log_action_check;
+	ALTER TABLE share_bundle_access_log ADD CONSTRAINT share_bundle_access_log_action_check CHECK (action IN ('redeem','reveal','send'));`,
 }
