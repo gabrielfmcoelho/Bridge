@@ -791,6 +791,19 @@ export const globalIssuesAPI = {
   delete: (id: number) => api.delete(`/api/issues/${id}`),
 };
 
+// Canvases (entidade idea boards). update is partial and carries the loaded
+// version; a stale one rejects with ApiError status 409.
+export const canvasAPI = {
+  list: (entidadeId?: number) =>
+    api.getList<import("./types").Canvas>(`/api/canvases${entidadeId ? `?entidade_id=${entidadeId}` : ""}`),
+  get: (id: number) => api.get<import("./types").Canvas>(`/api/canvases/${id}`),
+  create: (data: { entidade_id: number; title: string }) =>
+    api.post<import("./types").Canvas>("/api/canvases", data),
+  update: (id: number, data: { version: number; title?: string; content?: import("./types").Canvas["content"] }) =>
+    api.put<import("./types").Canvas>(`/api/canvases/${id}`, data),
+  delete: (id: number) => api.delete(`/api/canvases/${id}`),
+};
+
 // Releases
 export const releasesAPI = {
   list: (projectId?: number) =>

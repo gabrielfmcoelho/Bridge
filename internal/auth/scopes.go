@@ -29,6 +29,7 @@ var domainRules = map[string]string{
 	"/api/projects":      "projects",
 	"/api/releases":      "projects",
 	"/api/issues":        "projects",
+	"/api/canvases":      "projects",
 	"/api/contacts":      "contacts",
 	"/api/api-catalog":   "apis",
 	"/api/secrets":       "vault",

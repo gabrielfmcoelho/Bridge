@@ -37,6 +37,7 @@ type App struct {
 	release             *releaseHandlers
 	tool                *toolHandlers
 	contact             *contactHandlers
+	canvas              *canvasHandlers
 	relation            *relationHandlers
 	importH             *importHandlers
 	backup              *backupHandlers
@@ -94,6 +95,7 @@ func newApp(db *database.DB, configPath string) *App {
 		release:             &releaseHandlers{db: db},
 		tool:                &toolHandlers{db: db},
 		contact:             &contactHandlers{contacts: store.NewContactRepo(db.SQL)},
+		canvas:              &canvasHandlers{canvases: store.NewCanvasRepo(db.SQL)},
 		relation:            &relationHandlers{relations: store.NewRelationRepo(db.SQL)},
 		importH:             &importHandlers{db: db},
 		backup:              &backupHandlers{db: db},

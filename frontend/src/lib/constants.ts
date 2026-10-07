@@ -83,6 +83,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/catalog", label: "nav.serviceCatalog", icon: "Store" },
       { href: "/requests", label: "nav.requests", icon: "ClipboardList" },
       { href: "/issues", label: "nav.issues", icon: "ListChecks", count: "openIssues" },
+      { href: "/canvas", label: "nav.canvas", icon: "Lightbulb" },
       { href: "/chamados", label: "nav.chamados", icon: "Ticket" },
     ],
   },

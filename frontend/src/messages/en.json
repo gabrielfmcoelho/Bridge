@@ -50,7 +50,8 @@
     "workspace": "Workspace",
     "selfService": "Self-service",
     "menu": "Menu",
-    "shares": "Shares"
+    "shares": "Shares",
+    "canvas": "Idea boards"
   },
   "atlas": {
     "apis": {
@@ -1540,7 +1541,8 @@
     "saving": "Saving...",
     "markdownHint": "Supports **markdown** formatting...",
     "noneReported": "No issues reported",
-    "boardEmpty": "No issues yet."
+    "boardEmpty": "No issues yet.",
+    "entityEntidade": "Entidade"
   },
   "release": {
     "title": "Releases",
@@ -3518,6 +3520,53 @@
     "users": {
       "keys": "Unique keys",
       "visitors": "Unique visitors"
+    }
+  },
+  "canvas": {
+    "pageDescription": "Free-form boards per entidade for brainstorming — notes, text, shapes and arrows. What matures goes to the entidade's backlog.",
+    "create": "New board",
+    "titleLabel": "Title",
+    "titleRequired": "Enter a title.",
+    "entidade": "Entidade",
+    "entidadeRequired": "Pick the entidade.",
+    "emptyTitle": "No boards yet",
+    "emptyHint": "Create a board to start gathering the team's ideas.",
+    "editedAgo": "edited {when}",
+    "backlog": "Entidade backlog",
+    "notFound": "Board not found.",
+    "rename": "Rename board",
+    "deleteHint": "The board disappears for everyone. Issues it sent to the backlog stay.",
+    "addNote": "Note",
+    "addText": "Text",
+    "addRect": "Rectangle",
+    "addEllipse": "Ellipse",
+    "addDiamond": "Diamond",
+    "editText": "Edit text",
+    "emptyNote": "Double-click to write",
+    "emptyBoard": "Empty board.",
+    "emptyBoardHint": "Double-click the board to add a note, or use the toolbar.",
+    "readOnly": "Read only",
+    "save": {
+      "saved": "Saved",
+      "saving": "Saving…",
+      "conflict": "Changed by someone else",
+      "error": "Save failed"
+    },
+    "saveFailed": "Couldn't save the board",
+    "conflictTitle": "Board changed by someone else",
+    "conflictHint": "Reload to see the current version. Your latest changes weren't saved.",
+    "reload": "Reload",
+    "sendToBacklog": "Send to backlog",
+    "sentTitle": "Sent to backlog",
+    "sentHint": "It's now an issue in {entidade}'s backlog.",
+    "sendFailed": "Couldn't send to backlog",
+    "inBacklog": "#{id} in backlog",
+    "tone": {
+      "warning": "Yellow",
+      "info": "Blue",
+      "success": "Green",
+      "accent": "Purple",
+      "danger": "Red"
     }
   }
 }

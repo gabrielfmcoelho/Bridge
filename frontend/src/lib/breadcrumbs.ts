@@ -32,6 +32,7 @@ const DYNAMIC: Record<string, Dyn> = {
   "/dns":        { key: "dns",         coerce: "number", pick: (d) => (d as any)?.dns_record?.domain, mono: true },
   "/requests":   { key: "requests",    coerce: "number", pick: (d) => (d as any)?.request?.title },
   "/atlas/apis": { key: "api-catalog", coerce: "number", pick: (d) => (d as any)?.name },
+  "/canvas":     { key: "canvas",      coerce: "number", pick: (d) => (d as any)?.title },
 };
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

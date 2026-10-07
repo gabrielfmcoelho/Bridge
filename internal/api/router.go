@@ -169,6 +169,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 
 	// Contacts
 	ch.registerRoutes(rr)           // /api/contacts/*
+	app.canvas.registerRoutes(rr)   // /api/canvases/*
 	app.relation.registerRoutes(rr) // /api/relations
 
 	// (/api/ssh-keys retired in v91 — host credentials are vault secrets:

@@ -152,6 +152,14 @@ func (h *globalIssueHandlers) handleCreate(w http.ResponseWriter, r *http.Reques
 		jsonError(w, http.StatusNotFound, "parent not found")
 		return
 	}
+	// An entidade parent has no grant rows to prove it exists, and admins skip
+	// the predicate entirely, so check the row (issues.entity_id has no FK).
+	if req.EntityType == string(store.AssetEntidade) {
+		if e, err := store.NewEntidadeRepo(h.db.SQL).Get(r.Context(), req.EntityID); err != nil || e == nil {
+			jsonError(w, http.StatusNotFound, "parent not found")
+			return
+		}
+	}
 
 	log.Printf("[issues] Creating issue: entity_type=%s entity_id=%d project_id=%v title=%q source=%s alert_ids=%v",
 		req.EntityType, req.EntityID, req.ProjectID, req.Title, req.Source, req.AlertIDs)

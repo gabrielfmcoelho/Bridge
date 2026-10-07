@@ -50,7 +50,8 @@
     "workspace": "Área de trabalho",
     "selfService": "Autoatendimento",
     "menu": "Menu",
-    "shares": "Compartilhamentos"
+    "shares": "Compartilhamentos",
+    "canvas": "Quadros de ideias"
   },
   "atlas": {
     "apis": {
@@ -1540,7 +1541,8 @@
     "saving": "Salvando...",
     "markdownHint": "Suporta formatação **markdown**...",
     "noneReported": "Nenhuma issue reportada",
-    "boardEmpty": "Nenhuma issue ainda."
+    "boardEmpty": "Nenhuma issue ainda.",
+    "entityEntidade": "Entidade"
   },
   "release": {
     "title": "Lançamentos",
@@ -3518,6 +3520,53 @@
     "users": {
       "keys": "Chaves únicas",
       "visitors": "Visitantes únicos"
+    }
+  },
+  "canvas": {
+    "pageDescription": "Quadros livres por entidade para levantar ideias — notas, textos, formas e setas. O que amadurecer vai para o backlog da entidade.",
+    "create": "Novo quadro",
+    "titleLabel": "Título",
+    "titleRequired": "Informe um título.",
+    "entidade": "Entidade",
+    "entidadeRequired": "Escolha a entidade.",
+    "emptyTitle": "Nenhum quadro ainda",
+    "emptyHint": "Crie um quadro para começar a reunir ideias da equipe.",
+    "editedAgo": "editado {when}",
+    "backlog": "Backlog da entidade",
+    "notFound": "Quadro não encontrado.",
+    "rename": "Renomear quadro",
+    "deleteHint": "O quadro some para todos. As issues que ele enviou ao backlog continuam.",
+    "addNote": "Nota",
+    "addText": "Texto",
+    "addRect": "Retângulo",
+    "addEllipse": "Elipse",
+    "addDiamond": "Losango",
+    "editText": "Editar texto",
+    "emptyNote": "Clique duas vezes para escrever",
+    "emptyBoard": "Quadro vazio.",
+    "emptyBoardHint": "Clique duas vezes no quadro para criar uma nota, ou use a barra de ferramentas.",
+    "readOnly": "Somente leitura",
+    "save": {
+      "saved": "Salvo",
+      "saving": "Salvando…",
+      "conflict": "Alterado por outra pessoa",
+      "error": "Falha ao salvar"
+    },
+    "saveFailed": "Não foi possível salvar o quadro",
+    "conflictTitle": "Quadro alterado por outra pessoa",
+    "conflictHint": "Recarregue para ver a versão atual. Suas últimas mudanças não foram salvas.",
+    "reload": "Recarregar",
+    "sendToBacklog": "Enviar ao backlog",
+    "sentTitle": "Enviado ao backlog",
+    "sentHint": "Virou uma issue no backlog de {entidade}.",
+    "sendFailed": "Não foi possível enviar ao backlog",
+    "inBacklog": "#{id} no backlog",
+    "tone": {
+      "warning": "Amarelo",
+      "info": "Azul",
+      "success": "Verde",
+      "accent": "Roxo",
+      "danger": "Vermelho"
     }
   }
 }

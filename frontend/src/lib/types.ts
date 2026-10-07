@@ -423,6 +423,19 @@ export interface GraphData {
   focus?: string;
 }
 
+/** An entidade's idea board. content (xyflow {nodes, edges}) only on GET by id. */
+export interface Canvas {
+  id: number;
+  entidade_id: number;
+  entidade_name: string;
+  title: string;
+  content?: { nodes: unknown[]; edges: unknown[] };
+  version: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Issue {
   id: number;
   project_id: number;

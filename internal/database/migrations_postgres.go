@@ -1795,4 +1795,20 @@ var migrationsPostgres = []string{
 	`ALTER TABLE share_bundle_access_log ADD COLUMN IF NOT EXISTS sent_to TEXT NOT NULL DEFAULT '';
 	ALTER TABLE share_bundle_access_log DROP CONSTRAINT IF EXISTS share_bundle_access_log_action_check;
 	ALTER TABLE share_bundle_access_log ADD CONSTRAINT share_bundle_access_log_action_check CHECK (action IN ('redeem','reveal','send'));`,
+
+	// Version 108: canvases — free-form idea boards, each owned by one entidade
+	// (visible like the entidade itself: no asset_entidades grants). content is
+	// the board's xyflow JSON, opaque to the server; version guards autosave
+	// against concurrent edits.
+	`CREATE TABLE IF NOT EXISTS canvases (
+		id          BIGSERIAL PRIMARY KEY,
+		entidade_id BIGINT NOT NULL REFERENCES entidades(id) ON DELETE CASCADE,
+		title       TEXT NOT NULL,
+		content     TEXT NOT NULL DEFAULT '{"nodes":[],"edges":[]}',
+		version     INT NOT NULL DEFAULT 1,
+		created_by  BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_canvases_entidade ON canvases(entidade_id);`,
 }

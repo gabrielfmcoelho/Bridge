@@ -20,6 +20,12 @@ const (
 	AssetTool       AssetType = "tool"
 	AssetAPICatalog AssetType = "api_catalog"
 	AssetSecret     AssetType = "secret"
+
+	// AssetEntidade is the entidade itself as a polymorphic parent (an issue
+	// sent to the backlog from an entidade's canvas). It has no grant rows:
+	// it's visible iff it's in the caller's visible set. Deliberately not in
+	// assetRegistry — it isn't grantable.
+	AssetEntidade AssetType = "entidade"
 )
 
 // AssetSpec describes how to reach a root asset's rows for the cross-cutting
@@ -129,9 +135,11 @@ func VisibleExprDyn(ctx context.Context, typeExpr, idExpr string, typeArgs ...an
 	if ids == nil {
 		ids = []int64{} // nil would bind as NULL and `= ANY(NULL)` is never true but confusing
 	}
+	// typeExpr appears twice (entidade branch + grant branch), so its args do too.
 	args := append(append([]any{}, typeArgs...), ids)
-	return fmt.Sprintf(`EXISTS (SELECT 1 FROM asset_entidades ae WHERE ae.asset_type = %s AND ae.asset_id = %s AND (ae.relation = 'global' OR ae.entidade_id = ANY(?)))`,
-		typeExpr, idExpr), args
+	args = append(append(args, typeArgs...), ids)
+	return fmt.Sprintf(`((%s = '%s' AND (%s)::bigint = ANY(?::bigint[])) OR EXISTS (SELECT 1 FROM asset_entidades ae WHERE ae.asset_type = %s AND ae.asset_id = %s AND (ae.relation = 'global' OR ae.entidade_id = ANY(?))))`,
+		typeExpr, AssetEntidade, idExpr, typeExpr, idExpr), args
 }
 
 // CanSee evaluates the visibility predicate for a single asset id. For

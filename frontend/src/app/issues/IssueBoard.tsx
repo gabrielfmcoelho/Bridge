@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { globalIssuesAPI, usersAPI, hostsAPI, dnsAPI, servicesAPI, projectsAPI } from "@/lib/api";
+import { globalIssuesAPI, usersAPI, hostsAPI, dnsAPI, servicesAPI, projectsAPI, entidadesAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import PageShell from "@/components/layout/PageShell";
@@ -46,17 +46,19 @@ const priorityColors: Record<string, string> = {
 
 // Badge colour key per entity, and the chip classes as full literals
 // (Tailwind only generates classes it can read from source).
-const entityColors: Record<string, "cyan" | "success" | "accent" | "warning"> = {
+const entityColors: Record<string, "cyan" | "success" | "accent" | "warning" | "info"> = {
   host: "cyan",
   dns: "success",
   service: "accent",
   project: "warning",
+  entidade: "info",
 };
 const entityChip: Record<string, string> = {
   host: "text-[var(--cyan)] bg-[var(--cyan)]/10",
   dns: "text-[var(--success)] bg-[var(--success)]/10",
   service: "text-[var(--accent)] bg-[var(--accent)]/10",
   project: "text-[var(--warning)] bg-[var(--warning)]/10",
+  entidade: "text-[var(--info)] bg-[var(--info)]/10",
 };
 
 // ─── Filters type ────────────────────────────────────────────────────────────
@@ -119,6 +121,7 @@ export default function IssueBoard() {
   const { data: allDns = [] } = useQuery({ queryKey: ["dns"], queryFn: dnsAPI.list });
   const { data: allServices = [] } = useQuery({ queryKey: ["services"], queryFn: servicesAPI.list });
   const { data: allProjects = [] } = useQuery({ queryKey: ["projects"], queryFn: projectsAPI.list });
+  const { data: allEntidades = [] } = useQuery({ queryKey: ["entidades"], queryFn: entidadesAPI.list });
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
@@ -131,9 +134,10 @@ export default function IssueBoard() {
       case "dns": return allDns.find(d => d.id === issue.entity_id)?.domain || `DNS #${issue.entity_id}`;
       case "service": return allServices.find(s => s.id === issue.entity_id)?.nickname || `Service #${issue.entity_id}`;
       case "project": return allProjects.find(p => p.id === issue.entity_id)?.name || `Project #${issue.entity_id}`;
+      case "entidade": return allEntidades.find(e => e.id === issue.entity_id)?.name || `Entidade #${issue.entity_id}`;
       default: return issue.entity_type;
     }
-  }, [allHosts, allDns, allServices, allProjects]);
+  }, [allHosts, allDns, allServices, allProjects, allEntidades]);
 
   // ── KPI counts ──────────────────────────────────────────────────────────────
 
@@ -399,6 +403,7 @@ export default function IssueBoard() {
               { value: "dns", label: "DNS" },
               { value: "service", label: t("issue.entityService") },
               { value: "project", label: t("issue.entityProject") },
+              { value: "entidade", label: t("issue.entityEntidade") },
             ]}
           />
           <Select

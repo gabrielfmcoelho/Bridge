@@ -63,6 +63,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_Canvas:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.Canvas'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-models_Contact:
     properties:
       data:
@@ -447,6 +456,24 @@ definitions:
         type: string
       url:
         type: string
+    type: object
+  api.canvasCreateRequest:
+    properties:
+      entidade_id:
+        type: integer
+      title:
+        type: string
+    type: object
+  api.canvasUpdateRequest:
+    properties:
+      content:
+        items:
+          type: integer
+        type: array
+      title:
+        type: string
+      version:
+        type: integer
     type: object
   api.catalogueOption:
     properties:
@@ -3152,6 +3179,27 @@ definitions:
         type: string
       provider_name:
         type: string
+    type: object
+  models.Canvas:
+    properties:
+      content:
+        type: object
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      entidade_id:
+        type: integer
+      entidade_name:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
     type: object
   models.Contact:
     properties:
@@ -6758,6 +6806,166 @@ paths:
       summary: Download a backup
       tags:
       - backup
+  /api/canvases:
+    get:
+      description: Visible idea boards (without content), latest edit first. Any role.
+      parameters:
+      - description: Only this entidade's boards
+        in: query
+        name: entidade_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_Canvas'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List canvases
+      tags:
+      - canvases
+    post:
+      consumes:
+      - application/json
+      description: Editor+. An empty board for an entidade the caller can see (404
+        otherwise).
+      parameters:
+      - description: Entidade and title
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.canvasCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Canvas'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Create a canvas
+      tags:
+      - canvases
+  /api/canvases/{id}:
+    delete:
+      description: Editor+. Issues the board sent to the backlog stay.
+      parameters:
+      - description: Canvas ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Delete a canvas
+      tags:
+      - canvases
+    get:
+      description: The board with its content (xyflow JSON object). Any role.
+      parameters:
+      - description: Canvas ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Canvas'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Get a canvas
+      tags:
+      - canvases
+    put:
+      consumes:
+      - application/json
+      description: 'Editor+. Partial: omitted title/content keep their value. version
+        must be the one loaded; a stale one answers 409 with the current canvas.'
+      parameters:
+      - description: Canvas ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Version and changed fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.canvasUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Canvas'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/models.Canvas'
+      summary: Update a canvas
+      tags:
+      - canvases
   /api/contacts:
     get:
       description: Visible contacts, each with its usage counts per asset type. Any
