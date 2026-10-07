@@ -14793,7 +14793,7 @@ const docTemplate = `{
         },
         "/api/telemetry/requests": {
             "get": {
-                "description": "Any role that can see the asset (404 otherwise). Reads SigNoz: an API's spans come from the APISIX gateway (filtered by the path of its base_url), a service's and a host's from Coolify's Traefik (by Coolify resource uuid; a host = its services). Optional filters route (normalized, as group_by=route reports it), key (Keycloak client; APIs only) and status. series_by=key adds one line per top-5 key plus \"__outros__\" (APIs only). facets lists the window's top routes and keys, ignoring the route/key/status filters. Keys are labelled with their Bridge key and owner; host services with their nickname. {available:false, reason} when SigNoz isn't configured or the asset has nothing to match on. Latencies in ms; errors = 5xx.",
+                "description": "Any role that can see the asset (404 otherwise). Reads SigNoz: an API's spans come from the APISIX gateway (filtered by the path of its base_url), a service's and a host's from Coolify's Traefik (by requested domain: a service's linked DNS records and external URL; a host's DNS records plus its services'). Optional filters route (normalized, as group_by=route reports it), key (Keycloak client; APIs only) and status. series_by=key adds one line per top-5 key plus \"__outros__\" (APIs only). facets lists the window's top routes and keys, ignoring the route/key/status filters. Keys are labelled with their Bridge key and owner; a host's domains with their service's nickname. {available:false, reason} when SigNoz isn't configured or the asset has nothing to match on. Latencies in ms; errors = 5xx.",
                 "produces": [
                     "application/json"
                 ],
@@ -19524,7 +19524,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/api.telemetryFacets"
                 },
                 "reason": {
-                    "description": "not_configured | no_gateway_url | no_coolify_uuid",
+                    "description": "not_configured | no_gateway_url | no_domain",
                     "type": "string"
                 },
                 "series": {
