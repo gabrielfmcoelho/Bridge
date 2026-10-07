@@ -238,3 +238,16 @@ func TestCleanDomain(t *testing.T) {
 		}
 	}
 }
+
+func TestIsCollectorDomain(t *testing.T) {
+	for d, want := range map[string]bool{
+		"otel-collector-m0cwcowwg0gsk8kscggwc4w0": true,
+		"otelcollectorhttp.10.0.122.91.sslip.io":  true,
+		"api-bridge.10.0.122.91.sslip.io":         false,
+		"gerenciador.sead.pi.gov.br":              false,
+	} {
+		if got := isCollectorDomain(d); got != want {
+			t.Errorf("isCollectorDomain(%q) = %v", d, got)
+		}
+	}
+}
