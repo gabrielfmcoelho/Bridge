@@ -43,7 +43,13 @@ const (
 	// APISIX writes http.method; Traefik (new semconv) http.request.method.
 	attrMethod = "if(attributes_string['http.method'] != '', attributes_string['http.method'], attributes_string['http.request.method'])"
 
-	// The aggregate every stats query selects.
+	// "Users" per source: an API's distinct keys (Keycloak clients); an app's
+	// distinct visitors, approximated by client address + user agent (NAT and
+	// proxies merge people; it counts devices, never stores who).
+	usersGateway = "uniqIf(attributes_string['bridge.client'], attributes_string['bridge.client'] != '')"
+	usersTraefik = "uniq(attributes_string['client.address'], attributes_string['user_agent.original'])"
+
+	// The aggregate every stats query selects (plus the source's users).
 	agg = `count() AS count,
 		countIf(has_error OR toUInt16OrZero(response_status_code) >= 500) AS errors,
 		quantile(0.5)(duration_nano) / 1e6 AS p50,
@@ -62,17 +68,19 @@ const (
 // applies to everything, facets included. Route, Key and Status are the
 // viewer's own filters: facets ignore them, so the options stay complete.
 type Filter struct {
-	PathPrefix  string
-	Domains     []string
-	Clients     []string
-	Route       string // normalized route, as group_by=route reports it
-	Key         string // one Keycloak client (azp); APIs only
-	Status      string // HTTP status code, e.g. "404"
+	PathPrefix string
+	Domains    []string
+	Clients    []string
+	Route      string // normalized route, as group_by=route reports it
+	Key        string // one Keycloak client (azp); APIs only
+	Status     string // HTTP status code, e.g. "404"
 }
 
-// Stats is one aggregate; latencies in milliseconds. Errors = 5xx or span error.
+// Stats is one aggregate; latencies in milliseconds. Errors = 5xx or span
+// error. Users: distinct keys (APIs) or visitors (apps), see usersGateway.
 type Stats struct {
 	Count  int64   `json:"count"`
+	Users  int64   `json:"users"`
 	Errors int64   `json:"errors"`
 	P50    float64 `json:"p50"`
 	P95    float64 `json:"p95"`
@@ -175,6 +183,7 @@ type scope struct {
 	path       string // path expression (gateway: without the API prefix)
 	from, step int64
 	gateway    bool
+	agg        string // agg plus this source's users
 }
 
 func (c *Client) scope(f Filter, rng string) (*scope, error) {
@@ -194,6 +203,10 @@ func (c *Client) scope(f Filter, rng string) (*scope, error) {
 		}
 	}
 	s := &scope{from: c.now().Add(-win[0]).Unix(), step: int64(win[1].Seconds()), gateway: f.PathPrefix != ""}
+	s.agg = agg + ", " + usersTraefik + " AS users"
+	if s.gateway {
+		s.agg = agg + ", " + usersGateway + " AS users"
+	}
 	s.params = url.Values{"param_from": {fmt.Sprint(s.from)}, "param_step": {fmt.Sprint(s.step)}}
 	s.where = "timestamp >= toDateTime64({from:Int64}, 9) AND ts_bucket_start >= {from:Int64} - 1800"
 	if s.gateway {
@@ -268,7 +281,7 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string, by
 
 	res := &Result{Top: []Row{}, Facets: Facets{Routes: []string{}}}
 	var sum []Stats
-	if err := c.query(ctx, fmt.Sprintf("SELECT %s FROM %s WHERE %s", agg, spansTable, s.where), s.params, &sum); err != nil {
+	if err := c.query(ctx, fmt.Sprintf("SELECT %s FROM %s WHERE %s", s.agg, spansTable, s.where), s.params, &sum); err != nil {
 		return nil, err
 	}
 	if len(sum) > 0 {
@@ -278,7 +291,7 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string, by
 		T int64 `json:"t"`
 		Stats
 	}
-	q := fmt.Sprintf("SELECT toUnixTimestamp(toStartOfInterval(timestamp, toIntervalSecond({step:Int64}))) AS t, %s FROM %s WHERE %s GROUP BY t ORDER BY t", agg, spansTable, s.where)
+	q := fmt.Sprintf("SELECT toUnixTimestamp(toStartOfInterval(timestamp, toIntervalSecond({step:Int64}))) AS t, %s FROM %s WHERE %s GROUP BY t ORDER BY t", s.agg, spansTable, s.where)
 	if err := c.query(ctx, q, s.params, &series); err != nil {
 		return nil, err
 	}
@@ -287,7 +300,7 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string, by
 		got[b.T] = b.Stats
 	}
 	res.Series = c.slots(s, got)
-	q = fmt.Sprintf("SELECT %s AS key, %s FROM %s WHERE %s GROUP BY key ORDER BY count DESC LIMIT 20", key, agg, spansTable, s.where)
+	q = fmt.Sprintf("SELECT %s AS key, %s FROM %s WHERE %s GROUP BY key ORDER BY count DESC LIMIT 20", key, s.agg, spansTable, s.where)
 	if err := c.query(ctx, q, s.params, &res.Top); err != nil {
 		return nil, err
 	}
@@ -357,7 +370,7 @@ func (c *Client) seriesByKey(ctx context.Context, s *scope) ([]KeySeries, error)
 	q := fmt.Sprintf(`SELECT toUnixTimestamp(toStartOfInterval(timestamp, toIntervalSecond({step:Int64}))) AS t,
 		if(has(arraySlice(%s, 2), %s), %s, '%s') AS k, %s
 		FROM %s WHERE %s GROUP BY t, k ORDER BY t`,
-		csvParam("topkeys"), attrGatewayClient, attrGatewayClient, OtherKey, agg, spansTable, s.where)
+		csvParam("topkeys"), attrGatewayClient, attrGatewayClient, OtherKey, s.agg, spansTable, s.where)
 	if err := c.query(ctx, q, params, &rows); err != nil {
 		return nil, err
 	}

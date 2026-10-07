@@ -1831,8 +1831,8 @@ export const grafanaAPI = {
 export type TelemetryKind = "api" | "service" | "host";
 export type TelemetryRange = "1h" | "24h" | "7d" | "30d";
 export type TelemetryGroupBy = "route" | "key" | "status" | "service";
-/** Latencies in ms; errors = 5xx. */
-export type TelemetryStats = { count: number; errors: number; p50: number; p95: number; p99: number };
+/** Latencies in ms; errors = 5xx. users: distinct keys (APIs) or visitors, by client address + user agent (apps). */
+export type TelemetryStats = { count: number; users?: number; errors: number; p50: number; p95: number; p99: number };
 export type TelemetryPoint = TelemetryStats & { t: string };
 /** The viewer's own filters (route as group_by=route reports it; key = Keycloak client, APIs only). */
 export type TelemetryFilters = { route?: string; key?: string; status?: string };

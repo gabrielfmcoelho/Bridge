@@ -2361,6 +2361,8 @@ definitions:
         type: number
       p99:
         type: number
+      users:
+        type: integer
     type: object
   api.telemetrySpan:
     properties:
@@ -4646,6 +4648,8 @@ definitions:
         type: number
       t:
         type: string
+      users:
+        type: integer
     type: object
   signoz.Facets:
     properties:
@@ -4681,6 +4685,8 @@ definitions:
         type: number
       p99:
         type: number
+      users:
+        type: integer
     type: object
   signoz.Stats:
     properties:
@@ -4694,6 +4700,8 @@ definitions:
         type: number
       p99:
         type: number
+      users:
+        type: integer
     type: object
   signoz.TraceSpan:
     properties:

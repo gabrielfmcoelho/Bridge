@@ -19576,6 +19576,9 @@ const docTemplate = `{
                 },
                 "p99": {
                     "type": "number"
+                },
+                "users": {
+                    "type": "integer"
                 }
             }
         },
@@ -22907,6 +22910,9 @@ const docTemplate = `{
                 },
                 "t": {
                     "type": "string"
+                },
+                "users": {
+                    "type": "integer"
                 }
             }
         },
@@ -22961,6 +22967,9 @@ const docTemplate = `{
                 },
                 "p99": {
                     "type": "number"
+                },
+                "users": {
+                    "type": "integer"
                 }
             }
         },
@@ -22981,6 +22990,9 @@ const docTemplate = `{
                 },
                 "p99": {
                     "type": "number"
+                },
+                "users": {
+                    "type": "integer"
                 }
             }
         },

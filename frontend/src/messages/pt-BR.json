@@ -3455,6 +3455,10 @@
       "cut": "Rastro longo: só os primeiros 500 spans aparecem.",
       "waterfall": "Rastro",
       "redacted": "Os valores dos parâmetros são visíveis só para administradores; você vê os nomes."
+    },
+    "users": {
+      "keys": "Chaves únicas",
+      "visitors": "Visitantes únicos"
     }
   }
 }
