@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/mailer"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -19,6 +21,9 @@ import (
 // on the same crypto, ACL helpers, and secret reveal path.
 type bundleHandlers struct {
 	repo *vault.SecretRepo
+	db   *database.DB // SMTP settings for handleSend
+	// send delivers one email; nil = mailer.Send (tests swap it).
+	send func(context.Context, mailer.Settings, mailer.Message) error
 }
 
 func (h *bundleHandlers) actor(r *http.Request) (vault.ActorContext, bool) {

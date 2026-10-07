@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -13,7 +14,9 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/mailer"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -413,5 +416,99 @@ func TestBundleHandlers_UpdateDetails(t *testing.T) {
 	}
 	if code, _ := put(f.owner, `{"recipient_contact_id":999999}`); code != http.StatusBadRequest {
 		t.Errorf("unknown contact = %d, want 400", code)
+	}
+}
+
+// TestBundleHandlers_Send covers POST /api/share-bundles/{id}/send: the mail
+// carries the link and passphrase, defaults to the recipient contact's email,
+// audits each address, and refuses strangers, dead links and missing SMTP.
+func TestBundleHandlers_Send(t *testing.T) {
+	f := newBundleHandlerFixture(t)
+	ctx := context.Background()
+	var sent []mailer.Message
+	fail := false
+	h := &bundleHandlers{repo: f.repo, db: f.d, send: func(_ context.Context, _ mailer.Settings, m mailer.Message) error {
+		if fail {
+			return errors.New("550 mailbox unavailable")
+		}
+		sent = append(sent, m)
+		return nil
+	}}
+	if _, err := f.d.SQL.Exec(`UPDATE contacts SET email = 'fulano@example.com' WHERE id = ?`, f.contactID); err != nil {
+		t.Fatal(err)
+	}
+	cid := f.contactID
+	tok, view, err := f.repo.CreateBundle(ctx, f.actor,
+		[]vault.BundleItemInput{{Type: vault.BundleItemSecret, RefID: f.secretID}},
+		vault.CreateBundleOpts{Title: "Acesso PGE", TTL: time.Hour, Passphrase: "Xk9-senha", RecipientContactID: &cid})
+	if err != nil {
+		t.Fatalf("create bundle: %v", err)
+	}
+	idStr := strconv.FormatInt(view.ID, 10)
+	post := func(u *models.User, body string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := f.as(u, httptest.NewRequest(http.MethodPost, "/api/share-bundles/"+idStr+"/send", strings.NewReader(body)))
+		req.SetPathValue("id", idStr)
+		rec := httptest.NewRecorder()
+		h.handleSend(rec, req)
+		return rec
+	}
+
+	if rec := post(f.owner, ``); rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("smtp unset = %d, want 503", rec.Code)
+	}
+	settings := store.NewAppSettingsRepo(f.d.SQL)
+	for k, v := range map[string]string{"smtp_enabled": "true", "smtp_host": "smtp.example", "smtp_from": "bridge@example.com", "smtp_link_base_url": "https://bridge.example/"} {
+		if err := settings.Set(ctx, k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if rec := post(f.other, ``); rec.Code != http.StatusNotFound {
+		t.Errorf("stranger = %d, want 404", rec.Code)
+	}
+	if rec := post(f.owner, `{"emails":["not an address"]}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("bad address = %d, want 400", rec.Code)
+	}
+
+	rec := post(f.owner, ``)
+	if rec.Code != http.StatusOK || len(sent) != 1 {
+		t.Fatalf("default recipient = %d %s (sent %d)", rec.Code, rec.Body, len(sent))
+	}
+	m := sent[0]
+	if m.To != "<fulano@example.com>" || !strings.Contains(m.Body, "https://bridge.example/share/"+tok) ||
+		!strings.Contains(m.Body, "Senha: Xk9-senha") || !strings.Contains(m.Body, "Olá, Fulano") {
+		t.Errorf("mail = %+v", m)
+	}
+
+	fail = true
+	rec = post(f.owner, `{"emails":["a@example.com"]}`)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"sent":false`) {
+		t.Errorf("failed delivery = %d %s", rec.Code, rec.Body)
+	}
+	fail = false
+	if rec := post(f.admin, `{"emails":["b@example.com","B@example.com"]}`); rec.Code != http.StatusOK || len(sent) != 2 {
+		t.Errorf("admin send (deduped) = %d, sent %d", rec.Code, len(sent))
+	}
+
+	log, err := f.repo.BundleAccessLog(ctx, f.actor, view.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var to []string
+	for _, e := range log {
+		if e.Action == "send" {
+			to = append(to, e.SentTo)
+		}
+	}
+	if strings.Join(to, ",") != "b@example.com,fulano@example.com" {
+		t.Errorf("audited sends = %v (failed delivery must not stay logged)", to)
+	}
+
+	if err := f.repo.RevokeBundle(ctx, f.actor, view.ID); err != nil {
+		t.Fatal(err)
+	}
+	if rec := post(f.owner, ``); rec.Code != http.StatusConflict {
+		t.Errorf("revoked = %d, want 409", rec.Code)
 	}
 }

@@ -11841,7 +11841,7 @@ const docTemplate = `{
         },
         "/api/settings/integrations": {
             "get": {
-                "description": "Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
+                "description": "Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, smtp, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
                 "produces": [
                     "application/json"
                 ],
@@ -12568,6 +12568,52 @@ const docTemplate = `{
                         "in": "body",
                         "schema": {
                             "$ref": "#/definitions/api.integrationTestOutlineRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/settings/integrations/test/smtp": {
+            "post": {
+                "description": "Admin. Uses the saved settings and mails \"to\", or the caller's own email when omitted. A failed test still answers 200: {\"success\": false, \"error\": \"...\"}; success is {\"success\": true, \"to\"}.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "integration-settings"
+                ],
+                "summary": "Test the SMTP settings",
+                "parameters": [
+                    {
+                        "description": "Address to mail",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/api.integrationTestSMTPRequest"
                         }
                     }
                 ],
@@ -13558,6 +13604,82 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/share-bundles/{id}/send": {
+            "post": {
+                "description": "Any role; owner or admin (others get 404). Mails the link and its passphrase, one message per address, to \"emails\" or, when omitted, the recipient contact's email. Each address mailed is recorded in the access log (action \"send\"). Always 200 once sending starts, with a per-address {email, sent, error?}. 400 when no valid address; 409 when the link is not live or predates stored links; 503 when SMTP is not configured.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "share-bundles"
+                ],
+                "summary": "Email a share bundle's link and passphrase",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Bundle ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Addresses (optional)",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/api.sendBundleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/api.sendBundleResult"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -18443,6 +18565,14 @@ const docTemplate = `{
                 }
             }
         },
+        "api.integrationTestSMTPRequest": {
+            "type": "object",
+            "properties": {
+                "to": {
+                    "type": "string"
+                }
+            }
+        },
         "api.issueCreateRequest": {
             "type": "object",
             "properties": {
@@ -19147,6 +19277,32 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                }
+            }
+        },
+        "api.sendBundleRequest": {
+            "type": "object",
+            "properties": {
+                "emails": {
+                    "description": "Emails are the addresses to mail; empty = the recipient contact's email.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.sendBundleResult": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "sent": {
+                    "type": "boolean"
                 }
             }
         },
@@ -23207,6 +23363,10 @@ const docTemplate = `{
                 "remote_ip": {
                     "type": "string"
                 },
+                "sent_to": {
+                    "description": "action 'send': the address mailed",
+                    "type": "string"
+                },
                 "used_passphrase": {
                     "type": "boolean"
                 },
@@ -23360,6 +23520,10 @@ const docTemplate = `{
                 "recipient_contact_id": {
                     "description": "RecipientContactID / RecipientName come from the linked contact;\nRecipientLabel is the free-text recipient.",
                     "type": "integer"
+                },
+                "recipient_email": {
+                    "description": "the contact's, default for a send",
+                    "type": "string"
                 },
                 "recipient_label": {
                     "type": "string"

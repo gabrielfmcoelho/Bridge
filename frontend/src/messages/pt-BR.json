@@ -1892,6 +1892,23 @@
         "chUser": "Usuário do ClickHouse",
         "chPassword": "Senha do ClickHouse",
         "chHint": "Use um usuário somente leitura do ClickHouse (readonly=1), acessível só a partir da VM do Bridge."
+      },
+      "smtp": {
+        "title": "E-mail (SMTP)",
+        "hint": "Servidor de saída usado para enviar links de compartilhamento (link e senha) aos destinatários.",
+        "ariaEnable": "Ativar envio de e-mail",
+        "host": "Servidor",
+        "port": "Porta",
+        "tls": "Criptografia",
+        "tlsNone": "Nenhuma (relay local)",
+        "username": "Usuário",
+        "password": "Senha",
+        "from": "Remetente",
+        "linkBaseUrl": "URL pública do Bridge",
+        "linkBaseUrlHint": "Os links nos e-mails começam com este endereço, ex.: https://bridge.example.org/share/…",
+        "testTo": "Enviar teste para",
+        "testToPlaceholder": "Vazio = e-mail do seu usuário",
+        "testSent": "E-mail de teste enviado para {to}."
       }
     },
     "integrationsTabLabel": "Integrações",
@@ -2686,6 +2703,18 @@
       "badMaxViews": "O limite de acessos deve ser um número inteiro a partir de 1.",
       "saved": "Compartilhamento atualizado",
       "expiryDay": "1 dia a partir de agora"
+    },
+    "send": {
+      "action": "Enviar por e-mail",
+      "title": "Enviar \"{title}\" por e-mail",
+      "hint": "Cada endereço recebe um e-mail próprio com o link e a senha. Todo envio fica registrado no histórico de acessos.",
+      "to": "Destinatários",
+      "toPlaceholder": "Contato ou endereço de e-mail, depois Enter",
+      "noPassphrase": "Este link não tem senha: qualquer pessoa com o e-mail consegue abri-lo.",
+      "submit": "Enviar",
+      "sentTitle": "Link enviado",
+      "sentCount": "Enviado para {count} endereço(s).",
+      "loggedBy": "Enviado por e-mail por {name} para {to}"
     }
   },
   "entidades": {

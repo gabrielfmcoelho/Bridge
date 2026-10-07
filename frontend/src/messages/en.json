@@ -1892,6 +1892,23 @@
         "chUser": "ClickHouse user",
         "chPassword": "ClickHouse password",
         "chHint": "Use a read-only ClickHouse user (readonly=1) reachable only from Bridge's VM."
+      },
+      "smtp": {
+        "title": "Email (SMTP)",
+        "hint": "Outgoing mail server used to send share links (link and passphrase) to recipients.",
+        "ariaEnable": "Enable email sending",
+        "host": "Server",
+        "port": "Port",
+        "tls": "Encryption",
+        "tlsNone": "None (local relay)",
+        "username": "Username",
+        "password": "Password",
+        "from": "Sender",
+        "linkBaseUrl": "Bridge public URL",
+        "linkBaseUrlHint": "Links in emails start with this address, e.g. https://bridge.example.org/share/…",
+        "testTo": "Send test to",
+        "testToPlaceholder": "Empty = your user's email",
+        "testSent": "Test email sent to {to}."
       }
     },
     "integrationsTabLabel": "Integrations",
@@ -2686,6 +2703,18 @@
       "badMaxViews": "The view limit must be a whole number from 1 up.",
       "saved": "Share updated",
       "expiryDay": "1 day from now"
+    },
+    "send": {
+      "action": "Send by email",
+      "title": "Send \"{title}\" by email",
+      "hint": "Each address gets its own email with the link and the passphrase. Every send is recorded in the access log.",
+      "to": "Recipients",
+      "toPlaceholder": "Contact or email address, then Enter",
+      "noPassphrase": "This link has no passphrase: anyone holding the email can open it.",
+      "submit": "Send",
+      "sentTitle": "Link sent",
+      "sentCount": "Sent to {count} address(es).",
+      "loggedBy": "Sent by email by {name} to {to}"
     }
   },
   "entidades": {

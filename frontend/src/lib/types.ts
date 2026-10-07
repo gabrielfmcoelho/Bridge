@@ -732,6 +732,8 @@ export interface ShareBundleView {
   /** Who the link is for: a contact (recipient_name is its name) and/or free text. */
   recipient_contact_id?: number | null;
   recipient_name?: string;
+  /** The recipient contact's email — the default address for a send. */
+  recipient_email?: string;
   recipient_label?: string;
   created_by_name?: string;
   /** Last guest redemption (admin reveals don't count). */
@@ -830,14 +832,23 @@ export interface BundleKeyUsage {
 
 // ShareBundleAccessEntry is one access-log row returned by
 // GET /api/share-bundles/{id}/access-log: an anonymous guest redemption
-// (network metadata only) or an admin reveal (actor_name says who).
+// (network metadata only), an admin reveal or an email send (actor_name says
+// who; sent_to, for a send, the address).
 export interface ShareBundleAccessEntry {
   accessed_at: string;
   remote_ip: string;
   user_agent: string;
   used_passphrase: boolean;
-  action?: "redeem" | "reveal";
+  action?: "redeem" | "reveal" | "send";
   actor_name?: string;
+  sent_to?: string;
+}
+
+/** One address's outcome from POST /api/share-bundles/{id}/send. */
+export interface ShareSendResult {
+  email: string;
+  sent: boolean;
+  error?: string;
 }
 
 // ── Service Catalog & Requests ──────────────────────────────────────────────

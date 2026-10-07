@@ -14,6 +14,7 @@ import SignozIntegrationSection from "./integrations/SignozIntegrationSection";
 import LLMSection from "./integrations/LLMSection";
 import CoolifySection from "./integrations/CoolifySection";
 import ProxmoxSection from "./integrations/ProxmoxSection";
+import SMTPSection from "./integrations/SMTPSection";
 
 export default function IntegrationsTab() {
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
@@ -30,6 +31,7 @@ export default function IntegrationsTab() {
       <SignozIntegrationSection />
       <OutlineIntegrationSection />
       <GLPIIntegrationSection />
+      <SMTPSection />
       <LLMSection />
       <CoolifySection />
       <ProxmoxSection />

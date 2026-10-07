@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/ui/Modal";
-import CopyButton from "@/components/ui/CopyButton";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FormError from "@/components/ui/FormError";
@@ -11,6 +10,7 @@ import { shareBundlesAPI, secretsAPI, outlineAPI, type OutlineDocumentNode } fro
 import { useLocale } from "@/contexts/LocaleContext";
 import type { ApiCatalog } from "@/lib/types";
 import RecipientField, { EMPTY_RECIPIENT, recipientPayload } from "@/components/share/RecipientField";
+import { ShareLinkCreated, type SendTarget } from "@/components/share/ShareSendModal";
 
 type Mode = "all" | "tags" | "operations";
 
@@ -47,8 +47,9 @@ export function WikiPickerNodes({
 
 // AccessLogPanel lazily loads (only when expanded) and renders a bundle's
 // access log: guest openings (time / IP / browser, with a lock when a
-// passphrase gated them — network metadata only, the links are anonymous) and
-// admin reveals of the link (who). Also used by the /shares page.
+// passphrase gated them — network metadata only, the links are anonymous),
+// admin reveals of the link (who) and email sends (who, to where). Also used
+// by the /shares page.
 export function AccessLogPanel({ bundleId }: { bundleId: number }) {
   const { t } = useLocale();
   const { data: entries = [], isLoading } = useQuery({
@@ -70,6 +71,13 @@ export function AccessLogPanel({ bundleId }: { bundleId: number }) {
                 {new Date(e.accessed_at).toLocaleString()}
               </span>
               <span>{t("shares.revealedBy", { name: e.actor_name || "—" })}</span>
+            </li>
+          ) : e.action === "send" ? (
+            <li key={i} className="flex items-center gap-2 text-2xs text-[var(--info)]">
+              <span className="text-[var(--text-faint)] shrink-0">
+                {new Date(e.accessed_at).toLocaleString()}
+              </span>
+              <span>{t("shares.send.loggedBy", { name: e.actor_name || "—", to: e.sent_to || "—" })}</span>
             </li>
           ) : (
             <li key={i} className="flex items-center gap-2 text-2xs text-[var(--text-secondary)]">
@@ -126,6 +134,8 @@ export default function ShareBundleModal({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  // What the "send by email" step needs; null for a link the server gave no id for.
+  const [created, setCreated] = useState<SendTarget | null>(null);
   // When set, the top form is editing an existing link's items in place (same
   // URL) rather than creating a new one; `notice` shows a transient confirmation.
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -208,6 +218,7 @@ export default function ShareBundleModal({
     setError(null);
     setSubmitting(false);
     setResult(null);
+    setCreated(null);
     setOpenLog(null);
     setEditingId(null);
     setNotice(null);
@@ -311,7 +322,7 @@ export default function ShareBundleModal({
       if (token) {
         // Restore a lost link: rebuild under the token the holder still has, so
         // the exact /share/<token> URL works again.
-        await shareBundlesAPI.reissue({
+        const v = await shareBundlesAPI.reissue({
           token,
           title: bundleTitle,
           description: bundleDescription,
@@ -321,6 +332,7 @@ export default function ShareBundleModal({
           items,
         });
         setResult(`${window.location.origin}/share/${token}`);
+        setCreated({ id: v.id, title: v.title, has_passphrase: v.has_passphrase, recipient_contact_id: recipient.contactId });
       } else {
         const res = await shareBundlesAPI.create({
           title: bundleTitle,
@@ -331,6 +343,7 @@ export default function ShareBundleModal({
           items,
         });
         setResult(`${window.location.origin}${res.url}`);
+        setCreated({ id: res.id, title: res.title, has_passphrase: res.has_passphrase, recipient_contact_id: recipient.contactId });
       }
       qc.invalidateQueries({ queryKey: linksKey });
     } catch (e) {
@@ -358,19 +371,7 @@ export default function ShareBundleModal({
   return (
     <Modal open={open} onClose={close} title={t("atlas.apis.shareTitle")}>
       {result ? (
-        <div className="space-y-3">
-          <p className="text-sm text-[var(--text-secondary)]">{t("atlas.apis.linkCreated")}</p>
-          <div className="flex gap-2">
-            <Input value={result} readOnly className="font-mono text-xs" />
-            <CopyButton value={result} variant="primary" label={t("atlas.apis.copyLink")} copiedLabel={t("atlas.apis.copied")} />
-          </div>
-          <p className="text-xs text-[var(--warning)]">⚠ {t("atlas.apis.tokenOnce")}</p>
-          <div className="flex justify-end pt-2">
-            <Button variant="secondary" type="button" onClick={close}>
-              {t("common.close")}
-            </Button>
-          </div>
-        </div>
+        <ShareLinkCreated url={result} target={created} onClose={close} />
       ) : (
         <div className="space-y-4">
           <div>

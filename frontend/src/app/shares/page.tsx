@@ -17,6 +17,7 @@ import Icon from "@/components/ui/Icon";
 import { tableClasses } from "@/components/ui/Table";
 import { AccessLogPanel } from "@/components/atlas/apis/ShareBundleModal";
 import ShareEditDrawer from "@/components/share/ShareEditDrawer";
+import ShareSendModal from "@/components/share/ShareSendModal";
 import { ApiError, shareBundlesAPI } from "@/lib/api";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { BUNDLE_STATUSES, bundleStatus, groupItems, recipientText, type BundleStatus, type ItemGroup } from "@/lib/shareBundles";
@@ -58,6 +59,7 @@ export default function SharesPage() {
   const [openLog, setOpenLog] = useState<number | null>(null);
   const [revealed, setRevealed] = useState<(ShareBundleReveal & { title: string }) | null>(null);
   const [editing, setEditing] = useState<ShareBundleView | null>(null);
+  const [sending, setSending] = useState<ShareBundleView | null>(null);
 
   const { data: bundles = [], isLoading, error } = useQuery({ queryKey: ["share-bundles", "all"], queryFn: shareBundlesAPI.list });
   const refresh = () => qc.invalidateQueries({ queryKey: ["share-bundles"] });
@@ -199,6 +201,7 @@ export default function SharesPage() {
                           name={b.title || `#${b.id}`}
                           actions={[
                             { label: t("common.edit"), icon: ICON_PATHS.edit, onClick: () => setEditing(b) },
+                            { label: t("shares.send.action"), icon: ICON_PATHS.send, onClick: () => setSending(b), hidden: st !== "live" || !b.recoverable },
                             { label: t("shares.reveal"), icon: ICON_PATHS.eye, onClick: () => reveal(b), hidden: !isAdmin || !b.recoverable },
                             { label: t("shares.renew"), icon: ICON_PATHS.refresh, onClick: () => renew.mutate(b.id) },
                             { label: openLog === b.id ? t("shares.hideLog") : t("shares.accessLog"), icon: ICON_PATHS.clock, onClick: () => setOpenLog((c) => (c === b.id ? null : b.id)) },
@@ -221,6 +224,7 @@ export default function SharesPage() {
       )}
 
       <ShareEditDrawer bundle={editing} onClose={() => setEditing(null)} />
+      <ShareSendModal target={sending} onClose={() => setSending(null)} />
 
       <Modal open={revealed != null} onClose={() => setRevealed(null)} title={t("shares.revealTitle", { title: revealed?.title || "" })}>
         {revealed && (

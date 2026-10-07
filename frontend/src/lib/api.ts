@@ -1109,6 +1109,10 @@ export const shareBundlesAPI = {
       items: import("./types").ShareBundleItemView[];
     }>("/api/share-bundles", body),
   list: () => api.getList<import("./types").ShareBundleView>("/api/share-bundles"),
+  // Server mails link + passphrase, one message per address; omit emails to
+  // use the recipient contact's. Per-address outcome — a failure isn't thrown.
+  send: (id: number, emails?: string[]) =>
+    api.post<{ results: import("./types").ShareSendResult[] }>(`/api/share-bundles/${id}/send`, { emails: emails ?? [] }),
   // Bundles already emitted that EXPOSE a given item (e.g. all live links for an
   // API doc). Server-side filter — matches multi-item bundles too.
   listForItem: (itemType: "secret" | "api_doc", refID: number) =>
@@ -1237,6 +1241,9 @@ export const integrationsAPI = {
       workspace?: string;
       workspace_url?: string;
     }>("/api/settings/integrations/test/outline", data ?? {}),
+  // Mails a test message with the SAVED smtp settings to `to` (default: the caller's email).
+  testSMTP: (to?: string) =>
+    api.post<{ success: boolean; error?: string; to?: string }>("/api/settings/integrations/test/smtp", { to: to ?? "" }),
   clearSecret: (group: string, key: string) =>
     api.delete<{ status: string }>(`/api/settings/integrations/${group}/secret/${key}`),
 };

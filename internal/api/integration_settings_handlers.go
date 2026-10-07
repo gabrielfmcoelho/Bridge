@@ -12,6 +12,7 @@ import (
 	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/llm"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/mailer"
 	outlineclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/outline"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -115,6 +116,18 @@ var integrationGroups = map[string][]string{
 		"glpi_app_token",
 		"glpi_default_entity_id",
 	},
+	// Outgoing email (share links). smtp_link_base_url is Bridge's public
+	// address: the link in a mail can't come from the request's Host header.
+	"smtp": {
+		"smtp_enabled",
+		"smtp_host",
+		"smtp_port",
+		"smtp_tls",
+		"smtp_username",
+		"smtp_password",
+		"smtp_from",
+		"smtp_link_base_url",
+	},
 	"general": {
 		"auth_active_provider",
 		"auth_auto_provision",
@@ -139,12 +152,13 @@ var secretKeys = map[string]bool{
 	"glpi_app_token":                     true,
 	"kc_apis_client_secret":              true,
 	"kc_apis_usage_client_secret":        true,
+	"smtp_password":                      true,
 }
 
 // handleGetIntegrations returns all integration settings grouped by provider.
 //
 //	@Summary		Get integration settings
-//	@Description	Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, general) mapped to its key/value settings. Secret keys are never returned: they read "••••••••" when set, "" otherwise.
+//	@Description	Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, smtp, general) mapped to its key/value settings. Secret keys are never returned: they read "••••••••" when set, "" otherwise.
 //	@Tags			integration-settings
 //	@Produce		json
 //	@Success		200	{object}	map[string]map[string]string
@@ -277,6 +291,50 @@ func (h *integrationSettingsHandlers) handleTestLDAP(w http.ResponseWriter, r *h
 	}
 
 	jsonOK(w, map[string]any{"success": true})
+}
+
+type integrationTestSMTPRequest struct {
+	To string `json:"to"`
+}
+
+// handleTestSMTP sends a test email with the saved SMTP settings.
+//
+//	@Summary		Test the SMTP settings
+//	@Description	Admin. Uses the saved settings and mails "to", or the caller's own email when omitted. A failed test still answers 200: {"success": false, "error": "..."}; success is {"success": true, "to"}.
+//	@Tags			integration-settings
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		integrationTestSMTPRequest	false	"Address to mail"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/test/smtp [post]
+func (h *integrationSettingsHandlers) handleTestSMTP(w http.ResponseWriter, r *http.Request) {
+	var req integrationTestSMTPRequest
+	_ = decodeJSON(r, &req) // body is optional
+	to := strings.TrimSpace(req.To)
+	if u := auth.UserFromContext(r.Context()); to == "" && u != nil {
+		to = u.Email
+	}
+	if to == "" {
+		jsonOK(w, map[string]any{"success": false, "error": "No address: pass one, or set an email on your user"})
+		return
+	}
+	s, err := mailer.LoadSettings(r.Context(), h.db.SQL, h.db.Encryptor)
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	err = mailer.Send(r.Context(), s, mailer.Message{
+		To:      to,
+		Subject: "Bridge: teste de e-mail",
+		Body:    "Este é um teste da configuração de SMTP do Bridge.\nLinks de compartilhamento usarão: " + s.LinkBaseURL + "\n",
+	})
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	jsonOK(w, map[string]any{"success": true, "to": to})
 }
 
 // handleClearIntegrationSecret wipes the cipher/nonce pair for one secret key.
@@ -900,6 +958,7 @@ func (h *integrationSettingsHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "POST /api/settings/integrations/test/llm", h.handleTestLLM)
 	rr.role("admin", "POST /api/settings/integrations/test/grafana", h.handleTestGrafana)
 	rr.role("admin", "POST /api/settings/integrations/test/outline", h.handleTestOutline)
+	rr.role("admin", "POST /api/settings/integrations/test/smtp", h.handleTestSMTP)
 	rr.role("admin", "DELETE /api/settings/integrations/{group}/secret/{key}", h.handleClearIntegrationSecret)
 
 	// Permissions management (admin only)
