@@ -353,3 +353,65 @@ func decodeEnvelopeData(t *testing.T, rec *httptest.ResponseRecorder) []map[stri
 	}
 	return env.Data
 }
+
+// Editing a bundle's details is partial and keeps the token: omitted fields
+// stay, the recipient can be set and cleared, and a new passphrase replaces
+// the old one for redeem and for the admin reveal.
+func TestBundleHandlers_UpdateDetails(t *testing.T) {
+	f := newBundleHandlerFixture(t)
+	h := &bundleHandlers{repo: f.repo}
+	ctx := context.Background()
+	tok, view, err := f.repo.CreateBundle(ctx, f.actor,
+		[]vault.BundleItemInput{{Type: vault.BundleItemSecret, RefID: f.secretID}},
+		vault.CreateBundleOpts{Title: "antigo", Description: "nota", TTL: time.Hour, Passphrase: "velha"})
+	if err != nil {
+		t.Fatalf("create bundle: %v", err)
+	}
+	idStr := strconv.FormatInt(view.ID, 10)
+	put := func(u *models.User, body string) (int, vault.BundleView) {
+		t.Helper()
+		req := f.as(u, httptest.NewRequest(http.MethodPut, "/api/share-bundles/"+idStr+"/details", strings.NewReader(body)))
+		req.SetPathValue("id", idStr)
+		rec := httptest.NewRecorder()
+		h.handleUpdateDetails(rec, req)
+		var v vault.BundleView
+		_ = json.Unmarshal(rec.Body.Bytes(), &v)
+		return rec.Code, v
+	}
+	redeems := func(pass string) bool {
+		_, err := f.repo.RedeemBundle(ctx, tok, pass, vault.RedeemMeta{})
+		return err == nil
+	}
+
+	code, v := put(f.owner, `{"title":"novo","recipient_contact_id":`+strconv.FormatInt(f.contactID, 10)+`,"recipient_label":"PGE"}`)
+	if code != http.StatusOK || v.Title != "novo" || v.Description != "nota" || !v.HasPassphrase ||
+		v.RecipientContactID == nil || *v.RecipientContactID != f.contactID || v.RecipientLabel != "PGE" {
+		t.Fatalf("partial edit = %d %+v", code, v)
+	}
+
+	if code, _ := put(f.owner, `{"passphrase":"nova"}`); code != http.StatusOK {
+		t.Fatalf("passphrase change = %d", code)
+	}
+	if redeems("velha") || !redeems("nova") {
+		t.Error("after the change, the old passphrase must fail and the new one open the link")
+	}
+	adminActor := vault.ActorContext{UserID: f.admin.ID, Role: f.admin.Role}
+	if sec, err := f.repo.RevealBundle(ctx, adminActor, view.ID); err != nil || sec.Passphrase != "nova" || sec.Token != tok {
+		t.Errorf("reveal after change = %+v %v (want the new passphrase, same token)", sec, err)
+	}
+
+	code, v = put(f.owner, `{"passphrase":"","recipient_contact_id":0}`)
+	if code != http.StatusOK || v.HasPassphrase || v.RecipientContactID != nil || v.Title != "novo" {
+		t.Fatalf("clear passphrase/contact = %d %+v", code, v)
+	}
+	if !redeems("") {
+		t.Error("link without passphrase should open without one")
+	}
+
+	if code, _ := put(f.other, `{"title":"x"}`); code != http.StatusNotFound {
+		t.Errorf("non-owner edit = %d, want 404", code)
+	}
+	if code, _ := put(f.owner, `{"recipient_contact_id":999999}`); code != http.StatusBadRequest {
+		t.Errorf("unknown contact = %d, want 400", code)
+	}
+}

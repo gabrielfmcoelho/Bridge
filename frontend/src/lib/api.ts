@@ -1124,6 +1124,13 @@ export const shareBundlesAPI = {
   // a revoked/archived link; max_views null clears the cap, >0 sets it, omit to keep.
   renew: (id: number, body: { ttl_seconds?: number; max_views?: number | null }) =>
     api.patch<import("./types").ShareBundleView>(`/api/share-bundles/${id}`, body),
+  // Edit title/description/recipient/passphrase in place (same URL). Partial:
+  // an omitted field keeps its value; recipient_contact_id 0 clears the
+  // contact, passphrase "" removes it.
+  updateDetails: (
+    id: number,
+    body: { title?: string; description?: string; recipient_contact_id?: number; recipient_label?: string; passphrase?: string },
+  ) => api.put<import("./types").ShareBundleView>(`/api/share-bundles/${id}/details`, body),
   // Replace a live bundle's items IN PLACE, keeping the same token/URL — used to
   // add/remove secrets, API docs, or wiki content on an already-shared link.
   updateItems: (

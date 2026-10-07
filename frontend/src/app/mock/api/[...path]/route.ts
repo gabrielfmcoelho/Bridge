@@ -320,7 +320,8 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   // ── Contacts + share bundles (the /shares page) ─────────────────────
   // Mirrors internal/vault/bundle.go: admins see and act on every bundle, the
   // rest only on their own (others 404); reveal/revoke-all are admin-only.
-  // ponytail: no create/edit here — those forms talk to the real backend.
+  // ponytail: no create here — that form talks to the real backend. Edit
+  // (details, items, validity) is mocked so /shares can be exercised.
   if (method === "GET" && p === "contacts") return json(paginate(db.contacts, qs.get("page"), qs.get("per_page")));
   // Public redeem (the /share/{token} guest page). ponytail: resolves secret
   // items only, each as a Keycloak API key with its scopes; api docs and wiki
@@ -366,9 +367,37 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     const b = mine.find((x) => x.id === Number(segs[1]));
     if (!b) return notFound("share bundle not found");
     if (method === "PATCH" && segs.length === 2) {
-      const body = await readJSON<{ ttl_seconds?: number }>(request);
+      const body = await readJSON<{ ttl_seconds?: number; max_views?: number | null }>(request);
       const ttl = body.ttl_seconds ?? 86400;
       Object.assign(b, { revoked_at: null, deleted_at: null, expires_at: ttl < 0 ? null : new Date(Date.now() + ttl * 1000).toISOString() });
+      if (body.max_views !== undefined) b.max_views = body.max_views && body.max_views > 0 ? body.max_views : null;
+      return json(view(b));
+    }
+    if (method === "PUT" && segs[2] === "details") {
+      const body = await readJSON<{ title?: string; description?: string; recipient_contact_id?: number; recipient_label?: string; passphrase?: string }>(request);
+      if (body.title !== undefined) b.title = body.title.trim();
+      if (body.description !== undefined) b.description = body.description;
+      if (body.recipient_label !== undefined) b.recipient_label = body.recipient_label.trim();
+      if (body.recipient_contact_id !== undefined) {
+        const c = db.contacts.find((x) => x.id === body.recipient_contact_id);
+        if (body.recipient_contact_id > 0 && !c) return json({ error: "recipient contact not found" }, 400);
+        b.recipient_contact_id = c ? c.id : null;
+        b.recipient_name = c ? c.name : "";
+      }
+      if (body.passphrase !== undefined) {
+        b.passphrase = body.passphrase || undefined;
+        b.has_passphrase = !!body.passphrase;
+      }
+      return json(view(b));
+    }
+    if (method === "PUT" && segs[2] === "items") {
+      const body = await readJSON<{ items: { type: string; ref_id?: number; ref_key?: string; selector?: unknown }[] }>(request);
+      if (!body.items?.length) return json({ error: "a share bundle must contain at least one item" }, 400);
+      const old = new Map(b.items.map((i) => [`${i.type}:${i.ref_id}:${i.ref_key ?? ""}`, i]));
+      b.items = body.items.map((i) => old.get(`${i.type}:${i.ref_id ?? 0}:${i.ref_key ?? ""}`) ?? {
+        type: i.type as (typeof b.items)[number]["type"], ref_id: i.ref_id ?? 0, ref_key: i.ref_key, label: i.ref_key ?? `#${i.ref_id}`,
+        selector: i.selector ? JSON.stringify(i.selector) : undefined,
+      });
       return json(view(b));
     }
     if (method === "DELETE" && segs.length === 2) {

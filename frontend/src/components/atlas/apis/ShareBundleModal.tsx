@@ -16,7 +16,7 @@ type Mode = "all" | "tags" | "operations";
 
 // WikiPickerNodes recursively renders an Outline collection's document tree with
 // a checkbox per document, so individual pages can be attached to the bundle.
-function WikiPickerNodes({
+export function WikiPickerNodes({
   nodes,
   selected,
   onToggle,

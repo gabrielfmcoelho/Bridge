@@ -13376,6 +13376,65 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/share-bundles/{id}/details": {
+            "put": {
+                "description": "Any role; owner or admin (others get 404). Partial: an omitted field keeps its value. recipient_contact_id 0 clears the contact; passphrase \"\" removes it (a new one is hashed for redeem and stored encrypted for the admin reveal). Token/URL, items, expiry and view count are kept — items have PUT .../items, validity PATCH .../{id}.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "share-bundles"
+                ],
+                "summary": "Edit a share bundle's details",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Bundle ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.updateBundleDetailsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/vault.BundleView"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/share-bundles/{id}/items": {
             "put": {
                 "description": "Any role; owner or admin (others get 404). Same token and URL; expiry, passphrase and view count are kept. Every item is re-validated for access.",
@@ -19732,6 +19791,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.updateBundleDetailsRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "passphrase": {
+                    "type": "string"
+                },
+                "recipient_contact_id": {
+                    "type": "integer"
+                },
+                "recipient_label": {
+                    "type": "string"
+                },
+                "title": {
                     "type": "string"
                 }
             }

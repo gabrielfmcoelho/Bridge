@@ -2466,6 +2466,19 @@ definitions:
       url:
         type: string
     type: object
+  api.updateBundleDetailsRequest:
+    properties:
+      description:
+        type: string
+      passphrase:
+        type: string
+      recipient_contact_id:
+        type: integer
+      recipient_label:
+        type: string
+      title:
+        type: string
+    type: object
   api.updateBundleItemsRequest:
     properties:
       items:
@@ -14146,6 +14159,49 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: A share bundle's access log
+      tags:
+      - share-bundles
+  /api/share-bundles/{id}/details:
+    put:
+      consumes:
+      - application/json
+      description: 'Any role; owner or admin (others get 404). Partial: an omitted
+        field keeps its value. recipient_contact_id 0 clears the contact; passphrase
+        "" removes it (a new one is hashed for redeem and stored encrypted for the
+        admin reveal). Token/URL, items, expiry and view count are kept — items have
+        PUT .../items, validity PATCH .../{id}.'
+      parameters:
+      - description: Bundle ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.updateBundleDetailsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/vault.BundleView'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Edit a share bundle's details
       tags:
       - share-bundles
   /api/share-bundles/{id}/items:

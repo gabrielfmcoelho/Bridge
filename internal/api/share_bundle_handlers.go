@@ -320,6 +320,64 @@ func (h *bundleHandlers) handleRenew(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// updateBundleDetailsRequest is partial: an omitted (null) field keeps its
+// value. recipient_contact_id 0 clears the contact; passphrase "" removes it.
+type updateBundleDetailsRequest struct {
+	Title              *string `json:"title"`
+	Description        *string `json:"description"`
+	RecipientContactID *int64  `json:"recipient_contact_id"`
+	RecipientLabel     *string `json:"recipient_label"`
+	Passphrase         *string `json:"passphrase"`
+}
+
+// handleUpdateDetails edits a bundle's title, description, recipient and
+// passphrase in place, keeping the token (same URL), items, expiry and views.
+//
+//	@Summary		Edit a share bundle's details
+//	@Description	Any role; owner or admin (others get 404). Partial: an omitted field keeps its value. recipient_contact_id 0 clears the contact; passphrase "" removes it (a new one is hashed for redeem and stored encrypted for the admin reveal). Token/URL, items, expiry and view count are kept — items have PUT .../items, validity PATCH .../{id}.
+//	@Tags			share-bundles
+//	@Accept			json
+//	@Produce		json
+//	@Param			id		path		int							true	"Bundle ID"
+//	@Param			body	body		updateBundleDetailsRequest	true	"Fields to change"
+//	@Success		200		{object}	vault.BundleView
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/share-bundles/{id}/details [put]
+func (h *bundleHandlers) handleUpdateDetails(w http.ResponseWriter, r *http.Request) {
+	actor, ok := actorFrom(r)
+	if !ok {
+		jsonError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	id, err := pathInt64(r, "id")
+	if err != nil {
+		jsonBadRequest(w, r, "invalid bundle id", err)
+		return
+	}
+	var req updateBundleDetailsRequest
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+	view, err := h.repo.UpdateBundleDetails(r.Context(), actor, id, vault.BundleDetails{
+		Title: req.Title, Description: req.Description,
+		RecipientContactID: req.RecipientContactID, RecipientLabel: req.RecipientLabel,
+		Passphrase: req.Passphrase,
+	})
+	switch {
+	case err == nil:
+		jsonOK(w, view)
+	case errors.Is(err, vault.ErrBundleNotFound):
+		jsonError(w, http.StatusNotFound, "share bundle not found")
+	case errors.Is(err, vault.ErrBundleRecipientInvalid):
+		jsonError(w, http.StatusBadRequest, "recipient contact not found")
+	default:
+		jsonServerError(w, r, "update share bundle", err)
+	}
+}
+
 type updateBundleItemsRequest struct {
 	Items []vault.BundleItemInput `json:"items"`
 }
