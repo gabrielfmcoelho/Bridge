@@ -912,6 +912,79 @@ func (r *SecretRepo) RenewBundle(ctx context.Context, actor ActorContext, bundle
 	return r.getBundleView(ctx, actor, bundleID)
 }
 
+// BundleDetails is a partial edit of a bundle's descriptive fields: a nil
+// field keeps its value. RecipientContactID 0 clears the contact; Passphrase
+// "" removes the passphrase. The token (and so the URL), items, expiry and
+// view count are untouched.
+type BundleDetails struct {
+	Title              *string
+	Description        *string
+	RecipientContactID *int64
+	RecipientLabel     *string
+	Passphrase         *string
+}
+
+// UpdateBundleDetails edits a bundle's title, description, recipient and
+// passphrase in place (owner, or admin). A new passphrase is stored like at
+// creation: hashed for redeem, encrypted for the admin reveal.
+func (r *SecretRepo) UpdateBundleDetails(ctx context.Context, actor ActorContext, bundleID int64, d BundleDetails) (*BundleView, error) {
+	if err := r.checkBundleScope(ctx, actor, bundleID); err != nil {
+		return nil, err
+	}
+	var sets []string
+	var args []any
+	set := func(col string, v any) { sets = append(sets, col+" = ?"); args = append(args, v) }
+	if d.Title != nil {
+		set("title", strings.TrimSpace(*d.Title))
+	}
+	if d.Description != nil {
+		set("description", *d.Description)
+	}
+	if d.RecipientLabel != nil {
+		set("recipient_label", strings.TrimSpace(*d.RecipientLabel))
+	}
+	if d.RecipientContactID != nil {
+		if *d.RecipientContactID <= 0 {
+			set("recipient_contact_id", nil)
+		} else {
+			var one int
+			switch err := r.db.QueryRowContext(ctx, `SELECT 1 FROM contacts WHERE id = ?`, *d.RecipientContactID).Scan(&one); {
+			case errors.Is(err, sql.ErrNoRows):
+				return nil, ErrBundleRecipientInvalid
+			case err != nil:
+				return nil, err
+			}
+			set("recipient_contact_id", *d.RecipientContactID)
+		}
+	}
+	if d.Passphrase != nil {
+		if *d.Passphrase == "" {
+			set("passphrase_hash", nil)
+			set("passphrase_cipher", nil)
+			set("passphrase_nonce", nil)
+		} else {
+			ph, err := hashPassphrase(*d.Passphrase)
+			if err != nil {
+				return nil, err
+			}
+			ct, nonce, err := r.enc.Encrypt(*d.Passphrase)
+			if err != nil {
+				return nil, fmt.Errorf("encrypt passphrase: %w", err)
+			}
+			set("passphrase_hash", ph)
+			set("passphrase_cipher", ct)
+			set("passphrase_nonce", nonce)
+		}
+	}
+	if len(sets) > 0 {
+		args = append(args, bundleID)
+		if _, err := r.db.ExecContext(ctx, `UPDATE share_bundles SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...); err != nil {
+			return nil, err
+		}
+	}
+	return r.getBundleView(ctx, actor, bundleID)
+}
+
 func (r *SecretRepo) labelItems(ctx context.Context, items []bundleItemRow) []BundleItemView {
 	views := make([]BundleItemView, 0, len(items))
 	// Outline client is built lazily on the first wiki item and reused for the
