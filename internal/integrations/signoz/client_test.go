@@ -196,7 +196,8 @@ func TestRequestsTraefik(t *testing.T) {
 	q, _ := find(*queries, "GROUP BY key")
 	for _, want := range []string{"'traefik'", "kind_string = 'Server'", "has(splitByChar(',', {domains:String}), lower(splitByChar(':', attributes_string['server.address'])[1]))",
 		"SELECT lower(splitByChar(':', attributes_string['server.address'])[1]) AS key",
-		"uniq(attributes_string['client.address'], attributes_string['user_agent.original']) AS users"} {
+		"extract(attributes_string['http.request.header.x-forwarded-for'], '[0-9]+(?:\\\\.[0-9]+){3}')",
+		"attributes_string['client.address']), attributes_string['user_agent.original']) AS users"} {
 		if !strings.Contains(q, want) {
 			t.Errorf("traefik query lacks %q:\n%s", want, q)
 		}

@@ -47,7 +47,14 @@ const (
 	// distinct visitors, approximated by client address + user agent (NAT and
 	// proxies merge people; it counts devices, never stores who).
 	usersGateway = "uniqIf(attributes_string['bridge.client'], attributes_string['bridge.client'] != '')"
-	usersTraefik = "uniq(attributes_string['client.address'], attributes_string['user_agent.original'])"
+	// Traefik's client.address is always the direct peer (ETIPI's proxy for
+	// public domains): the visitor is the first IP of X-Forwarded-For, which
+	// Traefik records only with forwardedHeaders.trustedIPs plus
+	// tracing.capturedRequestHeaders=X-Forwarded-For. Without it, the peer.
+	// (?:…): extract returns the first capture group when there is one.
+	attrVisitorIP = "if(extract(attributes_string['http.request.header.x-forwarded-for'], '[0-9]+(?:\\\\.[0-9]+){3}') != '', " +
+		"extract(attributes_string['http.request.header.x-forwarded-for'], '[0-9]+(?:\\\\.[0-9]+){3}'), attributes_string['client.address'])"
+	usersTraefik = "uniq(" + attrVisitorIP + ", attributes_string['user_agent.original'])"
 
 	// The aggregate every stats query selects (plus the source's users).
 	agg = `count() AS count,
