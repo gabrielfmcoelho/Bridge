@@ -1,7 +1,7 @@
 // Package signoz reads request telemetry (count, errors, p50/p95/p99, recent
 // requests, whole traces) from SigNoz's ClickHouse. Two span sources feed it:
 // the APISIX gateway (APIs, with the caller's Keycloak azp) and Coolify's
-// Traefik (apps, by Coolify resource uuid).
+// Traefik (apps, by the domain each request asked for).
 //
 // Every SigNoz schema detail lives in the constants below: when SigNoz
 // changes its trace table, this is the one place to update.
@@ -33,9 +33,12 @@ const (
 	// it, the plugin reads those in the rewrite phase, before auth.
 	attrGatewayPath   = "attributes_string['http.target']"
 	attrGatewayClient = "attributes_string['bridge.client']"
-	// Traefik router spans carry the router name, which Coolify builds from
-	// the resource uuid (e.g. "https-0-<uuid>@docker").
-	attrTraefikRouter = "attributes_string['traefik.router.name']"
+	// Traefik (v3.6) makes two spans per request: its entry point's Server
+	// span (server.address = the requested domain, url.path, url.query) and a
+	// ReverseProxy Client span to the app, plus Client spans polling Docker.
+	// Only the Server span counts; it carries no router name, so an app is
+	// matched by its domains. server.address may carry a :port.
+	attrTraefikDomain = "lower(splitByChar(':', attributes_string['server.address'])[1])"
 	attrTraefikPath   = "attributes_string['url.path']"
 	// APISIX writes http.method; Traefik (new semconv) http.request.method.
 	attrMethod = "if(attributes_string['http.method'] != '', attributes_string['http.method'], attributes_string['http.request.method'])"
@@ -53,14 +56,14 @@ const (
 )
 
 // Filter picks the spans of one asset. Exactly one of PathPrefix (an API
-// behind the gateway) or RouterUUIDs (Coolify resources behind Traefik).
+// behind the gateway) or Domains (apps behind Traefik, lower-case, no port).
 //
 // Clients is a restriction (a share link sees only the keys it shares): it
 // applies to everything, facets included. Route, Key and Status are the
 // viewer's own filters: facets ignore them, so the options stay complete.
 type Filter struct {
 	PathPrefix  string
-	RouterUUIDs []string
+	Domains     []string
 	Clients     []string
 	Route       string // normalized route, as group_by=route reports it
 	Key         string // one Keycloak client (azp); APIs only
@@ -82,7 +85,7 @@ type Bucket struct {
 	Stats
 }
 
-// Row is Stats for one group (route, key, status or service uuid).
+// Row is Stats for one group (route, key, status or domain).
 type Row struct {
 	Key string `json:"key"`
 	Stats
@@ -179,15 +182,15 @@ func (c *Client) scope(f Filter, rng string) (*scope, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid range %q", rng)
 	}
-	if (f.PathPrefix == "") == (len(f.RouterUUIDs) == 0) {
-		return nil, errors.New("filter needs a path prefix or router uuids")
+	if (f.PathPrefix == "") == (len(f.Domains) == 0) {
+		return nil, errors.New("filter needs a path prefix or domains")
 	}
 	if (len(f.Clients) > 0 || f.Key != "") && f.PathPrefix == "" {
 		return nil, errors.New("clients and keys only filter an API")
 	}
-	for _, v := range append(append([]string{}, f.RouterUUIDs...), f.Clients...) {
+	for _, v := range append(append([]string{}, f.Domains...), f.Clients...) {
 		if v == "" || strings.Contains(v, ",") {
-			return nil, fmt.Errorf("invalid uuid or client %q", v)
+			return nil, fmt.Errorf("invalid domain or client %q", v)
 		}
 	}
 	s := &scope{from: c.now().Add(-win[0]).Unix(), step: int64(win[1].Seconds()), gateway: f.PathPrefix != ""}
@@ -204,9 +207,8 @@ func (c *Client) scope(f Filter, rng string) (*scope, error) {
 		}
 		s.path = fmt.Sprintf("substring(%s, %d)", attrGatewayPath, len(f.PathPrefix)+1)
 	} else {
-		// Traefik's router span is a child of the entrypoint span: no root filter.
-		s.where += fmt.Sprintf(" AND %s = '%s' AND arrayExists(u -> position(%s, u) > 0, %s)", svcCol, traefikService, attrTraefikRouter, csvParam("uuids"))
-		s.params.Set("param_uuids", strings.Join(f.RouterUUIDs, ","))
+		s.where += fmt.Sprintf(" AND kind_string = 'Server' AND %s = '%s' AND has(%s, %s)", svcCol, traefikService, csvParam("domains"), attrTraefikDomain)
+		s.params.Set("param_domains", strings.ToLower(strings.Join(f.Domains, ",")))
 		s.path = attrTraefikPath
 	}
 	// ponytail: ids are collapsed by pattern (digits, uuids); true route
@@ -261,7 +263,7 @@ func (c *Client) Requests(ctx context.Context, f Filter, rng, groupBy string, by
 	case "status":
 		key = "response_status_code"
 	case "service":
-		key = fmt.Sprintf("arrayFirst(u -> position(%s, u) > 0, %s)", attrTraefikRouter, csvParam("uuids"))
+		key = attrTraefikDomain
 	}
 
 	res := &Result{Top: []Row{}, Facets: Facets{Routes: []string{}}}

@@ -1838,10 +1838,10 @@ export type TelemetryPoint = TelemetryStats & { t: string };
 export type TelemetryFilters = { route?: string; key?: string; status?: string };
 export type TelemetryRequests = {
   available: boolean;
-  reason?: "not_configured" | "no_gateway_url" | "no_coolify_uuid";
+  reason?: "not_configured" | "no_gateway_url" | "no_domain";
   summary?: TelemetryStats;
   series?: TelemetryPoint[];
-  /** label: the Bridge key (and owner) for a Keycloak client, or the service nickname for a Coolify uuid. */
+  /** label: the Bridge key (and owner) for a Keycloak client, or the service nickname for a host's domain. */
   top?: (TelemetryStats & { key: string; label?: string })[];
   /** One line per top key; key "__outros__" folds the rest (APIs, series_by=key). */
   series_by_key?: { key: string; label?: string; points: TelemetryPoint[] }[];

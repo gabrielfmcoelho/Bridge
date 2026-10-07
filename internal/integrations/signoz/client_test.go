@@ -181,22 +181,30 @@ func TestRequestsSeriesByKey(t *testing.T) {
 	if got := (*params)[i]["param_topkeys"]; got != ",servidores-painel,/api/x" {
 		t.Errorf("topkeys = %q", got)
 	}
-	if _, err := c.Requests(context.Background(), Filter{RouterUUIDs: []string{"u"}}, "24h", "route", true); err == nil {
+	if _, err := c.Requests(context.Background(), Filter{Domains: []string{"app.example"}}, "24h", "route", true); err == nil {
 		t.Error("series by key accepted for a service")
 	}
 }
 
 func TestRequestsTraefik(t *testing.T) {
 	c, queries, params := newTestClient(t)
-	if _, err := c.Requests(context.Background(), Filter{RouterUUIDs: []string{"abc123", "o'q"}}, "1h", "service", false); err != nil {
+	if _, err := c.Requests(context.Background(), Filter{Domains: []string{"Bridge.Example", "o'q.example"}}, "1h", "service", false); err != nil {
 		t.Fatal(err)
 	}
+	// One span per request (Traefik's Server span), matched on the requested
+	// domain without its port; grouped by that domain for a host.
 	q, _ := find(*queries, "GROUP BY key")
-	if !strings.Contains(q, "'traefik'") || !strings.Contains(q, "arrayExists(u -> position(") || strings.Contains(q, "Array(String)") || strings.Contains(q, "kind_string") {
-		t.Errorf("traefik query:\n%s", q)
+	for _, want := range []string{"'traefik'", "kind_string = 'Server'", "has(splitByChar(',', {domains:String}), lower(splitByChar(':', attributes_string['server.address'])[1]))",
+		"SELECT lower(splitByChar(':', attributes_string['server.address'])[1]) AS key"} {
+		if !strings.Contains(q, want) {
+			t.Errorf("traefik query lacks %q:\n%s", want, q)
+		}
 	}
-	if got := (*params)[0]["param_uuids"]; got != "abc123,o'q" {
-		t.Errorf("uuids param = %s", got)
+	if strings.Contains(q, "Array(String)") {
+		t.Errorf("Array parameter in:\n%s", q)
+	}
+	if got := (*params)[0]["param_domains"]; got != "bridge.example,o'q.example" {
+		t.Errorf("domains param = %s", got)
 	}
 	if _, i := find(*queries, "bridge.client"); i >= 0 {
 		t.Errorf("a service query reads bridge.client:\n%s", (*queries)[i])
@@ -253,10 +261,10 @@ func TestRequestsRejects(t *testing.T) {
 		{Filter{PathPrefix: "/x"}, "2h", "route"},
 		{Filter{PathPrefix: "/x"}, "1h", "user"},
 		{Filter{}, "1h", "route"},
-		{Filter{PathPrefix: "/x", RouterUUIDs: []string{"a"}}, "1h", "route"},
-		{Filter{RouterUUIDs: []string{"a"}, Clients: []string{"c"}}, "1h", "route"},
-		{Filter{RouterUUIDs: []string{"a"}, Key: "c"}, "1h", "route"},
-		{Filter{RouterUUIDs: []string{"a,b"}}, "1h", "route"},
+		{Filter{PathPrefix: "/x", Domains: []string{"a"}}, "1h", "route"},
+		{Filter{Domains: []string{"a"}, Clients: []string{"c"}}, "1h", "route"},
+		{Filter{Domains: []string{"a"}, Key: "c"}, "1h", "route"},
+		{Filter{Domains: []string{"a,b"}}, "1h", "route"},
 		{Filter{PathPrefix: "/x", Clients: []string{""}}, "1h", "route"},
 	} {
 		if _, err := c.Requests(context.Background(), tc.f, tc.rng, tc.grp, false); err == nil {

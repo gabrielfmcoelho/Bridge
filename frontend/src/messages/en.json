@@ -3424,7 +3424,7 @@
     "reason": {
       "not_configured": "Request telemetry needs the SigNoz integration (Settings → Integrations).",
       "no_gateway_url": "This API has no base URL with a gateway path, so its requests can't be matched.",
-      "no_coolify_uuid": "No Coolify resource is linked here, so Traefik's requests can't be matched."
+      "no_domain": "No domain is linked here (DNS records or external URL), so Traefik's requests can't be matched."
     },
     "others": "others",
     "byKey": "By key",

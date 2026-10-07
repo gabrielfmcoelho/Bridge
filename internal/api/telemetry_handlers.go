@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -40,7 +41,7 @@ type telemetryFacets struct {
 
 type telemetryResponse struct {
 	Available   bool                 `json:"available"`
-	Reason      string               `json:"reason,omitempty"` // not_configured | no_gateway_url | no_coolify_uuid
+	Reason      string               `json:"reason,omitempty"` // not_configured | no_gateway_url | no_domain
 	Summary     *signoz.Stats        `json:"summary,omitempty"`
 	Series      []signoz.Bucket      `json:"series,omitempty"`
 	Top         []telemetryRow       `json:"top,omitempty"`
@@ -133,10 +134,13 @@ func (h *telemetryHandlers) asset(w http.ResponseWriter, r *http.Request) (*tele
 			jsonError(w, http.StatusNotFound, "service not found")
 			return nil, false
 		}
-		if svc.CoolifyResourceUUID == "" {
-			a.reason = "no_coolify_uuid"
-		} else {
-			a.filter.RouterUUIDs = []string{svc.CoolifyResourceUUID}
+		domains, err := h.serviceDomains(ctx, svc.ID, svc.ExternalURL)
+		if err != nil {
+			jsonServerError(w, r, "service domains", err)
+			return nil, false
+		}
+		if a.filter.Domains = domains; len(domains) == 0 {
+			a.reason = "no_domain"
 		}
 	case "host":
 		host, err := store.NewHostRepo(h.db.SQL).GetBySlug(ctx, id)
@@ -148,19 +152,41 @@ func (h *telemetryHandlers) asset(w http.ResponseWriter, r *http.Request) (*tele
 			jsonError(w, http.StatusNotFound, "host not found")
 			return nil, false
 		}
+		// A host's domains: the DNS records pointing at it, plus its services'
+		// own; a domain that belongs to a service is labelled with it.
+		seen := map[string]bool{}
+		add := func(d string) {
+			if d = cleanDomain(d); d != "" && !seen[d] {
+				seen[d] = true
+				a.filter.Domains = append(a.filter.Domains, d)
+			}
+		}
+		recs, err := store.NewDNSRepo(h.db.SQL).RecordsByHost(ctx, host.ID)
+		if err != nil {
+			jsonServerError(w, r, "host dns", err)
+			return nil, false
+		}
+		for _, rec := range recs {
+			add(rec.Domain)
+		}
 		svcs, err := store.NewServiceRepo(h.db.SQL).ListByHost(ctx, host.ID)
 		if err != nil {
 			jsonServerError(w, r, "list host services", err)
 			return nil, false
 		}
-		for _, s := range svcs {
-			if s.CoolifyResourceUUID != "" {
-				a.filter.RouterUUIDs = append(a.filter.RouterUUIDs, s.CoolifyResourceUUID)
-				a.labels[s.CoolifyResourceUUID] = s.Nickname
+		for _, sv := range svcs {
+			ds, err := h.serviceDomains(ctx, sv.ID, sv.ExternalURL)
+			if err != nil {
+				jsonServerError(w, r, "service domains", err)
+				return nil, false
+			}
+			for _, d := range ds {
+				add(d)
+				a.labels[d] = sv.Nickname
 			}
 		}
-		if len(a.filter.RouterUUIDs) == 0 {
-			a.reason = "no_coolify_uuid"
+		if len(a.filter.Domains) == 0 {
+			a.reason = "no_domain"
 		}
 	default:
 		jsonError(w, http.StatusBadRequest, "kind must be api, service or host")
@@ -188,7 +214,7 @@ func (h *telemetryHandlers) client(w http.ResponseWriter, r *http.Request) (*sig
 // handleRequests returns request telemetry for one API, service or host.
 //
 //	@Summary		Request telemetry (count, errors, p50/p95/p99)
-//	@Description	Any role that can see the asset (404 otherwise). Reads SigNoz: an API's spans come from the APISIX gateway (filtered by the path of its base_url), a service's and a host's from Coolify's Traefik (by Coolify resource uuid; a host = its services). Optional filters route (normalized, as group_by=route reports it), key (Keycloak client; APIs only) and status. series_by=key adds one line per top-5 key plus "__outros__" (APIs only). facets lists the window's top routes and keys, ignoring the route/key/status filters. Keys are labelled with their Bridge key and owner; host services with their nickname. {available:false, reason} when SigNoz isn't configured or the asset has nothing to match on. Latencies in ms; errors = 5xx.
+//	@Description	Any role that can see the asset (404 otherwise). Reads SigNoz: an API's spans come from the APISIX gateway (filtered by the path of its base_url), a service's and a host's from Coolify's Traefik (by requested domain: a service's linked DNS records and external URL; a host's DNS records plus its services'). Optional filters route (normalized, as group_by=route reports it), key (Keycloak client; APIs only) and status. series_by=key adds one line per top-5 key plus "__outros__" (APIs only). facets lists the window's top routes and keys, ignoring the route/key/status filters. Keys are labelled with their Bridge key and owner; a host's domains with their service's nickname. {available:false, reason} when SigNoz isn't configured or the asset has nothing to match on. Latencies in ms; errors = 5xx.
 //	@Tags			telemetry
 //	@Produce		json
 //	@Param			kind		query		string	true	"Asset kind"	Enums(api, service, host)
@@ -438,6 +464,52 @@ func (h *telemetryHandlers) handleStatus(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	jsonOK(w, map[string]bool{"enabled": signoz.NewServiceClient(s) != nil})
+}
+
+// serviceDomains is the domains a service answers on, lower-case: its linked
+// DNS records and its external URL's host. Traefik spans are matched on them.
+func (h *telemetryHandlers) serviceDomains(ctx context.Context, serviceID int64, externalURL string) ([]string, error) {
+	ids, err := store.NewServiceRepo(h.db.SQL).DNSIDs(ctx, serviceID)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	seen := map[string]bool{}
+	add := func(d string) {
+		if d = cleanDomain(d); d != "" && !seen[d] {
+			seen[d] = true
+			out = append(out, d)
+		}
+	}
+	dns := store.NewDNSRepo(h.db.SQL)
+	for _, id := range ids {
+		rec, err := dns.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if rec != nil {
+			add(rec.Domain)
+		}
+	}
+	if u, err := url.Parse(externalURL); err == nil {
+		add(u.Hostname())
+	}
+	return out, nil
+}
+
+// cleanDomain lower-cases a domain and drops scheme, port and path; "" when
+// it can't be one (or would break the comma-joined parameter).
+func cleanDomain(d string) string {
+	d = strings.ToLower(strings.TrimSpace(d))
+	if i := strings.Index(d, "://"); i >= 0 {
+		d = d[i+3:]
+	}
+	d, _, _ = strings.Cut(d, "/")
+	d, _, _ = strings.Cut(d, ":")
+	if d == "" || strings.ContainsAny(d, ", ") {
+		return ""
+	}
+	return d
 }
 
 // gatewayPath is the path of an API's base URL ("/datalakehouse/servidores"),

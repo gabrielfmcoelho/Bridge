@@ -224,3 +224,17 @@ func TestRedactSpan(t *testing.T) {
 		t.Error("cookie kept")
 	}
 }
+
+func TestCleanDomain(t *testing.T) {
+	for in, want := range map[string]string{
+		"Bridge.10.0.122.91.sslip.io":    "bridge.10.0.122.91.sslip.io",
+		"https://App.Example:8443/x?y=1": "app.example",
+		" gateway.sead.pi.gov.br ":       "gateway.sead.pi.gov.br",
+		"a,b.example":                    "",
+		"":                               "",
+	} {
+		if got := cleanDomain(in); got != want {
+			t.Errorf("cleanDomain(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

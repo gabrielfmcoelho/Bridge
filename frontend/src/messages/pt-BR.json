@@ -3424,7 +3424,7 @@
     "reason": {
       "not_configured": "A telemetria de requisições precisa da integração com o SigNoz (Configurações → Integrações).",
       "no_gateway_url": "Esta API não tem URL base com o caminho do gateway, então as requisições dela não podem ser identificadas.",
-      "no_coolify_uuid": "Nenhum recurso do Coolify está vinculado aqui, então as requisições do Traefik não podem ser identificadas."
+      "no_domain": "Nenhum domínio está vinculado aqui (registros DNS ou URL externa), então as requisições do Traefik não podem ser identificadas."
     },
     "others": "outros",
     "byKey": "Por chave",
