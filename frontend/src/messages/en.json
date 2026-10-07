@@ -3455,6 +3455,10 @@
       "cut": "Long trace: only the first 500 spans are shown.",
       "waterfall": "Trace",
       "redacted": "Parameter values are visible to administrators only; you see their names."
+    },
+    "users": {
+      "keys": "Unique keys",
+      "visitors": "Unique visitors"
     }
   }
 }

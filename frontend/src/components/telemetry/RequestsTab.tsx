@@ -36,7 +36,7 @@ const GROUPS: Record<TelemetryKind, TelemetryGroupBy[]> = {
 };
 const OTHER = "__outros__";
 
-type Metric = "count" | "p95";
+type Metric = "count" | "p95" | "users";
 
 const ms = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`);
 
@@ -57,12 +57,15 @@ export function RequestsPanel({
   groupControls,
   chartControls,
   onPick,
+  usersLabel,
 }: {
   data: Pick<TelemetryRequests, "summary" | "series" | "top" | "series_by_key">;
   groupBy: TelemetryGroupBy;
   groupControls?: ReactNode;
   chartControls?: ReactNode;
   onPick?: (key: string) => void;
+  /** Shows distinct users (KPI + chart metric) under this name; omitted = hidden (e.g. a share link's single key). */
+  usersLabel?: string;
 }) {
   const { t, locale } = useLocale();
   const [metric, setMetric] = useState<Metric>("count");
@@ -71,7 +74,8 @@ export function RequestsPanel({
 
   // Rows for the chart: one per slot; one column per series (the total, or each key).
   const { rows, series } = useMemo(() => {
-    const value = (p: { count: number; p95: number }) => (metric === "count" ? p.count : Math.round(p.p95));
+    const value = (p: { count: number; p95: number; users?: number }) =>
+      metric === "count" ? p.count : metric === "users" ? p.users ?? 0 : Math.round(p.p95);
     if (data.series_by_key?.length) {
       let slot = 0;
       const series: LineSeries[] = data.series_by_key.map((k) => ({
@@ -82,16 +86,16 @@ export function RequestsPanel({
       }));
       const rows = (data.series_by_key[0]?.points ?? []).map((p, i) => {
         const row: Record<string, number> = { t: Date.parse(p.t) };
-        for (const k of data.series_by_key!) row[k.key] = value(k.points[i] ?? { count: 0, p95: 0 });
+        for (const k of data.series_by_key!) row[k.key] = value(k.points[i] ?? { count: 0, p95: 0, users: 0 });
         return row;
       });
       return { rows, series };
     }
     return {
       rows: (data.series ?? []).map((p) => ({ t: Date.parse(p.t), total: value(p) })),
-      series: [{ key: "total", label: metric === "count" ? t("telemetry.requests") : "p95", color: CHART_COLORS[0] }],
+      series: [{ key: "total", label: metric === "count" ? t("telemetry.requests") : metric === "users" ? usersLabel ?? "" : "p95", color: CHART_COLORS[0] }],
     };
-  }, [data, metric, t]);
+  }, [data, metric, t, usersLabel]);
 
   if (!s || s.count === 0) {
     return <EmptyState icon="search" title={t("telemetry.emptyTitle")} description={t("telemetry.emptyHint")} />;
@@ -105,8 +109,9 @@ export function RequestsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 ${usersLabel ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
         <StatCard label={t("telemetry.requests")} value={num(s.count)} icon={ICON_PATHS.bolt} color="accent" />
+        {usersLabel && <StatCard label={usersLabel} value={num(s.users ?? 0)} icon={ICON_PATHS.user} color="cyan" />}
         <StatCard
           label={t("telemetry.errors")}
           value={`${errPct.toFixed(errPct < 10 ? 1 : 0)}%`}
@@ -126,9 +131,9 @@ export function RequestsPanel({
           actions={
             <div className="flex flex-wrap items-center gap-1.5">
               {chartControls}
-              {(["count", "p95"] as Metric[]).map((m) => (
+              {(usersLabel ? (["count", "users", "p95"] as Metric[]) : (["count", "p95"] as Metric[])).map((m) => (
                 <PillButton key={m} size="sm" active={metric === m} onClick={() => setMetric(m)}>
-                  {t(`telemetry.metric.${m}`)}
+                  {m === "users" ? usersLabel : t(`telemetry.metric.${m}`)}
                 </PillButton>
               ))}
             </div>
@@ -159,6 +164,7 @@ export function RequestsPanel({
               <tr className={tableClasses.compact.headRow}>
                 <th className={tableClasses.compact.th}>{t(`telemetry.groupBy.${groupBy}`)}</th>
                 <th className={`${tableClasses.compact.th} text-right`}>{t("telemetry.requests")}</th>
+                {usersLabel && <th className={`${tableClasses.compact.th} text-right`}>{usersLabel}</th>}
                 <th className={`${tableClasses.compact.th} text-right`}>5xx</th>
                 <th className={`${tableClasses.compact.th} text-right`}>p95</th>
                 <th className={`${tableClasses.compact.th} text-right`}>p99</th>
@@ -186,6 +192,7 @@ export function RequestsPanel({
                       )}
                     </td>
                     <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{num(row.count)}</td>
+                    {usersLabel && <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{num(row.users ?? 0)}</td>}
                     <td className={`${tableClasses.compact.td} text-right tabular-nums ${row.errors ? "text-[var(--danger)]" : ""}`}>{num(row.errors)}</td>
                     <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{ms(row.p95)}</td>
                     <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{ms(row.p99)}</td>
@@ -296,6 +303,7 @@ export default function RequestsTab({ kind, id }: { kind: TelemetryKind; id: str
           data={data}
           groupBy={groupBy}
           onPick={pick}
+          usersLabel={t(kind === "api" ? "telemetry.users.keys" : "telemetry.users.visitors")}
           chartControls={
             kind === "api" ? (
               <PillButton size="sm" active={byKey} onClick={() => setByKey(!byKey)}>

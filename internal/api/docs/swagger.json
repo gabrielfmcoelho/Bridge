@@ -19569,6 +19569,9 @@
                 },
                 "p99": {
                     "type": "number"
+                },
+                "users": {
+                    "type": "integer"
                 }
             }
         },
@@ -22900,6 +22903,9 @@
                 },
                 "t": {
                     "type": "string"
+                },
+                "users": {
+                    "type": "integer"
                 }
             }
         },
@@ -22954,6 +22960,9 @@
                 },
                 "p99": {
                     "type": "number"
+                },
+                "users": {
+                    "type": "integer"
                 }
             }
         },
@@ -22974,6 +22983,9 @@
                 },
                 "p99": {
                     "type": "number"
+                },
+                "users": {
+                    "type": "integer"
                 }
             }
         },

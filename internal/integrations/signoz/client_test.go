@@ -31,7 +31,7 @@ func fakeCH(t *testing.T) (*httptest.Server, *[]string, *[]map[string]string) {
 			p[k] = v[0]
 		}
 		params = append(params, p)
-		const stats = `"count":10,"errors":1,"p50":12.5,"p95":80,"p99":120.25`
+		const stats = `"count":10,"users":3,"errors":1,"p50":12.5,"p95":80,"p99":120.25`
 		switch {
 		case strings.Contains(q, "GROUP BY t, k"):
 			io.WriteString(w, `{"data":[{"t":1699999200,"k":"servidores-painel",`+stats+`},{"t":1699999200,"k":"__outros__",`+stats+`}]}`)
@@ -79,7 +79,7 @@ func TestRequestsGateway(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Summary.Count != 10 || res.Summary.P99 != 120.25 || res.Top[0].Key != "servidores-painel" {
+	if res.Summary.Count != 10 || res.Summary.Users != 3 || res.Summary.P99 != 120.25 || res.Top[0].Key != "servidores-painel" {
 		t.Fatalf("result = %+v", res)
 	}
 	// 24h in 1h slots, empty ones filled: the slot the fake answered keeps its numbers.
@@ -106,7 +106,7 @@ func TestRequestsGateway(t *testing.T) {
 		t.Errorf("facets = %+v", res.Facets)
 	}
 	top, _ := find(*queries, "GROUP BY key")
-	for _, want := range []string{"'apisix-gateway'", "startsWith(", "kind_string = 'Server'", "bridge.client", "FORMAT JSON"} {
+	for _, want := range []string{"'apisix-gateway'", "startsWith(", "kind_string = 'Server'", "bridge.client", "uniqIf(attributes_string['bridge.client']", "AS users", "FORMAT JSON"} {
 		if !strings.Contains(top, want) {
 			t.Errorf("top query lacks %q:\n%s", want, top)
 		}
@@ -195,7 +195,8 @@ func TestRequestsTraefik(t *testing.T) {
 	// domain without its port; grouped by that domain for a host.
 	q, _ := find(*queries, "GROUP BY key")
 	for _, want := range []string{"'traefik'", "kind_string = 'Server'", "has(splitByChar(',', {domains:String}), lower(splitByChar(':', attributes_string['server.address'])[1]))",
-		"SELECT lower(splitByChar(':', attributes_string['server.address'])[1]) AS key"} {
+		"SELECT lower(splitByChar(':', attributes_string['server.address'])[1]) AS key",
+		"uniq(attributes_string['client.address'], attributes_string['user_agent.original']) AS users"} {
 		if !strings.Contains(q, want) {
 			t.Errorf("traefik query lacks %q:\n%s", want, q)
 		}
