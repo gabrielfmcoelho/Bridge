@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -157,6 +158,63 @@ func first[T any](xs []T) []T {
 
 // ── Read tools ──────────────────────────────────────────────────────────
 
+// searchStopwords are dropped from a query before searching word by word.
+var searchStopwords = map[string]bool{
+	"a": true, "o": true, "as": true, "os": true, "e": true, "de": true, "da": true, "do": true, "das": true, "dos": true,
+	"em": true, "no": true, "na": true, "nos": true, "nas": true, "um": true, "uma": true, "para": true, "por": true,
+	"com": true, "sobre": true, "the": true, "of": true, "and": true,
+}
+
+// searchTerms splits a query into its significant words (at most 5).
+func searchTerms(query string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, w := range strings.FieldsFunc(strings.ToLower(query), func(r rune) bool {
+		return r == ' ' || r == ',' || r == ';' || r == '"' || r == '?' || r == '!'
+	}) {
+		if len([]rune(w)) < 2 || searchStopwords[w] || seen[w] {
+			continue
+		}
+		seen[w] = true
+		out = append(out, w)
+		if len(out) == 5 {
+			break
+		}
+	}
+	return out
+}
+
+// searchAny runs one (scoped) repo search per significant word and ranks the
+// items by how many words they matched. The repos match a single substring,
+// so "datalake sead" as one string misses a project named "Datalake" whose
+// text never says "SEAD"; word by word it is the top hit. An empty query
+// lists everything.
+func searchAny[T any](query string, key func(T) string, fetch func(term string) ([]T, error)) ([]T, error) {
+	terms := searchTerms(query)
+	if len(terms) == 0 {
+		return fetch("")
+	}
+	hits := map[string]int{}
+	var order []T
+	for _, term := range terms {
+		items, err := fetch(term)
+		if err != nil {
+			return nil, err
+		}
+		for _, it := range items {
+			k := key(it)
+			if hits[k] == 0 {
+				order = append(order, it)
+			}
+			hits[k]++
+		}
+	}
+	// ponytail: one query per word (≤5); a ranked full-text index if the
+	// inventory grows past what that costs.
+	sort.SliceStable(order, func(i, j int) bool { return hits[key(order[i])] > hits[key(order[j])] })
+	return order, nil
+}
+
 func searchHosts(ctx context.Context, env aiToolEnv, raw json.RawMessage) (toolOutput, error) {
 	var a struct {
 		Query      string `json:"query"`
@@ -166,7 +224,9 @@ func searchHosts(ctx context.Context, env aiToolEnv, raw json.RawMessage) (toolO
 	if err := decodeArgs(raw, &a); err != nil {
 		return toolOutput{}, err
 	}
-	hosts, err := service.NewHostService(env.db).List(ctx, models.HostFilter{Search: a.Query, Situacao: a.Situacao})
+	hosts, err := searchAny(a.Query, func(h service.HostListItem) string { return h.OficialSlug }, func(term string) ([]service.HostListItem, error) {
+		return service.NewHostService(env.db).List(ctx, models.HostFilter{Search: term, Situacao: a.Situacao})
+	})
 	if err != nil {
 		return toolOutput{}, err
 	}
@@ -206,7 +266,9 @@ func searchServices(ctx context.Context, env aiToolEnv, raw json.RawMessage) (to
 	if err := decodeArgs(raw, &a); err != nil {
 		return toolOutput{}, err
 	}
-	svcs, err := store.NewServiceRepo(env.db.SQL).ListFiltered(ctx, models.ServiceFilter{Search: a.Query})
+	svcs, err := searchAny(a.Query, func(s models.Service) string { return strconv.FormatInt(s.ID, 10) }, func(term string) ([]models.Service, error) {
+		return store.NewServiceRepo(env.db.SQL).ListFiltered(ctx, models.ServiceFilter{Search: term})
+	})
 	if err != nil {
 		return toolOutput{}, err
 	}
@@ -227,7 +289,9 @@ func searchDNS(ctx context.Context, env aiToolEnv, raw json.RawMessage) (toolOut
 	if err := decodeArgs(raw, &a); err != nil {
 		return toolOutput{}, err
 	}
-	recs, err := store.NewDNSRepo(env.db.SQL).ListFiltered(ctx, models.DNSFilter{Search: a.Query})
+	recs, err := searchAny(a.Query, func(d models.DNSRecord) string { return strconv.FormatInt(d.ID, 10) }, func(term string) ([]models.DNSRecord, error) {
+		return store.NewDNSRepo(env.db.SQL).ListFiltered(ctx, models.DNSFilter{Search: term})
+	})
 	if err != nil {
 		return toolOutput{}, err
 	}
@@ -249,7 +313,9 @@ func searchProjects(ctx context.Context, env aiToolEnv, raw json.RawMessage) (to
 	if err := decodeArgs(raw, &a); err != nil {
 		return toolOutput{}, err
 	}
-	projects, err := store.NewProjectRepo(env.db.SQL).ListFiltered(ctx, models.ProjectFilter{Search: a.Query})
+	projects, err := searchAny(a.Query, func(p models.Project) string { return strconv.FormatInt(p.ID, 10) }, func(term string) ([]models.Project, error) {
+		return store.NewProjectRepo(env.db.SQL).ListFiltered(ctx, models.ProjectFilter{Search: term})
+	})
 	if err != nil {
 		return toolOutput{}, err
 	}
@@ -271,11 +337,15 @@ func searchAPIs(ctx context.Context, env aiToolEnv, raw json.RawMessage) (toolOu
 		return toolOutput{}, err
 	}
 	repo := store.NewAPICatalogRepo(env.db.SQL)
-	apis, err := repo.List(ctx, models.APICatalogFilter{Query: a.Query})
+	apis, err := searchAny(a.Query, func(x models.APICatalog) string { return strconv.FormatInt(x.ID, 10) }, func(term string) ([]models.APICatalog, error) {
+		return repo.List(ctx, models.APICatalogFilter{Query: term})
+	})
 	if err != nil {
 		return toolOutput{}, err
 	}
-	ops, err := repo.SearchOperations(ctx, a.Query, 0, 0)
+	ops, err := searchAny(a.Query, func(o models.OperationSearchResult) string { return fmt.Sprint(o.APIID, o.OpKey) }, func(term string) ([]models.OperationSearchResult, error) {
+		return repo.SearchOperations(ctx, term, 0, 0)
+	})
 	if err != nil {
 		return toolOutput{}, err
 	}
@@ -306,12 +376,15 @@ func searchIssues(ctx context.Context, env aiToolEnv, raw json.RawMessage) (tool
 	if err := decodeArgs(raw, &a); err != nil {
 		return toolOutput{}, err
 	}
-	f := models.IssueFilter{Search: a.Query, Status: a.Status, ExcludeArchived: true}
+	f := models.IssueFilter{Status: a.Status, ExcludeArchived: true}
 	if a.AssignedToMe && env.user != nil {
 		f.AssigneeID = env.user.ID
 	}
 	f.VisibleSQL, f.VisibleArgs = store.VisibleExprDyn(ctx, "entity_type", "entity_id")
-	issues, err := models.ListIssues(env.db.SQL, f)
+	issues, err := searchAny(a.Query, func(i models.Issue) string { return strconv.FormatInt(i.ID, 10) }, func(term string) ([]models.Issue, error) {
+		f.Search = term
+		return models.ListIssues(env.db.SQL, f)
+	})
 	if err != nil {
 		return toolOutput{}, err
 	}
