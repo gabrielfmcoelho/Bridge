@@ -36,8 +36,11 @@ function collectIds(nodes: OutlineDocumentNode[], into: Set<string>) {
 //   - empty → folder SVG with the color (or a neutral color).
 function CollectionIconPip({ icon, color, size = 14 }: { icon?: string; color?: string; size?: number }) {
   const tint = color || "var(--text-faint)";
-  // Treat anything ≤ 4 codepoints as an emoji-style glyph.
-  if (icon && [...icon].length <= 4) {
+  // Outline stores either an emoji or the name of one of its own icons
+  // ("team", "star", "bug"…). Only emoji render as text; a name would print
+  // as a word ("team" leaked into the collapsed rail), so it gets the
+  // tinted folder. ponytail: map Outline's icon names if the folder isn't enough.
+  if (icon && /\p{Extended_Pictographic}/u.test(icon)) {
     return (
       <span
         aria-hidden
@@ -418,7 +421,7 @@ function WikiPageInner() {
       <div className="flex h-full min-h-0">
         {/* LEFT NAV — flush left, full height; collapsible on desktop. */}
         {sidebarCollapsed ? (
-          <aside className="hidden md:flex w-12 shrink-0 border-r border-[var(--border-subtle)] bg-[var(--bg-surface)] flex-col items-center py-2 gap-1">
+          <aside className="hidden md:flex w-12 shrink-0 border-r border-[var(--border-subtle)] bg-[var(--bg-surface)] flex-col items-center pt-2 gap-1">
             <button
               type="button"
               onClick={() => setSidebarCollapsed(false)}
