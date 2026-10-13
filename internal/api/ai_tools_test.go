@@ -83,6 +83,19 @@ func TestAITools_Scope(t *testing.T) {
 		}
 	}
 
+	// A multi-word question: the project is named "Datalake" and never says
+	// "SEAD"; as one substring "datalake sead" matched nothing.
+	var lake int64
+	if err := d.SQL.QueryRow(`INSERT INTO projects (name, description) VALUES ('Datalake Fazendário', 'Lakehouse em Trino e Iceberg') RETURNING id`).Scan(&lake); err != nil {
+		t.Fatalf("project: %v", err)
+	}
+	if err := grants.Replace(ctx, d.SQL, store.AssetProject, lake, models.AssetGrants{CreatorEntidadeID: &sga}); err != nil {
+		t.Fatalf("grant: %v", err)
+	}
+	if out, err := searchProjects(scoped, env, json.RawMessage(`{"query":"projeto do datalake sead"}`)); err != nil || out.Total == 0 || out.Refs[0].Label != "Datalake Fazendário" {
+		t.Fatalf("multi-word search: total=%d refs=%+v err=%v, want the Datalake project first", out.Total, out.Refs, err)
+	}
+
 	propose := func(pid int64) (toolOutput, error) {
 		return proposeIssue(scoped, env, json.RawMessage(`{"title":"Renovar certificado","priority":"urgent","parent_type":"project","parent_id":`+jsonInt(pid)+`}`))
 	}
@@ -209,5 +222,25 @@ func TestLLMClientChat(t *testing.T) {
 	var apiErr *llm.APIError
 	if !errors.As(err, &apiErr) || apiErr.Status != 400 {
 		t.Fatalf("err=%v, want *llm.APIError 400", err)
+	}
+}
+
+func TestSearchAny_RanksByWordsMatched(t *testing.T) {
+	if got := searchTerms(`Projeto do "Datalake" da SEAD? datalake`); strings.Join(got, ",") != "projeto,datalake,sead" {
+		t.Fatalf("terms = %v", got)
+	}
+	index := map[string][]string{"portal": {"portal-servidor", "portal-sei"}, "sei": {"portal-sei", "sei-api"}}
+	got, err := searchAny("portal do sei", func(s string) string { return s }, func(term string) ([]string, error) { return index[term], nil })
+	if err != nil || strings.Join(got, ",") != "portal-sei,portal-servidor,sei-api" {
+		t.Fatalf("ranked = %v err=%v, want the item matching both words first", got, err)
+	}
+	all, _ := searchAny("  de  ", func(s string) string { return s }, func(term string) ([]string, error) {
+		if term != "" {
+			t.Fatalf("stopword-only query searched %q", term)
+		}
+		return []string{"x"}, nil
+	})
+	if len(all) != 1 {
+		t.Fatalf("empty query should list everything, got %v", all)
 	}
 }
