@@ -293,8 +293,8 @@ function Atlas() {
 const PERSONA_ACTIONS: Record<Persona, string[]> = {
   infra: ["/hosts", "/services", "/dns", "/secrets"],
   dev: ["/projects", "/issues", "/atlas/apis"],
-  chamados: ["/catalog", "/requests", "/chamados"],
-  suporte: ["/requests", "/chamados"],
+  chamados: ["/catalog", "/chamados"],
+  suporte: ["/chamados"],
   atlas: ["/atlas/catalog", "/atlas/lineage", "/atlas/apis"],
 };
 

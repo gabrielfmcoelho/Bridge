@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectsAPI, glpiAPI, integrationsAPI, type GlpiTicketSummary } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
+import ChamadosSource from "@/components/chamados/ChamadosSource";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -252,7 +253,7 @@ export default function ChamadosPage() {
 
   return (
     <PageShell>
-      <PageHeader title={t("host.chamados")} />
+      <PageHeader title={t("nav.chamados")} subtitle={t("chamados.source.glpiHint")} status={<ChamadosSource active="glpi" />} />
       <Card hover={false} className="!p-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
           {/* View mode toggle */}

@@ -41,6 +41,8 @@ const EXTRA: Record<string, string> = {
   "/atlas": "nav.atlas",
   "/secrets/trash": "nav.trash",
   "/chamados/forms": "nav.chamadosForms",
+  // /requests left the sidebar (it is a tab of Chamados) but keeps its crumb.
+  "/requests": "nav.requests",
 };
 const NO_PAGE = new Set(["/atlas"]);
 
