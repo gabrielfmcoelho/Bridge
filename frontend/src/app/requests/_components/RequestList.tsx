@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
+import ChamadosSource from "@/components/chamados/ChamadosSource";
 import Button from "@/components/ui/Button";
 import TabBar, { type Tab } from "@/components/ui/TabBar";
 import SortableTable, { sortRows, type SortableColumn } from "@/components/ui/SortableTable";
@@ -155,8 +156,9 @@ export default function RequestList() {
   return (
     <PageShell>
       <PageHeader
-        title={t("requests.title")}
+        title={t("nav.chamados")}
         subtitle={t("requests.subtitle")}
+        status={<ChamadosSource active="bridge" />}
         addLabel={t("requests.new")}
         onAdd={() => router.push("/catalog")}
         controlsKey="requests"

@@ -3739,5 +3739,13 @@
       "userHint": "A Bridge administrator needs to set it up. Everything else in Bridge works as usual.",
       "configure": "Set up in Integrations"
     }
+  },
+  "chamados": {
+    "source": {
+      "label": "How to open the ticket",
+      "glpi": "GLPI",
+      "bridge": "Bridge requests",
+      "glpiHint": "GLPI tickets of the configured projects and profiles"
+    }
   }
 }

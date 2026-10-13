@@ -3739,5 +3739,13 @@
       "userHint": "Um administrador do Bridge precisa configurá-lo. Enquanto isso, o resto do Bridge funciona normalmente.",
       "configure": "Configurar em Integrações"
     }
+  },
+  "chamados": {
+    "source": {
+      "label": "Como abrir o chamado",
+      "glpi": "GLPI",
+      "bridge": "Solicitações do Bridge",
+      "glpiHint": "Chamados do GLPI dos projetos e perfis configurados"
+    }
   }
 }
