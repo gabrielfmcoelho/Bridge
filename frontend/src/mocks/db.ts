@@ -57,6 +57,8 @@ export interface Seed {
   shareAccessLog: (ShareBundleAccessEntry & { bundle_id: number })[];
   /** token stands in for the encrypted secret. */
   proxmoxServers: (ProxmoxServer & { token?: string })[];
+  /** users.home_prefs by user id; absent = {} (never set up). */
+  homePrefs: Record<number, object>;
 }
 
 // ponytail: dev-singleton pin on globalThis — Fast Refresh re-evaluates this

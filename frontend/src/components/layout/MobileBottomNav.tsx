@@ -12,7 +12,7 @@ interface MobileBottomNavProps {
 }
 
 const navItems = [
-  { href: "/", label: "nav.dashboard", icon: NAV_ICONS.LayoutDashboard },
+  { href: "/", label: "nav.home", icon: NAV_ICONS.Home },
   { href: "/issues", label: "nav.issues", icon: NAV_ICONS.ListChecks },
   { href: "__drawer__", label: "nav.menu", icon: "" },
   { href: "/hosts", label: "nav.hosts", icon: NAV_ICONS.Server },

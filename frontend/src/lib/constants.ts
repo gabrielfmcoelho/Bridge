@@ -58,7 +58,7 @@ export const NAV_SECTIONS: NavSection[] = [
     key: "main",
     label: "nav.workspace",
     items: [
-      { href: "/", label: "nav.dashboard", icon: "LayoutDashboard" },
+      { href: "/", label: "nav.home", icon: "Home" },
       { href: "/wiki", label: "nav.wiki", icon: "Book" },
     ],
   },

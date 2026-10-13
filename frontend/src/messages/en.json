@@ -17,7 +17,6 @@
     "assistant": "Assistant"
   },
   "nav": {
-    "dashboard": "Dashboard",
     "issues": "Issues",
     "hosts": "Hosts",
     "dns": "DNS",
@@ -51,7 +50,8 @@
     "selfService": "Self-service",
     "menu": "Menu",
     "shares": "Shares",
-    "canvas": "Idea boards"
+    "canvas": "Idea boards",
+    "home": "Home"
   },
   "atlas": {
     "apis": {
@@ -950,7 +950,14 @@
       "usageMid": "50–80%",
       "usageHigh": "80% or more",
       "usageNone": "No scan",
-      "alertsByLevel": "Alerts by level"
+      "alertsByLevel": "Alerts by level",
+      "resourcesByHospedagem": "Resources by hosting",
+      "resourcesBySituacao": "Resources by status",
+      "avgUsage": "Average use of scanned hosts",
+      "recentScans": "Recent scans",
+      "noScansYet": "No scans yet. Run a scan to see data here.",
+      "hostCount": "{count} host(s)",
+      "disk": "Disk"
     },
     "pageDescription": "Servers, VMs and containers in the inventory: access, resources, links to services and DNS, and their state.",
     "profileTitle": "Host",
@@ -1418,29 +1425,7 @@
     "noActiveHosts": "No active hosts configured"
   },
   "dashboard": {
-    "title": "Dashboard",
-    "totalHosts": "Total Hosts",
-    "totalDns": "DNS Records",
-    "totalProjects": "Projects",
-    "totalServices": "Services",
-    "openIssues": "Open Issues",
-    "scanCoverage": "Scan Coverage",
-    "scanned": "scanned",
-    "maintenanceAlerts": "Maintenance Alerts",
-    "hostsNeedAttention": "Hosts need attention",
-    "allHostsHealthy": "All hosts healthy",
-    "infrastructure": "Infrastructure",
-    "noHostingData": "No hosting data yet",
-    "recentScans": "Recent Scans",
-    "noScansYet": "No scans yet. Run a scan to see activity here.",
-    "resourcesByInfra": "Resources by Infrastructure",
-    "resourcesBySituacao": "Resources by Status",
-    "avgUsage": "Avg Usage",
-    "criticalCount": "{count} critical",
-    "hostsByStatus": "{hosts} by {status}",
-    "diskLabel": "Disk",
-    "hostSingular": "host",
-    "hostPlural": "hosts"
+    "totalHosts": "Total Hosts"
   },
   "chamado": {
     "inExecution": "In Execution",
@@ -3599,6 +3584,160 @@
       "success": "Green",
       "accent": "Purple",
       "danger": "Red"
+    }
+  },
+  "home": {
+    "loadFailed": "Couldn't load your home page: {message}",
+    "saveFailed": "Couldn't save your preferences",
+    "noWidgets": "No widgets on. Use Customize to choose what shows here.",
+    "welcome": {
+      "title": "This is your home page",
+      "body": "Bridge brings together SEAD's infrastructure inventory, the data Atlas, tickets and the wiki. Tell us how you use Bridge and Home shows what matters for your work: what's waiting on you, shortcuts and first steps. You can change it any time.",
+      "greeting": "Welcome,"
+    },
+    "onboarding": {
+      "title": "How do you use Bridge?",
+      "description": "Pick everything that applies. What your permissions suggest is already checked.",
+      "start": "Get started",
+      "skip": "Skip for now"
+    },
+    "personas": {
+      "label": "How you use Bridge",
+      "infra": "Infrastructure",
+      "infraHint": "Hosts, services, DNS, SSH access and scans.",
+      "dev": "Development",
+      "devHint": "Projects, issues and the APIs you build or consume.",
+      "chamados": "I open tickets",
+      "chamadosHint": "I request services and follow my tickets.",
+      "suporte": "I handle tickets",
+      "suporteHint": "I approve and fulfill requests and tickets.",
+      "atlas": "Data Atlas",
+      "atlasHint": "Data catalog, lineage, pipelines and topology."
+    },
+    "customize": {
+      "open": "Customize",
+      "title": "Customize Home",
+      "personasHint": "Changing your profile restores that profile's default widgets.",
+      "widgets": "Widgets",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "reset": "Restore defaults",
+      "column": "Column"
+    },
+    "column": {
+      "main": "Main column",
+      "side": "Side column"
+    },
+    "steps": {
+      "title": "First steps",
+      "dismiss": "Dismiss",
+      "sshKey": "Add your SSH key to the vault",
+      "scan": "Run your first host scan",
+      "topology": "See the infrastructure topology",
+      "projects": "Find your projects",
+      "issues": "See the issues assigned to you",
+      "apis": "Explore the cataloged APIs",
+      "openChamado": "Open your first ticket",
+      "catalog": "Browse the service catalog",
+      "requests": "See the requests in your queue",
+      "chamados": "Follow the GLPI tickets",
+      "atlasCatalog": "Explore the data catalog",
+      "lineage": "Trace a table's lineage",
+      "wiki": "Read the team wiki"
+    },
+    "w": {
+      "toHandle": "To handle",
+      "toApprove": "Awaiting approval",
+      "toFulfill": "To fulfill",
+      "toHandleEmpty": "Nothing in your queue right now.",
+      "myRequests": "My requests",
+      "myRequestsEmpty": "You haven't made any requests yet.",
+      "browseCatalog": "Browse the service catalog",
+      "openRequests": "See all requests",
+      "myIssues": "Issues assigned to me",
+      "myIssuesEmpty": "No open issues assigned to you.",
+      "seeAllIssues": "See all ({count})",
+      "infraHealth": "Infrastructure health",
+      "withWarnings": "With warnings",
+      "noCritical": "No host has a critical alert.",
+      "hostsDashboard": "Open hosts dashboard",
+      "atlas": "Data Atlas",
+      "atlasHint": "Catalog, lineage and APIs.",
+      "recentApis": "Recently updated APIs",
+      "noApis": "No APIs cataloged yet.",
+      "quickActions": "Shortcuts",
+      "chamados": "Tickets",
+      "chamadosHint": "Open a ticket or follow yours in GLPI.",
+      "followChamados": "Follow tickets",
+      "inventory": "Inventory",
+      "wiki": "Recent wiki",
+      "wikiEmpty": "No recent documents.",
+      "openWiki": "Open wiki",
+      "assistant": "Assistant",
+      "assistantHint": "Ask, request a draft or clear up a quick question.",
+      "openAssistant": "Open in the assistant panel",
+      "assistantPlaceholder": "Ask the assistant…"
+    }
+  },
+  "ai": {
+    "chat": {
+      "retry": "Try again",
+      "copy": "Copy reply",
+      "jumpToLatest": "Jump to latest message",
+      "inputLabel": "Message to the assistant",
+      "stop": "Stop reply",
+      "newChat": "New conversation",
+      "suggest": {
+        "summary": "Summarize the infrastructure inventory",
+        "disk": "How do I investigate high disk usage on a Linux VM?",
+        "dns": "How do I set up a DNS record for a new subdomain?",
+        "infra": "Checklist for putting a new VM into production",
+        "dev": "Good practices for documenting an API in the Atlas",
+        "chamados": "How do I write a good support ticket?",
+        "suporte": "How should I prioritize a request queue?",
+        "atlas": "What is data lineage and what is it for?"
+      },
+      "sources": "Sources:"
+    },
+    "tools": {
+      "stepsLabel": "Lookups made by the assistant",
+      "search_hosts": "Searched hosts",
+      "search_services": "Searched services",
+      "search_dns": "Searched DNS",
+      "search_projects": "Searched projects",
+      "search_apis": "Searched Atlas APIs",
+      "search_issues": "Searched issues",
+      "search_wiki": "Searched the wiki",
+      "propose_issue": "Drafted an issue",
+      "propose_chamado": "Drafted a ticket",
+      "results": "{count} result(s)",
+      "failed": "didn't work",
+      "unavailable": "The configured model can't look up Bridge data; this answer is generic."
+    },
+    "proposal": {
+      "issueDraft": "Issue draft",
+      "chamadoDraft": "Ticket draft",
+      "notCreatedYet": "Not created yet",
+      "title": "Title",
+      "description": "Description",
+      "priority": "Priority",
+      "parent": "Linked to",
+      "glpiProfile": "GLPI profile: {name}",
+      "linkedHost": "host {host}",
+      "dismiss": "Dismiss",
+      "createIssue": "Create issue",
+      "openChamado": "Open ticket",
+      "issueCreated": "Issue #{id} created",
+      "chamadoCreated": "Ticket #{id} opened",
+      "dismissed": "Draft dismissed: {title}",
+      "open": "Open"
+    },
+    "unavailable": {
+      "title": "The assistant isn't set up yet",
+      "disabledTitle": "The assistant is turned off",
+      "adminHint": "Enter the URL, model and key of an OpenAI-compatible provider and turn the integration on.",
+      "userHint": "A Bridge administrator needs to set it up. Everything else in Bridge works as usual.",
+      "configure": "Set up in Integrations"
     }
   }
 }

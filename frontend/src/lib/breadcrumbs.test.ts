@@ -7,7 +7,7 @@ import { NAV_ITEMS } from "./constants.ts";
 const buildCrumbs = (p: string) => build(p, NAV_ITEMS);
 
 test("root is a single dashboard crumb with no link", () => {
-  assert.deepEqual(buildCrumbs("/"), [{ label: "nav.dashboard" }]);
+  assert.deepEqual(buildCrumbs("/"), [{ label: "nav.home" }]);
 });
 
 test("top-level static route is one unlinked crumb", () => {

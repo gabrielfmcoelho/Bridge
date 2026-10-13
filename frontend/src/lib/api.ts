@@ -405,6 +405,9 @@ export const authAPI = {
     api.post<{ user: unknown; token: string }>("/api/auth/login", data),
   logout: () => api.post("/api/auth/logout"),
   me: () => api.get<import("./types").User>("/api/auth/me"),
+  // Home page preferences: an opaque JSON object, {} until onboarding (app/_home/homeModel.ts).
+  homePrefs: () => api.get<unknown>("/api/auth/me/home"),
+  setHomePrefs: (prefs: object) => api.put<unknown>("/api/auth/me/home", prefs),
 };
 
 // R4 list envelope: { data: [...], meta: { page, per_page, total } }.
@@ -1393,8 +1396,11 @@ export const aiAPI = {
     api.post<{ description: string }>("/api/ai/assist/issue", { summary, context }),
   assistHostDoc: (hostSlug: string) =>
     api.post<{ documentation: string }>("/api/ai/assist/host-doc", { host_slug: hostSlug }),
-  chat: (message: string) =>
-    api.post<{ response: string }>("/api/ai/chat", { message }),
+  /** `history`: the conversation so far, oldest first (the server keeps the last 20 turns).
+   *  `signal` cancels the request (the assistant's stop button). */
+  // The model may search the inventory (entidade-scoped) for a few rounds, hence the longer timeout.
+  chat: (message: string, history: { role: "user" | "assistant"; content: string }[] = [], signal?: AbortSignal) =>
+    request<import("./types").AiChatResponse>("/api/ai/chat", { method: "POST", body: JSON.stringify({ message, history }), signal }, 180_000),
   /** Turns a free-text description into a draft answer set for one offering's
    *  form_schema. The server coerces the model's reply through that schema, so
    *  anything returned here already satisfies the field types and rules. */

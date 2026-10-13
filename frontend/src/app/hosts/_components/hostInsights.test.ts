@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hostInsights, hostBreakdowns, peakUsage } from "./hostInsights.ts";
+import { hostInsights, hostBreakdowns, peakUsage, resourcesBy, recentScans } from "./hostInsights.ts";
 import type { Host } from "@/lib/types";
 
 const t = (k: string, v?: Record<string, string>) => (v ? `${k}(${Object.values(v).join(",")})` : k);
@@ -61,4 +61,22 @@ test("situação KPIs follow roles when the values are renamed", () => {
   assert.deepEqual(by.maintenance.filter, { situacao: "Em manutenção" });
   assert.deepEqual(by.inactive.filter, { situacao: "Desligada" });
   assert.equal(by.total.hint, "2 common.active · 1 common.maintenance");
+});
+
+test("resources group scanned hosts, average use, sum capacity", () => {
+  const rs = [
+    host({ id: 1, hospedagem: "ETIPI", has_scan: true, scan_resources: { cpu_usage: "40", ram_percent: "50%", cpu: "8 vCPU", ram: "7,5Gi" } }),
+    host({ id: 2, hospedagem: "ETIPI", has_scan: true, scan_resources: { cpu_usage: "21", cpu: "4 vCPU", ram: "8Gi" } }),
+    host({ id: 3, hospedagem: "AWS", has_scan: true, scan_resources: { disk_percent: "73%" } }),
+    host({ id: 4, hospedagem: "AWS" }),
+  ];
+  const [etipi, aws] = resourcesBy(rs, (h) => h.hospedagem);
+  assert.deepEqual(etipi, { name: "ETIPI", count: 2, cpu: 31, ram: 50, disk: 0, totalCpu: "12 vCPU", totalRam: "15.5 Gi", totalDisk: "" });
+  assert.equal(aws.count, 1);
+  assert.equal(aws.disk, 73);
+});
+
+test("recent scans, newest first", () => {
+  const rs = [host({ id: 1, last_scan_at: "2026-10-01T10:00:00Z" }), host({ id: 2 }), host({ id: 3, last_scan_at: "2026-10-12T08:30:00Z" })];
+  assert.deepEqual(recentScans(rs).map((h) => h.id), [3, 1]);
 });

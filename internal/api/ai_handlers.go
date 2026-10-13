@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/llm"
@@ -60,7 +61,9 @@ func (h *aiHandlers) getClient() (*llm.Client, error) {
 //	@Router			/api/ai/status [get]
 func (h *aiHandlers) handleStatus(w http.ResponseWriter, r *http.Request) {
 	enabled := store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_enabled") == "true"
-	configured := store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), "llm_api_key")
+	// Same conditions as getClient: a key and a base URL.
+	configured := store.NewAppSecretRepo(h.db.SQL).Configured(r.Context(), "llm_api_key") &&
+		store.NewAppSettingsRepo(h.db.SQL).Value(r.Context(), "llm_base_url") != ""
 	jsonOK(w, map[string]any{
 		"enabled":    enabled,
 		"configured": configured,
@@ -453,17 +456,50 @@ func (h *aiHandlers) handleGetProjectAnalysis(w http.ResponseWriter, r *http.Req
 // aiChatRequest is the chat body.
 type aiChatRequest struct {
 	Message string `json:"message"`
+	// History is the conversation so far, oldest first (roles user/assistant),
+	// so follow-up questions keep their context. Optional.
+	History []llm.ChatMessage `json:"history"`
+}
+
+// Chat history limits: the last maxChatHistory turns, each cut to
+// maxChatTurnChars, so a long session can't grow the prompt without bound.
+const (
+	maxChatHistory   = 20
+	maxChatTurnChars = 8000
+)
+
+// chatMessages builds the completion messages: one leading system message
+// (some OpenAI-compatible gateways, e.g. LiteLLM in front of certain models,
+// reject more than one), then the recent history, then the new message.
+// History turns with any other role are dropped, so a client can't inject a
+// system prompt.
+func chatMessages(system string, history []llm.ChatMessage, message string) []llm.ChatMessage {
+	if len(history) > maxChatHistory {
+		history = history[len(history)-maxChatHistory:]
+	}
+	out := []llm.ChatMessage{{Role: "system", Content: system}}
+	for _, m := range history {
+		if (m.Role != "user" && m.Role != "assistant") || m.Content == "" {
+			continue
+		}
+		if len(m.Content) > maxChatTurnChars {
+			// Cut on bytes, then drop a rune the cut split in half.
+			m.Content = strings.ToValidUTF8(m.Content[:maxChatTurnChars], "")
+		}
+		out = append(out, m)
+	}
+	return append(out, llm.ChatMessage{Role: "user", Content: message})
 }
 
 // handleChat handles a natural language query about infrastructure.
 //
 //	@Summary		Ask about the infrastructure
-//	@Description	Requires permission ai.use. Returns {response}. 503 when the LLM is not configured.
+//	@Description	Requires permission ai.use. Body {message, history?: [{role: user|assistant, content}]} (last 20 turns kept). The model may call entidade-scoped search tools and draft issue/chamado proposals (never executed server-side). Returns {response, tools, steps, refs, proposals}. 503 when the LLM is not configured.
 //	@Tags			ai
 //	@Accept			json
 //	@Produce		json
 //	@Param			body	body		aiChatRequest	true	"User message"
-//	@Success		200		{object}	map[string]string
+//	@Success		200		{object}	aiChatResult
 //	@Failure		400		{object}	httpx.ErrorResponse
 //	@Failure		401		{object}	httpx.ErrorResponse
 //	@Failure		403		{object}	httpx.ErrorResponse
@@ -483,33 +519,49 @@ func (h *aiHandlers) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build context with high-level stats.
-	var hostCount, svcCount, dnsCount, projCount int
-	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM hosts WHERE deleted_at IS NULL`).Scan(&hostCount)
-	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM services WHERE deleted_at IS NULL`).Scan(&svcCount)
-	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM dns_records WHERE deleted_at IS NULL`).Scan(&dnsCount)
-	h.db.SQL.QueryRow(`SELECT COUNT(*) FROM projects WHERE deleted_at IS NULL`).Scan(&projCount)
-	statsContext := "Infrastructure summary: " +
-		strconv.Itoa(hostCount) + " hosts, " +
-		strconv.Itoa(svcCount) + " services, " +
-		strconv.Itoa(dnsCount) + " DNS records, " +
-		strconv.Itoa(projCount) + " projects."
+	ctx, cancel := context.WithTimeout(r.Context(), 150*time.Second) // keeps the caller's scope
+	defer cancel()
+	user := auth.UserFromContext(ctx)
+	messages := chatMessages(llm.ChatSystem+"\n\n"+h.chatContext(ctx, user), req.History, req.Message)
 
-	// Some OpenAI-compatible gateways (e.g. LiteLLM in front of certain models)
-	// reject multiple system messages with "System message must be at the beginning".
-	// Merge them into a single leading system message to stay compatible everywhere.
-	messages := []llm.ChatMessage{
-		{Role: "system", Content: llm.ChatSystem + "\n\n" + statsContext},
-		{Role: "user", Content: req.Message},
-	}
-
-	result, err := client.Complete(r.Context(), messages)
+	result, err := runChat(ctx, client, aiToolEnv{db: h.db, user: user}, messages)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "AI request failed: "+err.Error())
 		return
 	}
+	jsonOK(w, result)
+}
 
-	jsonOK(w, map[string]string{"response": result})
+// chatContext tells the model who is asking and what they can see: name,
+// role, entidades and the size of their (entidade-scoped) inventory.
+func (h *aiHandlers) chatContext(ctx context.Context, user *models.User) string {
+	var b strings.Builder
+	if user != nil {
+		name := user.DisplayName
+		if name == "" {
+			name = user.Username
+		}
+		fmt.Fprintf(&b, "Current user: %s (role %s).", name, user.Role)
+		if ents, _ := store.NewUserEntidadeRepo(h.db.SQL).ListForUser(ctx, user.ID); len(ents) > 0 {
+			names := make([]string, len(ents))
+			for i, e := range ents {
+				names[i] = e.Name
+			}
+			fmt.Fprintf(&b, " Entidades: %s.", strings.Join(names, ", "))
+		}
+		if roleLevel[user.Role] < roleLevel["editor"] {
+			b.WriteString(" This user is a viewer: they cannot create issues or open chamados in Bridge, so draft text instead of proposing.")
+		}
+	}
+	hosts, _ := store.NewHostRepo(h.db.SQL).CountAll(ctx)
+	svcs, _ := store.NewServiceRepo(h.db.SQL).Count(ctx)
+	dns, _ := store.NewDNSRepo(h.db.SQL).Count(ctx)
+	projects, _ := store.NewProjectRepo(h.db.SQL).Count(ctx)
+	visSQL, visArgs := store.VisibleExprDyn(ctx, "entity_type", "entity_id")
+	issues, _ := models.OpenIssueCountVisible(h.db.SQL, visSQL, visArgs)
+	fmt.Fprintf(&b, "\nVisible to this user: %d hosts, %d services, %d DNS records, %d projects, %d open issues. Today is %s.",
+		hosts, svcs, dns, projects, issues, time.Now().Format("2006-01-02"))
+	return b.String()
 }
 
 // registerRoutes wires this group's routes (self-registration, R2).

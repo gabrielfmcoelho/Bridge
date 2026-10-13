@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
@@ -649,6 +651,67 @@ func (h *authHandlers) handleDeleteUser(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, map[string]string{"status": "deleted"})
 }
 
+// maxHomePrefsBytes caps the home preferences document: a few persona and
+// widget ids, nowhere near this.
+const maxHomePrefsBytes = 8 << 10
+
+// handleGetHomePrefs godoc
+//
+//	@Summary		Current user's home preferences
+//	@Description	Any role. The caller's home page preferences: a JSON object owned by the frontend, {} when never set.
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/auth/me/home [get]
+func (h *authHandlers) handleGetHomePrefs(w http.ResponseWriter, r *http.Request) {
+	user := auth.UserFromContext(r.Context())
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	prefs, err := store.NewUserRepo(h.db.SQL).HomePrefs(r.Context(), user.ID)
+	if err != nil {
+		jsonServerError(w, r, "failed to load home preferences", err)
+		return
+	}
+	jsonOK(w, prefs)
+}
+
+// handlePutHomePrefs godoc
+//
+//	@Summary		Replace the current user's home preferences
+//	@Description	Any role. Replaces the whole document (it has one owner, so no partial merge). Body must be a JSON object of at most 8 KB.
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Router			/api/auth/me/home [put]
+func (h *authHandlers) handlePutHomePrefs(w http.ResponseWriter, r *http.Request) {
+	user := auth.UserFromContext(r.Context())
+	if user == nil {
+		jsonError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxHomePrefsBytes))
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "home preferences too large")
+		return
+	}
+	var obj map[string]json.RawMessage
+	if json.Unmarshal(body, &obj) != nil || obj == nil {
+		jsonError(w, http.StatusBadRequest, "home preferences must be a JSON object")
+		return
+	}
+	if err := store.NewUserRepo(h.db.SQL).SetHomePrefs(r.Context(), user.ID, body); err != nil {
+		jsonServerError(w, r, "failed to save home preferences", err)
+		return
+	}
+	jsonOK(w, json.RawMessage(body))
+}
+
 // registerRoutes wires this group's routes (self-registration, R2).
 func (h *authHandlers) registerRoutes(rr routeRegistrar) {
 	rr.public("GET /api/auth/status", h.handleStatus)
@@ -656,6 +719,8 @@ func (h *authHandlers) registerRoutes(rr routeRegistrar) {
 	rr.public("POST /api/auth/login", h.handleLogin)
 	rr.auth("POST /api/auth/logout", h.handleLogout)
 	rr.auth("GET /api/auth/me", h.handleMe)
+	rr.auth("GET /api/auth/me/home", h.handleGetHomePrefs)
+	rr.auth("PUT /api/auth/me/home", h.handlePutHomePrefs)
 	rr.role("admin", "GET /api/users", h.handleListUsers)
 	rr.role("admin", "POST /api/users", h.handleCreateUser)
 	rr.role("admin", "PUT /api/users/{id}", h.handleUpdateUser)
