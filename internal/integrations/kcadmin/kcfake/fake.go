@@ -5,13 +5,17 @@
 package kcfake
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // Client is a stored client.
@@ -125,6 +129,17 @@ func (f *Keycloak) serve(w http.ResponseWriter, r *http.Request) {
 	if p == realm+"/protocol/openid-connect/token" {
 		_ = r.ParseForm()
 		cid := r.PostForm.Get("client_id")
+		// A stored client (not a service account above) gets an unsigned JWT
+		// carrying azp, the granted scopes and its rate claim.
+		if c := f.ByClientID(cid); c != nil && f.Creds[cid] == "" {
+			if !c.Enabled || c.Secret != r.PostForm.Get("client_secret") {
+				write(http.StatusUnauthorized, map[string]string{"error": "unauthorized_client", "error_description": "Invalid client or Invalid client credentials"})
+				return
+			}
+			f.TokenScopes = append(f.TokenScopes, r.PostForm.Get("scope"))
+			write(http.StatusOK, map[string]any{"access_token": jwt(c, r.PostForm.Get("scope")), "expires_in": 300})
+			return
+		}
 		if sec, ok := f.Creds[cid]; !ok || sec != r.PostForm.Get("client_secret") {
 			write(http.StatusUnauthorized, map[string]string{"error": "unauthorized_client", "error_description": "Invalid client credentials"})
 			return
@@ -259,6 +274,30 @@ func (f *Keycloak) client(c *Client, rest []string, method string, body map[stri
 	default:
 		write(http.StatusNotFound, map[string]string{"error": "unknown"})
 	}
+}
+
+// jwt is an unsigned token of c for the requested scopes: only the ones c
+// has as optional scopes are granted, like Keycloak does.
+func jwt(c *Client, requested string) string {
+	granted := []string{}
+	for _, s := range strings.Fields(requested) {
+		if slices.Contains(c.Optional, s) {
+			granted = append(granted, s)
+		}
+	}
+	claims := map[string]any{"azp": c.ClientID, "scope": strings.Join(granted, " "), "exp": time.Now().Add(5 * time.Minute).Unix()}
+	for _, m := range c.Mappers {
+		if m["name"] == "rate_limit_per_minute" {
+			if cfg, ok := m["config"].(map[string]any); ok {
+				if n, err := strconv.Atoi(fmt.Sprint(cfg["claim.value"])); err == nil {
+					claims["rate_limit_per_minute"] = n
+				}
+			}
+		}
+	}
+	b, _ := json.Marshal(claims)
+	enc := base64.RawURLEncoding.EncodeToString
+	return enc([]byte(`{"alg":"none"}`)) + "." + enc(b) + ".fake"
 }
 
 // ByClientID returns the stored client with clientID (lock Mu first).

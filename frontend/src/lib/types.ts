@@ -700,6 +700,33 @@ export interface ApiKeyUsage {
   daily: Record<string, number>;
 }
 
+/** POST /api/api-catalog/{id}/keys/{keyId}/test: one key's verdict. */
+export interface ApiKeyTestResult {
+  key_id: number;
+  label: string;
+  client_id: string;
+  ok: boolean;
+  token_ok: boolean;
+  token_error?: string;
+  granted: string[];
+  /** in Bridge's list, absent from the token */
+  missing: string[];
+  rate_limit_per_minute?: number;
+  expires_in?: number;
+  url: string;
+  status?: number;
+  answered_by?: "gateway" | "api";
+  /** start of an error answer (never of a 2xx one) */
+  body?: string;
+  error?: string;
+}
+
+export interface ApiKeyTestBatch {
+  results: ApiKeyTestResult[];
+  total: number;
+  ok: number;
+}
+
 export interface OperationSearchResult {
   api_id: number;
   api_name: string;

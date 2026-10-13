@@ -1206,6 +1206,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/api-catalog/{id}/keys/test": {
+            "post": {
+                "description": "apis.keys.manage. The default test (token + gateway, no real route: a batch must not fire one query per key) on every active or in-grace Keycloak key of the API, 4 at a time.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Test every key of an API through the gateway",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.keyTestBatchResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/api-catalog/{id}/keys/{keyId}": {
             "put": {
                 "description": "apis.keys.manage. Partial: an omitted field keeps its value. Changes Bridge's owner, contact and notes; a manual key's expiry; an active Keycloak key's scopes and rate limit (applied to the client: tokens issued from then on carry them; scopes null keeps them, rate 0 = the API's default).",
@@ -1409,6 +1456,71 @@ const docTemplate = `{
                     },
                     "502": {
                         "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/api-catalog/{id}/keys/{keyId}/test": {
+            "post": {
+                "description": "apis.keys.manage. Bridge reads the client's secret from Keycloak, asks for a token with the key's scopes and calls the API's base URL (normally the gateway) with it. The token and the secret are never returned. Default: a path no API has, so a 404 from the API proves the gateway took the token and nothing runs; \"path\" calls a real GET route instead (relative to the base URL), which also tests the route's scope. \"missing\" lists scopes Bridge has on the key but the token lacks; \"answered_by\" tells the gateway's refusal from the API's. Always 200 with the verdict in \"ok\".",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Test a Keycloak key through the gateway",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "API catalog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Key ID",
+                        "name": "keyId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Optional real route",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/api.keyTestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.keyTestResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -19136,6 +19248,91 @@ const docTemplate = `{
                 },
                 "success": {
                     "type": "boolean"
+                }
+            }
+        },
+        "api.keyTestBatchResponse": {
+            "type": "object",
+            "properties": {
+                "ok": {
+                    "type": "integer"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.keyTestResult"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.keyTestRequest": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "example": "/api/cadastro/ugs"
+                }
+            }
+        },
+        "api.keyTestResult": {
+            "type": "object",
+            "properties": {
+                "answered_by": {
+                    "description": "\"gateway\" or \"api\"",
+                    "type": "string"
+                },
+                "body": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "description": "seconds",
+                    "type": "integer"
+                },
+                "granted": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "key_id": {
+                    "type": "integer"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "missing": {
+                    "description": "in Bridge's list, absent from the token",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "ok": {
+                    "type": "boolean"
+                },
+                "rate_limit_per_minute": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "token_error": {
+                    "type": "string"
+                },
+                "token_ok": {
+                    "type": "boolean"
+                },
+                "url": {
+                    "type": "string"
                 }
             }
         },

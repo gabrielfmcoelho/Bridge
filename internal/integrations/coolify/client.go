@@ -166,7 +166,7 @@ func (c *Client) CreateServer(req CreateServerRequest) (string, error) {
 
 // ValidateServer triggers async validation of a server.
 func (c *Client) ValidateServer(uuid string) error {
-	_, _, err := c.do("GET", "/servers/"+uuid+"/validate", nil)
+	_, _, err := c.do("POST", "/servers/"+uuid+"/validate", nil)
 	return err
 }
 

@@ -28,6 +28,7 @@ import SecretValue from "@/components/vault/SecretValue";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import ApiKeyDrawer from "./ApiKeyDrawer";
 import KeyManagementDrawer from "./KeyManagementDrawer";
+import { KeyTestAllModal, KeyTestModal } from "./KeyTestModal";
 
 const STATUS_APPEARANCE = { active: "success", grace: "moved", expired: "moved", revoked: "removed" } as const;
 
@@ -47,6 +48,8 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
   const [issued, setIssued] = useState<{ label: string; plaintext: string } | null>(null);
   const [revealing, setRevealing] = useState<ApiKey | null>(null);
   const [usageOf, setUsageOf] = useState<ApiKey | null>(null);
+  const [testing, setTesting] = useState<ApiKey | null>(null);
+  const [testingAll, setTestingAll] = useState(false);
   const [tokenUsageOf, setTokenUsageOf] = useState<APIToken | null>(null);
   const [issuingToken, setIssuingToken] = useState(false);
 
@@ -58,6 +61,8 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
     enabled: mode !== "none",
   });
   const isBridge = api.scope_prefix === "bridge";
+  // Bridge's route is passthrough at the gateway: a test there proves nothing.
+  const canTest = keycloak && canManage && !isBridge;
   // Admins see every user's tokens; others their own (the endpoint enforces it).
   const { data: allTokens = [] } = useQuery({
     queryKey: ["api-tokens", isAdmin],
@@ -168,6 +173,9 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
             {keycloak && canManage && (
               <IconButton label={t("atlas.apis.keys.sync")} onClick={() => sync.mutate()} disabled={sync.isPending}><Icon path={ICON_PATHS.refresh} /></IconButton>
             )}
+            {canTest && (
+              <IconButton label={t("atlas.apis.keys.test.all")} onClick={() => setTestingAll(true)}><Icon path={ICON_PATHS.checkCircle} /></IconButton>
+            )}
             {configButton}
             {isBridge ? (
               <DropdownMenu trigger={<IconButton label={t("atlas.apis.keys.issue")}><Icon path={ICON_PATHS.plus} /></IconButton>}>
@@ -206,6 +214,7 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
                   name={k.label}
                   actions={[
                     { label: t("atlas.apis.keys.reveal"), icon: ICON_PATHS.eye, hidden: !canManage || !k.secret_id || k.status === "revoked", onClick: () => setRevealing(k) },
+                    { label: t("atlas.apis.keys.test.action"), icon: ICON_PATHS.checkCircle, hidden: !canTest || k.source !== "keycloak" || k.status === "revoked", onClick: () => setTesting(k) },
                     { label: t("atlas.apis.keys.usage"), icon: ICON_PATHS.clock, hidden: k.source !== "keycloak" || api.scope_prefix === "bridge", onClick: () => setUsageOf(k) },
                     { label: t("atlas.apis.keys.rotate"), icon: ICON_PATHS.refresh, hidden: !canManage || k.source !== "keycloak" || k.status !== "active", onClick: () => askRotate(k) },
                     { label: t("common.edit"), icon: ICON_PATHS.pencil, hidden: !canManage, onClick: () => setDrawer({ editing: k }) },
@@ -258,6 +267,8 @@ export default function ApiKeysTab({ api, canManage, isAdmin }: { api: ApiCatalo
       )}
       {configuring && <KeyManagementDrawer api={api} open onClose={() => setConfiguring(false)} />}
       {revealing && <RevealKeyModal apiKey={revealing} onClose={() => setRevealing(null)} />}
+      {testing && <KeyTestModal api={api} apiKey={testing} onClose={() => setTesting(null)} />}
+      {testingAll && <KeyTestAllModal api={api} onClose={() => setTestingAll(false)} />}
       {usageOf && <KeyUsageModal api={api} apiKey={usageOf} onClose={() => setUsageOf(null)} />}
     </>
   );

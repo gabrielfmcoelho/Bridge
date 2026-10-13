@@ -156,8 +156,10 @@ element" of the slice — the next migration breaks that test (v99's did when v1
 - Bring a branch up to date with `git pull --no-rebase origin dev` (merge,
   never rebase — see the global rules).
 - Delete the branch (local and remote) once its PR is merged.
-- Worktrees: `Bridge-main` holds `main` — a clean checkout with no `.env`,
-  for before/after test runs. A parallel feature gets its own
+- Worktrees: `Bridge-dev` is the main checkout (holds `.git` and the
+  `.env`) and sits on `dev` or the feature branch being worked on.
+  `Bridge-main` holds `main` — a clean checkout with no `.env`, for
+  before/after test runs. A parallel feature gets its own
   `git worktree add ../Bridge-<topic> -b feat/<topic> dev`; remove it
   (`git worktree remove`) when the branch is merged.
 
