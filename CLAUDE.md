@@ -146,6 +146,21 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.
 
+## Git flow
+
+- `main` is what's released; `dev` is the integration branch. Nothing is
+  committed straight to either.
+- Every change starts as a branch off `dev` (`feat/<topic>`, `fix/<topic>`)
+  and goes back through a pull request **into `dev`**. `dev` reaches `main`
+  only through a `dev` → `main` pull request.
+- Bring a branch up to date with `git pull --no-rebase origin dev` (merge,
+  never rebase — see the global rules).
+- Delete the branch (local and remote) once its PR is merged.
+- Worktrees: `Bridge-main` holds `main` — a clean checkout with no `.env`,
+  for before/after test runs. A parallel feature gets its own
+  `git worktree add ../Bridge-<topic> -b feat/<topic> dev`; remove it
+  (`git worktree remove`) when the branch is merged.
+
 ## Where to read more
 
 - `internal/spec/entidades.md` — entidades / visibility spec
