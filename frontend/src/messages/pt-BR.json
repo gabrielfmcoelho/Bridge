@@ -17,7 +17,6 @@
     "assistant": "Assistente"
   },
   "nav": {
-    "dashboard": "Painel",
     "issues": "Issues",
     "hosts": "Hosts",
     "dns": "DNS",
@@ -51,7 +50,8 @@
     "selfService": "Autoatendimento",
     "menu": "Menu",
     "shares": "Compartilhamentos",
-    "canvas": "Quadros de ideias"
+    "canvas": "Quadros de ideias",
+    "home": "Início"
   },
   "atlas": {
     "apis": {
@@ -950,7 +950,14 @@
       "usageMid": "50–80%",
       "usageHigh": "80% ou mais",
       "usageNone": "Sem scan",
-      "alertsByLevel": "Alertas por nível"
+      "alertsByLevel": "Alertas por nível",
+      "resourcesByHospedagem": "Recursos por hospedagem",
+      "resourcesBySituacao": "Recursos por situação",
+      "avgUsage": "Uso médio dos hosts escaneados",
+      "recentScans": "Scans recentes",
+      "noScansYet": "Nenhum scan ainda. Execute um scan para ver dados aqui.",
+      "hostCount": "{count} host(s)",
+      "disk": "Disco"
     },
     "pageDescription": "Servidores, VMs e containers do inventário: acesso, recursos, vínculos com serviços e DNS, e o estado de cada um.",
     "profileTitle": "Host",
@@ -1418,29 +1425,7 @@
     "noActiveHosts": "Nenhum host ativo configurado"
   },
   "dashboard": {
-    "title": "Painel",
-    "totalHosts": "Total de Hosts",
-    "totalDns": "Registros DNS",
-    "totalProjects": "Projetos",
-    "totalServices": "Serviços",
-    "openIssues": "Issues Abertas",
-    "scanCoverage": "Cobertura de Scan",
-    "scanned": "escaneados",
-    "maintenanceAlerts": "Alertas de Manutenção",
-    "hostsNeedAttention": "Hosts precisam de atenção",
-    "allHostsHealthy": "Todos os hosts saudáveis",
-    "infrastructure": "Infraestrutura",
-    "noHostingData": "Sem dados de hospedagem",
-    "recentScans": "Scans Recentes",
-    "noScansYet": "Nenhum scan ainda. Execute um scan para ver atividades aqui.",
-    "resourcesByInfra": "Recursos por Infraestrutura",
-    "resourcesBySituacao": "Recursos por Situação",
-    "avgUsage": "Média de Uso",
-    "criticalCount": "{count} críticos",
-    "hostsByStatus": "{hosts} por {status}",
-    "diskLabel": "Disco",
-    "hostSingular": "host",
-    "hostPlural": "hosts"
+    "totalHosts": "Total de Hosts"
   },
   "chamado": {
     "inExecution": "Em Execução",
@@ -3599,6 +3584,160 @@
       "success": "Verde",
       "accent": "Roxo",
       "danger": "Vermelho"
+    }
+  },
+  "home": {
+    "loadFailed": "Não foi possível carregar sua página inicial: {message}",
+    "saveFailed": "Não foi possível salvar suas preferências",
+    "noWidgets": "Nenhum widget ativo. Use Personalizar para escolher o que aparece aqui.",
+    "welcome": {
+      "title": "Esta é a sua página inicial",
+      "body": "O Bridge reúne o inventário de infraestrutura, o Atlas de dados, os chamados e a wiki da SEAD. Conte como você usa o Bridge e o Início mostra o que importa para o seu trabalho: o que espera por você, atalhos e primeiros passos. Dá para mudar quando quiser.",
+      "greeting": "Bem-vindo,"
+    },
+    "onboarding": {
+      "title": "Como você usa o Bridge?",
+      "description": "Marque tudo o que se aplica. Já deixamos marcado o que suas permissões sugerem.",
+      "start": "Começar",
+      "skip": "Pular por agora"
+    },
+    "personas": {
+      "label": "Como você usa o Bridge",
+      "infra": "Infraestrutura",
+      "infraHint": "Hosts, serviços, DNS, acesso SSH e scans.",
+      "dev": "Desenvolvimento",
+      "devHint": "Projetos, issues e as APIs que você constrói ou consome.",
+      "chamados": "Abro chamados",
+      "chamadosHint": "Peço serviços e acompanho meus chamados.",
+      "suporte": "Atendo chamados",
+      "suporteHint": "Aprovo e atendo solicitações e chamados.",
+      "atlas": "Atlas de dados",
+      "atlasHint": "Catálogo, linhagem, pipelines e topologia dos dados."
+    },
+    "customize": {
+      "open": "Personalizar",
+      "title": "Personalizar o Início",
+      "personasHint": "Mudar o perfil restaura os widgets padrão desse perfil.",
+      "widgets": "Widgets",
+      "moveUp": "Mover para cima",
+      "moveDown": "Mover para baixo",
+      "reset": "Restaurar padrão",
+      "column": "Coluna"
+    },
+    "column": {
+      "main": "Coluna principal",
+      "side": "Coluna lateral"
+    },
+    "steps": {
+      "title": "Primeiros passos",
+      "dismiss": "Dispensar",
+      "sshKey": "Cadastre sua chave SSH no cofre",
+      "scan": "Rode o primeiro scan de hosts",
+      "topology": "Veja a topologia da infraestrutura",
+      "projects": "Encontre seus projetos",
+      "issues": "Veja as issues atribuídas a você",
+      "apis": "Explore as APIs catalogadas",
+      "openChamado": "Abra seu primeiro chamado",
+      "catalog": "Conheça o catálogo de serviços",
+      "requests": "Veja as solicitações na sua fila",
+      "chamados": "Acompanhe os chamados do GLPI",
+      "atlasCatalog": "Explore o catálogo de dados",
+      "lineage": "Siga a linhagem de uma tabela",
+      "wiki": "Leia a wiki da equipe"
+    },
+    "w": {
+      "toHandle": "Para atender",
+      "toApprove": "Aguardando aprovação",
+      "toFulfill": "Para executar",
+      "toHandleEmpty": "Nada na sua fila agora.",
+      "myRequests": "Minhas solicitações",
+      "myRequestsEmpty": "Você ainda não fez nenhuma solicitação.",
+      "browseCatalog": "Ver catálogo de serviços",
+      "openRequests": "Ver todas as solicitações",
+      "myIssues": "Issues atribuídas a mim",
+      "myIssuesEmpty": "Nenhuma issue aberta atribuída a você.",
+      "seeAllIssues": "Ver todas ({count})",
+      "infraHealth": "Saúde da infraestrutura",
+      "withWarnings": "Com avisos",
+      "noCritical": "Nenhum host com alerta crítico.",
+      "hostsDashboard": "Abrir dashboard de hosts",
+      "atlas": "Atlas de dados",
+      "atlasHint": "Catálogo, linhagem e APIs.",
+      "recentApis": "APIs atualizadas recentemente",
+      "noApis": "Nenhuma API catalogada ainda.",
+      "quickActions": "Atalhos",
+      "chamados": "Chamados",
+      "chamadosHint": "Abra um chamado ou acompanhe os seus no GLPI.",
+      "followChamados": "Acompanhar chamados",
+      "inventory": "Inventário",
+      "wiki": "Wiki recente",
+      "wikiEmpty": "Nenhum documento recente.",
+      "openWiki": "Abrir wiki",
+      "assistant": "Assistente",
+      "assistantHint": "Pergunte, peça um rascunho ou tire uma dúvida rápida.",
+      "openAssistant": "Abrir no painel do assistente",
+      "assistantPlaceholder": "Pergunte ao assistente…"
+    }
+  },
+  "ai": {
+    "chat": {
+      "retry": "Tentar de novo",
+      "copy": "Copiar resposta",
+      "jumpToLatest": "Ir para a última mensagem",
+      "inputLabel": "Mensagem para o assistente",
+      "stop": "Parar resposta",
+      "newChat": "Nova conversa",
+      "suggest": {
+        "summary": "Resuma o inventário de infraestrutura",
+        "disk": "Como investigar uso alto de disco em uma VM Linux?",
+        "dns": "Como configuro um registro DNS para um novo subdomínio?",
+        "infra": "Checklist para colocar uma VM nova em produção",
+        "dev": "Boas práticas para documentar uma API no Atlas",
+        "chamados": "Como escrever um bom chamado para o suporte?",
+        "suporte": "Como priorizar uma fila de solicitações?",
+        "atlas": "O que é linhagem de dados e para que serve?"
+      },
+      "sources": "Fontes:"
+    },
+    "tools": {
+      "stepsLabel": "Consultas feitas pelo assistente",
+      "search_hosts": "Buscou hosts",
+      "search_services": "Buscou serviços",
+      "search_dns": "Buscou DNS",
+      "search_projects": "Buscou projetos",
+      "search_apis": "Buscou APIs no Atlas",
+      "search_issues": "Buscou issues",
+      "search_wiki": "Buscou na wiki",
+      "propose_issue": "Rascunhou uma issue",
+      "propose_chamado": "Rascunhou um chamado",
+      "results": "{count} resultado(s)",
+      "failed": "não deu certo",
+      "unavailable": "O modelo configurado não consulta os dados do Bridge; esta resposta é genérica."
+    },
+    "proposal": {
+      "issueDraft": "Rascunho de issue",
+      "chamadoDraft": "Rascunho de chamado",
+      "notCreatedYet": "Ainda não foi criado",
+      "title": "Título",
+      "description": "Descrição",
+      "priority": "Prioridade",
+      "parent": "Vinculada a",
+      "glpiProfile": "Perfil GLPI: {name}",
+      "linkedHost": "host {host}",
+      "dismiss": "Descartar",
+      "createIssue": "Criar issue",
+      "openChamado": "Abrir chamado",
+      "issueCreated": "Issue #{id} criada",
+      "chamadoCreated": "Chamado #{id} aberto",
+      "dismissed": "Rascunho descartado: {title}",
+      "open": "Abrir"
+    },
+    "unavailable": {
+      "title": "O assistente ainda não está configurado",
+      "disabledTitle": "O assistente está desativado",
+      "adminHint": "Informe a URL, o modelo e a chave de um provedor compatível com a API da OpenAI e ative a integração.",
+      "userHint": "Um administrador do Bridge precisa configurá-lo. Enquanto isso, o resto do Bridge funciona normalmente.",
+      "configure": "Configurar em Integrações"
     }
   }
 }

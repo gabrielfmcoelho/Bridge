@@ -15,6 +15,7 @@ import Divider from "@/components/ui/Divider";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
 import AiChatDrawer from "@/components/ai/AiChatDrawer";
+import { chatActions } from "@/components/ai/chatStore";
 import Breadcrumbs from "./Breadcrumbs";
 import CommandPalette from "./CommandPalette";
 import ProfilePanel from "./ProfilePanel";
@@ -40,7 +41,6 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [userDrawer, setUserDrawer] = useState(false);
-  const [aiChat, setAiChat] = useState(false);
   const hasAiPermission = user?.permissions?.includes("ai.use") ?? false;
   const name = user ? user.display_name || user.username : "";
   const canEdit = user?.role === "admin" || user?.role === "editor";
@@ -82,18 +82,18 @@ export default function Header({ onToggleCollapse, collapsed }: HeaderProps) {
         <Breadcrumbs />
       </div>
 
-      <AiChatDrawer open={aiChat} onClose={() => setAiChat(false)} />
+      <AiChatDrawer />
 
       {/* Right, fixed order: search · Assistente · Criar · profile. */}
       <div className="shrink-0 flex items-center gap-2">
         <CommandPalette />
         {hasAiPermission && (
           <>
-            <Button size="sm" variant="secondary" onClick={() => setAiChat(true)} className="max-md:hidden">
+            <Button size="sm" variant="secondary" onClick={chatActions.open} className="max-md:hidden">
               <Icon path={ICON_PATHS.sparkles} className="w-4 h-4" />
               {t("header.assistant")}
             </Button>
-            <IconButton onClick={() => setAiChat(true)} label={t("header.assistant")} className="md:hidden">
+            <IconButton onClick={chatActions.open} label={t("header.assistant")} className="md:hidden">
               <Icon path={ICON_PATHS.sparkles} className="w-4 h-4" />
             </IconButton>
           </>

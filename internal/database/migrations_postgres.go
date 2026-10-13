@@ -1811,4 +1811,8 @@ var migrationsPostgres = []string{
 		updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_canvases_entidade ON canvases(entidade_id);`,
+
+	// Version 109: per-user home page preferences (personas, widget order,
+	// onboarding state). Opaque JSON owned by the frontend; {} = never set up.
+	`ALTER TABLE users ADD COLUMN IF NOT EXISTS home_prefs JSONB NOT NULL DEFAULT '{}'::jsonb;`,
 }

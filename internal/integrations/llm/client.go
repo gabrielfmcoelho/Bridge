@@ -75,50 +75,67 @@ func (c *Client) ListModels(ctx context.Context) ([]string, error) {
 	return ids, nil
 }
 
+// APIError is a non-2xx answer from the API. Callers can tell a request the
+// gateway rejected (4xx, e.g. a model without tool support) from an outage.
+type APIError struct {
+	Status int
+	Body   string
+}
+
+func (e *APIError) Error() string { return fmt.Sprintf("api error %d: %s", e.Status, e.Body) }
+
 // Complete sends a chat completion request and returns the assistant's reply.
 func (c *Client) Complete(ctx context.Context, messages []ChatMessage) (string, error) {
+	msg, err := c.Chat(ctx, messages, nil)
+	return msg.Content, err
+}
+
+// Chat sends a chat completion request with optional tools and returns the
+// whole assistant message (text, or the tool calls it asks for).
+func (c *Client) Chat(ctx context.Context, messages []ChatMessage, tools []Tool) (ChatMessage, error) {
 	req := CompletionRequest{
 		Model:     c.model,
 		Messages:  messages,
 		MaxTokens: c.maxTokens,
+		Tools:     tools,
 	}
 
 	body, err := json.Marshal(req)
 	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
+		return ChatMessage{}, fmt.Errorf("marshal request: %w", err)
 	}
 
 	url := c.baseURL + "/chat/completions"
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
+		return ChatMessage{}, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return "", fmt.Errorf("api request: %w", err)
+		return ChatMessage{}, fmt.Errorf("api request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
+		return ChatMessage{}, fmt.Errorf("read response: %w", err)
 	}
 
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("api error %d: %s", resp.StatusCode, string(respBody))
+		return ChatMessage{}, &APIError{Status: resp.StatusCode, Body: string(respBody)}
 	}
 
 	var result CompletionResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return "", fmt.Errorf("parse response: %w", err)
+		return ChatMessage{}, fmt.Errorf("parse response: %w", err)
 	}
 
 	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
+		return ChatMessage{}, fmt.Errorf("no choices in response")
 	}
 
-	return result.Choices[0].Message.Content, nil
+	return result.Choices[0].Message, nil
 }

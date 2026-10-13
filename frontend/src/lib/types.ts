@@ -1076,3 +1076,35 @@ export interface ProjectCoolifyLink {
   coolify_project: string;
   coolify_environment: string;
 }
+
+// ── Assistant (POST /api/ai/chat) ──────────────────────────────────────────
+
+/** A Bridge page a tool result pointed to; cited in the answer as a markdown link. */
+export interface AiRef { type: string; id: string; label: string; href: string }
+
+/** One tool the model ran while answering (shown as a step in the thread). */
+export interface AiStep { tool: string; query?: string; count: number; error?: string }
+
+/** An action the model drafted; nothing happens until the user confirms it. */
+export interface AiProposal {
+  id: string;
+  kind: "issue" | "chamado";
+  title: string;
+  description: string;
+  priority?: string;
+  parent?: AiRef;
+  /** The issue's entity_type / entity_id for POST /api/issues. */
+  parent_type?: string;
+  parent_id?: number;
+  profile?: { id: number; name: string };
+  host_slug?: string;
+}
+
+export interface AiChatResponse {
+  response: string;
+  /** false: the model gateway rejected tools, so the answer didn't look at the data. */
+  tools?: boolean;
+  steps?: AiStep[];
+  refs?: AiRef[];
+  proposals?: AiProposal[];
+}
