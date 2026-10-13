@@ -146,13 +146,29 @@ func (c *Client) token(ctx context.Context, clientID, secret, scope string) (str
 	if t, ok := c.toks[key]; ok && time.Now().Before(t.until) {
 		return t.value, nil
 	}
+	tok, expiresIn, err := c.fetchToken(ctx, clientID, secret, scope)
+	if err != nil {
+		return "", err
+	}
+	c.toks[key] = cachedToken{tok, time.Now().Add(time.Duration(expiresIn)*time.Second - 30*time.Second)}
+	return tok, nil
+}
+
+// IssueToken asks Keycloak for a fresh client_credentials token of clientID
+// (never cached: a key test must see what Keycloak answers now).
+func (c *Client) IssueToken(ctx context.Context, clientID, secret, scope string) (string, error) {
+	tok, _, err := c.fetchToken(ctx, clientID, secret, scope)
+	return tok, err
+}
+
+func (c *Client) fetchToken(ctx context.Context, clientID, secret, scope string) (string, int, error) {
 	form := url.Values{"grant_type": {"client_credentials"}, "client_id": {clientID}, "client_secret": {secret}}
 	if scope != "" {
 		form.Set("scope", scope)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.tokenURL(), strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	var out struct {
@@ -160,10 +176,9 @@ func (c *Client) token(ctx context.Context, clientID, secret, scope string) (str
 		ExpiresIn   int    `json:"expires_in"`
 	}
 	if _, err := send(c.http, req, &out); err != nil {
-		return "", err
+		return "", 0, err
 	}
-	c.toks[key] = cachedToken{out.AccessToken, time.Now().Add(time.Duration(out.ExpiresIn)*time.Second - 30*time.Second)}
-	return out.AccessToken, nil
+	return out.AccessToken, out.ExpiresIn, nil
 }
 
 // admin calls the admin REST API at path (relative to the realm).
@@ -467,6 +482,17 @@ func (c *Client) RegenerateSecret(ctx context.Context, id string) (string, error
 		Value string `json:"value"`
 	}
 	if _, err := c.admin(ctx, http.MethodPost, "/clients/"+url.PathEscape(id)+"/client-secret", nil, &cred); err != nil {
+		return "", err
+	}
+	return cred.Value, nil
+}
+
+// ClientSecret reads a client's current secret.
+func (c *Client) ClientSecret(ctx context.Context, id string) (string, error) {
+	var cred struct {
+		Value string `json:"value"`
+	}
+	if _, err := c.admin(ctx, http.MethodGet, "/clients/"+url.PathEscape(id)+"/client-secret", nil, &cred); err != nil {
 		return "", err
 	}
 	return cred.Value, nil

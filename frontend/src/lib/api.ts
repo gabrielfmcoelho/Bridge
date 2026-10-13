@@ -1086,6 +1086,11 @@ export const apiKeysAPI = {
     api.post<{ created: number; total: number }>(`/api/api-catalog/${apiId}/keys/sync-scopes`, {}),
   usage: (apiId: number, keyId: number) =>
     api.get<import("./types").ApiKeyUsage>(`/api/api-catalog/${apiId}/keys/${keyId}/usage`),
+  /** path: a real GET route relative to the API's base URL; omitted = the no-query default */
+  test: (apiId: number, keyId: number, path?: string) =>
+    api.post<import("./types").ApiKeyTestResult>(`/api/api-catalog/${apiId}/keys/${keyId}/test`, path ? { path } : {}),
+  testAll: (apiId: number) =>
+    api.post<import("./types").ApiKeyTestBatch>(`/api/api-catalog/${apiId}/keys/test`, {}),
   setManagement: (apiId: number, data: KeyManagementPayload) =>
     api.put<import("./types").ApiCatalog>(`/api/api-catalog/${apiId}/key-management`, data),
   testManagement: (apiId: number, data: Partial<KeyManagementPayload>) =>

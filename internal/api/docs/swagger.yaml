@@ -1774,6 +1774,63 @@ definitions:
       success:
         type: boolean
     type: object
+  api.keyTestBatchResponse:
+    properties:
+      ok:
+        type: integer
+      results:
+        items:
+          $ref: '#/definitions/api.keyTestResult'
+        type: array
+      total:
+        type: integer
+    type: object
+  api.keyTestRequest:
+    properties:
+      path:
+        example: /api/cadastro/ugs
+        type: string
+    type: object
+  api.keyTestResult:
+    properties:
+      answered_by:
+        description: '"gateway" or "api"'
+        type: string
+      body:
+        type: string
+      client_id:
+        type: string
+      error:
+        type: string
+      expires_in:
+        description: seconds
+        type: integer
+      granted:
+        items:
+          type: string
+        type: array
+      key_id:
+        type: integer
+      label:
+        type: string
+      missing:
+        description: in Bridge's list, absent from the token
+        items:
+          type: string
+        type: array
+      ok:
+        type: boolean
+      rate_limit_per_minute:
+        type: integer
+      status:
+        type: integer
+      token_error:
+        type: string
+      token_ok:
+        type: boolean
+      url:
+        type: string
+    type: object
   api.linkWithHealth:
     properties:
       created_at:
@@ -5826,6 +5883,56 @@ paths:
       summary: Rotate a Keycloak key's secret
       tags:
       - atlas
+  /api/api-catalog/{id}/keys/{keyId}/test:
+    post:
+      consumes:
+      - application/json
+      description: 'apis.keys.manage. Bridge reads the client''s secret from Keycloak,
+        asks for a token with the key''s scopes and calls the API''s base URL (normally
+        the gateway) with it. The token and the secret are never returned. Default:
+        a path no API has, so a 404 from the API proves the gateway took the token
+        and nothing runs; "path" calls a real GET route instead (relative to the base
+        URL), which also tests the route''s scope. "missing" lists scopes Bridge has
+        on the key but the token lacks; "answered_by" tells the gateway''s refusal
+        from the API''s. Always 200 with the verdict in "ok".'
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Key ID
+        in: path
+        name: keyId
+        required: true
+        type: integer
+      - description: Optional real route
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/api.keyTestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.keyTestResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Test a Keycloak key through the gateway
+      tags:
+      - atlas
   /api/api-catalog/{id}/keys/{keyId}/usage:
     get:
       description: Any role that can see the API. Lifetime and per-day counts ("YYYY-MM-DD"
@@ -5994,6 +6101,39 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Create the API's scopes in Keycloak
+      tags:
+      - atlas
+  /api/api-catalog/{id}/keys/test:
+    post:
+      description: 'apis.keys.manage. The default test (token + gateway, no real route:
+        a batch must not fire one query per key) on every active or in-grace Keycloak
+        key of the API, 4 at a time.'
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.keyTestBatchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Test every key of an API through the gateway
       tags:
       - atlas
   /api/api-catalog/{id}/refetch:
