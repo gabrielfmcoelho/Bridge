@@ -33,6 +33,7 @@ type HostService struct {
 	scans        *store.HostScanRepo
 	alerts       *store.HostAlertRepo
 	alertCfg     *store.AlertSettingsRepo
+	sentinel     *store.SentinelRepo
 	services     *store.ServiceRepo
 	dns          *store.DNSRepo
 	projects     *store.ProjectRepo
@@ -52,6 +53,7 @@ func NewHostService(db *database.DB) *HostService {
 		scans:        store.NewHostScanRepo(db.SQL),
 		alerts:       store.NewHostAlertRepo(db.SQL),
 		alertCfg:     store.NewAlertSettingsRepo(db.SQL),
+		sentinel:     store.NewSentinelRepo(db.SQL),
 		services:     store.NewServiceRepo(db.SQL),
 		dns:          store.NewDNSRepo(db.SQL),
 		projects:     store.NewProjectRepo(db.SQL),
@@ -121,6 +123,9 @@ type HostListItem struct {
 	MainEntidade        string         `json:"main_entidade"`
 	ChamadosCount       int            `json:"chamados_count"`
 	ProjectsCount       int            `json:"projects_count"`
+	// Sentinel is the latest Sentinel sync of the host, kept apart from the
+	// scan (ScanRes); nil when never synced.
+	Sentinel *models.SentinelHostSnapshot `json:"sentinel,omitempty"`
 }
 
 // HostDetail is the full single-host view (host + relations).
@@ -190,7 +195,15 @@ func (s *HostService) List(ctx context.Context, f models.HostFilter) ([]HostList
 
 	thresholds, thErr := s.alertCfg.GetThresholds(ctx)
 	if thErr != nil || thresholds == nil {
-		thresholds = &models.AlertThresholds{ResourceCritical: 80, ResourceWarning: 60, ResourceInfoLow: 5}
+		d := models.DefaultAlertThresholds()
+		thresholds = &d
+	}
+	sentinelHosts, _ := s.sentinel.HostsBulk(ctx)
+	sentinelSvcs := map[int64][]models.SentinelServiceSnapshot{}
+	if all, err := s.sentinel.ServicesBulk(ctx, 0); err == nil {
+		for _, v := range all {
+			sentinelSvcs[v.HostID] = append(sentinelSvcs[v.HostID], v)
+		}
 	}
 
 	projCounts, _ := s.services.ProjectCountsByHost(ctx)
@@ -238,6 +251,10 @@ func (s *HostService) List(ctx context.Context, f models.HostFilter) ([]HostList
 			}
 		}
 		hwt.Alerts = computeAlerts(hwt.ScanRes, sfPtr, host, thresholds)
+		if sh, ok := sentinelHosts[host.ID]; ok {
+			hwt.Sentinel = &sh
+			hwt.Alerts = append(hwt.Alerts, SentinelAlerts(&sh, sentinelSvcs[host.ID], thresholds)...)
+		}
 
 		// Merge persisted alerts; an auto-sourced DB alert that duplicates a
 		// computed one of the same type replaces it (so the DB id + issue link

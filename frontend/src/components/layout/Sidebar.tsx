@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAppearance } from "@/contexts/AppearanceContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { NAV_SECTIONS, canSeeNavItem, type NavItem, type NavSection } from "@/lib/constants";
+import { NAV_SECTIONS, canSeeNavItem, isNavItemActive, type NavItem, type NavSection } from "@/lib/constants";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
 import Divider from "@/components/ui/Divider";
@@ -62,8 +62,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
   };
   const [closedSections, setClosedSections] = useLocalStorage<Record<string, boolean>>("sidebar_closed_sections", {});
   const closed = (sec: NavSection) =>
-    !!sec.collapsible && !!closedSections[sec.key] && !sec.items.some((i) => isActiveHref(i.href));
-  const isActiveHref = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+    !!sec.collapsible && !!closedSections[sec.key] && !sec.items.some((i) => isNavItemActive(i, pathname));
 
   // Labels stay mounted and fade, so opening animates as one motion: the width
   // grows (overflow clipped) while the text fades in. Icons never move — they
@@ -153,7 +152,7 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
                     </span>
                   );
                 }
-                const isActive = isActiveHref(item.href);
+                const isActive = isNavItemActive(item, pathname);
                 const count = item.count && counts[item.count].n > 0 ? counts[item.count] : null;
                 return (
                   <Link
@@ -256,7 +255,7 @@ function MobileDrawer({
                       </span>
                     );
                   }
-                  const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                  const isActive = isNavItemActive(item, pathname);
                   return (
                     <Link
                       key={item.href}

@@ -133,3 +133,52 @@ export function hostBreakdowns(hosts: Host[]): HostBreakdowns {
     })),
   };
 }
+
+export interface ResourceGroup {
+  name: string;
+  count: number;
+  /** Average use in percent (0 when no host in the group reported it). */
+  cpu: number; ram: number; disk: number;
+  /** Summed capacity, e.g. "48 vCPU", "" when unknown. */
+  totalCpu: string; totalRam: string; totalDisk: string;
+}
+
+/** Average CPU / RAM / disk use and summed capacity of the scanned hosts,
+ *  grouped by `groupOf` (hospedagem, situação), largest group first. */
+export function resourcesBy(hosts: Host[], groupOf: (h: Host) => string | undefined): ResourceGroup[] {
+  const pct = (s?: string) => { const n = parseFloat((s ?? "").replace("%", "")); return Number.isNaN(n) ? null : n; };
+  const groups = new Map<string, { count: number; cpu: number[]; ram: number[]; disk: number[]; tc: string[]; tr: string[]; td: string[] }>();
+  for (const h of hosts) {
+    const r = h.scan_resources;
+    if (!h.has_scan || !r) continue;
+    const name = groupOf(h)?.trim() || "";
+    const g = groups.get(name) ?? { count: 0, cpu: [], ram: [], disk: [], tc: [], tr: [], td: [] };
+    groups.set(name, g);
+    g.count++;
+    for (const [arr, v] of [[g.cpu, pct(r.cpu_usage)], [g.ram, pct(r.ram_percent)], [g.disk, pct(r.disk_percent)]] as const) if (v !== null) arr.push(v);
+    if (r.cpu) g.tc.push(r.cpu);
+    if (r.ram) g.tr.push(r.ram);
+    if (r.storage) g.td.push(r.storage);
+  }
+  const avg = (a: number[]) => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0);
+  // "8 vCPU", "15Gi", "7,8Gi" → summed with the first unit seen.
+  // ponytail: mixed units (Gi + Ti) add up wrong; normalize if hosts start mixing them.
+  const sum = (a: string[]) => {
+    let total = 0, unit = "";
+    for (const s of a) {
+      const m = s.replace(/,/g, ".").trim().match(/([\d.]+)\s*(.*)/);
+      if (!m) continue;
+      total += parseFloat(m[1]);
+      unit ||= m[2].trim();
+    }
+    return total ? `${Number.isInteger(total) ? total : total.toFixed(1)} ${unit}`.trim() : "";
+  };
+  return [...groups]
+    .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+    .map(([name, g]) => ({ name, count: g.count, cpu: avg(g.cpu), ram: avg(g.ram), disk: avg(g.disk), totalCpu: sum(g.tc), totalRam: sum(g.tr), totalDisk: sum(g.td) }));
+}
+
+/** The `n` most recently scanned hosts, newest first. */
+export function recentScans(hosts: Host[], n = 5): Host[] {
+  return hosts.filter((h) => h.last_scan_at).sort((a, b) => b.last_scan_at!.localeCompare(a.last_scan_at!)).slice(0, n);
+}

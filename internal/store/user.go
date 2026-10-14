@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -61,6 +62,20 @@ func (r *UserRepo) GetByID(ctx context.Context, id int64) (*models.User, error) 
 		return nil, nil
 	}
 	return u, err
+}
+
+// HomePrefs returns the user's home page preferences, a JSON object ("{}"
+// when never set). The server stores it opaquely; the frontend owns its shape.
+func (r *UserRepo) HomePrefs(ctx context.Context, id int64) (json.RawMessage, error) {
+	var s string
+	err := r.db.QueryRowContext(ctx, `SELECT home_prefs::text FROM users WHERE id = ?`, id).Scan(&s)
+	return json.RawMessage(s), err
+}
+
+// SetHomePrefs replaces the user's home page preferences with prefs (a JSON object).
+func (r *UserRepo) SetHomePrefs(ctx context.Context, id int64, prefs json.RawMessage) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE users SET home_prefs = ?::jsonb WHERE id = ?`, string(prefs), id)
+	return err
 }
 
 // List returns all users ordered by id.

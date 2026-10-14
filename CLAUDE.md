@@ -29,7 +29,7 @@ and contacts. Access is scoped by a hierarchical org-unit tree called
 | Frontend build | `cd frontend && npm run build` |
 | Frontend dev | `cd frontend && npm run dev` |
 | Frontend dev, no Go backend | `cd frontend && npm run dev:mock` — sets `NEXT_PUBLIC_USE_MOCK_API=1`, which repoints `API_BASE` at the in-app mock (`src/app/mock/api/[...path]/route.ts` + `src/mocks/`). **Required for `/catalog` and `/requests`**: those routes have no Go backend yet, so plain `npm run dev` proxies them to Go and gets 404. `POST /mock/api/__user {role, entidade_slug}` switches persona, `POST /mock/api/__reset` re-seeds. |
-| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases,shareBundles}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts` (insight modules stay runtime-import free so Node can run them) |
+| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases,shareBundles,breadcrumbs,constants}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts`, `src/app/_home/homeModel.test.ts`, `src/components/ai/chatModel.test.ts` (insight modules stay runtime-import free so Node can run them) |
 
 ## Architecture
 
@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v107**. Use idempotent idioms:
+per element, currently at **v110**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -145,6 +145,23 @@ element" of the slice — the next migration breaks that test (v99's did when v1
 - List endpoints return `{data, meta:{page,per_page,total}}`
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.
+
+## Git flow
+
+- `main` is what's released; `dev` is the integration branch. Nothing is
+  committed straight to either.
+- Every change starts as a branch off `dev` (`feat/<topic>`, `fix/<topic>`)
+  and goes back through a pull request **into `dev`**. `dev` reaches `main`
+  only through a `dev` → `main` pull request.
+- Bring a branch up to date with `git pull --no-rebase origin dev` (merge,
+  never rebase — see the global rules).
+- Delete the branch (local and remote) once its PR is merged.
+- Worktrees: `Bridge-dev` is the main checkout (holds `.git` and the
+  `.env`) and sits on `dev` or the feature branch being worked on.
+  `Bridge-main` holds `main` — a clean checkout with no `.env`, for
+  before/after test runs. A parallel feature gets its own
+  `git worktree add ../Bridge-<topic> -b feat/<topic> dev`; remove it
+  (`git worktree remove`) when the branch is merged.
 
 ## Where to read more
 

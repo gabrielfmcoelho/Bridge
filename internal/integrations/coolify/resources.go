@@ -108,8 +108,10 @@ func SanitizeRepoURL(raw string) string {
 	return u.String()
 }
 
-// containerName: optional role prefix, the 24-char resource uuid, optional deploy timestamp.
-var containerName = regexp.MustCompile(`^(?:(.+)-)?([a-z0-9]{24})(?:-(\d{12}))?$`)
+// containerName: optional role prefix, the 24-char resource uuid, optional
+// deploy timestamp — 12 digits, or 20261013T214301 since Coolify 4.4 (Sentinel
+// lowercases names, hence [tT]).
+var containerName = regexp.MustCompile(`^(?:(.+)-)?([a-z0-9]{24})(?:-(\d{12}|\d{8}[tT]\d{6}))?$`)
 
 // dbProxy: the container Coolify runs to expose a database's public port.
 var dbProxy = regexp.MustCompile(`^([a-z0-9]{24})-proxy$`)

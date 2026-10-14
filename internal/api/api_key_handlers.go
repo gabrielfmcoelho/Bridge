@@ -150,6 +150,8 @@ func (h *apiKeyHandlers) registerRoutes(rr routeRegistrar) {
 	rr.perm("apis.keys.manage", "POST /api/api-catalog/{id}/keys/{keyId}/revoke", h.handleRevoke)
 	rr.perm("apis.keys.manage", "POST /api/api-catalog/{id}/keys/{keyId}/rotate", h.handleRotate)
 	rr.auth("GET /api/api-catalog/{id}/keys/{keyId}/usage", h.handleUsage)
+	rr.perm("apis.keys.manage", "POST /api/api-catalog/{id}/keys/test", h.handleTestKeys)
+	rr.perm("apis.keys.manage", "POST /api/api-catalog/{id}/keys/{keyId}/test", h.handleTestKey)
 	rr.role("admin", "PUT /api/api-catalog/{id}/key-management", h.handleSetKeyManagement)
 	rr.role("admin", "POST /api/api-catalog/{id}/key-management/test", h.handleTestKeyManagement)
 }

@@ -49,7 +49,8 @@ export const ROLE_COLORS: Record<string, string> = {
 // ponytail: `role` gates by users.role; `permission` by permission code. Permission codes are
 // empty under dev:mock (mocks/seed.ts), so admin-only dev pages use `role` instead.
 // `count` names a live number shown after the label (ADS side-nav elemAfter).
-export type NavItem = { href: string; label: string; icon: string; permission?: string; role?: "admin"; count?: "openIssues" };
+// `also`: other route prefixes this item stands for (one entry, several pages).
+export type NavItem = { href: string; label: string; icon: string; permission?: string; role?: "admin"; count?: "openIssues"; also?: string[] };
 // `collapsible` sections fold their items under the heading (expanded sidebar only).
 export type NavSection = { key: string; label?: string; items: NavItem[]; collapsible?: boolean };
 
@@ -58,8 +59,10 @@ export const NAV_SECTIONS: NavSection[] = [
     key: "main",
     label: "nav.workspace",
     items: [
-      { href: "/", label: "nav.dashboard", icon: "LayoutDashboard" },
+      { href: "/", label: "nav.home", icon: "Home" },
       { href: "/wiki", label: "nav.wiki", icon: "Book" },
+      { href: "/issues", label: "nav.issues", icon: "ListChecks", count: "openIssues" },
+      { href: "/canvas", label: "nav.canvas", icon: "Lightbulb" },
     ],
   },
   {
@@ -81,10 +84,10 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "nav.selfService",
     items: [
       { href: "/catalog", label: "nav.serviceCatalog", icon: "Store" },
-      { href: "/requests", label: "nav.requests", icon: "ClipboardList" },
-      { href: "/issues", label: "nav.issues", icon: "ListChecks", count: "openIssues" },
-      { href: "/canvas", label: "nav.canvas", icon: "Lightbulb" },
-      { href: "/chamados", label: "nav.chamados", icon: "Ticket" },
+      // One entry, two ways to ask for something: GLPI tickets and Bridge's own
+      // requests (/requests), switched by ChamadosTabs. Lands on GLPI, the one
+      // with a backend in production today.
+      { href: "/chamados", label: "nav.chamados", icon: "Ticket", also: ["/requests"] },
     ],
   },
   {
@@ -111,6 +114,12 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
 ];
+
+/** Whether the page at `pathname` belongs to this nav item (its href or an `also` prefix). */
+export function isNavItemActive(item: Pick<NavItem, "href" | "also">, pathname: string): boolean {
+  if (item.href === "/") return pathname === "/";
+  return [item.href, ...(item.also ?? [])].some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
 
 /** Whether a user may see a nav item: its permission code and role gates. */
 export function canSeeNavItem(item: NavItem, permissions: string[], role?: string): boolean {

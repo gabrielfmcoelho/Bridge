@@ -27,6 +27,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-api_sentinelHostRow:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/api.sentinelHostRow'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-api_userWithEntidades:
     properties:
       data:
@@ -322,7 +331,88 @@ definitions:
     type: object
   api.aiChatRequest:
     properties:
+      history:
+        description: |-
+          History is the conversation so far, oldest first (roles user/assistant),
+          so follow-up questions keep their context. Optional.
+        items:
+          $ref: '#/definitions/llm.ChatMessage'
+        type: array
       message:
+        type: string
+    type: object
+  api.aiChatResult:
+    properties:
+      proposals:
+        items:
+          $ref: '#/definitions/api.aiProposal'
+        type: array
+      refs:
+        items:
+          $ref: '#/definitions/api.aiRef'
+        type: array
+      response:
+        type: string
+      steps:
+        items:
+          $ref: '#/definitions/api.aiStep'
+        type: array
+      tools:
+        type: boolean
+    type: object
+  api.aiGlpiTarget:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  api.aiProposal:
+    properties:
+      description:
+        type: string
+      host_slug:
+        type: string
+      id:
+        type: string
+      kind:
+        description: '"issue" | "chamado"'
+        type: string
+      parent:
+        $ref: '#/definitions/api.aiRef'
+      parent_id:
+        type: integer
+      parent_type:
+        description: 'ParentType/ParentID: the issue''s entity_type/entity_id for
+          POST /api/issues.'
+        type: string
+      priority:
+        type: string
+      profile:
+        $ref: '#/definitions/api.aiGlpiTarget'
+      title:
+        type: string
+    type: object
+  api.aiRef:
+    properties:
+      href:
+        type: string
+      id:
+        type: string
+      label:
+        type: string
+      type:
+        type: string
+    type: object
+  api.aiStep:
+    properties:
+      count:
+        type: integer
+      error:
+        type: string
+      query:
+        type: string
+      tool:
         type: string
     type: object
   api.apiKeyCreateRequest:
@@ -1774,6 +1864,63 @@ definitions:
       success:
         type: boolean
     type: object
+  api.keyTestBatchResponse:
+    properties:
+      ok:
+        type: integer
+      results:
+        items:
+          $ref: '#/definitions/api.keyTestResult'
+        type: array
+      total:
+        type: integer
+    type: object
+  api.keyTestRequest:
+    properties:
+      path:
+        example: /api/cadastro/ugs
+        type: string
+    type: object
+  api.keyTestResult:
+    properties:
+      answered_by:
+        description: '"gateway" or "api"'
+        type: string
+      body:
+        type: string
+      client_id:
+        type: string
+      error:
+        type: string
+      expires_in:
+        description: seconds
+        type: integer
+      granted:
+        items:
+          type: string
+        type: array
+      key_id:
+        type: integer
+      label:
+        type: string
+      missing:
+        description: in Bridge's list, absent from the token
+        items:
+          type: string
+        type: array
+      ok:
+        type: boolean
+      rate_limit_per_minute:
+        type: integer
+      status:
+        type: integer
+      token_error:
+        type: string
+      token_ok:
+        type: boolean
+      url:
+        type: string
+    type: object
   api.linkWithHealth:
     properties:
       created_at:
@@ -2075,6 +2222,44 @@ definitions:
         type: string
       sent:
         type: boolean
+    type: object
+  api.sentinelHostRow:
+    properties:
+      hostname:
+        type: string
+      id:
+        type: integer
+      nickname:
+        type: string
+      slug:
+        type: string
+      snapshot:
+        $ref: '#/definitions/models.SentinelHostSnapshot'
+    type: object
+  api.sentinelHostView:
+    properties:
+      alerts:
+        items:
+          $ref: '#/definitions/service.AlertView'
+        type: array
+      services:
+        additionalProperties:
+          $ref: '#/definitions/models.SentinelServiceSnapshot'
+        type: object
+      snapshot:
+        $ref: '#/definitions/models.SentinelHostSnapshot'
+      status:
+        $ref: '#/definitions/service.SentinelStatus'
+    type: object
+  api.sentinelResponse:
+    properties:
+      available:
+        type: boolean
+      data: {}
+      detail:
+        type: string
+      reason:
+        type: string
     type: object
   api.serviceUpdateContainerRequest:
     properties:
@@ -2906,6 +3091,39 @@ definitions:
       lifetime:
         type: integer
     type: object
+  llm.ChatMessage:
+    properties:
+      content:
+        type: string
+      role:
+        description: '"system", "user", "assistant", "tool"'
+        type: string
+      tool_call_id:
+        description: 'ToolCallID: on a "tool" turn, the call this result answers.'
+        type: string
+      tool_calls:
+        description: 'ToolCalls: an assistant turn asking for tools (its Content may
+          be empty).'
+        items:
+          $ref: '#/definitions/llm.ToolCall'
+        type: array
+    type: object
+  llm.ToolCall:
+    properties:
+      function:
+        properties:
+          arguments:
+            description: JSON object, as text
+            type: string
+          name:
+            type: string
+        type: object
+      id:
+        type: string
+      type:
+        description: '"function"'
+        type: string
+    type: object
   models.APICatalog:
     properties:
       admin_base_url:
@@ -3131,11 +3349,19 @@ definitions:
     type: object
   models.AlertThresholds:
     properties:
+      latency_p95_critical:
+        type: integer
+      latency_p95_warning:
+        type: integer
       resource_critical:
         type: integer
       resource_info_low:
         type: integer
       resource_warning:
+        type: integer
+      traffic_5xx_critical:
+        type: integer
+      traffic_5xx_warning:
         type: integer
     type: object
   models.AppSettings:
@@ -3935,6 +4161,78 @@ definitions:
     x-enum-varnames:
     - SecretVisibilityPersonal
     - SecretVisibilityShared
+  models.SentinelHostSnapshot:
+    properties:
+      cpu_avg_24h:
+        type: number
+      cpu_p95_24h:
+        type: number
+      detail:
+        type: string
+      disk_pct:
+        type: number
+      host_id:
+        type: integer
+      last_push_at:
+        type: string
+      load1:
+        type: number
+      mem_p95_24h:
+        type: number
+      metrics_enabled:
+        type: boolean
+      push_ok:
+        type: boolean
+      state:
+        type: string
+      synced_at:
+        type: string
+      traffic_enabled:
+        type: boolean
+    type: object
+  models.SentinelServiceSnapshot:
+    properties:
+      container_health:
+        type: string
+      container_state:
+        type: string
+      cpu_pct:
+        type: number
+      host_id:
+        type: integer
+      mem_pct:
+        type: number
+      p50_ms:
+        type: number
+      p95_ms:
+        type: number
+      p99_ms:
+        type: number
+      prev_restart_count:
+        type: integer
+      req_24h:
+        type: integer
+      restart_count:
+        type: integer
+      s4xx_24h:
+        type: integer
+      s5xx_24h:
+        type: integer
+      service_id:
+        type: integer
+      service_name:
+        description: ServiceName is read-only (joined from services).
+        type: string
+      synced_at:
+        type: string
+      traefik_bypass:
+        description: |-
+          TraefikBypass: the service has traffic through the proxy and also
+          publishes a host port, so the counts miss whatever uses the port.
+        type: boolean
+      visitors_24h:
+        type: integer
+    type: object
   models.Service:
     properties:
       container_id:
@@ -4121,6 +4419,17 @@ definitions:
       title:
         type: string
       url:
+        type: string
+    type: object
+  sentinel.PushStatus:
+    properties:
+      consecutive_failures:
+        type: integer
+      last_attempt_at:
+        type: string
+      last_error:
+        type: string
+      last_success_at:
         type: string
     type: object
   service.AlertView:
@@ -4415,6 +4724,12 @@ definitions:
         type: string
       scan_resources:
         $ref: '#/definitions/service.ScanResources'
+      sentinel:
+        allOf:
+        - $ref: '#/definitions/models.SentinelHostSnapshot'
+        description: |-
+          Sentinel is the latest Sentinel sync of the host, kept apart from the
+          scan (ScanRes); nil when never synced.
       services_count:
         type: integer
       setor_responsavel:
@@ -4558,6 +4873,48 @@ definitions:
       storage:
         type: string
     type: object
+  service.SentinelStatus:
+    properties:
+      available:
+        type: boolean
+      detail:
+        type: string
+      metrics:
+        type: boolean
+      push:
+        $ref: '#/definitions/sentinel.PushStatus'
+      reason:
+        type: string
+      traffic:
+        type: boolean
+      version:
+        type: string
+    type: object
+  service.SentinelSyncHost:
+    properties:
+      detail:
+        type: string
+      host_id:
+        type: integer
+      nickname:
+        type: string
+      services:
+        description: service snapshots written
+        type: integer
+      slug:
+        type: string
+      state:
+        type: string
+    type: object
+  service.SentinelSyncReport:
+    properties:
+      hosts:
+        items:
+          $ref: '#/definitions/service.SentinelSyncHost'
+        type: array
+      ok:
+        type: integer
+    type: object
   service.ServiceDetail:
     properties:
       dependent_ids:
@@ -4695,6 +5052,12 @@ definitions:
         type: integer
       repository_url:
         type: string
+      sentinel:
+        allOf:
+        - $ref: '#/definitions/models.SentinelServiceSnapshot'
+        description: |-
+          Sentinel is the service's latest Sentinel sync (traffic + container),
+          kept apart from the scan's fields; nil when never matched.
       service_kind:
         description: |-
           ServiceKind is the category (database, cache, queue, web, proxy, runtime,
@@ -5244,8 +5607,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Requires permission ai.use. Returns {response}. 503 when the LLM
-        is not configured.
+      description: 'Requires permission ai.use. Body {message, history?: [{role: user|assistant,
+        content}]} (last 20 turns kept). The model may call entidade-scoped search
+        tools and draft issue/chamado proposals (never executed server-side). Returns
+        {response, tools, steps, refs, proposals}. 503 when the LLM is not configured.'
       parameters:
       - description: User message
         in: body
@@ -5259,9 +5624,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/api.aiChatResult'
         "400":
           description: Bad Request
           schema:
@@ -5826,6 +6189,56 @@ paths:
       summary: Rotate a Keycloak key's secret
       tags:
       - atlas
+  /api/api-catalog/{id}/keys/{keyId}/test:
+    post:
+      consumes:
+      - application/json
+      description: 'apis.keys.manage. Bridge reads the client''s secret from Keycloak,
+        asks for a token with the key''s scopes and calls the API''s base URL (normally
+        the gateway) with it. The token and the secret are never returned. Default:
+        a path no API has, so a 404 from the API proves the gateway took the token
+        and nothing runs; "path" calls a real GET route instead (relative to the base
+        URL), which also tests the route''s scope. "missing" lists scopes Bridge has
+        on the key but the token lacks; "answered_by" tells the gateway''s refusal
+        from the API''s. Always 200 with the verdict in "ok".'
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Key ID
+        in: path
+        name: keyId
+        required: true
+        type: integer
+      - description: Optional real route
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/api.keyTestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.keyTestResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Test a Keycloak key through the gateway
+      tags:
+      - atlas
   /api/api-catalog/{id}/keys/{keyId}/usage:
     get:
       description: Any role that can see the API. Lifetime and per-day counts ("YYYY-MM-DD"
@@ -5994,6 +6407,39 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Create the API's scopes in Keycloak
+      tags:
+      - atlas
+  /api/api-catalog/{id}/keys/test:
+    post:
+      description: 'apis.keys.manage. The default test (token + gateway, no real route:
+        a batch must not fire one query per key) on every active or in-grace Keycloak
+        key of the API, 4 at a time.'
+      parameters:
+      - description: API catalog ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.keyTestBatchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Test every key of an API through the gateway
       tags:
       - atlas
   /api/api-catalog/{id}/refetch:
@@ -6513,6 +6959,49 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Current user
+      tags:
+      - auth
+  /api/auth/me/home:
+    get:
+      description: 'Any role. The caller''s home page preferences: a JSON object owned
+        by the frontend, {} when never set.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Current user's home preferences
+      tags:
+      - auth
+    put:
+      consumes:
+      - application/json
+      description: Any role. Replaces the whole document (it has one owner, so no
+        partial merge). Body must be a JSON object of at most 8 KB.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Replace the current user's home preferences
       tags:
       - auth
   /api/auth/oauth/{provider}/authorize:
@@ -10184,6 +10673,100 @@ paths:
       summary: Restore a host from the trash
       tags:
       - hosts
+  /api/hosts/{slug}/sentinel:
+    get:
+      description: Any role. Probes the host's Coolify Sentinel live (never cached)
+        and returns it with the last sync's snapshots and the alerts they raise.
+      parameters:
+      - description: Host oficial slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.sentinelHostView'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Host Sentinel status
+      tags:
+      - sentinel
+  /api/hosts/{slug}/sentinel/containers:
+    get:
+      description: Any role. Every live container Sentinel sees on the host — state,
+        health, restarts, CPU (percent of one core) and memory — each linked to its
+        Bridge service when one matches.
+      parameters:
+      - description: Host oficial slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.sentinelResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Host containers (live)
+      tags:
+      - sentinel
+  /api/hosts/{slug}/sentinel/metrics:
+    get:
+      description: Any role. Host CPU / memory (percent) and 1-minute load from Sentinel,
+        downsampled to ≤500 points, plus the latest sample. Answers {available:false,
+        reason} when Sentinel can't be read.
+      parameters:
+      - description: Host oficial slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: 1h | 24h (default) | 7d
+        in: query
+        name: range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.sentinelResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Host metrics history
+      tags:
+      - sentinel
   /api/hosts/trash:
     get:
       description: Any role.
@@ -12824,6 +13407,55 @@ paths:
       summary: List trashed secrets
       tags:
       - secrets
+  /api/sentinel/hosts:
+    get:
+      description: Admin. Every host linked to a Coolify server and its last Sentinel
+        sync (snapshot null = never synced).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-api_sentinelHostRow'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Coolify-linked hosts with their Sentinel state
+      tags:
+      - sentinel
+  /api/sentinel/sync:
+    post:
+      description: Admin. Reads every Coolify-linked host's Sentinel (4 at a time)
+        and stores the host and service snapshots lists sort on and alerts read. A
+        host that can't be read records why; it never fails the sync.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/service.SentinelSyncReport'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Sync Sentinel snapshots
+      tags:
+      - sentinel
   /api/services:
     get:
       description: Any role. Visible services, enriched with their relations. Paginated
@@ -13220,6 +13852,122 @@ paths:
       summary: Restore a service from the trash
       tags:
       - services
+  /api/services/{id}/sentinel/resources:
+    get:
+      description: Any role. CPU (percent of one core) and memory (percent) history
+        of the service's live container. container is empty when none matches.
+      parameters:
+      - description: Service id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 1h | 24h (default) | 7d
+        in: query
+        name: range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.sentinelResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Service container metrics
+      tags:
+      - sentinel
+  /api/services/{id}/sentinel/traffic:
+    get:
+      description: Any role. Requests, status classes, latency percentiles, a status-class
+        series and top paths for the service, summed over the Sentinel app keys (Traefik
+        routers) that belong to it. keys is empty when no traffic goes through the
+        proxy.
+      parameters:
+      - description: Service id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 24h (default) | 7d | 30d
+        in: query
+        name: range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.sentinelResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Service traffic
+      tags:
+      - sentinel
+  /api/services/{id}/sentinel/traffic/breakdown/{dim}:
+    get:
+      description: Any role. Top values of one dimension (status, method, country,
+        referer, browser, os, device, protocol, scheme, tls, cache, bot). Visitor-identifying
+        dimensions (ip, user agent) are not exposed.
+      parameters:
+      - description: Service id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Dimension
+        in: path
+        name: dim
+        required: true
+        type: string
+      - description: 24h (default) | 7d | 30d
+        in: query
+        name: range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.sentinelResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Service traffic by dimension
+      tags:
+      - sentinel
   /api/services/trash:
     get:
       description: Any role.
@@ -13266,7 +14014,8 @@ paths:
     put:
       consumes:
       - application/json
-      description: Admin. Resource thresholds must be between 0 and 100.
+      description: 'Admin. Partial: omitted fields keep their value. Percent thresholds
+        (resource, 5xx) must be between 0 and 100; latency (ms) must be ≥ 0.'
       parameters:
       - description: Alert thresholds
         in: body

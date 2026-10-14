@@ -23,22 +23,7 @@ type coolifyHandlers struct {
 }
 
 func (h *coolifyHandlers) getClient() (*coolify.Client, error) {
-	get := func(key string) string { return store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), key) }
-
-	if get("coolify_enabled") != "true" {
-		return nil, fmt.Errorf("coolify integration is not enabled")
-	}
-
-	baseURL := get("coolify_base_url")
-	apiToken, ok, err := store.NewAppSecretRepo(h.db.SQL).Reveal(context.Background(), h.db.Encryptor, "coolify_api_token")
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt coolify token: %w", err)
-	}
-	if !ok || baseURL == "" {
-		return nil, fmt.Errorf("coolify integration is not configured")
-	}
-
-	return coolify.NewClient(baseURL, apiToken), nil
+	return service.CoolifyClient(context.Background(), h.db)
 }
 
 func (h *coolifyHandlers) logOp(r *http.Request, hostID int64, opType, status, output string) {
@@ -299,7 +284,7 @@ func (h *coolifyHandlers) handleRegisterHost(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	privateKeyUUID, err := client.EnsurePrivateKey(privKey, keyName, description)
+	privateKeyUUID, _, err := client.EnsurePrivateKey(privKey, keyName, description)
 	if err != nil {
 		h.logOp(r, host.ID, "coolify-register", "failed", "key upload: "+err.Error())
 		jsonError(w, http.StatusBadGateway, "failed to upload key to coolify: "+err.Error())
@@ -433,7 +418,7 @@ func (h *coolifyHandlers) handleUpdateServerKey(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	privateKeyUUID, err := client.EnsurePrivateKey(privKey, keyName, description)
+	privateKeyUUID, _, err := client.EnsurePrivateKey(privKey, keyName, description)
 	if err != nil {
 		h.logOp(r, host.ID, "coolify-update-key", "failed", "key upload: "+err.Error())
 		jsonError(w, http.StatusBadGateway, "failed to upload key to coolify: "+err.Error())
@@ -640,7 +625,6 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	privKeyText := key.PrivateKeyPEM
 
 	client, err := h.getClient()
 	if err != nil {
@@ -648,29 +632,15 @@ func (h *coolifyHandlers) handleSyncKey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	keyName := fmt.Sprintf("sshcm-%s", strings.ReplaceAll(key.Name, " ", "_"))
-	uuid, createErr := client.CreatePrivateKey(coolify.CreateKeyRequest{
-		Name:        keyName,
-		Description: fmt.Sprintf("Managed by SSHCM — %s", key.Name),
-		PrivateKey:  privKeyText,
-	})
-	if createErr != nil {
-		// Already exists — find it by fingerprint
-		if strings.Contains(createErr.Error(), "422") || strings.Contains(createErr.Error(), "already exists") {
-			fp := strings.TrimPrefix(key.Fingerprint(), "SHA256:")
-			coolifyKeys, _ := client.ListPrivateKeys()
-			for _, ck := range coolifyKeys {
-				if fp != "" && ck.Fingerprint == fp {
-					jsonOK(w, map[string]any{"uuid": ck.UUID, "name": ck.Name, "already_existed": true})
-					return
-				}
-			}
-		}
-		jsonError(w, http.StatusBadGateway, "failed to upload key: "+createErr.Error())
+	// Same name and lookup as register/key-swap, so one vault key is one Coolify key.
+	keyName := coolifyManagedKeyName(key.Name)
+	uuid, existed, err := client.EnsurePrivateKey(key.PrivateKeyPEM, keyName, fmt.Sprintf("Managed by SSHCM key %q", key.Name))
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "failed to upload key: "+err.Error())
 		return
 	}
 
-	jsonOK(w, map[string]any{"uuid": uuid, "name": keyName, "already_existed": false})
+	jsonOK(w, map[string]any{"uuid": uuid, "name": keyName, "already_existed": existed})
 }
 
 // handleDNSSync pulls every application/service domain from Coolify into

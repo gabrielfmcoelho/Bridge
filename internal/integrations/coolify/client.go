@@ -149,6 +149,16 @@ func (c *Client) GetServer(uuid string) (*Server, error) {
 	return &s, json.Unmarshal(data, &s)
 }
 
+// GetSentinel returns a server's Sentinel settings, token included.
+func (c *Client) GetSentinel(uuid string) (*SentinelSettings, error) {
+	data, _, err := c.do("GET", "/servers/"+uuid+"/sentinel", nil)
+	if err != nil {
+		return nil, err
+	}
+	var s SentinelSettings
+	return &s, json.Unmarshal(data, &s)
+}
+
 // CreateServer creates a new server and returns its UUID.
 func (c *Client) CreateServer(req CreateServerRequest) (string, error) {
 	data, _, err := c.do("POST", "/servers", req)
@@ -166,7 +176,7 @@ func (c *Client) CreateServer(req CreateServerRequest) (string, error) {
 
 // ValidateServer triggers async validation of a server.
 func (c *Client) ValidateServer(uuid string) error {
-	_, _, err := c.do("GET", "/servers/"+uuid+"/validate", nil)
+	_, _, err := c.do("POST", "/servers/"+uuid+"/validate", nil)
 	return err
 }
 

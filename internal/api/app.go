@@ -55,6 +55,7 @@ type App struct {
 	grafana             *grafanaHandlers
 	grafanaWebhook      *grafanaWebhookHandlers
 	telemetry           *telemetryHandlers
+	sentinel            *sentinelHandlers
 	outline             *outlineHandlers
 	glpi                *glpiHandlers
 	entidade            *entidadeHandlers
@@ -113,6 +114,7 @@ func newApp(db *database.DB, configPath string) *App {
 		grafana:             &grafanaHandlers{db: db},
 		grafanaWebhook:      &grafanaWebhookHandlers{db: db},
 		telemetry:           &telemetryHandlers{db: db},
+		sentinel:            &sentinelHandlers{db: db, sentinel: deps.Sentinel},
 		outline:             &outlineHandlers{db: db},
 		glpi:                &glpiHandlers{db: db, cache: glpiclient.NewSessionCache(30 * time.Minute)},
 		entidade:            newEntidadeHandlers(db),

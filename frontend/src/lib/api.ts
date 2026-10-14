@@ -405,6 +405,9 @@ export const authAPI = {
     api.post<{ user: unknown; token: string }>("/api/auth/login", data),
   logout: () => api.post("/api/auth/logout"),
   me: () => api.get<import("./types").User>("/api/auth/me"),
+  // Home page preferences: an opaque JSON object, {} until onboarding (app/_home/homeModel.ts).
+  homePrefs: () => api.get<unknown>("/api/auth/me/home"),
+  setHomePrefs: (prefs: object) => api.put<unknown>("/api/auth/me/home", prefs),
 };
 
 // R4 list envelope: { data: [...], meta: { page, per_page, total } }.
@@ -554,7 +557,8 @@ export const backupAPI = {
 // Alert Settings
 export const alertSettingsAPI = {
   get: () => api.get<import("./types").AlertThresholds>("/api/settings/alerts"),
-  update: (data: import("./types").AlertThresholds) =>
+  /** Partial: omitted thresholds keep their value. */
+  update: (data: Partial<import("./types").AlertThresholds>) =>
     api.put<import("./types").AlertThresholds>("/api/settings/alerts", data),
 };
 
@@ -1086,6 +1090,11 @@ export const apiKeysAPI = {
     api.post<{ created: number; total: number }>(`/api/api-catalog/${apiId}/keys/sync-scopes`, {}),
   usage: (apiId: number, keyId: number) =>
     api.get<import("./types").ApiKeyUsage>(`/api/api-catalog/${apiId}/keys/${keyId}/usage`),
+  /** path: a real GET route relative to the API's base URL; omitted = the no-query default */
+  test: (apiId: number, keyId: number, path?: string) =>
+    api.post<import("./types").ApiKeyTestResult>(`/api/api-catalog/${apiId}/keys/${keyId}/test`, path ? { path } : {}),
+  testAll: (apiId: number) =>
+    api.post<import("./types").ApiKeyTestBatch>(`/api/api-catalog/${apiId}/keys/test`, {}),
   setManagement: (apiId: number, data: KeyManagementPayload) =>
     api.put<import("./types").ApiCatalog>(`/api/api-catalog/${apiId}/key-management`, data),
   testManagement: (apiId: number, data: Partial<KeyManagementPayload>) =>
@@ -1388,8 +1397,11 @@ export const aiAPI = {
     api.post<{ description: string }>("/api/ai/assist/issue", { summary, context }),
   assistHostDoc: (hostSlug: string) =>
     api.post<{ documentation: string }>("/api/ai/assist/host-doc", { host_slug: hostSlug }),
-  chat: (message: string) =>
-    api.post<{ response: string }>("/api/ai/chat", { message }),
+  /** `history`: the conversation so far, oldest first (the server keeps the last 20 turns).
+   *  `signal` cancels the request (the assistant's stop button). */
+  // The model may search the inventory (entidade-scoped) for a few rounds, hence the longer timeout.
+  chat: (message: string, history: { role: "user" | "assistant"; content: string }[] = [], signal?: AbortSignal) =>
+    request<import("./types").AiChatResponse>("/api/ai/chat", { method: "POST", body: JSON.stringify({ message, history }), signal }, 180_000),
   /** Turns a free-text description into a draft answer set for one offering's
    *  form_schema. The server coerces the model's reply through that schema, so
    *  anything returned here already satisfies the field types and rules. */
@@ -1920,6 +1932,29 @@ export const telemetryAPI = {
     api.get<TelemetrySpans>(`/api/telemetry/spans?${telemetryQuery(kind, id, { range, ...f })}`),
   trace: (kind: TelemetryKind, id: string | number, traceId: string) =>
     api.get<TelemetryTrace>(`/api/telemetry/traces/${encodeURIComponent(traceId)}?${telemetryQuery(kind, id, {})}`),
+};
+
+// Coolify Sentinel: live reads go through the host's SSH connection, so a
+// "Sentinel can't be read" answer is a 200 {available:false, reason}.
+export type SentinelMetricsRange = "1h" | "24h" | "7d";
+export type SentinelTrafficRange = "24h" | "7d" | "30d";
+export const sentinelAPI = {
+  hostStatus: (slug: string) => api.get<import("./types").SentinelHostView>(`/api/hosts/${slug}/sentinel`),
+  hostMetrics: (slug: string, range: SentinelMetricsRange) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelHostMetrics>>(`/api/hosts/${slug}/sentinel/metrics?range=${range}`),
+  hostContainers: (slug: string) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelContainer[]>>(`/api/hosts/${slug}/sentinel/containers`),
+  serviceTraffic: (id: number, range: SentinelTrafficRange) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelServiceTraffic>>(`/api/services/${id}/sentinel/traffic?range=${range}`),
+  serviceBreakdown: (id: number, dim: string, range: SentinelTrafficRange) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelBreakdownRow[]>>(
+      `/api/services/${id}/sentinel/traffic/breakdown/${encodeURIComponent(dim)}?range=${range}`,
+    ),
+  serviceResources: (id: number, range: SentinelMetricsRange) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelServiceResources>>(`/api/services/${id}/sentinel/resources?range=${range}`),
+  hosts: () => api.getList<import("./types").SentinelHostRow>("/api/sentinel/hosts"),
+  // Visits every Coolify host over SSH, 4 at a time: can outlive the 120s default.
+  sync: () => request<import("./types").SentinelSyncReport>("/api/sentinel/sync", { method: "POST" }, 10 * 60_000),
 };
 
 // Coolify integration

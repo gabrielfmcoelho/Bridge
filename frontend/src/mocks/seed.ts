@@ -916,6 +916,7 @@ export function seed(): Seed {
       { id: 1, name: "Cluster SEAD 1", base_url: "https://pve1.sead.pi.gov.br:8006", token_id: "bridge@pve!sync", has_token: true, token: "mock", skip_verify: true, enabled: true, created_at: "2026-09-01T10:00:00Z", updated_at: "2026-09-01T10:00:00Z" },
       { id: 2, name: "Cluster SEAD 2", base_url: "https://pve2.sead.pi.gov.br:8006", token_id: "bridge@pve!sync", has_token: true, token: "mock", skip_verify: true, enabled: false, created_at: "2026-09-02T10:00:00Z", updated_at: "2026-09-02T10:00:00Z" },
     ],
+    homePrefs: {},
   };
 }
 

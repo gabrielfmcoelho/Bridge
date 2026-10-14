@@ -23,12 +23,13 @@ import HostProfile from "./_components/HostProfile";
 import ScanPane from "./_components/ScanPane";
 import MetricsTab from "./_components/MetricsTab";
 import RequestsTab, { useTelemetryEnabled } from "@/components/telemetry/RequestsTab";
+import HostSentinelTab from "@/components/sentinel/HostSentinelTab";
 import IssuesTab from "./IssuesTab";
 import SSHConfigDrawer from "./_components/SSHConfigDrawer";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
-type TabKey = "overview" | "operations" | "alerts" | "topology" | "metrics" | "requests";
+type TabKey = "overview" | "operations" | "alerts" | "topology" | "metrics" | "requests" | "sentinel";
 
 export default function HostDetail({ slug }: { slug: string }) {
   const { t, locale } = useLocale();
@@ -107,6 +108,8 @@ export default function HostDetail({ slug }: { slug: string }) {
     staleTime: 60_000,
   });
   const grafanaEnabled = integrations?.grafana?.grafana_enabled === "true";
+  // Settings are admin-only: other roles see the tab and get the "disabled" reason inside.
+  const sentinelEnabled = integrations ? integrations.sentinel?.sentinel_enabled === "true" : true;
   const telemetryEnabled = useTelemetryEnabled();
 
   const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
@@ -115,6 +118,7 @@ export default function HostDetail({ slug }: { slug: string }) {
     { key: "alerts" as TabKey, label: t("host.tabTracking"), icon: tabIcons.alerts, badge: issuesTabBadge || undefined },
     { key: "topology", label: t("host.tabTopology"), icon: tabIcons.topology },
     ...(telemetryEnabled ? [{ key: "requests" as TabKey, label: t("telemetry.tab"), icon: ICON_PATHS.clock }] : []),
+    ...(sentinelEnabled && data?.host.coolify_server_uuid ? [{ key: "sentinel" as TabKey, label: "Sentinel", icon: ICON_PATHS.bolt }] : []),
     ...(grafanaEnabled ? [{ key: "metrics" as TabKey, label: t("host.tabMetrics"), icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" }] : []),
   ];
 
@@ -240,6 +244,7 @@ export default function HostDetail({ slug }: { slug: string }) {
           {/* ═══ METRICS TAB ═══ */}
           {activeTab === "metrics" && grafanaEnabled && <MetricsTab slug={slug} />}
           {activeTab === "requests" && telemetryEnabled && <RequestsTab kind="host" id={slug} />}
+          {activeTab === "sentinel" && <HostSentinelTab slug={slug} />}
           </PageHeader>
         </div>
       ) : null}

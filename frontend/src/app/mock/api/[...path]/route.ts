@@ -303,6 +303,15 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   if (method === "GET" && p === "auth/me") {
     return json(currentUser());
   }
+  if (p === "auth/me/home") {
+    if (method === "GET") return json(db.homePrefs[currentUser().id] ?? {});
+    if (method === "PUT") {
+      const body = await readJSON<unknown>(request);
+      if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "home preferences must be a JSON object" }, 400);
+      db.homePrefs[currentUser().id] = body;
+      return json(body);
+    }
+  }
   if (method === "GET" && p === "settings/appearance") {
     return json({ app_name: "Bridge", app_color: "#6366f1", app_logo: "" });
   }

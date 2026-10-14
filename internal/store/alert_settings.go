@@ -8,8 +8,8 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 )
 
-// AlertSettingsRepo owns the alert-threshold slice of app_settings (the three
-// alert_resource_* keys). It is a focused repo over a handful of key/value
+// AlertSettingsRepo owns the alert-threshold slice of app_settings (the
+// alert_resource_*, alert_traffic_* and alert_latency_* keys). It is a focused repo over a handful of key/value
 // rows rather than a dedicated table.
 type AlertSettingsRepo struct {
 	db *sql.DB
@@ -21,9 +21,10 @@ func NewAlertSettingsRepo(db *sql.DB) *AlertSettingsRepo { return &AlertSettings
 // GetThresholds reads the alert thresholds, falling back to sane defaults for
 // any key that is absent or unparseable.
 func (r *AlertSettingsRepo) GetThresholds(ctx context.Context) (*models.AlertThresholds, error) {
-	t := &models.AlertThresholds{ResourceCritical: 80, ResourceWarning: 60, ResourceInfoLow: 5}
+	d := models.DefaultAlertThresholds()
+	t := &d
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT key, value FROM app_settings WHERE key IN ('alert_resource_critical', 'alert_resource_warning', 'alert_resource_info_low')`)
+		`SELECT key, value FROM app_settings WHERE key LIKE 'alert\_%'`)
 	if err != nil {
 		return t, err
 	}
@@ -44,12 +45,20 @@ func (r *AlertSettingsRepo) GetThresholds(ctx context.Context) (*models.AlertThr
 			t.ResourceWarning = n
 		case "alert_resource_info_low":
 			t.ResourceInfoLow = n
+		case "alert_traffic_5xx_warning":
+			t.Traffic5xxWarning = n
+		case "alert_traffic_5xx_critical":
+			t.Traffic5xxCritical = n
+		case "alert_latency_p95_warning":
+			t.LatencyP95Warning = n
+		case "alert_latency_p95_critical":
+			t.LatencyP95Critical = n
 		}
 	}
 	return t, rows.Err()
 }
 
-// UpdateThresholds upserts the three threshold keys atomically.
+// UpdateThresholds upserts every threshold key atomically.
 func (r *AlertSettingsRepo) UpdateThresholds(ctx context.Context, t *models.AlertThresholds) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -72,6 +81,10 @@ func (r *AlertSettingsRepo) UpdateThresholds(ctx context.Context, t *models.Aler
 		{"alert_resource_critical", t.ResourceCritical},
 		{"alert_resource_warning", t.ResourceWarning},
 		{"alert_resource_info_low", t.ResourceInfoLow},
+		{"alert_traffic_5xx_warning", t.Traffic5xxWarning},
+		{"alert_traffic_5xx_critical", t.Traffic5xxCritical},
+		{"alert_latency_p95_warning", t.LatencyP95Warning},
+		{"alert_latency_p95_critical", t.LatencyP95Critical},
 	} {
 		if _, err := stmt.ExecContext(ctx, kv.k, strconv.Itoa(kv.v)); err != nil {
 			return err

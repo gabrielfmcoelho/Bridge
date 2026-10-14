@@ -115,9 +115,11 @@ func (r *TagRepo) Remove(ctx context.Context, entityType string, entityID int64,
 	return err
 }
 
+// scanStrings reads one string column. No rows is an empty slice, never nil,
+// so it serializes as [] — the frontend reads .length on these lists.
 func scanStrings(rows *sql.Rows) ([]string, error) {
 	defer rows.Close()
-	var out []string
+	out := []string{}
 	for rows.Next() {
 		var s string
 		if err := rows.Scan(&s); err != nil {

@@ -133,6 +133,8 @@ export interface Host {
   projects_count?: number;
   can_compile?: boolean;
   alerts?: HostAlert[];
+  /** Latest Coolify Sentinel sync, kept apart from the scan (list only). */
+  sentinel?: SentinelHostSnapshot | null;
   responsaveis?: HostResponsavel[];
   chamados?: HostChamado[];
   main_responsavel_name?: string;
@@ -161,9 +163,17 @@ export interface AlertThresholds {
   resource_critical: number;
   resource_warning: number;
   resource_info_low: number;
+  /** Sentinel: share of requests answered 5xx in 24h (percent). */
+  traffic_5xx_warning: number;
+  traffic_5xx_critical: number;
+  /** Sentinel: p95 latency in 24h (ms). */
+  latency_p95_warning: number;
+  latency_p95_critical: number;
 }
 
-export type SortField = "nickname" | "hostname" | "hospedagem" | "containers_count" | "resource_cpu" | "resource_ram" | "resource_disk" | "situacao";
+export type SortField =
+  | "nickname" | "hostname" | "hospedagem" | "containers_count" | "resource_cpu" | "resource_ram" | "resource_disk" | "situacao"
+  | "sentinel_cpu" | "sentinel_ram" | "sentinel_disk";
 
 export interface HostSortConfig {
   field: SortField;
@@ -330,6 +340,8 @@ export interface Service {
   main_responsavel_name?: string;
   /** List endpoint: open issues. */
   issues_count?: number;
+  /** List endpoint: latest Coolify Sentinel sync (traffic + container). */
+  sentinel?: SentinelServiceSnapshot | null;
   responsaveis?: EntityResponsavel[];
 }
 
@@ -700,6 +712,33 @@ export interface ApiKeyUsage {
   daily: Record<string, number>;
 }
 
+/** POST /api/api-catalog/{id}/keys/{keyId}/test: one key's verdict. */
+export interface ApiKeyTestResult {
+  key_id: number;
+  label: string;
+  client_id: string;
+  ok: boolean;
+  token_ok: boolean;
+  token_error?: string;
+  granted: string[];
+  /** in Bridge's list, absent from the token */
+  missing: string[];
+  rate_limit_per_minute?: number;
+  expires_in?: number;
+  url: string;
+  status?: number;
+  answered_by?: "gateway" | "api";
+  /** start of an error answer (never of a 2xx one) */
+  body?: string;
+  error?: string;
+}
+
+export interface ApiKeyTestBatch {
+  results: ApiKeyTestResult[];
+  total: number;
+  ok: number;
+}
+
 export interface OperationSearchResult {
   api_id: number;
   api_name: string;
@@ -1048,4 +1087,209 @@ export interface CatalogHit {
 export interface ProjectCoolifyLink {
   coolify_project: string;
   coolify_environment: string;
+}
+
+// ── Assistant (POST /api/ai/chat) ──────────────────────────────────────────
+
+/** A Bridge page a tool result pointed to; cited in the answer as a markdown link. */
+export interface AiRef { type: string; id: string; label: string; href: string }
+
+/** One tool the model ran while answering (shown as a step in the thread). */
+export interface AiStep { tool: string; query?: string; count: number; error?: string }
+
+/** An action the model drafted; nothing happens until the user confirms it. */
+export interface AiProposal {
+  id: string;
+  kind: "issue" | "chamado";
+  title: string;
+  description: string;
+  priority?: string;
+  parent?: AiRef;
+  /** The issue's entity_type / entity_id for POST /api/issues. */
+  parent_type?: string;
+  parent_id?: number;
+  profile?: { id: number; name: string };
+  host_slug?: string;
+}
+
+export interface AiChatResponse {
+  response: string;
+  /** false: the model gateway rejected tools, so the answer didn't look at the data. */
+  tools?: boolean;
+  steps?: AiStep[];
+  refs?: AiRef[];
+  proposals?: AiProposal[];
+}
+
+/* ─── Coolify Sentinel ─── */
+
+/** Why Sentinel can't be read (i18n: sentinel.reason.<reason>). */
+export type SentinelReason =
+  | "ok" | "disabled" | "coolify_off" | "not_linked" | "ssh_config" | "ssh_failed" | "no_docker_access"
+  | "no_sentinel" | "no_tcp_forwarding" | "no_token" | "metrics_off" | "traffic_off" | "error";
+
+export interface SentinelHostSnapshot {
+  host_id: number;
+  state: SentinelReason;
+  detail?: string;
+  metrics_enabled: boolean;
+  traffic_enabled: boolean;
+  push_ok: boolean | null;
+  last_push_at: string | null;
+  cpu_avg_24h: number | null;
+  cpu_p95_24h: number | null;
+  mem_p95_24h: number | null;
+  disk_pct: number | null;
+  load1: number | null;
+  synced_at: string;
+}
+
+export interface SentinelServiceSnapshot {
+  service_id: number;
+  host_id: number;
+  req_24h: number | null;
+  s4xx_24h: number | null;
+  s5xx_24h: number | null;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  p99_ms: number | null;
+  visitors_24h: number | null;
+  container_state: string;
+  container_health: string;
+  restart_count: number | null;
+  prev_restart_count: number | null;
+  /** Percent of one core: can pass 100. */
+  cpu_pct: number | null;
+  mem_pct: number | null;
+  traefik_bypass: boolean;
+  synced_at: string;
+  service_name: string;
+}
+
+/** Every Sentinel read: the data, or why there is none. */
+export interface SentinelResponse<T> {
+  available: boolean;
+  reason?: SentinelReason;
+  detail?: string;
+  data?: T;
+}
+
+export interface SentinelPushStatus {
+  last_attempt_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  consecutive_failures: number;
+}
+
+export interface SentinelStatus {
+  available: boolean;
+  reason?: SentinelReason;
+  detail?: string;
+  metrics: boolean;
+  traffic: boolean;
+  version?: string;
+  push?: SentinelPushStatus;
+}
+
+export interface SentinelHostView {
+  status: SentinelStatus;
+  snapshot: SentinelHostSnapshot | null;
+  services: Record<string, SentinelServiceSnapshot>;
+  alerts: HostAlert[];
+}
+
+/** t = Unix ms. */
+export interface SentinelPoint {
+  t: number;
+  v: number;
+}
+
+export interface SentinelHostMetrics {
+  range: string;
+  cpu: SentinelPoint[];
+  memory: SentinelPoint[];
+  load: SentinelPoint[];
+  current: { cpu: number; memory: number; disk: number; load1: number; uptime_s: number; sample_at: number };
+}
+
+export interface SentinelContainer {
+  name: string;
+  state: string;
+  health: string;
+  restart_count: number;
+  cpu_pct: number | null;
+  mem_pct: number | null;
+  mem_used_bytes: number | null;
+  service_id?: number;
+  service_name?: string;
+}
+
+export interface SentinelStatusCounts {
+  s2xx: number;
+  s3xx: number;
+  s4xx: number;
+  s5xx: number;
+}
+
+export interface SentinelOverview {
+  requests: number;
+  bytes_in: number;
+  bytes_out: number;
+  status: SentinelStatusCounts;
+  latency: { p50: number; p95: number; p99: number };
+  unique_visitors: number;
+}
+
+export interface SentinelBucket extends SentinelStatusCounts {
+  bucket: number;
+  requests: number;
+  unique_visitors: number;
+  p95: number;
+}
+
+export interface SentinelPath {
+  path: string;
+  app: string;
+  requests: number;
+  bytes_out: number;
+  s4xx: number;
+  s5xx: number;
+  p50: number;
+  p95: number;
+}
+
+export interface SentinelServiceTraffic {
+  range: string;
+  /** Sentinel app keys (Traefik routers) matched; empty = no traffic through the proxy. */
+  keys: string[];
+  overview: SentinelOverview;
+  series: SentinelBucket[];
+  paths: SentinelPath[];
+}
+
+export interface SentinelBreakdownRow {
+  value: string;
+  requests: number;
+  bytes_out: number;
+}
+
+export interface SentinelServiceResources {
+  range: string;
+  /** "" = no live container matched. */
+  container: string;
+  cpu: SentinelPoint[];
+  memory: SentinelPoint[];
+}
+
+export interface SentinelSyncReport {
+  hosts: { host_id: number; slug: string; nickname: string; state: SentinelReason; detail?: string; services: number }[];
+  ok: number;
+}
+
+export interface SentinelHostRow {
+  id: number;
+  slug: string;
+  nickname: string;
+  hostname: string;
+  snapshot: SentinelHostSnapshot | null;
 }

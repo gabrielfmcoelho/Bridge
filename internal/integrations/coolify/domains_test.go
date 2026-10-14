@@ -13,7 +13,9 @@ func TestDomainRefs(t *testing.T) {
 		{"uuid":"a1","name":"bridge","fqdn":"http://Bridge.x.gov.br/api,https://bridge.x.gov.br","destination":{"server":{"uuid":"m","ip":"host.docker.internal"}}},
 		{"name":"api","fqdn":"http://api.x.gov.br:8080","destination":{"server":{"uuid":"s1","ip":"10.0.0.2"}}},
 		{"name":"nofqdn","fqdn":null,"destination":{"server":{"uuid":"s1","ip":"10.0.0.2"}}},
-		{"name":"sslip","fqdn":"http://abc.10.0.0.2.sslip.io","destination":{"server":{"uuid":"s1","ip":"10.0.0.2"}}}
+		{"name":"sslip","fqdn":"http://abc.10.0.0.2.sslip.io","destination":{"server":{"uuid":"s1","ip":"10.0.0.2"}}},
+		{"uuid":"c1","name":"airflow","fqdn":null,"docker_compose_domains":"{\"worker\":{\"domain\":\"\"},\"web\":{\"domain\":\"http:\\/\\/airflow.10.0.0.2.sslip.io\"}}","destination":{"server":{"uuid":"s1","ip":"10.0.0.2"}}},
+		{"uuid":"c2","name":"obj","docker_compose_domains":{"api":{"domain":"https://obj.x.gov.br"}},"destination":{"server":{"uuid":"s1","ip":"10.0.0.2"}}}
 	]`), &apps); err != nil {
 		t.Fatal(err)
 	}
@@ -27,6 +29,8 @@ func TestDomainRefs(t *testing.T) {
 		{Domain: "bridge.x.gov.br", HTTPS: true, ServerUUID: "m", ServerIP: "coolify.x.gov.br", Source: "bridge", ResourceUUID: "a1"},
 		{Domain: "api.x.gov.br", HTTPS: true, ServerUUID: "s1", ServerIP: "10.0.0.2", Source: "api"},
 		{Domain: "abc.10.0.0.2.sslip.io", ServerUUID: "s1", ServerIP: "10.0.0.2", Source: "sslip"},
+		{Domain: "airflow.10.0.0.2.sslip.io", ServerUUID: "s1", ServerIP: "10.0.0.2", Source: "airflow", ResourceUUID: "c1", Member: "web-c1"},
+		{Domain: "obj.x.gov.br", HTTPS: true, ServerUUID: "s1", ServerIP: "10.0.0.2", Source: "obj", ResourceUUID: "c2", Member: "api-c2"},
 		{Domain: "wiki.x.gov.br", HTTPS: true, ServerUUID: "s2", ServerIP: "10.0.0.3", Source: "wiki", ResourceUUID: "w1", Member: "outline-w1"},
 	}
 	if !reflect.DeepEqual(got, want) {

@@ -514,24 +514,6 @@ func (h *hostHandlers) handleGetPassword(w http.ResponseWriter, r *http.Request)
 	jsonOK(w, map[string]string{"password": password})
 }
 
-// resolveHostKeyPEM returns the decrypted private-key PEM for a host, read
-// directly from the encrypted blob stored on the host row. The filesystem is
-// never touched — this is what keeps key-auth working after a DB backup is
-// restored onto a machine where host.key_path no longer exists.
-func resolveHostKeyPEM(db *database.DB, host *models.Host) ([]byte, error) {
-	if host == nil {
-		return nil, fmt.Errorf("host has no stored private key — link an SSH key via the host editor")
-	}
-	key, ok, err := vault.HostGetSSHKey(context.Background(), db, host.ID)
-	if err != nil {
-		return nil, fmt.Errorf("load host key: %w", err)
-	}
-	if !ok || key.PrivateKeyPEM == "" {
-		return nil, fmt.Errorf("host has no stored private key — link an SSH key via the host editor")
-	}
-	return []byte(key.PrivateKeyPEM), nil
-}
-
 // registerRoutes wires this group's routes (self-registration, R2).
 func (h *hostHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/hosts", h.handleList)
