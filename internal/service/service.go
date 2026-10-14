@@ -54,6 +54,9 @@ type ServiceListItem struct {
 	DependsOnIDs        []int64  `json:"depends_on_ids"`
 	MainResponsavelName string   `json:"main_responsavel_name"`
 	IssuesCount         int      `json:"issues_count"` // open issues
+	// Sentinel is the service's latest Sentinel sync (traffic + container),
+	// kept apart from the scan's fields; nil when never matched.
+	Sentinel *models.SentinelServiceSnapshot `json:"sentinel,omitempty"`
 }
 
 // ServiceDetail is the full single-service view (service + relations).
@@ -110,6 +113,10 @@ func (s *ServiceService) List(ctx context.Context, f models.ServiceFilter) ([]Se
 	if err != nil {
 		return nil, err
 	}
+	sentinelSnaps, err := store.NewSentinelRepo(s.db).ServicesBulk(ctx, 0)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]ServiceListItem, len(services))
 	for i, svc := range services {
 		out[i] = ServiceListItem{
@@ -120,6 +127,9 @@ func (s *ServiceService) List(ctx context.Context, f models.ServiceFilter) ([]Se
 			DependsOnIDs:        depIDs[svc.ID],
 			MainResponsavelName: mainNames[svc.ID],
 			IssuesCount:         issueCounts[svc.ID],
+		}
+		if v, ok := sentinelSnaps[svc.ID]; ok {
+			out[i].Sentinel = &v
 		}
 	}
 	return out, nil

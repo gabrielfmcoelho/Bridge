@@ -94,6 +94,12 @@ var integrationGroups = map[string][]string{
 		"grafana_prom_remote_write_password",
 		"grafana_datasource_uid",
 	},
+	// Coolify Sentinel: read through each host's SSH connection with the
+	// token Coolify's API returns, so there's nothing secret to store here.
+	"sentinel": {
+		"sentinel_enabled",
+		"sentinel_cache_seconds",
+	},
 	"signoz": {
 		"signoz_enabled",
 		"signoz_ch_url",

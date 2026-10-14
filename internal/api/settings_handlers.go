@@ -144,7 +144,7 @@ func (h *settingsHandlers) handleGetAlertThresholds(w http.ResponseWriter, r *ht
 // handleUpdateAlertThresholds godoc
 //
 //	@Summary		Update alert thresholds
-//	@Description	Admin. Resource thresholds must be between 0 and 100.
+//	@Description	Admin. Partial: omitted fields keep their value. Percent thresholds (resource, 5xx) must be between 0 and 100; latency (ms) must be ≥ 0.
 //	@Tags			settings
 //	@Accept			json
 //	@Produce		json
@@ -155,18 +155,27 @@ func (h *settingsHandlers) handleGetAlertThresholds(w http.ResponseWriter, r *ht
 //	@Failure		403		{object}	httpx.ErrorResponse
 //	@Router			/api/settings/alerts [put]
 func (h *settingsHandlers) handleUpdateAlertThresholds(w http.ResponseWriter, r *http.Request) {
-	var req models.AlertThresholds
-	if err := decodeJSON(r, &req); err != nil {
+	repo := store.NewAlertSettingsRepo(h.db.SQL)
+	req, err := repo.GetThresholds(r.Context()) // decode over the current values: omitted fields keep them
+	if err != nil {
+		jsonServerError(w, r, "failed to load alert thresholds", err)
+		return
+	}
+	if err := decodeJSON(r, req); err != nil {
 		jsonBadRequest(w, r, "invalid JSON", err)
 		return
 	}
-	if req.ResourceCritical < 0 || req.ResourceCritical > 100 ||
-		req.ResourceWarning < 0 || req.ResourceWarning > 100 ||
-		req.ResourceInfoLow < 0 || req.ResourceInfoLow > 100 {
-		jsonError(w, http.StatusBadRequest, "threshold values must be between 0 and 100")
+	for _, pct := range []int{req.ResourceCritical, req.ResourceWarning, req.ResourceInfoLow, req.Traffic5xxWarning, req.Traffic5xxCritical} {
+		if pct < 0 || pct > 100 {
+			jsonError(w, http.StatusBadRequest, "percent thresholds must be between 0 and 100")
+			return
+		}
+	}
+	if req.LatencyP95Warning < 0 || req.LatencyP95Critical < 0 {
+		jsonError(w, http.StatusBadRequest, "latency thresholds must be 0 or more")
 		return
 	}
-	if err := store.NewAlertSettingsRepo(h.db.SQL).UpdateThresholds(r.Context(), &req); err != nil {
+	if err := repo.UpdateThresholds(r.Context(), req); err != nil {
 		jsonServerError(w, r, "failed to save alert thresholds", err)
 		return
 	}

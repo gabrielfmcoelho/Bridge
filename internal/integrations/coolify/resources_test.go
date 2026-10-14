@@ -6,6 +6,8 @@ func TestContainerKey(t *testing.T) {
 	cases := []struct{ name, key, uuid string }{
 		{"a1rwyyxk4rby396m4ooq4ubu-143303502430", "a1rwyyxk4rby396m4ooq4ubu", "a1rwyyxk4rby396m4ooq4ubu"},
 		{"airflow-scheduler-rtb37u69bbkepzukr9vclrd7-123344967269", "airflow-scheduler-rtb37u69bbkepzukr9vclrd7", "rtb37u69bbkepzukr9vclrd7"},
+		{"airflow-scheduler-rtb37u69bbkepzukr9vclrd7-20261013T214301", "airflow-scheduler-rtb37u69bbkepzukr9vclrd7", "rtb37u69bbkepzukr9vclrd7"},
+		{"flower-rtb37u69bbkepzukr9vclrd7-20261013t214301", "flower-rtb37u69bbkepzukr9vclrd7", "rtb37u69bbkepzukr9vclrd7"},
 		{"keycloak-rsul83d5es2xd6dxdvup5d98", "keycloak-rsul83d5es2xd6dxdvup5d98", "rsul83d5es2xd6dxdvup5d98"},
 		{"zwkg80s48g4gogko44o8gg4g", "zwkg80s48g4gogko44o8gg4g", "zwkg80s48g4gogko44o8gg4g"},
 		{"uvhib9msgy3z86l3ujdt20s9-proxy", "uvhib9msgy3z86l3ujdt20s9-proxy", "uvhib9msgy3z86l3ujdt20s9"},

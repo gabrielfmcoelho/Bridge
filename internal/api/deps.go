@@ -24,6 +24,8 @@ type Deps struct {
 	Project *service.ProjectService
 	Service *service.ServiceService
 	Host    *service.HostService
+	// Sentinel holds pooled SSH connections to Coolify's Sentinel agents.
+	Sentinel *service.SentinelService
 }
 
 // NewDeps wires the container from a database handle. Construction order:
@@ -36,5 +38,7 @@ func NewDeps(db *database.DB) *Deps {
 		Project: service.NewProjectService(db.SQL),
 		Service: service.NewServiceService(db.SQL),
 		Host:    service.NewHostService(db),
+		// Sentinel pools SSH connections: one instance for the whole process.
+		Sentinel: service.NewSentinelService(db),
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshconfig"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshkeys"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshsetup"
@@ -84,72 +85,21 @@ func (h *sshHandlers) requireUser(w http.ResponseWriter, host *models.Host) stri
 	return host.User
 }
 
-// resolveAuth builds an Auth for the given method. If method is empty, it picks
-// the best available method. Returns the resolved method name and Auth, or
-// writes an HTTP error and returns false.
+// resolveAuth builds an Auth for the given method (service.ResolveSSHAuth).
+// Returns the resolved method name and Auth, or writes an HTTP error and
+// returns false: 400 for the host's own settings, 500 otherwise.
 func (h *sshHandlers) resolveAuth(w http.ResponseWriter, host *models.Host, method string) (string, sshtest.Auth, bool) {
-	// Auto-select method if not specified
-	if method == "" {
-		switch {
-		case host.HasPassword && host.HasKey:
-			if host.PreferredAuth == "password" || host.PreferredAuth == "key" {
-				method = host.PreferredAuth
-			} else {
-				jsonError(w, http.StatusBadRequest, "host has both auth methods; set preferred auth or choose one")
-				return "", sshtest.Auth{}, false
-			}
-		case host.HasKey:
-			method = "key"
-		case host.HasPassword:
-			method = "password"
-		default:
-			jsonError(w, http.StatusBadRequest, "host has no password or key configured")
-			return "", sshtest.Auth{}, false
-		}
-	}
-
-	switch method {
-	case "password":
-		pw, ok, err := vault.HostGetPassword(context.Background(), h.db, host.ID)
-		if err != nil {
-			jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
-			return "", sshtest.Auth{}, false
-		}
-		if !ok {
-			jsonError(w, http.StatusBadRequest, "no password stored for this host")
-			return "", sshtest.Auth{}, false
-		}
-		return "password", sshtest.PasswordAuth(pw), true
-
-	case "key":
-		if !host.HasKey {
-			jsonError(w, http.StatusBadRequest, "no key configured for this host")
-			return "", sshtest.Auth{}, false
-		}
-		keyPEM, err := resolveHostKeyPEM(h.db, host)
-		if err != nil {
-			jsonError(w, http.StatusBadRequest, err.Error())
-			return "", sshtest.Auth{}, false
-		}
-		// Carry the password for sudo operations even with key auth — but
-		// only when the password actually works. If the last password test
-		// failed (or the password was never tested) the stored credential
-		// is likely stale, and feeding it to `sudo -S` makes every retry
-		// wait on PAM's ~3-second faildelay before falling through to the
-		// unprivileged path. Across the ~5 sudo sites in the capture
-		// (key-enum, cron user crontabs, passwd -Sa, sshd -T, …) that's
-		// enough cumulative slowdown to blow past the dev-proxy idle
-		// timeout and surface as a "socket hang up" / 500 to the user.
-		var pw string
-		if host.HasPassword && host.PasswordTestStatus != nil && *host.PasswordTestStatus == "success" {
-			pw, _, _ = vault.HostGetPassword(context.Background(), h.db, host.ID)
-		}
-		return "key", sshtest.KeyAuth(keyPEM, pw), true
-
-	default:
-		jsonError(w, http.StatusBadRequest, "method must be 'password' or 'key'")
+	m, auth, err := service.ResolveSSHAuth(context.Background(), h.db, host, method)
+	var cfgErr *service.SSHConfigError
+	if errors.As(err, &cfgErr) {
+		jsonError(w, http.StatusBadRequest, cfgErr.Msg)
 		return "", sshtest.Auth{}, false
 	}
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "failed to decrypt password")
+		return "", sshtest.Auth{}, false
+	}
+	return m, auth, true
 }
 
 // dial opens an SSH connection using the resolved auth. Returns the client or

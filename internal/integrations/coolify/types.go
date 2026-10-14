@@ -1,5 +1,7 @@
 package coolify
 
+import "encoding/json"
+
 // Server represents a Coolify server resource.
 type Server struct {
 	UUID        string `json:"uuid"`
@@ -10,6 +12,20 @@ type Server struct {
 	Port        int    `json:"port"`
 	IsReachable bool   `json:"is_reachable"`
 	IsUsable    bool   `json:"is_usable"`
+	Settings    struct {
+		IsMetricsEnabled          bool `json:"is_metrics_enabled"`
+		IsTrafficAnalyticsEnabled bool `json:"is_traffic_analytics_enabled"`
+	} `json:"settings"`
+}
+
+// SentinelSettings is GET /servers/{uuid}/sentinel. Token is the plain bearer
+// Sentinel checks (present only with the read:sensitive ability): never log
+// or store it.
+type SentinelSettings struct {
+	IsSentinelEnabled bool    `json:"is_sentinel_enabled"`
+	IsMetricsEnabled  bool    `json:"is_metrics_enabled"`
+	Token             string  `json:"sentinel_token"`
+	UpdatedAt         *string `json:"sentinel_updated_at"`
 }
 
 // PrivateKey represents a Coolify private key resource.
@@ -59,7 +75,11 @@ type Application struct {
 	EnvironmentID int64  `json:"environment_id"`
 	GitRepository string `json:"git_repository"`
 	GitBranch     string `json:"git_branch"`
-	Destination   struct {
+	// DockerComposeDomains maps a compose app's services to their domains
+	// ({"svc":{"domain":"https://a.x,http://b.x"}}). Coolify sends it as a
+	// JSON-encoded string; ComposeDomains decodes either form.
+	DockerComposeDomains json.RawMessage `json:"docker_compose_domains"`
+	Destination          struct {
 		Server ServerRef `json:"server"`
 	} `json:"destination"`
 }
@@ -110,4 +130,27 @@ type ServerRef struct {
 	UUID string `json:"uuid"`
 	Name string `json:"name"`
 	IP   string `json:"ip"`
+}
+
+// ComposeDomains returns each compose service's raw fqdn list. Empty for
+// non-compose apps or an undecodable value.
+func (a Application) ComposeDomains() map[string]string {
+	raw := a.DockerComposeDomains
+	var str string
+	if json.Unmarshal(raw, &str) == nil {
+		raw = json.RawMessage(str)
+	}
+	var m map[string]struct {
+		Domain string `json:"domain"`
+	}
+	if json.Unmarshal(raw, &m) != nil {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for svc, d := range m {
+		if d.Domain != "" {
+			out[svc] = d.Domain
+		}
+	}
+	return out
 }

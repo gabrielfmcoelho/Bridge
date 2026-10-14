@@ -1815,4 +1815,45 @@ var migrationsPostgres = []string{
 	// Version 109: per-user home page preferences (personas, widget order,
 	// onboarding state). Opaque JSON owned by the frontend; {} = never set up.
 	`ALTER TABLE users ADD COLUMN IF NOT EXISTS home_prefs JSONB NOT NULL DEFAULT '{}'::jsonb;`,
+
+	// Version 110: Coolify Sentinel snapshots — the latest summary per host and
+	// per service, written by the manual Sentinel sync and kept apart from the
+	// SSH scan (host_scans). Sentinel keeps the history; these are what lists
+	// sort on and alerts read. NULL = Sentinel had no value (metrics or traffic
+	// off, no matching app key), never 0.
+	`CREATE TABLE IF NOT EXISTS sentinel_host_snapshots (
+		host_id         BIGINT PRIMARY KEY REFERENCES hosts(id) ON DELETE CASCADE,
+		state           TEXT NOT NULL,
+		detail          TEXT NOT NULL DEFAULT '',
+		metrics_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+		traffic_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+		push_ok         BOOLEAN,
+		last_push_at    TIMESTAMPTZ,
+		cpu_avg_24h     DOUBLE PRECISION,
+		cpu_p95_24h     DOUBLE PRECISION,
+		mem_p95_24h     DOUBLE PRECISION,
+		disk_pct        DOUBLE PRECISION,
+		load1           DOUBLE PRECISION,
+		synced_at       TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE TABLE IF NOT EXISTS sentinel_service_snapshots (
+		service_id         BIGINT PRIMARY KEY REFERENCES services(id) ON DELETE CASCADE,
+		host_id            BIGINT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+		req_24h            BIGINT,
+		s4xx_24h           BIGINT,
+		s5xx_24h           BIGINT,
+		p50_ms             DOUBLE PRECISION,
+		p95_ms             DOUBLE PRECISION,
+		p99_ms             DOUBLE PRECISION,
+		visitors_24h       BIGINT,
+		container_state    TEXT NOT NULL DEFAULT '',
+		container_health   TEXT NOT NULL DEFAULT '',
+		restart_count      INT,
+		prev_restart_count INT,
+		cpu_pct            DOUBLE PRECISION,
+		mem_pct            DOUBLE PRECISION,
+		traefik_bypass     BOOLEAN NOT NULL DEFAULT FALSE,
+		synced_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_sentinel_service_snapshots_host ON sentinel_service_snapshots(host_id);`,
 }
