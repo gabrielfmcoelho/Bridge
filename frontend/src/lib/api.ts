@@ -320,6 +320,30 @@ export class ApiError extends Error {
   }
 }
 
+// Pages that work without a session; a 401 there is expected, not an expiry.
+const PUBLIC_PATHS = ["/login", "/setup", "/share/"];
+let checkingSession = false;
+
+/** After a 401: if the session is really gone (not just a bad integration
+ *  token, which GitLab also answers with 401), go to /login and come back. */
+async function onUnauthorized() {
+  if (typeof window === "undefined" || checkingSession) return;
+  const { pathname, search } = window.location;
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) return;
+  checkingSession = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/status`, { credentials: "include" });
+    const status = await res.json();
+    if (!status.authenticated && !status.setup_required) {
+      window.location.assign(`/login?next=${encodeURIComponent(pathname + search)}`);
+    }
+  } catch {
+    // Server unreachable: leave the page as it is; the request's own error shows.
+  } finally {
+    checkingSession = false;
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -357,6 +381,7 @@ async function request<T>(
       },
     });
     if (!res.ok) {
+      if (res.status === 401) void onUnauthorized();
       const body = await res.json().catch(() => ({}));
       // Carry the HTTP status on the Error so callers can tell "gone / not
       // yours" (404) from "broken" (5xx) without string-matching the message.
