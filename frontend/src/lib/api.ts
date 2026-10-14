@@ -557,7 +557,8 @@ export const backupAPI = {
 // Alert Settings
 export const alertSettingsAPI = {
   get: () => api.get<import("./types").AlertThresholds>("/api/settings/alerts"),
-  update: (data: import("./types").AlertThresholds) =>
+  /** Partial: omitted thresholds keep their value. */
+  update: (data: Partial<import("./types").AlertThresholds>) =>
     api.put<import("./types").AlertThresholds>("/api/settings/alerts", data),
 };
 
@@ -1931,6 +1932,29 @@ export const telemetryAPI = {
     api.get<TelemetrySpans>(`/api/telemetry/spans?${telemetryQuery(kind, id, { range, ...f })}`),
   trace: (kind: TelemetryKind, id: string | number, traceId: string) =>
     api.get<TelemetryTrace>(`/api/telemetry/traces/${encodeURIComponent(traceId)}?${telemetryQuery(kind, id, {})}`),
+};
+
+// Coolify Sentinel: live reads go through the host's SSH connection, so a
+// "Sentinel can't be read" answer is a 200 {available:false, reason}.
+export type SentinelMetricsRange = "1h" | "24h" | "7d";
+export type SentinelTrafficRange = "24h" | "7d" | "30d";
+export const sentinelAPI = {
+  hostStatus: (slug: string) => api.get<import("./types").SentinelHostView>(`/api/hosts/${slug}/sentinel`),
+  hostMetrics: (slug: string, range: SentinelMetricsRange) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelHostMetrics>>(`/api/hosts/${slug}/sentinel/metrics?range=${range}`),
+  hostContainers: (slug: string) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelContainer[]>>(`/api/hosts/${slug}/sentinel/containers`),
+  serviceTraffic: (id: number, range: SentinelTrafficRange) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelServiceTraffic>>(`/api/services/${id}/sentinel/traffic?range=${range}`),
+  serviceBreakdown: (id: number, dim: string, range: SentinelTrafficRange) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelBreakdownRow[]>>(
+      `/api/services/${id}/sentinel/traffic/breakdown/${encodeURIComponent(dim)}?range=${range}`,
+    ),
+  serviceResources: (id: number, range: SentinelMetricsRange) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelServiceResources>>(`/api/services/${id}/sentinel/resources?range=${range}`),
+  hosts: () => api.getList<import("./types").SentinelHostRow>("/api/sentinel/hosts"),
+  // Visits every Coolify host over SSH, 4 at a time: can outlive the 120s default.
+  sync: () => request<import("./types").SentinelSyncReport>("/api/sentinel/sync", { method: "POST" }, 10 * 60_000),
 };
 
 // Coolify integration

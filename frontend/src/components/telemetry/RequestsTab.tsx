@@ -58,6 +58,7 @@ export function RequestsPanel({
   chartControls,
   onPick,
   usersLabel,
+  hideRowP99,
 }: {
   data: Pick<TelemetryRequests, "summary" | "series" | "top" | "series_by_key">;
   groupBy: TelemetryGroupBy;
@@ -66,11 +67,15 @@ export function RequestsPanel({
   onPick?: (key: string) => void;
   /** Shows distinct users (KPI + chart metric) under this name; omitted = hidden (e.g. a share link's single key). */
   usersLabel?: string;
+  /** Drops the top table's p99 column (a source without per-row p99, like Sentinel's paths). */
+  hideRowP99?: boolean;
 }) {
   const { t, locale } = useLocale();
   const [metric, setMetric] = useState<Metric>("count");
   const num = (n: number) => n.toLocaleString(locale);
   const s = data.summary;
+  // Per-row users only when the source has them (Sentinel's paths don't).
+  const rowUsers = !!usersLabel && (data.top ?? []).some((r) => r.users != null);
 
   // Rows for the chart: one per slot; one column per series (the total, or each key).
   const { rows, series } = useMemo(() => {
@@ -164,10 +169,10 @@ export function RequestsPanel({
               <tr className={tableClasses.compact.headRow}>
                 <th className={tableClasses.compact.th}>{t(`telemetry.groupBy.${groupBy}`)}</th>
                 <th className={`${tableClasses.compact.th} text-right`}>{t("telemetry.requests")}</th>
-                {usersLabel && <th className={`${tableClasses.compact.th} text-right`}>{usersLabel}</th>}
+                {rowUsers && <th className={`${tableClasses.compact.th} text-right`}>{usersLabel}</th>}
                 <th className={`${tableClasses.compact.th} text-right`}>5xx</th>
                 <th className={`${tableClasses.compact.th} text-right`}>p95</th>
-                <th className={`${tableClasses.compact.th} text-right`}>p99</th>
+                {!hideRowP99 && <th className={`${tableClasses.compact.th} text-right`}>p99</th>}
               </tr>
             </thead>
             <tbody>
@@ -192,10 +197,10 @@ export function RequestsPanel({
                       )}
                     </td>
                     <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{num(row.count)}</td>
-                    {usersLabel && <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{num(row.users ?? 0)}</td>}
+                    {rowUsers && <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{num(row.users ?? 0)}</td>}
                     <td className={`${tableClasses.compact.td} text-right tabular-nums ${row.errors ? "text-[var(--danger)]" : ""}`}>{num(row.errors)}</td>
                     <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{ms(row.p95)}</td>
-                    <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{ms(row.p99)}</td>
+                    {!hideRowP99 && <td className={`${tableClasses.compact.td} text-right tabular-nums`}>{ms(row.p99)}</td>}
                   </tr>
                 );
               })}

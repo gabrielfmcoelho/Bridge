@@ -9,6 +9,7 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 import { QuickLookOutlet } from "./HostQuickLook";
 import { openQuickLook } from "./quickLookStore";
 import type { Host, HostSortConfig } from "@/lib/types";
+import { pct } from "@/lib/sentinel";
 
 // Server-driven table (inventory pagination reference). `hosts` is ONE server
 // page (already filtered+sorted+limited by the parent's paginated query),
@@ -46,10 +47,13 @@ export default function HostsTableView({
           { key: "hospedagem" as const, label: t("host.hospedagem") },
           { key: "situacao" as const, label: t("host.situacao") },
           { key: "scan" as const, label: t("host.scan"), align: "center", sortable: false },
+          // Sentinel's last sync, beside (never instead of) the scan.
+          { key: "sentinel_cpu" as const, label: t("sentinel.colCpu"), align: "right" },
+          { key: "sentinel_ram" as const, label: t("sentinel.colRam"), align: "right" },
           { key: "tags" as const, label: t("common.tags"), sortable: false },
           { key: "actions" as const, label: t("common.actions"), align: "right", sortable: false },
         ]}
-        sortKey={sort.field as "nickname" | "hostname" | "hospedagem" | "situacao" | "scan" | "tags" | "actions"}
+        sortKey={sort.field as "nickname" | "hostname" | "hospedagem" | "situacao" | "scan" | "sentinel_cpu" | "sentinel_ram" | "tags" | "actions"}
         sortDir={sort.direction}
         onSortChange={(key, dir) => {
           if (key === "scan" || key === "tags" || key === "actions") return; // not server-sortable
@@ -70,6 +74,12 @@ export default function HostsTableView({
                 <SituacaoCell host={host} canEdit={canEdit} t={t} />
               </td>
               <td className="px-4 py-2.5 text-center"><ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} /></td>
+              <td className="px-4 py-2.5 text-right tabular-nums whitespace-nowrap text-[var(--text-secondary)]" title={host.sentinel && host.sentinel.state !== "ok" ? t(`sentinel.reason.${host.sentinel.state}`) : undefined}>
+                {host.sentinel?.state === "ok" ? pct(host.sentinel.cpu_p95_24h) : "–"}
+              </td>
+              <td className="px-4 py-2.5 text-right tabular-nums whitespace-nowrap text-[var(--text-secondary)]">
+                {host.sentinel?.state === "ok" ? pct(host.sentinel.mem_p95_24h) : "–"}
+              </td>
               <td className="px-4 py-2.5">
                 <div className="flex flex-wrap gap-1">
                   {host.tags?.slice(0, 3).map((tag) => <Tag key={tag}>{tag}</Tag>)}

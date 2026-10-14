@@ -7,15 +7,17 @@ import Pagination from "@/components/ui/Pagination";
 import Badge from "@/components/ui/Badge";
 import Tag from "@/components/ui/Tag";
 import type { Service } from "@/lib/types";
+import { errorRate, ms, pct } from "@/lib/sentinel";
 
 // Server-driven table (inventory pagination). `services` is ONE server page
 // (filtered+sorted+limited by the parent's paginated query), `total` is the full
 // match count for the pager, and column-header clicks drive the page-level sort
-// via onSortChange (→ server refetch). Only nickname/technology_stack are
-// server-sortable.
+// via onSortChange (→ server refetch). nickname/technology_stack and the
+// Sentinel columns (last sync's traffic) are server-sortable.
 const PER_PAGE = 20;
 type Sort = { field: string; direction: "asc" | "desc" };
-type ColKey = "nickname" | "description" | "source" | "technology_stack" | "developed_by" | "tags";
+type ColKey = "nickname" | "description" | "source" | "technology_stack" | "developed_by" | "sentinel_req" | "sentinel_5xx" | "sentinel_p95" | "tags";
+const SORTABLE = new Set<ColKey>(["nickname", "technology_stack", "sentinel_req", "sentinel_5xx", "sentinel_p95"]);
 
 interface ServicesTableViewProps {
   services: Service[];
@@ -40,12 +42,15 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
           { key: "source" as ColKey, label: t("service.source"), sortable: false },
           { key: "technology_stack" as ColKey, label: t("service.technologyStack") },
           { key: "developed_by" as ColKey, label: t("service.developedBy"), sortable: false },
+          { key: "sentinel_req" as ColKey, label: t("sentinel.colReq"), align: "right" },
+          { key: "sentinel_5xx" as ColKey, label: "5xx", align: "right" },
+          { key: "sentinel_p95" as ColKey, label: "p95", align: "right" },
           { key: "tags" as ColKey, label: t("common.tags"), sortable: false },
         ]}
         sortKey={sort.field as ColKey}
         sortDir={sort.direction}
         onSortChange={(key, dir) => {
-          if (key !== "nickname" && key !== "technology_stack") return; // not server-sortable
+          if (!SORTABLE.has(key)) return; // not server-sortable
           onSortChange({ field: key, direction: dir });
         }}
       >
@@ -87,6 +92,13 @@ export default function ServicesTableView({ services, total, tablePage, onPageCh
                   </Badge>
                 )}
               </td>
+              <td className="px-4 py-2.5 text-right tabular-nums whitespace-nowrap text-[var(--text-secondary)]">
+                {svc.sentinel?.req_24h == null ? "–" : svc.sentinel.req_24h.toLocaleString()}
+              </td>
+              <td className={`px-4 py-2.5 text-right tabular-nums whitespace-nowrap ${(errorRate(svc.sentinel?.req_24h, svc.sentinel?.s5xx_24h) ?? 0) >= 1 ? "text-[var(--danger)]" : "text-[var(--text-secondary)]"}`}>
+                {pct(errorRate(svc.sentinel?.req_24h, svc.sentinel?.s5xx_24h), 1)}
+              </td>
+              <td className="px-4 py-2.5 text-right tabular-nums whitespace-nowrap text-[var(--text-secondary)]">{ms(svc.sentinel?.p95_ms)}</td>
               <td className="px-4 py-2.5">
                 <div className="flex flex-wrap gap-1">
                   {svc.tags && svc.tags.length > 0

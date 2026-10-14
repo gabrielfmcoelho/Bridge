@@ -13,6 +13,7 @@ import GrafanaIntegrationSection from "./integrations/GrafanaIntegrationSection"
 import SignozIntegrationSection from "./integrations/SignozIntegrationSection";
 import LLMSection from "./integrations/LLMSection";
 import CoolifySection from "./integrations/CoolifySection";
+import SentinelSection from "./integrations/SentinelSection";
 import ProxmoxSection from "./integrations/ProxmoxSection";
 import SMTPSection from "./integrations/SMTPSection";
 
@@ -34,6 +35,7 @@ export default function IntegrationsTab() {
       <SMTPSection />
       <LLMSection />
       <CoolifySection />
+      <SentinelSection />
       <ProxmoxSection />
     </div>
   );
