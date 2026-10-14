@@ -72,6 +72,17 @@ func TestSentinelHandlers(t *testing.T) {
 		t.Fatalf("traffic of a service on no Coolify host = %d %v", code, body)
 	}
 
+	// Per-host sync: editor+; an unlinked host records why instead of failing.
+	if code, _ := call(viewer, "POST", "/api/hosts/web/sentinel/sync"); code != 403 {
+		t.Errorf("viewer host sync = %d, want 403", code)
+	}
+	if code, body = call(admin, "POST", "/api/hosts/web/sentinel/sync"); code != 200 || body["state"] != "not_linked" {
+		t.Fatalf("host sync of an unlinked host = %d %v", code, body)
+	}
+	if code, body = call(admin, "GET", "/api/hosts/web/sentinel/containers?fresh=1"); code != 200 || body["reason"] != "not_linked" {
+		t.Fatalf("fresh containers = %d %v", code, body)
+	}
+
 	// Bad queries are the caller's fault.
 	for _, p := range []string{"/api/hosts/web/sentinel/metrics?range=1y", svc + "/sentinel/traffic?range=1h", svc + "/sentinel/traffic/breakdown/ip"} {
 		if code, _ := call(admin, "GET", p); code != 400 {

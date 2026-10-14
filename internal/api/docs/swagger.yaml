@@ -10712,6 +10712,10 @@ paths:
         name: slug
         required: true
         type: string
+      - description: Skip the read cache (live mode)
+        in: query
+        name: fresh
+        type: boolean
       produces:
       - application/json
       responses:
@@ -10745,6 +10749,10 @@ paths:
         in: query
         name: range
         type: string
+      - description: Skip the read cache (live mode)
+        in: query
+        name: fresh
+        type: boolean
       produces:
       - application/json
       responses:
@@ -10765,6 +10773,43 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Host metrics history
+      tags:
+      - sentinel
+  /api/hosts/{slug}/sentinel/sync:
+    post:
+      description: Editor+. Reads the host's Sentinel now and stores its host and
+        service snapshots (what lists sort on and alerts read), like the full sync
+        does for every host. A host that can't be read records why.
+      parameters:
+      - description: Host oficial slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/service.SentinelSyncHost'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Sync one host's Sentinel snapshots
       tags:
       - sentinel
   /api/hosts/trash:

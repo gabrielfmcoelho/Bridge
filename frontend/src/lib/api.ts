@@ -1965,10 +1965,14 @@ export type SentinelMetricsRange = "1h" | "24h" | "7d";
 export type SentinelTrafficRange = "24h" | "7d" | "30d";
 export const sentinelAPI = {
   hostStatus: (slug: string) => api.get<import("./types").SentinelHostView>(`/api/hosts/${slug}/sentinel`),
-  hostMetrics: (slug: string, range: SentinelMetricsRange) =>
-    api.get<import("./types").SentinelResponse<import("./types").SentinelHostMetrics>>(`/api/hosts/${slug}/sentinel/metrics?range=${range}`),
-  hostContainers: (slug: string) =>
-    api.get<import("./types").SentinelResponse<import("./types").SentinelContainer[]>>(`/api/hosts/${slug}/sentinel/containers`),
+  // fresh skips the server's read cache (live mode).
+  hostMetrics: (slug: string, range: SentinelMetricsRange, fresh = false) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelHostMetrics>>(
+      `/api/hosts/${slug}/sentinel/metrics?range=${range}${fresh ? "&fresh=1" : ""}`,
+    ),
+  hostContainers: (slug: string, fresh = false) =>
+    api.get<import("./types").SentinelResponse<import("./types").SentinelContainer[]>>(`/api/hosts/${slug}/sentinel/containers${fresh ? "?fresh=1" : ""}`),
+  hostSync: (slug: string) => api.post<import("./types").SentinelSyncReport["hosts"][number]>(`/api/hosts/${slug}/sentinel/sync`),
   serviceTraffic: (id: number, range: SentinelTrafficRange) =>
     api.get<import("./types").SentinelResponse<import("./types").SentinelServiceTraffic>>(`/api/services/${id}/sentinel/traffic?range=${range}`),
   serviceBreakdown: (id: number, dim: string, range: SentinelTrafficRange) =>

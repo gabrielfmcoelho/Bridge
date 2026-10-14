@@ -162,6 +162,7 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/hosts/x/sentinel"},
 		{"GET", "/api/hosts/x/sentinel/metrics"},
 		{"GET", "/api/hosts/x/sentinel/containers"},
+		{"POST", "/api/hosts/x/sentinel/sync"},
 		{"GET", "/api/services/1/sentinel/traffic"},
 		{"GET", "/api/services/1/sentinel/traffic/breakdown/status"},
 		{"GET", "/api/services/1/sentinel/resources"},
