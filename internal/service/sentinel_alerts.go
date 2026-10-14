@@ -73,7 +73,9 @@ func SentinelAlerts(h *models.SentinelHostSnapshot, svcs []models.SentinelServic
 				add("sentinel_latency", "warning", fmt.Sprintf("%s: p95 latency %.0f ms in 24h (warning: %d ms)", name, ms, t.LatencyP95Warning))
 			}
 		}
-		if v.ContainerHealth == "unhealthy" {
+		// A stopped container keeps the health it had when it stopped: only a
+		// running one's health means anything.
+		if v.ContainerHealth == "unhealthy" && v.ContainerState == "running" {
 			add("sentinel_unhealthy", "critical", name+": container is unhealthy")
 		}
 		if v.RestartCount != nil && v.PrevRestartCount != nil && *v.RestartCount > *v.PrevRestartCount {

@@ -64,6 +64,13 @@ func TestContainerFor(t *testing.T) {
 	if containerFor(cs, models.Service{}) != nil {
 		t.Fatal("manual service must not match")
 	}
+	// A host-kind service (systemd postgres) must not take a container named like its catalog entry.
+	var stale sentinel.Container
+	_ = json.Unmarshal([]byte(`{"id":"postgresql","status":{"state":"exited","health":"unhealthy","restartCount":0}}`), &stale)
+	cs = append(cs, stale)
+	if containerFor(cs, models.Service{DiscoveryKind: "host", DiscoveryKey: "postgresql"}) != nil {
+		t.Fatal("host-kind service must not match a container")
+	}
 }
 
 func TestMergeTraffic(t *testing.T) {

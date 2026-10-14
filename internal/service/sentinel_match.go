@@ -12,11 +12,16 @@ import (
 
 // serviceKey is a scan-discovered service's container identity
 // ("airflow-apiserver-<uuid>", or "<uuid>" for a plain app) and its Coolify
-// resource uuid; "" when the service isn't a Coolify container.
+// resource uuid; "" when the service isn't a container. A host-kind service
+// (systemd/process) is never a container, even when its catalog name
+// ("postgresql") happens to equal one's.
 func serviceKey(svc models.Service) (key, uuid string) {
 	name := svc.ContainerName
-	if name == "" {
+	if name == "" && svc.DiscoveryKind == "container" {
 		name = svc.DiscoveryKey
+	}
+	if name == "" {
+		return "", ""
 	}
 	key, uuid = coolify.ContainerKey(strings.ToLower(name))
 	if uuid == "" {
@@ -61,10 +66,10 @@ func trafficKeys(svc models.Service, keys []string) []string {
 // containerFor finds svc's container among Sentinel's live ones by the
 // redeploy-stable key, so a deploy since the last scan still matches.
 func containerFor(cs []sentinel.Container, svc models.Service) *sentinel.Container {
-	if svc.ContainerName == "" && svc.DiscoveryKey == "" {
+	key, _ := serviceKey(svc)
+	if key == "" {
 		return nil
 	}
-	key, _ := serviceKey(svc)
 	var found *sentinel.Container
 	for i := range cs {
 		if k, _ := coolify.ContainerKey(cs[i].ID); k != key {

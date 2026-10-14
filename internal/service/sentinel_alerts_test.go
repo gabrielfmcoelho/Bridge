@@ -18,8 +18,9 @@ func TestSentinelAlerts(t *testing.T) {
 	svcs := []models.SentinelServiceSnapshot{
 		{ServiceName: "api", Req24h: n(1000), S5xx24h: n(60), P95Ms: f(1500)}, // 6% critical, latency warning
 		{ServiceName: "quiet", Req24h: n(10), S5xx24h: n(5), P95Ms: f(10)},    // under the request floor
-		{ServiceName: "flower", ContainerHealth: "unhealthy", RestartCount: i(3), PrevRestartCount: i(1), TraefikBypass: true},
-		{ServiceName: "fresh", RestartCount: i(4)}, // first sync: no previous count
+		{ServiceName: "flower", ContainerState: "running", ContainerHealth: "unhealthy", RestartCount: i(3), PrevRestartCount: i(1), TraefikBypass: true},
+		{ServiceName: "old-postgres", ContainerState: "exited", ContainerHealth: "unhealthy"}, // stale health of a stopped container
+		{ServiceName: "fresh", RestartCount: i(4)},                                            // first sync: no previous count
 	}
 	got := map[string]string{}
 	for _, a := range SentinelAlerts(host, svcs, &th) {

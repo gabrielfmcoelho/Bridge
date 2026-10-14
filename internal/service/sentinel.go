@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -242,12 +241,12 @@ func runSSH(client *ssh.Client, cmd string) (string, error) {
 		return "", err
 	}
 	defer sess.Close()
-	var buf bytes.Buffer
-	sess.Stdout, sess.Stderr = &buf, &buf
 	t := time.AfterFunc(15*time.Second, func() { sess.Close() })
 	defer t.Stop()
-	err = sess.Run(cmd)
-	return buf.String(), err
+	// CombinedOutput, not one buffer as Stdout and Stderr: the two streams are
+	// copied by separate goroutines, and an unguarded buffer gets corrupted.
+	out, err := sess.CombinedOutput(cmd)
+	return string(out), err
 }
 
 // conn returns host's pooled connection, opening one when needed (dialed
