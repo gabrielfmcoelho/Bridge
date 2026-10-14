@@ -23,22 +23,7 @@ type coolifyHandlers struct {
 }
 
 func (h *coolifyHandlers) getClient() (*coolify.Client, error) {
-	get := func(key string) string { return store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), key) }
-
-	if get("coolify_enabled") != "true" {
-		return nil, fmt.Errorf("coolify integration is not enabled")
-	}
-
-	baseURL := get("coolify_base_url")
-	apiToken, ok, err := store.NewAppSecretRepo(h.db.SQL).Reveal(context.Background(), h.db.Encryptor, "coolify_api_token")
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt coolify token: %w", err)
-	}
-	if !ok || baseURL == "" {
-		return nil, fmt.Errorf("coolify integration is not configured")
-	}
-
-	return coolify.NewClient(baseURL, apiToken), nil
+	return service.CoolifyClient(context.Background(), h.db)
 }
 
 func (h *coolifyHandlers) logOp(r *http.Request, hostID int64, opType, status, output string) {

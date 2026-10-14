@@ -127,7 +127,17 @@ func scanSortColumn(sortBy string) string {
 	case "containers_count":
 		return "ls.containers_count"
 	}
-	return ""
+	return sentinelHostSort(sortBy)
+}
+
+// sentinelHostSort maps a Sentinel sort key to its snapshot value (a
+// correlated subquery, so no join and no column clash).
+func sentinelHostSort(sortBy string) string {
+	col := map[string]string{"sentinel_cpu": "cpu_p95_24h", "sentinel_ram": "mem_p95_24h", "sentinel_disk": "disk_pct"}[sortBy]
+	if col == "" {
+		return ""
+	}
+	return "(SELECT sh." + col + " FROM sentinel_host_snapshots sh WHERE sh.host_id = hosts.id)"
 }
 
 // List returns hosts matching the filter, with sort + pagination applied.
@@ -139,7 +149,7 @@ func (r *HostRepo) List(ctx context.Context, f models.HostFilter) ([]models.Host
 	// SELECT names stay unambiguous.
 	scanSort := scanSortColumn(f.SortBy)
 	from := ` FROM hosts`
-	if scanSort != "" {
+	if strings.HasPrefix(scanSort, "ls.") {
 		from += ` LEFT JOIN (SELECT DISTINCT ON (host_id) host_id, cpu_pct, ram_pct, disk_pct, containers_count
 		                     FROM host_scans ORDER BY host_id, scanned_at DESC) ls ON ls.host_id = hosts.id`
 	}

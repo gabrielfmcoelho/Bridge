@@ -194,9 +194,18 @@ func (r *ServiceRepo) ListFiltered(ctx context.Context, f models.ServiceFilter) 
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
 
+	// Sentinel keys sort on the service's snapshot (correlated subquery);
+	// services without one go last either direction.
+	sentinelSnap := func(expr string) string {
+		return "(SELECT " + expr + " FROM sentinel_service_snapshots ss WHERE ss.service_id = services.id)"
+	}
 	allowedSorts := map[string]string{
 		"nickname":         "nickname",
 		"technology_stack": "technology_stack",
+		"sentinel_req":     sentinelSnap("ss.req_24h"),
+		"sentinel_5xx":     sentinelSnap("ss.s5xx_24h::float8 / NULLIF(ss.req_24h, 0)"),
+		"sentinel_p95":     sentinelSnap("ss.p95_ms"),
+		"sentinel_cpu":     sentinelSnap("ss.cpu_pct"),
 	}
 	sortCol := "nickname"
 	if col, ok := allowedSorts[f.SortBy]; ok {
@@ -206,7 +215,11 @@ func (r *ServiceRepo) ListFiltered(ctx context.Context, f models.ServiceFilter) 
 	if f.SortDir == "desc" {
 		sortDir = "DESC"
 	}
-	query += " ORDER BY " + sortCol + " " + sortDir
+	nullsLast := ""
+	if strings.HasPrefix(f.SortBy, "sentinel_") {
+		nullsLast = " NULLS LAST"
+	}
+	query += " ORDER BY " + sortCol + " " + sortDir + nullsLast
 
 	if f.PerPage > 0 {
 		offset := 0

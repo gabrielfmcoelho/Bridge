@@ -2,6 +2,7 @@ package coolify
 
 import (
 	"net/url"
+	"sort"
 	"strings"
 )
 
@@ -21,7 +22,8 @@ type DomainRef struct {
 // masterIP is the IP Coolify reports for its own (master) server.
 const masterIP = "host.docker.internal"
 
-// DomainRefs flattens every fqdn of apps and services into one ref per
+// DomainRefs flattens every fqdn of apps (compose services included) and
+// services into one ref per
 // lowercased hostname (scheme, port and path dropped). A domain seen more than
 // once keeps its first server/source. HTTPS is true for every real domain:
 // Coolify's fqdn scheme is often plain http even when the proxy serves TLS, so
@@ -60,6 +62,17 @@ func DomainRefs(apps []Application, svcs []Service, masterHost string) []DomainR
 	}
 	for _, a := range apps {
 		add(a.FQDN, a.Destination.Server, a.Name, a.UUID, "")
+		// A compose app's containers are `<svc>-<uuid>-<ts>`; Member drops the
+		// timestamp like ContainerKey. Sorted so the first-seen rule is stable.
+		cd := a.ComposeDomains()
+		svcs := make([]string, 0, len(cd))
+		for svc := range cd {
+			svcs = append(svcs, svc)
+		}
+		sort.Strings(svcs)
+		for _, svc := range svcs {
+			add(cd[svc], a.Destination.Server, a.Name, a.UUID, svc+"-"+a.UUID)
+		}
 	}
 	for _, s := range svcs {
 		for _, a := range s.Applications {

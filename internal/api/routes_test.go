@@ -158,6 +158,15 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/telemetry/requests"},
 		{"GET", "/api/telemetry/spans"},
 		{"GET", "/api/telemetry/traces/x"},
+		// Coolify Sentinel
+		{"GET", "/api/hosts/x/sentinel"},
+		{"GET", "/api/hosts/x/sentinel/metrics"},
+		{"GET", "/api/hosts/x/sentinel/containers"},
+		{"GET", "/api/services/1/sentinel/traffic"},
+		{"GET", "/api/services/1/sentinel/traffic/breakdown/status"},
+		{"GET", "/api/services/1/sentinel/resources"},
+		{"GET", "/api/sentinel/hosts"},
+		{"POST", "/api/sentinel/sync"},
 
 		// GLPI integration
 		{"GET", "/api/settings/integrations/glpi/tokens"},
