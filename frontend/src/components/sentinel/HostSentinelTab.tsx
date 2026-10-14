@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { sentinelAPI, type SentinelMetricsRange } from "@/lib/api";
 import type { SentinelHostView } from "@/lib/types";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useFlag } from "@/contexts/FlagContext";
+import Button from "@/components/ui/Button";
+import Toggle from "@/components/ui/Toggle";
 import Card from "@/components/ui/Card";
 import StatCard from "@/components/ui/StatCard";
 import Badge from "@/components/ui/Badge";
@@ -20,6 +24,8 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 import { pointsToRows, pct } from "@/lib/sentinel";
 
 const RANGES: SentinelMetricsRange[] = ["1h", "24h", "7d"];
+/** Live mode's refresh; Sentinel samples every 10s. */
+const LIVE_MS = 15_000;
 const LEVEL_DOT = { critical: "danger", warning: "warning", info: "info" } as const;
 
 /** Why Sentinel can't be read, as a callout (reason + raw detail). */
@@ -37,20 +43,46 @@ export function SentinelReasonAlert({ reason, detail }: { reason?: string; detai
 /** Coolify Sentinel on a host: live status, the last sync, its alerts, history charts and live containers. */
 export default function HostSentinelTab({ slug }: { slug: string }) {
   const { t, locale } = useLocale();
+  const { user } = useAuth();
+  const flag = useFlag();
+  const queryClient = useQueryClient();
+  const canSync = user?.role === "admin" || user?.role === "editor";
   const [range, setRange] = useState<SentinelMetricsRange>("24h");
+  // Live: re-read every LIVE_MS past the server cache, while the tab is open.
+  const [liveMode, setLiveMode] = useState(false);
+  const every = liveMode ? LIVE_MS : false;
 
-  const status = useQuery({ queryKey: ["sentinel-host", slug], queryFn: () => sentinelAPI.hostStatus(slug) });
+  const status = useQuery({ queryKey: ["sentinel-host", slug], queryFn: () => sentinelAPI.hostStatus(slug), refetchInterval: every });
   const live = status.data?.status;
   const metricsOn = !!live?.available && live.metrics;
   const metrics = useQuery({
     queryKey: ["sentinel-host-metrics", slug, range],
-    queryFn: () => sentinelAPI.hostMetrics(slug, range),
+    queryFn: () => sentinelAPI.hostMetrics(slug, range, liveMode),
     enabled: metricsOn,
+    refetchInterval: every,
   });
   const containers = useQuery({
     queryKey: ["sentinel-host-containers", slug],
-    queryFn: () => sentinelAPI.hostContainers(slug),
+    queryFn: () => sentinelAPI.hostContainers(slug, liveMode),
     enabled: metricsOn,
+    refetchInterval: every,
+  });
+  const sync = useMutation({
+    mutationFn: () => sentinelAPI.hostSync(slug),
+    onSuccess: (res) => {
+      // The sync dropped the server cache too: everything re-reads fresh.
+      queryClient.invalidateQueries({ queryKey: ["sentinel-host", slug] });
+      queryClient.invalidateQueries({ queryKey: ["sentinel-host-metrics", slug] });
+      queryClient.invalidateQueries({ queryKey: ["sentinel-host-containers", slug] });
+      queryClient.invalidateQueries({ queryKey: ["hosts"] });
+      queryClient.invalidateQueries({ queryKey: ["services"] });
+      flag(
+        res.state === "ok"
+          ? { appearance: "success", title: t("sentinel.hostSynced", { services: String(res.services) }) }
+          : { appearance: "warning", title: t(`sentinel.reason.${res.state}`), description: res.detail },
+      );
+    },
+    onError: (e: Error) => flag({ appearance: "error", title: t("sentinel.syncFailed"), description: e.message }),
   });
 
   if (status.isLoading) return <Skeleton className="h-40 w-full" />;
@@ -68,7 +100,24 @@ export default function HostSentinelTab({ slug }: { slug: string }) {
   return (
     <div className="space-y-5 animate-fade-in">
       <Card>
-        <SectionHeading variant="label" as="h3" actions={live?.version && <span className="text-xs text-[var(--text-muted)] font-mono">Sentinel {live.version}</span>}>
+        <SectionHeading
+          variant="label"
+          as="h3"
+          actions={
+            <div className="flex flex-wrap items-center gap-3">
+              {live?.version && <span className="text-xs text-[var(--text-muted)] font-mono">Sentinel {live.version}</span>}
+              <span className="inline-flex items-center gap-2 text-xs text-[var(--text-secondary)]" title={t("sentinel.liveHint")}>
+                <Toggle checked={liveMode} onChange={setLiveMode} ariaLabel={t("sentinel.live")} />
+                {t("sentinel.live")}
+              </span>
+              {canSync && (
+                <Button type="button" size="sm" variant="secondary" loading={sync.isPending} onClick={() => sync.mutate()}>
+                  {t("sentinel.syncHost")}
+                </Button>
+              )}
+            </div>
+          }
+        >
           {t("sentinel.title")}
         </SectionHeading>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -86,6 +135,12 @@ export default function HostSentinelTab({ slug }: { slug: string }) {
         </div>
         <p className="mt-3 text-xs text-[var(--text-muted)]">
           {snap ? t("sentinel.lastSync", { when: when(snap.synced_at) }) : t("sentinel.neverSynced")}
+          {liveMode && status.dataUpdatedAt > 0 && (
+            <span className="ml-3 inline-flex items-center gap-1.5">
+              <StatusDot color="success" size="xs" />
+              {t("sentinel.liveUpdated", { time: new Date(status.dataUpdatedAt).toLocaleTimeString(locale) })}
+            </span>
+          )}
         </p>
       </Card>
 

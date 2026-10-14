@@ -37,7 +37,11 @@ func TestSentinelSync(t *testing.T) {
 		t.Fatal(err)
 	}
 	var failOnce atomic.Bool
+	var containerReads atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/containers/current" {
+			containerReads.Add(1)
+		}
 		if failOnce.CompareAndSwap(true, false) {
 			http.Error(w, "gone", http.StatusBadGateway)
 			return
@@ -116,6 +120,37 @@ func TestSentinelSync(t *testing.T) {
 	}
 	if n := dials.Load(); n != 1 {
 		t.Fatalf("dials after a live read = %d, want 1", n)
+	}
+
+	// Live reads are cached; ForgetHost (live mode, sync button) skips the cache.
+	host := &models.Host{ID: hostID, CoolifyServerUUID: ptr("h7t2q26dp5r8ty3oazurbv41")}
+	before := containerReads.Load()
+	for i := 0; i < 2; i++ {
+		if _, err := svc.Containers(ctx, host); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := containerReads.Load() - before; n != 1 {
+		t.Fatalf("cached container reads hit Sentinel %d times, want 1", n)
+	}
+	svc.ForgetHost(hostID)
+	if _, err := svc.Containers(ctx, host); err != nil {
+		t.Fatal(err)
+	}
+	if n := containerReads.Load() - before; n != 2 {
+		t.Fatalf("read after ForgetHost hit Sentinel %d times in total, want 2", n)
+	}
+
+	// The host page's sync button: one host, same snapshots as the full sync.
+	if _, err := d.SQL.Exec(`DELETE FROM sentinel_host_snapshots`); err != nil {
+		t.Fatal(err)
+	}
+	one, err := svc.SyncHost(ctx, host)
+	if err != nil || one.State != SentinelOK || one.Services != 2 {
+		t.Fatalf("SyncHost = %+v, %v", one, err)
+	}
+	if h, _ := repo.GetHost(ctx, hostID); h == nil || h.State != SentinelOK {
+		t.Fatalf("snapshot after SyncHost = %+v", h)
 	}
 
 	// A pooled connection that fails (Sentinel recreated) is redialed once.
