@@ -3835,6 +3835,11 @@
     "metricsTraffic": "Métricas / tráfego",
     "colCpu": "CPU p95",
     "colRam": "RAM p95",
-    "colReq": "Req. 24h"
+    "colReq": "Req. 24h",
+    "live": "Ao vivo",
+    "liveHint": "Consulta o Sentinel de novo a cada 15 segundos enquanto esta aba estiver aberta.",
+    "liveUpdated": "atualizado às {time}",
+    "syncHost": "Sincronizar este host",
+    "hostSynced": "Host sincronizado: {services} serviços atualizados."
   }
 }

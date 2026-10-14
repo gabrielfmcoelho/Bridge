@@ -134,6 +134,7 @@ func (h *sentinelHandlers) handleHostStatus(w http.ResponseWriter, r *http.Reque
 //	@Produce		json
 //	@Param			slug	path		string	true	"Host oficial slug"
 //	@Param			range	query		string	false	"1h | 24h (default) | 7d"
+//	@Param			fresh	query		bool	false	"Skip the read cache (live mode)"
 //	@Success		200		{object}	sentinelResponse
 //	@Failure		400		{object}	httpx.ErrorResponse
 //	@Failure		401		{object}	httpx.ErrorResponse
@@ -149,6 +150,7 @@ func (h *sentinelHandlers) handleHostMetrics(w http.ResponseWriter, r *http.Requ
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	h.forgetIfFresh(r, host)
 	m, err := h.sentinel.HostMetrics(r.Context(), host, rng)
 	sentinelReply(w, m, err)
 }
@@ -160,6 +162,7 @@ func (h *sentinelHandlers) handleHostMetrics(w http.ResponseWriter, r *http.Requ
 //	@Tags			sentinel
 //	@Produce		json
 //	@Param			slug	path		string	true	"Host oficial slug"
+//	@Param			fresh	query		bool	false	"Skip the read cache (live mode)"
 //	@Success		200		{object}	sentinelResponse
 //	@Failure		401		{object}	httpx.ErrorResponse
 //	@Failure		404		{object}	httpx.ErrorResponse
@@ -169,6 +172,7 @@ func (h *sentinelHandlers) handleHostContainers(w http.ResponseWriter, r *http.R
 	if host == nil {
 		return
 	}
+	h.forgetIfFresh(r, host)
 	cs, err := h.sentinel.Containers(r.Context(), host)
 	sentinelReply(w, cs, err)
 }
@@ -233,6 +237,14 @@ func (h *sentinelHandlers) handleServiceBreakdown(w http.ResponseWriter, r *http
 	sentinelReply(w, rows, err)
 }
 
+// forgetIfFresh drops the host's cached reads on ?fresh=1 (live mode: the
+// default 60s cache would freeze charts Sentinel updates every 10s).
+func (h *sentinelHandlers) forgetIfFresh(r *http.Request, host *models.Host) {
+	if r.URL.Query().Get("fresh") == "1" {
+		h.sentinel.ForgetHost(host.ID)
+	}
+}
+
 func isUnavailable(err error) bool {
 	var un *service.SentinelUnavailable
 	return errors.As(err, &un)
@@ -289,6 +301,32 @@ func (h *sentinelHandlers) handleSync(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, rep)
 }
 
+// handleHostSync godoc
+//
+//	@Summary		Sync one host's Sentinel snapshots
+//	@Description	Editor+. Reads the host's Sentinel now and stores its host and service snapshots (what lists sort on and alerts read), like the full sync does for every host. A host that can't be read records why.
+//	@Tags			sentinel
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host oficial slug"
+//	@Success		200		{object}	service.SentinelSyncHost
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/sentinel/sync [post]
+func (h *sentinelHandlers) handleHostSync(w http.ResponseWriter, r *http.Request) {
+	host := h.host(w, r)
+	if host == nil {
+		return
+	}
+	res, err := h.sentinel.SyncHost(r.Context(), host)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "sentinel integration is not enabled")
+		return
+	}
+	jsonOK(w, res)
+}
+
 // sentinelHostRow is one Coolify-linked host on the Integrações page.
 type sentinelHostRow struct {
 	ID       int64                        `json:"id"`
@@ -335,6 +373,7 @@ func (h *sentinelHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/hosts/{slug}/sentinel", h.handleHostStatus)
 	rr.auth("GET /api/hosts/{slug}/sentinel/metrics", h.handleHostMetrics)
 	rr.auth("GET /api/hosts/{slug}/sentinel/containers", h.handleHostContainers)
+	rr.role("editor", "POST /api/hosts/{slug}/sentinel/sync", h.handleHostSync)
 	rr.auth("GET /api/services/{id}/sentinel/traffic", h.handleServiceTraffic)
 	rr.auth("GET /api/services/{id}/sentinel/traffic/breakdown/{dim}", h.handleServiceBreakdown)
 	rr.auth("GET /api/services/{id}/sentinel/resources", h.handleServiceResources)

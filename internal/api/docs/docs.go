@@ -7594,6 +7594,12 @@ const docTemplate = `{
                         "name": "slug",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Skip the read cache (live mode)",
+                        "name": "fresh",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -7641,6 +7647,12 @@ const docTemplate = `{
                         "description": "1h | 24h (default) | 7d",
                         "name": "range",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Skip the read cache (live mode)",
+                        "name": "fresh",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -7658,6 +7670,59 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/hosts/{slug}/sentinel/sync": {
+            "post": {
+                "description": "Editor+. Reads the host's Sentinel now and stores its host and service snapshots (what lists sort on and alerts read), like the full sync does for every host. A host that can't be read records why.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "sentinel"
+                ],
+                "summary": "Sync one host's Sentinel snapshots",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Host oficial slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/service.SentinelSyncHost"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }

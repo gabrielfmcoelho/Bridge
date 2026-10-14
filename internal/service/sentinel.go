@@ -736,6 +736,32 @@ func (s *SentinelService) Sync(ctx context.Context) (*SentinelSyncReport, error)
 	return rep, nil
 }
 
+// SyncHost snapshots one host now (the host page's sync button).
+func (s *SentinelService) SyncHost(ctx context.Context, host *models.Host) (SentinelSyncHost, error) {
+	if !s.Enabled(ctx) {
+		return SentinelSyncHost{}, unavailable(SentinelReasonDisabled, "")
+	}
+	hctx, cancel := context.WithTimeout(ctx, sentinelHostSyncTimeout)
+	defer cancel()
+	s.ForgetHost(host.ID)
+	return s.syncHost(hctx, host), nil
+}
+
+// ForgetHost drops host's cached live reads, so the next read asks Sentinel
+// (live mode, and right after a sync). Service reads expire on their TTL.
+func (s *SentinelService) ForgetHost(hostID int64) {
+	id := strconv.FormatInt(hostID, 10)
+	s.cmu.Lock()
+	defer s.cmu.Unlock()
+	for k := range s.cache {
+		// keys are "<kind>:<hostID>" or "<kind>:<hostID>:<range>"
+		if parts := strings.SplitN(k, ":", 3); len(parts) >= 2 && parts[1] == id &&
+			(parts[0] == "metrics" || parts[0] == "containers" || parts[0] == "apps") {
+			delete(s.cache, k)
+		}
+	}
+}
+
 func f64(v float64) *float64 { return &v }
 func i64(v int64) *int64     { return &v }
 
