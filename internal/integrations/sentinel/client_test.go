@@ -24,6 +24,7 @@ var fixtures = map[string]string{
 	"/api/resource/rtb37u69bbkepzukr9vclrd7/traffic/breakdown/status":            `[{"value":"200","requests":142,"bytes_out":2221789},{"value":"499","requests":1,"bytes_out":21}]`,
 	"/api/traffic/apps": `["rtb37u69bbkepzukr9vclrd7-airflow-apiserver-0c35","rtb37u69bbkepzukr9vclrd7-flower-608f"]`,
 	"/api/app/rtb37u69bbkepzukr9vclrd7-flower-608f/traffic/overview": `{"requests":2,"bytes_in":0,"bytes_out":10,"status":{"s2xx":2,"s3xx":0,"s4xx":0,"s5xx":0},"latency":{"p50":2.3,"p95":2.3,"p99":2.3},"unique_visitors":1}`,
+	"/api/version":     "1.0.2\n",
 	"/api/push-status": `{"last_attempt_at":"2026-10-14T13:54:21Z","last_success_at":"2026-10-14T13:54:21Z","last_error":null,"last_status":null,"consecutive_failures":0}`,
 }
 
@@ -81,6 +82,9 @@ func TestClient(t *testing.T) {
 	}
 	if b, err := c.Breakdown(ctx, ScopeResource, "rtb37u69bbkepzukr9vclrd7", "status", now, now, 10); err != nil || b[1].Value != "499" {
 		t.Fatalf("breakdown: %+v %v", b, err)
+	}
+	if v, err := c.Version(ctx); err != nil || v != "1.0.2" {
+		t.Fatalf("version (plain text) = %q, %v", v, err)
 	}
 	if keys, err := c.TrafficApps(ctx); err != nil || len(keys) != 2 {
 		t.Fatalf("apps: %v %v", keys, err)

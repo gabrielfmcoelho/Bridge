@@ -18,7 +18,7 @@ import (
 // fakeSentinelBodies mirror Sentinel 1.0.2 on a host running an Airflow
 // compose app (Nodo F): flower has traffic, the worker only a container.
 var fakeSentinelBodies = map[string]string{
-	"/api/version":            `"1.0.2"`,
+	"/api/version":            `1.0.2`,
 	"/api/push-status":        `{"last_success_at":"2026-10-14T13:54:21Z","consecutive_failures":0}`,
 	"/api/cpu/history":        `[{"time":"1","percent":"10"},{"time":"2","percent":"30"},{"time":"3","percent":"95"}]`,
 	"/api/memory/history":     `[{"time":"1","usedPercent":40},{"time":"2","usedPercent":44}]`,

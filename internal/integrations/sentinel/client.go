@@ -49,31 +49,39 @@ func NewClient(addr, token string, dial Dialer) *Client {
 }
 
 func (c *Client) get(ctx context.Context, path string, q url.Values, out any) error {
+	body, err := c.raw(ctx, path, q)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, out)
+}
+
+func (c *Client) raw(ctx context.Context, path string, q url.Values) ([]byte, error) {
 	u := c.base + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		return ErrUnauthorized
+		return nil, ErrUnauthorized
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("sentinel %s: %d %.200s", path, resp.StatusCode, body)
+		return nil, fmt.Errorf("sentinel %s: %d %.200s", path, resp.StatusCode, body)
 	}
-	return json.Unmarshal(body, out)
+	return body, nil
 }
 
 // safeSegment is what Sentinel ids look like: resource uuids, container
@@ -171,12 +179,10 @@ func (c *Client) Summary(ctx context.Context) (*Summary, error) {
 	return &s, c.get(ctx, "/summary", nil, &s)
 }
 
+// Version is Sentinel's version; the endpoint answers plain text ("1.0.2").
 func (c *Client) Version(ctx context.Context) (string, error) {
-	var v any
-	if err := c.get(ctx, "/version", nil, &v); err != nil {
-		return "", err
-	}
-	return fmt.Sprint(v), nil
+	b, err := c.raw(ctx, "/version", nil)
+	return strings.Trim(strings.TrimSpace(string(b)), `"`), err
 }
 
 func cpuPoints(rows []cpuRow) []Point {
