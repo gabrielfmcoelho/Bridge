@@ -11,6 +11,12 @@ func TestTagRepo_SetGetDistinctRemove(t *testing.T) {
 	ctx := context.Background()
 	repo := store.NewTagRepo(openDB(t).SQL)
 
+	// No tags is an empty list, not nil: the JSON must be [] (null crashed
+	// the host page, which reads tags.length).
+	if none, err := repo.Get(ctx, "host", 99); err != nil || none == nil {
+		t.Fatalf("get with no tags = %#v, %v; want []string{}", none, err)
+	}
+
 	// Set replaces; tags come back sorted.
 	if err := repo.Set(ctx, "host", 1, []string{"prod", "db", ""}); err != nil {
 		t.Fatalf("set: %v", err)
