@@ -119,7 +119,12 @@ export default function EtipiImportModal({ open, onClose }: { open: boolean; onC
                 </div>
               ))}
             </dl>
-            {preview.unmatched > 0 && <p className="text-xs text-[var(--text-muted)]">{t("vuln.unmatchedPreviewHint")}</p>}
+            {preview.unmatched > 0 && (
+              <p className="text-xs text-[var(--text-muted)]">
+                {t("vuln.unmatchedPreviewHint")}{" "}
+                <span className="font-mono break-all">{preview.unmatched_targets.slice(0, 15).join(", ")}{preview.unmatched_targets.length > 15 ? " …" : ""}</span>
+              </p>
+            )}
             <Button size="sm" variant="ghost" onClick={reset}>{t("vuln.pickAnother")}</Button>
           </div>
         )}

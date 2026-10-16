@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
@@ -18,7 +18,8 @@ import VulnDrawer from "@/components/vulns/VulnDrawer";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebounce } from "@/hooks/useDebounce";
-import { vulnAPI } from "@/lib/api";
+import { integrationsAPI, vulnAPI, wazuhAPI } from "@/lib/api";
+import { useFlag } from "@/contexts/FlagContext";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import EtipiImportModal from "./EtipiImportModal";
 
@@ -53,6 +54,24 @@ export default function VulnList() {
   const searchParams = useSearchParams();
   const [openId, setOpenId] = useState<number | null>(() => Number(searchParams.get("id")) || null);
   const [importOpen, setImportOpen] = useState(false);
+  const flag = useFlag();
+  const queryClient = useQueryClient();
+  // Settings are admin-only, as is the sync.
+  const { data: integrations } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get, enabled: isAdmin, retry: false, staleTime: 60_000 });
+  const wazuhEnabled = integrations?.wazuh?.wazuh_enabled === "true";
+  const syncWazuh = useMutation({
+    mutationFn: wazuhAPI.sync,
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ["vulnerabilities"] });
+      flag({
+        appearance: "success",
+        title: t("vuln.wazuhSynced"),
+        description: t("vuln.importSummary", { new: String(r.new), resolved: String(r.resolved), unmatched: String(r.unmatched) }) +
+          (r.unmatched_targets.length ? ` · ${t("vuln.unmatchedAgents", { names: r.unmatched_targets.slice(0, 10).join(", ") })}` : ""),
+      });
+    },
+    onError: (e: Error) => flag({ appearance: "error", title: t("vuln.wazuhSyncFailed"), description: e.message }),
+  });
 
   const params: Record<string, string> = { page: String(page), per_page: String(PER_PAGE) };
   if (VIEW_STATUS[view]) params.status = VIEW_STATUS[view];
@@ -80,7 +99,16 @@ export default function VulnList() {
       <PageHeader
         title={t("nav.vulnerabilities")}
         subtitle={t("vuln.subtitle")}
-        actions={isAdmin ? <Button size="sm" onClick={() => setImportOpen(true)}>{t("vuln.importEtipi")}</Button> : undefined}
+        actions={
+          isAdmin ? (
+            <div className="flex items-center gap-2">
+              {wazuhEnabled && (
+                <Button size="sm" variant="secondary" onClick={() => syncWazuh.mutate()} loading={syncWazuh.isPending}>{t("vuln.syncWazuh")}</Button>
+              )}
+              <Button size="sm" onClick={() => setImportOpen(true)}>{t("vuln.importEtipi")}</Button>
+            </div>
+          ) : undefined
+        }
         controlsKey="vulnerabilities"
         controls={
           <>

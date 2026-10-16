@@ -72,12 +72,14 @@ type VulnFilter struct {
 
 // VulnImportResult is what an import / sync did (or would do, on a dry run).
 type VulnImportResult struct {
-	Parsed    int      `json:"parsed"`
-	New       int      `json:"new"`
-	Updated   int      `json:"updated"`
-	Reopened  int      `json:"reopened"`
-	Resolved  int      `json:"resolved"`
-	Unmatched int      `json:"unmatched"`
-	DryRun    bool     `json:"dry_run"`
-	Notes     []string `json:"notes,omitempty"`
+	Parsed    int  `json:"parsed"`
+	New       int  `json:"new"`
+	Updated   int  `json:"updated"`
+	Reopened  int  `json:"reopened"`
+	Resolved  int  `json:"resolved"`
+	Unmatched int  `json:"unmatched"`
+	DryRun    bool `json:"dry_run"`
+	// UnmatchedTargets are the distinct targets (an ETIPI "Alvo", a Wazuh
+	// agent name) whose findings matched no asset, sorted.
+	UnmatchedTargets []string `json:"unmatched_targets"`
 }

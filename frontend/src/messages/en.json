@@ -1943,6 +1943,15 @@
         "saveThresholds": "Save thresholds",
         "hosts": "Coolify servers",
         "saveFirst": "Save the changes above before syncing."
+      },
+      "wazuh": {
+        "hint": "Wazuh 4.8+ indexer (OpenSearch) holding the agents' vulnerability states. The \"Sync Wazuh\" button on Vulnerabilities reads them; agents are matched to hosts by name.",
+        "ariaEnable": "Enable Wazuh",
+        "indexerUrl": "Indexer URL",
+        "user": "Indexer user",
+        "userHint": "Read access to wazuh-states-vulnerabilities-* is enough.",
+        "password": "Indexer password",
+        "testOk": "Connected: {count} vulnerability states"
       }
     },
     "integrationsTabLabel": "Integrations",
@@ -3944,6 +3953,10 @@
     "openTicket": "Open GLPI ticket",
     "ticketLink": "GLPI ticket #{id}",
     "issueNeedsLink": "Link the finding to an asset first: the issue is created on it.",
-    "detailsInBridge": "Details in Bridge"
+    "detailsInBridge": "Details in Bridge",
+    "syncWazuh": "Sync Wazuh",
+    "wazuhSynced": "Wazuh synced",
+    "wazuhSyncFailed": "Wazuh sync failed",
+    "unmatchedAgents": "agents: {names}"
   }
 }

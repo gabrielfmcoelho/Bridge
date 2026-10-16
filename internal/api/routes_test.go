@@ -64,6 +64,8 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"POST", "/api/vulnerabilities/1/links"},
 		{"DELETE", "/api/vulnerabilities/1/links"},
 		{"POST", "/api/vulnerabilities/import/etipi"},
+		{"POST", "/api/wazuh/test"},
+		{"POST", "/api/wazuh/sync"},
 		{"GET", "/api/releases"},
 		{"POST", "/api/releases"},
 		{"GET", "/api/tools"},

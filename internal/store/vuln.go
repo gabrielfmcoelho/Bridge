@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/netip"
+	"sort"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -303,6 +304,7 @@ func (r *VulnRepo) ApplyImport(ctx context.Context, source string, findings []mo
 	defer tx.Rollback()
 
 	seen := make([]string, 0, len(findings))
+	unmatched := map[string]bool{}
 	for _, f := range findings {
 		seen = append(seen, f.Fingerprint)
 		var id int64
@@ -351,6 +353,7 @@ func (r *VulnRepo) ApplyImport(ctx context.Context, source string, findings []mo
 		}
 		if !linked {
 			res.Unmatched++
+			unmatched[f.Target] = true
 		}
 	}
 
@@ -365,6 +368,11 @@ func (r *VulnRepo) ApplyImport(ctx context.Context, source string, findings []mo
 		}
 	}
 	res.Resolved = len(gone)
+	res.UnmatchedTargets = make([]string, 0, len(unmatched))
+	for t := range unmatched {
+		res.UnmatchedTargets = append(res.UnmatchedTargets, t)
+	}
+	sort.Strings(res.UnmatchedTargets)
 
 	if dryRun {
 		return res, nil // deferred Rollback discards everything

@@ -1346,4 +1346,5 @@ export interface VulnImportResult {
   resolved: number;
   unmatched: number;
   dry_run: boolean;
+  unmatched_targets: string[];
 }

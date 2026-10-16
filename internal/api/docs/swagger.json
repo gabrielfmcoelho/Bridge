@@ -17111,6 +17111,91 @@
                 }
             }
         },
+        "/api/wazuh/sync": {
+            "post": {
+                "description": "Admin. Reads every vulnerability state from the Wazuh 4.8+ indexer and imports it: one finding per agent + CVE + package version, matched to hosts by agent name. Open Wazuh findings the indexer no longer has are resolved; a read that doesn't add up to the indexer's total writes nothing. With dry_run=true nothing is written.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Sync vulnerabilities from Wazuh",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Count only, write nothing",
+                        "name": "dry_run",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnImportResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/wazuh/test": {
+            "post": {
+                "description": "Admin. Counts the vulnerability states in the saved Wazuh indexer. Always 200: {\"success\": false, \"error\"} or {\"success\": true, \"count\"}.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Test the Wazuh integration",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/webhooks/grafana/alerts": {
             "post": {
                 "description": "Public, no auth, but HMAC-signed: X-Sshcm-Signature must be the HMAC-SHA256 of the raw body with the configured webhook secret (\"sha256=\u003chex\u003e\" or bare hex). Alerts are upserted by fingerprint and matched to hosts via the sshcm_slug, host or instance label. Returns {processed, skipped, unmatched?}. Errors are plain text, not JSON.",
@@ -24080,12 +24165,6 @@
                 "new": {
                     "type": "integer"
                 },
-                "notes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
                 "parsed": {
                     "type": "integer"
                 },
@@ -24097,6 +24176,13 @@
                 },
                 "unmatched": {
                     "type": "integer"
+                },
+                "unmatched_targets": {
+                    "description": "UnmatchedTargets are the distinct targets (an ETIPI \"Alvo\", a Wazuh\nagent name) whose findings matched no asset, sorted.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "updated": {
                     "type": "integer"

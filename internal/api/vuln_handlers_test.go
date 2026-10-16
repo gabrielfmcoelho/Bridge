@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
@@ -158,5 +159,69 @@ func TestVuln_ImportScopeAndUpdate(t *testing.T) {
 	tab := decodeArr(t, scoped.do("GET", "/api/vulnerabilities?entity_type=dns&entity_id="+itoa(dadosDNS), ""))
 	if len(tab) != 1 {
 		t.Fatalf("dns tab = %d", len(tab))
+	}
+}
+
+// The Wazuh sync reads every page from the indexer, matches agents to hosts
+// by name, and resolves what the indexer no longer reports.
+func TestVuln_WazuhSync(t *testing.T) {
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	ctx := context.Background()
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug, hostname) VALUES ('web-01', 'web-01', '10.0.0.9') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatal(err)
+	}
+
+	hits := []string{
+		`{"_source":{"agent":{"id":"001","name":"web-01"},"package":{"name":"openssl","version":"3.0.2"},"vulnerability":{"id":"CVE-2024-0001","severity":"Critical","score":{"base":9.8}}}}`,
+		`{"_source":{"agent":{"id":"002","name":"db-unknown"},"package":{"name":"curl","version":"7.0"},"vulnerability":{"id":"CVE-2024-0002","severity":"Medium"}}}`,
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/wazuh-states-vulnerabilities-*/_search":
+			body := `{"_scroll_id":"s","hits":{"total":{"value":` + itoa(int64(len(hits))) + `},"hits":[` + strings.Join(hits, ",") + `]}}`
+			_, _ = w.Write([]byte(body))
+		case r.Method == http.MethodPost && r.URL.Path == "/_search/scroll":
+			_, _ = w.Write([]byte(`{"_scroll_id":"s","hits":{"total":{"value":0},"hits":[]}}`))
+		default:
+			_, _ = w.Write([]byte(`{}`))
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	admin := newVulnEnv(t, d, "admin", 0)
+	if resp := admin.do("POST", "/api/wazuh/sync", ""); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("sync while disabled = %d, want 400", resp.StatusCode)
+	}
+	settings := store.NewAppSettingsRepo(d.SQL)
+	for k, v := range map[string]string{"wazuh_enabled": "true", "wazuh_indexer_url": srv.URL, "wazuh_indexer_user": "reader"} {
+		if err := settings.Set(ctx, k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.NewAppSecretRepo(d.SQL).Store(ctx, d.Encryptor, "wazuh_indexer_password", "pw"); err != nil {
+		t.Fatal(err)
+	}
+
+	res := decodeObj(t, admin.do("POST", "/api/wazuh/sync", ""))
+	if res["new"] != float64(2) || res["unmatched"] != float64(1) {
+		t.Fatalf("first sync = %+v", res)
+	}
+	if u, _ := res["unmatched_targets"].([]any); len(u) != 1 || u[0] != "db-unknown" {
+		t.Fatalf("unmatched targets = %v", res["unmatched_targets"])
+	}
+	tab := decodeArr(t, admin.do("GET", "/api/vulnerabilities?entity_type=host&entity_id="+itoa(hostID), ""))
+	if len(tab) != 1 || tab[0]["severity"] != "critical" || tab[0]["source"] != "wazuh" {
+		t.Fatalf("host tab = %+v", tab)
+	}
+
+	hits = hits[:1] // db-unknown's CVE is fixed
+	res = decodeObj(t, admin.do("POST", "/api/wazuh/sync", ""))
+	if res["resolved"] != float64(1) || res["updated"] != float64(1) {
+		t.Fatalf("second sync = %+v", res)
 	}
 }

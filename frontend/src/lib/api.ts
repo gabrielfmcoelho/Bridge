@@ -846,6 +846,12 @@ export const vulnAPI = {
   },
 };
 
+// Wazuh 4.8+ indexer (admin): test the saved settings, sync vulnerabilities.
+export const wazuhAPI = {
+  test: () => api.post<{ success: boolean; error?: string; count?: number }>("/api/wazuh/test"),
+  sync: () => api.post<import("./types").VulnImportResult>("/api/wazuh/sync"),
+};
+
 // Canvases (entidade idea boards). update is partial and carries the loaded
 // version; a stale one rejects with ApiError status 409.
 export const canvasAPI = {

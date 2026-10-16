@@ -1943,6 +1943,15 @@
         "saveThresholds": "Salvar limites",
         "hosts": "Servidores do Coolify",
         "saveFirst": "Salve as alterações acima antes de sincronizar."
+      },
+      "wazuh": {
+        "hint": "Indexador do Wazuh 4.8+ (OpenSearch) com os estados de vulnerabilidade dos agentes. O botão \"Sincronizar Wazuh\" em Vulnerabilidades os lê; os agentes são ligados aos hosts pelo nome.",
+        "ariaEnable": "Ativar Wazuh",
+        "indexerUrl": "URL do indexador",
+        "user": "Usuário do indexador",
+        "userHint": "Basta acesso de leitura a wazuh-states-vulnerabilities-*.",
+        "password": "Senha do indexador",
+        "testOk": "Conectado: {count} estados de vulnerabilidade"
       }
     },
     "integrationsTabLabel": "Integrações",
@@ -3944,6 +3953,10 @@
     "openTicket": "Abrir chamado no GLPI",
     "ticketLink": "Chamado GLPI nº {id}",
     "issueNeedsLink": "Ligue o achado a um ativo primeiro: a issue é criada nele.",
-    "detailsInBridge": "Detalhes no Bridge"
+    "detailsInBridge": "Detalhes no Bridge",
+    "syncWazuh": "Sincronizar Wazuh",
+    "wazuhSynced": "Wazuh sincronizado",
+    "wazuhSyncFailed": "Falha ao sincronizar o Wazuh",
+    "unmatchedAgents": "agentes: {names}"
   }
 }

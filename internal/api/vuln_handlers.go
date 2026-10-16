@@ -1,12 +1,15 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vulnimport"
 )
@@ -302,8 +305,71 @@ func (h *vulnHandlers) handleImportETIPI(w http.ResponseWriter, r *http.Request)
 	jsonOK(w, res)
 }
 
+// handleWazuhTest godoc
+//
+//	@Summary		Test the Wazuh integration
+//	@Description	Admin. Counts the vulnerability states in the saved Wazuh indexer. Always 200: {"success": false, "error"} or {"success": true, "count"}.
+//	@Tags			vulnerabilities
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/wazuh/test [post]
+func (h *vulnHandlers) handleWazuhTest(w http.ResponseWriter, r *http.Request) {
+	client, err := service.WazuhClient(r.Context(), h.db)
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	n, err := client.Count(ctx)
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	jsonOK(w, map[string]any{"success": true, "count": n})
+}
+
+// handleWazuhSync godoc
+//
+//	@Summary		Sync vulnerabilities from Wazuh
+//	@Description	Admin. Reads every vulnerability state from the Wazuh 4.8+ indexer and imports it: one finding per agent + CVE + package version, matched to hosts by agent name. Open Wazuh findings the indexer no longer has are resolved; a read that doesn't add up to the indexer's total writes nothing. With dry_run=true nothing is written.
+//	@Tags			vulnerabilities
+//	@Produce		json
+//	@Param			dry_run	query		bool	false	"Count only, write nothing"
+//	@Success		200		{object}	models.VulnImportResult
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		502		{object}	httpx.ErrorResponse
+//	@Router			/api/wazuh/sync [post]
+func (h *vulnHandlers) handleWazuhSync(w http.ResponseWriter, r *http.Request) {
+	client, err := service.WazuhClient(r.Context(), h.db)
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	hits, err := client.Vulnerabilities(ctx)
+	if err != nil {
+		jsonErrorLogged(w, r, http.StatusBadGateway, "failed to read Wazuh: "+err.Error(), err)
+		return
+	}
+	res, err := h.repo().ApplyImport(store.WithSystemScope(ctx), vulnimport.SourceWazuh, vulnimport.FromWazuh(hits), nil,
+		r.URL.Query().Get("dry_run") == "true")
+	if err != nil {
+		jsonServerError(w, r, "failed to import Wazuh vulnerabilities", err)
+		return
+	}
+	jsonOK(w, res)
+}
+
 // registerRoutes wires this group's routes (self-registration, R2).
 func (h *vulnHandlers) registerRoutes(rr routeRegistrar) {
+	rr.role("admin", "POST /api/wazuh/test", h.handleWazuhTest)
+	rr.role("admin", "POST /api/wazuh/sync", h.handleWazuhSync)
 	rr.auth("GET /api/vulnerabilities", h.handleList)
 	rr.role("admin", "POST /api/vulnerabilities/import/etipi", h.handleImportETIPI)
 	rr.auth("GET /api/vulnerabilities/{id}", h.handleGet)

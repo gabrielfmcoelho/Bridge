@@ -4477,10 +4477,6 @@ definitions:
         type: boolean
       new:
         type: integer
-      notes:
-        items:
-          type: string
-        type: array
       parsed:
         type: integer
       reopened:
@@ -4489,6 +4485,13 @@ definitions:
         type: integer
       unmatched:
         type: integer
+      unmatched_targets:
+        description: |-
+          UnmatchedTargets are the distinct targets (an ETIPI "Alvo", a Wazuh
+          agent name) whose findings matched no asset, sorted.
+        items:
+          type: string
+        type: array
       updated:
         type: integer
     type: object
@@ -17387,6 +17390,67 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Import an ETIPI report
+      tags:
+      - vulnerabilities
+  /api/wazuh/sync:
+    post:
+      description: 'Admin. Reads every vulnerability state from the Wazuh 4.8+ indexer
+        and imports it: one finding per agent + CVE + package version, matched to
+        hosts by agent name. Open Wazuh findings the indexer no longer has are resolved;
+        a read that doesn''t add up to the indexer''s total writes nothing. With dry_run=true
+        nothing is written.'
+      parameters:
+      - description: Count only, write nothing
+        in: query
+        name: dry_run
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.VulnImportResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Sync vulnerabilities from Wazuh
+      tags:
+      - vulnerabilities
+  /api/wazuh/test:
+    post:
+      description: 'Admin. Counts the vulnerability states in the saved Wazuh indexer.
+        Always 200: {"success": false, "error"} or {"success": true, "count"}.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Test the Wazuh integration
       tags:
       - vulnerabilities
   /api/webhooks/grafana/alerts:
