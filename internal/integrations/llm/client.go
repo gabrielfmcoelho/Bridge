@@ -96,11 +96,18 @@ func (c *Client) Complete(ctx context.Context, messages []ChatMessage) (string, 
 // Chat sends a chat completion request with optional tools and returns the
 // whole assistant message (text, or the tool calls it asks for).
 func (c *Client) Chat(ctx context.Context, messages []ChatMessage, tools []Tool) (ChatMessage, error) {
+	return c.ChatChoice(ctx, messages, tools, "")
+}
+
+// ChatChoice is Chat with a tool_choice ("required" forces a tool call;
+// "" leaves it to the model).
+func (c *Client) ChatChoice(ctx context.Context, messages []ChatMessage, tools []Tool, toolChoice string) (ChatMessage, error) {
 	req := CompletionRequest{
-		Model:     c.model,
-		Messages:  messages,
-		MaxTokens: c.maxTokens,
-		Tools:     tools,
+		Model:      c.model,
+		Messages:   messages,
+		MaxTokens:  c.maxTokens,
+		Tools:      tools,
+		ToolChoice: toolChoice,
 	}
 
 	body, err := json.Marshal(req)

@@ -130,11 +130,13 @@ func TestToolsFor_ProposalsNeedEditor(t *testing.T) {
 type fakeModel struct {
 	replies []func(msgs []llm.ChatMessage, tools []llm.Tool) (llm.ChatMessage, error)
 	calls   int
+	choices []string // tool_choice of each call
 }
 
-func (f *fakeModel) Chat(_ context.Context, msgs []llm.ChatMessage, tools []llm.Tool) (llm.ChatMessage, error) {
+func (f *fakeModel) ChatChoice(_ context.Context, msgs []llm.ChatMessage, tools []llm.Tool, choice string) (llm.ChatMessage, error) {
 	r := f.replies[f.calls]
 	f.calls++
+	f.choices = append(f.choices, choice)
 	return r(msgs, tools)
 }
 

@@ -577,20 +577,23 @@ type aiChatResult struct {
 }
 
 type chatModel interface {
-	Chat(ctx context.Context, messages []llm.ChatMessage, tools []llm.Tool) (llm.ChatMessage, error)
+	ChatChoice(ctx context.Context, messages []llm.ChatMessage, tools []llm.Tool, toolChoice string) (llm.ChatMessage, error)
 }
 
 // runChat answers one user turn, letting the model call the user's tools
 // (up to maxToolRounds rounds).
 func runChat(ctx context.Context, model chatModel, env aiToolEnv, messages []llm.ChatMessage) (aiChatResult, error) {
-	return runToolLoop(ctx, model, env, messages, toolsFor(env.user), maxToolRounds)
+	return runToolLoop(ctx, model, env, messages, toolsFor(env.user), maxToolRounds, false)
 }
 
 // runToolLoop lets the model call the given tools for up to maxRounds
-// rounds, then makes it answer (the last round offers no tools). A gateway
-// that rejects tools (4xx on the first call) gets the plain conversation
-// instead, and Tools reports false.
-func runToolLoop(ctx context.Context, model chatModel, env aiToolEnv, messages []llm.ChatMessage, available []aiTool, maxRounds int) (aiChatResult, error) {
+// rounds, then makes it answer (the last round offers no tools).
+// forceFirst sends tool_choice "required" on the first round, for models
+// that would otherwise answer from the prompt without looking (Qwen does).
+// A gateway that rejects that (4xx) is asked again without it; one that
+// rejects tools altogether gets the plain conversation, and Tools reports
+// false.
+func runToolLoop(ctx context.Context, model chatModel, env aiToolEnv, messages []llm.ChatMessage, available []aiTool, maxRounds int, forceFirst bool) (aiChatResult, error) {
 	byName := map[string]aiTool{}
 	defs := make([]llm.Tool, 0, len(available))
 	for _, t := range available {
@@ -605,12 +608,23 @@ func runToolLoop(ctx context.Context, model chatModel, env aiToolEnv, messages [
 		if res.Tools && round < maxRounds {
 			tools = defs // the last round has none, so the model must answer
 		}
-		msg, err := model.Chat(ctx, messages, tools)
+		choice := ""
+		if forceFirst && round == 0 && tools != nil {
+			choice = "required"
+		}
+		msg, err := model.ChatChoice(ctx, messages, tools, choice)
 		var apiErr *llm.APIError
-		if err != nil && round == 0 && tools != nil && errors.As(err, &apiErr) && apiErr.Status >= 400 && apiErr.Status < 500 {
+		rejected := func() bool {
+			return err != nil && round == 0 && tools != nil && errors.As(err, &apiErr) && apiErr.Status >= 400 && apiErr.Status < 500
+		}
+		if choice != "" && rejected() {
+			log.Printf("[ai-tool] tool_choice rejected by the model gateway (%d), retrying without it", apiErr.Status)
+			msg, err = model.ChatChoice(ctx, messages, tools, "")
+		}
+		if rejected() {
 			log.Printf("[ai-tool] tools rejected by the model gateway (%d), answering without them", apiErr.Status)
 			res.Tools = false
-			msg, err = model.Chat(ctx, messages, nil)
+			msg, err = model.ChatChoice(ctx, messages, nil, "")
 		}
 		if err != nil {
 			return res, err
