@@ -51,7 +51,8 @@
     "menu": "Menu",
     "shares": "Shares",
     "canvas": "Idea boards",
-    "home": "Home"
+    "home": "Home",
+    "vulnerabilities": "Vulnerabilities"
   },
   "atlas": {
     "apis": {
@@ -1942,6 +1943,15 @@
         "saveThresholds": "Save thresholds",
         "hosts": "Coolify servers",
         "saveFirst": "Save the changes above before syncing."
+      },
+      "wazuh": {
+        "hint": "Wazuh 4.8+ indexer (OpenSearch) holding the agents' vulnerability states. The \"Sync Wazuh\" button on Vulnerabilities reads them; agents are matched to hosts by name.",
+        "ariaEnable": "Enable Wazuh",
+        "indexerUrl": "Indexer URL",
+        "user": "Indexer user",
+        "userHint": "Read access to wazuh-states-vulnerabilities-* is enough.",
+        "password": "Indexer password",
+        "testOk": "Connected: {count} vulnerability states"
       }
     },
     "integrationsTabLabel": "Integrations",
@@ -3841,5 +3851,112 @@
     "liveUpdated": "updated {time}",
     "syncHost": "Sync this host",
     "hostSynced": "Host synced: {services} services updated."
+  },
+  "vuln": {
+    "tab": "Vulnerabilities",
+    "subtitle": "Findings from ETIPI reports and Wazuh, linked to hosts, DNS, services and projects",
+    "importEtipi": "Import ETIPI report",
+    "searchPlaceholder": "Search title, CVE, target or VM...",
+    "severity": "Severity",
+    "source": "Source",
+    "anySeverity": "Any severity",
+    "anySource": "Any source",
+    "severityLevel": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "info": "Info"
+    },
+    "status": {
+      "open": "Open",
+      "accepted": "Accepted risk",
+      "false_positive": "False positive",
+      "resolved": "Resolved"
+    },
+    "view": {
+      "open": "Open",
+      "triaged": "Accepted / false positive",
+      "resolved": "Resolved",
+      "unmatched": "Unmatched",
+      "closed": "Closed"
+    },
+    "empty": {
+      "open": "No open findings",
+      "triaged": "No accepted or false-positive findings",
+      "resolved": "No resolved findings",
+      "unmatched": "Every finding is linked to an asset"
+    },
+    "emptyHint": "Findings arrive from ETIPI report imports and the Wazuh sync.",
+    "emptyEntityOpen": "No open findings here",
+    "emptyEntityClosed": "No closed findings here",
+    "emptyEntityHint": "Includes findings on the hosts and DNS records this is related to.",
+    "finding": "Finding",
+    "target": "Target",
+    "viaColumn": "Reached via",
+    "lastSeen": "Last seen",
+    "knownExploited": "Known exploit",
+    "via": "via {type} {name}",
+    "direct": "Direct",
+    "entity": {
+      "host": "Host",
+      "dns": "DNS",
+      "service": "Service",
+      "project": "Project"
+    },
+    "vm": "VM",
+    "cve": "CVE",
+    "cvss": "CVSS",
+    "cwe": "CWE",
+    "scanner": "Scanner",
+    "firstSeen": "First seen",
+    "resolvedAt": "Resolved at",
+    "risk": "Risk",
+    "remediation": "How to fix",
+    "evidence": "Evidence",
+    "reference": "Reference",
+    "links": "Linked assets",
+    "unmatchedHint": "Not linked to any asset yet: only admins see it. Link it to a host, DNS record, service or project.",
+    "origin": {
+      "auto": "matched by import",
+      "manual": "linked by hand"
+    },
+    "linkType": "Asset type",
+    "addLink": "Link to an asset...",
+    "triage": "Triage",
+    "note": "Note",
+    "noteHint": "Why it was accepted, marked false positive or resolved.",
+    "saved": "Finding updated",
+    "imported": "ETIPI report imported",
+    "importSummary": "{new} new, {resolved} resolved, {unmatched} unmatched",
+    "importConfirm": "Import",
+    "importHint": "Upload the ETIPI text report. Nothing is saved until you confirm: open findings missing from the file are resolved.",
+    "selectFile": "Choose or drop the report (.txt)",
+    "checking": "Checking the report...",
+    "previewTitle": "This import will:",
+    "count": {
+      "parsed": "Findings in file",
+      "new": "New",
+      "updated": "Updated",
+      "reopened": "Reopened",
+      "resolved": "Resolved",
+      "unmatched": "Unmatched"
+    },
+    "unmatchedPreviewHint": "Unmatched findings name no DNS record or host Bridge knows; they wait in the Unmatched tab for an admin to link them.",
+    "pickAnother": "Choose another file",
+    "importComplete": "This file lists every open finding",
+    "importCompleteHint": "Leave it off when ETIPI sent only some systems: a finding is then resolved only if the file still lists its host with that severity. A host that comes back fully clean drops out of the report, so its findings stay open until you resolve them or import a complete file.",
+    "followUp": "Follow-up",
+    "createIssue": "Create issue",
+    "issueCreated": "Issue created from the finding",
+    "issueLink": "Issue #{id}",
+    "openTicket": "Open GLPI ticket",
+    "ticketLink": "GLPI ticket #{id}",
+    "issueNeedsLink": "Link the finding to an asset first: the issue is created on it.",
+    "detailsInBridge": "Details in Bridge",
+    "syncWazuh": "Sync Wazuh",
+    "wazuhSynced": "Wazuh synced",
+    "wazuhSyncFailed": "Wazuh sync failed",
+    "unmatchedAgents": "agents: {names}"
   }
 }

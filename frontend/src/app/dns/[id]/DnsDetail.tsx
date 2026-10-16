@@ -24,10 +24,11 @@ import RelationsCard, { hostsGroup, servicesGroup, projectsGroup } from "@/compo
 import IssuesBoard from "@/components/issues/IssuesBoard";
 import EmptyState from "@/components/ui/EmptyState";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
 import { certState, certTone } from "@/lib/dnsCert";
 import { certLabel } from "../_components/CertBadge";
 
-type TabKey = "overview" | "topology" | "issues";
+type TabKey = "overview" | "topology" | "issues" | "vulns";
 
 export default function DnsDetail({ id }: { id: number }) {
   const { t } = useLocale();
@@ -79,6 +80,8 @@ export default function DnsDetail({ id }: { id: number }) {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["dns"] }); router.push("/dns"); },
   });
 
+  const openVulns = useEntityVulnCount("dns", dns ? id : undefined);
+
   const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
     {
       key: "overview",
@@ -90,6 +93,12 @@ export default function DnsDetail({ id }: { id: number }) {
       label: t("host.tabTracking"),
       icon: ICON_PATHS.alert,
       badge: dnsIssues.length || undefined,
+    },
+    {
+      key: "vulns",
+      label: t("vuln.tab"),
+      icon: ICON_PATHS.shieldAlert,
+      badge: openVulns || undefined,
     },
     {
       key: "topology",
@@ -140,6 +149,8 @@ export default function DnsDetail({ id }: { id: number }) {
           {activeTab === "issues" && (
             <IssuesBoard entityType="dns" entityId={id} canEdit={canEdit} />
           )}
+
+          {activeTab === "vulns" && <EntityVulnsTab entityType="dns" entityId={id} />}
 
           {activeTab === "topology" && (() => {
             const groups = [hostsGroup(linkedHosts, t), servicesGroup(linkedServices, t), projectsGroup(linkedProjects, t)];

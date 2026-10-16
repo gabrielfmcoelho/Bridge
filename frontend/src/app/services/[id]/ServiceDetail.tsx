@@ -30,9 +30,10 @@ import MetricsTab from "./_components/MetricsTab";
 import RequestsTab, { useTelemetryEnabled } from "@/components/telemetry/RequestsTab";
 import ServiceSentinelTab from "@/components/sentinel/ServiceSentinelTab";
 import ServiceApisTab from "./_components/ServiceApisTab";
+import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
 import { linkedApisQuery } from "@/app/atlas/apis/_components/LinkedApisCard";
 
-type TabKey = "overview" | "issues" | "topology" | "credentials" | "metrics" | "apis" | "requests" | "sentinel";
+type TabKey = "overview" | "issues" | "vulns" | "topology" | "credentials" | "metrics" | "apis" | "requests" | "sentinel";
 
 const GENERATED = /^Auto-discovered /;
 
@@ -66,6 +67,7 @@ export default function ServiceDetail({ id }: { id: number }) {
   // Settings are admin-only: other roles see the tab and get the "disabled" reason inside.
   const sentinelEnabled = integrations ? integrations.sentinel?.sentinel_enabled === "true" : true;
   const telemetryEnabled = useTelemetryEnabled();
+  const openVulns = useEntityVulnCount("service", data ? id : undefined);
   const { graph, loading: graphLoading } = useEntityGraph(data ? `service-${id}` : undefined, activeTab === "topology");
   const { data: linkedApis = [] } = useQuery({ ...linkedApisQuery({ service_id: id }), enabled: !!data });
 
@@ -91,6 +93,7 @@ export default function ServiceDetail({ id }: { id: number }) {
   const tabs = [
     { key: "overview", label: t("host.tabOverview"), icon: ICON_PATHS.home },
     { key: "issues", label: t("host.tabTracking"), icon: ICON_PATHS.alert, badge: openIssues || undefined },
+    { key: "vulns", label: t("vuln.tab"), icon: ICON_PATHS.shieldAlert, badge: openVulns || undefined },
     { key: "topology", label: t("host.tabTopology"), icon: ICON_PATHS.bolt },
     { key: "credentials", label: t("service.credentials"), icon: ICON_PATHS.lock },
     ...(grafanaEnabled ? [{ key: "metrics", label: t("host.tabMetrics"), icon: ICON_PATHS.layoutGrid }] : []),
@@ -169,6 +172,8 @@ export default function ServiceDetail({ id }: { id: number }) {
           )}
 
           {activeTab === "issues" && <IssuesBoard entityType="service" entityId={id} canEdit={canEdit} />}
+
+          {activeTab === "vulns" && <EntityVulnsTab entityType="service" entityId={id} />}
 
           {activeTab === "topology" && (
             <TopologyPane graph={graph} loading={graphLoading} t={t}

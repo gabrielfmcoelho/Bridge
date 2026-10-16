@@ -216,6 +216,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_VulnFinding:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.VulnFinding'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-service_DNSListItem:
     properties:
       data:
@@ -2856,6 +2865,26 @@ definitions:
       username:
         type: string
     type: object
+  api.vulnLinkRequest:
+    properties:
+      entity_id:
+        type: integer
+      entity_type:
+        type: string
+    type: object
+  api.vulnUpdateRequest:
+    properties:
+      glpi_ticket_id:
+        type: integer
+      glpi_ticket_url:
+        type: string
+      issue_id:
+        type: integer
+      status:
+        type: string
+      status_note:
+        type: string
+    type: object
   api.wikiCreateCommonDocumentRequest:
     properties:
       collection_id:
@@ -4372,6 +4401,109 @@ definitions:
       is_primary:
         type: boolean
       name:
+        type: string
+      slug:
+        type: string
+    type: object
+  models.VulnFinding:
+    properties:
+      created_at:
+        type: string
+      cve:
+        type: string
+      cvss:
+        type: number
+      cwe:
+        type: string
+      evidence:
+        type: string
+      first_seen_at:
+        type: string
+      glpi_ticket_id:
+        type: integer
+      glpi_ticket_url:
+        type: string
+      id:
+        type: integer
+      issue_id:
+        type: integer
+      known_exploited:
+        type: boolean
+      last_seen_at:
+        type: string
+      links:
+        description: Links is filled on the detail read.
+        items:
+          $ref: '#/definitions/models.VulnLink'
+        type: array
+      reference:
+        type: string
+      remediation:
+        type: string
+      resolved_at:
+        type: string
+      risk:
+        type: string
+      scanner:
+        type: string
+      severity:
+        type: string
+      source:
+        type: string
+      status:
+        type: string
+      status_by:
+        type: integer
+      status_note:
+        type: string
+      target:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      via:
+        description: |-
+          Via is set only on entity-tab lists: "" for a direct link, otherwise
+          the related asset the finding reached this entity through
+          ("dns:portal.sead.pi.gov.br", "host:<nickname>").
+        type: string
+      vm_hint:
+        type: string
+    type: object
+  models.VulnImportResult:
+    properties:
+      dry_run:
+        type: boolean
+      new:
+        type: integer
+      parsed:
+        type: integer
+      reopened:
+        type: integer
+      resolved:
+        type: integer
+      unmatched:
+        type: integer
+      unmatched_targets:
+        description: |-
+          UnmatchedTargets are the distinct targets (an ETIPI "Alvo", a Wazuh
+          agent name) whose findings matched no asset, sorted.
+        items:
+          type: string
+        type: array
+      updated:
+        type: integer
+    type: object
+  models.VulnLink:
+    properties:
+      entity_id:
+        type: integer
+      entity_type:
+        type: string
+      name:
+        type: string
+      origin:
         type: string
       slug:
         type: string
@@ -16994,6 +17126,333 @@ paths:
       summary: Update a user
       tags:
       - users
+  /api/vulnerabilities:
+    get:
+      description: 'Findings from ETIPI reports and Wazuh, most severe first. Visible
+        through the host / DNS / service / project they link to; unlinked ones are
+        admin-only. With entity_type + entity_id: that entity''s tab, including findings
+        on its related hosts / DNS records (via). Any role.'
+      parameters:
+      - description: 'Comma-separated: open, accepted, false_positive, resolved'
+        in: query
+        name: status
+        type: string
+      - description: 'Comma-separated: critical, high, medium, low, info'
+        in: query
+        name: severity
+        type: string
+      - description: etipi or wazuh
+        in: query
+        name: source
+        type: string
+      - description: Title, CVE, target or VM
+        in: query
+        name: search
+        type: string
+      - description: Only findings linked to nothing (admin)
+        in: query
+        name: unmatched
+        type: boolean
+      - description: host, dns, service or project
+        in: query
+        name: entity_type
+        type: string
+      - description: Entity ID (with entity_type)
+        in: query
+        name: entity_id
+        type: integer
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200, default 50)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_VulnFinding'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List vulnerability findings
+      tags:
+      - vulnerabilities
+  /api/vulnerabilities/{id}:
+    get:
+      description: With its links. 404 when absent or invisible. Any role.
+      parameters:
+      - description: Finding ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.VulnFinding'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Get a vulnerability finding
+      tags:
+      - vulnerabilities
+    patch:
+      consumes:
+      - application/json
+      description: 'Editor+. Partial: status (open, accepted, false_positive, resolved),
+        status_note, and the issue / GLPI ticket opened from it. accepted / false_positive
+        survive re-imports.'
+      parameters:
+      - description: Finding ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.vulnUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.VulnFinding'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Update a vulnerability finding
+      tags:
+      - vulnerabilities
+  /api/vulnerabilities/{id}/links:
+    delete:
+      consumes:
+      - application/json
+      description: Editor+. Removes a manual or auto link; an auto link returns on
+        the next import that still matches it. The asset must be visible (404 otherwise).
+      parameters:
+      - description: Finding ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Asset
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.vulnLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.VulnFinding'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Unlink a finding from an asset
+      tags:
+      - vulnerabilities
+    post:
+      consumes:
+      - application/json
+      description: Editor+. Manual link to a host, DNS record, service or project,
+        kept across imports. The asset must exist and be visible (404 otherwise).
+      parameters:
+      - description: Finding ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Asset
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.vulnLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.VulnFinding'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Link a finding to an asset
+      tags:
+      - vulnerabilities
+  /api/vulnerabilities/import/etipi:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 'Admin. Multipart field "file": the ETIPI text report. The file
+        is rejected when its counts don''t add up. Findings are matched to DNS records
+        (target) and hosts (VM). An open ETIPI finding missing from the file is resolved
+        only when the file still lists its host with that severity, unless complete=true
+        (the file is every open finding). With dry_run=true nothing is written and
+        the counts are returned.'
+      parameters:
+      - description: ETIPI report (.txt)
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Count only, write nothing
+        in: query
+        name: dry_run
+        type: boolean
+      - description: 'The file lists every open finding: resolve absent ones on any
+          host'
+        in: query
+        name: complete
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.VulnImportResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Import an ETIPI report
+      tags:
+      - vulnerabilities
+  /api/wazuh/sync:
+    post:
+      description: 'Admin. Reads every vulnerability state from the Wazuh 4.8+ indexer
+        and imports it: one finding per agent + CVE + package version, matched to
+        hosts by agent name. Open Wazuh findings the indexer no longer has are resolved;
+        a read that doesn''t add up to the indexer''s total writes nothing. With dry_run=true
+        nothing is written.'
+      parameters:
+      - description: Count only, write nothing
+        in: query
+        name: dry_run
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.VulnImportResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Sync vulnerabilities from Wazuh
+      tags:
+      - vulnerabilities
+  /api/wazuh/test:
+    post:
+      description: 'Admin. Counts the vulnerability states in the saved Wazuh indexer.
+        Always 200: {"success": false, "error"} or {"success": true, "count"}.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Test the Wazuh integration
+      tags:
+      - vulnerabilities
   /api/webhooks/grafana/alerts:
     post:
       consumes:

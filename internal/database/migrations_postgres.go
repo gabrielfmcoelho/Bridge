@@ -1856,4 +1856,50 @@ var migrationsPostgres = []string{
 		synced_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_sentinel_service_snapshots_host ON sentinel_service_snapshots(host_id);`,
+
+	// Version 111: vulnerability findings from ETIPI report files and Wazuh.
+	// Identity across imports is (source, fingerprint); an import auto-resolves
+	// the open findings it no longer lists. No grants of their own: a finding
+	// is visible through the host / dns / service / project it links to, and
+	// an unlinked one is admin-only. issue_id / glpi_ticket_* record the issue
+	// or GLPI ticket opened from a finding.
+	`CREATE TABLE IF NOT EXISTS vuln_findings (
+		id              BIGSERIAL PRIMARY KEY,
+		source          TEXT NOT NULL CHECK (source IN ('etipi','wazuh')),
+		fingerprint     TEXT NOT NULL,
+		title           TEXT NOT NULL,
+		severity        TEXT NOT NULL CHECK (severity IN ('critical','high','medium','low','info')),
+		cve             TEXT NOT NULL DEFAULT '',
+		cvss            DOUBLE PRECISION,
+		cwe             TEXT NOT NULL DEFAULT '',
+		scanner         TEXT NOT NULL DEFAULT '',
+		target          TEXT NOT NULL DEFAULT '',
+		vm_hint         TEXT NOT NULL DEFAULT '',
+		evidence        TEXT NOT NULL DEFAULT '',
+		risk            TEXT NOT NULL DEFAULT '',
+		remediation     TEXT NOT NULL DEFAULT '',
+		reference       TEXT NOT NULL DEFAULT '',
+		known_exploited BOOLEAN NOT NULL DEFAULT FALSE,
+		status          TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','accepted','false_positive','resolved')),
+		status_note     TEXT NOT NULL DEFAULT '',
+		status_by       BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		issue_id        BIGINT REFERENCES issues(id) ON DELETE SET NULL,
+		glpi_ticket_id  BIGINT,
+		glpi_ticket_url TEXT NOT NULL DEFAULT '',
+		first_seen_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		last_seen_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		resolved_at     TIMESTAMPTZ,
+		created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE (source, fingerprint)
+	);
+	CREATE INDEX IF NOT EXISTS idx_vuln_findings_status ON vuln_findings(status, severity);
+	CREATE TABLE IF NOT EXISTS vuln_finding_links (
+		finding_id  BIGINT NOT NULL REFERENCES vuln_findings(id) ON DELETE CASCADE,
+		entity_type TEXT NOT NULL CHECK (entity_type IN ('host','dns','service','project')),
+		entity_id   BIGINT NOT NULL,
+		origin      TEXT NOT NULL DEFAULT 'auto' CHECK (origin IN ('auto','manual')),
+		PRIMARY KEY (finding_id, entity_type, entity_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_vuln_finding_links_entity ON vuln_finding_links(entity_type, entity_id);`,
 }

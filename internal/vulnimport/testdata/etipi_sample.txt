@@ -1,0 +1,45 @@
+Total de achados em aberto: 7
+
+--- CRITICAL (2) ---
+  • Metabase - Unauthenticated SQL Injection  [EXPLORAÇÃO CONHECIDA — CORRIGIR COM URGÊNCIA]
+    Alvo: dados.example.test
+    CVE: CVE-2026-0001 (CVSS 10.0)
+    Categoria (CWE): CWE-89
+    Detectado por: Nuclei
+    Evidência: https://dados.example.test/api/session/reset_password
+    Risco: Remote attackers can run arbitrary SQL.
+    COMO CORRIGIR: Update Metabase.
+    Referência: https://example.test/advisory
+
+  • OSVDB-CVE‑2003‑1540
+    Alvo: wiki.example.test:443
+    VM: VM-PROXY-01
+    Detectado por: Nikto
+    Evidência: http://wiki.example.test:443/a.mdb
+
+
+--- HIGH (5) ---
+  • SNMPv1 Public Community String - Detect
+    Alvo: snmp.example.test
+    Detectado por: Nuclei
+    Evidência: snmp.example.test:161
+
+  • OSVDB-CVE-2001-0821 https://packetstorm.example.test/xmas.txt.html
+    Alvo: wiki.example.test:443
+    Detectado por: Nikto
+    Evidência: http://wiki.example.test:443/orders.txt
+
+  • SQL Injection
+    Alvo: http://app.example.test:8080
+    Detectado por: ZAP
+    Evidência: http://app.example.test:8080/login/ | http://app.example.test:8080/login/?next=%2Fhome
+
+  • Alerta Nikto
+    Alvo: wiki.example.test:443
+    Detectado por: Nikto
+    Evidência: http://wiki.example.test:443/one/<script>alert(1)</script>
+
+  • Alerta Nikto
+    Alvo: wiki.example.test:443
+    Detectado por: Nikto
+    Evidência: http://wiki.example.test:443/two

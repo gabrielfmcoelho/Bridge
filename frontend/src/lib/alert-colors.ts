@@ -1,4 +1,5 @@
-import type { AlertLevel } from "@/lib/types";
+import type { AlertLevel, VulnSeverity, VulnStatus } from "@/lib/types";
+import type { LozengeAppearance } from "@/components/ui/Lozenge";
 
 export const ALERT_DOT_COLOR: Record<AlertLevel, string> = {
   critical: "bg-[var(--danger)]",
@@ -20,3 +21,20 @@ export const PRIORITY_DOT_COLOR: Record<string, string> = {
 };
 
 export const LEVEL_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+
+// Vulnerability severity is a Badge (a category), its status a Lozenge
+// (workflow state) — DESIGN_SYSTEM.md.
+export const VULN_SEVERITY_BADGE: Record<VulnSeverity, "danger" | "warning" | "info" | "default"> = {
+  critical: "danger",
+  high: "warning",
+  medium: "info",
+  low: "default",
+  info: "default",
+};
+
+export const VULN_STATUS_LOZENGE: Record<VulnStatus, LozengeAppearance> = {
+  open: "removed",
+  accepted: "moved",
+  false_positive: "default",
+  resolved: "success",
+};
