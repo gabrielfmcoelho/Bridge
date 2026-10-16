@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -14,7 +15,13 @@ const fixture = `{"totalResults":1,"vulnerabilities":[{"cve":{
  "metrics":{"cvssMetricV31":[{"cvssData":{"baseScore":10.0,"vectorString":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"}}],
             "cvssMetricV2":[{"cvssData":{"baseScore":9.3,"vectorString":"AV:N/AC:M/Au:N/C:C/I:C/A:C"}}]},
  "weaknesses":[{"description":[{"value":"NVD-CWE-noinfo"}]},{"description":[{"value":"CWE-502"},{"value":"CWE-20"}]}],
- "references":[{"url":"https://logging.apache.org/log4j/2.x/security.html"},{"url":"https://example.org/b"}]}}]}`
+ "references":[{"url":"https://logging.apache.org/log4j/2.x/security.html"},{"url":"https://example.org/b"}],
+ "configurations":[{"nodes":[{"cpeMatch":[
+   {"vulnerable":true,"criteria":"cpe:2.3:o:siemens:fw:*:*:*:*:*:*:*:*","versionEndExcluding":"2.7.0"},
+   {"vulnerable":true,"criteria":"cpe:2.3:a:apache:log4j:*:*:*:*:*:*:*:*","versionStartIncluding":"2.0.1","versionEndExcluding":"2.3.1"},
+   {"vulnerable":true,"criteria":"cpe:2.3:a:apache:log4j:2.15.0:-:*:*:*:*:*:*"},
+   {"vulnerable":true,"criteria":"cpe:2.3:a:apache:log4j:*:*:*:*:*:*:*:*","versionStartIncluding":"2.0.1","versionEndExcluding":"2.3.1"},
+   {"vulnerable":false,"criteria":"cpe:2.3:o:linux:linux_kernel:-:*:*:*:*:*:*:*"}]}]}]}}]}`
 
 func fake(t *testing.T, status int, body string) *Client {
 	t.Helper()
@@ -43,6 +50,10 @@ func TestCVEParses(t *testing.T) {
 	if c.CWE != "CWE-502" {
 		t.Errorf("cwe = %q, want first real CWE", c.CWE)
 	}
+	// Applications first, ranges deduplicated, non-vulnerable (platform) entries left out.
+	if strings.Join(c.Affected, " | ") != "apache:log4j >=2.0.1 <2.3.1; =2.15.0 | siemens:fw <2.7.0" {
+		t.Errorf("affected = %q", c.Affected)
+	}
 	if len(c.References) != 2 || c.Published == nil || c.Published.Year() != 2021 {
 		t.Errorf("refs = %v published = %v", c.References, c.Published)
 	}
@@ -59,5 +70,19 @@ func TestCVENotFound(t *testing.T) {
 	}
 	if _, err := fake(t, 503, "down").CVE(context.Background(), "CVE-2099-0001"); err == nil || errors.Is(err, ErrNotFound) {
 		t.Errorf("503: err = %v, want a non-NotFound error", err)
+	}
+}
+
+// NVD often enumerates exact versions instead of a range: they come back
+// sorted numerically, and when many, as their ends — the newest affected
+// version must survive.
+func TestAffectedExactVersions(t *testing.T) {
+	var ms []cpeMatch
+	for _, v := range []string{"2.4.10", "2.4.2", "2.4.27", "2.2.34", "2.4.0", "2.4.9"} {
+		ms = append(ms, cpeMatch{Vulnerable: true, Criteria: "cpe:2.3:a:apache:http_server:" + v + ":*:*:*:*:*:*:*"})
+	}
+	got := strings.Join(affected(ms), " | ")
+	if got != "apache:http_server =2.2.34; =2.4.0 … =2.4.10; =2.4.27 (6 listed versions)" {
+		t.Fatalf("affected = %q", got)
 	}
 }

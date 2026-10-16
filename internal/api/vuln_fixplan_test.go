@@ -41,8 +41,35 @@ func TestUnsupportedVersions(t *testing.T) {
 	if got := strings.Join(unsupportedVersions(plan, evidence), ","); got != "0.49.3,0.46.2" {
 		t.Fatalf("unsupported = %q, want the two invented versions once each", got)
 	}
+	// A fixed version given by the NVD ranges in the prompt is sourced.
+	withNVD := evidence + "\nVersões afetadas (NVD CPE; em \"<X\", X é a primeira versão corrigida):\n- metabase:metabase >=0.46.0 <0.46.6.1"
+	if got := unsupportedVersions("Atualize para v0.46.6.1.", withNVD); len(got) != 0 {
+		t.Fatalf("the NVD fixed version was flagged: %v", got)
+	}
 	if got := unsupportedVersions("Atualize de v0.46.1 conforme o advisory.", evidence); len(got) != 0 {
 		t.Fatalf("a version from the evidence was flagged: %v", got)
+	}
+}
+
+// The catalog analysis is LLM-written: a version that only it mentions must
+// not count as a source for the fix plan.
+func TestFixPlanEvidenceExcludesCatalogAnalysis(t *testing.T) {
+	ctx := context.Background()
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.NewCVECatalogRepo(d.SQL).Upsert(ctx, &models.CVECatalogEntry{CVEID: "CVE-2017-9798", AnalysisPT: "Atualize para 2.4.28.", References: []string{}}); err != nil {
+		t.Fatal(err)
+	}
+	h := &vulnHandlers{db: d} // no NVD client: the record is the catalog text only
+	rec := h.cveForFixPlan(ctx, &models.VulnFinding{CVE: "CVE-2017-9798"})
+	if rec == nil || rec.analysis != "Atualize para 2.4.28." || !strings.Contains(rec.text, rec.analysis) {
+		t.Fatalf("rec = %+v", rec)
+	}
+	evidence := strings.Replace(rec.text, rec.analysis, "", 1)
+	if got := unsupportedVersions("Atualize o httpd para 2.4.28.", evidence); len(got) != 1 {
+		t.Fatalf("a version only in the catalog analysis passed as sourced: %v", got)
 	}
 }
 
