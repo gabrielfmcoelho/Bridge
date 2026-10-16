@@ -33,13 +33,14 @@ func TestVuln_CVEAnalysis(t *testing.T) {
 		_, _ = w.Write([]byte(`{"totalResults":1,"vulnerabilities":[{"cve":{"id":"CVE-2024-0001","published":"2024-01-02T03:04:05.000",
 			"descriptions":[{"lang":"en","value":"OpenSSL overflow"}],
 			"metrics":{"cvssMetricV31":[{"cvssData":{"baseScore":9.8,"vectorString":"CVSS:3.1/AV:N"}}]},
-			"weaknesses":[{"description":[{"value":"CWE-787"}]}],"references":[{"url":"https://openssl.org/news"}]}}]}`))
+			"weaknesses":[{"description":[{"value":"CWE-787"}]}],"references":[{"url":"https://openssl.org/news"}],
+			"configurations":[{"nodes":[{"cpeMatch":[{"vulnerable":true,"criteria":"cpe:2.3:a:openssl:openssl:*:*:*:*:*:*:*:*","versionStartIncluding":"3.0.0","versionEndExcluding":"3.0.8"}]}]}]}}]}`))
 	}))
 	t.Cleanup(nvdSrv.Close)
 
 	// The fake LLM answers with the language line it was given, so each
 	// column proves which prompt filled it.
-	var llmFail atomic.Bool
+	var llmFail, sawRange atomic.Bool
 	llmSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if llmFail.Load() {
 			http.Error(w, "boom", http.StatusInternalServerError)
@@ -47,8 +48,12 @@ func TestVuln_CVEAnalysis(t *testing.T) {
 		}
 		var req llm.CompletionRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
-		first, _, _ := strings.Cut(req.Messages[len(req.Messages)-1].Content, "\n")
-		out, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": "### " + first}}}})
+		user := req.Messages[len(req.Messages)-1].Content
+		if strings.Contains(user, "openssl:openssl >=3.0.0 <3.0.8") {
+			sawRange.Store(true)
+		}
+		first, _, _ := strings.Cut(user, "\n")
+		out, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": "### " + first + " 3.0.8 9.9.9"}}}})
 		_, _ = w.Write(out)
 	}))
 	t.Cleanup(llmSrv.Close)
@@ -100,11 +105,16 @@ func TestVuln_CVEAnalysis(t *testing.T) {
 	llmFail.Store(false)
 	post("a", http.StatusOK)
 	e := decodeObj(t, admin.do("GET", "/api/vulnerabilities/cves/cve-2024-0001", ""))
-	if e["analysis_pt"] != "### Responda em português do Brasil." || e["analysis_en"] != "### Respond in English." {
+	// 3.0.8 is the NVD range's fixed version (sourced); 9.9.9 is made up.
+	if e["analysis_pt"] != "> ⚠️ Versões citadas que não estão no registro da NVD: 9.9.9. Confirme no advisory.\n\n### Responda em português do Brasil. 3.0.8 9.9.9" ||
+		e["analysis_en"] != "> ⚠️ Versions cited that are not in the NVD record: 9.9.9. Check the advisory.\n\n### Respond in English. 3.0.8 9.9.9" {
 		t.Fatalf("analyses = %q / %q", e["analysis_pt"], e["analysis_en"])
 	}
 	if e["model"] != "qwen" || e["cvss"] != 9.8 || e["cwe"] != "CWE-787" || e["open_findings"] != float64(1) {
 		t.Fatalf("entry = %+v", e)
+	}
+	if !sawRange.Load() {
+		t.Fatal("the NVD affected-version range never reached the prompt")
 	}
 	if refs, _ := e["references"].([]any); len(refs) != 1 {
 		t.Fatalf("references = %v", e["references"])

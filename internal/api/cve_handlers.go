@@ -124,14 +124,25 @@ func (h *vulnHandlers) handleAnalyzeCVE(w http.ResponseWriter, r *http.Request) 
 	var pt, en string
 	var ptErr, enErr error
 	wg.Add(2)
-	go func() { defer wg.Done(); pt, ptErr = analyzeCVE(ctx, client, rec, "Responda em português do Brasil.") }()
-	go func() { defer wg.Done(); en, enErr = analyzeCVE(ctx, client, rec, "Respond in English.") }()
+	record := cveRecordPrompt(rec)
+	go func() {
+		defer wg.Done()
+		pt, ptErr = analyzeCVE(ctx, client, record, "Responda em português do Brasil.")
+	}()
+	go func() { defer wg.Done(); en, enErr = analyzeCVE(ctx, client, record, "Respond in English.") }()
 	wg.Wait()
 	if err := errors.Join(ptErr, enErr); err != nil {
 		jsonError(w, http.StatusBadGateway, "AI request failed: "+err.Error())
 		return
 	}
 
+	// The model names "fixed" versions from memory; flag any the record lacks.
+	if v := unsupportedVersions(pt, record); len(v) > 0 {
+		pt = "> ⚠️ Versões citadas que não estão no registro da NVD: " + strings.Join(v, ", ") + ". Confirme no advisory.\n\n" + pt
+	}
+	if v := unsupportedVersions(en, record); len(v) > 0 {
+		en = "> ⚠️ Versions cited that are not in the NVD record: " + strings.Join(v, ", ") + ". Check the advisory.\n\n" + en
+	}
 	user := auth.UserFromContext(r.Context())
 	entry := &models.CVECatalogEntry{
 		CVEID: id, Description: rec.Description, CVSS: rec.CVSS, CVSSVector: rec.CVSSVector, CWE: rec.CWE,
@@ -150,10 +161,11 @@ func (h *vulnHandlers) handleAnalyzeCVE(w http.ResponseWriter, r *http.Request) 
 	jsonOK(w, saved)
 }
 
-// analyzeCVE runs one language of the analysis over the NVD record.
-func analyzeCVE(ctx context.Context, client *llm.Client, rec *nvd.CVE, language string) (string, error) {
+// cveRecordPrompt renders the NVD record the analysis is based on. It is
+// also the evidence its version numbers are checked against.
+func cveRecordPrompt(rec *nvd.CVE) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s\n\nCVE: %s\nDescription: %s\n", language, rec.ID, rec.Description)
+	fmt.Fprintf(&b, "CVE: %s\nDescription: %s\n", rec.ID, rec.Description)
 	if rec.CVSS != nil {
 		fmt.Fprintf(&b, "CVSS: %.1f (%s)\n", *rec.CVSS, rec.CVSSVector)
 	}
@@ -163,12 +175,20 @@ func analyzeCVE(ctx context.Context, client *llm.Client, rec *nvd.CVE, language 
 	if rec.Published != nil {
 		fmt.Fprintf(&b, "Published: %s\n", rec.Published.Format("2006-01-02"))
 	}
+	if len(rec.Affected) > 0 {
+		b.WriteString("Affected versions (NVD CPE; in \"<X\", X is the first fixed version):\n- " + strings.Join(rec.Affected, "\n- ") + "\n")
+	}
 	if len(rec.References) > 0 {
 		b.WriteString("References:\n- " + strings.Join(rec.References, "\n- ") + "\n")
 	}
+	return b.String()
+}
+
+// analyzeCVE runs one language of the analysis over the rendered record.
+func analyzeCVE(ctx context.Context, client *llm.Client, record, language string) (string, error) {
 	reply, err := client.Complete(ctx, []llm.ChatMessage{
 		{Role: "system", Content: llm.CVEAnalysisSystem},
-		{Role: "user", Content: b.String()},
+		{Role: "user", Content: language + "\n\n" + record},
 	})
 	if err != nil {
 		return "", err

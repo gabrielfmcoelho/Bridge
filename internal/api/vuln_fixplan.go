@@ -590,8 +590,10 @@ func fixPlanMessage(f *models.VulnFinding, rec *cveRecordText, sc *fixScope) str
 	return b.String()
 }
 
-// cveRecordText is the CVE block of the prompt.
-type cveRecordText struct{ text string }
+// cveRecordText is the CVE block of the prompt. analysis is the catalog's
+// LLM-written text inside it: shown to the model, but not a source for
+// version numbers.
+type cveRecordText struct{ text, analysis string }
 
 // cveForFixPlan renders the finding's CVE from NVD (live) plus the catalog's
 // generic pt-BR analysis when one exists. nil when the finding has no CVE.
@@ -608,6 +610,9 @@ func (h *vulnHandlers) cveForFixPlan(ctx context.Context, f *models.VulnFinding)
 			if rec.CVSS != nil {
 				fmt.Fprintf(&b, "CVSS: %.1f (%s)\n", *rec.CVSS, rec.CVSSVector)
 			}
+			if len(rec.Affected) > 0 {
+				b.WriteString("Versões afetadas (NVD CPE; em \"<X\", X é a primeira versão corrigida):\n- " + strings.Join(rec.Affected, "\n- ") + "\n")
+			}
 			if len(rec.References) > 0 {
 				b.WriteString("Referências:\n- " + strings.Join(rec.References[:min(len(rec.References), 10)], "\n- ") + "\n")
 			}
@@ -615,10 +620,13 @@ func (h *vulnHandlers) cveForFixPlan(ctx context.Context, f *models.VulnFinding)
 			b.WriteString("Registro da NVD indisponível: " + err.Error() + "\n")
 		}
 	}
+	rec := &cveRecordText{}
 	if e, err := h.cveRepo().Get(ctx, id); err == nil && e != nil && e.AnalysisPT != "" {
-		b.WriteString("Análise genérica (catálogo):\n" + clip(e.AnalysisPT, 4000) + "\n")
+		rec.analysis = clip(e.AnalysisPT, 4000)
+		b.WriteString("Análise genérica (catálogo):\n" + rec.analysis + "\n")
 	}
-	return &cveRecordText{text: b.String()}
+	rec.text = b.String()
+	return rec
 }
 
 func (h *vulnHandlers) fixPlanRepo() *store.VulnFixPlanRepo {
@@ -687,7 +695,8 @@ func (h *vulnHandlers) handleGenerateFixPlan(w http.ResponseWriter, r *http.Requ
 	defer cancel()
 	sc := buildFixScope(ctx, h.db, f, gl, gls)
 	user := auth.UserFromContext(r.Context())
-	prompt := fixPlanMessage(f, h.cveForFixPlan(ctx, f), sc)
+	rec := h.cveForFixPlan(ctx, f)
+	prompt := fixPlanMessage(f, rec, sc)
 	res, err := runToolLoop(ctx, client, aiToolEnv{db: h.db, user: user}, []llm.ChatMessage{
 		{Role: "system", Content: llm.FixPlanSystem},
 		{Role: "user", Content: prompt},
@@ -701,7 +710,13 @@ func (h *vulnHandlers) handleGenerateFixPlan(w http.ResponseWriter, r *http.Requ
 		jsonError(w, http.StatusBadGateway, "AI returned an empty plan")
 		return
 	}
-	if v := unsupportedVersions(content, prompt+sc.read.String()); len(v) > 0 {
+	// Evidence is what the model was given plus what its tools read (so
+	// after the loop), minus the catalog analysis: LLM-written, not a source.
+	evidence := prompt + sc.read.String()
+	if rec != nil && rec.analysis != "" {
+		evidence = strings.Replace(evidence, rec.analysis, "", 1)
+	}
+	if v := unsupportedVersions(content, evidence); len(v) > 0 {
 		content = "> ⚠️ Versões citadas sem fonte no que o modelo leu: " + strings.Join(v, ", ") +
 			". Confirme a versão corrigida no advisory antes de aplicar.\n\n" + content
 	}
