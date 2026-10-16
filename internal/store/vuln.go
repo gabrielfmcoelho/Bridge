@@ -47,43 +47,45 @@ func vulnVisible(ctx context.Context) (string, []any) {
 
 // vulnEntitySet returns a (finding_id, via) row source for an entity tab:
 // the entity's own links plus findings on the hosts / DNS records it is
-// related to. via is "" for a direct link, else "<type>:<name>".
-func vulnEntitySet(entityType string, id int64) (string, []any, error) {
+// related to. via is "" for a direct link, else "<type>:<name>". A hop only
+// goes through a related asset the caller can see, so a hidden host / DNS
+// record neither adds rows nor leaks its name in via.
+func vulnEntitySet(ctx context.Context, entityType string, id int64) (string, []any, error) {
 	direct := `SELECT finding_id, '' AS via FROM vuln_finding_links WHERE entity_type = ? AND entity_id = ?`
 	args := []any{entityType, id}
-	viaDNS := func(join string) string {
-		return `SELECT l.finding_id, 'dns:' || d.domain FROM vuln_finding_links l
-			JOIN dns_records d ON d.id = l.entity_id AND d.deleted_at IS NULL ` + join + `
-			WHERE l.entity_type = 'dns'`
-	}
-	viaHost := func(join string) string {
-		return `SELECT l.finding_id, 'host:' || h.nickname FROM vuln_finding_links l
-			JOIN hosts h ON h.id = l.entity_id AND h.deleted_at IS NULL ` + join + `
-			WHERE l.entity_type = 'host'`
-	}
 	var parts []string
+	// hop adds one related-asset branch; its JOIN binds id, then the
+	// related asset's visibility predicate.
+	hop := func(sel string, at AssetType, idExpr string) {
+		vis, vargs := VisibleExpr(ctx, at, idExpr)
+		parts = append(parts, sel+` AND `+vis)
+		args = append(append(args, id), vargs...)
+	}
+	viaDNS := func(join string) {
+		hop(`SELECT l.finding_id, 'dns:' || d.domain FROM vuln_finding_links l
+			JOIN dns_records d ON d.id = l.entity_id AND d.deleted_at IS NULL `+join+`
+			WHERE l.entity_type = 'dns'`, AssetDNS, "d.id")
+	}
+	viaHost := func(join string) {
+		hop(`SELECT l.finding_id, 'host:' || h.nickname FROM vuln_finding_links l
+			JOIN hosts h ON h.id = l.entity_id AND h.deleted_at IS NULL `+join+`
+			WHERE l.entity_type = 'host'`, AssetHost, "h.id")
+	}
 	switch entityType {
 	case "host":
-		parts = []string{viaDNS(`JOIN dns_host_links x ON x.dns_id = l.entity_id AND x.host_id = ?`)}
+		viaDNS(`JOIN dns_host_links x ON x.dns_id = l.entity_id AND x.host_id = ?`)
 	case "dns":
 	case "service":
-		parts = []string{
-			viaHost(`JOIN service_host_links x ON x.host_id = l.entity_id AND x.service_id = ?`),
-			viaDNS(`JOIN service_dns_links x ON x.dns_id = l.entity_id AND x.service_id = ?`),
-		}
+		viaHost(`JOIN service_host_links x ON x.host_id = l.entity_id AND x.service_id = ?`)
+		viaDNS(`JOIN service_dns_links x ON x.dns_id = l.entity_id AND x.service_id = ?`)
 	case "project":
-		parts = []string{
-			viaHost(`JOIN project_host_links x ON x.host_id = l.entity_id AND x.project_id = ?`),
-			viaDNS(`JOIN project_dns_links x ON x.dns_id = l.entity_id AND x.project_id = ?`),
-			`SELECT l.finding_id, 'service:' || s.nickname FROM vuln_finding_links l
+		viaHost(`JOIN project_host_links x ON x.host_id = l.entity_id AND x.project_id = ?`)
+		viaDNS(`JOIN project_dns_links x ON x.dns_id = l.entity_id AND x.project_id = ?`)
+		hop(`SELECT l.finding_id, 'service:' || s.nickname FROM vuln_finding_links l
 				JOIN services s ON s.id = l.entity_id AND s.deleted_at IS NULL AND s.project_id = ?
-				WHERE l.entity_type = 'service'`,
-		}
+				WHERE l.entity_type = 'service'`, AssetService, "s.id")
 	default:
 		return "", nil, fmt.Errorf("unknown entity type %q", entityType)
-	}
-	for range parts {
-		args = append(args, id)
 	}
 	// A finding reached several ways shows its best path: direct ('') first.
 	return `SELECT finding_id, MIN(via) AS via FROM (` + strings.Join(append([]string{direct}, parts...), " UNION ALL ") + `) u GROUP BY finding_id`, args, nil
@@ -96,7 +98,7 @@ func (r *VulnRepo) List(ctx context.Context, flt models.VulnFilter) ([]models.Vu
 	viaCol := `''`
 	var args []any
 	if flt.EntityType != "" {
-		set, sargs, err := vulnEntitySet(flt.EntityType, flt.EntityID)
+		set, sargs, err := vulnEntitySet(ctx, flt.EntityType, flt.EntityID)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -180,6 +182,9 @@ func (r *VulnRepo) Get(ctx context.Context, id int64) (*models.VulnFinding, erro
 // links lists a finding's links with display names. Links to trashed or
 // purged assets are left out (entity_id has no FK).
 func (r *VulnRepo) links(ctx context.Context, id int64) ([]models.VulnLink, error) {
+	// A visible finding may also link to assets the caller can't see: their
+	// names must not leak, so each link is filtered on its own.
+	vis, vargs := VisibleExprDyn(ctx, "l.entity_type", "l.entity_id")
 	rows, err := r.db.QueryContext(ctx, `SELECT l.entity_type, l.entity_id, l.origin,
 			COALESCE(h.nickname, d.domain, s.nickname, p.name), COALESCE(h.oficial_slug, '')
 		FROM vuln_finding_links l
@@ -187,8 +192,8 @@ func (r *VulnRepo) links(ctx context.Context, id int64) ([]models.VulnLink, erro
 		LEFT JOIN dns_records d ON l.entity_type = 'dns'     AND d.id = l.entity_id AND d.deleted_at IS NULL
 		LEFT JOIN services s    ON l.entity_type = 'service' AND s.id = l.entity_id AND s.deleted_at IS NULL
 		LEFT JOIN projects p    ON l.entity_type = 'project' AND p.id = l.entity_id AND p.deleted_at IS NULL
-		WHERE l.finding_id = ? AND COALESCE(h.id, d.id, s.id, p.id) IS NOT NULL
-		ORDER BY l.entity_type, l.entity_id`, id)
+		WHERE l.finding_id = ? AND COALESCE(h.id, d.id, s.id, p.id) IS NOT NULL AND `+vis+`
+		ORDER BY l.entity_type, l.entity_id`, append([]any{id}, vargs...)...)
 	if err != nil {
 		return nil, err
 	}

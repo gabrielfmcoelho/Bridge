@@ -19,6 +19,9 @@ func encodeNamespacedPath(p string) string {
 	return strings.ReplaceAll(url.PathEscape(p), "/", "%2F")
 }
 
+// maxBody caps one API response read into memory.
+const maxBody = 8 << 20
+
 // Client interacts with the GitLab REST API v4.
 type Client struct {
 	baseURL    string
@@ -55,7 +58,9 @@ func (c *Client) get(path string, params url.Values) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	// ponytail: 8 MiB covers any manifest or source file the API returns; a
+	// bigger body is cut, not streamed.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	if err != nil {
 		return nil, err
 	}
@@ -213,4 +218,66 @@ func (c *Client) ListIssues(projectID int, params IssueListParams) ([]Issue, err
 	}
 	var issues []Issue
 	return issues, json.Unmarshal(body, &issues)
+}
+
+// ListTree lists a repository directory ("" = root) at ref ("" = the
+// default branch). recursive walks every subdirectory; at most
+// maxTreePages × 100 entries come back, enough to find files by name.
+func (c *Client) ListTree(projectID int, ref, path string, recursive bool) ([]TreeEntry, error) {
+	const maxTreePages = 10
+	var all []TreeEntry
+	for page := 1; page <= maxTreePages; page++ {
+		q := url.Values{}
+		q.Set("per_page", "100")
+		q.Set("page", strconv.Itoa(page))
+		if ref != "" {
+			q.Set("ref", ref)
+		}
+		if path != "" {
+			q.Set("path", path)
+		}
+		if recursive {
+			q.Set("recursive", "true")
+		}
+		body, err := c.get(fmt.Sprintf("/projects/%d/repository/tree", projectID), q)
+		if err != nil {
+			return nil, err
+		}
+		var batch []TreeEntry
+		if err := json.Unmarshal(body, &batch); err != nil {
+			return nil, err
+		}
+		all = append(all, batch...)
+		if len(batch) < 100 {
+			break
+		}
+	}
+	return all, nil
+}
+
+// GetRawFile returns a file's content at ref ("" = HEAD).
+func (c *Client) GetRawFile(projectID int, filePath, ref string) ([]byte, error) {
+	if ref == "" {
+		ref = "HEAD"
+	}
+	return c.get(fmt.Sprintf("/projects/%d/repository/files/%s/raw", projectID, encodeNamespacedPath(filePath)),
+		url.Values{"ref": {ref}})
+}
+
+// SearchBlobs searches file contents in one project at ref ("" = the
+// default branch). Needs the instance's code search (basic search works).
+func (c *Client) SearchBlobs(projectID int, query, ref string) ([]BlobHit, error) {
+	q := url.Values{}
+	q.Set("scope", "blobs")
+	q.Set("search", query)
+	q.Set("per_page", "20")
+	if ref != "" {
+		q.Set("ref", ref)
+	}
+	body, err := c.get(fmt.Sprintf("/projects/%d/search", projectID), q)
+	if err != nil {
+		return nil, err
+	}
+	var hits []BlobHit
+	return hits, json.Unmarshal(body, &hits)
 }

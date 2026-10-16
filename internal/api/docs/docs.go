@@ -16824,6 +16824,93 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/vulnerabilities/cves": {
+            "get": {
+                "description": "Analysed CVEs, most recent first, without the analysis text. A non-admin sees a CVE only while a finding they can see carries it. Any role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "List the CVE catalog",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "CVE id or description",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_CVECatalogEntry"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/vulnerabilities/cves/{cve}": {
+            "get": {
+                "description": "The cached NVD text and pt-BR / en analysis. Never calls NVD or the LLM. Answers 200 with a null body when the CVE was never analysed or is not visible. Any role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Get a CVE catalog entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "CVE id, e.g. CVE-2024-1234",
+                        "name": "cve",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.CVECatalogEntry"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/vulnerabilities/import/etipi": {
             "post": {
                 "description": "Admin. Multipart field \"file\": the ETIPI text report. The file is rejected when its counts don't add up. Findings are matched to DNS records (target) and hosts (VM). An open ETIPI finding missing from the file is resolved only when the file still lists its host with that severity, unless complete=true (the file is every open finding). With dry_run=true nothing is written and the counts are returned.",
@@ -16983,6 +17070,169 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/vulnerabilities/{id}/cve-analysis": {
+            "post": {
+                "description": "Fetches the CVE from NVD and asks the LLM for a generic analysis in pt-BR and en (in parallel), then saves it to the CVE catalog, replacing any previous one. Keyed by finding so the caller must see it. Requires ai.use.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Analyse a finding's CVE",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Finding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.CVECatalogEntry"
+                        }
+                    },
+                    "400": {
+                        "description": "Finding has no valid CVE",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Finding not visible, or CVE not in NVD",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "NVD or LLM failed",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "AI not configured",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/vulnerabilities/{id}/fix-plan": {
+            "get": {
+                "description": "The case-specific fix plan, or a null body when none was generated. Never calls the LLM. 404 when the finding is absent or invisible. Any role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Get a finding's fix plan",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Finding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnFixPlan"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "The LLM explores, with read-only tools, the GitLab repos linked to the finding's projects / services and its hosts' last scans, then writes a case-specific fix plan in pt-BR. Replaces the previous plan. Without GitLab it works from the topology and host scans alone. Can take minutes. Requires ai.use.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Generate a finding's fix plan",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Finding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnFixPlan"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "LLM failed",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "AI not configured",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -17636,6 +17886,20 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.APIToken"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
+        "api.ListEnvelope-models_CVECatalogEntry": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.CVECatalogEntry"
                     }
                 },
                 "meta": {
@@ -22656,6 +22920,53 @@ const docTemplate = `{
                 }
             }
         },
+        "models.CVECatalogEntry": {
+            "type": "object",
+            "properties": {
+                "analysis_en": {
+                    "type": "string"
+                },
+                "analysis_pt": {
+                    "type": "string"
+                },
+                "analyzed_at": {
+                    "type": "string"
+                },
+                "analyzed_by": {
+                    "type": "integer"
+                },
+                "cve_id": {
+                    "type": "string"
+                },
+                "cvss": {
+                    "type": "number"
+                },
+                "cvss_vector": {
+                    "type": "string"
+                },
+                "cwe": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "open_findings": {
+                    "type": "integer"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "references": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "models.Canvas": {
             "type": "object",
             "properties": {
@@ -24160,6 +24471,38 @@ const docTemplate = `{
                 },
                 "vm_hint": {
                     "type": "string"
+                }
+            }
+        },
+        "models.VulnFixPlan": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "finding_id": {
+                    "type": "integer"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "generated_by": {
+                    "type": "integer"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "repos": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
                 }
             }
         },

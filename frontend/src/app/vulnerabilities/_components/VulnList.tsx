@@ -22,9 +22,10 @@ import { integrationsAPI, vulnAPI, wazuhAPI } from "@/lib/api";
 import { useFlag } from "@/contexts/FlagContext";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import EtipiImportModal from "./EtipiImportModal";
+import CveCatalog from "./CveCatalog";
 
 const PER_PAGE = 25;
-type View = "open" | "triaged" | "resolved" | "unmatched";
+type View = "open" | "triaged" | "resolved" | "unmatched" | "catalog";
 type Severity = "" | "critical" | "high" | "medium" | "low";
 type Source = "" | "etipi" | "wazuh";
 
@@ -33,6 +34,7 @@ const VIEW_STATUS: Record<View, string> = {
   triaged: "accepted,false_positive",
   resolved: "resolved",
   unmatched: "",
+  catalog: "",
 };
 
 export default function VulnList() {
@@ -80,9 +82,11 @@ export default function VulnList() {
   if (source) params.source = source;
   if (q) params.search = q;
 
+  const isCatalog = view === "catalog";
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["vulnerabilities", "list", params],
     queryFn: () => vulnAPI.list(params),
+    enabled: !isCatalog,
   });
   const rows = data?.data ?? [];
   const total = data?.meta.total ?? 0;
@@ -92,6 +96,7 @@ export default function VulnList() {
     { key: "triaged", label: t("vuln.view.triaged") },
     { key: "resolved", label: t("vuln.view.resolved") },
     ...(isAdmin ? [{ key: "unmatched", label: t("vuln.view.unmatched") }] : []),
+    { key: "catalog", label: t("vuln.view.catalog") },
   ];
 
   return (
@@ -116,9 +121,9 @@ export default function VulnList() {
             <ListToolbar
               search={search}
               onSearchChange={setSearch}
-              searchPlaceholder={t("vuln.searchPlaceholder")}
+              searchPlaceholder={isCatalog ? t("vuln.cveAnalysis.searchPlaceholder") : t("vuln.searchPlaceholder")}
               actions={
-                <>
+                isCatalog ? undefined : <>
                   <ToolbarSelect<Severity>
                     name={t("vuln.severity")}
                     icon={ICON_PATHS.filter}
@@ -147,7 +152,9 @@ export default function VulnList() {
         }
       />
 
-      {isLoading ? (
+      {isCatalog ? (
+        <CveCatalog search={q} />
+      ) : isLoading ? (
         <SkeletonTable rows={8} />
       ) : isError ? (
         <StatusAlert variant="error">{(error as Error)?.message}</StatusAlert>
