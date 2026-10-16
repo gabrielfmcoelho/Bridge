@@ -35,6 +35,17 @@ func TestGitlabRepoPath(t *testing.T) {
 	}
 }
 
+func TestUnsupportedVersions(t *testing.T) {
+	evidence := "Containers: metabase (metabase/metabase:v0.46.1) · Ubuntu 22.04 · host 10.0.122.40"
+	plan := "Imagem v0.46.1 em uso. Atualize para 0.49.3 (geralmente 0.46.2 ou superior); repita 0.49.3. Ubuntu 22.04."
+	if got := strings.Join(unsupportedVersions(plan, evidence), ","); got != "0.49.3,0.46.2" {
+		t.Fatalf("unsupported = %q, want the two invented versions once each", got)
+	}
+	if got := unsupportedVersions("Atualize de v0.46.1 conforme o advisory.", evidence); len(got) != 0 {
+		t.Fatalf("a version from the evidence was flagged: %v", got)
+	}
+}
+
 func TestReadLines(t *testing.T) {
 	body := strings.Repeat("x\n", 250) + "end"
 	m := readLines("a.txt", body, 0)
@@ -121,12 +132,37 @@ func TestFixTools_ThroughToolLoop(t *testing.T) {
 			return llm.ChatMessage{Role: "assistant", Content: "### Diagnóstico neste ambiente\nv0.46.1"}, nil
 		},
 	}}
-	res, err := runToolLoop(context.Background(), m, aiToolEnv{}, []llm.ChatMessage{{Role: "user", Content: "x"}}, tools, 2)
+	res, err := runToolLoop(context.Background(), m, aiToolEnv{}, []llm.ChatMessage{{Role: "user", Content: "x"}}, tools, 2, true)
 	if err != nil || !strings.Contains(res.Response, "v0.46.1") || len(res.Steps) != 5 {
 		t.Fatalf("res=%+v err=%v", res, err)
 	}
 	if res.Steps[4].Query != "SEAD/app:Dockerfile" || res.Steps[1].Error == "" {
 		t.Fatalf("steps = %+v", res.Steps)
+	}
+	// Only the first round forces a tool call.
+	if strings.Join(m.choices, ",") != "required,," {
+		t.Fatalf("tool_choice per round = %q, want required then none", m.choices)
+	}
+}
+
+// A gateway that rejects tool_choice is asked again with the tools but
+// without it — the plan still gets to explore.
+func TestRunToolLoop_ForceFirstFallback(t *testing.T) {
+	m := &fakeModel{replies: []func([]llm.ChatMessage, []llm.Tool) (llm.ChatMessage, error){
+		func([]llm.ChatMessage, []llm.Tool) (llm.ChatMessage, error) {
+			return llm.ChatMessage{}, &llm.APIError{Status: 400, Body: "tool_choice required is not supported"}
+		},
+		func(_ []llm.ChatMessage, tools []llm.Tool) (llm.ChatMessage, error) {
+			if len(tools) == 0 {
+				t.Fatal("the retry must keep the tools")
+			}
+			return llm.ChatMessage{Role: "assistant", Content: "plano"}, nil
+		},
+	}}
+	tools := fixTools(&fixScope{hosts: map[string]*sshtest.VMInfo{}}, nil)
+	res, err := runToolLoop(context.Background(), m, aiToolEnv{}, nil, tools, 3, true)
+	if err != nil || res.Response != "plano" || !res.Tools || strings.Join(m.choices, ",") != "required," {
+		t.Fatalf("res=%+v err=%v choices=%q", res, err, m.choices)
 	}
 }
 
@@ -146,6 +182,9 @@ func TestVuln_FixPlan(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		var msg map[string]any
 		if llmCalls.Add(1) == 1 {
+			if req.ToolChoice != "required" {
+				t.Errorf("first request tool_choice = %q, want required", req.ToolChoice)
+			}
 			if len(req.Tools) == 0 || !strings.Contains(req.Messages[1].Content, "sead/app") || !strings.Contains(req.Messages[1].Content, "Catálogo") {
 				t.Errorf("first request lacks tools, repo list or topology: %s", req.Messages[1].Content)
 			}
@@ -153,6 +192,9 @@ func TestVuln_FixPlan(t *testing.T) {
 				"id": "c1", "type": "function", "function": map[string]any{"name": "read_file", "arguments": `{"repo":"sead/app","path":"Dockerfile"}`},
 			}}}
 		} else {
+			if req.ToolChoice != "" {
+				t.Errorf("later request tool_choice = %q, want none", req.ToolChoice)
+			}
 			last := req.Messages[len(req.Messages)-1]
 			if last.Role != "tool" || !strings.Contains(last.Content, "metabase:v0.46.1") {
 				t.Errorf("second request lacks the file read: %+v", last)
@@ -210,6 +252,11 @@ func TestVuln_FixPlan(t *testing.T) {
 		t.Fatalf("generate = %d %s", resp.StatusCode, readBody(resp))
 	}
 	p := decodeObj(t, admin.do("GET", path, ""))
+	// v0.46.1 only exists in the Dockerfile the model read: it has a source,
+	// so no unsupported-version warning.
+	if strings.Contains(p["content"].(string), "⚠️") {
+		t.Fatalf("a version read through a tool was flagged: %s", p["content"])
+	}
 	if !strings.Contains(p["content"].(string), "sead/app:Dockerfile:1") || p["model"] != "qwen" {
 		t.Fatalf("plan = %+v", p)
 	}

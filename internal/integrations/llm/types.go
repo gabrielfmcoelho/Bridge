@@ -41,6 +41,9 @@ type CompletionRequest struct {
 	Messages  []ChatMessage `json:"messages"`
 	MaxTokens int           `json:"max_tokens,omitempty"`
 	Tools     []Tool        `json:"tools,omitempty"`
+	// ToolChoice "required" makes the model call a tool this turn; "" lets
+	// it decide (the API default, "auto").
+	ToolChoice string `json:"tool_choice,omitempty"`
 }
 
 // CompletionResponse is the response from the chat completion API.
