@@ -610,20 +610,30 @@ func (h *apiCatalogHandlers) handleReplaceSpec(w http.ResponseWriter, r *http.Re
 
 // readSpecUpload reads the multipart "spec" file (bounded by MaxSpecBytes).
 func readSpecUpload(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
-	r.Body = http.MaxBytesReader(w, r.Body, apicatalog.MaxSpecBytes+1<<20)
-	if err := r.ParseMultipartForm(apicatalog.MaxSpecBytes + 1<<20); err != nil {
-		jsonBadRequest(w, r, "spec file too large or malformed form", err)
+	return readUpload(w, r, "spec", apicatalog.MaxSpecBytes)
+}
+
+// readUpload reads the multipart file in form field `field`, rejecting one
+// larger than max bytes with a 400.
+func readUpload(w http.ResponseWriter, r *http.Request, field string, max int64) ([]byte, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, max+1<<20)
+	if err := r.ParseMultipartForm(max + 1<<20); err != nil {
+		jsonBadRequest(w, r, field+" file too large or malformed form", err)
 		return nil, false
 	}
-	file, _, err := r.FormFile("spec")
+	file, _, err := r.FormFile(field)
 	if err != nil {
-		jsonBadRequest(w, r, "missing spec file", err)
+		jsonBadRequest(w, r, "missing "+field+" file", err)
 		return nil, false
 	}
 	defer file.Close()
-	raw, err := io.ReadAll(io.LimitReader(file, apicatalog.MaxSpecBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(file, max+1))
 	if err != nil {
-		jsonServerError(w, r, "read spec file", err)
+		jsonServerError(w, r, "read "+field+" file", err)
+		return nil, false
+	}
+	if int64(len(raw)) > max {
+		jsonError(w, http.StatusBadRequest, field+" file too large")
 		return nil, false
 	}
 	return raw, true

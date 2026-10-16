@@ -155,6 +155,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	grh.registerRoutes(rr)           // /api/grafana/*, /api/hosts/{slug}/metrics/live, host/service grafana provision
 	app.telemetry.registerRoutes(rr) // /api/telemetry/requests (SigNoz)
 	app.sentinel.registerRoutes(rr)  // /api/sentinel/*, host + service Sentinel reads (Coolify)
+	app.vuln.registerRoutes(rr)      // /api/vulnerabilities/*
 
 	// Public webhook — no auth middleware; HMAC-signed by Grafana and verified in the handler.
 	gwh.registerRoutes(rr) // POST /api/webhooks/grafana/alerts
