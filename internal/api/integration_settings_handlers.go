@@ -100,6 +100,15 @@ var integrationGroups = map[string][]string{
 		"sentinel_enabled",
 		"sentinel_cache_seconds",
 	},
+	// Wazuh 4.8+ indexer (OpenSearch): the vulnerability states the manual
+	// sync on /vulnerabilities reads. A read-only indexer user is enough.
+	"wazuh": {
+		"wazuh_enabled",
+		"wazuh_indexer_url",
+		"wazuh_indexer_user",
+		"wazuh_indexer_password",
+		"wazuh_tls_skip_verify",
+	},
 	"signoz": {
 		"signoz_enabled",
 		"signoz_ch_url",
@@ -156,6 +165,7 @@ var secretKeys = map[string]bool{
 	"outline_api_token":                  true,
 	"signoz_ch_password":                 true,
 	"glpi_app_token":                     true,
+	"wazuh_indexer_password":             true,
 	"kc_apis_client_secret":              true,
 	"kc_apis_usage_client_secret":        true,
 	"smtp_password":                      true,

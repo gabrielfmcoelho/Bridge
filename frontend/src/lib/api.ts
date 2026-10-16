@@ -820,6 +820,38 @@ export const globalIssuesAPI = {
   delete: (id: number) => api.delete(`/api/issues/${id}`),
 };
 
+// Vulnerability findings (ETIPI imports, Wazuh). list takes status /
+// severity (comma sets), source, search, unmatched, entity_type + entity_id,
+// page, per_page. update is partial.
+type VulnLinkInput = { entity_type: import("./types").VulnEntityType; entity_id: number };
+export const vulnAPI = {
+  list: (params: Record<string, string>) =>
+    api.getListPaginated<import("./types").VulnFinding>(`/api/vulnerabilities?${new URLSearchParams(params).toString()}`),
+  get: (id: number) => api.get<import("./types").VulnFinding>(`/api/vulnerabilities/${id}`),
+  update: (
+    id: number,
+    data: { status?: import("./types").VulnStatus; status_note?: string; issue_id?: number; glpi_ticket_id?: number; glpi_ticket_url?: string },
+  ) => api.patch<import("./types").VulnFinding>(`/api/vulnerabilities/${id}`, data),
+  addLink: (id: number, link: VulnLinkInput) =>
+    api.post<import("./types").VulnFinding>(`/api/vulnerabilities/${id}/links`, link),
+  removeLink: (id: number, link: VulnLinkInput) =>
+    request<import("./types").VulnFinding>(`/api/vulnerabilities/${id}/links`, { method: "DELETE", body: JSON.stringify(link) }),
+  // complete: the file lists every open finding, so absent ones resolve on
+  // any host (default: only on hosts the file still mentions).
+  importETIPI: (file: File, opts: { dryRun: boolean; complete: boolean }) => {
+    const form = new FormData();
+    form.append("file", file);
+    const qs = new URLSearchParams({ dry_run: String(opts.dryRun), complete: String(opts.complete) });
+    return postSpecForm<import("./types").VulnImportResult>(`/api/vulnerabilities/import/etipi?${qs}`, form);
+  },
+};
+
+// Wazuh 4.8+ indexer (admin): test the saved settings, sync vulnerabilities.
+export const wazuhAPI = {
+  test: () => api.post<{ success: boolean; error?: string; count?: number }>("/api/wazuh/test"),
+  sync: () => api.post<import("./types").VulnImportResult>("/api/wazuh/sync"),
+};
+
 // Canvases (entidade idea boards). update is partial and carries the loaded
 // version; a stale one rejects with ApiError status 409.
 export const canvasAPI = {

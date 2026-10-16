@@ -28,8 +28,9 @@ import IssuesTab from "./IssuesTab";
 import SSHConfigDrawer from "./_components/SSHConfigDrawer";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
 
-type TabKey = "overview" | "operations" | "alerts" | "topology" | "metrics" | "requests" | "sentinel";
+type TabKey = "overview" | "operations" | "alerts" | "vulns" | "topology" | "metrics" | "requests" | "sentinel";
 
 export default function HostDetail({ slug }: { slug: string }) {
   const { t, locale } = useLocale();
@@ -111,11 +112,13 @@ export default function HostDetail({ slug }: { slug: string }) {
   // Settings are admin-only: other roles see the tab and get the "disabled" reason inside.
   const sentinelEnabled = integrations ? integrations.sentinel?.sentinel_enabled === "true" : true;
   const telemetryEnabled = useTelemetryEnabled();
+  const openVulns = useEntityVulnCount("host", data?.host.id);
 
   const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
     { key: "overview", label: t("host.tabOverview"), icon: tabIcons.overview },
     ...(canEdit ? [{ key: "operations" as TabKey, label: t("host.tabOperations"), icon: tabIcons.operations }] : []),
     { key: "alerts" as TabKey, label: t("host.tabTracking"), icon: tabIcons.alerts, badge: issuesTabBadge || undefined },
+    { key: "vulns" as TabKey, label: t("vuln.tab"), icon: ICON_PATHS.shieldAlert, badge: openVulns || undefined },
     { key: "topology", label: t("host.tabTopology"), icon: tabIcons.topology },
     ...(telemetryEnabled ? [{ key: "requests" as TabKey, label: t("telemetry.tab"), icon: ICON_PATHS.clock }] : []),
     ...(sentinelEnabled && data?.host.coolify_server_uuid ? [{ key: "sentinel" as TabKey, label: "Sentinel", icon: ICON_PATHS.bolt }] : []),
@@ -235,6 +238,8 @@ export default function HostDetail({ slug }: { slug: string }) {
               onChamadoCreateDone={() => setOpenChamadoCreate(false)}
             />
           )}
+
+          {activeTab === "vulns" && <EntityVulnsTab entityType="host" entityId={data.host.id} />}
 
           {/* ═══ TOPOLOGY TAB ═══ */}
           {activeTab === "topology" && (

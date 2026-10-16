@@ -16736,6 +16736,473 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/vulnerabilities": {
+            "get": {
+                "description": "Findings from ETIPI reports and Wazuh, most severe first. Visible through the host / DNS / service / project they link to; unlinked ones are admin-only. With entity_type + entity_id: that entity's tab, including findings on its related hosts / DNS records (via). Any role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "List vulnerability findings",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Comma-separated: open, accepted, false_positive, resolved",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated: critical, high, medium, low, info",
+                        "name": "severity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "etipi or wazuh",
+                        "name": "source",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Title, CVE, target or VM",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only findings linked to nothing (admin)",
+                        "name": "unmatched",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "host, dns, service or project",
+                        "name": "entity_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Entity ID (with entity_type)",
+                        "name": "entity_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200, default 50)",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_VulnFinding"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/vulnerabilities/import/etipi": {
+            "post": {
+                "description": "Admin. Multipart field \"file\": the ETIPI text report. The file is rejected when its counts don't add up. Findings are matched to DNS records (target) and hosts (VM). An open ETIPI finding missing from the file is resolved only when the file still lists its host with that severity, unless complete=true (the file is every open finding). With dry_run=true nothing is written and the counts are returned.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Import an ETIPI report",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "ETIPI report (.txt)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Count only, write nothing",
+                        "name": "dry_run",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "The file lists every open finding: resolve absent ones on any host",
+                        "name": "complete",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnImportResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/vulnerabilities/{id}": {
+            "get": {
+                "description": "With its links. 404 when absent or invisible. Any role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Get a vulnerability finding",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Finding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnFinding"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "description": "Editor+. Partial: status (open, accepted, false_positive, resolved), status_note, and the issue / GLPI ticket opened from it. accepted / false_positive survive re-imports.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Update a vulnerability finding",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Finding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.vulnUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnFinding"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/vulnerabilities/{id}/links": {
+            "post": {
+                "description": "Editor+. Manual link to a host, DNS record, service or project, kept across imports. The asset must exist and be visible (404 otherwise).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Link a finding to an asset",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Finding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Asset",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.vulnLinkRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnFinding"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Editor+. Removes a manual or auto link; an auto link returns on the next import that still matches it. The asset must be visible (404 otherwise).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Unlink a finding from an asset",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Finding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Asset",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.vulnLinkRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnFinding"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/wazuh/sync": {
+            "post": {
+                "description": "Admin. Reads every vulnerability state from the Wazuh 4.8+ indexer and imports it: one finding per agent + CVE + package version, matched to hosts by agent name. Open Wazuh findings the indexer no longer has are resolved; a read that doesn't add up to the indexer's total writes nothing. With dry_run=true nothing is written.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Sync vulnerabilities from Wazuh",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Count only, write nothing",
+                        "name": "dry_run",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnImportResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/wazuh/test": {
+            "post": {
+                "description": "Admin. Counts the vulnerability states in the saved Wazuh indexer. Always 200: {\"success\": false, \"error\"} or {\"success\": true, \"count\"}.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Test the Wazuh integration",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/webhooks/grafana/alerts": {
             "post": {
                 "description": "Public, no auth, but HMAC-signed: X-Sshcm-Signature must be the HMAC-SHA256 of the raw body with the configured webhook secret (\"sha256=\u003chex\u003e\" or bare hex). Alerts are upserted by fingerprint and matched to hosts via the sshcm_slug, host or instance label. Returns {processed, skipped, unmatched?}. Errors are plain text, not JSON.",
@@ -17393,6 +17860,20 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.Service"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
+        "api.ListEnvelope-models_VulnFinding": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.VulnFinding"
                     }
                 },
                 "meta": {
@@ -21344,6 +21825,37 @@ const docTemplate = `{
                 }
             }
         },
+        "api.vulnLinkRequest": {
+            "type": "object",
+            "properties": {
+                "entity_id": {
+                    "type": "integer"
+                },
+                "entity_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.vulnUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "glpi_ticket_id": {
+                    "type": "integer"
+                },
+                "glpi_ticket_url": {
+                    "type": "string"
+                },
+                "issue_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "status_note": {
+                    "type": "string"
+                }
+            }
+        },
         "api.wikiCreateCommonDocumentRequest": {
             "type": "object",
             "properties": {
@@ -23550,6 +24062,153 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.VulnFinding": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "cve": {
+                    "type": "string"
+                },
+                "cvss": {
+                    "type": "number"
+                },
+                "cwe": {
+                    "type": "string"
+                },
+                "evidence": {
+                    "type": "string"
+                },
+                "first_seen_at": {
+                    "type": "string"
+                },
+                "glpi_ticket_id": {
+                    "type": "integer"
+                },
+                "glpi_ticket_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "issue_id": {
+                    "type": "integer"
+                },
+                "known_exploited": {
+                    "type": "boolean"
+                },
+                "last_seen_at": {
+                    "type": "string"
+                },
+                "links": {
+                    "description": "Links is filled on the detail read.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.VulnLink"
+                    }
+                },
+                "reference": {
+                    "type": "string"
+                },
+                "remediation": {
+                    "type": "string"
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "risk": {
+                    "type": "string"
+                },
+                "scanner": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "status_by": {
+                    "type": "integer"
+                },
+                "status_note": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "via": {
+                    "description": "Via is set only on entity-tab lists: \"\" for a direct link, otherwise\nthe related asset the finding reached this entity through\n(\"dns:portal.sead.pi.gov.br\", \"host:\u003cnickname\u003e\").",
+                    "type": "string"
+                },
+                "vm_hint": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.VulnImportResult": {
+            "type": "object",
+            "properties": {
+                "dry_run": {
+                    "type": "boolean"
+                },
+                "new": {
+                    "type": "integer"
+                },
+                "parsed": {
+                    "type": "integer"
+                },
+                "reopened": {
+                    "type": "integer"
+                },
+                "resolved": {
+                    "type": "integer"
+                },
+                "unmatched": {
+                    "type": "integer"
+                },
+                "unmatched_targets": {
+                    "description": "UnmatchedTargets are the distinct targets (an ETIPI \"Alvo\", a Wazuh\nagent name) whose findings matched no asset, sorted.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.VulnLink": {
+            "type": "object",
+            "properties": {
+                "entity_id": {
+                    "type": "integer"
+                },
+                "entity_type": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "origin": {
                     "type": "string"
                 },
                 "slug": {

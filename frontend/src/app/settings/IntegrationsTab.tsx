@@ -15,6 +15,7 @@ import LLMSection from "./integrations/LLMSection";
 import CoolifySection from "./integrations/CoolifySection";
 import SentinelSection from "./integrations/SentinelSection";
 import ProxmoxSection from "./integrations/ProxmoxSection";
+import WazuhSection from "./integrations/WazuhSection";
 import SMTPSection from "./integrations/SMTPSection";
 
 export default function IntegrationsTab() {
@@ -37,6 +38,7 @@ export default function IntegrationsTab() {
       <CoolifySection />
       <SentinelSection />
       <ProxmoxSection />
+      <WazuhSection />
     </div>
   );
 }
