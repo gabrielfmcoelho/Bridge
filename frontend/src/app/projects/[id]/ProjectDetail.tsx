@@ -33,8 +33,9 @@ import ProjectSecretsTab from "./_components/ProjectSecretsTab";
 import ProjectApisTab from "./_components/ProjectApisTab";
 import { linkedApisQuery } from "@/app/atlas/apis/_components/LinkedApisCard";
 import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
+import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
 
-type TabKey = "overview" | "topology" | "issues" | "releases" | "commits" | "wiki" | "chamados" | "observability" | "secrets" | "apis";
+type TabKey = "overview" | "topology" | "issues" | "vulns" | "releases" | "commits" | "wiki" | "chamados" | "observability" | "secrets" | "apis";
 
 export default function ProjectDetail({ id }: { id: number }) {
   const { t } = useLocale();
@@ -87,10 +88,12 @@ export default function ProjectDetail({ id }: { id: number }) {
 
   const projectIssues = Array.isArray(issues) ? issues : [];
   const openIssues = projectIssues.filter((i) => !i.archived && i.status !== "done").length;
+  const openVulns = useEntityVulnCount("project", data ? id : undefined);
   const tabs: { key: TabKey; label: string; icon: string; badge?: number }[] = [
     { key: "overview", label: t("host.tabOverview"), icon: ICON_PATHS.home },
     { key: "topology", label: t("host.tabTopology"), icon: ICON_PATHS.bolt },
     { key: "issues", label: t("host.tabTracking"), icon: ICON_PATHS.alert, badge: openIssues || undefined },
+    { key: "vulns", label: t("vuln.tab"), icon: ICON_PATHS.shieldAlert, badge: openVulns || undefined },
     { key: "releases", label: t("release.title"), icon: NAV_ICONS.Rocket },
     { key: "commits", label: t("project.tab.commits"), icon: ICON_PATHS.code },
     ...(outlineEnabled ? [{ key: "wiki" as TabKey, label: t("project.tab.wiki"), icon: ICON_PATHS.document }] : []),
@@ -158,6 +161,7 @@ export default function ProjectDetail({ id }: { id: number }) {
             {activeTab === "issues" && (
               <IssuesBoard entityType="project" entityId={id} canEdit={canEdit} fetcher={fetchIssues} />
             )}
+            {activeTab === "vulns" && <EntityVulnsTab entityType="project" entityId={id} />}
             {activeTab === "releases" && <ProjectReleases projectId={id} canEdit={canEdit} canDelete={isAdmin} />}
             {activeTab === "commits" && <CommitsTab projectId={id} />}
             {activeTab === "wiki" && outlineEnabled && <WikiTab projectId={id} canEdit={canEdit} />}

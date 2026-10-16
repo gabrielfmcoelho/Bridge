@@ -16826,7 +16826,7 @@ const docTemplate = `{
         },
         "/api/vulnerabilities/import/etipi": {
             "post": {
-                "description": "Admin. Multipart field \"file\": the ETIPI text report. The file is rejected when its counts don't add up. Findings are matched to DNS records (target) and hosts (VM). An open ETIPI finding missing from the file is resolved, but only when the file covers its target and severity. With dry_run=true nothing is written and the counts are returned.",
+                "description": "Admin. Multipart field \"file\": the ETIPI text report. The file is rejected when its counts don't add up. Findings are matched to DNS records (target) and hosts (VM). An open ETIPI finding missing from the file is resolved only when the file still lists its host with that severity, unless complete=true (the file is every open finding). With dry_run=true nothing is written and the counts are returned.",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -16849,6 +16849,12 @@ const docTemplate = `{
                         "type": "boolean",
                         "description": "Count only, write nothing",
                         "name": "dry_run",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "The file lists every open finding: resolve absent ones on any host",
+                        "name": "complete",
                         "in": "query"
                     }
                 ],
@@ -24064,7 +24070,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "via": {
-                    "description": "Via is set only on entity-tab lists: \"\" for a direct link, otherwise\nthe related asset the finding reached this entity through (\"dns:12\").",
+                    "description": "Via is set only on entity-tab lists: \"\" for a direct link, otherwise\nthe related asset the finding reached this entity through\n(\"dns:portal.sead.pi.gov.br\", \"host:\u003cnickname\u003e\").",
                     "type": "string"
                 },
                 "vm_hint": {
@@ -24117,6 +24123,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "origin": {
+                    "type": "string"
+                },
+                "slug": {
                     "type": "string"
                 }
             }

@@ -7,8 +7,9 @@ import { VIEW_ICONS } from "@/components/ui/ViewToggle";
 interface ListToolbarProps {
   search: string;
   onSearchChange: (s: string) => void;
-  onFilterClick: () => void;
-  activeFilterCount: number;
+  /** Omit for a list without a filter drawer: the button is not rendered. */
+  onFilterClick?: () => void;
+  activeFilterCount?: number;
   searchPlaceholder?: string;
   actions?: React.ReactNode;
   /** Optional element rendered absolute-right inside the search input. */
@@ -22,7 +23,7 @@ export default function ListToolbar({
   search,
   onSearchChange,
   onFilterClick,
-  activeFilterCount,
+  activeFilterCount = 0,
   searchPlaceholder = "Search...",
   actions,
   searchAdornment,
@@ -51,7 +52,7 @@ export default function ListToolbar({
 
       <div className="flex items-center gap-1.5 sm:flex-1">
         {/* Filter button */}
-        <button
+        {onFilterClick && <button
           onClick={onFilterClick}
           className={`relative flex items-center gap-1.5 h-8 px-3 text-sm rounded-[var(--radius-md)] border transition ${
             activeFilterCount > 0
@@ -66,7 +67,7 @@ export default function ListToolbar({
               {activeFilterCount}
             </span>
           )}
-        </button>
+        </button>}
         {/* Order: how the list reads (cards/table), then group, bulk actions, export. */}
         <div className="flex items-center gap-1.5 sm:ml-auto">
         {viewMode && onViewModeChange && (

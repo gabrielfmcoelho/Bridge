@@ -180,7 +180,7 @@ func (r *VulnRepo) Get(ctx context.Context, id int64) (*models.VulnFinding, erro
 // purged assets are left out (entity_id has no FK).
 func (r *VulnRepo) links(ctx context.Context, id int64) ([]models.VulnLink, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT l.entity_type, l.entity_id, l.origin,
-			COALESCE(h.nickname, d.domain, s.nickname, p.name)
+			COALESCE(h.nickname, d.domain, s.nickname, p.name), COALESCE(h.oficial_slug, '')
 		FROM vuln_finding_links l
 		LEFT JOIN hosts h       ON l.entity_type = 'host'    AND h.id = l.entity_id AND h.deleted_at IS NULL
 		LEFT JOIN dns_records d ON l.entity_type = 'dns'     AND d.id = l.entity_id AND d.deleted_at IS NULL
@@ -195,7 +195,7 @@ func (r *VulnRepo) links(ctx context.Context, id int64) ([]models.VulnLink, erro
 	out := []models.VulnLink{}
 	for rows.Next() {
 		var l models.VulnLink
-		if err := rows.Scan(&l.EntityType, &l.EntityID, &l.Origin, &l.Name); err != nil {
+		if err := rows.Scan(&l.EntityType, &l.EntityID, &l.Origin, &l.Name, &l.Slug); err != nil {
 			return nil, err
 		}
 		out = append(out, l)
@@ -273,8 +273,9 @@ func (r *VulnRepo) RemoveLink(ctx context.Context, id int64, entityType string, 
 }
 
 // VulnCoverage is what a partial report covers. An absent open finding is
-// auto-resolved only when its (lowercased) target and its severity are
-// both covered. nil coverage = the import is the complete list.
+// auto-resolved only when its target's host (scheme and port dropped:
+// "x.gov.br" and "x.gov.br:443" are the same host) and its severity are both
+// in the report. nil coverage = the import is the complete list.
 type VulnCoverage struct {
 	Targets    []string
 	Severities []string
@@ -353,24 +354,54 @@ func (r *VulnRepo) ApplyImport(ctx context.Context, source string, findings []mo
 		}
 	}
 
-	q := `UPDATE vuln_findings SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-		WHERE source = ? AND status = 'open' AND NOT (fingerprint = ANY(?))`
-	args := []any{source, seen}
-	if cover != nil {
-		q += ` AND lower(target) = ANY(?) AND severity = ANY(?)`
-		args = append(args, cover.Targets, cover.Severities)
-	}
-	out, err := tx.ExecContext(ctx, q, args...)
+	gone, err := absentFindings(ctx, tx, source, seen, cover)
 	if err != nil {
 		return nil, err
 	}
-	n, _ := out.RowsAffected()
-	res.Resolved = int(n)
+	if len(gone) > 0 {
+		if _, err := tx.ExecContext(ctx, `UPDATE vuln_findings SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ANY(?)`, gone); err != nil {
+			return nil, err
+		}
+	}
+	res.Resolved = len(gone)
 
 	if dryRun {
 		return res, nil // deferred Rollback discards everything
 	}
 	return res, tx.Commit()
+}
+
+// absentFindings returns the open findings of source the import no longer
+// lists and, for a partial report, whose host and severity it covers.
+func absentFindings(ctx context.Context, tx *sql.Tx, source string, seen []string, cover *VulnCoverage) ([]int64, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT id, target, severity FROM vuln_findings
+		WHERE source = ? AND status = 'open' AND NOT (fingerprint = ANY(?))`, source, seen)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	hosts, sevs := map[string]bool{}, map[string]bool{}
+	if cover != nil {
+		for _, t := range cover.Targets {
+			hosts[targetHost(t)] = true
+		}
+		for _, s := range cover.Severities {
+			sevs[s] = true
+		}
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		var target, sev string
+		if err := rows.Scan(&id, &target, &sev); err != nil {
+			return nil, err
+		}
+		if cover == nil || (hosts[targetHost(target)] && sevs[sev]) {
+			ids = append(ids, id)
+		}
+	}
+	return ids, rows.Err()
 }
 
 // vulnMatcher resolves a finding's target / VM hint to live hosts and DNS

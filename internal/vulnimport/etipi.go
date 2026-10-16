@@ -22,9 +22,9 @@ import (
 const SourceETIPI = "etipi"
 
 // ETIPIReport is a parsed ETIPI file. Targets and Severities are what the
-// file covers (lowercased targets): an absent finding is only auto-resolved
-// when its target and severity both appear here, because a report may be a
-// subset of everything that is open.
+// file covers: an absent finding is only auto-resolved when its target's
+// host and its severity both appear here, because a report may be a subset
+// of everything that is open.
 type ETIPIReport struct {
 	Findings   []models.VulnFinding
 	Targets    []string

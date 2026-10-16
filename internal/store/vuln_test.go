@@ -43,19 +43,20 @@ func TestVulnRepo_ApplyImportLifecycle(t *testing.T) {
 	c := vf("c", "other.example.test", "high")
 	x := vf("x", "absent.example.test", "high") // target the next report won't cover
 	crit := vf("k", "wiki.example.test:443", "critical")
+	bare := vf("bare", "https://wiki.example.test", "high") // same host as wiki:443
 
 	// Dry run writes nothing.
-	res, err := repo.ApplyImport(ctx, "etipi", []models.VulnFinding{a, b, c, x, crit}, nil, true)
-	if err != nil || res.New != 5 || !res.DryRun {
+	res, err := repo.ApplyImport(ctx, "etipi", []models.VulnFinding{a, b, c, x, crit, bare}, nil, true)
+	if err != nil || res.New != 6 || !res.DryRun {
 		t.Fatalf("dry run = %+v, %v", res, err)
 	}
 	if all, n, _ := repo.List(ctx, models.VulnFilter{}); n != 0 || len(all) != 0 {
 		t.Fatalf("dry run persisted %d rows", n)
 	}
 
-	res, err = repo.ApplyImport(ctx, "etipi", []models.VulnFinding{a, b, c, x, crit}, nil, false)
-	if err != nil || res.New != 5 || res.Unmatched != 2 {
-		t.Fatalf("first import = %+v, %v (want 5 new, 2 unmatched: c and x)", res, err)
+	res, err = repo.ApplyImport(ctx, "etipi", []models.VulnFinding{a, b, c, x, crit, bare}, nil, false)
+	if err != nil || res.New != 6 || res.Unmatched != 2 {
+		t.Fatalf("first import = %+v, %v (want 6 new, 2 unmatched: c and x)", res, err)
 	}
 	fa := vulnByFP(t, repo, "a")
 	got, _ := repo.Get(ctx, fa.ID)
@@ -70,11 +71,12 @@ func TestVulnRepo_ApplyImportLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Second (partial) report covers wiki + other, high only: a and b absent.
+	// Second (partial) report covers wiki + other, high only: a, b and bare
+	// absent. bare's target has no port but is the same host as wiki:443.
 	cover := &store.VulnCoverage{Targets: []string{"wiki.example.test:443", "other.example.test"}, Severities: []string{"high"}}
 	res, err = repo.ApplyImport(ctx, "etipi", []models.VulnFinding{c}, cover, false)
-	if err != nil || res.Updated != 1 || res.Resolved != 1 {
-		t.Fatalf("second import = %+v, %v (want c updated, a resolved)", res, err)
+	if err != nil || res.Updated != 1 || res.Resolved != 2 {
+		t.Fatalf("second import = %+v, %v (want c updated, a + bare resolved)", res, err)
 	}
 	if s := vulnByFP(t, repo, "a").Status; s != "resolved" {
 		t.Fatalf("a = %s, want resolved", s)

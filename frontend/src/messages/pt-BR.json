@@ -51,7 +51,8 @@
     "menu": "Menu",
     "shares": "Compartilhamentos",
     "canvas": "Quadros de ideias",
-    "home": "Início"
+    "home": "Início",
+    "vulnerabilities": "Vulnerabilidades"
   },
   "atlas": {
     "apis": {
@@ -3841,5 +3842,100 @@
     "liveUpdated": "atualizado às {time}",
     "syncHost": "Sincronizar este host",
     "hostSynced": "Host sincronizado: {services} serviços atualizados."
+  },
+  "vuln": {
+    "tab": "Vulnerabilidades",
+    "subtitle": "Achados dos relatórios da ETIPI e do Wazuh, ligados a hosts, DNS, serviços e projetos",
+    "importEtipi": "Importar relatório da ETIPI",
+    "searchPlaceholder": "Buscar título, CVE, alvo ou VM...",
+    "severity": "Severidade",
+    "source": "Origem",
+    "anySeverity": "Qualquer severidade",
+    "anySource": "Qualquer origem",
+    "severityLevel": {
+      "critical": "Crítica",
+      "high": "Alta",
+      "medium": "Média",
+      "low": "Baixa",
+      "info": "Informativa"
+    },
+    "status": {
+      "open": "Aberto",
+      "accepted": "Risco aceito",
+      "false_positive": "Falso positivo",
+      "resolved": "Resolvido"
+    },
+    "view": {
+      "open": "Abertos",
+      "triaged": "Aceitos / falsos positivos",
+      "resolved": "Resolvidos",
+      "unmatched": "Sem vínculo",
+      "closed": "Encerrados"
+    },
+    "empty": {
+      "open": "Nenhum achado aberto",
+      "triaged": "Nenhum achado aceito ou falso positivo",
+      "resolved": "Nenhum achado resolvido",
+      "unmatched": "Todo achado está ligado a um ativo"
+    },
+    "emptyHint": "Os achados chegam pela importação dos relatórios da ETIPI e pela sincronização do Wazuh.",
+    "emptyEntityOpen": "Nenhum achado aberto aqui",
+    "emptyEntityClosed": "Nenhum achado encerrado aqui",
+    "emptyEntityHint": "Inclui os achados dos hosts e registros DNS relacionados.",
+    "finding": "Achado",
+    "target": "Alvo",
+    "viaColumn": "Chegou por",
+    "lastSeen": "Visto por último",
+    "knownExploited": "Exploração conhecida",
+    "via": "por {type} {name}",
+    "direct": "Direto",
+    "entity": {
+      "host": "Host",
+      "dns": "DNS",
+      "service": "Serviço",
+      "project": "Projeto"
+    },
+    "vm": "VM",
+    "cve": "CVE",
+    "cvss": "CVSS",
+    "cwe": "CWE",
+    "scanner": "Detectado por",
+    "firstSeen": "Visto pela primeira vez",
+    "resolvedAt": "Resolvido em",
+    "risk": "Risco",
+    "remediation": "Como corrigir",
+    "evidence": "Evidência",
+    "reference": "Referência",
+    "links": "Ativos ligados",
+    "unmatchedHint": "Ainda sem vínculo com um ativo: só administradores o veem. Ligue-o a um host, registro DNS, serviço ou projeto.",
+    "origin": {
+      "auto": "vinculado pela importação",
+      "manual": "vinculado à mão"
+    },
+    "linkType": "Tipo de ativo",
+    "addLink": "Ligar a um ativo...",
+    "triage": "Triagem",
+    "note": "Observação",
+    "noteHint": "Por que foi aceito, marcado como falso positivo ou resolvido.",
+    "saved": "Achado atualizado",
+    "imported": "Relatório da ETIPI importado",
+    "importSummary": "{new} novos, {resolved} resolvidos, {unmatched} sem vínculo",
+    "importConfirm": "Importar",
+    "importHint": "Envie o relatório em texto da ETIPI. Nada é salvo até você confirmar: achados abertos que não estão no arquivo são resolvidos.",
+    "selectFile": "Escolha ou arraste o relatório (.txt)",
+    "checking": "Conferindo o relatório...",
+    "previewTitle": "Esta importação vai:",
+    "count": {
+      "parsed": "Achados no arquivo",
+      "new": "Novos",
+      "updated": "Atualizados",
+      "reopened": "Reabertos",
+      "resolved": "Resolvidos",
+      "unmatched": "Sem vínculo"
+    },
+    "unmatchedPreviewHint": "Achados sem vínculo não citam nenhum registro DNS ou host conhecido pelo Bridge; ficam na aba Sem vínculo até um administrador ligá-los.",
+    "pickAnother": "Escolher outro arquivo",
+    "importComplete": "Este arquivo lista todos os achados abertos",
+    "importCompleteHint": "Deixe desmarcado quando a ETIPI mandou só alguns sistemas: um achado só é resolvido se o arquivo ainda cita o host dele com aquela severidade. Um host que voltou totalmente limpo some do relatório, então os achados dele ficam abertos até você resolvê-los ou importar um arquivo completo."
   }
 }

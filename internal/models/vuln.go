@@ -36,7 +36,8 @@ type VulnFinding struct {
 	UpdatedAt      time.Time  `json:"updated_at"`
 
 	// Via is set only on entity-tab lists: "" for a direct link, otherwise
-	// the related asset the finding reached this entity through ("dns:12").
+	// the related asset the finding reached this entity through
+	// ("dns:portal.sead.pi.gov.br", "host:<nickname>").
 	Via string `json:"via,omitempty"`
 	// Links is filled on the detail read.
 	Links []VulnLink `json:"links,omitempty"`
@@ -44,12 +45,13 @@ type VulnFinding struct {
 
 // VulnLink attaches a finding to a host / dns / service / project. Origin is
 // "auto" (rewritten by each import) or "manual" (kept). Name is the entity's
-// display label, filled on reads.
+// display label and Slug a host's URL key, filled on reads.
 type VulnLink struct {
 	EntityType string `json:"entity_type"`
 	EntityID   int64  `json:"entity_id"`
 	Origin     string `json:"origin"`
 	Name       string `json:"name"`
+	Slug       string `json:"slug,omitempty"`
 }
 
 // VulnFilter is the list predicate set for store.VulnRepo.List. Status may be

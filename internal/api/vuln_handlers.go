@@ -267,16 +267,17 @@ func (h *vulnHandlers) changeLink(w http.ResponseWriter, r *http.Request, add bo
 // handleImportETIPI godoc
 //
 //	@Summary		Import an ETIPI report
-//	@Description	Admin. Multipart field "file": the ETIPI text report. The file is rejected when its counts don't add up. Findings are matched to DNS records (target) and hosts (VM). An open ETIPI finding missing from the file is resolved, but only when the file covers its target and severity. With dry_run=true nothing is written and the counts are returned.
+//	@Description	Admin. Multipart field "file": the ETIPI text report. The file is rejected when its counts don't add up. Findings are matched to DNS records (target) and hosts (VM). An open ETIPI finding missing from the file is resolved only when the file still lists its host with that severity, unless complete=true (the file is every open finding). With dry_run=true nothing is written and the counts are returned.
 //	@Tags			vulnerabilities
 //	@Accept			mpfd
 //	@Produce		json
-//	@Param			file	formData	file	true	"ETIPI report (.txt)"
-//	@Param			dry_run	query		bool	false	"Count only, write nothing"
-//	@Success		200		{object}	models.VulnImportResult
-//	@Failure		400		{object}	httpx.ErrorResponse
-//	@Failure		401		{object}	httpx.ErrorResponse
-//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Param			file		formData	file	true	"ETIPI report (.txt)"
+//	@Param			dry_run		query		bool	false	"Count only, write nothing"
+//	@Param			complete	query		bool	false	"The file lists every open finding: resolve absent ones on any host"
+//	@Success		200			{object}	models.VulnImportResult
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
 //	@Router			/api/vulnerabilities/import/etipi [post]
 func (h *vulnHandlers) handleImportETIPI(w http.ResponseWriter, r *http.Request) {
 	raw, ok := readUpload(w, r, "file", maxETIPIBytes)
@@ -289,8 +290,11 @@ func (h *vulnHandlers) handleImportETIPI(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	dryRun := r.URL.Query().Get("dry_run") == "true"
-	res, err := h.repo().ApplyImport(store.WithSystemScope(r.Context()), vulnimport.SourceETIPI, rep.Findings,
-		&store.VulnCoverage{Targets: rep.Targets, Severities: rep.Severities}, dryRun)
+	cover := &store.VulnCoverage{Targets: rep.Targets, Severities: rep.Severities}
+	if r.URL.Query().Get("complete") == "true" {
+		cover = nil
+	}
+	res, err := h.repo().ApplyImport(store.WithSystemScope(r.Context()), vulnimport.SourceETIPI, rep.Findings, cover, dryRun)
 	if err != nil {
 		jsonServerError(w, r, "failed to import ETIPI report", err)
 		return

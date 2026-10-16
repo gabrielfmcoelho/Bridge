@@ -73,6 +73,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/dns", label: "nav.dns", icon: "Globe" },
       { href: "/services", label: "nav.services", icon: "Boxes" },
       { href: "/projects", label: "nav.projects", icon: "FolderKanban" },
+      { href: "/vulnerabilities", label: "nav.vulnerabilities", icon: "ShieldAlert" },
       { href: "/contacts", label: "nav.contacts", icon: "Users" },
       // The vault: every credential, host credentials included (the former
       // /ssh-keys library redirects here). Each module keeps its own trash.

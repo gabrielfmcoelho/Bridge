@@ -1293,3 +1293,57 @@ export interface SentinelHostRow {
   hostname: string;
   snapshot: SentinelHostSnapshot | null;
 }
+
+// Vulnerability findings (ETIPI report imports, Wazuh). Visible through the
+// assets they link to; via is set on entity-tab rows reached through a
+// related host / DNS record ("dns:portal.sead.pi.gov.br").
+export type VulnSeverity = "critical" | "high" | "medium" | "low" | "info";
+export type VulnStatus = "open" | "accepted" | "false_positive" | "resolved";
+export type VulnEntityType = "host" | "dns" | "service" | "project";
+
+export interface VulnLink {
+  entity_type: VulnEntityType;
+  entity_id: number;
+  origin: "auto" | "manual";
+  name: string;
+  slug?: string; // host URL key
+}
+
+export interface VulnFinding {
+  id: number;
+  source: "etipi" | "wazuh";
+  title: string;
+  severity: VulnSeverity;
+  cve: string;
+  cvss: number | null;
+  cwe: string;
+  scanner: string;
+  target: string;
+  vm_hint: string;
+  evidence: string;
+  risk: string;
+  remediation: string;
+  reference: string;
+  known_exploited: boolean;
+  status: VulnStatus;
+  status_note: string;
+  status_by: number | null;
+  issue_id: number | null;
+  glpi_ticket_id: number | null;
+  glpi_ticket_url: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  resolved_at: string | null;
+  via?: string;
+  links?: VulnLink[];
+}
+
+export interface VulnImportResult {
+  parsed: number;
+  new: number;
+  updated: number;
+  reopened: number;
+  resolved: number;
+  unmatched: number;
+  dry_run: boolean;
+}
