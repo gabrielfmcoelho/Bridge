@@ -1902,4 +1902,23 @@ var migrationsPostgres = []string{
 		PRIMARY KEY (finding_id, entity_type, entity_id)
 	);
 	CREATE INDEX IF NOT EXISTS idx_vuln_finding_links_entity ON vuln_finding_links(entity_type, entity_id);`,
+
+	// Version 112: CVE catalog — one row per CVE id with the public NVD text
+	// and a generic LLM analysis in pt-BR and en, written together. Shared by
+	// every finding carrying that CVE; visible through those findings.
+	`CREATE TABLE IF NOT EXISTS cve_catalog (
+		cve_id       TEXT PRIMARY KEY,
+		description  TEXT NOT NULL DEFAULT '',
+		cvss         DOUBLE PRECISION,
+		cvss_vector  TEXT NOT NULL DEFAULT '',
+		cwe          TEXT NOT NULL DEFAULT '',
+		published_at TIMESTAMPTZ,
+		refs         TEXT NOT NULL DEFAULT '',
+		analysis_pt  TEXT NOT NULL DEFAULT '',
+		analysis_en  TEXT NOT NULL DEFAULT '',
+		model        TEXT NOT NULL DEFAULT '',
+		analyzed_by  BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		analyzed_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_vuln_findings_cve ON vuln_findings(cve) WHERE cve <> '';`,
 }

@@ -3879,13 +3879,15 @@
       "triaged": "Accepted / false positive",
       "resolved": "Resolved",
       "unmatched": "Unmatched",
-      "closed": "Closed"
+      "closed": "Closed",
+      "catalog": "CVE catalog"
     },
     "empty": {
       "open": "No open findings",
       "triaged": "No accepted or false-positive findings",
       "resolved": "No resolved findings",
-      "unmatched": "Every finding is linked to an asset"
+      "unmatched": "Every finding is linked to an asset",
+      "catalog": "No CVE analysed yet"
     },
     "emptyHint": "Findings arrive from ETIPI report imports and the Wazuh sync.",
     "emptyEntityOpen": "No open findings here",
@@ -3957,6 +3959,21 @@
     "syncWazuh": "Sync Wazuh",
     "wazuhSynced": "Wazuh synced",
     "wazuhSyncFailed": "Wazuh sync failed",
-    "unmatchedAgents": "agents: {names}"
+    "unmatchedAgents": "agents: {names}",
+    "cveAnalysis": {
+      "title": "CVE analysis",
+      "hint": "Generic analysis of the public NVD record, in Portuguese and English. Shared by every finding with this CVE.",
+      "analyze": "Analyse CVE",
+      "reanalyze": "Re-analyse",
+      "running": "Fetching the CVE from NVD and analysing it in both languages. This can take a minute.",
+      "empty": "Not analysed yet. Analyse it to get what the CVE means and how to handle it.",
+      "emptyReadOnly": "Not analysed yet.",
+      "meta": "Analysed {ago} · {model}",
+      "openFindings": "Open findings",
+      "description": "Description",
+      "analyzedAt": "Analysed",
+      "catalogHint": "Open a finding with a CVE and click \"Analyse CVE\" to add it here.",
+      "searchPlaceholder": "Search CVE id or description"
+    }
   }
 }

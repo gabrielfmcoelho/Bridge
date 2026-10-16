@@ -72,6 +72,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_CVECatalogEntry:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.CVECatalogEntry'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-models_Canvas:
     properties:
       data:
@@ -3434,6 +3443,37 @@ definitions:
         type: string
       provider_name:
         type: string
+    type: object
+  models.CVECatalogEntry:
+    properties:
+      analysis_en:
+        type: string
+      analysis_pt:
+        type: string
+      analyzed_at:
+        type: string
+      analyzed_by:
+        type: integer
+      cve_id:
+        type: string
+      cvss:
+        type: number
+      cvss_vector:
+        type: string
+      cwe:
+        type: string
+      description:
+        type: string
+      model:
+        type: string
+      open_findings:
+        type: integer
+      published_at:
+        type: string
+      references:
+        items:
+          type: string
+        type: array
     type: object
   models.Canvas:
     properties:
@@ -17258,6 +17298,51 @@ paths:
       summary: Update a vulnerability finding
       tags:
       - vulnerabilities
+  /api/vulnerabilities/{id}/cve-analysis:
+    post:
+      description: Fetches the CVE from NVD and asks the LLM for a generic analysis
+        in pt-BR and en (in parallel), then saves it to the CVE catalog, replacing
+        any previous one. Keyed by finding so the caller must see it. Requires ai.use.
+      parameters:
+      - description: Finding ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.CVECatalogEntry'
+        "400":
+          description: Finding has no valid CVE
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Finding not visible, or CVE not in NVD
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: NVD or LLM failed
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: AI not configured
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Analyse a finding's CVE
+      tags:
+      - vulnerabilities
   /api/vulnerabilities/{id}/links:
     delete:
       consumes:
@@ -17343,6 +17428,66 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Link a finding to an asset
+      tags:
+      - vulnerabilities
+  /api/vulnerabilities/cves:
+    get:
+      description: Analysed CVEs, most recent first, without the analysis text. A
+        non-admin sees a CVE only while a finding they can see carries it. Any role.
+      parameters:
+      - description: CVE id or description
+        in: query
+        name: search
+        type: string
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 50)
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_CVECatalogEntry'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List the CVE catalog
+      tags:
+      - vulnerabilities
+  /api/vulnerabilities/cves/{cve}:
+    get:
+      description: The cached NVD text and pt-BR / en analysis. Never calls NVD or
+        the LLM. Answers 200 with a null body when the CVE was never analysed or is
+        not visible. Any role.
+      parameters:
+      - description: CVE id, e.g. CVE-2024-1234
+        in: path
+        name: cve
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.CVECatalogEntry'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Get a CVE catalog entry
       tags:
       - vulnerabilities
   /api/vulnerabilities/import/etipi:

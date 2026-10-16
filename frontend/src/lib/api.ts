@@ -844,6 +844,13 @@ export const vulnAPI = {
     const qs = new URLSearchParams({ dry_run: String(opts.dryRun), complete: String(opts.complete) });
     return postSpecForm<import("./types").VulnImportResult>(`/api/vulnerabilities/import/etipi?${qs}`, form);
   },
+  // CVE catalog: cve() is null when never analysed. analyzeCve fetches NVD
+  // and runs two LLM calls (pt + en), so it gets more than the default timeout.
+  cves: (params: Record<string, string>) =>
+    api.getListPaginated<import("./types").CveCatalogEntry>(`/api/vulnerabilities/cves?${new URLSearchParams(params).toString()}`),
+  cve: (cve: string) => api.get<import("./types").CveCatalogEntry | null>(`/api/vulnerabilities/cves/${encodeURIComponent(cve)}`),
+  analyzeCve: (findingId: number) =>
+    request<import("./types").CveCatalogEntry>(`/api/vulnerabilities/${findingId}/cve-analysis`, { method: "POST" }, 200_000),
 };
 
 // Wazuh 4.8+ indexer (admin): test the saved settings, sync vulnerabilities.

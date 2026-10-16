@@ -83,3 +83,23 @@ type VulnImportResult struct {
 	// agent name) whose findings matched no asset, sorted.
 	UnmatchedTargets []string `json:"unmatched_targets"`
 }
+
+// CVECatalogEntry is one CVE's public NVD text plus a generic LLM analysis
+// in pt-BR and en, shared by every finding carrying that CVE. OpenFindings
+// is the caller's visible open findings with this CVE, filled on reads.
+// List reads leave AnalysisPT / AnalysisEN empty.
+type CVECatalogEntry struct {
+	CVEID        string     `json:"cve_id"`
+	Description  string     `json:"description"`
+	CVSS         *float64   `json:"cvss"`
+	CVSSVector   string     `json:"cvss_vector"`
+	CWE          string     `json:"cwe"`
+	PublishedAt  *time.Time `json:"published_at"`
+	References   []string   `json:"references"`
+	AnalysisPT   string     `json:"analysis_pt"`
+	AnalysisEN   string     `json:"analysis_en"`
+	Model        string     `json:"model"`
+	AnalyzedBy   *int64     `json:"analyzed_by"`
+	AnalyzedAt   time.Time  `json:"analyzed_at"`
+	OpenFindings int        `json:"open_findings"`
+}

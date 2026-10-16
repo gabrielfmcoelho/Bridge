@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFlag } from "@/contexts/FlagContext";
 import { dnsAPI, globalIssuesAPI, hostsAPI, integrationsAPI, projectsAPI, servicesAPI, vulnAPI } from "@/lib/api";
 import CreateTicketModal from "@/components/glpi/CreateTicketModal";
+import CveAnalysis from "@/components/vulns/CveAnalysis";
 import { VULN_SEVERITY_BADGE, VULN_STATUS_LOZENGE } from "@/lib/alert-colors";
 import { findingSummary, linkifyParts, nvdURL, safeHref } from "@/lib/vulns";
 import type { VulnEntityType, VulnFinding, VulnLink, VulnStatus } from "@/lib/types";
@@ -127,6 +128,8 @@ export default function VulnDrawer({ id, onClose }: { id: number | null; onClose
             <Field label={t("vuln.lastSeen")} value={formatDateTime(f.last_seen_at)} />
             {f.resolved_at && <Field label={t("vuln.resolvedAt")} value={formatDateTime(f.resolved_at)} />}
           </div>
+
+          {f.cve && <CveAnalysis cve={f.cve} findingId={f.id} />}
 
           {f.risk && (
             <section className="space-y-1.5">

@@ -1348,3 +1348,22 @@ export interface VulnImportResult {
   dry_run: boolean;
   unmatched_targets: string[];
 }
+
+/** One CVE's public NVD text plus a generic analysis in pt-BR and en,
+ *  shared by every finding with that CVE. Catalog list rows leave the
+ *  analysis fields empty. open_findings counts the caller's visible ones. */
+export interface CveCatalogEntry {
+  cve_id: string;
+  description: string;
+  cvss: number | null;
+  cvss_vector: string;
+  cwe: string;
+  published_at: string | null;
+  references: string[];
+  analysis_pt: string;
+  analysis_en: string;
+  model: string;
+  analyzed_by: number | null;
+  analyzed_at: string;
+  open_findings: number;
+}

@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +15,7 @@ import (
 	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/llm"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -24,30 +24,7 @@ type aiHandlers struct {
 }
 
 func (h *aiHandlers) getClient() (*llm.Client, error) {
-	get := func(key string) string { return store.NewAppSettingsRepo(h.db.SQL).Value(context.Background(), key) }
-
-	if get("llm_enabled") != "true" {
-		return nil, http.ErrAbortHandler
-	}
-
-	baseURL := get("llm_base_url")
-	model := get("llm_model_text")
-	maxTokensStr := get("llm_max_tokens")
-	maxTokens := 2000
-	if n, err := strconv.Atoi(maxTokensStr); err == nil && n > 0 {
-		maxTokens = n
-	}
-
-	// Decrypt API key (now stored in app_secrets).
-	apiKey, ok, err := store.NewAppSecretRepo(h.db.SQL).Reveal(context.Background(), h.db.Encryptor, "llm_api_key")
-	if err != nil {
-		return nil, err
-	}
-	if !ok || baseURL == "" {
-		return nil, http.ErrAbortHandler
-	}
-
-	return llm.NewClient(baseURL, apiKey, model, maxTokens), nil
+	return service.LLMClient(context.Background(), h.db)
 }
 
 // handleStatus checks if the LLM integration is configured.

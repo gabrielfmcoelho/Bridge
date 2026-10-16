@@ -8,6 +8,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/nvd"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -18,7 +19,8 @@ import (
 const maxETIPIBytes = 5 << 20
 
 type vulnHandlers struct {
-	db *database.DB
+	db  *database.DB
+	nvd *nvd.Client
 }
 
 var vulnStatuses = map[string]bool{"open": true, "accepted": true, "false_positive": true, "resolved": true}
@@ -372,7 +374,10 @@ func (h *vulnHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "POST /api/wazuh/sync", h.handleWazuhSync)
 	rr.auth("GET /api/vulnerabilities", h.handleList)
 	rr.role("admin", "POST /api/vulnerabilities/import/etipi", h.handleImportETIPI)
+	rr.auth("GET /api/vulnerabilities/cves", h.handleListCVEs)
+	rr.auth("GET /api/vulnerabilities/cves/{cve}", h.handleGetCVE)
 	rr.auth("GET /api/vulnerabilities/{id}", h.handleGet)
+	rr.perm("ai.use", "POST /api/vulnerabilities/{id}/cve-analysis", h.handleAnalyzeCVE)
 	rr.role("editor", "PATCH /api/vulnerabilities/{id}", h.handleUpdate)
 	rr.role("editor", "POST /api/vulnerabilities/{id}/links", h.handleAddLink)
 	rr.role("editor", "DELETE /api/vulnerabilities/{id}/links", h.handleRemoveLink)
