@@ -344,38 +344,7 @@ func (h *projectGitLabHandlers) handleListCommits(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Resolve group links into their member projects. Each target is one repo that
-	// will be fetched with its own commits-list call.
-	type target struct {
-		ID   int
-		Path string
-		Name string
-		Ref  string
-	}
-	var targets []target
-	var warnings []string
-
-	for _, l := range links {
-		switch l.Kind {
-		case models.GitLabLinkKindGroup:
-			projects, err := client.ListGroupProjects(l.GitLabProjectID, true)
-			if err != nil {
-				warnings = append(warnings, "group "+l.GitLabPath+": "+err.Error())
-				continue
-			}
-			for _, p := range projects {
-				targets = append(targets, target{
-					ID: p.ID, Path: p.PathWithNamespace, Name: p.Name,
-					Ref: strOr(l.RefName, settings.DefaultRef),
-				})
-			}
-		default: // project
-			targets = append(targets, target{
-				ID: l.GitLabProjectID, Path: l.GitLabPath, Name: pickName(l.DisplayName, l.GitLabPath),
-				Ref: strOr(l.RefName, settings.DefaultRef),
-			})
-		}
-	}
+	targets, warnings := gitlabTargets(links, client, settings.DefaultRef)
 
 	if len(targets) == 0 {
 		env.Warnings = warnings
@@ -393,7 +362,7 @@ func (h *projectGitLabHandlers) handleListCommits(w http.ResponseWriter, r *http
 	for _, tgt := range targets {
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(t target) {
+		go func(t gitlabTarget) {
 			defer wg.Done()
 			defer func() { <-sem }()
 
@@ -466,6 +435,44 @@ func (h *projectGitLabHandlers) handleListCommits(w http.ResponseWriter, r *http
 		env.Warnings = warnings
 	}
 	jsonOK(w, env)
+}
+
+// gitlabTarget is one repository a project's GitLab links resolve to.
+type gitlabTarget struct {
+	ID   int
+	Path string
+	Name string
+	Ref  string
+}
+
+// gitlabTargets resolves a project's links into repositories: a group link
+// expands to its member projects (subgroups included). Ref falls back to the
+// Code Management default ref. A group that fails to list is a warning.
+func gitlabTargets(links []models.ProjectGitLabLink, client *gitlabclient.Client, defaultRef string) ([]gitlabTarget, []string) {
+	var targets []gitlabTarget
+	var warnings []string
+	for _, l := range links {
+		switch l.Kind {
+		case models.GitLabLinkKindGroup:
+			projects, err := client.ListGroupProjects(l.GitLabProjectID, true)
+			if err != nil {
+				warnings = append(warnings, "group "+l.GitLabPath+": "+err.Error())
+				continue
+			}
+			for _, p := range projects {
+				targets = append(targets, gitlabTarget{
+					ID: p.ID, Path: p.PathWithNamespace, Name: p.Name,
+					Ref: strOr(l.RefName, defaultRef),
+				})
+			}
+		default: // project
+			targets = append(targets, gitlabTarget{
+				ID: l.GitLabProjectID, Path: l.GitLabPath, Name: pickName(l.DisplayName, l.GitLabPath),
+				Ref: strOr(l.RefName, defaultRef),
+			})
+		}
+	}
+	return targets, warnings
 }
 
 func strOr(a, b string) string {

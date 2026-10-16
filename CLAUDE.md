@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v110**. Use idempotent idioms:
+per element, currently at **v113**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -142,6 +142,13 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   Bridge's own entry; a key's secret is returned **once** (also stored in the
   vault). Operating the SEAD gateway/Keycloak around it: the `sead-api-gateway`
   skill.
+- LLM calls go through `service.LLMClient` (settings group `llm`, OpenAI-compatible).
+  The CVE catalog (`cve_catalog`, fetched from NVD by `internal/integrations/nvd`)
+  keeps one generic pt-BR + en analysis per CVE, shared by every finding with
+  that CVE and visible only through those findings.
+  A finding's case-specific fix plan (`vuln_fix_plans`, `internal/api/vuln_fixplan.go`)
+  lets the model explore, with read-only tools, only the GitLab repos and host
+  scans of the finding's visible topology; tool loops share `runToolLoop`.
 - List endpoints return `{data, meta:{page,per_page,total}}`
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.

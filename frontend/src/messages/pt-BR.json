@@ -3879,13 +3879,15 @@
       "triaged": "Aceitos / falsos positivos",
       "resolved": "Resolvidos",
       "unmatched": "Sem vínculo",
-      "closed": "Encerrados"
+      "closed": "Encerrados",
+      "catalog": "Catálogo de CVEs"
     },
     "empty": {
       "open": "Nenhum achado aberto",
       "triaged": "Nenhum achado aceito ou falso positivo",
       "resolved": "Nenhum achado resolvido",
-      "unmatched": "Todo achado está ligado a um ativo"
+      "unmatched": "Todo achado está ligado a um ativo",
+      "catalog": "Nenhuma CVE analisada ainda"
     },
     "emptyHint": "Os achados chegam pela importação dos relatórios da ETIPI e pela sincronização do Wazuh.",
     "emptyEntityOpen": "Nenhum achado aberto aqui",
@@ -3957,6 +3959,34 @@
     "syncWazuh": "Sincronizar Wazuh",
     "wazuhSynced": "Wazuh sincronizado",
     "wazuhSyncFailed": "Falha ao sincronizar o Wazuh",
-    "unmatchedAgents": "agentes: {names}"
+    "unmatchedAgents": "agentes: {names}",
+    "cveAnalysis": {
+      "title": "Análise da CVE",
+      "hint": "Análise genérica do registro público da NVD, em português e inglês. Compartilhada por todos os achados com esta CVE.",
+      "analyze": "Analisar CVE",
+      "reanalyze": "Reanalisar",
+      "running": "Buscando a CVE na NVD e analisando nos dois idiomas. Pode levar um minuto.",
+      "empty": "Ainda não analisada. Analise para ver o que a CVE significa e como tratá-la.",
+      "emptyReadOnly": "Ainda não analisada.",
+      "meta": "Analisada {ago} · {model}",
+      "openFindings": "Achados abertos",
+      "description": "Descrição",
+      "analyzedAt": "Analisada em",
+      "catalogHint": "Abra um achado com CVE e clique em \"Analisar CVE\" para incluí-la aqui.",
+      "searchPlaceholder": "Buscar por id da CVE ou descrição"
+    },
+    "fixPlan": {
+      "title": "Plano de correção para este caso",
+      "hint": "Escrito pela IA depois de ler o código dos repositórios GitLab ligados e a última varredura dos hosts. Confira antes de aplicar.",
+      "generate": "Gerar plano de correção",
+      "regenerate": "Regenerar",
+      "running": "Lendo o código e a topologia. Pode levar alguns minutos.",
+      "empty": "Ainda sem plano. Gere um para ver o que mudar neste ambiente.",
+      "emptyReadOnly": "Ainda sem plano.",
+      "howMade": "Como foi feito ({steps} passos)",
+      "repos": "Repositórios oferecidos",
+      "noRepos": "nenhum",
+      "meta": "Gerado {ago} · {model}"
+    }
   }
 }

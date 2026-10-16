@@ -23,12 +23,19 @@ import (
 // limits the scope to that entidade, 0 is unscoped (admin-like).
 func newVulnEnv(t *testing.T, d *database.DB, name string, entidade int64) *catalogEnv {
 	t.Helper()
+	return newVulnEnvWith(t, &vulnHandlers{db: d}, name, entidade)
+}
+
+// newVulnEnvWith is newVulnEnv over a prepared handler (e.g. a fake NVD).
+func newVulnEnvWith(t *testing.T, h *vulnHandlers, name string, entidade int64) *catalogEnv {
+	t.Helper()
+	d := h.db
 	u := &models.User{Username: name, DisplayName: name, Role: "editor", Email: name + "@example.com"}
 	if err := store.NewUserRepo(d.SQL).Create(context.Background(), u); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 	mux := newEcho()
-	(&vulnHandlers{db: d}).registerRoutes(routeRegistrar{e: mux})
+	h.registerRoutes(routeRegistrar{e: mux})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := auth.WithUser(r.Context(), u)
 		if entidade != 0 {

@@ -581,10 +581,16 @@ type chatModel interface {
 }
 
 // runChat answers one user turn, letting the model call the user's tools
-// (up to maxToolRounds rounds). A gateway that rejects tools (4xx on the
-// first call) gets the plain conversation instead, and Tools reports false.
+// (up to maxToolRounds rounds).
 func runChat(ctx context.Context, model chatModel, env aiToolEnv, messages []llm.ChatMessage) (aiChatResult, error) {
-	available := toolsFor(env.user)
+	return runToolLoop(ctx, model, env, messages, toolsFor(env.user), maxToolRounds)
+}
+
+// runToolLoop lets the model call the given tools for up to maxRounds
+// rounds, then makes it answer (the last round offers no tools). A gateway
+// that rejects tools (4xx on the first call) gets the plain conversation
+// instead, and Tools reports false.
+func runToolLoop(ctx context.Context, model chatModel, env aiToolEnv, messages []llm.ChatMessage, available []aiTool, maxRounds int) (aiChatResult, error) {
 	byName := map[string]aiTool{}
 	defs := make([]llm.Tool, 0, len(available))
 	for _, t := range available {
@@ -594,9 +600,9 @@ func runChat(ctx context.Context, model chatModel, env aiToolEnv, messages []llm
 	res := aiChatResult{Tools: len(defs) > 0, Steps: []aiStep{}, Refs: []aiRef{}, Proposals: []aiProposal{}}
 	seen := map[string]bool{}
 
-	for round := 0; round <= maxToolRounds; round++ {
+	for round := 0; round <= maxRounds; round++ {
 		var tools []llm.Tool
-		if res.Tools && round < maxToolRounds {
+		if res.Tools && round < maxRounds {
 			tools = defs // the last round has none, so the model must answer
 		}
 		msg, err := model.Chat(ctx, messages, tools)
@@ -625,12 +631,19 @@ func runChat(ctx context.Context, model chatModel, env aiToolEnv, messages []llm
 func runToolCall(ctx context.Context, env aiToolEnv, byName map[string]aiTool, call llm.ToolCall, res *aiChatResult, seen map[string]bool) string {
 	name := call.Function.Name
 	step := aiStep{Tool: name}
+	// The step label is whatever the call targets: a search, a draft's
+	// title, or (code tools) a repo / host and a path or name.
 	var q struct {
 		Query string `json:"query"`
 		Title string `json:"title"`
+		Repo  string `json:"repo"`
+		Host  string `json:"host"`
+		Path  string `json:"path"`
+		Name  string `json:"name"`
 	}
 	_ = json.Unmarshal([]byte(call.Function.Arguments), &q)
-	step.Query = clip(q.Query+q.Title, 80)
+	target := strings.Trim(q.Repo+q.Host+":"+q.Path+q.Name, ":")
+	step.Query = clip(strings.TrimSpace(target+" "+q.Query+q.Title), 120)
 
 	reply := func(v any) string {
 		b, _ := json.Marshal(v)

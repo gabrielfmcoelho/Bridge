@@ -207,4 +207,20 @@ func TestVulnRepo_Scope(t *testing.T) {
 	if _, n, _ := repo.List(bg, models.VulnFilter{EntityType: "service", EntityID: svcID}); n != 1 {
 		t.Fatalf("admin service tab = %d, want t via host", n)
 	}
+	// A finding linked to a visible and an invisible host shows a scoped
+	// caller only the visible link: the other host's name must not leak.
+	fm := vulnByFP(t, repo, "m")
+	must(repo.AddLink(bg, fm.ID, "host", theirs))
+	if f, _ := repo.Get(scoped, fm.ID); f == nil || len(f.Links) != 1 || f.Links[0].Name != "mine" {
+		t.Fatalf("scoped links = %+v, want only host mine", f)
+	}
+	if f, _ := repo.Get(bg, fm.ID); f == nil || len(f.Links) != 2 {
+		t.Fatalf("admin links = %+v, want mine + theirs", f)
+	}
+	// m is now visible (through mine) and also on hidden host theirs, which
+	// the service relates to: the hop through a hidden host must not add it
+	// to the tab, nor show "via host:theirs".
+	if tab, n, _ := repo.List(scoped, models.VulnFilter{EntityType: "service", EntityID: svcID}); n != 0 {
+		t.Fatalf("service tab hopped through a hidden host: %+v", tab)
+	}
 }

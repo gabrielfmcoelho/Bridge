@@ -35,6 +35,9 @@ func NewClient(baseURL, apiKey, model string, maxTokens int) *Client {
 	}
 }
 
+// Model is the configured text model id.
+func (c *Client) Model() string { return c.model }
+
 // ListModels calls GET /models on the OpenAI-compatible API and returns the list
 // of available model ids. Used as a cheap connectivity + auth check.
 func (c *Client) ListModels(ctx context.Context) ([]string, error) {

@@ -7,6 +7,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth/providers"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	glpiclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/glpi"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/nvd"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -116,7 +117,7 @@ func newApp(db *database.DB, configPath string) *App {
 		grafanaWebhook:      &grafanaWebhookHandlers{db: db},
 		telemetry:           &telemetryHandlers{db: db},
 		sentinel:            &sentinelHandlers{db: db, sentinel: deps.Sentinel},
-		vuln:                &vulnHandlers{db: db},
+		vuln:                &vulnHandlers{db: db, nvd: nvd.New()},
 		outline:             &outlineHandlers{db: db},
 		glpi:                &glpiHandlers{db: db, cache: glpiclient.NewSessionCache(30 * time.Minute)},
 		entidade:            newEntidadeHandlers(db),
