@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -46,6 +47,7 @@ type fixScope struct {
 	hosts    map[string]*sshtest.VMInfo // lower-cased host nickname → last scan
 	notes    []string                   // what could not be gathered
 	trees    map[int][]gitlabclient.TreeEntry
+	read     strings.Builder // every tool output, to check the plan's versions against
 }
 
 // buildFixScope walks one hop out from the finding's (visible) links. Every
@@ -375,6 +377,8 @@ func fixTools(sc *fixScope, gl *gitlabclient.Client) []aiTool {
 		return sc.repo(a.Repo)
 	}
 	out := func(items []map[string]any) (toolOutput, error) {
+		b, _ := json.Marshal(items)
+		sc.read.Write(b)
 		return toolOutput{Total: len(items), Items: items}, nil
 	}
 
@@ -500,6 +504,27 @@ func fixTools(sc *fixScope, gl *gitlabclient.Client) []aiTool {
 				return out(items)
 			}),
 	}
+}
+
+var versionRe = regexp.MustCompile(`\bv?(\d+\.\d+\.\d+)\b`)
+
+// unsupportedVersions lists the x.y.z versions the plan cites that appear
+// nowhere in what the model was given or read. Qwen names "fixed" versions
+// from memory even when told not to; this catches it without trusting it.
+func unsupportedVersions(plan, evidence string) []string {
+	known := map[string]bool{}
+	for _, m := range versionRe.FindAllStringSubmatch(evidence, -1) {
+		known[m[1]] = true
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range versionRe.FindAllStringSubmatch(plan, -1) {
+		if !known[m[1]] && !seen[m[1]] {
+			seen[m[1]] = true
+			out = append(out, m[1])
+		}
+	}
+	return out
 }
 
 // readLines returns up to fixReadLines numbered lines from start (1-based),
@@ -662,10 +687,11 @@ func (h *vulnHandlers) handleGenerateFixPlan(w http.ResponseWriter, r *http.Requ
 	defer cancel()
 	sc := buildFixScope(ctx, h.db, f, gl, gls)
 	user := auth.UserFromContext(r.Context())
+	prompt := fixPlanMessage(f, h.cveForFixPlan(ctx, f), sc)
 	res, err := runToolLoop(ctx, client, aiToolEnv{db: h.db, user: user}, []llm.ChatMessage{
 		{Role: "system", Content: llm.FixPlanSystem},
-		{Role: "user", Content: fixPlanMessage(f, h.cveForFixPlan(ctx, f), sc)},
-	}, fixTools(sc, gl), fixPlanMaxRounds)
+		{Role: "user", Content: prompt},
+	}, fixTools(sc, gl), fixPlanMaxRounds, true)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "AI request failed: "+err.Error())
 		return
@@ -674,6 +700,10 @@ func (h *vulnHandlers) handleGenerateFixPlan(w http.ResponseWriter, r *http.Requ
 	if content == "" {
 		jsonError(w, http.StatusBadGateway, "AI returned an empty plan")
 		return
+	}
+	if v := unsupportedVersions(content, prompt+sc.read.String()); len(v) > 0 {
+		content = "> ⚠️ Versões citadas sem fonte no que o modelo leu: " + strings.Join(v, ", ") +
+			". Confirme a versão corrigida no advisory antes de aplicar.\n\n" + content
 	}
 	if !res.Tools {
 		content = "> O modelo não aceitou ferramentas: este plano foi feito sem ler código nem pacotes.\n\n" + content
