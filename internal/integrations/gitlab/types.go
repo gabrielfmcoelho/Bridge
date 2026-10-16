@@ -79,3 +79,18 @@ type IssueListParams struct {
 	PerPage int
 	Page    int
 }
+
+// TreeEntry is one file ("blob") or directory ("tree") of a repository tree.
+type TreeEntry struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+	Path string `json:"path"`
+}
+
+// BlobHit is one code-search match: the file and a snippet starting at Startline.
+type BlobHit struct {
+	Path      string `json:"path"`
+	Startline int    `json:"startline"`
+	Data      string `json:"data"`
+	Ref       string `json:"ref"`
+}

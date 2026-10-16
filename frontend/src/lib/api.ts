@@ -851,6 +851,11 @@ export const vulnAPI = {
   cve: (cve: string) => api.get<import("./types").CveCatalogEntry | null>(`/api/vulnerabilities/cves/${encodeURIComponent(cve)}`),
   analyzeCve: (findingId: number) =>
     request<import("./types").CveCatalogEntry>(`/api/vulnerabilities/${findingId}/cve-analysis`, { method: "POST" }, 200_000),
+  // Case-specific fix plan: fixPlan() is null until generated. Generating
+  // lets the model explore repos and host scans for up to 6 min.
+  fixPlan: (findingId: number) => api.get<import("./types").VulnFixPlan | null>(`/api/vulnerabilities/${findingId}/fix-plan`),
+  generateFixPlan: (findingId: number) =>
+    request<import("./types").VulnFixPlan>(`/api/vulnerabilities/${findingId}/fix-plan`, { method: "POST" }, 420_000),
 };
 
 // Wazuh 4.8+ indexer (admin): test the saved settings, sync vulnerabilities.

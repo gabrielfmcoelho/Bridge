@@ -17142,6 +17142,104 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/vulnerabilities/{id}/fix-plan": {
+            "get": {
+                "description": "The case-specific fix plan, or a null body when none was generated. Never calls the LLM. 404 when the finding is absent or invisible. Any role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Get a finding's fix plan",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Finding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnFixPlan"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "The LLM explores, with read-only tools, the GitLab repos linked to the finding's projects / services and its hosts' last scans, then writes a case-specific fix plan in pt-BR. Replaces the previous plan. Without GitLab it works from the topology and host scans alone. Can take minutes. Requires ai.use.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Generate a finding's fix plan",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Finding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.VulnFixPlan"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "LLM failed",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "AI not configured",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/vulnerabilities/{id}/links": {
             "post": {
                 "description": "Editor+. Manual link to a host, DNS record, service or project, kept across imports. The asset must exist and be visible (404 otherwise).",
@@ -24373,6 +24471,38 @@ const docTemplate = `{
                 },
                 "vm_hint": {
                     "type": "string"
+                }
+            }
+        },
+        "models.VulnFixPlan": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "finding_id": {
+                    "type": "integer"
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "generated_by": {
+                    "type": "integer"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "repos": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "steps": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    }
                 }
             }
         },

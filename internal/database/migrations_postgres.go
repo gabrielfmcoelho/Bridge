@@ -1921,4 +1921,18 @@ var migrationsPostgres = []string{
 		analyzed_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_vuln_findings_cve ON vuln_findings(cve) WHERE cve <> '';`,
+
+	// Version 113: case-specific fix plan of a finding — an LLM plan written
+	// after it explored the linked GitLab repos and host scans with tools.
+	// One per finding, rewritten on regeneration. steps is the JSON list of
+	// tool calls it made; repos the repo paths it was offered.
+	`CREATE TABLE IF NOT EXISTS vuln_fix_plans (
+		finding_id   BIGINT PRIMARY KEY REFERENCES vuln_findings(id) ON DELETE CASCADE,
+		content      TEXT NOT NULL,
+		steps        TEXT NOT NULL DEFAULT '[]',
+		repos        TEXT NOT NULL DEFAULT '',
+		model        TEXT NOT NULL DEFAULT '',
+		generated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		generated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);`,
 }

@@ -3974,6 +3974,19 @@
       "analyzedAt": "Analysed",
       "catalogHint": "Open a finding with a CVE and click \"Analyse CVE\" to add it here.",
       "searchPlaceholder": "Search CVE id or description"
+    },
+    "fixPlan": {
+      "title": "Fix plan for this case",
+      "hint": "Written by the AI after reading the code of the linked GitLab repos and the hosts' last scans. Check before applying.",
+      "generate": "Generate fix plan",
+      "regenerate": "Regenerate",
+      "running": "Reading the code and topology. This can take a few minutes.",
+      "empty": "No plan yet. Generate one to get what to change in this environment.",
+      "emptyReadOnly": "No plan yet.",
+      "howMade": "How it was made ({steps} steps)",
+      "repos": "Repositories offered",
+      "noRepos": "none",
+      "meta": "Generated {ago} · {model}"
     }
   }
 }

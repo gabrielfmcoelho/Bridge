@@ -241,37 +241,7 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Resolve group links into their member projects (same pattern as the commits tab).
-	type target struct {
-		ID   int
-		Path string
-		Name string
-		Ref  string
-	}
-	var targets []target
-	for _, l := range links {
-		if l.Kind == models.GitLabLinkKindGroup {
-			projects, err := glClient.ListGroupProjects(l.GitLabProjectID, true)
-			if err != nil {
-				continue
-			}
-			for _, p := range projects {
-				targets = append(targets, target{
-					ID: p.ID, Path: p.PathWithNamespace, Name: p.Name,
-					Ref: l.RefName,
-				})
-			}
-		} else {
-			name := l.DisplayName
-			if name == "" {
-				name = l.GitLabPath
-			}
-			targets = append(targets, target{
-				ID: l.GitLabProjectID, Path: l.GitLabPath, Name: name,
-				Ref: l.RefName,
-			})
-		}
-	}
+	targets, _ := gitlabTargets(links, glClient, settings.DefaultRef)
 	if len(targets) == 0 {
 		jsonError(w, http.StatusBadGateway, "no reachable GitLab repos for this project")
 		return
@@ -293,7 +263,7 @@ func (h *aiHandlers) handleAnalyzeProject(w http.ResponseWriter, r *http.Request
 	for _, tgt := range targets {
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(t target) {
+		go func(t gitlabTarget) {
 			defer wg.Done()
 			defer func() { <-sem }()
 			batch, err := glClient.ListCommits(t.ID, gitlabclient.CommitListParams{

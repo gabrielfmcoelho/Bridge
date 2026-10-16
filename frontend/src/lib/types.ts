@@ -1367,3 +1367,23 @@ export interface CveCatalogEntry {
   analyzed_at: string;
   open_findings: number;
 }
+
+/** One tool call the fix plan's model made while exploring. */
+export interface AiStep {
+  tool: string;
+  query?: string;
+  count: number;
+  error?: string;
+}
+
+/** A finding's case-specific fix plan (pt-BR markdown). repos: what the
+ *  model was allowed to read; steps: what it actually read. */
+export interface VulnFixPlan {
+  finding_id: number;
+  content: string;
+  steps: AiStep[];
+  repos: string[];
+  model: string;
+  generated_by: number | null;
+  generated_at: string;
+}

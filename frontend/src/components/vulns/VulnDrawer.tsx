@@ -21,6 +21,7 @@ import { useFlag } from "@/contexts/FlagContext";
 import { dnsAPI, globalIssuesAPI, hostsAPI, integrationsAPI, projectsAPI, servicesAPI, vulnAPI } from "@/lib/api";
 import CreateTicketModal from "@/components/glpi/CreateTicketModal";
 import CveAnalysis from "@/components/vulns/CveAnalysis";
+import FixPlan, { fixPlanKey } from "@/components/vulns/FixPlan";
 import { VULN_SEVERITY_BADGE, VULN_STATUS_LOZENGE } from "@/lib/alert-colors";
 import { findingSummary, linkifyParts, nvdURL, safeHref } from "@/lib/vulns";
 import type { VulnEntityType, VulnFinding, VulnLink, VulnStatus } from "@/lib/types";
@@ -130,6 +131,7 @@ export default function VulnDrawer({ id, onClose }: { id: number | null; onClose
           </div>
 
           {f.cve && <CveAnalysis cve={f.cve} findingId={f.id} />}
+          <FixPlan findingId={f.id} />
 
           {f.risk && (
             <section className="space-y-1.5">
@@ -265,12 +267,15 @@ function FollowUp({ f, onChanged }: { f: VulnFinding; onChanged: () => void }) {
     risk: t("vuln.risk"), remediation: t("vuln.remediation"), evidence: t("vuln.evidence"), reference: t("vuln.reference"), details: t("vuln.detailsInBridge"),
   };
   const severity = t(`vuln.severityLevel.${f.severity}`);
+  // Reads the cache FixPlan already filled: a generated plan becomes part
+  // of the issue, so the work item carries the case-specific steps.
+  const { data: plan } = useQuery({ queryKey: fixPlanKey(f.id), queryFn: () => vulnAPI.fixPlan(f.id) });
 
   const createIssue = useMutation({
     mutationFn: async () => {
       const issue = await globalIssuesAPI.create({
         title: f.title,
-        description: findingSummary({ ...f, severity }, labels),
+        description: findingSummary({ ...f, severity }, labels) + (plan ? `\n\n## ${t("vuln.fixPlan.title")}\n\n${plan.content}` : ""),
         entity_type: parent.entity_type,
         entity_id: parent.entity_id,
         status: "backlog",

@@ -3974,6 +3974,19 @@
       "analyzedAt": "Analisada em",
       "catalogHint": "Abra um achado com CVE e clique em \"Analisar CVE\" para incluí-la aqui.",
       "searchPlaceholder": "Buscar por id da CVE ou descrição"
+    },
+    "fixPlan": {
+      "title": "Plano de correção para este caso",
+      "hint": "Escrito pela IA depois de ler o código dos repositórios GitLab ligados e a última varredura dos hosts. Confira antes de aplicar.",
+      "generate": "Gerar plano de correção",
+      "regenerate": "Regenerar",
+      "running": "Lendo o código e a topologia. Pode levar alguns minutos.",
+      "empty": "Ainda sem plano. Gere um para ver o que mudar neste ambiente.",
+      "emptyReadOnly": "Ainda sem plano.",
+      "howMade": "Como foi feito ({steps} passos)",
+      "repos": "Repositórios oferecidos",
+      "noRepos": "nenhum",
+      "meta": "Gerado {ago} · {model}"
     }
   }
 }

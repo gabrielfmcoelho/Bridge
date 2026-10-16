@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // VulnFinding is one vulnerability finding reported by a scanner source
 // (ETIPI report file, Wazuh). Most ETIPI findings carry no CVE (SQLi, SNMP,
@@ -102,4 +105,18 @@ type CVECatalogEntry struct {
 	AnalyzedBy   *int64     `json:"analyzed_by"`
 	AnalyzedAt   time.Time  `json:"analyzed_at"`
 	OpenFindings int        `json:"open_findings"`
+}
+
+// VulnFixPlan is the case-specific fix plan of one finding (pt-BR), written
+// by the LLM after exploring the linked repos and host scans. Steps is the
+// JSON list of tool calls it made ({tool, query, count, error}); Repos the
+// repository paths it was allowed to read.
+type VulnFixPlan struct {
+	FindingID   int64           `json:"finding_id"`
+	Content     string          `json:"content"`
+	Steps       json.RawMessage `json:"steps" swaggertype:"array,object"`
+	Repos       []string        `json:"repos"`
+	Model       string          `json:"model"`
+	GeneratedBy *int64          `json:"generated_by"`
+	GeneratedAt time.Time       `json:"generated_at"`
 }
