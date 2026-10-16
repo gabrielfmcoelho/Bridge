@@ -18,10 +18,11 @@ import StatusAlert from "@/components/ui/StatusAlert";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFlag } from "@/contexts/FlagContext";
-import { dnsAPI, hostsAPI, projectsAPI, servicesAPI, vulnAPI } from "@/lib/api";
+import { dnsAPI, globalIssuesAPI, hostsAPI, integrationsAPI, projectsAPI, servicesAPI, vulnAPI } from "@/lib/api";
+import CreateTicketModal from "@/components/glpi/CreateTicketModal";
 import { VULN_SEVERITY_BADGE, VULN_STATUS_LOZENGE } from "@/lib/alert-colors";
-import { linkifyParts, nvdURL, safeHref } from "@/lib/vulns";
-import type { VulnEntityType, VulnLink, VulnStatus } from "@/lib/types";
+import { findingSummary, linkifyParts, nvdURL, safeHref } from "@/lib/vulns";
+import type { VulnEntityType, VulnFinding, VulnLink, VulnStatus } from "@/lib/types";
 
 const STATUSES: VulnStatus[] = ["open", "accepted", "false_positive", "resolved"];
 const ENTITY_TYPES: VulnEntityType[] = ["host", "dns", "service", "project"];
@@ -192,6 +193,8 @@ export default function VulnDrawer({ id, onClose }: { id: number | null; onClose
             )}
           </section>
 
+          {canEdit && <FollowUp f={f} onChanged={refresh} />}
+
           {formError && <FormError message={formError} />}
           {canEdit && (
             // Keyed on the saved values: a reload after saving starts a fresh form.
@@ -235,6 +238,98 @@ function TriageForm({ id, status: initialStatus, note: initialNote, onSaved }: {
       <Textarea label={t("vuln.note")} hint={t("vuln.noteHint")} value={note} onChange={(e) => setNote(e.target.value)} rows={3} />
       {error && <FormError message={error} />}
       <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty}>{t("common.save")}</Button>
+    </section>
+  );
+}
+
+const ISSUE_PRIORITY: Record<string, string> = { critical: "critical", high: "high", medium: "medium", low: "low", info: "low" };
+
+/** Turn a finding into tracked work: a Bridge issue on its first linked
+ *  asset, or a GLPI ticket (on its host, when it has one). Each is recorded
+ *  on the finding, so the drawer links to it instead of offering it again. */
+function FollowUp({ f, onChanged }: { f: VulnFinding; onChanged: () => void }) {
+  const { t } = useLocale();
+  const flag = useFlag();
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [error, setError] = useState("");
+  const { data: integrations } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get, retry: false, staleTime: 60_000 });
+  const glpiEnabled = integrations?.glpi?.glpi_enabled === "true";
+  const links = f.links ?? [];
+  const parent = links[0];
+  const host = links.find((l) => l.entity_type === "host");
+  const labels = {
+    severity: t("vuln.severity"), cve: t("vuln.cve"), target: t("vuln.target"), vm: t("vuln.vm"), scanner: t("vuln.scanner"),
+    risk: t("vuln.risk"), remediation: t("vuln.remediation"), evidence: t("vuln.evidence"), reference: t("vuln.reference"), details: t("vuln.detailsInBridge"),
+  };
+  const severity = t(`vuln.severityLevel.${f.severity}`);
+
+  const createIssue = useMutation({
+    mutationFn: async () => {
+      const issue = await globalIssuesAPI.create({
+        title: f.title,
+        description: findingSummary({ ...f, severity }, labels),
+        entity_type: parent.entity_type,
+        entity_id: parent.entity_id,
+        status: "backlog",
+        priority: ISSUE_PRIORITY[f.severity],
+        source: "vuln",
+        source_ref: String(f.id),
+      });
+      await vulnAPI.update(f.id, { issue_id: issue.id });
+    },
+    onSuccess: () => {
+      setError("");
+      onChanged();
+      flag({ appearance: "success", title: t("vuln.issueCreated") });
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+  const recordTicket = useMutation({
+    mutationFn: ({ id, url }: { id: number; url: string }) => vulnAPI.update(f.id, { glpi_ticket_id: id, glpi_ticket_url: url }),
+    onSuccess: onChanged,
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const ticketHref = safeHref(f.glpi_ticket_url);
+  const detailsURL = typeof window === "undefined" ? "" : `${window.location.origin}/vulnerabilities?id=${f.id}`;
+
+  return (
+    <section className="space-y-2">
+      <SectionHeading>{t("vuln.followUp")}</SectionHeading>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {f.issue_id ? (
+          parent ? (
+            <Link href={entityHref(parent)} className="text-[var(--accent)] hover:underline">{t("vuln.issueLink", { id: String(f.issue_id) })}</Link>
+          ) : (
+            <span className="text-[var(--text-secondary)]">{t("vuln.issueLink", { id: String(f.issue_id) })}</span>
+          )
+        ) : (
+          <Button size="sm" variant="secondary" onClick={() => createIssue.mutate()} loading={createIssue.isPending} disabled={!parent}>
+            {t("vuln.createIssue")}
+          </Button>
+        )}
+        {f.glpi_ticket_id ? (
+          ticketHref ? (
+            <a href={ticketHref} target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">{t("vuln.ticketLink", { id: String(f.glpi_ticket_id) })}</a>
+          ) : (
+            <span className="text-[var(--text-secondary)]">{t("vuln.ticketLink", { id: String(f.glpi_ticket_id) })}</span>
+          )
+        ) : glpiEnabled ? (
+          <Button size="sm" variant="secondary" onClick={() => setTicketOpen(true)}>{t("vuln.openTicket")}</Button>
+        ) : null}
+      </div>
+      {!parent && !f.issue_id && <p className="text-xs text-[var(--text-muted)]">{t("vuln.issueNeedsLink")}</p>}
+      {error && <FormError message={error} />}
+      {glpiEnabled && (
+        <CreateTicketModal
+          open={ticketOpen}
+          onClose={() => setTicketOpen(false)}
+          defaultTitle={`[${severity}] ${f.title}`.replace(/[<>]/g, "")}
+          defaultDescription={findingSummary({ ...f, severity }, labels, { detailsURL })}
+          hostSlug={host?.slug}
+          onCreated={(id, url) => recordTicket.mutate({ id, url })}
+        />
+      )}
     </section>
   );
 }

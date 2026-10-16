@@ -3936,6 +3936,14 @@
     "unmatchedPreviewHint": "Unmatched findings name no DNS record or host Bridge knows; they wait in the Unmatched tab for an admin to link them.",
     "pickAnother": "Choose another file",
     "importComplete": "This file lists every open finding",
-    "importCompleteHint": "Leave it off when ETIPI sent only some systems: a finding is then resolved only if the file still lists its host with that severity. A host that comes back fully clean drops out of the report, so its findings stay open until you resolve them or import a complete file."
+    "importCompleteHint": "Leave it off when ETIPI sent only some systems: a finding is then resolved only if the file still lists its host with that severity. A host that comes back fully clean drops out of the report, so its findings stay open until you resolve them or import a complete file.",
+    "followUp": "Follow-up",
+    "createIssue": "Create issue",
+    "issueCreated": "Issue created from the finding",
+    "issueLink": "Issue #{id}",
+    "openTicket": "Open GLPI ticket",
+    "ticketLink": "GLPI ticket #{id}",
+    "issueNeedsLink": "Link the finding to an asset first: the issue is created on it.",
+    "detailsInBridge": "Details in Bridge"
   }
 }

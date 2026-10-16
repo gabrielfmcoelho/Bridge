@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import TabBar, { type Tab } from "@/components/ui/TabBar";
@@ -48,7 +49,9 @@ export default function VulnList() {
   const [paged, setPaged] = useState({ key: filterKey, page: 1 });
   const page = paged.key === filterKey ? paged.page : 1;
   const setPage = (p: number) => setPaged({ key: filterKey, page: p });
-  const [openId, setOpenId] = useState<number | null>(null);
+  // ?id= opens a finding directly (the link a GLPI ticket carries back).
+  const searchParams = useSearchParams();
+  const [openId, setOpenId] = useState<number | null>(() => Number(searchParams.get("id")) || null);
   const [importOpen, setImportOpen] = useState(false);
 
   const params: Record<string, string> = { page: String(page), per_page: String(PER_PAGE) };

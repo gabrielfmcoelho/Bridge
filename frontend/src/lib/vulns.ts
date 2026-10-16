@@ -39,3 +39,34 @@ export function parseVia(via: string | undefined): { type: string; name: string 
 export function nvdURL(cve: string): string | null {
   return /^CVE-\d{4}-\d{4,}$/.test(cve) ? `https://nvd.nist.gov/vuln/detail/${cve}` : null;
 }
+
+/** HTML-escapes text for a Bridge issue (markdown, rendered through DOMPurify). */
+export function escapeHTML(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+type SummaryFinding = { severity: string; cve: string; target: string; vm_hint: string; scanner: string; risk: string; remediation: string; evidence: string; reference: string };
+type SummaryLabels = Record<"severity" | "cve" | "target" | "vm" | "scanner" | "risk" | "remediation" | "evidence" | "reference" | "details", string>;
+
+/** Body for an issue / GLPI ticket opened from a finding.
+ *
+ *  Bridge issue: every field, HTML-escaped. GLPI ticket: GLPI content comes
+ *  back into Bridge through an entity decode + dangerouslySetInnerHTML
+ *  (TicketDetailDrawer), so one layer of escaping can turn live again —
+ *  evidence (the exploit URLs) is left out, angle brackets are dropped from
+ *  the rest, and detailsURL points back to the finding in Bridge. */
+export function findingSummary(f: SummaryFinding, labels: SummaryLabels, glpi?: { detailsURL: string }): string {
+  const clean = glpi ? (v: string) => v.replace(/[<>]/g, "") : escapeHTML;
+  const rows: [string, string][] = [
+    [labels.severity, f.severity],
+    [labels.cve, f.cve],
+    [labels.target, f.target],
+    [labels.vm, f.vm_hint],
+    [labels.scanner, f.scanner],
+    [labels.risk, f.risk],
+    [labels.remediation, f.remediation],
+    [labels.reference, f.reference],
+    ...(glpi ? [[labels.details, glpi.detailsURL] as [string, string]] : [[labels.evidence, f.evidence] as [string, string]]),
+  ];
+  return rows.filter(([, v]) => v).map(([k, v]) => `**${k}:** ${clean(v)}`).join("\n\n");
+}
