@@ -1935,4 +1935,11 @@ var migrationsPostgres = []string{
 		generated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
 		generated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`,
+
+	// Version 114: clear Coolify's placeholder repo. An application deployed
+	// from a Docker image / compose file reports git_repository
+	// "coollabsio/coolify" (branch "main"); the sync now stores it as empty,
+	// this clears the rows it already wrote.
+	`UPDATE services SET git_repository = '', git_branch = ''
+	WHERE lower(regexp_replace(git_repository, '(\.git)?/*$', '')) ~ '(^|[/:])coollabsio/coolify$';`,
 }

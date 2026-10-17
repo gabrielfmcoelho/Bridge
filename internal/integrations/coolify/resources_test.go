@@ -64,3 +64,25 @@ func TestResourcesResolvesEnvironmentAndMembers(t *testing.T) {
 		t.Errorf("service = %+v", s)
 	}
 }
+
+func TestIsPlaceholderRepo(t *testing.T) {
+	for repo, want := range map[string]bool{
+		"coollabsio/coolify":                            true,
+		"https://github.com/coollabsio/coolify.git":     true,
+		"git@github.com:coollabsio/coolify.git":         true,
+		"https://github.com/CoolLabsIO/coolify/":        true,
+		"https://gitlab.ati.pi.gov.br/sead/app.git":     false,
+		"git@gitlab.ati.pi.gov.br:sead/coolify.git":     false,
+		"https://github.com/someone/coollabsio-coolify": false,
+		"": false,
+	} {
+		if got := isPlaceholderRepo(repo); got != want {
+			t.Errorf("isPlaceholderRepo(%q) = %v, want %v", repo, got, want)
+		}
+	}
+	// An image-deployed app comes out with no repo and no branch.
+	rs := Resources([]Application{{UUID: "u", Name: "wiki", GitRepository: "coollabsio/coolify", GitBranch: "main"}}, nil, nil, nil, "")
+	if rs[0].GitRepository != "" || rs[0].GitBranch != "" {
+		t.Fatalf("placeholder kept: %+v", rs[0])
+	}
+}

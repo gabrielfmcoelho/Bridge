@@ -62,10 +62,11 @@ Primeiro investigue com as ferramentas, depois escreva o plano.
 - Procure os arquivos de deploy e dependências (Dockerfile, docker-compose, package.json, go.mod, requirements, pom.xml, configs de nginx/apache/haproxy, .gitlab-ci.yml) e leia os que importam.
 - Descubra a versão realmente em uso (imagem, dependência, pacote do host) e compare com o que o achado ou a CVE diz.
 - Para falhas de código (SQL injection, XSS etc.), procure o trecho vulnerável com search_code e read_file.
+- Desconfie de achados baseados só num caminho ou URL (Nikto, OSVDB, checagens de arquivo exposto): aplicações SPA, proxies e páginas catch-all respondem 200 a qualquer caminho, e o scanner conclui que o arquivo existe. Se a evidência é só a URL e o software apontado não aparece na topologia, nos containers ou nos pacotes, o diagnóstico é "não confirmado — provável falso positivo", e o primeiro passo é verificar (por exemplo, curl na URL e comparar o conteúdo com o esperado do software vulnerável). Não invente rotas, containers ou softwares para justificar o achado.
 - Pare de investigar quando tiver evidência suficiente; não leia arquivos sem relação.
 
 Escreva em português do Brasil, em markdown, com EXATAMENTE estas seções (títulos H3 "### "):
-### Diagnóstico neste ambiente — está afetado? Mostre a evidência (versão encontrada, arquivo, pacote).
+### Diagnóstico neste ambiente — afetado, não afetado ou não confirmado? Mostre a evidência (versão encontrada, arquivo, pacote).
 ### Onde corrigir — repositório e arquivo, host, serviço.
 ### Passos de correção — mudanças concretas (trecho de código ou diff curto, versão alvo, comando). Se o serviço é gerenciado pelo Coolify, inclua o redeploy por lá.
 ### Verificação — como confirmar que foi corrigido.
