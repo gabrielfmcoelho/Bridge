@@ -73,6 +73,36 @@ func TestFixPlanEvidenceExcludesCatalogAnalysis(t *testing.T) {
 	}
 }
 
+// Only usable tools are offered: repo tools need GitLab and a repo,
+// host_packages a scanned host.
+func TestFixToolsOffered(t *testing.T) {
+	names := func(ts []aiTool) string {
+		var n []string
+		for _, x := range ts {
+			n = append(n, x.def.Function.Name)
+		}
+		return strings.Join(n, ",")
+	}
+	gl := gitlabclient.NewClient("http://unused", "tok")
+	scan := map[string]*sshtest.VMInfo{"web-01": {}}
+	repos := []fixRepo{{Key: "sead/app", ID: 7}}
+	for _, tc := range []struct {
+		sc   *fixScope
+		gl   *gitlabclient.Client
+		want string
+	}{
+		{&fixScope{repos: repos, hosts: scan}, gl, "list_files,find_files,read_file,search_code,host_packages"},
+		{&fixScope{hosts: scan}, gl, "host_packages"},                // no repo
+		{&fixScope{repos: repos, hosts: scan}, nil, "host_packages"}, // GitLab off
+		{&fixScope{repos: repos, hosts: map[string]*sshtest.VMInfo{}}, gl, "list_files,find_files,read_file,search_code"},
+		{&fixScope{hosts: map[string]*sshtest.VMInfo{}}, nil, ""},
+	} {
+		if got := names(fixTools(tc.sc, tc.gl)); got != tc.want {
+			t.Errorf("offered %q, want %q", got, tc.want)
+		}
+	}
+}
+
 func TestReadLines(t *testing.T) {
 	body := strings.Repeat("x\n", 250) + "end"
 	m := readLines("a.txt", body, 0)
@@ -186,7 +216,7 @@ func TestRunToolLoop_ForceFirstFallback(t *testing.T) {
 			return llm.ChatMessage{Role: "assistant", Content: "plano"}, nil
 		},
 	}}
-	tools := fixTools(&fixScope{hosts: map[string]*sshtest.VMInfo{}}, nil)
+	tools := fixTools(&fixScope{hosts: map[string]*sshtest.VMInfo{"web-01": {}}}, nil)
 	res, err := runToolLoop(context.Background(), m, aiToolEnv{}, nil, tools, 3, true)
 	if err != nil || res.Response != "plano" || !res.Tools || strings.Join(m.choices, ",") != "required," {
 		t.Fatalf("res=%+v err=%v choices=%q", res, err, m.choices)

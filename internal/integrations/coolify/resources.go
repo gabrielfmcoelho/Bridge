@@ -44,8 +44,12 @@ func Resources(apps []Application, svcs []Service, dbs []Database, projects []Pr
 	var out []Resource
 	for _, a := range apps {
 		e := envs[a.EnvironmentID]
+		repo, branch := SanitizeRepoURL(a.GitRepository), a.GitBranch
+		if isPlaceholderRepo(repo) {
+			repo, branch = "", ""
+		}
 		out = append(out, Resource{UUID: a.UUID, Type: "application", Name: a.Name, Project: e.project, Environment: e.env,
-			GitRepository: SanitizeRepoURL(a.GitRepository), GitBranch: a.GitBranch, Server: srv(a.Destination.Server),
+			GitRepository: repo, GitBranch: branch, Server: srv(a.Destination.Server),
 			FQDNs: []string{a.FQDN}})
 	}
 	for _, s := range svcs {
@@ -106,6 +110,16 @@ func SanitizeRepoURL(raw string) string {
 	}
 	u.User = nil
 	return u.String()
+}
+
+// isPlaceholderRepo reports Coolify's default git_repository,
+// "coollabsio/coolify" (branch "main"), which an application deployed from a
+// Docker image or compose file carries though no repo is involved. Stored as
+// is, it reads as the app's source in the UI and to the fix plan's model.
+func isPlaceholderRepo(repo string) bool {
+	r := strings.ToLower(strings.TrimSpace(repo))
+	r = strings.TrimSuffix(strings.TrimRight(r, "/"), ".git")
+	return r == "coollabsio/coolify" || strings.HasSuffix(r, "/coollabsio/coolify") || strings.HasSuffix(r, ":coollabsio/coolify")
 }
 
 // containerName: optional role prefix, the 24-char resource uuid, optional

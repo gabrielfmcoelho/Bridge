@@ -355,7 +355,9 @@ func (sc *fixScope) tree(gl *gitlabclient.Client, r fixRepo) ([]gitlabclient.Tre
 
 // fixTools are the read-only tools of one fix plan. Every repo / host
 // argument is checked against the scope, so the model can't read beyond the
-// finding's topology. gl may be nil: then only host_packages works.
+// finding's topology. Only usable tools are offered: no repo, no repo tools
+// (Qwen otherwise burns rounds on made-up repos); no scanned host, no
+// host_packages.
 func fixTools(sc *fixScope, gl *gitlabclient.Client) []aiTool {
 	type args struct {
 		Repo      string `json:"repo"`
@@ -382,7 +384,7 @@ func fixTools(sc *fixScope, gl *gitlabclient.Client) []aiTool {
 		return toolOutput{Total: len(items), Items: items}, nil
 	}
 
-	return []aiTool{
+	all := []aiTool{
 		tool("list_files", "List one directory of a repository (path \"\" = root).",
 			`{"type":"object","properties":{"repo":{"type":"string","description":"Repository path, from the list given"},"path":{"type":"string"}},"required":["repo"]}`,
 			"", func(_ context.Context, _ aiToolEnv, raw json.RawMessage) (toolOutput, error) {
@@ -504,6 +506,17 @@ func fixTools(sc *fixScope, gl *gitlabclient.Client) []aiTool {
 				return out(items)
 			}),
 	}
+	var usable []aiTool
+	for _, t := range all {
+		if t.def.Function.Name == "host_packages" {
+			if len(sc.hosts) > 0 {
+				usable = append(usable, t)
+			}
+		} else if gl != nil && len(sc.repos) > 0 {
+			usable = append(usable, t)
+		}
+	}
+	return usable
 }
 
 var versionRe = regexp.MustCompile(`\bv?(\d+\.\d+\.\d+)\b`)
@@ -697,10 +710,11 @@ func (h *vulnHandlers) handleGenerateFixPlan(w http.ResponseWriter, r *http.Requ
 	user := auth.UserFromContext(r.Context())
 	rec := h.cveForFixPlan(ctx, f)
 	prompt := fixPlanMessage(f, rec, sc)
+	tools := fixTools(sc, gl)
 	res, err := runToolLoop(ctx, client, aiToolEnv{db: h.db, user: user}, []llm.ChatMessage{
 		{Role: "system", Content: llm.FixPlanSystem},
 		{Role: "user", Content: prompt},
-	}, fixTools(sc, gl), fixPlanMaxRounds, true)
+	}, tools, fixPlanMaxRounds, true)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "AI request failed: "+err.Error())
 		return
@@ -720,7 +734,10 @@ func (h *vulnHandlers) handleGenerateFixPlan(w http.ResponseWriter, r *http.Requ
 		content = "> ⚠️ Versões citadas sem fonte no que o modelo leu: " + strings.Join(v, ", ") +
 			". Confirme a versão corrigida no advisory antes de aplicar.\n\n" + content
 	}
-	if !res.Tools {
+	switch {
+	case len(tools) == 0:
+		content = "> Sem repositório nem host com varredura ligados a este achado: o plano foi feito só com o achado e a topologia.\n\n" + content
+	case !res.Tools:
 		content = "> O modelo não aceitou ferramentas: este plano foi feito sem ler código nem pacotes.\n\n" + content
 	}
 	steps, _ := json.Marshal(res.Steps)
