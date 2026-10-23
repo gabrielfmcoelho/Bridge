@@ -342,6 +342,12 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		} else {
 			result["services_reconciled"] = true
 		}
+		// Dependency inventory (versions on the host and in its containers),
+		// after reconcile so container rows can point at their service. A
+		// failure is reported, never fails the scan.
+		if depErr := service.RecordDependencies(r.Context(), h.db.SQL, host.ID, *vmInfo); depErr != nil {
+			result["dependencies_error"] = depErr.Error()
+		}
 	} else {
 		testErr := sshtest.Test(client)
 		if testErr != nil {

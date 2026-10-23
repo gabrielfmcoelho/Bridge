@@ -119,6 +119,11 @@ type VMInfo struct {
 	FirewallStatus    string             `json:"firewall_status,omitempty"`
 	RemoteUsers       []RemoteUserInfo   `json:"remote_users,omitempty"`
 	PortOwners        []PortOwner        `json:"port_owners,omitempty"`
+	// Dependencies is the host's and each container's OS, runtimes and
+	// packages (deps.go). Kept out of the stored scan JSON: the scan handler
+	// writes it to dependency_inventory; container package lists would
+	// bloat host_scans.
+	Dependencies []DepScope `json:"-"`
 	SSHAuthPolicy     *SSHAuthPolicy     `json:"ssh_auth_policy,omitempty"`
 }
 
@@ -1647,6 +1652,8 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		enhancedRaw    string
 		remoteUsersRaw string
 		resourceTop    *ResourceUsageSnapshot
+		hostDeps       DepScope
+		containerDeps  []DepScope
 	)
 
 	wg.Add(10)
@@ -1687,6 +1694,15 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 			`sudo -n docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}' 2>/dev/null`,
 			warnFlags,
 		)
+		// Container dependencies reuse what docker ps needed (sudo or
+		// not) and stay in this goroutine, so the block keeps 10 sessions.
+		if dockerPsRaw != "" && !warnFlags["docker_unreadable"] {
+			pfx := ""
+			if warnFlags["docker_requires_sudo"] {
+				pfx = "sudo -n "
+			}
+			containerDeps = collectContainerDeps(client, dockerPsRaw, pfx)
+		}
 		timeSession("[par] sessions 4-5 docker", s)
 	}()
 	go func() {
@@ -1731,6 +1747,11 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 				`getent passwd 2>/dev/null | `+
 				`awk -F: -v cur="$current" '$3 >= 1000 && $3 < 65534 {is=($1==cur)?"1":"0"; print $1"|"$3"|"$6"|"$7"|"is}'`)
 		timeSession("[par] session 7 remote-users", s)
+		// Host dependencies in their own session, chained here: a timeout
+		// costs only the inventory, never the service/agent detection.
+		s = time.Now()
+		hostDeps = collectHostDeps(client)
+		timeSession("[par] session 7b host-dependencies", s)
 	}()
 	go func() {
 		defer wg.Done()
@@ -1751,6 +1772,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	nginxPortMap := parseNginxListens(nginxConfig)
 	info.ProcessDetails = procDetails
 	info.ResourceTop = resourceTop
+	info.Dependencies = append([]DepScope{hostDeps}, containerDeps...)
 
 	// Parse docker output (sessions 4-5).
 	for _, line := range splitLines(dockerPsRaw) {

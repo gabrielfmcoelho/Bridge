@@ -109,6 +109,13 @@ var integrationGroups = map[string][]string{
 		"wazuh_indexer_password",
 		"wazuh_tls_skip_verify",
 	},
+	// Dependency CVE checks (Vulnerabilities › Dependencies): the admin
+	// "Evaluate" button calls OSV, NVD and endoflife.date when enabled. The
+	// NVD API key is optional (raises NVD's rate limit).
+	"dependencies": {
+		"deps_cve_enabled",
+		"nvd_api_key",
+	},
 	"signoz": {
 		"signoz_enabled",
 		"signoz_ch_url",
@@ -166,6 +173,7 @@ var secretKeys = map[string]bool{
 	"signoz_ch_password":                 true,
 	"glpi_app_token":                     true,
 	"wazuh_indexer_password":             true,
+	"nvd_api_key":                        true,
 	"kc_apis_client_secret":              true,
 	"kc_apis_usage_client_secret":        true,
 	"smtp_password":                      true,

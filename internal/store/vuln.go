@@ -179,6 +179,31 @@ func (r *VulnRepo) Get(ctx context.Context, id int64) (*models.VulnFinding, erro
 	return f, err
 }
 
+// ByFingerprints returns the visible findings of source with the given
+// fingerprints (a dependency's findings, for its drawer).
+func (r *VulnRepo) ByFingerprints(ctx context.Context, source string, fps []string) ([]models.VulnFinding, error) {
+	out := []models.VulnFinding{}
+	if len(fps) == 0 {
+		return out, nil
+	}
+	vis, vargs := vulnVisible(ctx)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+vulnCols+` FROM vuln_findings f
+		WHERE f.source = ? AND f.fingerprint = ANY(?) AND `+vis+` ORDER BY f.id`,
+		append([]any{source, fps}, vargs...)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var f models.VulnFinding
+		if err := scanVuln(rows, &f); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
 // links lists a finding's links with display names. Links to trashed or
 // purged assets are left out (entity_id has no FK).
 func (r *VulnRepo) links(ctx context.Context, id int64) ([]models.VulnLink, error) {
@@ -293,8 +318,10 @@ type VulnCoverage struct {
 // accepted / false_positive keep their status. One transaction; dryRun
 // rolls it back after counting. Runs unscoped (system work).
 //
-// ponytail: two statements per finding plus links; fine for hundreds,
-// batch with unnest() if a Wazuh fleet ever sends tens of thousands.
+// Writes are batched (multi-row INSERT / UPDATE … FROM VALUES, chunks of
+// 400): the dependency inventory sends thousands of findings per scan.
+// Findings may carry their own Links (origin auto) on top of the matched
+// host / DNS ones.
 func (r *VulnRepo) ApplyImport(ctx context.Context, source string, findings []models.VulnFinding, cover *VulnCoverage, dryRun bool) (*models.VulnImportResult, error) {
 	res := &models.VulnImportResult{Parsed: len(findings), DryRun: dryRun}
 	m, err := r.newMatcher(ctx)
@@ -308,55 +335,179 @@ func (r *VulnRepo) ApplyImport(ctx context.Context, source string, findings []mo
 	}
 	defer tx.Rollback()
 
-	seen := make([]string, 0, len(findings))
-	unmatched := map[string]bool{}
+	// A fingerprint listed twice is one finding: the last copy wins.
+	byFP := make(map[string]int, len(findings))
+	uniq := make([]models.VulnFinding, 0, len(findings))
 	for _, f := range findings {
-		seen = append(seen, f.Fingerprint)
-		var id int64
-		var status string
-		err := tx.QueryRowContext(ctx, `SELECT id, status FROM vuln_findings WHERE source = ? AND fingerprint = ?`, source, f.Fingerprint).Scan(&id, &status)
-		switch {
-		case err == sql.ErrNoRows:
-			err = tx.QueryRowContext(ctx, `INSERT INTO vuln_findings (source, fingerprint, title, severity, cve, cvss, cwe, scanner,
-					target, vm_hint, evidence, risk, remediation, reference, known_exploited)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-				source, f.Fingerprint, f.Title, f.Severity, f.CVE, f.CVSS, f.CWE, f.Scanner,
-				f.Target, f.VMHint, f.Evidence, f.Risk, f.Remediation, f.Reference, f.KnownExploited).Scan(&id)
-			res.New++
-		case err != nil:
-		default:
-			if status == "resolved" {
+		if i, ok := byFP[f.Fingerprint]; ok {
+			uniq[i] = f
+			continue
+		}
+		byFP[f.Fingerprint] = len(uniq)
+		uniq = append(uniq, f)
+	}
+	seen := make([]string, len(uniq))
+	for i, f := range uniq {
+		seen[i] = f.Fingerprint
+	}
+
+	// Existing rows of this source, in one query.
+	type prior struct {
+		id     int64
+		status string
+	}
+	existing := map[string]prior{}
+	rows, err := tx.QueryContext(ctx, `SELECT fingerprint, id, status FROM vuln_findings WHERE source = ? AND fingerprint = ANY(?)`, source, seen)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var fp string
+		var p prior
+		if err := rows.Scan(&fp, &p.id, &p.status); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		existing[fp] = p
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Batched writes: findings arrive by the thousand from the dependency
+	// inventory, one statement per finding would take minutes.
+	const chunk = 400
+	ids := make([]int64, len(uniq))
+	var fresh, known []int
+	for i, f := range uniq {
+		if p, ok := existing[f.Fingerprint]; ok {
+			ids[i] = p.id
+			known = append(known, i)
+			if p.status == "resolved" {
 				res.Reopened++
 			} else {
 				res.Updated++
 			}
-			_, err = tx.ExecContext(ctx, `UPDATE vuln_findings SET title = ?, severity = ?, cve = ?, cvss = ?, cwe = ?, scanner = ?,
-					target = ?, vm_hint = ?, evidence = ?, risk = ?, remediation = ?, reference = ?, known_exploited = ?,
-					status = CASE WHEN status = 'resolved' THEN 'open' ELSE status END,
-					resolved_at = CASE WHEN status = 'resolved' THEN NULL ELSE resolved_at END,
-					last_seen_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-				WHERE id = ?`,
-				f.Title, f.Severity, f.CVE, f.CVSS, f.CWE, f.Scanner, f.Target, f.VMHint, f.Evidence, f.Risk,
-				f.Remediation, f.Reference, f.KnownExploited, id)
+		} else {
+			fresh = append(fresh, i)
 		}
+	}
+	res.New = len(fresh)
+	for start := 0; start < len(fresh); start += chunk {
+		part := fresh[start:min(start+chunk, len(fresh))]
+		var b strings.Builder
+		b.WriteString(`INSERT INTO vuln_findings (source, fingerprint, title, severity, cve, cvss, cwe, scanner,
+			target, vm_hint, evidence, risk, remediation, reference, known_exploited) VALUES `)
+		args := make([]any, 0, len(part)*15)
+		for k, i := range part {
+			if k > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString("(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+			f := uniq[i]
+			args = append(args, source, f.Fingerprint, f.Title, f.Severity, f.CVE, f.CVSS, f.CWE, f.Scanner,
+				f.Target, f.VMHint, f.Evidence, f.Risk, f.Remediation, f.Reference, f.KnownExploited)
+		}
+		b.WriteString(" RETURNING id, fingerprint")
+		rows, err := tx.QueryContext(ctx, b.String(), args...)
 		if err != nil {
-			return nil, fmt.Errorf("finding %q on %s: %w", f.Title, f.Target, err)
+			return nil, fmt.Errorf("insert findings: %w", err)
 		}
-
-		if _, err := tx.ExecContext(ctx, `DELETE FROM vuln_finding_links WHERE finding_id = ? AND origin = 'auto'`, id); err != nil {
-			return nil, err
-		}
-		for _, l := range m.match(f) {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO vuln_finding_links (finding_id, entity_type, entity_id, origin)
-				VALUES (?, ?, ?, 'auto') ON CONFLICT DO NOTHING`, id, l.EntityType, l.EntityID); err != nil {
+		for rows.Next() {
+			var id int64
+			var fp string
+			if err := rows.Scan(&id, &fp); err != nil {
+				rows.Close()
 				return nil, err
 			}
+			ids[byFP[fp]] = id
 		}
-		var linked bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM vuln_finding_links WHERE finding_id = ?)`, id).Scan(&linked); err != nil {
+		rows.Close()
+		if err := rows.Err(); err != nil {
 			return nil, err
 		}
-		if !linked {
+	}
+	for start := 0; start < len(known); start += chunk {
+		part := known[start:min(start+chunk, len(known))]
+		var b strings.Builder
+		b.WriteString(`UPDATE vuln_findings v SET title = u.title, severity = u.severity, cve = u.cve, cvss = u.cvss, cwe = u.cwe,
+			scanner = u.scanner, target = u.target, vm_hint = u.vm_hint, evidence = u.evidence, risk = u.risk,
+			remediation = u.remediation, reference = u.reference, known_exploited = u.known_exploited,
+			status = CASE WHEN v.status = 'resolved' THEN 'open' ELSE v.status END,
+			resolved_at = CASE WHEN v.status = 'resolved' THEN NULL ELSE v.resolved_at END,
+			last_seen_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+			FROM (VALUES `)
+		args := make([]any, 0, len(part)*14)
+		for k, i := range part {
+			if k > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString("(?::bigint,?,?,?,?::double precision,?,?,?,?,?,?,?,?,?::boolean)")
+			f := uniq[i]
+			args = append(args, ids[i], f.Title, f.Severity, f.CVE, f.CVSS, f.CWE, f.Scanner, f.Target, f.VMHint,
+				f.Evidence, f.Risk, f.Remediation, f.Reference, f.KnownExploited)
+		}
+		b.WriteString(`) AS u(id, title, severity, cve, cvss, cwe, scanner, target, vm_hint, evidence, risk, remediation, reference, known_exploited)
+			WHERE v.id = u.id`)
+		if _, err := tx.ExecContext(ctx, b.String(), args...); err != nil {
+			return nil, fmt.Errorf("update findings: %w", err)
+		}
+	}
+
+	// Auto links: matched host / DNS plus the links the source names itself
+	// (the inventory knows the container's service).
+	if _, err := tx.ExecContext(ctx, `DELETE FROM vuln_finding_links WHERE finding_id = ANY(?) AND origin = 'auto'`, ids); err != nil {
+		return nil, err
+	}
+	type link struct {
+		id  int64
+		typ string
+		eid int64
+	}
+	var links []link
+	for i, f := range uniq {
+		for _, l := range append(m.match(f), f.Links...) {
+			links = append(links, link{ids[i], l.EntityType, l.EntityID})
+		}
+	}
+	for start := 0; start < len(links); start += chunk {
+		part := links[start:min(start+chunk, len(links))]
+		var b strings.Builder
+		b.WriteString(`INSERT INTO vuln_finding_links (finding_id, entity_type, entity_id, origin) VALUES `)
+		args := make([]any, 0, len(part)*3)
+		for k, l := range part {
+			if k > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString("(?,?,?,'auto')")
+			args = append(args, l.id, l.typ, l.eid)
+		}
+		b.WriteString(" ON CONFLICT DO NOTHING")
+		if _, err := tx.ExecContext(ctx, b.String(), args...); err != nil {
+			return nil, err
+		}
+	}
+	linked := map[int64]bool{}
+	lrows, err := tx.QueryContext(ctx, `SELECT DISTINCT finding_id FROM vuln_finding_links WHERE finding_id = ANY(?)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	for lrows.Next() {
+		var id int64
+		if err := lrows.Scan(&id); err != nil {
+			lrows.Close()
+			return nil, err
+		}
+		linked[id] = true
+	}
+	lrows.Close()
+	if err := lrows.Err(); err != nil {
+		return nil, err
+	}
+	unmatched := map[string]bool{}
+	for i, f := range uniq {
+		if !linked[ids[i]] {
 			res.Unmatched++
 			unmatched[f.Target] = true
 		}

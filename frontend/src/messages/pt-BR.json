@@ -1952,6 +1952,13 @@
         "userHint": "Basta acesso de leitura a wazuh-states-vulnerabilities-*.",
         "password": "Senha do indexador",
         "testOk": "Conectado: {count} estados de vulnerabilidade"
+      },
+      "dependencies": {
+        "title": "CVEs de dependências",
+        "hint": "O botão \"Avaliar CVEs\" em Vulnerabilidades › Dependências consulta o OSV.dev (pacotes da distribuição), o NVD (builds upstream) e o endoflife.date sobre as versões encontradas pelos scans. Só ecossistema, produto e versão saem do Bridge — nunca nomes de host.",
+        "ariaEnable": "Ativar avaliação de CVEs das dependências",
+        "nvdKey": "Chave da API do NVD (opcional)",
+        "nvdKeyHint": "Sem chave o NVD permite 5 requisições a cada 30 s, então cada rodada avalia cerca de 30 versões e deixa o resto para a próxima; com chave, cerca de 300."
       }
     },
     "integrationsTabLabel": "Integrações",
@@ -3880,14 +3887,16 @@
       "resolved": "Resolvidos",
       "unmatched": "Sem vínculo",
       "closed": "Encerrados",
-      "catalog": "Catálogo de CVEs"
+      "catalog": "Catálogo de CVEs",
+      "dependencies": "Dependências"
     },
     "empty": {
       "open": "Nenhum achado aberto",
       "triaged": "Nenhum achado aceito ou falso positivo",
       "resolved": "Nenhum achado resolvido",
       "unmatched": "Todo achado está ligado a um ativo",
-      "catalog": "Nenhuma CVE analisada ainda"
+      "catalog": "Nenhuma CVE analisada ainda",
+      "dependencies": "Nenhuma versão de dependência ainda"
     },
     "emptyHint": "Os achados chegam pela importação dos relatórios da ETIPI e pela sincronização do Wazuh.",
     "emptyEntityOpen": "Nenhum achado aberto aqui",
@@ -3987,6 +3996,60 @@
       "repos": "Repositórios oferecidos",
       "noRepos": "nenhum",
       "meta": "Gerado {ago} · {model}"
-    }
+    },
+    "deps": {
+      "searchPlaceholder": "Buscar componente, versão, container ou host…",
+      "emptyHint": "As versões aparecem depois do scan de um host (SSH › Testar com captura).",
+      "component": "Componente",
+      "version": "Versão",
+      "where": "Onde",
+      "versionFrom": "Versão via",
+      "eol": "Fim de suporte",
+      "eolYes": "Sem suporte",
+      "eolNo": "Com suporte",
+      "cves": "CVEs",
+      "onHost": "host",
+      "host": "Host",
+      "container": "Container",
+      "image": "Imagem",
+      "kindLabel": "Tipo",
+      "lookup": "Fonte de CVEs",
+      "lookupVersion": "Versão avaliada",
+      "noLookup": "não verificado",
+      "notEvaluated": "não avaliado",
+      "notEvaluatedHint": "Esta versão ainda não foi avaliada quanto a CVEs.",
+      "noVulns": "Nenhuma CVE conhecida para esta versão.",
+      "evaluatedAt": "Avaliado em",
+      "vulns": "CVEs conhecidas",
+      "fixed": "Corrigido em",
+      "flag": "Mostrar",
+      "flagAny": "Todos",
+      "flagCves": "Com CVEs",
+      "flagEol": "Sem suporte",
+      "kind": {
+        "os": "SO",
+        "runtime": "Runtime",
+        "package": "Pacote"
+      },
+      "kindFilter": {
+        "components": "SO e runtimes",
+        "packages": "Pacotes",
+        "all": "Tudo"
+      },
+      "source": {
+        "probe": "binário",
+        "package": "gerenciador de pacotes",
+        "image_env": "imagem",
+        "os_release": "os-release"
+      },
+      "viaPackage": "via pacote do SO",
+      "evaluate": "Avaliar CVEs",
+      "evaluated": "Dependências avaliadas",
+      "evaluatedSummary": "{new} achados novos, {resolved} resolvidos · {osv} consultas OSV e {nvd} NVD",
+      "nvdDeferred": "{count} consultas NVD ficaram para a próxima rodada (limite de taxa)",
+      "evaluateFailed": "Não foi possível avaliar as dependências",
+      "eolUntil": "Com suporte até {date}"
+    },
+    "sourceInventory": "Inventário"
   }
 }
