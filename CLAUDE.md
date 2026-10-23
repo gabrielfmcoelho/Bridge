@@ -149,6 +149,16 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   A finding's case-specific fix plan (`vuln_fix_plans`, `internal/api/vuln_fixplan.go`)
   lets the model explore, with read-only tools, only the GitLab repos and host
   scans of the finding's visible topology; tool loops share `runToolLoop`.
+- Dependency inventory (`dependency_inventory`, Vulnerabilities › Dependencies):
+  each host scan probes the host and, through `docker exec`, one running
+  container per image (`internal/sshtest/deps.go`); `service.NormalizeDependencies`
+  decides per row whether advisories come from OSV (distro package) or NVD
+  (upstream build). Container env is **never** read — versions from env come
+  from the *image* config, filtered to `*_VERSION` keys on the remote side.
+  The admin "Evaluate CVEs" button (`service.EvaluateDependencies`, settings
+  group `dependencies`) caches OSV / NVD / endoflife.date answers in
+  `dependency_advisories` for 24h; every scan re-applies the cache offline
+  (`ApplyCache`) and every matched CVE is an `inventory` finding.
 - List endpoints return `{data, meta:{page,per_page,total}}`
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.

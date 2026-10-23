@@ -1311,7 +1311,7 @@ export interface VulnLink {
 
 export interface VulnFinding {
   id: number;
-  source: "etipi" | "wazuh";
+  source: "etipi" | "wazuh" | "inventory";
   title: string;
   severity: VulnSeverity;
   cve: string;
@@ -1386,4 +1386,66 @@ export interface VulnFixPlan {
   model: string;
   generated_by: number | null;
   generated_at: string;
+}
+
+// ── Dependency inventory (Vulnerabilities › Dependencies) ───────────────
+
+export type DependencyKind = "os" | "runtime" | "package";
+
+/** One OS / runtime / package version the scan found on a host (container "")
+ *  or inside one of its containers. lookup: where its CVEs come from. */
+export interface Dependency {
+  id: number;
+  host_id: number;
+  host_nickname: string;
+  host_slug: string;
+  service_id: number | null;
+  container: string;
+  image: string;
+  image_id: string;
+  kind: DependencyKind;
+  name: string;
+  version: string;
+  version_source: "probe" | "package" | "image_env" | "os_release";
+  lookup: "" | "osv" | "nvd";
+  ecosystem: string;
+  lookup_name: string;
+  lookup_version: string;
+  eol_product: string;
+  cve_count: number;
+  max_severity: VulnSeverity | "";
+  eol: boolean;
+  eol_date: string;
+  /** null until the first CVE evaluation. */
+  evaluated_at: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface DependencyVuln {
+  id: string;
+  /** The OSV advisory ("DEBIAN-CVE-…") when source is osv. */
+  osv_id?: string;
+  severity: VulnSeverity;
+  cvss: number;
+  summary: string;
+  fixed?: string;
+  source: "osv" | "nvd";
+}
+
+export interface DependencyDetail extends Dependency {
+  vulns: DependencyVuln[];
+  findings: VulnFinding[];
+}
+
+/** POST /api/vulnerabilities/dependencies/evaluate. */
+export interface DependencyEvalResult {
+  osv_queried: number;
+  osv_vulns: number;
+  nvd_queried: number;
+  /** NVD lookups left for the next run (rate limit). */
+  nvd_deferred: number;
+  eol_queried: number;
+  errors: string[];
+  findings: VulnImportResult;
 }

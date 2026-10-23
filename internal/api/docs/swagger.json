@@ -16904,6 +16904,173 @@
                 }
             }
         },
+        "/api/vulnerabilities/dependencies": {
+            "get": {
+                "description": "OS, runtime and package versions the SSH scan found on hosts and inside their containers, with their CVE count and EOL flag. Visible through the host or the container's service. Any role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "List dependency versions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Comma-separated: os, runtime, package (default os,runtime)",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only this host",
+                        "name": "host_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only this (container) service",
+                        "name": "service_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only rows with known CVEs",
+                        "name": "has_cves",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only end-of-life versions",
+                        "name": "eol",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Name, version, container, image or host",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200); omit for every row",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_Dependency"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/vulnerabilities/dependencies/evaluate": {
+            "post": {
+                "description": "Admin. Asks OSV (distro packages), NVD (upstream builds) and endoflife.date about every inventoried version whose answer is missing or older than a day — only ecosystem, product and version are sent — then turns every matched CVE into an \"inventory\" finding. NVD calls are rate-limited: what doesn't fit this run is reported as nvd_deferred and picked up by the next one. 400 when the integration is off.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Check dependency versions for CVEs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/service.DependencyEvalResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/vulnerabilities/dependencies/{id}": {
+            "get": {
+                "description": "One inventory row with its known advisories and the findings they produced. Invisible rows answer 404. Any role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Get a dependency version",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Dependency ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DependencyDetail"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/vulnerabilities/import/etipi": {
             "post": {
                 "description": "Admin. Multipart field \"file\": the ETIPI text report. The file is rejected when its counts don't add up. Findings are matched to DNS records (target) and hosts (VM). An open ETIPI finding missing from the file is resolved only when the file still lists its host with that severity, unless complete=true (the file is every open finding). With dry_run=true nothing is written and the counts are returned.",
@@ -17935,6 +18102,20 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.DNSRecord"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
+        "api.ListEnvelope-models_Dependency": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Dependency"
                     }
                 },
                 "meta": {
@@ -23104,6 +23285,205 @@
                 }
             }
         },
+        "models.Dependency": {
+            "type": "object",
+            "properties": {
+                "container": {
+                    "type": "string"
+                },
+                "cve_count": {
+                    "type": "integer"
+                },
+                "ecosystem": {
+                    "type": "string"
+                },
+                "eol": {
+                    "type": "boolean"
+                },
+                "eol_date": {
+                    "type": "string"
+                },
+                "eol_product": {
+                    "type": "string"
+                },
+                "evaluated_at": {
+                    "type": "string"
+                },
+                "first_seen_at": {
+                    "type": "string"
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "host_nickname": {
+                    "type": "string"
+                },
+                "host_slug": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "image_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "os | runtime | package",
+                    "type": "string"
+                },
+                "last_seen_at": {
+                    "type": "string"
+                },
+                "lookup": {
+                    "type": "string"
+                },
+                "lookup_name": {
+                    "type": "string"
+                },
+                "lookup_version": {
+                    "type": "string"
+                },
+                "max_severity": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "service_id": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "version_source": {
+                    "description": "probe | package | image_env | os_release",
+                    "type": "string"
+                }
+            }
+        },
+        "models.DependencyDetail": {
+            "type": "object",
+            "properties": {
+                "container": {
+                    "type": "string"
+                },
+                "cve_count": {
+                    "type": "integer"
+                },
+                "ecosystem": {
+                    "type": "string"
+                },
+                "eol": {
+                    "type": "boolean"
+                },
+                "eol_date": {
+                    "type": "string"
+                },
+                "eol_product": {
+                    "type": "string"
+                },
+                "evaluated_at": {
+                    "type": "string"
+                },
+                "findings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.VulnFinding"
+                    }
+                },
+                "first_seen_at": {
+                    "type": "string"
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "host_nickname": {
+                    "type": "string"
+                },
+                "host_slug": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "image_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "os | runtime | package",
+                    "type": "string"
+                },
+                "last_seen_at": {
+                    "type": "string"
+                },
+                "lookup": {
+                    "type": "string"
+                },
+                "lookup_name": {
+                    "type": "string"
+                },
+                "lookup_version": {
+                    "type": "string"
+                },
+                "max_severity": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "service_id": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "version_source": {
+                    "description": "probe | package | image_env | os_release",
+                    "type": "string"
+                },
+                "vulns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.DependencyVuln"
+                    }
+                }
+            }
+        },
+        "models.DependencyVuln": {
+            "type": "object",
+            "properties": {
+                "cvss": {
+                    "type": "number"
+                },
+                "fixed": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "CVE-… (or the OSV id when no CVE alias)",
+                    "type": "string"
+                },
+                "osv_id": {
+                    "description": "OSVID is the OSV advisory (\"DEBIAN-CVE-…\") when Source is osv.",
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                },
+                "source": {
+                    "description": "osv | nvd",
+                    "type": "string"
+                },
+                "summary": {
+                    "type": "string"
+                }
+            }
+        },
         "models.Entidade": {
             "type": "object",
             "properties": {
@@ -24849,6 +25229,35 @@
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "service.DependencyEvalResult": {
+            "type": "object",
+            "properties": {
+                "eol_queried": {
+                    "type": "integer"
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "findings": {
+                    "$ref": "#/definitions/models.VulnImportResult"
+                },
+                "nvd_deferred": {
+                    "type": "integer"
+                },
+                "nvd_queried": {
+                    "type": "integer"
+                },
+                "osv_queried": {
+                    "type": "integer"
+                },
+                "osv_vulns": {
+                    "type": "integer"
                 }
             }
         },
