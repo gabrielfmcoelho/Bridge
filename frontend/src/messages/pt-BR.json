@@ -3880,14 +3880,16 @@
       "resolved": "Resolvidos",
       "unmatched": "Sem vínculo",
       "closed": "Encerrados",
-      "catalog": "Catálogo de CVEs"
+      "catalog": "Catálogo de CVEs",
+      "dependencies": "Dependências"
     },
     "empty": {
       "open": "Nenhum achado aberto",
       "triaged": "Nenhum achado aceito ou falso positivo",
       "resolved": "Nenhum achado resolvido",
       "unmatched": "Todo achado está ligado a um ativo",
-      "catalog": "Nenhuma CVE analisada ainda"
+      "catalog": "Nenhuma CVE analisada ainda",
+      "dependencies": "Nenhuma versão de dependência ainda"
     },
     "emptyHint": "Os achados chegam pela importação dos relatórios da ETIPI e pela sincronização do Wazuh.",
     "emptyEntityOpen": "Nenhum achado aberto aqui",
@@ -3987,6 +3989,54 @@
       "repos": "Repositórios oferecidos",
       "noRepos": "nenhum",
       "meta": "Gerado {ago} · {model}"
-    }
+    },
+    "deps": {
+      "searchPlaceholder": "Buscar componente, versão, container ou host…",
+      "emptyHint": "As versões aparecem depois do scan de um host (SSH › Testar com captura).",
+      "component": "Componente",
+      "version": "Versão",
+      "where": "Onde",
+      "versionFrom": "Versão via",
+      "eol": "Fim de suporte",
+      "eolYes": "Sem suporte",
+      "eolNo": "Com suporte",
+      "cves": "CVEs",
+      "onHost": "host",
+      "host": "Host",
+      "container": "Container",
+      "image": "Imagem",
+      "kindLabel": "Tipo",
+      "lookup": "Fonte de CVEs",
+      "lookupVersion": "Versão avaliada",
+      "noLookup": "não verificado",
+      "notEvaluated": "não avaliado",
+      "notEvaluatedHint": "Esta versão ainda não foi avaliada quanto a CVEs.",
+      "noVulns": "Nenhuma CVE conhecida para esta versão.",
+      "evaluatedAt": "Avaliado em",
+      "vulns": "CVEs conhecidas",
+      "fixed": "Corrigido em",
+      "flag": "Mostrar",
+      "flagAny": "Todos",
+      "flagCves": "Com CVEs",
+      "flagEol": "Sem suporte",
+      "kind": {
+        "os": "SO",
+        "runtime": "Runtime",
+        "package": "Pacote"
+      },
+      "kindFilter": {
+        "components": "SO e runtimes",
+        "packages": "Pacotes",
+        "all": "Tudo"
+      },
+      "source": {
+        "probe": "binário",
+        "package": "gerenciador de pacotes",
+        "image_env": "imagem",
+        "os_release": "os-release"
+      },
+      "viaPackage": "via pacote do SO"
+    },
+    "sourceInventory": "Inventário"
   }
 }

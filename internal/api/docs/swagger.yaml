@@ -108,6 +108,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_Dependency:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.Dependency'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-models_Entidade:
     properties:
       data:
@@ -3570,6 +3579,137 @@ definitions:
       situacao:
         type: string
       updated_at:
+        type: string
+    type: object
+  models.Dependency:
+    properties:
+      container:
+        type: string
+      cve_count:
+        type: integer
+      ecosystem:
+        type: string
+      eol:
+        type: boolean
+      eol_date:
+        type: string
+      eol_product:
+        type: string
+      evaluated_at:
+        type: string
+      first_seen_at:
+        type: string
+      host_id:
+        type: integer
+      host_nickname:
+        type: string
+      host_slug:
+        type: string
+      id:
+        type: integer
+      image:
+        type: string
+      image_id:
+        type: string
+      kind:
+        description: os | runtime | package
+        type: string
+      last_seen_at:
+        type: string
+      lookup:
+        type: string
+      lookup_name:
+        type: string
+      lookup_version:
+        type: string
+      max_severity:
+        type: string
+      name:
+        type: string
+      service_id:
+        type: integer
+      version:
+        type: string
+      version_source:
+        description: probe | package | image_env | os_release
+        type: string
+    type: object
+  models.DependencyDetail:
+    properties:
+      container:
+        type: string
+      cve_count:
+        type: integer
+      ecosystem:
+        type: string
+      eol:
+        type: boolean
+      eol_date:
+        type: string
+      eol_product:
+        type: string
+      evaluated_at:
+        type: string
+      findings:
+        items:
+          $ref: '#/definitions/models.VulnFinding'
+        type: array
+      first_seen_at:
+        type: string
+      host_id:
+        type: integer
+      host_nickname:
+        type: string
+      host_slug:
+        type: string
+      id:
+        type: integer
+      image:
+        type: string
+      image_id:
+        type: string
+      kind:
+        description: os | runtime | package
+        type: string
+      last_seen_at:
+        type: string
+      lookup:
+        type: string
+      lookup_name:
+        type: string
+      lookup_version:
+        type: string
+      max_severity:
+        type: string
+      name:
+        type: string
+      service_id:
+        type: integer
+      version:
+        type: string
+      version_source:
+        description: probe | package | image_env | os_release
+        type: string
+      vulns:
+        items:
+          $ref: '#/definitions/models.DependencyVuln'
+        type: array
+    type: object
+  models.DependencyVuln:
+    properties:
+      cvss:
+        type: number
+      fixed:
+        type: string
+      id:
+        description: CVE-… (or the OSV id when no CVE alias)
+        type: string
+      severity:
+        type: string
+      source:
+        description: osv | nvd
+        type: string
+      summary:
         type: string
     type: object
   models.Entidade:
@@ -17579,6 +17719,94 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Get a CVE catalog entry
+      tags:
+      - vulnerabilities
+  /api/vulnerabilities/dependencies:
+    get:
+      description: OS, runtime and package versions the SSH scan found on hosts and
+        inside their containers, with their CVE count and EOL flag. Visible through
+        the host or the container's service. Any role.
+      parameters:
+      - description: 'Comma-separated: os, runtime, package (default os,runtime)'
+        in: query
+        name: kind
+        type: string
+      - description: Only this host
+        in: query
+        name: host_id
+        type: integer
+      - description: Only this (container) service
+        in: query
+        name: service_id
+        type: integer
+      - description: Only rows with known CVEs
+        in: query
+        name: has_cves
+        type: boolean
+      - description: Only end-of-life versions
+        in: query
+        name: eol
+        type: boolean
+      - description: Name, version, container, image or host
+        in: query
+        name: search
+        type: string
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_Dependency'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List dependency versions
+      tags:
+      - vulnerabilities
+  /api/vulnerabilities/dependencies/{id}:
+    get:
+      description: One inventory row with its known advisories and the findings they
+        produced. Invisible rows answer 404. Any role.
+      parameters:
+      - description: Dependency ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DependencyDetail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Get a dependency version
       tags:
       - vulnerabilities
   /api/vulnerabilities/import/etipi:

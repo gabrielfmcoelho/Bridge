@@ -23,11 +23,12 @@ import { useFlag } from "@/contexts/FlagContext";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import EtipiImportModal from "./EtipiImportModal";
 import CveCatalog from "./CveCatalog";
+import DependencyList, { type DependencyFlag, type DependencyKindFilter } from "./DependencyList";
 
 const PER_PAGE = 25;
-type View = "open" | "triaged" | "resolved" | "unmatched" | "catalog";
+type View = "open" | "triaged" | "resolved" | "unmatched" | "catalog" | "dependencies";
 type Severity = "" | "critical" | "high" | "medium" | "low";
-type Source = "" | "etipi" | "wazuh";
+type Source = "" | "etipi" | "wazuh" | "inventory";
 
 const VIEW_STATUS: Record<View, string> = {
   open: "open",
@@ -35,6 +36,7 @@ const VIEW_STATUS: Record<View, string> = {
   resolved: "resolved",
   unmatched: "",
   catalog: "",
+  dependencies: "",
 };
 
 export default function VulnList() {
@@ -45,6 +47,8 @@ export default function VulnList() {
   const [view, setView] = useState<View>("open");
   const [severity, setSeverity] = useState<Severity>("");
   const [source, setSource] = useState<Source>("");
+  const [depKind, setDepKind] = useState<DependencyKindFilter>("components");
+  const [depFlag, setDepFlag] = useState<DependencyFlag>("");
   const [search, setSearch] = useState("");
   const q = useDebounce(search.trim(), 300);
   // The page belongs to one filter set: changing a filter is back to page 1.
@@ -83,10 +87,11 @@ export default function VulnList() {
   if (q) params.search = q;
 
   const isCatalog = view === "catalog";
+  const isDeps = view === "dependencies";
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["vulnerabilities", "list", params],
     queryFn: () => vulnAPI.list(params),
-    enabled: !isCatalog,
+    enabled: !isCatalog && !isDeps,
   });
   const rows = data?.data ?? [];
   const total = data?.meta.total ?? 0;
@@ -97,6 +102,7 @@ export default function VulnList() {
     { key: "resolved", label: t("vuln.view.resolved") },
     ...(isAdmin ? [{ key: "unmatched", label: t("vuln.view.unmatched") }] : []),
     { key: "catalog", label: t("vuln.view.catalog") },
+    { key: "dependencies", label: t("vuln.view.dependencies") },
   ];
 
   return (
@@ -121,9 +127,28 @@ export default function VulnList() {
             <ListToolbar
               search={search}
               onSearchChange={setSearch}
-              searchPlaceholder={isCatalog ? t("vuln.cveAnalysis.searchPlaceholder") : t("vuln.searchPlaceholder")}
+              searchPlaceholder={isCatalog ? t("vuln.cveAnalysis.searchPlaceholder") : isDeps ? t("vuln.deps.searchPlaceholder") : t("vuln.searchPlaceholder")}
               actions={
-                isCatalog ? undefined : <>
+                isCatalog ? undefined : isDeps ? <>
+                  <ToolbarSelect<DependencyKindFilter>
+                    name={t("vuln.deps.kindLabel")}
+                    icon={ICON_PATHS.filter}
+                    value={depKind}
+                    onChange={setDepKind}
+                    options={(["components", "packages", "all"] as const).map((k) => ({ value: k, label: t(`vuln.deps.kindFilter.${k}`) }))}
+                  />
+                  <ToolbarSelect<DependencyFlag>
+                    name={t("vuln.deps.flag")}
+                    icon={ICON_PATHS.filter}
+                    value={depFlag}
+                    onChange={setDepFlag}
+                    options={[
+                      { value: "", label: t("vuln.deps.flagAny") },
+                      { value: "cves", label: t("vuln.deps.flagCves") },
+                      { value: "eol", label: t("vuln.deps.flagEol") },
+                    ]}
+                  />
+                </> : <>
                   <ToolbarSelect<Severity>
                     name={t("vuln.severity")}
                     icon={ICON_PATHS.filter}
@@ -143,6 +168,7 @@ export default function VulnList() {
                       { value: "", label: t("vuln.anySource") },
                       { value: "etipi", label: "ETIPI" },
                       { value: "wazuh", label: "Wazuh" },
+                      { value: "inventory", label: t("vuln.sourceInventory") },
                     ]}
                   />
                 </>
@@ -154,6 +180,8 @@ export default function VulnList() {
 
       {isCatalog ? (
         <CveCatalog search={q} />
+      ) : isDeps ? (
+        <DependencyList search={q} kind={depKind} flag={depFlag} onOpenFinding={setOpenId} />
       ) : isLoading ? (
         <SkeletonTable rows={8} />
       ) : isError ? (

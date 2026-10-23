@@ -3880,14 +3880,16 @@
       "resolved": "Resolved",
       "unmatched": "Unmatched",
       "closed": "Closed",
-      "catalog": "CVE catalog"
+      "catalog": "CVE catalog",
+      "dependencies": "Dependencies"
     },
     "empty": {
       "open": "No open findings",
       "triaged": "No accepted or false-positive findings",
       "resolved": "No resolved findings",
       "unmatched": "Every finding is linked to an asset",
-      "catalog": "No CVE analysed yet"
+      "catalog": "No CVE analysed yet",
+      "dependencies": "No dependency versions yet"
     },
     "emptyHint": "Findings arrive from ETIPI report imports and the Wazuh sync.",
     "emptyEntityOpen": "No open findings here",
@@ -3987,6 +3989,54 @@
       "repos": "Repositories offered",
       "noRepos": "none",
       "meta": "Generated {ago} · {model}"
-    }
+    },
+    "deps": {
+      "searchPlaceholder": "Search component, version, container or host…",
+      "emptyHint": "Versions appear after a host scan (SSH › Test with capture).",
+      "component": "Component",
+      "version": "Version",
+      "where": "Where",
+      "versionFrom": "Version from",
+      "eol": "End of life",
+      "eolYes": "End of life",
+      "eolNo": "Supported",
+      "cves": "CVEs",
+      "onHost": "host",
+      "host": "Host",
+      "container": "Container",
+      "image": "Image",
+      "kindLabel": "Kind",
+      "lookup": "CVE source",
+      "lookupVersion": "Version checked",
+      "noLookup": "not checked",
+      "notEvaluated": "not evaluated",
+      "notEvaluatedHint": "This version hasn't been checked for CVEs yet.",
+      "noVulns": "No known CVE for this version.",
+      "evaluatedAt": "Evaluated",
+      "vulns": "Known CVEs",
+      "fixed": "Fixed in",
+      "flag": "Show",
+      "flagAny": "All",
+      "flagCves": "With CVEs",
+      "flagEol": "End of life",
+      "kind": {
+        "os": "OS",
+        "runtime": "Runtime",
+        "package": "Package"
+      },
+      "kindFilter": {
+        "components": "OS and runtimes",
+        "packages": "Packages",
+        "all": "Everything"
+      },
+      "source": {
+        "probe": "binary",
+        "package": "package manager",
+        "image_env": "image",
+        "os_release": "os-release"
+      },
+      "viaPackage": "via OS package"
+    },
+    "sourceInventory": "Inventory"
   }
 }

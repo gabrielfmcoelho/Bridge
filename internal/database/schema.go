@@ -56,6 +56,7 @@ var TableCopyOrder = []string{
 	"vuln_finding_links",
 	"cve_catalog",
 	"vuln_fix_plans",
+	"dependency_inventory", // dependency_advisories is a cache: rebuilt by the next evaluation
 	"releases",
 	"release_issues",
 	"host_operation_logs",
@@ -73,6 +74,7 @@ var BoolColumns = map[string]map[string]bool{
 	},
 	"dns_records":          {"has_https": true},
 	"vuln_findings":        {"known_exploited": true},
+	"dependency_inventory": {"eol": true},
 	"projects":             {"tem_empresa_externa_responsavel": true, "is_directly_managed": true, "is_responsible": true},
 	"services":             {"orchestrator_managed": true, "is_directly_managed": true, "is_responsible": true, "is_external_dependency": true},
 	"external_tools":       {"embed_enabled": true},
@@ -131,7 +133,7 @@ var SerialTables = []string{
 	"host_chamados", "host_alerts", "issues", "releases",
 	"host_operation_logs", "user_external_identities",
 	"user_gitlab_tokens", "project_gitlab_links", "project_embeds", "auth_role_mappings",
-	"entidades", "asset_entidades",
+	"entidades", "asset_entidades", "dependency_inventory",
 }
 
 // ColumnRenames maps source → target column names for tables whose

@@ -856,6 +856,11 @@ export const vulnAPI = {
   fixPlan: (findingId: number) => api.get<import("./types").VulnFixPlan | null>(`/api/vulnerabilities/${findingId}/fix-plan`),
   generateFixPlan: (findingId: number) =>
     request<import("./types").VulnFixPlan>(`/api/vulnerabilities/${findingId}/fix-plan`, { method: "POST" }, 420_000),
+  // Dependency inventory: params kind (comma set: os,runtime,package),
+  // host_id, service_id, has_cves, eol, search, page, per_page.
+  dependencies: (params: Record<string, string>) =>
+    api.getListPaginated<import("./types").Dependency>(`/api/vulnerabilities/dependencies?${new URLSearchParams(params).toString()}`),
+  dependency: (id: number) => api.get<import("./types").DependencyDetail>(`/api/vulnerabilities/dependencies/${id}`),
 };
 
 // Wazuh 4.8+ indexer (admin): test the saved settings, sync vulnerabilities.

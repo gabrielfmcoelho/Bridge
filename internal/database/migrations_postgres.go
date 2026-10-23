@@ -1942,4 +1942,51 @@ var migrationsPostgres = []string{
 	// this clears the rows it already wrote.
 	`UPDATE services SET git_repository = '', git_branch = ''
 	WHERE lower(regexp_replace(git_repository, '(\.git)?/*$', '')) ~ '(^|[/:])coollabsio/coolify$';`,
+
+	// Version 115: dependency inventory — the OS, runtimes and packages (with
+	// versions) the SSH scan finds on each host and inside its containers
+	// (internal/sshtest/deps.go), so their versions can be checked for CVEs.
+	// One row per (host, container — '' for the host itself —, kind, name,
+	// version). lookup says where its advisories come from (osv for distro
+	// packages, nvd for upstream builds, '' for none), decided once at
+	// collection. Rows are visible through their host or service, like
+	// findings. dependency_advisories caches the OSV/NVD/endoflife answers.
+	// vuln_findings gets the 'inventory' source for the CVEs they match.
+	`ALTER TABLE vuln_findings DROP CONSTRAINT IF EXISTS vuln_findings_source_check;
+	ALTER TABLE vuln_findings ADD CONSTRAINT vuln_findings_source_check CHECK (source IN ('etipi','wazuh','inventory'));
+	CREATE TABLE IF NOT EXISTS dependency_inventory (
+		id             BIGSERIAL PRIMARY KEY,
+		host_id        BIGINT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+		service_id     BIGINT REFERENCES services(id) ON DELETE SET NULL,
+		container      TEXT NOT NULL DEFAULT '',
+		image          TEXT NOT NULL DEFAULT '',
+		image_id       TEXT NOT NULL DEFAULT '',
+		kind           TEXT NOT NULL CHECK (kind IN ('os','runtime','package')),
+		name           TEXT NOT NULL,
+		version        TEXT NOT NULL,
+		version_source TEXT NOT NULL CHECK (version_source IN ('probe','package','image_env','os_release')),
+		lookup         TEXT NOT NULL DEFAULT '' CHECK (lookup IN ('','osv','nvd')),
+		ecosystem      TEXT NOT NULL DEFAULT '',
+		lookup_name    TEXT NOT NULL DEFAULT '',
+		lookup_version TEXT NOT NULL DEFAULT '',
+		eol_product    TEXT NOT NULL DEFAULT '',
+		cve_count      INTEGER NOT NULL DEFAULT 0,
+		max_severity   TEXT NOT NULL DEFAULT '',
+		eol            BOOLEAN NOT NULL DEFAULT FALSE,
+		eol_date       TEXT NOT NULL DEFAULT '',
+		evaluated_at   TIMESTAMPTZ,
+		first_seen_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		last_seen_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE (host_id, container, kind, name, version)
+	);
+	CREATE INDEX IF NOT EXISTS idx_dependency_inventory_service ON dependency_inventory (service_id);
+	CREATE INDEX IF NOT EXISTS idx_dependency_inventory_name ON dependency_inventory (lower(name));
+	CREATE TABLE IF NOT EXISTS dependency_advisories (
+		source     TEXT NOT NULL CHECK (source IN ('osv','nvd','eol')),
+		lookup_key TEXT NOT NULL,
+		data       TEXT NOT NULL DEFAULT '',
+		error      TEXT NOT NULL DEFAULT '',
+		fetched_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (source, lookup_key)
+	);`,
 }
