@@ -65,6 +65,24 @@ export default function VulnList() {
   // Settings are admin-only, as is the sync.
   const { data: integrations } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get, enabled: isAdmin, retry: false, staleTime: 60_000 });
   const wazuhEnabled = integrations?.wazuh?.wazuh_enabled === "true";
+  const depsEnabled = integrations?.dependencies?.deps_cve_enabled === "true";
+  const evaluateDeps = useMutation({
+    mutationFn: vulnAPI.evaluateDependencies,
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ["vulnerabilities"] });
+      flag({
+        appearance: r.errors.length ? "warning" : "success",
+        title: t("vuln.deps.evaluated"),
+        description: t("vuln.deps.evaluatedSummary", {
+          new: String(r.findings.new), resolved: String(r.findings.resolved),
+          osv: String(r.osv_queried), nvd: String(r.nvd_queried),
+        }) +
+          (r.nvd_deferred ? ` · ${t("vuln.deps.nvdDeferred", { count: String(r.nvd_deferred) })}` : "") +
+          (r.errors.length ? ` · ${r.errors.slice(0, 3).join("; ")}` : ""),
+      });
+    },
+    onError: (e: Error) => flag({ appearance: "error", title: t("vuln.deps.evaluateFailed"), description: e.message }),
+  });
   const syncWazuh = useMutation({
     mutationFn: wazuhAPI.sync,
     onSuccess: (r) => {
@@ -113,6 +131,9 @@ export default function VulnList() {
         actions={
           isAdmin ? (
             <div className="flex items-center gap-2">
+              {depsEnabled && (
+                <Button size="sm" variant="secondary" onClick={() => evaluateDeps.mutate()} loading={evaluateDeps.isPending}>{t("vuln.deps.evaluate")}</Button>
+              )}
               {wazuhEnabled && (
                 <Button size="sm" variant="secondary" onClick={() => syncWazuh.mutate()} loading={syncWazuh.isPending}>{t("vuln.syncWazuh")}</Button>
               )}

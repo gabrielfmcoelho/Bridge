@@ -16993,6 +16993,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/vulnerabilities/dependencies/evaluate": {
+            "post": {
+                "description": "Admin. Asks OSV (distro packages), NVD (upstream builds) and endoflife.date about every inventoried version whose answer is missing or older than a day — only ecosystem, product and version are sent — then turns every matched CVE into an \"inventory\" finding. NVD calls are rate-limited: what doesn't fit this run is reported as nvd_deferred and picked up by the next one. 400 when the integration is off.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "Check dependency versions for CVEs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/service.DependencyEvalResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/vulnerabilities/dependencies/{id}": {
             "get": {
                 "description": "One inventory row with its known advisories and the findings they produced. Invisible rows answer 404. Any role.",
@@ -23437,6 +23475,10 @@ const docTemplate = `{
                     "description": "CVE-… (or the OSV id when no CVE alias)",
                     "type": "string"
                 },
+                "osv_id": {
+                    "description": "OSVID is the OSV advisory (\"DEBIAN-CVE-…\") when Source is osv.",
+                    "type": "string"
+                },
                 "severity": {
                     "type": "string"
                 },
@@ -25194,6 +25236,35 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "service.DependencyEvalResult": {
+            "type": "object",
+            "properties": {
+                "eol_queried": {
+                    "type": "integer"
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "findings": {
+                    "$ref": "#/definitions/models.VulnImportResult"
+                },
+                "nvd_deferred": {
+                    "type": "integer"
+                },
+                "nvd_queried": {
+                    "type": "integer"
+                },
+                "osv_queried": {
+                    "type": "integer"
+                },
+                "osv_vulns": {
+                    "type": "integer"
                 }
             }
         },

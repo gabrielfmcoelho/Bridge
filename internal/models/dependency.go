@@ -68,6 +68,8 @@ type DependencyVuln struct {
 	Summary  string  `json:"summary"`
 	Fixed    string  `json:"fixed,omitempty"`
 	Source   string  `json:"source"` // osv | nvd
+	// OSVID is the OSV advisory ("DEBIAN-CVE-…") when Source is osv.
+	OSVID string `json:"osv_id,omitempty"`
 }
 
 // DependencyDetail is the drawer payload: the row, its advisories and the

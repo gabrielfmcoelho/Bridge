@@ -1424,6 +1424,8 @@ export interface Dependency {
 
 export interface DependencyVuln {
   id: string;
+  /** The OSV advisory ("DEBIAN-CVE-…") when source is osv. */
+  osv_id?: string;
   severity: VulnSeverity;
   cvss: number;
   summary: string;
@@ -1436,3 +1438,14 @@ export interface DependencyDetail extends Dependency {
   findings: VulnFinding[];
 }
 
+/** POST /api/vulnerabilities/dependencies/evaluate. */
+export interface DependencyEvalResult {
+  osv_queried: number;
+  osv_vulns: number;
+  nvd_queried: number;
+  /** NVD lookups left for the next run (rate limit). */
+  nvd_deferred: number;
+  eol_queried: number;
+  errors: string[];
+  findings: VulnImportResult;
+}

@@ -64,6 +64,7 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/vulnerabilities/cves/CVE-2024-0001"},
 		{"GET", "/api/vulnerabilities/dependencies"},
 		{"GET", "/api/vulnerabilities/dependencies/1"},
+		{"POST", "/api/vulnerabilities/dependencies/evaluate"},
 		{"POST", "/api/vulnerabilities/1/cve-analysis"},
 		{"GET", "/api/vulnerabilities/1/fix-plan"},
 		{"POST", "/api/vulnerabilities/1/fix-plan"},

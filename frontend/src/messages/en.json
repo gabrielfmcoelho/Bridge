@@ -1952,6 +1952,13 @@
         "userHint": "Read access to wazuh-states-vulnerabilities-* is enough.",
         "password": "Indexer password",
         "testOk": "Connected: {count} vulnerability states"
+      },
+      "dependencies": {
+        "title": "Dependency CVEs",
+        "hint": "The \"Evaluate CVEs\" button on Vulnerabilities › Dependencies asks OSV.dev (distro packages), NVD (upstream builds) and endoflife.date about the versions the host scans found. Only ecosystem, product and version leave Bridge — never host names.",
+        "ariaEnable": "Enable dependency CVE checks",
+        "nvdKey": "NVD API key (optional)",
+        "nvdKeyHint": "Without a key NVD allows 5 requests per 30 s, so a run checks about 30 versions and leaves the rest for the next one; with a key, about 300."
       }
     },
     "integrationsTabLabel": "Integrations",
@@ -4035,7 +4042,13 @@
         "image_env": "image",
         "os_release": "os-release"
       },
-      "viaPackage": "via OS package"
+      "viaPackage": "via OS package",
+      "evaluate": "Evaluate CVEs",
+      "evaluated": "Dependencies evaluated",
+      "evaluatedSummary": "{new} new findings, {resolved} resolved · {osv} OSV and {nvd} NVD lookups",
+      "nvdDeferred": "{count} NVD lookups left for the next run (rate limit)",
+      "evaluateFailed": "Could not evaluate dependencies",
+      "eolUntil": "Supported until {date}"
     },
     "sourceInventory": "Inventory"
   }

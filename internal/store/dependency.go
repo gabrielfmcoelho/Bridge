@@ -191,3 +191,129 @@ func (r *DependencyRepo) Get(ctx context.Context, id int64) (*models.Dependency,
 	}
 	return d, err
 }
+
+// ForHosts returns every row of the given hosts (nil = all live hosts),
+// unscoped: for the evaluation, which runs as system work.
+func (r *DependencyRepo) ForHosts(ctx context.Context, hostIDs []int64) ([]models.Dependency, error) {
+	q := `SELECT ` + dependencyCols + ` FROM dependency_inventory d JOIN hosts h ON h.id = d.host_id AND h.deleted_at IS NULL`
+	var args []any
+	if hostIDs != nil {
+		q += ` WHERE d.host_id = ANY(?)`
+		args = append(args, hostIDs)
+	}
+	rows, err := r.db.QueryContext(ctx, q+` ORDER BY d.id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.Dependency
+	for rows.Next() {
+		var d models.Dependency
+		if err := scanDependency(rows, &d); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+// DependencyDerived is what an evaluation writes back onto a row.
+type DependencyDerived struct {
+	ID          int64
+	CVECount    int
+	MaxSeverity string
+	EOL         bool
+	EOLDate     string
+	EvaluatedAt *time.Time
+}
+
+// SetDerived writes evaluation results onto rows, batched.
+func (r *DependencyRepo) SetDerived(ctx context.Context, ds []DependencyDerived) error {
+	const chunk = 500
+	for start := 0; start < len(ds); start += chunk {
+		part := ds[start:min(start+chunk, len(ds))]
+		var b strings.Builder
+		b.WriteString(`UPDATE dependency_inventory d SET cve_count = u.cve_count, max_severity = u.max_severity,
+			eol = u.eol, eol_date = u.eol_date, evaluated_at = COALESCE(u.evaluated_at, d.evaluated_at) FROM (VALUES `)
+		args := make([]any, 0, len(part)*6)
+		for k, d := range part {
+			if k > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString("(?::bigint,?::integer,?,?::boolean,?,?::timestamptz)")
+			args = append(args, d.ID, d.CVECount, d.MaxSeverity, d.EOL, d.EOLDate, d.EvaluatedAt)
+		}
+		b.WriteString(`) AS u(id, cve_count, max_severity, eol, eol_date, evaluated_at) WHERE d.id = u.id`)
+		if _, err := r.db.ExecContext(ctx, b.String(), args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Advisory is one cached answer from OSV, NVD or endoflife.date.
+type Advisory struct {
+	Data      string
+	Error     string
+	FetchedAt time.Time
+}
+
+// AdvisoryRepo owns dependency_advisories, the lookup cache. Keys: osv
+// "<ecosystem>|<package>|<version>" (ids) and "vuln|<id>" (details), nvd
+// "<vendor:product>|<version>", eol "<product>".
+type AdvisoryRepo struct{ db *sql.DB }
+
+// NewAdvisoryRepo constructs an AdvisoryRepo over db.
+func NewAdvisoryRepo(db *sql.DB) *AdvisoryRepo { return &AdvisoryRepo{db: db} }
+
+// Get returns the cached entries among keys.
+func (r *AdvisoryRepo) Get(ctx context.Context, source string, keys []string) (map[string]Advisory, error) {
+	out := map[string]Advisory{}
+	if len(keys) == 0 {
+		return out, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT lookup_key, data, error, fetched_at FROM dependency_advisories
+		WHERE source = ? AND lookup_key = ANY(?)`, source, keys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var k string
+		var a Advisory
+		if err := rows.Scan(&k, &a.Data, &a.Error, &a.FetchedAt); err != nil {
+			return nil, err
+		}
+		out[k] = a
+	}
+	return out, rows.Err()
+}
+
+// Stale returns the keys with no entry, a failed one, or one older than
+// maxAge.
+func (r *AdvisoryRepo) Stale(ctx context.Context, source string, keys []string, maxAge time.Duration) ([]string, error) {
+	have, err := r.Get(ctx, source, keys)
+	if err != nil {
+		return nil, err
+	}
+	cutoff := time.Now().Add(-maxAge)
+	var out []string
+	for _, k := range keys {
+		a, ok := have[k]
+		if !ok || a.Error != "" || a.FetchedAt.Before(cutoff) {
+			out = append(out, k)
+		}
+	}
+	return out, nil
+}
+
+// Put stores one answer. A failure records the error but keeps the last
+// good data, so one bad lookup doesn't erase known CVEs.
+func (r *AdvisoryRepo) Put(ctx context.Context, source, key, data, errMsg string) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO dependency_advisories (source, lookup_key, data, error, fetched_at)
+		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT (source, lookup_key) DO UPDATE SET error = EXCLUDED.error, fetched_at = EXCLUDED.fetched_at,
+			data = CASE WHEN EXCLUDED.error = '' THEN EXCLUDED.data ELSE dependency_advisories.data END`,
+		source, key, data, errMsg)
+	return err
+}

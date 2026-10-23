@@ -13,7 +13,8 @@ import (
 // to dependency_inventory. Synchronous and offline: it runs right after
 // ReconcileDiscovered so each container row can point at its service.
 // Scopes that weren't probed keep their previous rows; containers docker ps
-// no longer lists are dropped.
+// no longer lists are dropped. Then ApplyCache updates the host's CVE
+// counts and findings from the cache.
 func RecordDependencies(ctx context.Context, db *sql.DB, hostID int64, info sshtest.VMInfo) error {
 	ctx = store.WithSystemScope(ctx)
 	svcs, err := store.NewServiceRepo(db).ListDiscoveredByHost(ctx, hostID)
@@ -41,5 +42,11 @@ func RecordDependencies(ctx context.Context, db *sql.DB, hostID int64, info ssht
 			sc.Probed = append(sc.Probed, scope.Container)
 		}
 	}
-	return store.NewDependencyRepo(db).ReplaceForHost(ctx, hostID, store.DedupeDependencies(rows), sc)
+	if err := store.NewDependencyRepo(db).ReplaceForHost(ctx, hostID, store.DedupeDependencies(rows), sc); err != nil {
+		return err
+	}
+	// Counts, EOL and findings from what is already cached — no network:
+	// a version that changed resolves its findings right away.
+	_, err = ApplyCache(ctx, db, []int64{hostID})
+	return err
 }

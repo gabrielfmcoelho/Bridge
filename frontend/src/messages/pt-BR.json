@@ -1952,6 +1952,13 @@
         "userHint": "Basta acesso de leitura a wazuh-states-vulnerabilities-*.",
         "password": "Senha do indexador",
         "testOk": "Conectado: {count} estados de vulnerabilidade"
+      },
+      "dependencies": {
+        "title": "CVEs de dependências",
+        "hint": "O botão \"Avaliar CVEs\" em Vulnerabilidades › Dependências consulta o OSV.dev (pacotes da distribuição), o NVD (builds upstream) e o endoflife.date sobre as versões encontradas pelos scans. Só ecossistema, produto e versão saem do Bridge — nunca nomes de host.",
+        "ariaEnable": "Ativar avaliação de CVEs das dependências",
+        "nvdKey": "Chave da API do NVD (opcional)",
+        "nvdKeyHint": "Sem chave o NVD permite 5 requisições a cada 30 s, então cada rodada avalia cerca de 30 versões e deixa o resto para a próxima; com chave, cerca de 300."
       }
     },
     "integrationsTabLabel": "Integrações",
@@ -4035,7 +4042,13 @@
         "image_env": "imagem",
         "os_release": "os-release"
       },
-      "viaPackage": "via pacote do SO"
+      "viaPackage": "via pacote do SO",
+      "evaluate": "Avaliar CVEs",
+      "evaluated": "Dependências avaliadas",
+      "evaluatedSummary": "{new} achados novos, {resolved} resolvidos · {osv} consultas OSV e {nvd} NVD",
+      "nvdDeferred": "{count} consultas NVD ficaram para a próxima rodada (limite de taxa)",
+      "evaluateFailed": "Não foi possível avaliar as dependências",
+      "eolUntil": "Com suporte até {date}"
     },
     "sourceInventory": "Inventário"
   }

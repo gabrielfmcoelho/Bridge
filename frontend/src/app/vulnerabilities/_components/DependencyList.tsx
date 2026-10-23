@@ -151,7 +151,8 @@ function DependencyDrawer({ id, onClose, onOpenFinding }: { id: number | null; o
             {d.image && <Field className="col-span-2" label={t("vuln.deps.image")} value={d.image} mono />}
             <Field label={t("vuln.deps.lookup")} value={d.lookup ? `${d.lookup.toUpperCase()} · ${d.ecosystem || d.lookup_name}` : t("vuln.deps.noLookup")} mono={!!d.lookup} />
             <Field label={t("vuln.deps.lookupVersion")} value={d.lookup_version} mono />
-            <Field label={t("vuln.deps.eol")} value={d.eol ? (d.eol_date || t("vuln.deps.eolYes")) : d.eol_product ? t("vuln.deps.eolNo") : ""} />
+            <Field label={t("vuln.deps.eol")} value={d.eol ? (d.eol_date || t("vuln.deps.eolYes"))
+              : d.eol_date ? t("vuln.deps.eolUntil", { date: d.eol_date }) : d.eol_product && d.evaluated_at ? t("vuln.deps.eolNo") : ""} />
             <Field label={t("vuln.deps.evaluatedAt")} value={d.evaluated_at ? formatDate(d.evaluated_at) : t("vuln.deps.notEvaluated")} />
             <Field label={t("vuln.firstSeen")} value={formatDate(d.first_seen_at)} />
             <Field label={t("vuln.lastSeen")} value={formatDate(d.last_seen_at)} />
@@ -175,11 +176,14 @@ function DependencyDrawer({ id, onClose, onOpenFinding }: { id: number | null; o
                   </thead>
                   <tbody>
                     {d.vulns.map((v, i) => {
-                      const finding = d.findings.find((f) => f.cve === v.id);
+                      const finding = d.findings.find((f) => (f.cve && f.cve === v.id) || f.title.startsWith(`${v.id} `));
                       return (
                         <tr key={v.id} className={`${tableClasses.row} ${finding ? "cursor-pointer" : ""} ${i % 2 === 1 ? tableClasses.rowAlt : ""}`}
                           onClick={finding ? () => onOpenFinding(finding.id) : undefined}>
-                          <td className={`${tableClasses.td} font-mono text-xs whitespace-nowrap`}>{v.id}</td>
+                          <td className={`${tableClasses.td} font-mono text-xs whitespace-nowrap`}>
+                            {v.id}
+                            {v.osv_id && v.osv_id !== v.id && <span className="block text-[var(--text-muted)]">{v.osv_id}</span>}
+                          </td>
                           <td className={tableClasses.td}><Badge color={VULN_SEVERITY_BADGE[v.severity]}>{t(`vuln.severityLevel.${v.severity}`)}</Badge></td>
                           <td className={tableClasses.td}>{v.cvss || "—"}</td>
                           <td className={`${tableClasses.td} font-mono text-xs`}>{v.fixed || "—"}</td>

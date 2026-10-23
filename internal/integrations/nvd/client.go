@@ -1,5 +1,7 @@
-// Package nvd reads one CVE record from the NVD CVE API 2.0. No API key:
-// the public limit (5 requests / 30s) is plenty for on-demand analysis.
+// Package nvd reads the NVD CVE API 2.0: one record by id (on-demand
+// analysis) or every CVE affecting a product version (dependency
+// inventory). The API key is optional; every call goes through one gate
+// that keeps under NVD's per-IP/key rate limit.
 package nvd
 
 import (
@@ -13,6 +15,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,6 +30,129 @@ var ErrNotFound = errors.New("CVE not found in NVD")
 type Client struct {
 	BaseURL string
 	HTTP    *http.Client
+	// APIKey raises the limit from 5 to 50 requests per 30s; "" = public.
+	APIKey string
+	// Gap overrides the spacing between calls; 0 = by APIKey against the
+	// real NVD, none against any other BaseURL (test servers).
+	Gap time.Duration
+}
+
+// gate spaces calls process-wide: NVD limits per IP (or key), not per
+// client value.
+var gate struct {
+	mu   sync.Mutex
+	next time.Time
+}
+
+func (c *Client) wait(ctx context.Context) error {
+	gap := c.Gap
+	if gap == 0 && c.BaseURL != DefaultBaseURL {
+		return nil // a test server: the limit is the real NVD's
+	}
+	if gap == 0 {
+		gap = 6 * time.Second
+		if c.APIKey != "" {
+			gap = 650 * time.Millisecond
+		}
+	}
+	gate.mu.Lock()
+	now := time.Now()
+	at := gate.next
+	if at.Before(now) {
+		at = now
+	}
+	gate.next = at.Add(gap)
+	gate.mu.Unlock()
+	select {
+	case <-time.After(time.Until(at)):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// get runs one rate-gated request and decodes the response.
+func (c *Client) get(ctx context.Context, query string) (*response, error) {
+	if err := c.wait(ctx); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"?"+query, nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.APIKey != "" {
+		req.Header.Set("apiKey", c.APIKey)
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("nvd: HTTP %d: %s", resp.StatusCode, truncate(string(data), 300))
+	}
+	var r response
+	if err := json.Unmarshal(data, &r); err != nil {
+		return nil, fmt.Errorf("nvd: decode: %w", err)
+	}
+	return &r, nil
+}
+
+// VersionCVE is one CVE affecting a product version.
+type VersionCVE struct {
+	ID      string  `json:"id"`
+	CVSS    float64 `json:"cvss"`
+	Summary string  `json:"summary"`
+}
+
+// maxVersionPages caps pagination (2000 per page) for one version lookup.
+const maxVersionPages = 5
+
+// VersionCVEs lists the CVEs NVD says affect vendorProduct ("php:php") at
+// version: NVD itself matches the version against each CVE's ranges
+// (virtualMatchString with the version filled in). Rejected CVEs are left
+// out.
+func (c *Client) VersionCVEs(ctx context.Context, vendorProduct, version string) ([]VersionCVE, error) {
+	cpe := "cpe:2.3:a:" + vendorProduct + ":" + version
+	var out []VersionCVE
+	for page, start := 0, 0; page < maxVersionPages; page++ {
+		q := url.Values{"virtualMatchString": {cpe}, "resultsPerPage": {"2000"}, "startIndex": {strconv.Itoa(start)}}
+		r, err := c.get(ctx, q.Encode()+"&noRejected")
+		if errors.Is(err, ErrNotFound) {
+			return out, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, v := range r.Vulnerabilities {
+			vc := VersionCVE{ID: v.CVE.ID}
+			for _, d := range v.CVE.Descriptions {
+				if d.Lang == "en" {
+					vc.Summary = truncate(d.Value, 500)
+					break
+				}
+			}
+			for _, ms := range [][]cvssMetric{v.CVE.Metrics.V40, v.CVE.Metrics.V31, v.CVE.Metrics.V30, v.CVE.Metrics.V2} {
+				if len(ms) > 0 {
+					vc.CVSS = ms[0].CVSSData.BaseScore
+					break
+				}
+			}
+			out = append(out, vc)
+		}
+		start += len(r.Vulnerabilities)
+		if len(r.Vulnerabilities) == 0 || start >= r.TotalResults {
+			break
+		}
+	}
+	return out, nil
 }
 
 // New returns a client for the public NVD API.
@@ -106,28 +232,9 @@ type response struct {
 
 // CVE fetches one record by id ("CVE-2024-1234").
 func (c *Client) CVE(ctx context.Context, id string) (*CVE, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"?cveId="+url.QueryEscape(id), nil)
+	r, err := c.get(ctx, "cveId="+url.QueryEscape(id))
 	if err != nil {
 		return nil, err
-	}
-	resp, err := c.HTTP.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, ErrNotFound
-	}
-	if resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("nvd: HTTP %d: %s", resp.StatusCode, truncate(string(data), 300))
-	}
-	var r response
-	if err := json.Unmarshal(data, &r); err != nil {
-		return nil, fmt.Errorf("nvd: decode: %w", err)
 	}
 	if r.TotalResults == 0 || len(r.Vulnerabilities) == 0 {
 		return nil, ErrNotFound

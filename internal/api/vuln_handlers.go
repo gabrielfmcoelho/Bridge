@@ -378,6 +378,7 @@ func (h *vulnHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/vulnerabilities/cves/{cve}", h.handleGetCVE)
 	rr.auth("GET /api/vulnerabilities/dependencies", h.handleListDependencies)
 	rr.auth("GET /api/vulnerabilities/dependencies/{id}", h.handleGetDependency)
+	rr.role("admin", "POST /api/vulnerabilities/dependencies/evaluate", h.handleEvaluateDependencies)
 	rr.auth("GET /api/vulnerabilities/{id}", h.handleGet)
 	rr.perm("ai.use", "POST /api/vulnerabilities/{id}/cve-analysis", h.handleAnalyzeCVE)
 	rr.auth("GET /api/vulnerabilities/{id}/fix-plan", h.handleGetFixPlan)
