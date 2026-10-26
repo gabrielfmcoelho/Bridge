@@ -159,10 +159,12 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   group `dependencies`) caches OSV / NVD / endoflife.date answers in
   `dependency_advisories` for 24h; every scan re-applies the cache offline
   (`ApplyCache`) and every matched CVE is an `inventory` finding.
-  A run is time-boxed (the request allows 4 min): NVD and endoflife go first,
-  OSV advisory details (one call each — a first run on many Debian/Ubuntu
-  hosts needs ~20k) fill the rest, and whatever doesn't fit is reported as
-  `*_deferred` and fetched by the next click; findings are always applied.
+  It runs in the background (`POST …/dependencies/evaluate` answers 202, `GET`
+  the status; one run at a time, in memory) for up to 45 min: NVD and
+  endoflife go first, OSV advisory details (one call each — a first run on
+  many Debian/Ubuntu hosts needs ~20k) fill the rest, outbound calls stop
+  10 min before the end so the fleet-wide findings rewrite (~120k rows) always
+  runs, and what doesn't fit is reported as `*_deferred` for the next run.
 - Web servers in the scan (`internal/sshtest/webservers.go`): one session runs
   `nginx -T`, `apachectl -S` and the php-fpm pool grep on the host (as root with
   the stored password when there is one) and in every running container (cap
