@@ -108,6 +108,24 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_Database:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.Database'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
+  api.ListEnvelope-models_DatabaseInstance:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.DatabaseInstance'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-models_Dependency:
     properties:
       data:
@@ -853,6 +871,65 @@ definitions:
       ticket_url:
         type: string
       warning:
+        type: string
+    type: object
+  api.databaseRequest:
+    properties:
+      backup_policy:
+        type: string
+      backup_retention_days:
+        type: integer
+      connection_mode:
+        type: string
+      consumer_service_ids:
+        items:
+          type: integer
+        type: array
+      creator_entidade_id:
+        type: integer
+      db_name:
+        type: string
+      description:
+        type: string
+      engine:
+        type: string
+      environment:
+        type: string
+      external_provider:
+        type: string
+      host:
+        type: string
+      instance_service_id:
+        type: integer
+      is_global:
+        type: boolean
+      last_backup_at:
+        type: string
+      name:
+        type: string
+      port:
+        type: integer
+      project_ids:
+        items:
+          type: integer
+        type: array
+      responsaveis:
+        items:
+          $ref: '#/definitions/models.ResponsavelInput'
+        type: array
+      responsible_entidade_ids:
+        items:
+          type: integer
+        type: array
+      sensitivity:
+        type: string
+      tls_mode:
+        type: string
+      tunnel_host_id:
+        type: integer
+      tunnel_target:
+        type: string
+      use_cases:
         type: string
     type: object
   api.dnsWriteRequest:
@@ -3680,6 +3757,150 @@ definitions:
       updated_at:
         type: string
     type: object
+  models.Database:
+    properties:
+      backup_policy:
+        type: string
+      backup_retention_days:
+        type: integer
+      connection_mode:
+        description: none | direct | ssh_tunnel
+        type: string
+      consumer_service_ids:
+        description: 'ConsumerServiceIDs / ProjectIDs: always set, [] when none.'
+        items:
+          type: integer
+        type: array
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      db_name:
+        description: real name in the engine
+        type: string
+      deleted_at:
+        type: string
+      description:
+        type: string
+      engine:
+        type: string
+      entidades:
+        $ref: '#/definitions/models.AssetGrants'
+      environment:
+        description: prod | homolog | dev
+        type: string
+      external_provider:
+        type: string
+      has_credential:
+        description: the credential itself never leaves the backend
+        type: boolean
+      host:
+        description: |-
+          Host/Port override the endpoint derived from the instance; "" / nil =
+          derive. Setting a free host is admin-only (it is where Bridge will
+          connect to).
+        type: string
+      id:
+        type: integer
+      instance:
+        allOf:
+        - $ref: '#/definitions/models.DatabaseInstanceRef'
+        description: |-
+          Instance is a summary of the engine row, nil when external or when
+          the caller can't see it.
+      instance_service_id:
+        description: nil = external
+        type: integer
+      last_backup_at:
+        type: string
+      main_responsavel_name:
+        description: MainResponsavelName is the main internal responsável (list responses).
+        type: string
+      name:
+        description: display name ("SEI produção")
+        type: string
+      port:
+        type: integer
+      project_ids:
+        items:
+          type: integer
+        type: array
+      responsaveis:
+        description: Responsaveis and Entidades are loaded on detail responses only.
+        items:
+          $ref: '#/definitions/models.Responsavel'
+        type: array
+      sensitivity:
+        description: 'LGPD: publico | interno | pessoal | sensivel'
+        type: string
+      tls_mode:
+        type: string
+      tunnel_host_id:
+        type: integer
+      tunnel_target:
+        description: container name or 127.0.0.1 on the tunnel host
+        type: string
+      updated_at:
+        type: string
+      use_cases:
+        description: 'Markdown: who uses it and for what'
+        type: string
+    type: object
+  models.DatabaseInstance:
+    properties:
+      container_image:
+        type: string
+      container_name:
+        type: string
+      container_status:
+        type: string
+      coolify_resource_type:
+        type: string
+      engine:
+        description: inferred; "other" when unknown
+        type: string
+      host_id:
+        type: integer
+      host_nickname:
+        type: string
+      host_slug:
+        type: string
+      id:
+        type: integer
+      nickname:
+        type: string
+      port:
+        type: string
+      registered_count:
+        type: integer
+      service_kind:
+        type: string
+      service_subtype:
+        type: string
+    type: object
+  models.DatabaseInstanceRef:
+    properties:
+      container_image:
+        type: string
+      container_name:
+        type: string
+      container_status:
+        type: string
+      host_id:
+        type: integer
+      host_nickname:
+        type: string
+      host_slug:
+        type: string
+      id:
+        type: integer
+      nickname:
+        type: string
+      port:
+        type: string
+      service_subtype:
+        type: string
+    type: object
   models.Dependency:
     properties:
       container:
@@ -4452,6 +4673,7 @@ definitions:
     - projeto
     - avulso
     - api_catalog
+    - database
     type: string
     x-enum-varnames:
     - SecretScopeService
@@ -4460,6 +4682,7 @@ definitions:
     - SecretScopeProjeto
     - SecretScopeAvulso
     - SecretScopeAPICatalog
+    - SecretScopeDatabase
   models.SecretType:
     enum:
     - cred
@@ -8720,6 +8943,307 @@ paths:
       summary: Dashboard counters
       tags:
       - dashboard
+  /api/databases:
+    get:
+      description: Any role. Only databases visible to the caller (entidade scoping).
+      parameters:
+      - description: Search text
+        in: query
+        name: q
+        type: string
+      - description: Engine
+        in: query
+        name: engine
+        type: string
+      - description: prod, homolog or dev
+        in: query
+        name: environment
+        type: string
+      - description: publico, interno, pessoal or sensivel
+        in: query
+        name: sensitivity
+        type: string
+      - description: Only databases on this instance
+        in: query
+        name: instance_service_id
+        type: integer
+      - description: Only databases this service consumes
+        in: query
+        name: service_id
+        type: integer
+      - description: Only databases of this project, directly or through its services
+        in: query
+        name: project_id
+        type: integer
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_Database'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List catalogued databases
+      tags:
+      - atlas
+    post:
+      consumes:
+      - application/json
+      description: Editor+. name and engine are required; instance_service_id null
+        means external (then external_provider or host is required). Setting host
+        is admin-only. Linked services, projects and the tunnel host must be visible
+        (404 otherwise).
+      parameters:
+      - description: Database, links and entidade grants
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.databaseRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Database'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Register a database
+      tags:
+      - atlas
+  /api/databases/{id}:
+    delete:
+      description: Admin. Soft delete, together with its vault secrets; restore brings
+        both back.
+      parameters:
+      - description: Database ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Delete a catalogued database
+      tags:
+      - atlas
+    get:
+      description: Any role; invisible databases answer 404. Includes links, the instance
+        summary, responsáveis and entidade grants.
+      parameters:
+      - description: Database ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Database'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Get a catalogued database
+      tags:
+      - atlas
+    put:
+      consumes:
+      - application/json
+      description: 'Editor+; invisible databases answer 404. Partial: an omitted field
+        keeps its value; null clears a nullable field; grants change only when a grant
+        field is sent. Changing host is admin-only.'
+      parameters:
+      - description: Database ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.databaseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Database'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Update a catalogued database
+      tags:
+      - atlas
+  /api/databases/{id}/restore:
+    post:
+      description: Admin. The database comes back with its links and vault secrets.
+      parameters:
+      - description: Database ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Restore a database from the trash
+      tags:
+      - atlas
+  /api/databases/instances:
+    get:
+      description: Any role. Visible engines found by the scan or Coolify (services
+        of kind database/cache, Coolify databases), with the inferred engine and how
+        many catalogued databases point at each.
+      parameters:
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_DatabaseInstance'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List database instances
+      tags:
+      - atlas
+  /api/databases/trash:
+    get:
+      description: Any role. Soft-deleted databases visible to the caller, newest
+        first.
+      parameters:
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_Database'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List trashed databases
+      tags:
+      - atlas
   /api/dns:
     get:
       description: Any role. Visible records, enriched with their relations. Paginated
@@ -10294,8 +10818,8 @@ paths:
   /api/graph:
     get:
       description: 'Any role. {"nodes": [graphNode], "edges": [graphEdge]} over visible
-        hosts, DNS records, projects, services and APIs; edges only between visible
-        nodes.'
+        hosts, DNS records, projects, services, APIs and databases; edges only between
+        visible nodes.'
       produces:
       - application/json
       responses:

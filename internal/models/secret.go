@@ -49,12 +49,15 @@ const (
 	// SecretScopeAPICatalog holds the access keys of a catalogued API. Named
 	// after the asset type so the vault's entidade visibility maps 1:1.
 	SecretScopeAPICatalog SecretScope = "api_catalog"
+	// SecretScopeDatabase holds the credentials of a catalogued database and
+	// the passwords of its users.
+	SecretScopeDatabase SecretScope = "database"
 )
 
 // Valid reports whether s is one of the known SecretScope values.
 func (s SecretScope) Valid() bool {
 	switch s {
-	case SecretScopeService, SecretScopeHost, SecretScopeTool, SecretScopeProjeto, SecretScopeAvulso, SecretScopeAPICatalog:
+	case SecretScopeService, SecretScopeHost, SecretScopeTool, SecretScopeProjeto, SecretScopeAvulso, SecretScopeAPICatalog, SecretScopeDatabase:
 		return true
 	}
 	return false

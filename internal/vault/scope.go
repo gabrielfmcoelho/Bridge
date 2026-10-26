@@ -14,6 +14,7 @@ import (
 // seeing the API is not enough to read its keys.
 var revealPermission = map[models.SecretScope]string{
 	models.SecretScopeAPICatalog: "apis.keys.manage",
+	models.SecretScopeDatabase:   "databases.users.manage",
 }
 
 // revealPermitted reports whether actor may read the plaintext of a secret in

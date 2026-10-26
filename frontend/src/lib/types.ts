@@ -51,7 +51,7 @@ export interface AssetGrantsInput {
 
 export type AssetType =
   | "host" | "dns" | "service" | "project" | "contact"
-  | "tool" | "api_catalog" | "secret" | "offering";
+  | "tool" | "api_catalog" | "secret" | "offering" | "database";
 
 export interface AuthProviderInfo {
   name: string;
@@ -361,7 +361,7 @@ export interface Orchestrator {
 export interface Secret {
   id: number;
   type: "cred" | "sshkey" | "password" | "app_login" | "env_var" | "api_key";
-  scope: "service" | "host" | "tool" | "projeto" | "avulso" | "api_catalog";
+  scope: "service" | "host" | "tool" | "projeto" | "avulso" | "api_catalog" | "database";
   visibility: "personal" | "shared";
   parent_id?: number | null;
   owner_user_id: number;
@@ -412,7 +412,7 @@ export interface EnumOption {
 
 export interface GraphNode {
   id: string;
-  type: "host" | "service" | "dns" | "project" | "api";
+  type: "host" | "service" | "dns" | "project" | "api" | "database";
   label: string;
   status?: string;
   /** Service nodes may carry container_name, source, coolify_project,
@@ -523,7 +523,7 @@ export interface Contact {
   is_external: boolean;
   email?: string;
   /** List only: asset type (host, dns, service, project) → how many it's responsável for. */
-  usage?: Partial<Record<"host" | "dns" | "service" | "project" | "api_catalog", number>>;
+  usage?: Partial<Record<"host" | "dns" | "service" | "project" | "api_catalog" | "database", number>>;
   /** Set while the contact is in the trash. */
   deleted_at?: string | null;
 }
@@ -1488,4 +1488,73 @@ export interface GitLabInventory {
   repos: GitLabInventoryRepo[];
   unlisted: GitLabInventoryRepo[];
   truncated: boolean;
+}
+
+// ── Atlas databases ─────────────────────────────────────────────────────
+
+export type DatabaseEngine = "postgres" | "mysql" | "mariadb" | "oracle" | "mssql" | "trino" | "mongodb" | "redis" | "other";
+export type DatabaseSensitivity = "publico" | "interno" | "pessoal" | "sensivel";
+export type DatabaseEnvironment = "prod" | "homolog" | "dev";
+export type DatabaseConnectionMode = "none" | "direct" | "ssh_tunnel";
+export type DatabaseTLSMode = "disable" | "prefer" | "require" | "verify";
+
+/** The services row a database runs on, as far as the caller can see it. */
+export interface DatabaseInstanceRef {
+  id: number;
+  nickname: string;
+  service_subtype: string;
+  container_name: string;
+  container_image: string;
+  container_status: string;
+  port: string;
+  host_id: number | null;
+  host_nickname: string;
+  host_slug: string;
+}
+
+/** An engine the scan or Coolify found, with how many catalogued databases point at it. */
+export interface DatabaseInstance extends DatabaseInstanceRef {
+  engine: DatabaseEngine;
+  service_kind: string;
+  coolify_resource_type: string;
+  registered_count: number;
+}
+
+/** One logical database in the Atlas catalogue. */
+export interface Database {
+  id: number;
+  name: string;
+  /** Real name in the engine (sei_prod, a Trino catalog, an Oracle service name). */
+  db_name: string;
+  description: string;
+  /** Markdown: who uses it and for what. */
+  use_cases: string;
+  engine: DatabaseEngine;
+  /** null = external. */
+  instance_service_id: number | null;
+  external_provider: string;
+  /** Overrides the endpoint derived from the instance; admin-only to set. */
+  host: string;
+  port: number | null;
+  connection_mode: DatabaseConnectionMode;
+  tunnel_host_id: number | null;
+  tunnel_target: string;
+  tls_mode: DatabaseTLSMode;
+  has_credential: boolean;
+  sensitivity: DatabaseSensitivity;
+  environment: DatabaseEnvironment;
+  backup_policy: string;
+  backup_retention_days: number | null;
+  last_backup_at: string | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+  instance?: DatabaseInstanceRef;
+  consumer_service_ids: number[];
+  project_ids: number[];
+  main_responsavel_name?: string;
+  /** Detail only. */
+  responsaveis?: EntityResponsavel[];
+  entidades?: AssetGrants;
 }

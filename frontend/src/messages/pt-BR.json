@@ -37,7 +37,7 @@
     "modules": "Módulos",
     "atlas": "Atlas",
     "lineage": "Linhagem",
-    "catalog": "Catálogo",
+    "catalog": "Catálogo do lakehouse",
     "pipeline": "Pipeline",
     "apis": "APIs",
     "serviceCatalog": "Catálogo de Serviços",
@@ -52,7 +52,8 @@
     "shares": "Compartilhamentos",
     "canvas": "Quadros de ideias",
     "home": "Início",
-    "vulnerabilities": "Vulnerabilidades"
+    "vulnerabilities": "Vulnerabilidades",
+    "databases": "Bancos de dados"
   },
   "atlas": {
     "apis": {
@@ -558,6 +559,150 @@
         "catalog": "Catálogo",
         "usedBy": "Usado por"
       }
+    },
+    "databases": {
+      "title": "Bancos de dados",
+      "subtitle": "Bancos lógicos: onde rodam, quem usa e quão sensíveis são",
+      "add": "Cadastrar banco",
+      "addTitle": "Cadastrar banco de dados",
+      "register": "Cadastrar",
+      "search": "Buscar bancos…",
+      "listing": "Bancos",
+      "empty": "Nenhum banco catalogado ainda",
+      "emptyHint": "Cadastre um à mão ou parta de uma instância encontrada pelo scan.",
+      "notFound": "Banco não encontrado",
+      "backToList": "Voltar aos bancos",
+      "deleteHint": "As credenciais dele no cofre vão para a lixeira junto.",
+      "noDescription": "Sem descrição ainda.",
+      "profileTitle": "Banco",
+      "name": "Nome",
+      "namePlaceholder": "SEI produção",
+      "dbName": "Nome no motor",
+      "dbNameHint": "O nome real do banco: sei_prod, um catálogo do Trino, o service name do Oracle.",
+      "engineLabel": "Motor",
+      "environmentLabel": "Ambiente",
+      "sensitivityLabel": "Sensibilidade dos dados (LGPD)",
+      "descriptionPlaceholder": "O que este banco guarda.",
+      "useCasesPlaceholder": "Quais sistemas leem ou escrevem nele, e para quê.",
+      "where": "Onde roda",
+      "onInstance": "Numa instância descoberta",
+      "external": "Externo",
+      "instance": "Instância",
+      "instanceHint": "O motor que o scan ou o Coolify encontrou (um serviço do tipo banco).",
+      "instanceHidden": "A instância está fora das suas entidades.",
+      "pickInstance": "Escolha uma instância",
+      "provider": "Provedor",
+      "providerHint": "Quem opera (outro órgão, um fornecedor, um serviço gerenciado).",
+      "providerRequired": "Um banco externo precisa de provedor ou host.",
+      "host": "Host",
+      "hostHint": "Substitui o endereço da instância. É aqui que o Bridge conecta.",
+      "hostAdminOnly": "Só admins definem o host: é onde o Bridge conecta.",
+      "port": "Porta",
+      "portInvalid": "Porta entre 1 e 65535.",
+      "endpoint": "Endereço",
+      "locationHint": "Um banco roda num motor que o Bridge já conhece, ou em outro lugar.",
+      "connectionHint": "Como o Bridge alcança o banco para ler os metadados.",
+      "connectionMode": "Conexão",
+      "tunnelHost": "Host do túnel",
+      "pickHost": "Escolha um host",
+      "tunnelTarget": "Destino no host",
+      "tunnelTargetHint": "Nome do container ou 127.0.0.1. Vazio: o container da instância.",
+      "tls": "TLS",
+      "credential": "Credencial",
+      "hasCredential": "Credencial no cofre",
+      "noCredential": "Sem credencial ainda",
+      "backupPolicy": "Política de backup",
+      "backupPolicyHint": "Como e onde é feito o backup. Vazio em produção é sinalizado.",
+      "backupPolicyPlaceholder": "pg_dump diário para o MinIO",
+      "retentionDays": "Retenção (dias)",
+      "retentionInvalid": "Zero ou mais dias.",
+      "lastBackup": "Último backup",
+      "backupOk": "Política de backup registrada",
+      "consumers": "Usado por",
+      "noConsumers": "Nenhum serviço usa ainda.",
+      "linksHint": "Os serviços que leem ou escrevem nele e os projetos a que pertence.",
+      "health": "Lacunas",
+      "hosted": "Bancos nesta instância",
+      "noneHosted": "Nenhum banco catalogado nesta instância.",
+      "used": "Bancos que usa",
+      "noneUsed": "Não usa nenhum banco catalogado.",
+      "noneLinked": "Nenhum banco vinculado.",
+      "section": {
+        "location": "Localização",
+        "connection": "Conexão",
+        "classification": "Classificação"
+      },
+      "instances": {
+        "title": "Instâncias de banco",
+        "button": "Instâncias",
+        "hint": "Motores encontrados pelos scans dos hosts e pelo Coolify. Cadastre os bancos lógicos de cada um.",
+        "registered": "{count} cadastrados",
+        "unregistered": "Não cadastrada",
+        "none": "Nenhum motor encontrado ainda. Rode o scan de um host ou sincronize o Coolify.",
+        "footer": "Instâncias são serviços do tipo banco ou cache:",
+        "banner": "{count} instâncias descobertas não têm banco cadastrado.",
+        "review": "Revisar"
+      },
+      "kpi": {
+        "total": "Bancos",
+        "totalHint": "{external} externos",
+        "personalData": "Dados pessoais",
+        "prodNoBackup": "Produção sem política de backup",
+        "noConsumers": "Sem consumidores",
+        "external": "Externos"
+      },
+      "dash": {
+        "byEngine": "Por motor",
+        "byEnvironment": "Por ambiente",
+        "bySensitivity": "Por sensibilidade",
+        "byProject": "Por projeto",
+        "noProject": "Sem projeto"
+      },
+      "engine": {
+        "postgres": "PostgreSQL",
+        "mysql": "MySQL",
+        "mariadb": "MariaDB",
+        "oracle": "Oracle",
+        "mssql": "SQL Server",
+        "trino": "Trino",
+        "mongodb": "MongoDB",
+        "redis": "Redis",
+        "other": "Outro"
+      },
+      "environment": {
+        "prod": "Produção",
+        "homolog": "Homologação",
+        "dev": "Desenvolvimento"
+      },
+      "sensitivity": {
+        "publico": "Público",
+        "interno": "Interno",
+        "pessoal": "Pessoal",
+        "sensivel": "Sensível"
+      },
+      "sensitivityHint": {
+        "publico": "Dado aberto: pode ser publicado.",
+        "interno": "Interno ao órgão, sem dados pessoais.",
+        "pessoal": "Dados pessoais (LGPD art. 5º, I): nomes, CPF, contatos.",
+        "sensivel": "Dados pessoais sensíveis (LGPD art. 5º, II): saúde, biometria, filiação sindical…"
+      },
+      "mode": {
+        "none": "Sem conexão",
+        "direct": "Direta",
+        "ssh_tunnel": "Túnel SSH"
+      },
+      "modeHint": {
+        "none": "Só catálogo: o Bridge nunca conecta.",
+        "direct": "O Bridge conecta direto no endereço.",
+        "ssh_tunnel": "O Bridge abre SSH num host e conecta a partir dele (para bancos dentro de containers)."
+      },
+      "tlsMode": {
+        "disable": "Desligado",
+        "prefer": "Preferir",
+        "require": "Exigir",
+        "verify": "Verificar certificado"
+      },
+      "about": "Sobre o banco"
     }
   },
   "auth": {
@@ -2840,7 +2985,8 @@
       "tool": "Ferramentas",
       "api_catalog": "APIs",
       "secret": "Segredos (avulsos)",
-      "offering": "Ofertas"
+      "offering": "Ofertas",
+      "database": "Bancos de dados"
     }
   },
   "catalog": {
@@ -3107,7 +3253,8 @@
       "service": "Serviço",
       "host": "Host",
       "tool": "Ferramenta",
-      "api_catalog": "API"
+      "api_catalog": "API",
+      "database": "Banco de dados"
     },
     "visibility": {
       "shared": "Compartilhado",
@@ -3319,14 +3466,16 @@
       "dns": "{count} DNS",
       "service": "{count} serviços",
       "project": "{count} projetos",
-      "api_catalog": "{count} APIs"
+      "api_catalog": "{count} APIs",
+      "database": "{count} bancos"
     },
     "useGroup": {
       "host": "Hosts",
       "dns": "DNS",
       "service": "Serviços",
       "project": "Projetos",
-      "api_catalog": "APIs"
+      "api_catalog": "APIs",
+      "database": "Bancos de dados"
     },
     "kind": {
       "internal": "Internos",

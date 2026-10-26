@@ -30,10 +30,13 @@ import MetricsTab from "./_components/MetricsTab";
 import RequestsTab, { useTelemetryEnabled } from "@/components/telemetry/RequestsTab";
 import ServiceSentinelTab from "@/components/sentinel/ServiceSentinelTab";
 import ServiceApisTab from "./_components/ServiceApisTab";
+import ServiceDatabasesTab from "./_components/ServiceDatabasesTab";
+import { linkedDatabasesQuery } from "@/app/atlas/databases/_components/LinkedDatabasesCard";
+import { inferDatabaseEngine } from "@/app/atlas/databases/_components/databaseInsights";
 import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
 import { linkedApisQuery } from "@/app/atlas/apis/_components/LinkedApisCard";
 
-type TabKey = "overview" | "issues" | "vulns" | "topology" | "credentials" | "metrics" | "apis" | "requests" | "sentinel";
+type TabKey = "overview" | "issues" | "vulns" | "topology" | "credentials" | "metrics" | "apis" | "databases" | "requests" | "sentinel";
 
 const GENERATED = /^Auto-discovered /;
 
@@ -70,6 +73,9 @@ export default function ServiceDetail({ id }: { id: number }) {
   const openVulns = useEntityVulnCount("service", data ? id : undefined);
   const { graph, loading: graphLoading } = useEntityGraph(data ? `service-${id}` : undefined, activeTab === "topology");
   const { data: linkedApis = [] } = useQuery({ ...linkedApisQuery({ service_id: id }), enabled: !!data });
+  const isEngine = ["database", "cache"].includes(data?.service.service_kind ?? "") || data?.service.coolify_resource_type === "database";
+  const { data: hostedDbs = [] } = useQuery({ ...linkedDatabasesQuery({ instance_service_id: id }), enabled: !!data && isEngine });
+  const { data: usedDbs = [] } = useQuery({ ...linkedDatabasesQuery({ service_id: id }), enabled: !!data });
 
   const dependsOn = allServices.filter((s) => data?.depends_on_ids?.includes(s.id));
   const dependents = allServices.filter((s) => data?.dependent_ids?.includes(s.id));
@@ -98,6 +104,7 @@ export default function ServiceDetail({ id }: { id: number }) {
     { key: "credentials", label: t("service.credentials"), icon: ICON_PATHS.lock },
     ...(grafanaEnabled ? [{ key: "metrics", label: t("host.tabMetrics"), icon: ICON_PATHS.layoutGrid }] : []),
     { key: "apis", label: t("nav.apis"), icon: ICON_PATHS.code, badge: linkedApis.length || undefined },
+    { key: "databases", label: t("nav.databases"), icon: ICON_PATHS.database, badge: (isEngine ? hostedDbs.length : 0) + usedDbs.length || undefined },
     ...(telemetryEnabled ? [{ key: "requests", label: t("telemetry.tab"), icon: ICON_PATHS.clock }] : []),
     ...(sentinelEnabled && data?.service.coolify_resource_uuid ? [{ key: "sentinel", label: "Sentinel", icon: ICON_PATHS.bolt }] : []),
   ];
@@ -188,6 +195,10 @@ export default function ServiceDetail({ id }: { id: number }) {
           {activeTab === "requests" && telemetryEnabled && <RequestsTab kind="service" id={id} />}
           {activeTab === "sentinel" && <ServiceSentinelTab serviceId={id} containerPorts={svc.container_ports} />}
           {activeTab === "apis" && <ServiceApisTab serviceId={id} projectId={svc.project_id} dns={linkedDns} canEdit={canEdit} />}
+          {activeTab === "databases" && (
+            <ServiceDatabasesTab serviceId={id} projectId={svc.project_id} isEngine={isEngine} canEdit={canEdit}
+              engine={inferDatabaseEngine(svc.service_subtype, svc.container_image)} />
+          )}
         </PageHeader>
 
         <Drawer open={showEditDrawer} onClose={() => setShowEditDrawer(false)} title={t("form.editTitle", { name: title })} subHeader={formSubHeader} footer={formFooter}>

@@ -596,6 +596,7 @@ const secretParentNameSQL = `CASE secrets.scope
 	WHEN 'tool' THEN (SELECT name FROM external_tools WHERE external_tools.id = secrets.parent_id)
 	WHEN 'projeto' THEN (SELECT name FROM projects WHERE projects.id = secrets.parent_id)
 	WHEN 'api_catalog' THEN (SELECT name FROM api_catalog WHERE api_catalog.id = secrets.parent_id)
+	WHEN 'database' THEN (SELECT name FROM databases WHERE databases.id = secrets.parent_id)
 	END`
 
 // markDuplicates flags secrets holding the same value — counted among the

@@ -5,7 +5,7 @@
 
 export type GroupEntity = "host" | "dns" | "service" | "project" | "contact" | "entidade";
 /** What can be grouped: any GroupEntity, plus assets only ever grouped (APIs). */
-export type GroupItemEntity = GroupEntity | "api_catalog";
+export type GroupItemEntity = GroupEntity | "api_catalog" | "database";
 
 export interface Relation {
   a: string;

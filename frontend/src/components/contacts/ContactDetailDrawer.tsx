@@ -15,9 +15,9 @@ import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
 import { formatPhone, whatsappNumber } from "@/lib/phone";
 import type { Contact } from "@/lib/types";
 
-type UseType = "host" | "dns" | "service" | "project" | "api_catalog";
-export const USE_TYPES: UseType[] = ["host", "service", "dns", "project", "api_catalog"];
-const USE_ICON: Record<UseType, string> = { host: NAV_ICONS.Server, dns: NAV_ICONS.Globe, service: NAV_ICONS.Boxes, project: NAV_ICONS.FolderKanban, api_catalog: NAV_ICONS.Plug };
+type UseType = "host" | "dns" | "service" | "project" | "api_catalog" | "database";
+export const USE_TYPES: UseType[] = ["host", "service", "dns", "project", "api_catalog", "database"];
+const USE_ICON: Record<UseType, string> = { host: NAV_ICONS.Server, dns: NAV_ICONS.Globe, service: NAV_ICONS.Boxes, project: NAV_ICONS.FolderKanban, api_catalog: NAV_ICONS.Plug, database: NAV_ICONS.Database };
 
 /** "3 hosts · 1 serviço" — what a contact is responsável for, in words. */
 export function usageSummary(usage: Contact["usage"], t: (k: string, v?: Record<string, string>) => string): string {
@@ -30,6 +30,7 @@ const HREF: Record<UseType, (u: { id: number; slug?: string }) => string> = {
   service: (u) => `/services/${u.id}`,
   project: (u) => `/projects/${u.id}`,
   api_catalog: (u) => `/atlas/apis/${u.id}`,
+  database: (u) => `/atlas/databases/${u.id}`,
 };
 const hrefOf = (u: { type: UseType; id: number; slug?: string }) => HREF[u.type](u);
 

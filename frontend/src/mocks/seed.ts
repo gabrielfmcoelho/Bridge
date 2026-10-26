@@ -10,6 +10,7 @@ import type {
   DNSRecord,
   Project,
   ApiCatalog,
+  Database,
   ExternalTool,
   Offering,
   ServiceRequest,
@@ -304,6 +305,31 @@ function apiCatalogs(): ApiCatalog[] {
   return [
     mk({ id: 1, project_ids: [1], name: "API do Portal do Servidor", title: "Portal do Servidor API", description: "Endpoints REST usados pelo frontend do Portal do Servidor.", version_label: "v1.3.0" }),
     mk({ id: 2, name: "API de Chamados SGI", title: "Chamados SGI API", description: "Integração de abertura e consulta de chamados técnicos.", version_label: "v2.0.0" }),
+  ];
+}
+
+function databases(): Database[] {
+  const mk = (o: Partial<Database> & Pick<Database, "id" | "name" | "engine">): Database => ({
+    db_name: "", description: "", use_cases: "", instance_service_id: null, external_provider: "", host: "", port: null,
+    connection_mode: "none", tunnel_host_id: null, tunnel_target: "", tls_mode: "prefer", has_credential: false,
+    sensitivity: "interno", environment: "prod", backup_policy: "", backup_retention_days: null, last_backup_at: null,
+    created_by: 3, created_at: "2026-08-01T09:00:00Z", updated_at: "2026-10-01T09:00:00Z", consumer_service_ids: [], project_ids: [],
+    entidades: { creator_entidade_id: null, responsible_entidade_ids: [], is_global: true }, responsaveis: [],
+    ...o,
+  });
+  const pg = { id: 1, nickname: "pg-prod-01", service_subtype: "relational", container_name: "pg-prod-01", container_image: "postgres:16",
+    container_status: "online", port: "5432", host_id: 1, host_nickname: "vm-postgres-02", host_slug: "vm-postgres-02" };
+  return [
+    mk({ id: 1, name: "Portal do Servidor", db_name: "portal_prod", engine: "postgres", instance_service_id: 1, instance: pg,
+      description: "Cadastro funcional e contracheques servidos pelo Portal do Servidor.", sensitivity: "sensivel",
+      connection_mode: "ssh_tunnel", tunnel_host_id: 1, has_credential: true, backup_policy: "pg_dump diário para o MinIO",
+      backup_retention_days: 30, last_backup_at: "2026-10-22T03:00:00Z", consumer_service_ids: [2], project_ids: [1] }),
+    mk({ id: 2, name: "Keycloak", db_name: "keycloak", engine: "postgres", instance_service_id: 1, instance: pg,
+      sensitivity: "pessoal", consumer_service_ids: [5], project_ids: [3] }),
+    mk({ id: 3, name: "Lakehouse (Iceberg)", db_name: "iceberg", engine: "trino", external_provider: "Trino SEAD", host: "trino.sead.pi.gov.br", port: 443,
+      description: "Camadas bronze, silver e gold do lakehouse.", environment: "prod", backup_policy: "Snapshots do Iceberg" }),
+    mk({ id: 4, name: "SIAPE", db_name: "SIAPE", engine: "oracle", external_provider: "SERPRO", sensitivity: "sensivel",
+      description: "Folha de pagamento federal, lida pelo catálogo siape do Trino." }),
   ];
 }
 
@@ -907,6 +933,7 @@ export function seed(): Seed {
     dns: dns(),
     projects: projects(),
     apiCatalogs: apiCatalogs(),
+    databases: databases(),
     tools: tools(),
     offerings: offeringList,
     requests: requests(offeringList),
