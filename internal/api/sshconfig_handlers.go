@@ -1740,4 +1740,9 @@ func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "POST /api/ssh/nginx-cleanup/{slug}", h.handleNginxCleanup)
 	rr.role("admin", "POST /api/ssh/grafana-agent-setup/{slug}", h.handleGrafanaAgentSetup)
 	rr.auth("GET /api/ssh/host-config/{slug}", h.handleHostSSHConfig)
+	rr.role("editor", "GET /api/ssh/custom-operations", h.handleListCustomOps)
+	rr.role("admin", "POST /api/ssh/custom-operations", h.handleCreateCustomOp)
+	rr.role("admin", "PUT /api/ssh/custom-operations/{id}", h.handleUpdateCustomOp)
+	rr.role("admin", "DELETE /api/ssh/custom-operations/{id}", h.handleDeleteCustomOp)
+	rr.role("editor", "POST /api/ssh/custom-operations/{id}/run/{slug}", h.handleRunCustomOp)
 }

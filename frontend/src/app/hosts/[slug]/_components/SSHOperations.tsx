@@ -2,13 +2,16 @@
 
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { sshAPI, hostsAPI, secretsAPI, integrationsAPI } from "@/lib/api";
+import Link from "next/link";
+import { sshAPI, hostsAPI, secretsAPI, integrationsAPI, sshCustomOpsAPI } from "@/lib/api";
 import { resolveAuthMethod } from "@/lib/utils";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { scriptParams } from "@/lib/sshCustomOps";
+import type { SSHCustomOperation } from "@/lib/types";
 import { useSSHMutation } from "@/hooks/useSSHMutation";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import IconButton from "@/components/ui/IconButton";
 import Drawer from "@/components/ui/Drawer";
@@ -63,8 +66,10 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   const [setupKeySource, setSetupKeySource] = useState<"generate" | "existing">("generate");
   const [setupExistingKeyId, setSetupExistingKeyId] = useState("");
   const [expandedOp, setExpandedOp] = useState<string | null>(null);
-  const [customScripts, saveCustomScripts] = useLocalStorage<{ id: string; name: string; command: string }[]>(`custom_scripts_${slug}`, []);
-  const [customResult, setCustomResult] = useState<{ id: string; success: boolean; error?: string } | null>(null);
+  // Custom operations: the one being run (console label) and the parameter form.
+  const [runningCustom, setRunningCustom] = useState<SSHCustomOperation | null>(null);
+  const [customParamsFor, setCustomParamsFor] = useState<SSHCustomOperation | null>(null);
+  const [customParams, setCustomParams] = useState<Record<string, string>>({});
 
   // Create remote user form
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -475,6 +480,32 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     sudoNopasswdMutation.mutate();
   };
 
+  const { data: customOps = [] } = useQuery({ queryKey: ["ssh-custom-ops"], queryFn: sshCustomOpsAPI.list });
+  const customOpMutation = useSSHMutation({
+    slug,
+    mutationFn: ({ op, params }: { op: SSHCustomOperation; params: Record<string, string> }) => sshCustomOpsAPI.run(op.id, slug, params),
+    // Read when the result lands, so it names the operation that ran.
+    label: runningCustom?.name ?? "",
+    pushConsole,
+    onResult: (data) => ({ status: data.success ? "success" as const : "error" as const, content: <OperationOutput data={data} /> }),
+  });
+
+  const runCustomOp = async (op: SSHCustomOperation, params: Record<string, string>) => {
+    const message = t(op.use_sudo ? "operation.custom.confirmSudo" : "operation.custom.confirm", { name: op.name });
+    if (!(await confirm({ title: t("confirm.runOperation"), message, danger: op.use_sudo }))) return;
+    setCustomParamsFor(null);
+    setRunningCustom(op);
+    setRunningOp(`custom-${op.id}`);
+    customOpMutation.mutate({ op, params });
+  };
+
+  const startCustomOp = (op: SSHCustomOperation) => {
+    const names = scriptParams(op.script);
+    if (names.length === 0) { runCustomOp(op, {}); return; }
+    setCustomParams(Object.fromEntries(names.map((n) => [n, ""])));
+    setCustomParamsFor(op);
+  };
+
   const toggleOp = (id: string) => setExpandedOp((prev) => (prev === id ? null : id));
 
   // Safety net: clear a stale runningOp if no mutation is actually pending.
@@ -496,7 +527,8 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     dockerLogsApplyRotationMutation.isPending ||
     nginxCleanupMutation.isPending ||
     networkTestMutation.isPending ||
-    grafanaAgentMutation.isPending;
+    grafanaAgentMutation.isPending ||
+    customOpMutation.isPending;
 
   useEffect(() => {
     if (!anyMutationPending && runningOp && setupStatus !== "testing" && setupStatus !== "installing") {
@@ -694,6 +726,51 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
     } satisfies OpDef] : []),
   ];
 
+  // One row of the operation list: label, description, the command behind a
+  // chevron, and Run. Shared by the built-in and custom cards.
+  const renderOpRow = (op: OpDef) => (
+    <>
+      <div className="flex items-center gap-3 px-5 py-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-[var(--text-primary)]">{op.label}</span>
+            {op.showStatus && (
+              <span className={`w-2 h-2 rounded-full shrink-0 ${op.status === "success" ? "bg-[var(--success)]" : op.status === "failed" ? "bg-[var(--danger)]" : "border border-[var(--border-default)]"}`} />
+            )}
+          </div>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">{op.description}</p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => toggleOp(op.id)}
+            className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors"
+            title={t("operation.showCommand")}
+          >
+            <Icon path={ICON_PATHS.chevronDown} className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedOp === op.id ? "rotate-180" : ""}`} />
+          </button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={op.disabled}
+            loading={op.loading}
+            onClick={op.onClick}
+            title={op.disabled ? op.disabledReason : undefined}
+          >
+            {t("common.run")}
+          </Button>
+        </div>
+      </div>
+      {expandedOp === op.id && (
+        <div className="px-5 pb-3 pt-0">
+          <pre className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">
+            {op.command}
+          </pre>
+        </div>
+      )}
+    </>
+  );
+
   // Stable sort: declaration order is kept inside each group.
   const groupedOps = [...operations].sort((a, b) => GROUP_ORDER.indexOf(OP_GROUPS[a.id]) - GROUP_ORDER.indexOf(OP_GROUPS[b.id]));
 
@@ -727,91 +804,35 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
             {OP_GROUPS[op.id] !== OP_GROUPS[groupedOps[i - 1]?.id] && (
               <RowGroupTitle>{t(`operation.group.${OP_GROUPS[op.id]}`)}</RowGroupTitle>
             )}
-            <div className="flex items-center gap-3 px-5 py-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">{op.label}</span>
-                  {op.showStatus && (
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${op.status === "success" ? "bg-[var(--success)]" : op.status === "failed" ? "bg-[var(--danger)]" : "border border-[var(--border-default)]"}`} />
-                  )}
-                </div>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">{op.description}</p>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => toggleOp(op.id)}
-                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors"
-                  title={t("operation.showCommand")}
-                >
-                  <Icon path={ICON_PATHS.chevronDown} className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedOp === op.id ? "rotate-180" : ""}`} />
-                </button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={op.disabled}
-                  loading={op.loading}
-                  onClick={op.onClick}
-                  title={op.disabled ? op.disabledReason : undefined}
-                >
-                  {t("common.run")}
-                </Button>
-              </div>
-            </div>
-            {expandedOp === op.id && (
-              <div className="px-5 pb-3 pt-0">
-                <pre className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">
-                  {op.command}
-                </pre>
-              </div>
-            )}
+            {renderOpRow(op)}
           </div>
         ))}
       </div>
       </SectionCard>
 
-      {/* Custom scripts */}
-      {customScripts.length > 0 && (
-      <SectionCard as="h3" title={t("operation.customScripts")} count={customScripts.length} body="flush">
+      {/* Custom operations (Configurações › Operações SSH) */}
+      {(customOps.length > 0 || isAdmin) && (
+      <SectionCard
+        as="h3"
+        title={t("operation.custom.title")}
+        count={customOps.length}
+        body="flush"
+        empty={customOps.length === 0 ? t("operation.custom.empty") : undefined}
+        controls={isAdmin ? <Link href="/settings?tab=ssh-operations" className="text-xs text-[var(--accent)] hover:underline">{t("operation.custom.manage")}</Link> : undefined}
+      >
       <div className="divide-y divide-[var(--border-subtle)]">
-        {customScripts.map((script) => (
-          <div key={script.id}>
-            <div className="flex items-center gap-3 px-5 py-3">
-              <div className="flex-1 min-w-0">
-                <span className="text-sm font-medium text-[var(--text-primary)]">{script.name}</span>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate font-mono">{script.command}</p>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button type="button" onClick={() => toggleOp(script.id)} className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] transition-colors" title={t("operation.showCommand")}>
-                  <Icon path={ICON_PATHS.chevronDown} className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedOp === script.id ? "rotate-180" : ""}`} />
-                </button>
-                {isAdmin && (
-                  <button type="button" onClick={() => saveCustomScripts(customScripts.filter((s) => s.id !== script.id))} className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors" title={t("common.delete")}>
-                    <Icon path={ICON_PATHS.trashOutline} className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <Button size="sm" variant="secondary" disabled={!hasPassword && !hasKey} onClick={async () => {
-                  setCustomResult(null);
-                  const method = hasPassword && hasKey ? (preferredAuth === "password" ? "password" : "key") : (hasPassword ? "password" : "key");
-                  try {
-                    const res = await sshAPI.testConnection(slug, method as "password" | "key", false);
-                    setCustomResult({ id: script.id, success: res.success, error: res.error });
-                  } catch (err) {
-                    setCustomResult({ id: script.id, success: false, error: err instanceof Error ? err.message : "Failed" });
-                  }
-                }}>{t("common.run")}</Button>
-              </div>
-            </div>
-            {expandedOp === script.id && (
-              <div className="px-5 pb-3 pt-0">
-                <pre className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-[var(--radius-sm)] p-3 overflow-x-auto whitespace-pre-wrap font-mono">{script.command}</pre>
-              </div>
-            )}
-            {customResult?.id === script.id && (
-              <div className={`mx-5 mb-3 rounded-[var(--radius-sm)] p-2.5 text-xs ${customResult.success ? "bg-[var(--success)]/10 text-[var(--success)]" : "bg-[var(--danger)]/10 text-[var(--danger)]"}`}>
-                {customResult.success ? t("operation.executedSuccessfully") : `${t("filters.failed")}: ${customResult.error}`}
-              </div>
-            )}
+        {customOps.map((op) => (
+          <div key={op.id}>
+            {renderOpRow({
+              id: `custom-${op.id}`,
+              label: op.name,
+              description: [op.use_sudo && "sudo", op.description].filter(Boolean).join(" · "),
+              command: op.script,
+              disabled: (!hasPassword && !hasKey) || (op.use_sudo && !hasPassword),
+              disabledReason: op.use_sudo && !hasPassword ? t("operation.custom.needsPassword") : undefined,
+              loading: runningOp === `custom-${op.id}`,
+              onClick: () => startCustomOp(op),
+            })}
           </div>
         ))}
       </div>
@@ -1236,6 +1257,39 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         );
       })()}
 
+      {/* Custom operation parameters ({{name}} placeholders in its script) */}
+      {customParamsFor && (() => {
+        const missing = Object.values(customParams).some((v) => !v.trim());
+        return (
+          <Drawer
+            open
+            onClose={() => setCustomParamsFor(null)}
+            title={customParamsFor.name}
+            footer={
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="secondary" onClick={() => setCustomParamsFor(null)}>{t("common.cancel")}</Button>
+                <Button size="sm" disabled={missing} onClick={() => runCustomOp(customParamsFor, customParams)}>{t("common.run")}</Button>
+              </div>
+            }
+          >
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (!missing) runCustomOp(customParamsFor, customParams); }}>
+              <p className="text-xs text-[var(--text-muted)]">{t("operation.custom.paramsDesc")}</p>
+              {Object.keys(customParams).map((name, i) => (
+                <Input
+                  key={name}
+                  label={name}
+                  className="font-mono"
+                  autoFocus={i === 0}
+                  value={customParams[name]}
+                  onChange={(e) => setCustomParams((p) => ({ ...p, [name]: e.target.value }))}
+                />
+              ))}
+              <button type="submit" hidden />
+            </form>
+          </Drawer>
+        );
+      })()}
+
       {/* Console Drawer — three sections (Wizard / Status / Output) instead
           of the single tinted card. Removing the colored outer wrapper fixes
           the "card inside card" visual noise when the output itself is made
@@ -1319,6 +1373,7 @@ const OP_GROUPS: Record<string, string> = {
 };
 
 function opTypeLabel(type_: string, t: (k: string) => string): string {
+  if (type_.startsWith("custom:")) return type_.slice("custom:".length);
   switch (type_) {
     case "test": return t("operation.testConnection");
     case "network-test": return t("operation.networkTest");

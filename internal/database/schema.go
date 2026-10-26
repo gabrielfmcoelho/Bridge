@@ -10,6 +10,7 @@ package database
 var TableCopyOrder = []string{
 	// independent
 	"users",
+	"ssh_custom_operations", // created_by → users
 	"entidades", // self-referencing parent_id; seeded parents have lower ids
 	"enum_options",
 	"app_settings",
@@ -134,7 +135,7 @@ var SerialTables = []string{
 	"host_chamados", "host_alerts", "issues", "releases",
 	"host_operation_logs", "user_external_identities",
 	"user_gitlab_tokens", "project_gitlab_links", "project_embeds", "auth_role_mappings",
-	"entidades", "asset_entidades", "dependency_inventory",
+	"entidades", "asset_entidades", "dependency_inventory", "ssh_custom_operations",
 }
 
 // ColumnRenames maps source → target column names for tables whose

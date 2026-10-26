@@ -465,6 +465,27 @@ func RunPrivilegedScript(client *ssh.Client, password, script string) (string, e
 	return runSudoCmd(client, password, script)
 }
 
+// RunScript executes an arbitrary shell script as the SSH user, with the same
+// base64 transport as RunPrivilegedScript. No deadline: the caller bounds it
+// (closing the client ends the session).
+func RunScript(client *ssh.Client, script string) (string, error) {
+	session, err := client.NewSession()
+	if err != nil {
+		return "", err
+	}
+	defer session.Close()
+	encoded := base64.StdEncoding.EncodeToString([]byte(script))
+	out, execErr := session.CombinedOutput(fmt.Sprintf("sh -c 'echo %s | base64 -d | sh' 2>&1", encoded))
+	cleaned := strings.TrimSpace(cleanCommandOutput(string(out), nil))
+	if execErr != nil {
+		if cleaned == "" {
+			return "", execErr
+		}
+		return cleaned, fmt.Errorf("%s: %w", cleaned, execErr)
+	}
+	return cleaned, nil
+}
+
 // runSudoCmd executes a command under sudo on the remote host, feeding the
 // password via the session's stdin pipe. This avoids interpolating the password
 // into the command string (which would expose it in /proc/*/cmdline and break

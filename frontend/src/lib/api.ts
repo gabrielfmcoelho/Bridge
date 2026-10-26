@@ -727,6 +727,17 @@ export const sshAPI = {
     api.post<{ success: boolean; error?: string; output?: string; message?: string }>(`/api/ssh/grafana-agent-setup/${slug}`),
 };
 
+// Custom SSH operations: admins manage the library, editors run them on a host.
+type SSHCustomOpInput = Partial<Pick<import("./types").SSHCustomOperation, "name" | "description" | "script" | "use_sudo">>;
+export const sshCustomOpsAPI = {
+  list: () => api.getList<import("./types").SSHCustomOperation>("/api/ssh/custom-operations"),
+  create: (data: SSHCustomOpInput) => api.post<import("./types").SSHCustomOperation>("/api/ssh/custom-operations", data),
+  update: (id: number, data: SSHCustomOpInput) => api.put<import("./types").SSHCustomOperation>(`/api/ssh/custom-operations/${id}`, data),
+  delete: (id: number) => api.delete(`/api/ssh/custom-operations/${id}`),
+  run: (id: number, slug: string, params: Record<string, string>) =>
+    api.post<{ success: boolean; error?: string; output?: string }>(`/api/ssh/custom-operations/${id}/run/${slug}`, { params }),
+};
+
 
 // Graph & Dashboard
 export const graphAPI = {
