@@ -4296,7 +4296,10 @@
       "nvdDeferred": "{count} NVD lookups left for the next run (rate limit)",
       "evaluateFailed": "Could not evaluate dependencies",
       "eolUntil": "Supported until {date}",
-      "timeDeferred": "{count} lookups left for the next run (time limit) — click again to continue"
+      "timeDeferred": "{count} lookups left for the next run (time limit) — click again to continue",
+      "evaluateStarted": "CVE evaluation started",
+      "evaluateStartedHint": "It runs in the background — the result shows up here when it ends (a first run can take half an hour).",
+      "evaluatingSince": "Evaluating since {time}…"
     },
     "sourceInventory": "Inventory"
   }

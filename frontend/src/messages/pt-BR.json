@@ -4296,7 +4296,10 @@
       "nvdDeferred": "{count} consultas NVD ficaram para a próxima rodada (limite de taxa)",
       "evaluateFailed": "Não foi possível avaliar as dependências",
       "eolUntil": "Com suporte até {date}",
-      "timeDeferred": "{count} consultas ficaram para a próxima rodada (limite de tempo) — clique de novo para continuar"
+      "timeDeferred": "{count} consultas ficaram para a próxima rodada (limite de tempo) — clique de novo para continuar",
+      "evaluateStarted": "Avaliação de CVEs iniciada",
+      "evaluateStartedHint": "Roda em segundo plano — o resultado aparece aqui quando terminar (a primeira rodada pode levar meia hora).",
+      "evaluatingSince": "Avaliando desde {time}…"
     },
     "sourceInventory": "Inventário"
   }

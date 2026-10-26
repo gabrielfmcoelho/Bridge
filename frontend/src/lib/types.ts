@@ -1451,7 +1451,16 @@ export interface DependencyDetail extends Dependency {
   findings: VulnFinding[];
 }
 
-/** POST /api/vulnerabilities/dependencies/evaluate. */
+/** GET/POST /api/vulnerabilities/dependencies/evaluate: the background run. */
+export interface DependencyEvalStatus {
+  running: boolean;
+  started_at?: string;
+  finished_at?: string;
+  result?: DependencyEvalResult;
+  error?: string;
+}
+
+/** The outcome of one evaluation run (DependencyEvalStatus.result). */
 export interface DependencyEvalResult {
   osv_queried: number;
   osv_vulns: number;

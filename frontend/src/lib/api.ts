@@ -919,10 +919,12 @@ export const vulnAPI = {
   dependencies: (params: Record<string, string>) =>
     api.getListPaginated<import("./types").Dependency>(`/api/vulnerabilities/dependencies?${new URLSearchParams(params).toString()}`),
   dependency: (id: number) => api.get<import("./types").DependencyDetail>(`/api/vulnerabilities/dependencies/${id}`),
-  // Asks OSV / NVD / endoflife.date about stale versions; NVD is rate-gated,
-  // so a run can take a few minutes.
+  // Starts the background run (OSV / NVD / endoflife.date, then findings);
+  // answers at once with its status — poll evaluationStatus for the result.
   evaluateDependencies: () =>
-    request<import("./types").DependencyEvalResult>("/api/vulnerabilities/dependencies/evaluate", { method: "POST" }, 300_000),
+    api.post<import("./types").DependencyEvalStatus>("/api/vulnerabilities/dependencies/evaluate"),
+  evaluationStatus: () =>
+    api.get<import("./types").DependencyEvalStatus>("/api/vulnerabilities/dependencies/evaluate"),
 };
 
 // Wazuh 4.8+ indexer (admin): test the saved settings, sync vulnerabilities.
