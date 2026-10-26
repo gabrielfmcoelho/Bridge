@@ -4295,7 +4295,8 @@
       "evaluatedSummary": "{new} new findings, {resolved} resolved · {osv} OSV and {nvd} NVD lookups",
       "nvdDeferred": "{count} NVD lookups left for the next run (rate limit)",
       "evaluateFailed": "Could not evaluate dependencies",
-      "eolUntil": "Supported until {date}"
+      "eolUntil": "Supported until {date}",
+      "timeDeferred": "{count} lookups left for the next run (time limit) — click again to continue"
     },
     "sourceInventory": "Inventory"
   }

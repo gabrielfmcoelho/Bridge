@@ -220,13 +220,16 @@ func ApplyCache(ctx context.Context, db *sql.DB, hostIDs []int64) (*models.VulnI
 
 // DependencyEvalResult summarises one "Evaluate CVEs" run.
 type DependencyEvalResult struct {
-	OSVQueried  int                      `json:"osv_queried"`
-	OSVVulns    int                      `json:"osv_vulns"`
-	NVDQueried  int                      `json:"nvd_queried"`
-	NVDDeferred int                      `json:"nvd_deferred"`
-	EOLQueried  int                      `json:"eol_queried"`
-	Errors      []string                 `json:"errors"`
-	Findings    *models.VulnImportResult `json:"findings"`
+	OSVQueried  int `json:"osv_queried"`
+	OSVVulns    int `json:"osv_vulns"`
+	NVDQueried  int `json:"nvd_queried"`
+	NVDDeferred int `json:"nvd_deferred"`
+	EOLQueried  int `json:"eol_queried"`
+	// Left for the next run when the time box closed first.
+	OSVVulnsDeferred int                      `json:"osv_vulns_deferred"`
+	EOLDeferred      int                      `json:"eol_deferred"`
+	Errors           []string                 `json:"errors"`
+	Findings         *models.VulnImportResult `json:"findings"`
 }
 
 // DependencyClients are the outbound clients Evaluate uses (tests swap
@@ -237,6 +240,9 @@ type DependencyClients struct {
 	EOL *endoflife.Client
 	// NVDBudget caps NVD calls per run (each one is rate-gated).
 	NVDBudget int
+	// Reserve is the time kept before the caller's deadline for writing the
+	// cache and applying findings; outbound calls stop when it starts. 0 = 45s.
+	Reserve time.Duration
 }
 
 const advisoryMaxAge = 24 * time.Hour
@@ -275,8 +281,13 @@ func EvaluateDependencies(ctx context.Context, db *sql.DB, cl *DependencyClients
 		}
 	}
 
-	// OSV: one batch for every stale package version, then the details of
-	// advisories not cached yet (8 at a time).
+	// Outbound calls run on work, which closes Reserve before the caller's
+	// deadline: what doesn't fit is deferred to the next run, and there is
+	// always time left to write the cache and apply findings (ctx).
+	work, cancelWork := workContext(ctx, cl.Reserve)
+	defer cancelWork()
+	cutOff := func() bool { return work.Err() != nil }
+
 	osvQueries := map[string]osv.Query{}
 	var nvdK, eolK []string
 	for _, d := range deps {
@@ -295,6 +306,8 @@ func EvaluateDependencies(ctx context.Context, db *sql.DB, cl *DependencyClients
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+
+	// OSV: one batch for every stale package version.
 	stale, err := repo.Stale(ctx, models.DepLookupOSV, keys, advisoryMaxAge)
 	if err != nil {
 		return nil, err
@@ -304,15 +317,17 @@ func EvaluateDependencies(ctx context.Context, db *sql.DB, cl *DependencyClients
 		for i, k := range stale {
 			qs[i] = osvQueries[k]
 		}
-		ids, err := cl.OSV.QueryBatch(ctx, qs)
-		if err != nil {
+		ids, err := cl.OSV.QueryBatch(work, qs)
+		switch {
+		case err != nil && cutOff():
+			// Out of time: the versions stay stale for the next run.
+		case err != nil:
 			fail("osv: %v", err)
 			for _, k := range stale {
 				_ = repo.Put(ctx, models.DepLookupOSV, k, "", err.Error())
 			}
-		} else {
+		default:
 			res.OSVQueried = len(stale)
-			var vulnIDs []string
 			for i, k := range stale {
 				list := ids[i]
 				if list == nil {
@@ -322,23 +337,7 @@ func EvaluateDependencies(ctx context.Context, db *sql.DB, cl *DependencyClients
 				if err := repo.Put(ctx, models.DepLookupOSV, k, string(data), ""); err != nil {
 					return nil, err
 				}
-				for _, id := range list {
-					vulnIDs = append(vulnIDs, osvVulnKey(id))
-				}
 			}
-			// Advisory details barely change: fetch only the ones never seen.
-			have, err := repo.Get(ctx, models.DepLookupOSV, dedupe(vulnIDs))
-			if err != nil {
-				return nil, err
-			}
-			var missing []string
-			for _, k := range dedupe(vulnIDs) {
-				if a, ok := have[k]; !ok || a.Data == "" {
-					missing = append(missing, strings.TrimPrefix(k, "vuln|"))
-				}
-			}
-			res.OSVVulns = len(missing)
-			fetchOSVVulns(ctx, cl.OSV, repo, missing, fail)
 		}
 	}
 
@@ -348,18 +347,19 @@ func EvaluateDependencies(ctx context.Context, db *sql.DB, cl *DependencyClients
 		return nil, err
 	}
 	for i, k := range staleNVD {
-		if i >= cl.NVDBudget {
+		if i >= cl.NVDBudget || cutOff() {
 			res.NVDDeferred = len(staleNVD) - i
 			break
 		}
 		cpe, version, _ := strings.Cut(k, "|")
-		list, err := cl.NVD.VersionCVEs(ctx, cpe, version)
+		list, err := cl.NVD.VersionCVEs(work, cpe, version)
 		if err != nil {
-			fail("nvd %s %s: %v", cpe, version, err)
-			_ = repo.Put(ctx, models.DepLookupNVD, k, "", err.Error())
-			if ctx.Err() != nil {
+			if cutOff() {
+				res.NVDDeferred = len(staleNVD) - i
 				break
 			}
+			fail("nvd %s %s: %v", cpe, version, err)
+			_ = repo.Put(ctx, models.DepLookupNVD, k, "", err.Error())
 			continue
 		}
 		if list == nil {
@@ -377,9 +377,17 @@ func EvaluateDependencies(ctx context.Context, db *sql.DB, cl *DependencyClients
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range staleEOL {
-		cycles, err := cl.EOL.Cycles(ctx, p)
+	for i, p := range staleEOL {
+		if cutOff() {
+			res.EOLDeferred = len(staleEOL) - i
+			break
+		}
+		cycles, err := cl.EOL.Cycles(work, p)
 		if err != nil {
+			if cutOff() {
+				res.EOLDeferred = len(staleEOL) - i
+				break
+			}
 			fail("endoflife %s: %v", p, err)
 			_ = repo.Put(ctx, "eol", p, "", err.Error())
 			continue
@@ -391,45 +399,98 @@ func EvaluateDependencies(ctx context.Context, db *sql.DB, cl *DependencyClients
 		res.EOLQueried++
 	}
 
+	// OSV advisory details last — the bulk of a first run (one call each) and
+	// only severity/summary on top of findings that already exist. Taken
+	// from every cached version answer, so details deferred by an earlier
+	// run are picked up even when no version was stale this time.
+	versions, err := repo.Get(ctx, models.DepLookupOSV, keys)
+	if err != nil {
+		return nil, err
+	}
+	var vulnIDs []string
+	for _, a := range versions {
+		var list []string
+		_ = json.Unmarshal([]byte(a.Data), &list)
+		for _, id := range list {
+			vulnIDs = append(vulnIDs, osvVulnKey(id))
+		}
+	}
+	vulnIDs = dedupe(vulnIDs)
+	have, err := repo.Get(ctx, models.DepLookupOSV, vulnIDs)
+	if err != nil {
+		return nil, err
+	}
+	var missing []string
+	for _, k := range vulnIDs {
+		if a, ok := have[k]; !ok || a.Data == "" {
+			missing = append(missing, strings.TrimPrefix(k, "vuln|"))
+		}
+	}
+	sort.Strings(missing)
+	fetched, deferred := fetchOSVVulns(ctx, work, cutOff, cl.OSV, repo, missing, fail)
+	res.OSVVulns, res.OSVVulnsDeferred = fetched, deferred
+
 	if res.Findings, err = ApplyCache(ctx, db, nil); err != nil {
 		return nil, err
 	}
 	return res, nil
 }
 
-// fetchOSVVulns fetches advisory details with 8 workers and caches them.
-func fetchOSVVulns(ctx context.Context, cl *osv.Client, repo *store.AdvisoryRepo, ids []string, fail func(string, ...any)) {
+// workContext ends reserve before ctx's deadline (none → just cancellable).
+func workContext(ctx context.Context, reserve time.Duration) (context.Context, context.CancelFunc) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return context.WithCancel(ctx)
+	}
+	if reserve <= 0 {
+		reserve = 45 * time.Second
+	}
+	return context.WithDeadline(ctx, deadline.Add(-reserve))
+}
+
+// fetchOSVVulns fetches advisory details with 8 workers on work and caches
+// them on ctx. Returns how many were fetched and how many the time box left
+// for the next run; a cut-off call is neither an error nor cached.
+func fetchOSVVulns(ctx, work context.Context, cutOff func() bool, cl *osv.Client, repo *store.AdvisoryRepo, ids []string, fail func(string, ...any)) (fetched, deferred int) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	work := make(chan string)
+	queue := make(chan string)
 	for w := 0; w < 8; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for id := range work {
-				v, err := cl.Vuln(ctx, id)
+			for id := range queue {
+				v, err := cl.Vuln(work, id)
 				mu.Lock()
-				if err != nil {
+				switch {
+				case err != nil && cutOff():
+					deferred++
+				case err != nil:
 					fail("osv %s: %v", id, err)
 					_ = repo.Put(ctx, models.DepLookupOSV, osvVulnKey(id), "", err.Error())
-				} else {
+				default:
 					data, _ := json.Marshal(v)
 					if err := repo.Put(ctx, models.DepLookupOSV, osvVulnKey(id), string(data), ""); err != nil {
 						log.Printf("[deps] cache osv %s: %v", id, err)
 					}
+					fetched++
 				}
 				mu.Unlock()
 			}
 		}()
 	}
-	for _, id := range ids {
-		if ctx.Err() != nil {
+	for i, id := range ids {
+		if cutOff() {
+			mu.Lock()
+			deferred += len(ids) - i
+			mu.Unlock()
 			break
 		}
-		work <- id
+		queue <- id
 	}
-	close(work)
+	close(queue)
 	wg.Wait()
+	return fetched, deferred
 }
 
 func dedupe(ss []string) []string {

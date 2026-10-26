@@ -1459,6 +1459,9 @@ export interface DependencyEvalResult {
   /** NVD lookups left for the next run (rate limit). */
   nvd_deferred: number;
   eol_queried: number;
+  /** Left for the next run because the run's time box closed first. */
+  osv_vulns_deferred: number;
+  eol_deferred: number;
   errors: string[];
   findings: VulnImportResult;
 }
