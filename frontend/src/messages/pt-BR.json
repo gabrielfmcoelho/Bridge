@@ -4295,7 +4295,8 @@
       "evaluatedSummary": "{new} achados novos, {resolved} resolvidos · {osv} consultas OSV e {nvd} NVD",
       "nvdDeferred": "{count} consultas NVD ficaram para a próxima rodada (limite de taxa)",
       "evaluateFailed": "Não foi possível avaliar as dependências",
-      "eolUntil": "Com suporte até {date}"
+      "eolUntil": "Com suporte até {date}",
+      "timeDeferred": "{count} consultas ficaram para a próxima rodada (limite de tempo) — clique de novo para continuar"
     },
     "sourceInventory": "Inventário"
   }
