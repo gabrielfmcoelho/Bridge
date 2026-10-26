@@ -88,8 +88,9 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	// import/mutate is editor; delete is admin — applied per-route inside
 	// register.
 	apiCatalogH := &apiCatalogHandlers{db: db, allowPrivateFetch: atlasAllowPrivateFetch()}
-	apiCatalogH.registerRoutes(rr) // /api/api-catalog/*
-	app.apiKey.registerRoutes(rr)  // /api/api-catalog/{id}/keys*, /key-management*
+	apiCatalogH.registerRoutes(rr)                 // /api/api-catalog/*
+	(&databaseHandlers{db: db}).registerRoutes(rr) // /api/databases/*
+	app.apiKey.registerRoutes(rr)                  // /api/api-catalog/{id}/keys*, /key-management*
 
 	// Share bundles (Phase D). Authenticated owner routes + a public,
 	// unwrapped redemption sibling to /api/share/{token}. Bundles reuse the

@@ -170,6 +170,7 @@ var usageSources = []struct {
 	{"service", "services", "nickname", "", AssetService},
 	{"project", "projects", "name", "", AssetProject},
 	{"api_catalog", "api_catalog", "name", "", AssetAPICatalog},
+	{"database", "databases", "name", "", AssetDatabase},
 }
 
 // Usage lists the assets contact id is responsável for that the caller sees.

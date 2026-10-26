@@ -20,6 +20,7 @@ const (
 	AssetTool       AssetType = "tool"
 	AssetAPICatalog AssetType = "api_catalog"
 	AssetSecret     AssetType = "secret"
+	AssetDatabase   AssetType = "database"
 
 	// AssetEntidade is the entidade itself as a polymorphic parent (an issue
 	// sent to the backlog from an entidade's canvas). It has no grant rows:
@@ -47,6 +48,7 @@ var assetRegistry = map[AssetType]AssetSpec{
 	AssetContact:    {Table: "contacts", NameColumn: "name", SoftDelete: true},
 	AssetTool:       {Table: "external_tools", NameColumn: "name", SoftDelete: true},
 	AssetAPICatalog: {Table: "api_catalog", NameColumn: "name", SoftDelete: true},
+	AssetDatabase:   {Table: "databases", NameColumn: "name", SoftDelete: true},
 	// Only standalone shared secrets carry their own grants; parented secrets
 	// inherit from host/service/project/tool and personal ones are owner-only.
 	AssetSecret: {Table: "secrets", NameColumn: "name", SoftDelete: true, Extra: "scope = 'avulso' AND visibility = 'shared'"},

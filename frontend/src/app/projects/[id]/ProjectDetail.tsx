@@ -31,11 +31,13 @@ import ProjectReleases from "./_components/ProjectReleases";
 import ProjectEmbeds, { projectEmbedsKey } from "./_components/ProjectEmbeds";
 import ProjectSecretsTab from "./_components/ProjectSecretsTab";
 import ProjectApisTab from "./_components/ProjectApisTab";
+import ProjectDatabasesTab from "./_components/ProjectDatabasesTab";
+import { linkedDatabasesQuery } from "@/app/atlas/databases/_components/LinkedDatabasesCard";
 import { linkedApisQuery } from "@/app/atlas/apis/_components/LinkedApisCard";
 import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
 import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
 
-type TabKey = "overview" | "topology" | "issues" | "vulns" | "releases" | "commits" | "wiki" | "chamados" | "observability" | "secrets" | "apis";
+type TabKey = "overview" | "topology" | "issues" | "vulns" | "releases" | "commits" | "wiki" | "chamados" | "observability" | "secrets" | "apis" | "databases";
 
 export default function ProjectDetail({ id }: { id: number }) {
   const { t } = useLocale();
@@ -65,6 +67,7 @@ export default function ProjectDetail({ id }: { id: number }) {
   // Viewers only get the Observabilidade tab when there's something in it.
   const { data: embeds = [] } = useQuery({ queryKey: projectEmbedsKey(id), queryFn: () => projectEmbedsAPI.list(id), enabled: !!data });
   const { data: linkedApis = [] } = useQuery({ ...linkedApisQuery({ project_id: id }), enabled: !!data });
+  const { data: linkedDbs = [] } = useQuery({ ...linkedDatabasesQuery({ project_id: id }), enabled: !!data });
 
   // -- Mutations --
   const deleteMutation = useMutation({
@@ -101,6 +104,7 @@ export default function ProjectDetail({ id }: { id: number }) {
     ...(canEdit || embeds.length > 0 ? [{ key: "observability" as TabKey, label: t("embed.title"), icon: ICON_PATHS.layoutGrid }] : []),
     { key: "secrets", label: t("project.tab.secrets"), icon: ICON_PATHS.lock },
     { key: "apis", label: t("nav.apis"), icon: ICON_PATHS.code, badge: linkedApis.length || undefined },
+    { key: "databases", label: t("nav.databases"), icon: ICON_PATHS.database, badge: linkedDbs.length || undefined },
   ];
 
 
@@ -176,6 +180,7 @@ export default function ProjectDetail({ id }: { id: number }) {
             {activeTab === "observability" && <ProjectEmbeds projectId={id} canEdit={canEdit} />}
             {activeTab === "secrets" && <ProjectSecretsTab projectId={id} services={data.services || []} canEdit={canEdit} />}
             {activeTab === "apis" && <ProjectApisTab projectId={id} canEdit={canEdit} />}
+            {activeTab === "databases" && <ProjectDatabasesTab projectId={id} canEdit={canEdit} />}
           </PageHeader>
 
           <Drawer

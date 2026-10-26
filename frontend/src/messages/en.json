@@ -37,7 +37,7 @@
     "modules": "Modules",
     "atlas": "Atlas",
     "lineage": "Lineage",
-    "catalog": "Catalog",
+    "catalog": "Lakehouse catalog",
     "pipeline": "Pipeline",
     "apis": "APIs",
     "serviceCatalog": "Service Catalog",
@@ -52,7 +52,8 @@
     "shares": "Shares",
     "canvas": "Idea boards",
     "home": "Home",
-    "vulnerabilities": "Vulnerabilities"
+    "vulnerabilities": "Vulnerabilities",
+    "databases": "Databases"
   },
   "atlas": {
     "apis": {
@@ -558,6 +559,150 @@
         "catalog": "Catalog",
         "usedBy": "Used by"
       }
+    },
+    "databases": {
+      "title": "Databases",
+      "subtitle": "Logical databases: where they run, who uses them, how sensitive they are",
+      "add": "Register database",
+      "addTitle": "Register a database",
+      "register": "Register",
+      "search": "Search databases…",
+      "listing": "Databases",
+      "empty": "No databases catalogued yet",
+      "emptyHint": "Register one by hand or start from an instance the scan found.",
+      "notFound": "Database not found",
+      "backToList": "Back to databases",
+      "deleteHint": "Its credentials in the vault go to the trash with it.",
+      "noDescription": "No description yet.",
+      "profileTitle": "Database",
+      "name": "Name",
+      "namePlaceholder": "SEI production",
+      "dbName": "Name in the engine",
+      "dbNameHint": "The real database name: sei_prod, a Trino catalog, an Oracle service name.",
+      "engineLabel": "Engine",
+      "environmentLabel": "Environment",
+      "sensitivityLabel": "Data sensitivity (LGPD)",
+      "descriptionPlaceholder": "What this database holds.",
+      "useCasesPlaceholder": "Which systems read or write it, and for what.",
+      "where": "Where it runs",
+      "onInstance": "On a discovered instance",
+      "external": "External",
+      "instance": "Instance",
+      "instanceHint": "The engine the scan or Coolify found (a service of kind database).",
+      "instanceHidden": "The instance is outside your entidades.",
+      "pickInstance": "Pick an instance",
+      "provider": "Provider",
+      "providerHint": "Who runs it (another organization, a vendor, a managed service).",
+      "providerRequired": "An external database needs a provider or a host.",
+      "host": "Host",
+      "hostHint": "Overrides the instance's address. Bridge connects here.",
+      "hostAdminOnly": "Only admins set the host: it is where Bridge connects.",
+      "port": "Port",
+      "portInvalid": "Port between 1 and 65535.",
+      "endpoint": "Endpoint",
+      "locationHint": "A database runs on an engine Bridge already knows, or somewhere else.",
+      "connectionHint": "How Bridge reaches the database to read its metadata.",
+      "connectionMode": "Connection",
+      "tunnelHost": "Tunnel host",
+      "pickHost": "Pick a host",
+      "tunnelTarget": "Target on the host",
+      "tunnelTargetHint": "Container name or 127.0.0.1. Empty: the instance's container.",
+      "tls": "TLS",
+      "credential": "Credential",
+      "hasCredential": "Credential in the vault",
+      "noCredential": "No credential yet",
+      "backupPolicy": "Backup policy",
+      "backupPolicyHint": "How and where it is backed up. Empty on prod is flagged.",
+      "backupPolicyPlaceholder": "Daily pg_dump to MinIO",
+      "retentionDays": "Retention (days)",
+      "retentionInvalid": "Zero or more days.",
+      "lastBackup": "Last backup",
+      "backupOk": "Backup policy recorded",
+      "consumers": "Used by",
+      "noConsumers": "No service uses it yet.",
+      "linksHint": "The services that read or write it, and the projects it belongs to.",
+      "health": "Gaps",
+      "hosted": "Databases on this instance",
+      "noneHosted": "No database catalogued on this instance.",
+      "used": "Databases it uses",
+      "noneUsed": "It uses no catalogued database.",
+      "noneLinked": "No database linked.",
+      "section": {
+        "location": "Location",
+        "connection": "Connection",
+        "classification": "Classification"
+      },
+      "instances": {
+        "title": "Database instances",
+        "button": "Instances",
+        "hint": "Engines found by the host scans and by Coolify. Register the logical databases each one holds.",
+        "registered": "{count} registered",
+        "unregistered": "Not registered",
+        "none": "No engine found yet. Scan a host or sync Coolify.",
+        "footer": "Instances are services of kind database or cache:",
+        "banner": "{count} discovered instances have no database registered.",
+        "review": "Review"
+      },
+      "kpi": {
+        "total": "Databases",
+        "totalHint": "{external} external",
+        "personalData": "Personal data",
+        "prodNoBackup": "Prod without backup policy",
+        "noConsumers": "No consumers",
+        "external": "External"
+      },
+      "dash": {
+        "byEngine": "By engine",
+        "byEnvironment": "By environment",
+        "bySensitivity": "By sensitivity",
+        "byProject": "By project",
+        "noProject": "No project"
+      },
+      "engine": {
+        "postgres": "PostgreSQL",
+        "mysql": "MySQL",
+        "mariadb": "MariaDB",
+        "oracle": "Oracle",
+        "mssql": "SQL Server",
+        "trino": "Trino",
+        "mongodb": "MongoDB",
+        "redis": "Redis",
+        "other": "Other"
+      },
+      "environment": {
+        "prod": "Production",
+        "homolog": "Staging",
+        "dev": "Development"
+      },
+      "sensitivity": {
+        "publico": "Public",
+        "interno": "Internal",
+        "pessoal": "Personal",
+        "sensivel": "Sensitive"
+      },
+      "sensitivityHint": {
+        "publico": "Open data: may be published.",
+        "interno": "Internal to the organization, no personal data.",
+        "pessoal": "Personal data (LGPD art. 5, I): names, CPF, contacts.",
+        "sensivel": "Sensitive personal data (LGPD art. 5, II): health, biometrics, union membership…"
+      },
+      "mode": {
+        "none": "Not connected",
+        "direct": "Direct",
+        "ssh_tunnel": "SSH tunnel"
+      },
+      "modeHint": {
+        "none": "Catalogue only: Bridge never connects.",
+        "direct": "Bridge connects straight to the endpoint.",
+        "ssh_tunnel": "Bridge opens SSH to a host and connects from there (for databases inside containers)."
+      },
+      "tlsMode": {
+        "disable": "Off",
+        "prefer": "Prefer",
+        "require": "Require",
+        "verify": "Verify certificate"
+      },
+      "about": "About the database"
     }
   },
   "auth": {
@@ -2788,7 +2933,8 @@
       "tool": "Tools",
       "api_catalog": "APIs",
       "secret": "Secrets (avulso)",
-      "offering": "Offerings"
+      "offering": "Offerings",
+      "database": "Databases"
     }
   },
   "catalog": {
@@ -3055,7 +3201,8 @@
       "service": "Service",
       "host": "Host",
       "tool": "Tool",
-      "api_catalog": "API"
+      "api_catalog": "API",
+      "database": "Database"
     },
     "visibility": {
       "shared": "Shared",
@@ -3267,14 +3414,16 @@
       "dns": "{count} DNS",
       "service": "{count} services",
       "project": "{count} projects",
-      "api_catalog": "{count} APIs"
+      "api_catalog": "{count} APIs",
+      "database": "{count} databases"
     },
     "useGroup": {
       "host": "Hosts",
       "dns": "DNS",
       "service": "Services",
       "project": "Projects",
-      "api_catalog": "APIs"
+      "api_catalog": "APIs",
+      "database": "Databases"
     },
     "kind": {
       "internal": "Internal",

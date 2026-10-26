@@ -16,6 +16,7 @@ import type {
   DNSRecord,
   Project,
   ApiCatalog,
+  Database,
   ExternalTool,
   Offering,
   ServiceRequest,
@@ -47,6 +48,7 @@ export interface Seed {
   dns: DNSRecord[];
   projects: Project[];
   apiCatalogs: ApiCatalog[];
+  databases: Database[];
   tools: ExternalTool[];
   offerings: Offering[];
   requests: ServiceRequest[];
