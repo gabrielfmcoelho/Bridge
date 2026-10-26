@@ -2,11 +2,15 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -101,13 +105,81 @@ func (h *vulnHandlers) handleGetDependency(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, models.DependencyDetail{Dependency: *d, Vulns: vulns, Findings: findings})
 }
 
+// DependencyEvalStatus is the background "Evaluate CVEs" run: under way, or
+// how the last one ended.
+type DependencyEvalStatus struct {
+	Running    bool                          `json:"running"`
+	StartedAt  *time.Time                    `json:"started_at,omitempty"`
+	FinishedAt *time.Time                    `json:"finished_at,omitempty"`
+	Result     *service.DependencyEvalResult `json:"result,omitempty"`
+	Error      string                        `json:"error,omitempty"`
+}
+
+// evalJob runs one evaluation at a time in the background.
+// ponytail: in memory, one process — a restart forgets a run under way (the
+// next click starts over); move it to a table if Bridge ever runs replicated.
+type evalJob struct {
+	mu     sync.Mutex
+	status DependencyEvalStatus
+}
+
+var depEvalJob = &evalJob{}
+
+const (
+	// A first run on a large fleet needs ~20k OSV calls plus a fleet-wide
+	// findings rewrite; outbound calls stop depEvalReserve before the end
+	// so the rewrite always has time.
+	depEvalTimeout = 45 * time.Minute
+	depEvalReserve = 10 * time.Minute
+)
+
+func (j *evalJob) get() DependencyEvalStatus {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.status
+}
+
+// start launches run unless one is under way; either way it returns the
+// current status and whether this call started it.
+func (j *evalJob) start(run func() (*service.DependencyEvalResult, error)) (DependencyEvalStatus, bool) {
+	j.mu.Lock()
+	if j.status.Running {
+		s := j.status
+		j.mu.Unlock()
+		return s, false
+	}
+	now := time.Now().UTC()
+	j.status = DependencyEvalStatus{Running: true, StartedAt: &now}
+	s := j.status
+	j.mu.Unlock()
+
+	go func() {
+		var res *service.DependencyEvalResult
+		var err error
+		defer func() {
+			if rv := recover(); rv != nil {
+				err = fmt.Errorf("panic: %v", rv)
+			}
+			end := time.Now().UTC()
+			j.mu.Lock()
+			j.status.Running, j.status.FinishedAt, j.status.Result = false, &end, res
+			if err != nil {
+				j.status.Error = err.Error()
+			}
+			j.mu.Unlock()
+		}()
+		res, err = run()
+	}()
+	return s, true
+}
+
 // handleEvaluateDependencies godoc
 //
-//	@Summary		Check dependency versions for CVEs
-//	@Description	Admin. Asks OSV (distro packages), NVD (upstream builds) and endoflife.date about every inventoried version whose answer is missing or older than a day — only ecosystem, product and version are sent — then turns every matched CVE into an "inventory" finding. NVD calls are rate-limited: what doesn't fit this run is reported as nvd_deferred and picked up by the next one. 400 when the integration is off.
+//	@Summary		Check dependency versions for CVEs (background)
+//	@Description	Admin. Starts, in the background, a run that asks NVD (upstream builds), endoflife.date and OSV (distro packages) about every inventoried version whose answer is missing or older than a day — only ecosystem, product and version are sent — then turns every matched CVE into an "inventory" finding. Answers 202 with the run's status at once; a run already under way is returned instead of starting another. Poll GET for the result. Up to 45 minutes; what doesn't fit is reported as *_deferred for the next run. 400 when the integration is off.
 //	@Tags			vulnerabilities
 //	@Produce		json
-//	@Success		200	{object}	service.DependencyEvalResult
+//	@Success		202	{object}	DependencyEvalStatus
 //	@Failure		400	{object}	httpx.ErrorResponse
 //	@Failure		401	{object}	httpx.ErrorResponse
 //	@Failure		403	{object}	httpx.ErrorResponse
@@ -118,13 +190,36 @@ func (h *vulnHandlers) handleEvaluateDependencies(w http.ResponseWriter, r *http
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
-	// Like the Wazuh sync: synchronous, bounded; the client waits up to 5 min.
-	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Minute)
-	defer cancel()
-	res, err := service.EvaluateDependencies(ctx, h.db.SQL, clients)
-	if err != nil {
-		jsonServerError(w, r, "failed to evaluate dependencies", err)
-		return
-	}
-	jsonOK(w, res)
+	clients.Reserve = depEvalReserve
+	// Detached: the run outlives this request (and a proxy cutting it).
+	base := context.WithoutCancel(r.Context())
+	st, _ := depEvalJob.start(func() (*service.DependencyEvalResult, error) {
+		ctx, cancel := context.WithTimeout(base, depEvalTimeout)
+		defer cancel()
+		start := time.Now()
+		res, err := service.EvaluateDependencies(ctx, h.db.SQL, clients)
+		if err != nil {
+			log.Printf("[deps] evaluate failed after %s: %v", time.Since(start).Round(time.Second), err)
+		} else {
+			log.Printf("[deps] evaluate done in %s: osv=%d details=%d (deferred %d) nvd=%d (deferred %d) eol=%d (deferred %d) errors=%d",
+				time.Since(start).Round(time.Second), res.OSVQueried, res.OSVVulns, res.OSVVulnsDeferred,
+				res.NVDQueried, res.NVDDeferred, res.EOLQueried, res.EOLDeferred, len(res.Errors))
+		}
+		return res, err
+	})
+	httpx.WriteJSON(w, http.StatusAccepted, st)
+}
+
+// handleEvaluateStatus godoc
+//
+//	@Summary		Status of the background CVE evaluation
+//	@Description	Admin. Whether a run is under way, and the result or error of the last one (since the server started).
+//	@Tags			vulnerabilities
+//	@Produce		json
+//	@Success		200	{object}	DependencyEvalStatus
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/vulnerabilities/dependencies/evaluate [get]
+func (h *vulnHandlers) handleEvaluateStatus(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, depEvalJob.get())
 }

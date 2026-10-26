@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import PageShell from "@/components/layout/PageShell";
@@ -40,7 +40,7 @@ const VIEW_STATUS: Record<View, string> = {
 };
 
 export default function VulnList() {
-  const { t } = useLocale();
+  const { t, formatDateTime } = useLocale();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
@@ -66,21 +66,43 @@ export default function VulnList() {
   const { data: integrations } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get, enabled: isAdmin, retry: false, staleTime: 60_000 });
   const wazuhEnabled = integrations?.wazuh?.wazuh_enabled === "true";
   const depsEnabled = integrations?.dependencies?.deps_cve_enabled === "true";
+  // "Avaliar CVEs" runs in the background: the click starts it, this query
+  // follows it (every 5s while running) and the run's end is announced once.
+  const { data: evalStatus } = useQuery({
+    queryKey: ["deps-eval"],
+    queryFn: vulnAPI.evaluationStatus,
+    enabled: isAdmin && depsEnabled,
+    refetchInterval: (q) => (q.state.data?.running ? 5000 : false),
+  });
+  const evalWasRunning = useRef(false);
+  useEffect(() => {
+    if (!evalStatus) return;
+    if (evalWasRunning.current && !evalStatus.running) {
+      queryClient.invalidateQueries({ queryKey: ["vulnerabilities"] });
+      const r = evalStatus.result;
+      if (!r) {
+        flag({ appearance: "error", title: t("vuln.deps.evaluateFailed"), description: evalStatus.error });
+      } else {
+        flag({
+          appearance: r.errors.length ? "warning" : "success",
+          title: t("vuln.deps.evaluated"),
+          description: t("vuln.deps.evaluatedSummary", {
+            new: String(r.findings.new), resolved: String(r.findings.resolved),
+            osv: String(r.osv_queried), nvd: String(r.nvd_queried),
+          }) +
+            (r.nvd_deferred ? ` · ${t("vuln.deps.nvdDeferred", { count: String(r.nvd_deferred) })}` : "") +
+            (r.osv_vulns_deferred + r.eol_deferred ? ` · ${t("vuln.deps.timeDeferred", { count: String(r.osv_vulns_deferred + r.eol_deferred) })}` : "") +
+            (r.errors.length ? ` · ${r.errors.slice(0, 3).join("; ")}` : ""),
+        });
+      }
+    }
+    evalWasRunning.current = evalStatus.running;
+  }, [evalStatus, flag, queryClient, t]);
   const evaluateDeps = useMutation({
     mutationFn: vulnAPI.evaluateDependencies,
-    onSuccess: (r) => {
-      queryClient.invalidateQueries({ queryKey: ["vulnerabilities"] });
-      flag({
-        appearance: r.errors.length ? "warning" : "success",
-        title: t("vuln.deps.evaluated"),
-        description: t("vuln.deps.evaluatedSummary", {
-          new: String(r.findings.new), resolved: String(r.findings.resolved),
-          osv: String(r.osv_queried), nvd: String(r.nvd_queried),
-        }) +
-          (r.nvd_deferred ? ` · ${t("vuln.deps.nvdDeferred", { count: String(r.nvd_deferred) })}` : "") +
-          (r.osv_vulns_deferred + r.eol_deferred ? ` · ${t("vuln.deps.timeDeferred", { count: String(r.osv_vulns_deferred + r.eol_deferred) })}` : "") +
-          (r.errors.length ? ` · ${r.errors.slice(0, 3).join("; ")}` : ""),
-      });
+    onSuccess: (st) => {
+      queryClient.setQueryData(["deps-eval"], st);
+      flag({ appearance: "info", title: t("vuln.deps.evaluateStarted"), description: t("vuln.deps.evaluateStartedHint") });
     },
     onError: (e: Error) => flag({ appearance: "error", title: t("vuln.deps.evaluateFailed"), description: e.message }),
   });
@@ -133,7 +155,12 @@ export default function VulnList() {
           isAdmin ? (
             <div className="flex items-center gap-2">
               {depsEnabled && (
-                <Button size="sm" variant="secondary" onClick={() => evaluateDeps.mutate()} loading={evaluateDeps.isPending}>{t("vuln.deps.evaluate")}</Button>
+                <>
+                  {evalStatus?.running && evalStatus.started_at && (
+                    <span className="text-xs text-[var(--text-muted)]">{t("vuln.deps.evaluatingSince", { time: formatDateTime(evalStatus.started_at) })}</span>
+                  )}
+                  <Button size="sm" variant="secondary" onClick={() => evaluateDeps.mutate()} loading={evaluateDeps.isPending || !!evalStatus?.running}>{t("vuln.deps.evaluate")}</Button>
+                </>
               )}
               {wazuhEnabled && (
                 <Button size="sm" variant="secondary" onClick={() => syncWazuh.mutate()} loading={syncWazuh.isPending}>{t("vuln.syncWazuh")}</Button>
