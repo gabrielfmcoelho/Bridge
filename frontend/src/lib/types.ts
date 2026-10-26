@@ -1,3 +1,16 @@
+/** Admin-written script run on a host from its Operações tab; {{name}}
+ *  placeholders in script are asked for at run time. */
+export interface SSHCustomOperation {
+  id: number;
+  name: string;
+  description: string;
+  script: string;
+  use_sudo: boolean;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface User {
   id: number;
   username: string;
