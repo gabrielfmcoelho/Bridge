@@ -161,21 +161,40 @@ export function resourcesBy(hosts: Host[], groupOf: (h: Host) => string | undefi
     if (r.storage) g.td.push(r.storage);
   }
   const avg = (a: number[]) => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0);
-  // "8 vCPU", "15Gi", "7,8Gi" → summed with the first unit seen.
-  // ponytail: mixed units (Gi + Ti) add up wrong; normalize if hosts start mixing them.
-  const sum = (a: string[]) => {
-    let total = 0, unit = "";
-    for (const s of a) {
-      const m = s.replace(/,/g, ".").trim().match(/([\d.]+)\s*(.*)/);
-      if (!m) continue;
-      total += parseFloat(m[1]);
-      unit ||= m[2].trim();
-    }
-    return total ? `${Number.isInteger(total) ? total : total.toFixed(1)} ${unit}`.trim() : "";
-  };
   return [...groups]
     .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
-    .map(([name, g]) => ({ name, count: g.count, cpu: avg(g.cpu), ram: avg(g.ram), disk: avg(g.disk), totalCpu: sum(g.tc), totalRam: sum(g.tr), totalDisk: sum(g.td) }));
+    .map(([name, g]) => ({ name, count: g.count, cpu: avg(g.cpu), ram: avg(g.ram), disk: avg(g.disk), totalCpu: sumSizes(g.tc), totalRam: sumSizes(g.tr), totalDisk: sumSizes(g.td) }));
+}
+
+const SIZE_UNITS = "KMGTP";
+
+/**
+ * Sums capacities: "8 vCPU" + "4 vCPU" → "12 vCPU"; sizes are added in bytes
+ * (1024-based) so units can mix — "150G" + "1.5T" → "1.6 T", "7,5Gi" + "8Gi"
+ * → "15.5 Gi" — and shown in the largest unit, styled like the first one seen.
+ */
+export function sumSizes(a: string[]): string {
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+  let total = 0, bytes = 0, unit = "", suffix = "";
+  for (const s of a) {
+    const m = s.replace(/,/g, ".").trim().match(/^([\d.]+)\s*(.*)$/);
+    if (!m) continue;
+    const u = m[2].trim();
+    const p = SIZE_UNITS.indexOf(u.charAt(0).toUpperCase());
+    if (p >= 0 && /^[KMGTP](i|iB|B)?$/i.test(u)) {
+      bytes += parseFloat(m[1]) * 1024 ** (p + 1);
+      if (!unit) { unit = u; suffix = u.includes("i") ? "i" : ""; }
+    } else {
+      total += parseFloat(m[1]);
+      unit ||= u;
+    }
+  }
+  if (bytes) {
+    let v = bytes / 1024, p = 0;
+    while (v >= 1024 && p < SIZE_UNITS.length - 1) { v /= 1024; p++; }
+    return `${fmt(v)} ${SIZE_UNITS[p]}${suffix}`;
+  }
+  return total ? `${fmt(total)} ${unit}`.trim() : "";
 }
 
 /** The `n` most recently scanned hosts, newest first. */

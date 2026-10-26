@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hostInsights, hostBreakdowns, peakUsage, resourcesBy, recentScans } from "./hostInsights.ts";
+import { hostInsights, hostBreakdowns, peakUsage, resourcesBy, recentScans, sumSizes } from "./hostInsights.ts";
 import type { Host } from "@/lib/types";
 
 const t = (k: string, v?: Record<string, string>) => (v ? `${k}(${Object.values(v).join(",")})` : k);
@@ -74,6 +74,14 @@ test("resources group scanned hosts, average use, sum capacity", () => {
   assert.deepEqual(etipi, { name: "ETIPI", count: 2, cpu: 31, ram: 50, disk: 0, totalCpu: "12 vCPU", totalRam: "15.5 Gi", totalDisk: "" });
   assert.equal(aws.count, 1);
   assert.equal(aws.disk, 73);
+});
+
+test("sumSizes adds mixed units in bytes", () => {
+  assert.equal(sumSizes(["150G", "1.5T"]), "1.6 T"); // gestor's 1.5T next to a 150G host
+  assert.equal(sumSizes(["7,5Gi", "8Gi"]), "15.5 Gi");
+  assert.equal(sumSizes(["512M", "512M"]), "1 G");
+  assert.equal(sumSizes(["8 vCPU", "4 vCPU"]), "12 vCPU");
+  assert.equal(sumSizes([]), "");
 });
 
 test("recent scans, newest first", () => {

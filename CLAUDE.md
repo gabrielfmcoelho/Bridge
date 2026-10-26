@@ -168,6 +168,14 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   name resolves from the Bridge server. Only adds; trashed records are never
   recreated; stopped host servers contribute nothing. `LinkableName` and
   `frontend/src/lib/webDns.ts` `linkableName` are twins.
+- Disk in the scan (`internal/sshtest/storage.go`): every local filesystem
+  (`df -lPTB1`, no tmpfs/overlay/snap/container mounts, bind mounts once),
+  network mounts (listed, never counted), raw disks (`lsblk`, "unused" when
+  nothing is on them) and LVM free space (`vgs`, as root with the stored
+  password). `Storage`/`StorageUsed` (→ `RecursoArmazenamento`, hosts-page
+  totals) sum the local filesystems; `DiskPercent` (card, sorting,
+  `alerta-recursos`, `sub-utilizado`, `host_scans.disk_pct`) is the **fullest**
+  one (`DiskFullest`), like Sentinel; `df /` is only the fallback.
 - List endpoints return `{data, meta:{page,per_page,total}}`
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.
