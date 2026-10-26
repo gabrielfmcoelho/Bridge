@@ -3954,6 +3954,447 @@
                 }
             }
         },
+        "/api/databases": {
+            "get": {
+                "description": "Any role. Only databases visible to the caller (entidade scoping).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "List catalogued databases",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search text",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Engine",
+                        "name": "engine",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "prod, homolog or dev",
+                        "name": "environment",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "publico, interno, pessoal or sensivel",
+                        "name": "sensitivity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only databases on this instance",
+                        "name": "instance_service_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only databases this service consumes",
+                        "name": "service_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only databases of this project, directly or through its services",
+                        "name": "project_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200); omit for every row",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_Database"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Editor+. name and engine are required; instance_service_id null means external (then external_provider or host is required). Setting host is admin-only. Linked services, projects and the tunnel host must be visible (404 otherwise).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Register a database",
+                "parameters": [
+                    {
+                        "description": "Database, links and entidade grants",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.databaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.Database"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/databases/instances": {
+            "get": {
+                "description": "Any role. Visible engines found by the scan or Coolify (services of kind database/cache, Coolify databases), with the inferred engine and how many catalogued databases point at each.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "List database instances",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200); omit for every row",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_DatabaseInstance"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/databases/trash": {
+            "get": {
+                "description": "Any role. Soft-deleted databases visible to the caller, newest first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "List trashed databases",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200); omit for every row",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_Database"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/databases/{id}": {
+            "get": {
+                "description": "Any role; invisible databases answer 404. Includes links, the instance summary, responsáveis and entidade grants.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Get a catalogued database",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Database ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Database"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Editor+; invisible databases answer 404. Partial: an omitted field keeps its value; null clears a nullable field; grants change only when a grant field is sent. Changing host is admin-only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Update a catalogued database",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Database ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.databaseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Database"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Admin. Soft delete, together with its vault secrets; restore brings both back.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Delete a catalogued database",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Database ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/databases/{id}/restore": {
+            "post": {
+                "description": "Admin. The database comes back with its links and vault secrets.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "atlas"
+                ],
+                "summary": "Restore a database from the trash",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Database ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/dns": {
             "get": {
                 "description": "Any role. Visible records, enriched with their relations. Paginated in SQL.",
@@ -3993,6 +4434,18 @@
                         "type": "string",
                         "description": "Filter by HTTPS",
                         "name": "has_https",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Linked to a host (yes, no)",
+                        "name": "has_hosts",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Linked to a service (yes, no)",
+                        "name": "has_services",
                         "in": "query"
                     },
                     {
@@ -6227,7 +6680,7 @@
         },
         "/api/graph": {
             "get": {
-                "description": "Any role. {\"nodes\": [graphNode], \"edges\": [graphEdge]} over visible hosts, DNS records, projects, services and APIs; edges only between visible nodes.",
+                "description": "Any role. {\"nodes\": [graphNode], \"edges\": [graphEdge]} over visible hosts, DNS records, projects, services, APIs and databases; edges only between visible nodes.",
                 "produces": [
                     "application/json"
                 ],
@@ -12677,6 +13130,167 @@
                 }
             }
         },
+        "/api/settings/gitlab/repo-links": {
+            "post": {
+                "description": "Admin. The repo is resolved by path with the service token, so it must be readable by it. Projetos and services are attached through their own endpoints.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gitlab"
+                ],
+                "summary": "Link a GitLab repo to a DNS record or host",
+                "parameters": [
+                    {
+                        "description": "Entity and repo path",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.gitlabRepoLinkRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.GitLabRepoLink"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/settings/gitlab/repo-links/{id}": {
+            "delete": {
+                "description": "Admin.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gitlab"
+                ],
+                "summary": "Remove a DNS/host GitLab repo link",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Link ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/settings/gitlab/repos": {
+            "get": {
+                "description": "Admin. Groups and repos visible to the GitLab service token, with their Bridge attachments (projeto links, service repo fields, DNS/host links). unlisted holds repos attached in Bridge that the token does not list. 400 when the integration is disabled or has no token.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gitlab"
+                ],
+                "summary": "GitLab repo inventory",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.gitlabInventory"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/settings/integrations": {
             "get": {
                 "description": "Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, smtp, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
@@ -18109,6 +18723,34 @@
                 }
             }
         },
+        "api.ListEnvelope-models_Database": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Database"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
+        "api.ListEnvelope-models_DatabaseInstance": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.DatabaseInstance"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
         "api.ListEnvelope-models_Dependency": {
             "type": "object",
             "properties": {
@@ -19238,6 +19880,95 @@
                 }
             }
         },
+        "api.databaseRequest": {
+            "type": "object",
+            "properties": {
+                "backup_policy": {
+                    "type": "string"
+                },
+                "backup_retention_days": {
+                    "type": "integer"
+                },
+                "connection_mode": {
+                    "type": "string"
+                },
+                "consumer_service_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "creator_entidade_id": {
+                    "type": "integer"
+                },
+                "db_name": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "engine": {
+                    "type": "string"
+                },
+                "environment": {
+                    "type": "string"
+                },
+                "external_provider": {
+                    "type": "string"
+                },
+                "host": {
+                    "type": "string"
+                },
+                "instance_service_id": {
+                    "type": "integer"
+                },
+                "is_global": {
+                    "type": "boolean"
+                },
+                "last_backup_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "integer"
+                },
+                "project_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "responsaveis": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ResponsavelInput"
+                    }
+                },
+                "responsible_entidade_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "sensitivity": {
+                    "type": "string"
+                },
+                "tls_mode": {
+                    "type": "string"
+                },
+                "tunnel_host_id": {
+                    "type": "integer"
+                },
+                "tunnel_target": {
+                    "type": "string"
+                },
+                "use_cases": {
+                    "type": "string"
+                }
+            }
+        },
         "api.dnsWriteRequest": {
             "type": "object",
             "properties": {
@@ -19553,11 +20284,152 @@
                 }
             }
         },
+        "api.gitlabInventory": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabInventoryGroup"
+                    }
+                },
+                "repos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabInventoryRepo"
+                    }
+                },
+                "truncated": {
+                    "type": "boolean"
+                },
+                "unlisted": {
+                    "description": "Unlisted are repos attached in Bridge that the token does not list:\nmoved, renamed, or out of the token's reach (GitLab answers 404).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabInventoryRepo"
+                    }
+                }
+            }
+        },
+        "api.gitlabInventoryGroup": {
+            "type": "object",
+            "properties": {
+                "full_path": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "projetos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "web_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.gitlabInventoryRepo": {
+            "type": "object",
+            "properties": {
+                "default_branch": {
+                    "type": "string"
+                },
+                "dns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "hosts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "id": {
+                    "description": "ID is 0 for a repo attached in Bridge that the token does not list.",
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace_id": {
+                    "type": "integer"
+                },
+                "path_with_namespace": {
+                    "type": "string"
+                },
+                "projetos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "services": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "web_url": {
+                    "type": "string"
+                }
+            }
+        },
         "api.gitlabLinkProjectRequest": {
             "type": "object",
             "properties": {
                 "gitlab_path": {
                     "description": "e.g., \"org/repo\"",
+                    "type": "string"
+                }
+            }
+        },
+        "api.gitlabRepoLinkRequest": {
+            "type": "object",
+            "properties": {
+                "entity_id": {
+                    "type": "integer"
+                },
+                "entity_type": {
+                    "type": "string",
+                    "enum": [
+                        "dns",
+                        "host"
+                    ]
+                },
+                "path": {
+                    "description": "Path is the repo's path with namespace, e.g. \"seadpi/sgi\".",
+                    "type": "string"
+                }
+            }
+        },
+        "api.gitlabRepoRef": {
+            "type": "object",
+            "properties": {
+                "field": {
+                    "description": "Field is where a service holds the repo: repository_url (editable) or\ngitlab_url / git_repository (legacy / written by the Coolify sync).",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "link_id": {
+                    "type": "integer"
+                },
+                "name": {
                     "type": "string"
                 }
             }
@@ -23285,6 +24157,211 @@
                 }
             }
         },
+        "models.Database": {
+            "type": "object",
+            "properties": {
+                "backup_policy": {
+                    "type": "string"
+                },
+                "backup_retention_days": {
+                    "type": "integer"
+                },
+                "connection_mode": {
+                    "description": "none | direct | ssh_tunnel",
+                    "type": "string"
+                },
+                "consumer_service_ids": {
+                    "description": "ConsumerServiceIDs / ProjectIDs: always set, [] when none.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "integer"
+                },
+                "db_name": {
+                    "description": "real name in the engine",
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "engine": {
+                    "type": "string"
+                },
+                "entidades": {
+                    "$ref": "#/definitions/models.AssetGrants"
+                },
+                "environment": {
+                    "description": "prod | homolog | dev",
+                    "type": "string"
+                },
+                "external_provider": {
+                    "type": "string"
+                },
+                "has_credential": {
+                    "description": "the credential itself never leaves the backend",
+                    "type": "boolean"
+                },
+                "host": {
+                    "description": "Host/Port override the endpoint derived from the instance; \"\" / nil =\nderive. Setting a free host is admin-only (it is where Bridge will\nconnect to).",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "instance": {
+                    "description": "Instance is a summary of the engine row, nil when external or when\nthe caller can't see it.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.DatabaseInstanceRef"
+                        }
+                    ]
+                },
+                "instance_service_id": {
+                    "description": "nil = external",
+                    "type": "integer"
+                },
+                "last_backup_at": {
+                    "type": "string"
+                },
+                "main_responsavel_name": {
+                    "description": "MainResponsavelName is the main internal responsável (list responses).",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "display name (\"SEI produção\")",
+                    "type": "string"
+                },
+                "port": {
+                    "type": "integer"
+                },
+                "project_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "responsaveis": {
+                    "description": "Responsaveis and Entidades are loaded on detail responses only.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Responsavel"
+                    }
+                },
+                "sensitivity": {
+                    "description": "LGPD: publico | interno | pessoal | sensivel",
+                    "type": "string"
+                },
+                "tls_mode": {
+                    "type": "string"
+                },
+                "tunnel_host_id": {
+                    "type": "integer"
+                },
+                "tunnel_target": {
+                    "description": "container name or 127.0.0.1 on the tunnel host",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "use_cases": {
+                    "description": "Markdown: who uses it and for what",
+                    "type": "string"
+                }
+            }
+        },
+        "models.DatabaseInstance": {
+            "type": "object",
+            "properties": {
+                "container_image": {
+                    "type": "string"
+                },
+                "container_name": {
+                    "type": "string"
+                },
+                "container_status": {
+                    "type": "string"
+                },
+                "coolify_resource_type": {
+                    "type": "string"
+                },
+                "engine": {
+                    "description": "inferred; \"other\" when unknown",
+                    "type": "string"
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "host_nickname": {
+                    "type": "string"
+                },
+                "host_slug": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "string"
+                },
+                "registered_count": {
+                    "type": "integer"
+                },
+                "service_kind": {
+                    "type": "string"
+                },
+                "service_subtype": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.DatabaseInstanceRef": {
+            "type": "object",
+            "properties": {
+                "container_image": {
+                    "type": "string"
+                },
+                "container_name": {
+                    "type": "string"
+                },
+                "container_status": {
+                    "type": "string"
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "host_nickname": {
+                    "type": "string"
+                },
+                "host_slug": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "string"
+                },
+                "service_subtype": {
+                    "type": "string"
+                }
+            }
+        },
         "models.Dependency": {
             "type": "object",
             "properties": {
@@ -23572,6 +24649,35 @@
                 },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "models.GitLabRepoLink": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "entity_id": {
+                    "type": "integer"
+                },
+                "entity_name": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string"
+                },
+                "gitlab_base_url": {
+                    "type": "string"
+                },
+                "gitlab_path": {
+                    "type": "string"
+                },
+                "gitlab_project_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
                 }
             }
         },
@@ -24408,7 +25514,8 @@
                 "tool",
                 "projeto",
                 "avulso",
-                "api_catalog"
+                "api_catalog",
+                "database"
             ],
             "x-enum-varnames": [
                 "SecretScopeService",
@@ -24416,7 +25523,8 @@
                 "SecretScopeTool",
                 "SecretScopeProjeto",
                 "SecretScopeAvulso",
-                "SecretScopeAPICatalog"
+                "SecretScopeAPICatalog",
+                "SecretScopeDatabase"
             ]
         },
         "models.SecretType": {

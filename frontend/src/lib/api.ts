@@ -1114,6 +1114,32 @@ export const apiCatalogAPI = {
   restore: (id: number) => api.post(`/api/api-catalog/${id}/restore`),
 };
 
+// Atlas databases catalogue. Update is partial: omitted keeps, null clears a
+// nullable field, [] clears links.
+export type DatabasePayload = Partial<Pick<import("./types").Database,
+  "name" | "db_name" | "description" | "use_cases" | "engine" | "instance_service_id" | "external_provider" |
+  "host" | "port" | "connection_mode" | "tunnel_host_id" | "tunnel_target" | "tls_mode" | "sensitivity" |
+  "environment" | "backup_policy" | "backup_retention_days" | "last_backup_at" | "consumer_service_ids" | "project_ids">> & {
+  responsaveis?: { contact_id?: number; is_main: boolean }[];
+} & import("./types").AssetGrantsInput;
+type DatabaseFilter = { q?: string; service_id?: number; project_id?: number; instance_service_id?: number };
+
+export const databasesAPI = {
+  list: (f: DatabaseFilter = {}) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (v != null && v !== "") q.set(k, String(v));
+    const qs = q.toString();
+    return api.getList<import("./types").Database>(`/api/databases${qs ? `?${qs}` : ""}`);
+  },
+  instances: () => api.getList<import("./types").DatabaseInstance>("/api/databases/instances"),
+  get: (id: number) => api.get<import("./types").Database>(`/api/databases/${id}`),
+  create: (body: DatabasePayload) => api.post<import("./types").Database>("/api/databases", body),
+  update: (id: number, body: DatabasePayload) => api.put<import("./types").Database>(`/api/databases/${id}`, body),
+  remove: (id: number) => api.delete(`/api/databases/${id}`),
+  trash: () => api.getList<import("./types").Database>("/api/databases/trash"),
+  restore: (id: number) => api.post(`/api/databases/${id}/restore`),
+};
+
 // Access keys of a catalogued API. Plaintext comes back only from issue and
 // rotate (and is also kept in the vault, readable with apis.keys.manage).
 export interface ApiKeyCreatePayload {
@@ -1412,6 +1438,15 @@ export const projectGitlabAPI = {
     api.delete(`/api/projects/${projectId}/gitlab/links/${linkId}`),
   listCommits: (projectId: number) =>
     api.get<ProjectGitLabCommitsResponse>(`/api/projects/${projectId}/gitlab/commits`),
+};
+
+// GitLab repo inventory (admin): what the service token sees and where each
+// repo is attached. Projetos and services attach through their own endpoints.
+export const gitlabReposAPI = {
+  list: () => api.get<import("./types").GitLabInventory>("/api/settings/gitlab/repos"),
+  link: (data: { entity_type: "dns" | "host"; entity_id: number; path: string }) =>
+    api.post<{ id: number }>("/api/settings/gitlab/repo-links", data),
+  unlink: (id: number) => api.delete(`/api/settings/gitlab/repo-links/${id}`),
 };
 
 // Permissions management (admin)

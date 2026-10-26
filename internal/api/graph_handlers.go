@@ -33,7 +33,7 @@ type graphEdge struct {
 // handleGraph godoc
 //
 //	@Summary		Inventory graph
-//	@Description	Any role. {"nodes": [graphNode], "edges": [graphEdge]} over visible hosts, DNS records, projects, services and APIs; edges only between visible nodes.
+//	@Description	Any role. {"nodes": [graphNode], "edges": [graphEdge]} over visible hosts, DNS records, projects, services, APIs and databases; edges only between visible nodes.
 //	@Tags			graph
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}
@@ -145,6 +145,26 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Databases (Atlas catalogue), scoped like the rest.
+	dbs, _ := store.NewDatabaseRepo(h.db.SQL).List(r.Context(), models.DatabaseFilter{})
+	dbIDMap := make(map[int64]string)
+	for _, d := range dbs {
+		nid := fmt.Sprintf("database-%d", d.ID)
+		dbIDMap[d.ID] = nid
+		nodes = append(nodes, graphNode{
+			ID:    nid,
+			Type:  "database",
+			Label: d.Name,
+			Data: map[string]any{
+				"engine":      d.Engine,
+				"db_name":     d.DBName,
+				"environment": d.Environment,
+				"sensitivity": d.Sensitivity,
+				"external":    d.InstanceServiceID == nil,
+			},
+		})
+	}
+
 	// Link-table edges: one query per table. An edge is drawn only when both
 	// ends are in the scoped node maps above, so invisible assets never leak.
 	links, err := store.NewGraphRepo(h.db.SQL).Links(r.Context())
@@ -184,6 +204,9 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	addEdges(links.APIService, apiIDMap, serviceIDMap, "served by")
 	addEdges(links.APIConsumer, apiIDMap, serviceIDMap, "consumed by")
 	addEdges(links.APIProject, apiIDMap, projectIDMap, "part of")
+	addEdges(links.DBInstance, dbIDMap, serviceIDMap, "runs on")
+	addEdges(links.DBConsumer, dbIDMap, serviceIDMap, "consumed by")
+	addEdges(links.DBProject, dbIDMap, projectIDMap, "part of")
 	edges = append(edges, derivedProjectEdges(services, links, hostIDMap, dnsIDMap, projectIDMap)...)
 
 	jsonOK(w, map[string]any{

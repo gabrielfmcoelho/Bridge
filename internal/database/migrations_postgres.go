@@ -1989,4 +1989,80 @@ var migrationsPostgres = []string{
 		fetched_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (source, lookup_key)
 	);`,
+	// Version 116: GitLab repos linked straight to a DNS record or host
+	// (projetos keep project_gitlab_links, services their repository_url).
+	// Polymorphic, so no FK: both parents are soft-deleted and reads join the
+	// live row, so a restored record gets its links back.
+	`CREATE TABLE IF NOT EXISTS gitlab_repo_links (
+		id                BIGSERIAL PRIMARY KEY,
+		entity_type       TEXT NOT NULL CHECK (entity_type IN ('dns','host')),
+		entity_id         BIGINT NOT NULL,
+		gitlab_project_id BIGINT NOT NULL,
+		gitlab_base_url   TEXT NOT NULL,
+		gitlab_path       TEXT NOT NULL,
+		created_by        BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		created_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE (entity_type, entity_id, gitlab_project_id, gitlab_base_url)
+	);
+	CREATE INDEX IF NOT EXISTS idx_gitlab_repo_links_entity ON gitlab_repo_links(entity_type, entity_id);`,
+	// Version 117: Atlas databases — a catalogue of logical databases (sei_prod,
+	// a Trino catalog, an Oracle service name). instance_service_id points at
+	// the engine that hosts it (a services row the scan or Coolify found);
+	// NULL means external, run by external_provider. Consumers are the
+	// services that use the database. Databases are entidade-scoped assets,
+	// can have responsáveis and hold vault secrets (scope 'database');
+	// databases.users.manage gates their credentials and database users.
+	`CREATE TABLE IF NOT EXISTS databases (
+		id                    BIGSERIAL PRIMARY KEY,
+		name                  TEXT NOT NULL,
+		db_name               TEXT NOT NULL DEFAULT '',
+		description           TEXT NOT NULL DEFAULT '',
+		use_cases             TEXT NOT NULL DEFAULT '',
+		engine                TEXT NOT NULL CHECK (engine IN ('postgres','mysql','mariadb','oracle','mssql','trino','mongodb','redis','other')),
+		instance_service_id   BIGINT REFERENCES services(id) ON DELETE SET NULL,
+		external_provider     TEXT NOT NULL DEFAULT '',
+		host                  TEXT NOT NULL DEFAULT '',
+		port                  INTEGER CHECK (port IS NULL OR (port > 0 AND port < 65536)),
+		connection_mode       TEXT NOT NULL DEFAULT 'none' CHECK (connection_mode IN ('none','direct','ssh_tunnel')),
+		tunnel_host_id        BIGINT REFERENCES hosts(id) ON DELETE SET NULL,
+		tunnel_target         TEXT NOT NULL DEFAULT '',
+		tls_mode              TEXT NOT NULL DEFAULT 'prefer' CHECK (tls_mode IN ('disable','prefer','require','verify')),
+		credential_secret_id  BIGINT REFERENCES secrets(id) ON DELETE SET NULL,
+		sensitivity           TEXT NOT NULL DEFAULT 'interno' CHECK (sensitivity IN ('publico','interno','pessoal','sensivel')),
+		environment           TEXT NOT NULL DEFAULT 'prod' CHECK (environment IN ('prod','homolog','dev')),
+		backup_policy         TEXT NOT NULL DEFAULT '',
+		backup_retention_days INTEGER CHECK (backup_retention_days IS NULL OR backup_retention_days >= 0),
+		last_backup_at        TIMESTAMPTZ,
+		created_by            BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		created_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		deleted_at            TIMESTAMPTZ
+	);
+	CREATE INDEX IF NOT EXISTS idx_databases_instance ON databases (instance_service_id);
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_databases_instance_dbname ON databases (instance_service_id, db_name)
+		WHERE deleted_at IS NULL AND instance_service_id IS NOT NULL AND db_name <> '';
+	CREATE TABLE IF NOT EXISTS database_consumer_links (
+		database_id BIGINT NOT NULL REFERENCES databases(id) ON DELETE CASCADE,
+		service_id  BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+		PRIMARY KEY (database_id, service_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_database_consumer_links_service ON database_consumer_links (service_id);
+	CREATE TABLE IF NOT EXISTS database_project_links (
+		database_id BIGINT NOT NULL REFERENCES databases(id) ON DELETE CASCADE,
+		project_id  BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		PRIMARY KEY (database_id, project_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_database_project_links_project ON database_project_links (project_id);
+	ALTER TABLE asset_entidades DROP CONSTRAINT IF EXISTS asset_entidades_asset_type_check;
+	ALTER TABLE asset_entidades ADD CONSTRAINT asset_entidades_asset_type_check
+		CHECK (asset_type IN ('host','dns','service','project','contact','tool','ssh_key','api_catalog','secret','database'));
+	ALTER TABLE responsaveis DROP CONSTRAINT IF EXISTS responsaveis_entity_type_check;
+	ALTER TABLE responsaveis ADD CONSTRAINT responsaveis_entity_type_check
+		CHECK (entity_type IN ('host','dns','service','project','api_catalog','database'));
+	ALTER TABLE secrets DROP CONSTRAINT IF EXISTS secrets_scope_check;
+	ALTER TABLE secrets ADD CONSTRAINT secrets_scope_check
+		CHECK (scope IN ('service','host','tool','avulso','projeto','api_catalog','database'));
+	INSERT INTO permissions (code, description, category) VALUES
+		('databases.users.manage', 'Set database credentials; create, rotate, disable and drop database users; reveal their passwords', 'databases')
+	ON CONFLICT DO NOTHING;`,
 }

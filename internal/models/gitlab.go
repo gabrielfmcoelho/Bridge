@@ -42,3 +42,16 @@ type ProjectGitLabLink struct {
 	LastSyncedAt    *time.Time `json:"last_synced_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 }
+
+// GitLabRepoLink links a GitLab repo straight to a DNS record or host.
+// EntityName (the domain or host nickname) is filled on read.
+type GitLabRepoLink struct {
+	ID              int64     `json:"id"`
+	EntityType      string    `json:"entity_type"`
+	EntityID        int64     `json:"entity_id"`
+	EntityName      string    `json:"entity_name"`
+	GitLabProjectID int       `json:"gitlab_project_id"`
+	GitLabBaseURL   string    `json:"gitlab_base_url"`
+	GitLabPath      string    `json:"gitlab_path"`
+	CreatedAt       time.Time `json:"created_at"`
+}

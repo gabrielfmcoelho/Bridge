@@ -40,7 +40,7 @@ import ConsolidateDrawer, { consolidationKey } from "./ConsolidateDrawer";
 // cards on phones, filters in the URL, a detail drawer per secret.
 
 const KINDS = ["", "host_cred", "password", "sshkey", "cred", "app_login", "env_var", "api_key"] as const;
-const SCOPES = ["", "avulso", "projeto", "service", "host", "tool", "api_catalog"] as const;
+const SCOPES = ["", "avulso", "projeto", "service", "host", "tool", "api_catalog", "database"] as const;
 const VISIBILITIES = ["", "shared", "personal"] as const;
 type Filters = { kind: string; scope: string; visibility: string };
 

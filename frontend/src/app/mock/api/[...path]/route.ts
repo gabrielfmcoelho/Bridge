@@ -14,7 +14,7 @@ import { canTransition } from "@/lib/requests";
 import { extractJSON, coerceToSchema, coercePriority } from "@/lib/aiDraft";
 import type {
   Offering, ServiceRequest, RequestEvent, RequestStatus, CatalogHit, AssetGrantsInput,
-  Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool,
+  Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool, Database,
 } from "@/lib/types";
 import {
   db, resetDB, currentUser, switchUser, requestVisible, abilitiesForRequest,
@@ -548,6 +548,65 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     return record ? json(mockCertScan(record)) : notFound("DNS record not found");
   }
   if (method === "GET" && p === "projects") return json(paginate(db.projects, qs.get("page"), qs.get("per_page")));
+  // ── Atlas databases ──────────────────────────────────────────────────
+  if (segs[0] === "databases") {
+    const live = () => db.databases.filter((d) => !d.deleted_at);
+    if (method === "GET" && p === "databases") {
+      const inst = Number(qs.get("instance_service_id")), svc = Number(qs.get("service_id")), proj = Number(qs.get("project_id"));
+      const rows = live().filter((d) => (!inst || d.instance_service_id === inst) && (!svc || d.consumer_service_ids.includes(svc)) &&
+        (!proj || d.project_ids.includes(proj)));
+      return json(paginate(rows, qs.get("page"), qs.get("per_page")));
+    }
+    if (method === "GET" && p === "databases/trash") return json(paginate(db.databases.filter((d) => d.deleted_at), null, null));
+    if (method === "GET" && p === "databases/instances") {
+      const rows = db.services.filter((s) => ["database", "cache"].includes(s.service_type) || s.service_kind === "database").map((s) => {
+        const h = db.hosts.find((x) => (s.host_ids ?? []).includes(x.id));
+        const image = s.container_image || s.technology_stack;
+        return {
+          id: s.id, nickname: s.nickname, service_subtype: s.service_subtype, container_name: s.container_name, container_image: image,
+          container_status: s.container_status, port: s.port, host_id: h?.id ?? null, host_nickname: h?.nickname ?? "", host_slug: h?.oficial_slug ?? "",
+          engine: /redis/i.test(image) ? "redis" : /postgres/i.test(image) ? "postgres" : "other", service_kind: s.service_kind ?? "",
+          coolify_resource_type: "", registered_count: live().filter((d) => d.instance_service_id === s.id).length,
+        };
+      });
+      return json(paginate(rows, null, null));
+    }
+    const canWrite = currentUser().role !== "viewer";
+    if (method === "POST" && p === "databases") {
+      if (!canWrite) return json({ error: "forbidden" }, 403);
+      const body = await readJSON<Partial<Database>>(request);
+      const now = new Date().toISOString();
+      const row: Database = {
+        id: Math.max(0, ...db.databases.map((d) => d.id)) + 1, name: "", db_name: "", description: "", use_cases: "", engine: "postgres",
+        instance_service_id: null, external_provider: "", host: "", port: null, connection_mode: "none", tunnel_host_id: null, tunnel_target: "",
+        tls_mode: "prefer", has_credential: false, sensitivity: "interno", environment: "prod", backup_policy: "", backup_retention_days: null,
+        last_backup_at: null, created_by: currentUser().id, created_at: now, updated_at: now, consumer_service_ids: [], project_ids: [], responsaveis: [],
+        ...body,
+      };
+      db.databases.push(row);
+      return json(row, 201);
+    }
+    const id = Number(segs[1]);
+    const row = db.databases.find((d) => d.id === id);
+    if (segs.length === 3 && segs[2] === "restore" && method === "POST") {
+      if (!row) return notFound("database not found in trash");
+      row.deleted_at = null;
+      return json({ status: "restored" });
+    }
+    if (segs.length === 2 && row && !row.deleted_at) {
+      if (method === "GET") return json(row);
+      if (method === "PUT") {
+        if (!canWrite) return json({ error: "forbidden" }, 403);
+        Object.assign(row, await readJSON<Partial<Database>>(request), { updated_at: new Date().toISOString() });
+        return json(row);
+      }
+      if (method === "DELETE") {
+        row.deleted_at = new Date().toISOString();
+        return new Response(null, { status: 204 });
+      }
+    }
+    return notFound("database not found");
+  }
   if (method === "GET" && p === "api-catalog") {
     const svc = Number(qs.get("service_id")), proj = Number(qs.get("project_id"));
     const rows = db.apiCatalogs.filter((a) => (!svc || a.service_ids.includes(svc)) && (!proj || a.project_ids.includes(proj)));

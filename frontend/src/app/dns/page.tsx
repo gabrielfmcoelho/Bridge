@@ -76,6 +76,8 @@ export default function DNSPage() {
       if (filters.tag) params.tag = filters.tag;
       if (filters.responsavel) params.responsavel = filters.responsavel;
       if (filters.has_https) params.has_https = filters.has_https;
+      if (filters.has_hosts) params.has_hosts = filters.has_hosts;
+      if (filters.has_services) params.has_services = filters.has_services;
       if (filters.cert) params.cert = filters.cert;
       params.sort_by = sort.field;
       params.sort_dir = sort.direction;
@@ -100,6 +102,8 @@ export default function DNSPage() {
     if (filters.responsavel) result = result.filter(d => d.main_responsavel_name === filters.responsavel);
     if (filters.has_https === "yes") result = result.filter(d => d.has_https);
     else if (filters.has_https === "no") result = result.filter(d => !d.has_https);
+    if (filters.has_hosts) result = result.filter(d => !!d.host_ids?.length === (filters.has_hosts === "yes"));
+    if (filters.has_services) result = result.filter(d => !!d.services_count === (filters.has_services === "yes"));
     if (filters.cert) result = result.filter(d => matchesCertFilter(d, filters.cert));
 
     result.sort((a, b) => {

@@ -30,6 +30,10 @@ test("insights count and carry filters", () => {
   assert.equal(by.noHttps.value, 1);
   assert.deepEqual(by.noHttps.filter, { has_https: "no" });
   assert.equal(by.orphan.value, 1);
+  assert.equal(by.noHost.value, 2);
+  assert.deepEqual(by.noHost.filter, { has_hosts: "no" });
+  assert.equal(by.noService.value, 3);
+  assert.deepEqual(by.noService.filter, { has_services: "no" });
   assert.deepEqual(by["sit:Em quarentena"].filter, { situacao: "Em quarentena" });
   assert.equal(by["tag:legado"].value, 1);
 });

@@ -27,7 +27,7 @@ applies to every module.
 
 | Root assets (own grants, `asset_type`) | Dependents (inherit from parent) |
 |---|---|
-| `host`, `dns`, `service`, `project`, `contact`, `tool` (external_tools), `ssh_key`, `api_catalog`, `secret` (**only** `scope='avulso' AND visibility='shared'`) | issues (→ `entity_type`/`entity_id`), releases (→ project; NULL project = unassigned), secrets with a parent (→ host/service/project/tool; personal stay owner-only), host sub-resources (alerts, chamados, scans, remote users, op logs, grafana, coolify, GLPI-by-host, SSH ops, AI), project sub-resources (wiki collection, GLPI tickets, gitlab links, AI analysis), dashboard counts, graph, trash |
+| `host`, `dns`, `service`, `project`, `contact`, `tool` (external_tools), `ssh_key`, `api_catalog`, `database`, `secret` (**only** `scope='avulso' AND visibility='shared'`) | issues (→ `entity_type`/`entity_id`), releases (→ project; NULL project = unassigned), secrets with a parent (→ host/service/project/tool; personal stay owner-only), host sub-resources (alerts, chamados, scans, remote users, op logs, grafana, coolify, GLPI-by-host, SSH ops, AI), project sub-resources (wiki collection, GLPI tickets, gitlab links, AI analysis), dashboard counts, graph, trash |
 
 Scan-discovered services copy their host's grants; tools synced from a service copy the
 service's grants. Wiki "common collections" and non-project GLPI forms stay org-wide.

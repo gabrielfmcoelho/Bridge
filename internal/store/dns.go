@@ -110,6 +110,15 @@ func dnsWhere(ctx context.Context, f models.DNSFilter) ([]string, []any) {
 	case "no":
 		where = append(where, "has_https = false")
 	}
+	// Link filters count link rows, like the list's host_ids / services_count.
+	for _, lf := range [][2]string{{f.HasHosts, "dns_host_links"}, {f.HasServices, "service_dns_links"}} {
+		switch lf[0] {
+		case "yes":
+			where = append(where, "EXISTS (SELECT 1 FROM "+lf[1]+" l WHERE l.dns_id = dns_records.id)")
+		case "no":
+			where = append(where, "NOT EXISTS (SELECT 1 FROM "+lf[1]+" l WHERE l.dns_id = dns_records.id)")
+		}
+	}
 	// Cert buckets: literal SQL only. "30" includes the "7" rows; both exclude
 	// already-expired certs. The frontend's matchesCertFilter mirrors these.
 	switch f.Cert {

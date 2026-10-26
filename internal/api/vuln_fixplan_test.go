@@ -332,3 +332,57 @@ func TestVuln_FixPlan(t *testing.T) {
 		}
 	}
 }
+
+// A repo linked straight to the finding's DNS record joins the allowlist;
+// one GitLab doesn't list is reported, not offered.
+func TestBuildFixScope_DNSRepoLink(t *testing.T) {
+	ctx := context.Background()
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	gl := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v4/projects/7" {
+			_, _ = w.Write([]byte(`{"id":7,"name":"sgi","path_with_namespace":"sead/sgi"}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(gl.Close)
+
+	var dnsID int64
+	if err := d.SQL.QueryRow(`INSERT INTO dns_records (domain) VALUES ('sgi.example') RETURNING id`).Scan(&dnsID); err != nil {
+		t.Fatal(err)
+	}
+	links := store.NewGitLabRepoLinkRepo(d.SQL)
+	for _, l := range []models.GitLabRepoLink{
+		{EntityType: "dns", EntityID: dnsID, GitLabProjectID: 7, GitLabBaseURL: gl.URL, GitLabPath: "sead/sgi"},
+		{EntityType: "dns", EntityID: dnsID, GitLabProjectID: 9, GitLabBaseURL: gl.URL, GitLabPath: "sead/gone"},
+	} {
+		if err := links.Create(ctx, &l, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	vulns := store.NewVulnRepo(d.SQL)
+	if _, err := vulns.ApplyImport(ctx, "etipi", []models.VulnFinding{{Fingerprint: "x", Title: "Nikto", Severity: "high", Target: "sgi.example"}}, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	all, _, _ := vulns.List(ctx, models.VulnFilter{})
+	if err := vulns.AddLink(ctx, all[0].ID, "dns", dnsID); err != nil {
+		t.Fatal(err)
+	}
+
+	f, err := vulns.Get(ctx, all[0].ID) // with its links, as the handler loads it
+	if err != nil {
+		t.Fatal(err)
+	}
+	gls := gitlabclient.Settings{Enabled: true, BaseURL: gl.URL, ServiceToken: "tok", DefaultRef: "main"}
+	sc := buildFixScope(ctx, d, f, gitlabclient.NewServiceClient(gls), gls)
+	if len(sc.repos) != 1 || sc.repos[0].Key != "sead/sgi" || sc.repos[0].ID != 7 || sc.repos[0].Ref != "main" {
+		t.Fatalf("repos = %+v, notes %v", sc.repos, sc.notes)
+	}
+	if !strings.Contains(strings.Join(sc.notes, "\n"), "sead/gone ligado a sgi.example não acessível") {
+		t.Fatalf("notes = %v", sc.notes)
+	}
+}
