@@ -29,7 +29,7 @@ and contacts. Access is scoped by a hierarchical org-unit tree called
 | Frontend build | `cd frontend && npm run build` |
 | Frontend dev | `cd frontend && npm run dev` |
 | Frontend dev, no Go backend | `cd frontend && npm run dev:mock` — sets `NEXT_PUBLIC_USE_MOCK_API=1`, which repoints `API_BASE` at the in-app mock (`src/app/mock/api/[...path]/route.ts` + `src/mocks/`). **Required for `/catalog` and `/requests`**: those routes have no Go backend yet, so plain `npm run dev` proxies them to Go and gets 404. `POST /mock/api/__user {role, entidade_slug}` switches persona, `POST /mock/api/__reset` re-seeds. |
-| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases,shareBundles,breadcrumbs,constants,vulns,sshCustomOps}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts`, `src/app/atlas/{apis,databases}/_components/{api,database}Insights.test.ts`, `src/app/_home/homeModel.test.ts`, `src/components/ai/chatModel.test.ts` (insight modules stay runtime-import free so Node can run them) |
+| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases,shareBundles,breadcrumbs,constants,vulns,sshCustomOps,webDns}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts`, `src/app/atlas/{apis,databases}/_components/{api,database}Insights.test.ts`, `src/app/_home/homeModel.test.ts`, `src/components/ai/chatModel.test.ts` (insight modules stay runtime-import free so Node can run them) |
 
 ## Architecture
 
@@ -159,6 +159,15 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   group `dependencies`) caches OSV / NVD / endoflife.date answers in
   `dependency_advisories` for 24h; every scan re-applies the cache offline
   (`ApplyCache`) and every matched CVE is an `inventory` finding.
+- Web servers in the scan (`internal/sshtest/webservers.go`): one session runs
+  `nginx -T`, `apachectl -S` and the php-fpm pool grep on the host (as root with
+  the stored password when there is one) and in every running container (cap
+  30). Sites land in the scan JSON (`web_servers`); `service.RecordWebDNS` then
+  links each valid name to its DNS record, the host and the services serving it
+  or receiving its `proxy_pass`/`fastcgi_pass` — creating the record when the
+  name resolves from the Bridge server. Only adds; trashed records are never
+  recreated; stopped host servers contribute nothing. `LinkableName` and
+  `frontend/src/lib/webDns.ts` `linkableName` are twins.
 - List endpoints return `{data, meta:{page,per_page,total}}`
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.

@@ -9,19 +9,24 @@ import ScanUsers from "./scan/ScanUsers";
 import ScanProcesses from "./scan/ScanProcesses";
 import ScanContainers from "./scan/ScanContainers";
 import ScanServices from "./scan/ScanServices";
+import ScanWebServers from "./scan/ScanWebServers";
 import ScanPackages from "./scan/ScanPackages";
 import ScanSecurity from "./scan/ScanSecurity";
 
-export const SCAN_GROUPS = ["resources", "system", "users", "processes", "containers", "services", "packages", "security"] as const;
+export const SCAN_GROUPS = ["resources", "system", "users", "processes", "containers", "services", "webservers", "packages", "security"] as const;
 export type ScanGroup = (typeof SCAN_GROUPS)[number];
 
 /**
- * One scan, as its eight groups — always all eight, each saying so when the
+ * One scan, as its groups — always all of them, each saying so when the
  * scan has nothing for it. Used by the host overview's scan pane (with
  * `anchorPrefix`, so the jump bar can reach each group) and by the
  * Operations console after a scan.
  */
-export default function VMInfoDisplay({ info, locale, anchorPrefix }: { info: VMInfoType; locale: string; anchorPrefix?: string }) {
+export default function VMInfoDisplay({ info, locale, anchorPrefix, dnsRecords }: {
+  info: VMInfoType; locale: string; anchorPrefix?: string;
+  /** The host's linked DNS records: web-server names show linked / not linked. */
+  dnsRecords?: { id: number; domain: string }[];
+}) {
   const { t } = useLocale();
   const groups: Record<ScanGroup, ReactNode> = {
     resources: <ScanResources info={info} t={t} />,
@@ -30,6 +35,7 @@ export default function VMInfoDisplay({ info, locale, anchorPrefix }: { info: VM
     processes: <ScanProcesses info={info} t={t} />,
     containers: <ScanContainers info={info} t={t} />,
     services: <ScanServices info={info} t={t} />,
+    webservers: <ScanWebServers info={info} t={t} dnsRecords={dnsRecords} />,
     packages: <ScanPackages info={info} t={t} />,
     security: <ScanSecurity info={info} t={t} />,
   };
