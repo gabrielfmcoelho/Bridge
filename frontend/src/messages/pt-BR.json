@@ -2711,6 +2711,15 @@
       "usedBy": "Usado por",
       "undeclared": "DNS vinculados a este host que nenhum servidor web declara",
       "dnsResult": "DNS: {created} criados, {linked} vinculados, {unresolved} sem resolução"
+    },
+    "storage": {
+      "diskFullest": "Disco · mais cheia: {mount}",
+      "partitions": "Partições",
+      "network": "rede",
+      "noAnswer": "sem resposta",
+      "disks": "Discos",
+      "unused": "sem uso",
+      "free": "livre"
     }
   },
   "sshKey": {

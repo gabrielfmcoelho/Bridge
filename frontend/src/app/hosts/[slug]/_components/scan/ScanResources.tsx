@@ -1,23 +1,31 @@
 "use client";
 
 import SectionCard from "@/components/ui/SectionCard";
+import Badge from "@/components/ui/Badge";
 import { UsageBar } from "../UsageBar";
+import { pctBarColor } from "@/lib/utils";
 import type { VMInfoType, ResourceUsageSnapshot } from "@/lib/api";
-import type { T } from "./shared";
+import { pctColor, type T } from "./shared";
 
-/** Usage at scan time (CPU/RAM/disk bars) plus the top consumers of each. */
+/** Usage at scan time (CPU/RAM/disk bars), every partition, plus the top consumers of each. */
 export default function ScanResources({ info, t }: { info: VMInfoType; t: T }) {
   const bars = [
     info.cpu_usage && <UsageBar key="cpu" label={t("vm.cpu")} total={info.cpu} used={info.cpu_usage} percent={info.cpu_usage} />,
     info.ram_percent && <UsageBar key="ram" label={t("vm.ram")} total={info.ram} used={info.ram_used} percent={info.ram_percent} />,
-    info.disk_percent && <UsageBar key="disk" label={t("vm.disk")} total={info.storage} used={info.storage_used} percent={info.disk_percent} />,
+    info.disk_percent && <UsageBar key="disk" label={info.disk_fullest ? t("scan.storage.diskFullest", { mount: info.disk_fullest }) : t("vm.disk")} total={info.storage} used={info.storage_used} percent={info.disk_percent} />,
   ].filter(Boolean);
   const top = info.resource_top;
   const hasTop = !!top && (top.top_cpu?.length || 0) + (top.top_mem?.length || 0) + (top.top_disk?.length || 0) > 0;
+  const hasStorage = (info.filesystems?.length ?? 0) > 0;
 
   return (
-    <SectionCard as="h3" title={t("scan.pane.group.resources")} empty={bars.length === 0 && !hasTop ? t("scan.pane.empty.resources") : undefined}>
+    <SectionCard as="h3" title={t("scan.pane.group.resources")} empty={bars.length === 0 && !hasTop && !hasStorage ? t("scan.pane.empty.resources") : undefined}>
       {bars.length > 0 && <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{bars}</div>}
+      {hasStorage && (
+        <div className={bars.length > 0 ? "mt-4 pt-4 border-t border-[var(--border-subtle)]" : ""}>
+          <StoragePanel info={info} t={t} />
+        </div>
+      )}
       {/* Top consumers answer "the host is at 87% RAM, who is using it?"
           without opening another terminal. */}
       {hasTop && (
@@ -26,6 +34,59 @@ export default function ScanResources({ info, t }: { info: VMInfoType; t: T }) {
         </div>
       )}
     </SectionCard>
+  );
+}
+
+/**
+ * Every partition with its own bar (the disk % above is only the fullest),
+ * then the raw disks — one with nothing on it is "unused" — and LVM free space.
+ */
+function StoragePanel({ info, t }: { info: VMInfoType; t: T }) {
+  const disks = info.disks ?? [];
+  const vgs = info.volume_groups ?? [];
+  const disksTotal = disks.reduce((n, d) => n + d.size_bytes, 0);
+  return (
+    <div>
+      <span className="block text-2xs text-[var(--text-faint)] mb-2">{t("scan.storage.partitions")}</span>
+      <div className="space-y-2.5">
+        {(info.filesystems ?? []).map((fs) => (
+          <div key={fs.mount} className="text-xs min-w-0">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <span className="font-mono text-[var(--text-primary)] truncate" title={fs.mount}>{fs.mount}</span>
+              {fs.network && <Badge compact color="info">{t("scan.storage.network")}</Badge>}
+              <span className="text-2xs text-[var(--text-faint)] font-mono truncate" title={fs.device}>{fs.device} · {fs.fstype}</span>
+              <span className={`ml-auto shrink-0 font-mono tabular-nums ${fs.size_bytes ? pctColor(fs.used_pct) : "text-[var(--text-faint)]"}`}>
+                {fs.size_bytes
+                  ? `${humanizeBytesUI(fs.used_bytes)} / ${humanizeBytesUI(fs.size_bytes)} (${Math.round(fs.used_pct)}%)`
+                  : t("scan.storage.noAnswer")}
+              </span>
+            </div>
+            {fs.size_bytes > 0 && (
+              <div className="mt-1 w-full h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                <div className={`h-full rounded-full ${pctBarColor(fs.used_pct)}`} style={{ width: `${Math.min(fs.used_pct, 100)}%` }} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {(disks.length > 0 || vgs.length > 0) && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-2xs text-[var(--text-faint)] mr-1">
+            {t("scan.storage.disks")}{disksTotal > 0 ? ` (${humanizeBytesUI(disksTotal)})` : ""}
+          </span>
+          {disks.map((d) => (
+            <Badge key={d.name} compact color={d.unused ? "warning" : "default"}>
+              <span className="font-mono">{d.name}</span> {humanizeBytesUI(d.size_bytes)}{d.unused ? ` · ${t("scan.storage.unused")}` : ""}
+            </Badge>
+          ))}
+          {vgs.map((v) => (
+            <Badge key={v.name} compact color={v.free_bytes > 0 ? "info" : "default"}>
+              LVM <span className="font-mono">{v.name}</span>: {humanizeBytesUI(v.free_bytes)} {t("scan.storage.free")}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

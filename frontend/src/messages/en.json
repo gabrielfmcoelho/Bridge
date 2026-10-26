@@ -2711,6 +2711,15 @@
       "usedBy": "Used by",
       "undeclared": "DNS records linked to this host that no web server declares",
       "dnsResult": "DNS: {created} created, {linked} linked, {unresolved} not resolving"
+    },
+    "storage": {
+      "diskFullest": "Disk · fullest: {mount}",
+      "partitions": "Partitions",
+      "network": "network",
+      "noAnswer": "no answer",
+      "disks": "Disks",
+      "unused": "unused",
+      "free": "free"
     }
   },
   "sshKey": {

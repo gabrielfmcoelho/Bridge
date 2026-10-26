@@ -119,6 +119,13 @@ type VMInfo struct {
 	FirewallStatus    string             `json:"firewall_status,omitempty"`
 	RemoteUsers       []RemoteUserInfo   `json:"remote_users,omitempty"`
 	PortOwners        []PortOwner        `json:"port_owners,omitempty"`
+	// Filesystems, Disks, VolumeGroups: every partition, raw disk and LVM
+	// group (storage.go). Storage / StorageUsed sum the local filesystems and
+	// DiskPercent is the fullest one (DiskFullest), falling back to df / alone.
+	Filesystems  []Filesystem  `json:"filesystems,omitempty"`
+	Disks        []BlockDisk   `json:"disks,omitempty"`
+	VolumeGroups []VolumeGroup `json:"volume_groups,omitempty"`
+	DiskFullest  string        `json:"disk_fullest,omitempty"`
 	// WebServers: nginx / Apache / php-fpm on the host and in running
 	// containers, with their sites (webservers.go).
 	WebServers []WebServer `json:"web_servers,omitempty"`
@@ -1666,6 +1673,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		// writes to the shared struct.
 		cronInfo       *CronInfo
 		sshPolicy      *SSHAuthPolicy
+		storageRaw     string
 		nginxConfig    string
 		webServers     []WebServer
 		hostInv        *hostInventory
@@ -1693,6 +1701,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		s := time.Now()
 		sshPolicy = scanSSHAuthPolicy(client, sudoPassword)
 		timeSession("[par] session 7c sshd-policy", s)
+		// Partitions, disks and LVM, chained here (a quick session).
+		s = time.Now()
+		storageRaw = collectStorage(client, sudoPassword)
+		timeSession("[par] session 7d storage", s)
 	}()
 	go func() {
 		defer wg.Done()
@@ -1797,6 +1809,12 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		info.SSHAuthPolicy = sshPolicy
 	}
 	nginxPortMap := parseNginxListens(nginxConfig)
+	st := parseStorage(storageRaw)
+	info.Filesystems, info.Disks, info.VolumeGroups = st.Filesystems, st.Disks, st.VolumeGroups
+	if size, used, fullest, ok := StorageTotals(st.Filesystems); ok {
+		info.Storage, info.StorageUsed = humanBytes(size), humanBytes(used)
+		info.DiskPercent, info.DiskFullest = fmt.Sprintf("%.0f%%", fullest.UsedPct), fullest.Mount
+	}
 	info.ProcessDetails = procDetails
 	info.ResourceTop = resourceTop
 	info.Dependencies = append([]DepScope{hostDeps}, containerDeps...)

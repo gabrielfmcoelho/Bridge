@@ -163,7 +163,22 @@ export type VMInfoType = {
   parsed_containers?: ParsedContainer[];
   ssh_auth_policy?: SSHAuthPolicy;
   web_servers?: WebServer[];
+  /** Every partition (storage.go); storage / disk_percent sum them / take the fullest. */
+  filesystems?: Filesystem[];
+  disks?: BlockDisk[];
+  volume_groups?: VolumeGroup[];
+  /** Mount of the fullest local filesystem — the one disk_percent is about. */
+  disk_fullest?: string;
 };
+
+export type Filesystem = {
+  mount: string; device: string; fstype: string;
+  size_bytes: number; used_bytes: number; avail_bytes: number; used_pct: number;
+  /** NFS/CIFS…: listed, never counted. size_bytes 0 = didn't answer in time. */
+  network?: boolean;
+};
+export type BlockDisk = { name: string; size_bytes: number; unused?: boolean };
+export type VolumeGroup = { name: string; size_bytes: number; free_bytes: number };
 
 /** nginx / Apache / php-fpm found by the scan, on the host or in a container. */
 export type WebServer = {
