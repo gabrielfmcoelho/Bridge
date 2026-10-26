@@ -1942,4 +1942,21 @@ var migrationsPostgres = []string{
 	// this clears the rows it already wrote.
 	`UPDATE services SET git_repository = '', git_branch = ''
 	WHERE lower(regexp_replace(git_repository, '(\.git)?/*$', '')) ~ '(^|[/:])coollabsio/coolify$';`,
+
+	// Version 115: GitLab repos linked straight to a DNS record or host
+	// (projetos keep project_gitlab_links, services their repository_url).
+	// Polymorphic, so no FK: both parents are soft-deleted and reads join the
+	// live row, so a restored record gets its links back.
+	`CREATE TABLE IF NOT EXISTS gitlab_repo_links (
+		id                BIGSERIAL PRIMARY KEY,
+		entity_type       TEXT NOT NULL CHECK (entity_type IN ('dns','host')),
+		entity_id         BIGINT NOT NULL,
+		gitlab_project_id BIGINT NOT NULL,
+		gitlab_base_url   TEXT NOT NULL,
+		gitlab_path       TEXT NOT NULL,
+		created_by        BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		created_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE (entity_type, entity_id, gitlab_project_id, gitlab_base_url)
+	);
+	CREATE INDEX IF NOT EXISTS idx_gitlab_repo_links_entity ON gitlab_repo_links(entity_type, entity_id);`,
 }

@@ -56,6 +56,7 @@ var TableCopyOrder = []string{
 	"vuln_finding_links",
 	"cve_catalog",
 	"vuln_fix_plans",
+	"gitlab_repo_links",
 	"releases",
 	"release_issues",
 	"host_operation_logs",

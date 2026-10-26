@@ -1054,10 +1054,109 @@ definitions:
           type: string
         type: array
     type: object
+  api.gitlabInventory:
+    properties:
+      base_url:
+        type: string
+      groups:
+        items:
+          $ref: '#/definitions/api.gitlabInventoryGroup'
+        type: array
+      repos:
+        items:
+          $ref: '#/definitions/api.gitlabInventoryRepo'
+        type: array
+      truncated:
+        type: boolean
+      unlisted:
+        description: |-
+          Unlisted are repos attached in Bridge that the token does not list:
+          moved, renamed, or out of the token's reach (GitLab answers 404).
+        items:
+          $ref: '#/definitions/api.gitlabInventoryRepo'
+        type: array
+    type: object
+  api.gitlabInventoryGroup:
+    properties:
+      full_path:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      parent_id:
+        type: integer
+      projetos:
+        items:
+          $ref: '#/definitions/api.gitlabRepoRef'
+        type: array
+      web_url:
+        type: string
+    type: object
+  api.gitlabInventoryRepo:
+    properties:
+      default_branch:
+        type: string
+      dns:
+        items:
+          $ref: '#/definitions/api.gitlabRepoRef'
+        type: array
+      hosts:
+        items:
+          $ref: '#/definitions/api.gitlabRepoRef'
+        type: array
+      id:
+        description: ID is 0 for a repo attached in Bridge that the token does not
+          list.
+        type: integer
+      name:
+        type: string
+      namespace_id:
+        type: integer
+      path_with_namespace:
+        type: string
+      projetos:
+        items:
+          $ref: '#/definitions/api.gitlabRepoRef'
+        type: array
+      services:
+        items:
+          $ref: '#/definitions/api.gitlabRepoRef'
+        type: array
+      web_url:
+        type: string
+    type: object
   api.gitlabLinkProjectRequest:
     properties:
       gitlab_path:
         description: e.g., "org/repo"
+        type: string
+    type: object
+  api.gitlabRepoLinkRequest:
+    properties:
+      entity_id:
+        type: integer
+      entity_type:
+        enum:
+        - dns
+        - host
+        type: string
+      path:
+        description: Path is the repo's path with namespace, e.g. "seadpi/sgi".
+        type: string
+    type: object
+  api.gitlabRepoRef:
+    properties:
+      field:
+        description: |-
+          Field is where a service holds the repo: repository_url (editable) or
+          gitlab_url / git_repository (legacy / written by the Coolify sync).
+        type: string
+      id:
+        type: integer
+      link_id:
+        type: integer
+      name:
         type: string
     type: object
   api.gitlabSaveTokenRequest:
@@ -3634,6 +3733,25 @@ definitions:
         type: string
       url:
         type: string
+    type: object
+  models.GitLabRepoLink:
+    properties:
+      created_at:
+        type: string
+      entity_id:
+        type: integer
+      entity_name:
+        type: string
+      entity_type:
+        type: string
+      gitlab_base_url:
+        type: string
+      gitlab_path:
+        type: string
+      gitlab_project_id:
+        type: integer
+      id:
+        type: integer
     type: object
   models.GlpiDropdownCatalogue:
     properties:
@@ -8464,6 +8582,14 @@ paths:
       - description: Filter by HTTPS
         in: query
         name: has_https
+        type: string
+      - description: Linked to a host (yes, no)
+        in: query
+        name: has_hosts
+        type: string
+      - description: Linked to a service (yes, no)
+        in: query
+        name: has_services
         type: string
       - description: Filter by certificate state
         in: query
@@ -14385,6 +14511,117 @@ paths:
       summary: Upload the app logo
       tags:
       - settings
+  /api/settings/gitlab/repo-links:
+    post:
+      consumes:
+      - application/json
+      description: Admin. The repo is resolved by path with the service token, so
+        it must be readable by it. Projetos and services are attached through their
+        own endpoints.
+      parameters:
+      - description: Entity and repo path
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.gitlabRepoLinkRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.GitLabRepoLink'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Link a GitLab repo to a DNS record or host
+      tags:
+      - gitlab
+  /api/settings/gitlab/repo-links/{id}:
+    delete:
+      description: Admin.
+      parameters:
+      - description: Link ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Remove a DNS/host GitLab repo link
+      tags:
+      - gitlab
+  /api/settings/gitlab/repos:
+    get:
+      description: Admin. Groups and repos visible to the GitLab service token, with
+        their Bridge attachments (projeto links, service repo fields, DNS/host links).
+        unlisted holds repos attached in Bridge that the token does not list. 400
+        when the integration is disabled or has no token.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.gitlabInventory'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: GitLab repo inventory
+      tags:
+      - gitlab
   /api/settings/integrations:
     get:
       description: 'Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis,

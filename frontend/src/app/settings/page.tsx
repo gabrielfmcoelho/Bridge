@@ -7,6 +7,7 @@ import PageShell from "@/components/layout/PageShell";
 import PageHeader from "@/components/ui/PageHeader";
 import { type SectionNavGroup } from "@/components/ui/SectionNav";
 import IntegrationsTab from "./IntegrationsTab";
+import GitLabReposTab from "./integrations/GitLabReposTab";
 import PermissionsTab from "./PermissionsTab";
 import RoleMappingsTab from "./RoleMappingsTab";
 import EntidadesTab from "./EntidadesTab";
@@ -18,7 +19,7 @@ import ImportTab from "./ImportTab";
 import BackupTab from "./BackupTab";
 import ApiTokensPanel from "@/components/tokens/ApiTokensPanel";
 
-type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "import" | "backup" | "integrations" | "permissions" | "role-mappings" | "api-tokens";
+type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "import" | "backup" | "integrations" | "gitlab-repos" | "permissions" | "role-mappings" | "api-tokens";
 
 export default function SettingsPage() {
   const { t } = useLocale();
@@ -47,7 +48,10 @@ export default function SettingsPage() {
       { key: "api-tokens", label: t("settings.apiTokens.tabLabel") },
     ] },
     { title: t("settings.groups.catalog"), items: canManageCatalog ? [{ key: "offerings", label: t("settings.offerings.title") }] : [] },
-    { title: t("settings.groups.integrations"), items: isAdmin ? [{ key: "integrations", label: t("settings.integrationsTabLabel") }] : [] },
+    { title: t("settings.groups.integrations"), items: isAdmin ? [
+      { key: "integrations", label: t("settings.integrationsTabLabel") },
+      { key: "gitlab-repos", label: t("settings.gitlabRepos.tabLabel") },
+    ] : [] },
     { title: t("settings.groups.data"), items: isAdmin ? [
       { key: "import", label: t("settings.import") },
       { key: "backup", label: t("settings.backup") },
@@ -77,6 +81,7 @@ export default function SettingsPage() {
         {activeTab === "import" && isAdmin && <ImportTab />}
         {activeTab === "backup" && isAdmin && <BackupTab />}
         {activeTab === "integrations" && isAdmin && <IntegrationsTab />}
+        {activeTab === "gitlab-repos" && isAdmin && <GitLabReposTab />}
         {activeTab === "permissions" && isAdmin && <PermissionsTab />}
         {activeTab === "role-mappings" && isAdmin && <RoleMappingsTab />}
         {activeTab === "api-tokens" && <ApiTokensPanel />}

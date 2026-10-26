@@ -11,7 +11,7 @@ type CertOf = (d: DNSRecord) => CertState;
 export type DnsInsight = Insight<DNSFilters>;
 export type BreakdownRow = BreakdownRowOf<DNSFilters>;
 
-export const DEFAULT_DNS_INSIGHTS = ["total", "certExpiring", "certError", "noHttps", "orphan"];
+export const DEFAULT_DNS_INSIGHTS = ["total", "certExpiring", "certError", "noHttps", "noHost", "noService", "orphan"];
 
 /** Linked to nothing: no host, no service, no project. */
 export const isOrphan = (d: DNSRecord) => !d.host_ids?.length && !d.services_count && !d.projects_count;
@@ -42,6 +42,8 @@ export function dnsInsights(records: DNSRecord[], t: T, certOf: CertOf): DnsInsi
     { key: "certError", label: t("dns.kpi.certError"), icon: "alert", color: "danger", value: n((d) => !!d.cert_error), hint: t("dns.kpi.certErrorHint"), filter: { cert: "error" } },
     { key: "unscanned", label: t("dns.certUnscanned"), icon: "scan", color: "info", value: n((d) => certOf(d) === "unscanned"), filter: { cert: "unscanned" } },
     { key: "noHttps", label: t("dns.kpi.noHttps"), icon: "lock", color: "warning", value: records.length - https, hint: pct(records.length - https), filter: { has_https: "no" } },
+    { key: "noHost", label: t("dns.kpi.noHost"), icon: "server", color: "warning", value: n((d) => !d.host_ids?.length), hint: t("dns.kpi.noHostHint"), filter: { has_hosts: "no" } },
+    { key: "noService", label: t("dns.kpi.noService"), icon: "container", color: "warning", value: n((d) => !d.services_count), hint: t("dns.kpi.noServiceHint"), filter: { has_services: "no" } },
     { key: "orphan", label: t("dns.kpi.orphan"), icon: "link", color: "warning", value: n(isOrphan), hint: t("dns.kpi.orphanHint") },
   ];
 

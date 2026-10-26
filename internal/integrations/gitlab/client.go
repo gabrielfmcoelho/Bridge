@@ -151,6 +151,42 @@ func (c *Client) ListGroupProjects(groupID int, includeSubgroups bool) ([]Projec
 	return all, nil
 }
 
+// maxListPages bounds ListGroups / ListProjects: 2000 entries each.
+const maxListPages = 20
+
+// listAll walks a paged list endpoint 100 at a time. truncated reports that
+// the cap stopped it before the last page.
+func listAll[T any](c *Client, path string, q url.Values) (all []T, truncated bool, err error) {
+	q.Set("per_page", "100")
+	for page := 1; page <= maxListPages; page++ {
+		q.Set("page", strconv.Itoa(page))
+		body, err := c.get(path, q)
+		if err != nil {
+			return nil, false, err
+		}
+		var batch []T
+		if err := json.Unmarshal(body, &batch); err != nil {
+			return nil, false, err
+		}
+		all = append(all, batch...)
+		if len(batch) < 100 {
+			return all, false, nil
+		}
+	}
+	return all, true, nil
+}
+
+// ListGroups returns every group and subgroup the token can see as a member
+// (guest or above), with parent_id to rebuild the tree.
+func (c *Client) ListGroups() ([]Group, bool, error) {
+	return listAll[Group](c, "/groups", url.Values{"min_access_level": {"10"}, "order_by": {"path"}})
+}
+
+// ListProjects returns every non-archived project the token is a member of.
+func (c *Client) ListProjects() ([]Project, bool, error) {
+	return listAll[Project](c, "/projects", url.Values{"membership": {"true"}, "simple": {"true"}, "archived": {"false"}, "order_by": {"path"}, "sort": {"asc"}})
+}
+
 // ListCommits returns recent commits for a project.
 // Pass params.All=true to include commits from every branch (default is the repo's default branch only).
 func (c *Client) ListCommits(projectID int, params CommitListParams) ([]Commit, error) {

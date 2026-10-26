@@ -19,6 +19,10 @@ type Project struct {
 	WebURL            string `json:"web_url"`
 	Description       string `json:"description"`
 	DefaultBranch     string `json:"default_branch"`
+	Namespace         struct {
+		ID       int    `json:"id"`
+		FullPath string `json:"full_path"`
+	} `json:"namespace"`
 }
 
 // Group represents a GitLab group.
@@ -27,6 +31,7 @@ type Group struct {
 	Name     string `json:"name"`
 	FullPath string `json:"full_path"`
 	WebURL   string `json:"web_url"`
+	ParentID *int   `json:"parent_id"`
 }
 
 // Commit represents a GitLab commit.

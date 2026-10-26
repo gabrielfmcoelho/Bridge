@@ -1387,3 +1387,43 @@ export interface VulnFixPlan {
   generated_by: number | null;
   generated_at: string;
 }
+
+/** One Bridge entity a GitLab repo or group is attached to. link_id is the
+ *  link row (projeto, dns, host); services hold the repo in `field`. */
+export interface GitLabRepoRef {
+  link_id?: number;
+  id: number;
+  name: string;
+  field?: "repository_url" | "gitlab_url" | "git_repository";
+}
+
+export interface GitLabInventoryGroup {
+  id: number;
+  name: string;
+  full_path: string;
+  parent_id: number | null;
+  web_url: string;
+  projetos: GitLabRepoRef[];
+}
+
+export interface GitLabInventoryRepo {
+  /** 0 for a repo attached in Bridge that the token does not list. */
+  id: number;
+  name: string;
+  path_with_namespace: string;
+  namespace_id: number;
+  web_url: string;
+  default_branch: string;
+  projetos: GitLabRepoRef[];
+  services: GitLabRepoRef[];
+  dns: GitLabRepoRef[];
+  hosts: GitLabRepoRef[];
+}
+
+export interface GitLabInventory {
+  base_url: string;
+  groups: GitLabInventoryGroup[];
+  repos: GitLabInventoryRepo[];
+  unlisted: GitLabInventoryRepo[];
+  truncated: boolean;
+}

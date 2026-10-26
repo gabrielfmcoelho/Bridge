@@ -74,3 +74,53 @@ func TestSearchBlobsAndErrors(t *testing.T) {
 		t.Fatalf("err = %v, want the 403 surfaced", err)
 	}
 }
+
+func TestListProjectsPaginatesAndTruncates(t *testing.T) {
+	page := func(n, from int) string {
+		items := make([]string, n)
+		for i := range items {
+			items[i] = fmt.Sprintf(`{"id":%d,"path_with_namespace":"g/r%d","namespace":{"id":3,"full_path":"g"}}`, from+i, from+i)
+		}
+		return "[" + strings.Join(items, ",") + "]"
+	}
+	var calls int
+	c := fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v4/projects" || r.URL.Query().Get("membership") != "true" {
+			t.Errorf("unexpected request %s", r.URL)
+		}
+		calls++
+		n := 100
+		if r.URL.Query().Get("page") == "2" {
+			n = 1
+		}
+		_, _ = w.Write([]byte(page(n, calls*100)))
+	})
+	all, truncated, err := c.ListProjects()
+	if err != nil || len(all) != 101 || truncated || all[0].Namespace.ID != 3 || all[0].Namespace.FullPath != "g" {
+		t.Fatalf("got %d projects truncated=%v err=%v first=%+v", len(all), truncated, err, all[0])
+	}
+
+	// Always a full page: stops at the cap and says so.
+	calls = 0
+	c = fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(page(100, calls*100)))
+	})
+	all, truncated, err = c.ListProjects()
+	if err != nil || !truncated || calls != maxListPages || len(all) != 100*maxListPages {
+		t.Fatalf("calls=%d len=%d truncated=%v err=%v, want the cap", calls, len(all), truncated, err)
+	}
+}
+
+func TestListGroupsParent(t *testing.T) {
+	c := fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v4/groups" || r.URL.Query().Get("min_access_level") != "10" {
+			t.Errorf("unexpected request %s", r.URL)
+		}
+		_, _ = w.Write([]byte(`[{"id":1,"full_path":"seadpi","parent_id":null},{"id":2,"full_path":"seadpi/dl","parent_id":1}]`))
+	})
+	gs, truncated, err := c.ListGroups()
+	if err != nil || truncated || len(gs) != 2 || gs[0].ParentID != nil || gs[1].ParentID == nil || *gs[1].ParentID != 1 {
+		t.Fatalf("got %+v truncated=%v err=%v", gs, truncated, err)
+	}
+}

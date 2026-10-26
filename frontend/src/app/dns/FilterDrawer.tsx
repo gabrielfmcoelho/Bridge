@@ -15,10 +15,12 @@ export type DNSFilters = {
   tag: string;
   responsavel: string;
   has_https: string;
+  has_hosts: string;
+  has_services: string;
   cert: string;
 };
 
-export const emptyFilters: DNSFilters = { situacao: "", tag: "", responsavel: "", has_https: "", cert: "" };
+export const emptyFilters: DNSFilters = { situacao: "", tag: "", responsavel: "", has_https: "", has_hosts: "", has_services: "", cert: "" };
 
 interface SortConfig { field: string; direction: "asc" | "desc" }
 
@@ -91,6 +93,16 @@ export default function DnsFilterDrawer({
           <PillButton active={filters.has_https === "no"} onClick={() => set("has_https", filters.has_https === "no" ? "" : "no")}>{t("common.no")}</PillButton>
         </div>
       </DrawerSection>
+
+      {([["has_hosts", "dns.filterHasHosts"], ["has_services", "dns.filterHasServices"]] as const).map(([key, label]) => (
+        <DrawerSection key={key} title={t(label)} open={openSection === key} onToggle={() => toggle(key)} active={!!filters[key]}>
+          <div className="flex flex-wrap gap-1.5">
+            <PillButton active={!filters[key]} onClick={() => set(key, "")}>{t("common.all")}</PillButton>
+            <PillButton active={filters[key] === "yes"} onClick={() => set(key, filters[key] === "yes" ? "" : "yes")}>{t("common.yes")}</PillButton>
+            <PillButton active={filters[key] === "no"} onClick={() => set(key, filters[key] === "no" ? "" : "no")}>{t("common.no")}</PillButton>
+          </div>
+        </DrawerSection>
+      ))}
 
       <DrawerSection title={t("dns.certificate")} open={openSection === "cert"} onToggle={() => toggle("cert")} active={!!filters.cert}>
         <div className="flex flex-wrap gap-1.5">

@@ -499,4 +499,7 @@ func (h *projectGitLabHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("editor", "POST /api/projects/{id}/gitlab/links", h.handleCreateLink)
 	rr.role("editor", "DELETE /api/projects/{id}/gitlab/links/{linkId}", h.handleDeleteLink)
 	rr.auth("GET /api/projects/{id}/gitlab/commits", h.handleListCommits)
+	rr.role("admin", "GET /api/settings/gitlab/repos", h.handleRepoInventory)
+	rr.role("admin", "POST /api/settings/gitlab/repo-links", h.handleCreateRepoLink)
+	rr.role("admin", "DELETE /api/settings/gitlab/repo-links/{id}", h.handleDeleteRepoLink)
 }

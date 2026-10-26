@@ -158,6 +158,9 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/projects/1/gitlab/links"},
 		{"POST", "/api/projects/1/gitlab/links"},
 		{"DELETE", "/api/projects/1/gitlab/links/1"},
+		{"GET", "/api/settings/gitlab/repos"},
+		{"POST", "/api/settings/gitlab/repo-links"},
+		{"DELETE", "/api/settings/gitlab/repo-links/1"},
 		{"GET", "/api/projects/1/gitlab/commits"},
 
 		// Grafana integration
