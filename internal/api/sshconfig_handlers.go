@@ -348,6 +348,14 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		if depErr := service.RecordDependencies(r.Context(), h.db.SQL, host.ID, *vmInfo); depErr != nil {
 			result["dependencies_error"] = depErr.Error()
 		}
+		// Web-server site names → DNS records linked to this host and to the
+		// services serving them (created when new and resolvable). After
+		// reconcile, so the services exist. Never fails the scan.
+		if webDNS, webErr := service.RecordWebDNS(r.Context(), h.db.SQL, host, *vmInfo, service.LookupHost); webErr != nil {
+			result["web_dns_error"] = webErr.Error()
+		} else {
+			result["web_dns"] = webDNS
+		}
 	} else {
 		testErr := sshtest.Test(client)
 		if testErr != nil {

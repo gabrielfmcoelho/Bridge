@@ -7,7 +7,7 @@ import { useFlag } from "@/contexts/FlagContext";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import StatusAlert from "@/components/ui/StatusAlert";
-import { sshAPI, type VMInfoType } from "@/lib/api";
+import { sshAPI, type VMInfoType, type WebDNSSummary } from "@/lib/api";
 import { getTimeAgo, resolveAuthMethod } from "@/lib/utils";
 import type { Host } from "@/lib/types";
 import VMInfoDisplay, { SCAN_GROUPS, type ScanGroup } from "./VMInfoDisplay";
@@ -16,12 +16,14 @@ const ANCHOR = "scan-";
 
 /**
  * Right column of the host overview: what the last scan observed. Header
- * (when, and "Executar scan" for editors), a sticky jump bar over the eight
+ * (when, and "Executar scan" for editors), a sticky jump bar over the
  * groups, then the groups in one continuous scroll.
  */
-export default function ScanPane({ slug, host, lastScan, canEdit }: {
+export default function ScanPane({ slug, host, lastScan, canEdit, dnsRecords }: {
   slug: string;
   host: Host;
+  /** DNS records linked to the host (web-server names show their link). */
+  dnsRecords?: { id: number; domain: string }[];
   lastScan: { data: string; scanned_at: string } | null | undefined;
   canEdit: boolean;
 }) {
@@ -36,7 +38,7 @@ export default function ScanPane({ slug, host, lastScan, canEdit }: {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["host", slug] });
       flag(res.success
-        ? { appearance: "success", title: t("scan.pane.done") }
+        ? { appearance: "success", title: t("scan.pane.done"), description: webDNSLine(res.web_dns, t) }
         : { appearance: "error", title: t("scan.pane.failed"), description: res.error });
     },
     onError: (err: Error) => flag({ appearance: "error", title: t("scan.pane.failed"), description: err.message }),
@@ -85,7 +87,7 @@ export default function ScanPane({ slug, host, lastScan, canEdit }: {
       ) : (
         <>
           <JumpBar t={t} />
-          <VMInfoDisplay info={parsed.info} locale={locale} anchorPrefix={ANCHOR} />
+          <VMInfoDisplay info={parsed.info} locale={locale} anchorPrefix={ANCHOR} dnsRecords={dnsRecords} />
         </>
       )}
     </section>
@@ -150,4 +152,10 @@ function JumpBar({ t }: { t: (k: string) => string }) {
       </div>
     </nav>
   );
+}
+
+/** "DNS: 2 created, 3 linked, 1 not resolving" after a scan, or nothing. */
+function webDNSLine(d: WebDNSSummary | undefined, t: (k: string, v?: Record<string, string>) => string): string | undefined {
+  if (!d || d.created + d.linked + d.unresolved === 0) return undefined;
+  return t("scan.web.dnsResult", { created: String(d.created), linked: String(d.linked), unresolved: String(d.unresolved) });
 }
