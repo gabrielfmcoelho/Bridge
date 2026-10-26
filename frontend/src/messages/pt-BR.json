@@ -2681,7 +2681,8 @@
         "containers": "Containers",
         "services": "Serviços",
         "packages": "Pacotes e agendamentos",
-        "security": "Segurança"
+        "security": "Segurança",
+        "webservers": "Servidores web"
       },
       "empty": {
         "resources": "Sem dados de uso neste scan.",
@@ -2691,8 +2692,25 @@
         "containers": "Nenhum container encontrado no último scan.",
         "services": "Nenhum serviço ou agente encontrado no último scan.",
         "packages": "Nenhum pacote ou agendamento encontrado no último scan.",
-        "security": "Sem dados de firewall ou política SSH neste scan."
+        "security": "Sem dados de firewall ou política SSH neste scan.",
+        "webservers": "Nenhum nginx, Apache ou PHP-FPM encontrado."
       }
+    },
+    "web": {
+      "summary": "Sites que cada servidor atende. Nomes em verde estão vinculados a um DNS do Bridge: o scan vincula os registros existentes e cria os novos que resolvem no DNS.",
+      "onHost": "no host",
+      "inContainer": "no container {name}",
+      "stopped": "parado",
+      "noName": "sem nome",
+      "linked": "Registro DNS no Bridge — abrir",
+      "unlinked": "Não vinculado: não resolve no DNS, o registro está na lixeira ou o servidor está parado",
+      "ignored": "Não é um nome DNS (servidor padrão, localhost, IP, curinga ou regex)",
+      "proxy": "Encaminha para",
+      "root": "Raiz dos arquivos",
+      "source": "Arquivo",
+      "usedBy": "Usado por",
+      "undeclared": "DNS vinculados a este host que nenhum servidor web declara",
+      "dnsResult": "DNS: {created} criados, {linked} vinculados, {unresolved} sem resolução"
     }
   },
   "sshKey": {

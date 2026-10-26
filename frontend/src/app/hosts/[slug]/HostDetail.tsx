@@ -197,7 +197,7 @@ export default function HostDetail({ slug }: { slug: string }) {
                 />
               }
             >
-              <ScanPane slug={slug} host={data.host} lastScan={data.last_scan} canEdit={canEdit} />
+              <ScanPane slug={slug} host={data.host} lastScan={data.last_scan} canEdit={canEdit} dnsRecords={data.dns_records ?? []} />
             </DetailSplit>
           )}
 

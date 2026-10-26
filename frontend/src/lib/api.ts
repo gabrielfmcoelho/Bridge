@@ -162,6 +162,38 @@ export type VMInfoType = {
   port_owners?: PortOwner[];
   parsed_containers?: ParsedContainer[];
   ssh_auth_policy?: SSHAuthPolicy;
+  web_servers?: WebServer[];
+};
+
+/** nginx / Apache / php-fpm found by the scan, on the host or in a container. */
+export type WebServer = {
+  kind: "nginx" | "apache" | "php-fpm";
+  container?: string;
+  container_id?: string;
+  container_image?: string;
+  sites?: WebSite[];
+  pools?: FPMPool[];
+  /** Host server whose systemd unit isn't running: its names create no DNS. */
+  stopped?: boolean;
+  error?: string;
+};
+
+export type WebSite = {
+  names?: string[];
+  listen?: number[];
+  tls?: boolean;
+  root?: string;
+  proxy?: string[];
+  fastcgi?: string[];
+  /** Apache: config file:line. */
+  source?: string;
+};
+
+export type FPMPool = { name: string; listen?: string };
+
+/** What the scan's web-server step did to DNS records (POST /api/ssh/test). */
+export type WebDNSSummary = {
+  names: number; created: number; linked: number; service_links: number; unresolved: number; trashed: number;
 };
 
 export type SSHAuthPolicy = {
@@ -676,7 +708,7 @@ export const sshAPI = {
   // to fetch, and the worker catches an AbortError instead of waiting for
   // the SSH op to time out at the default 120s.
   testConnection: (slug: string, method: "password" | "key", capture = false, signal?: AbortSignal) =>
-    request<{ success: boolean; error?: string; vm_info?: VMInfoType }>(
+    request<{ success: boolean; error?: string; vm_info?: VMInfoType; web_dns?: WebDNSSummary }>(
       `/api/ssh/test/${slug}`,
       {
         method: "POST",

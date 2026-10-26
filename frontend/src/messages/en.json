@@ -2681,7 +2681,8 @@
         "containers": "Containers",
         "services": "Services",
         "packages": "Packages and schedules",
-        "security": "Security"
+        "security": "Security",
+        "webservers": "Web servers"
       },
       "empty": {
         "resources": "No usage data in this scan.",
@@ -2691,8 +2692,25 @@
         "containers": "No containers found in the last scan.",
         "services": "No services or agents found in the last scan.",
         "packages": "No packages or schedules found in the last scan.",
-        "security": "No firewall or SSH policy data in this scan."
+        "security": "No firewall or SSH policy data in this scan.",
+        "webservers": "No nginx, Apache or PHP-FPM found."
       }
+    },
+    "web": {
+      "summary": "Sites each server answers for. Green names are linked to a DNS record in Bridge: the scan links records that exist and creates new ones that resolve in DNS.",
+      "onHost": "on the host",
+      "inContainer": "container {name}",
+      "stopped": "stopped",
+      "noName": "no name",
+      "linked": "DNS record in Bridge — open",
+      "unlinked": "Not linked: it does not resolve in DNS, its record is in the trash, or the server is stopped",
+      "ignored": "Not a DNS name (default server, localhost, IP, wildcard or regex)",
+      "proxy": "Proxies to",
+      "root": "Document root",
+      "source": "File",
+      "usedBy": "Used by",
+      "undeclared": "DNS records linked to this host that no web server declares",
+      "dnsResult": "DNS: {created} created, {linked} linked, {unresolved} not resolving"
     }
   },
   "sshKey": {

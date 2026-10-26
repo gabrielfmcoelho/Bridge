@@ -119,6 +119,9 @@ type VMInfo struct {
 	FirewallStatus    string             `json:"firewall_status,omitempty"`
 	RemoteUsers       []RemoteUserInfo   `json:"remote_users,omitempty"`
 	PortOwners        []PortOwner        `json:"port_owners,omitempty"`
+	// WebServers: nginx / Apache / php-fpm on the host and in running
+	// containers, with their sites (webservers.go).
+	WebServers []WebServer `json:"web_servers,omitempty"`
 	// Dependencies is the host's and each container's OS, runtimes and
 	// packages (deps.go). Kept out of the stored scan JSON: the scan handler
 	// writes it to dependency_inventory; container package lists would
@@ -1664,6 +1667,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		cronInfo       *CronInfo
 		sshPolicy      *SSHAuthPolicy
 		nginxConfig    string
+		webServers     []WebServer
 		hostInv        *hostInventory
 		dockerPsRaw    string
 		dockerStatsRaw string
@@ -1693,8 +1697,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	go func() {
 		defer wg.Done()
 		s := time.Now()
-		nginxConfig = runCmd(client, `nginx -T 2>/dev/null || sudo -n nginx -T 2>/dev/null || true`)
-		timeSession("[par] session 8 nginx-T", s)
+		// nginx -T, apachectl -S and php-fpm pools on the host and in every
+		// running container — one session (webservers.go).
+		webServers, nginxConfig = collectWebServers(client, sudoPassword)
+		timeSession("[par] session 8 web-servers", s)
 	}()
 	go func() {
 		defer wg.Done()
@@ -1998,6 +2004,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		}
 	}
 
+	// Web servers: a host one whose systemd unit isn't running is "stopped".
+	markStoppedHostServers(webServers, info.SystemdServices)
+	info.WebServers = webServers
+
 	// Build a map of docker host port → container for fast lookup.
 	dockerHostPorts := dockerHostPortMap(info.ParsedContainers)
 
@@ -2219,106 +2229,6 @@ func parsePortRange(s string) (int, int) {
 		return 0, 0
 	}
 	return p, p
-}
-
-// parseNginxListens walks the output of `nginx -T` and returns a map of
-// port → list of server_names answering on that port. Only top-level
-// `server { … }` blocks are considered (nginx forbids nesting); the parser
-// tracks brace depth so directives inside `location { … }` are ignored.
-//
-// If a server block has no `server_name` directive, it's recorded as "_"
-// (nginx's default-server marker) so the UI still shows something.
-func parseNginxListens(cfg string) map[int][]string {
-	out := map[int][]string{}
-	if strings.TrimSpace(cfg) == "" {
-		return out
-	}
-
-	var inServer bool
-	var serverBraceDepth int
-	var depth int
-	var listens []int
-	var names []string
-
-	flush := func() {
-		for _, p := range listens {
-			if len(names) == 0 {
-				out[p] = append(out[p], "_")
-			} else {
-				out[p] = append(out[p], names...)
-			}
-		}
-		listens = listens[:0]
-		names = names[:0]
-		inServer = false
-	}
-
-	for _, raw := range strings.Split(cfg, "\n") {
-		line := strings.TrimSpace(raw)
-		if strings.HasPrefix(line, "#") || line == "" {
-			continue
-		}
-
-		// Detect the start of a server block before we update depth, so
-		// we capture it correctly regardless of surrounding http / stream
-		// blocks that also carry their own braces.
-		if !inServer && strings.HasPrefix(line, "server") {
-			bodyStart := strings.IndexByte(line, '{')
-			if bodyStart >= 0 {
-				// `server` or `server {` — ignore lines like `server 1.2.3.4;`
-				// inside an upstream block by checking what's before the {.
-				prefix := strings.TrimSpace(line[:bodyStart])
-				if prefix == "server" {
-					inServer = true
-					serverBraceDepth = depth
-					// fall through to count braces in this line
-				}
-			}
-		}
-
-		// Update depth from braces in the line.
-		for _, c := range line {
-			switch c {
-			case '{':
-				depth++
-			case '}':
-				depth--
-				if inServer && depth == serverBraceDepth {
-					flush()
-				}
-			}
-		}
-
-		if !inServer || depth != serverBraceDepth+1 {
-			continue
-		}
-
-		// We're at the immediate top-level of a server { … } block.
-		switch {
-		case strings.HasPrefix(line, "listen ") || strings.HasPrefix(line, "listen\t"):
-			rest := strings.TrimSuffix(strings.TrimSpace(strings.TrimPrefix(line, "listen")), ";")
-			f := strings.Fields(rest)
-			if len(f) == 0 {
-				continue
-			}
-			spec := f[0]
-			if idx := strings.LastIndex(spec, ":"); idx >= 0 {
-				spec = spec[idx+1:]
-			}
-			if p, err := strconv.Atoi(spec); err == nil && p > 0 {
-				listens = append(listens, p)
-			}
-		case strings.HasPrefix(line, "server_name ") || strings.HasPrefix(line, "server_name\t"):
-			rest := strings.TrimSuffix(strings.TrimSpace(strings.TrimPrefix(line, "server_name")), ";")
-			for _, n := range strings.Fields(rest) {
-				if n != "" && n != "_" {
-					names = append(names, n)
-				}
-			}
-		}
-	}
-
-	return out
 }
 
 // shellEscape wraps an identifier in single quotes for safe inclusion in a
