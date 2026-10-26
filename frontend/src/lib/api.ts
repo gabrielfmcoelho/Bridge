@@ -1414,6 +1414,15 @@ export const projectGitlabAPI = {
     api.get<ProjectGitLabCommitsResponse>(`/api/projects/${projectId}/gitlab/commits`),
 };
 
+// GitLab repo inventory (admin): what the service token sees and where each
+// repo is attached. Projetos and services attach through their own endpoints.
+export const gitlabReposAPI = {
+  list: () => api.get<import("./types").GitLabInventory>("/api/settings/gitlab/repos"),
+  link: (data: { entity_type: "dns" | "host"; entity_id: number; path: string }) =>
+    api.post<{ id: number }>("/api/settings/gitlab/repo-links", data),
+  unlink: (id: number) => api.delete(`/api/settings/gitlab/repo-links/${id}`),
+};
+
 // Permissions management (admin)
 export const permissionsAPI = {
   get: () =>

@@ -1032,7 +1032,11 @@
       "certErrorHint": "Certificado não confiável ou inacessível",
       "noHttps": "Sem HTTPS",
       "orphan": "Sem vínculo",
-      "orphanHint": "Nenhum host, serviço ou projeto"
+      "orphanHint": "Nenhum host, serviço ou projeto",
+      "noHost": "Sem host",
+      "noHostHint": "Sem nenhum host vinculado",
+      "noService": "Sem serviço",
+      "noServiceHint": "Sem nenhum serviço vinculado"
     },
     "certBucket": {
       "expired": "Vencido",
@@ -1068,7 +1072,9 @@
       "no_content": "Online sem conteúdo",
       "error": "Online com erro",
       "offline": "Offline"
-    }
+    },
+    "filterHasHosts": "Host vinculado",
+    "filterHasServices": "Serviço vinculado"
   },
   "project": {
     "title": "Projetos",
@@ -2110,7 +2116,46 @@
       "usageNone": "Nenhuma requisição nos últimos 30 dias."
     },
     "serviceAccount": "Conta de serviço",
-    "serviceAccountHint": "Para uma integração: sem senha, nunca entra no sistema. Um administrador emite os tokens de API dela em Tokens de API."
+    "serviceAccountHint": "Para uma integração: sem senha, nunca entra no sistema. Um administrador emite os tokens de API dela em Tokens de API.",
+    "gitlabRepos": {
+      "tabLabel": "Repositórios GitLab",
+      "title": "Repositórios GitLab",
+      "intro": "Todos os grupos, subgrupos e repositórios que o token de serviço do GitLab enxerga, e onde cada repositório está vinculado no Bridge. Os planos de correção de vulnerabilidades leem o código dos repositórios vinculados aos projetos, serviços, DNS e hosts do achado.",
+      "notConfigured": "Ative o gerenciamento de código do GitLab e salve um token de serviço em Integrações → GitLab para listar os repositórios.",
+      "search": "Buscar repositórios ou vínculos",
+      "filter": {
+        "all": "Todos",
+        "linked": "Vinculados",
+        "unlinked": "Sem vínculo",
+        "projetos": "Com projeto",
+        "services": "Com serviço",
+        "dns": "Com DNS",
+        "hosts": "Com host"
+      },
+      "kind": {
+        "projetos": "Projeto",
+        "services": "Serviço",
+        "dns": "DNS",
+        "hosts": "Host"
+      },
+      "repoCount": "{n} repositórios",
+      "noLinks": "Sem vínculo",
+      "attach": "Vincular",
+      "attachTitle": "Vincular {repo}",
+      "pick": "Buscar…",
+      "attached": "{repo} vinculado a {name}",
+      "attachFailed": "Não foi possível vincular o repositório",
+      "detach": "Desvincular",
+      "detachConfirm": "Desvincular {repo} de {name}?",
+      "detachFailed": "Não foi possível desvincular o repositório",
+      "replaceConfirm": "{name} já aponta para {current}. Substituir?",
+      "replace": "Substituir",
+      "truncated": "O GitLab retornou mais de 2000 grupos ou repositórios; a lista foi cortada aí.",
+      "empty": "O token não enxerga nenhum repositório.",
+      "emptyFiltered": "Nenhum repositório corresponde a esses filtros.",
+      "unlistedTitle": "Vinculados, mas invisíveis ao token",
+      "unlistedHint": "Repositórios vinculados no Bridge que o token não lista: movidos, renomeados ou fora do seu alcance. Os planos de correção não conseguem lê-los."
+    }
   },
   "operation": {
     "builtIn": "Integradas",

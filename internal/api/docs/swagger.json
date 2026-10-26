@@ -3997,6 +3997,18 @@
                     },
                     {
                         "type": "string",
+                        "description": "Linked to a host (yes, no)",
+                        "name": "has_hosts",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Linked to a service (yes, no)",
+                        "name": "has_services",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter by certificate state",
                         "name": "cert",
                         "in": "query"
@@ -12677,6 +12689,167 @@
                 }
             }
         },
+        "/api/settings/gitlab/repo-links": {
+            "post": {
+                "description": "Admin. The repo is resolved by path with the service token, so it must be readable by it. Projetos and services are attached through their own endpoints.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gitlab"
+                ],
+                "summary": "Link a GitLab repo to a DNS record or host",
+                "parameters": [
+                    {
+                        "description": "Entity and repo path",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.gitlabRepoLinkRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.GitLabRepoLink"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/settings/gitlab/repo-links/{id}": {
+            "delete": {
+                "description": "Admin.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gitlab"
+                ],
+                "summary": "Remove a DNS/host GitLab repo link",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Link ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/settings/gitlab/repos": {
+            "get": {
+                "description": "Admin. Groups and repos visible to the GitLab service token, with their Bridge attachments (projeto links, service repo fields, DNS/host links). unlisted holds repos attached in Bridge that the token does not list. 400 when the integration is disabled or has no token.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gitlab"
+                ],
+                "summary": "GitLab repo inventory",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.gitlabInventory"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/settings/integrations": {
             "get": {
                 "description": "Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, smtp, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
@@ -19553,11 +19726,152 @@
                 }
             }
         },
+        "api.gitlabInventory": {
+            "type": "object",
+            "properties": {
+                "base_url": {
+                    "type": "string"
+                },
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabInventoryGroup"
+                    }
+                },
+                "repos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabInventoryRepo"
+                    }
+                },
+                "truncated": {
+                    "type": "boolean"
+                },
+                "unlisted": {
+                    "description": "Unlisted are repos attached in Bridge that the token does not list:\nmoved, renamed, or out of the token's reach (GitLab answers 404).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabInventoryRepo"
+                    }
+                }
+            }
+        },
+        "api.gitlabInventoryGroup": {
+            "type": "object",
+            "properties": {
+                "full_path": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "projetos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "web_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.gitlabInventoryRepo": {
+            "type": "object",
+            "properties": {
+                "default_branch": {
+                    "type": "string"
+                },
+                "dns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "hosts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "id": {
+                    "description": "ID is 0 for a repo attached in Bridge that the token does not list.",
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace_id": {
+                    "type": "integer"
+                },
+                "path_with_namespace": {
+                    "type": "string"
+                },
+                "projetos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "services": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "web_url": {
+                    "type": "string"
+                }
+            }
+        },
         "api.gitlabLinkProjectRequest": {
             "type": "object",
             "properties": {
                 "gitlab_path": {
                     "description": "e.g., \"org/repo\"",
+                    "type": "string"
+                }
+            }
+        },
+        "api.gitlabRepoLinkRequest": {
+            "type": "object",
+            "properties": {
+                "entity_id": {
+                    "type": "integer"
+                },
+                "entity_type": {
+                    "type": "string",
+                    "enum": [
+                        "dns",
+                        "host"
+                    ]
+                },
+                "path": {
+                    "description": "Path is the repo's path with namespace, e.g. \"seadpi/sgi\".",
+                    "type": "string"
+                }
+            }
+        },
+        "api.gitlabRepoRef": {
+            "type": "object",
+            "properties": {
+                "field": {
+                    "description": "Field is where a service holds the repo: repository_url (editable) or\ngitlab_url / git_repository (legacy / written by the Coolify sync).",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "link_id": {
+                    "type": "integer"
+                },
+                "name": {
                     "type": "string"
                 }
             }
@@ -23572,6 +23886,35 @@
                 },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "models.GitLabRepoLink": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "entity_id": {
+                    "type": "integer"
+                },
+                "entity_name": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string"
+                },
+                "gitlab_base_url": {
+                    "type": "string"
+                },
+                "gitlab_path": {
+                    "type": "string"
+                },
+                "gitlab_project_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
                 }
             }
         },

@@ -1032,7 +1032,11 @@
       "certErrorHint": "Certificate untrusted or unreachable",
       "noHttps": "No HTTPS",
       "orphan": "Unlinked",
-      "orphanHint": "No host, service or project"
+      "orphanHint": "No host, service or project",
+      "noHost": "No host",
+      "noHostHint": "Not linked to any host",
+      "noService": "No service",
+      "noServiceHint": "Not linked to any service"
     },
     "certBucket": {
       "expired": "Expired",
@@ -1068,7 +1072,9 @@
       "no_content": "Online, no content",
       "error": "Online with errors",
       "offline": "Offline"
-    }
+    },
+    "filterHasHosts": "Linked host",
+    "filterHasServices": "Linked service"
   },
   "project": {
     "title": "Projects",
@@ -2110,7 +2116,46 @@
       "usageNone": "No requests in the last 30 days."
     },
     "serviceAccount": "Service account",
-    "serviceAccountHint": "For an integration: no password, never signs in. An admin issues its API tokens in Tokens de API."
+    "serviceAccountHint": "For an integration: no password, never signs in. An admin issues its API tokens in Tokens de API.",
+    "gitlabRepos": {
+      "tabLabel": "GitLab repositories",
+      "title": "GitLab repositories",
+      "intro": "Every group, subgroup and repository the GitLab service token can see, and where each repository is attached in Bridge. Vulnerability fix plans read the code of the repositories attached to a finding's projetos, services, DNS records and hosts.",
+      "notConfigured": "Turn on GitLab code management and save a service token in Integrations → GitLab to list the repositories.",
+      "search": "Search repositories or attachments",
+      "filter": {
+        "all": "All",
+        "linked": "Attached",
+        "unlinked": "Not attached",
+        "projetos": "With projeto",
+        "services": "With service",
+        "dns": "With DNS",
+        "hosts": "With host"
+      },
+      "kind": {
+        "projetos": "Projeto",
+        "services": "Service",
+        "dns": "DNS",
+        "hosts": "Host"
+      },
+      "repoCount": "{n} repos",
+      "noLinks": "Not attached",
+      "attach": "Attach",
+      "attachTitle": "Attach {repo}",
+      "pick": "Search…",
+      "attached": "{repo} attached to {name}",
+      "attachFailed": "Could not attach the repository",
+      "detach": "Detach",
+      "detachConfirm": "Detach {repo} from {name}?",
+      "detachFailed": "Could not detach the repository",
+      "replaceConfirm": "{name} already points at {current}. Replace it?",
+      "replace": "Replace",
+      "truncated": "GitLab returned more than 2000 groups or repositories; the list is cut there.",
+      "empty": "The token sees no repositories.",
+      "emptyFiltered": "No repository matches these filters.",
+      "unlistedTitle": "Attached but not visible to the token",
+      "unlistedHint": "Repositories attached in Bridge that the token does not list: moved, renamed, or out of its reach. Fix plans cannot read them."
+    }
   },
   "operation": {
     "builtIn": "Built-in",

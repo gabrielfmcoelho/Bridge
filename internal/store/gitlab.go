@@ -130,6 +130,24 @@ func (r *ProjectGitLabLinkRepo) List(ctx context.Context, projectID int64) ([]mo
 	return links, rows.Err()
 }
 
+// ListAll returns every projeto link, for the settings repo inventory.
+func (r *ProjectGitLabLinkRepo) ListAll(ctx context.Context) ([]models.ProjectGitLabLink, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+projectGitLabLinkCols+` FROM project_gitlab_links ORDER BY id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var links []models.ProjectGitLabLink
+	for rows.Next() {
+		var l models.ProjectGitLabLink
+		if err := scanProjectGitLabLink(rows, &l); err != nil {
+			return nil, err
+		}
+		links = append(links, l)
+	}
+	return links, rows.Err()
+}
+
 // DeleteByID removes a link only if it belongs to the given project (prevents
 // cross-project id tampering). Returns whether a row was deleted.
 func (r *ProjectGitLabLinkRepo) DeleteByID(ctx context.Context, linkID, projectID int64) (bool, error) {

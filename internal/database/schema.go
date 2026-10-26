@@ -57,6 +57,7 @@ var TableCopyOrder = []string{
 	"cve_catalog",
 	"vuln_fix_plans",
 	"dependency_inventory", // dependency_advisories is a cache: rebuilt by the next evaluation
+	"gitlab_repo_links",
 	"releases",
 	"release_issues",
 	"host_operation_logs",

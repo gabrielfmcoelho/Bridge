@@ -124,6 +124,39 @@ func TestDNSRepo_ListFiltered(t *testing.T) {
 		t.Fatalf("CountFiltered(has_https=no) = %d, %v; want 2", n, err)
 	}
 
+	// Link filters: alpha.com has a host, beta.com a service.
+	var hostID, svcID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('h', 'h') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
+	if err := d.SQL.QueryRow(`INSERT INTO services (nickname) VALUES ('s') RETURNING id`).Scan(&svcID); err != nil {
+		t.Fatalf("seed service: %v", err)
+	}
+	if _, err := d.SQL.Exec(`INSERT INTO dns_host_links (dns_id, host_id) VALUES (?, ?)`, ids[0], hostID); err != nil {
+		t.Fatalf("seed host link: %v", err)
+	}
+	if _, err := d.SQL.Exec(`INSERT INTO service_dns_links (service_id, dns_id) VALUES (?, ?)`, svcID, ids[1]); err != nil {
+		t.Fatalf("seed service link: %v", err)
+	}
+	for _, c := range []struct {
+		f    models.DNSFilter
+		want string
+	}{
+		{models.DNSFilter{HasHosts: "yes"}, "alpha.com"},
+		{models.DNSFilter{HasHosts: "no"}, "beta.com,delta.org,gamma-alpha.net"},
+		{models.DNSFilter{HasServices: "yes"}, "beta.com"},
+		{models.DNSFilter{HasHosts: "no", HasServices: "no"}, "delta.org,gamma-alpha.net"},
+	} {
+		c.f.SortBy = "domain"
+		got, err := repo.ListFiltered(ctx, c.f)
+		if g := strings.Join(domains(got), ","); err != nil || g != c.want {
+			t.Fatalf("%+v = %s, %v; want %s", c.f, g, err, c.want)
+		}
+		if n, err := repo.CountFiltered(ctx, c.f); err != nil || n != len(got) {
+			t.Fatalf("CountFiltered(%+v) = %d, %v; want %d", c.f, n, err, len(got))
+		}
+	}
+
 	// Sort by domain desc.
 	got, err = repo.ListFiltered(ctx, models.DNSFilter{SortBy: "domain", SortDir: "desc"})
 	if err != nil {

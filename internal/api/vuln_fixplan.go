@@ -252,6 +252,32 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 			break
 		}
 	}
+	// Repos linked straight to the finding's DNS records and hosts.
+	direct := store.NewGitLabRepoLinkRepo(db.SQL)
+	var dnsIDs, hostIDs []int64
+	for _, d := range records {
+		dnsIDs = append(dnsIDs, d.ID)
+	}
+	for _, h := range hosts {
+		hostIDs = append(hostIDs, h.ID)
+	}
+	for _, q := range []struct {
+		kind string
+		ids  []int64
+	}{{"dns", dnsIDs}, {"host", hostIDs}} {
+		ls, _ := direct.ListFor(ctx, q.kind, q.ids)
+		for _, l := range ls {
+			if !sameGitLab(l.GitLabBaseURL, gls.BaseURL) {
+				continue
+			}
+			p, err := gl.GetProject(l.GitLabProjectID)
+			if err != nil {
+				sc.notes = append(sc.notes, "repo "+l.GitLabPath+" ligado a "+l.EntityName+" não acessível")
+				continue
+			}
+			addRepo(fixRepo{Key: p.PathWithNamespace, ID: p.ID, Name: p.Name, Ref: gls.DefaultRef})
+		}
+	}
 	links := store.NewProjectGitLabLinkRepo(db.SQL)
 	for _, p := range projects {
 		ls, err := links.List(ctx, p.ID)
@@ -265,7 +291,7 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 		}
 	}
 	if len(sc.repos) == 0 {
-		sc.notes = append(sc.notes, "Nenhum repositório GitLab ligado aos projetos ou serviços deste achado.")
+		sc.notes = append(sc.notes, "Nenhum repositório GitLab ligado aos projetos, serviços, DNS ou hosts deste achado.")
 	}
 	return sc
 }

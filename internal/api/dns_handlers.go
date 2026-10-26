@@ -23,18 +23,20 @@ type dnsHandlers struct {
 //	@Description	Any role. Visible records, enriched with their relations. Paginated in SQL.
 //	@Tags			dns
 //	@Produce		json
-//	@Param			search		query		string	false	"Free-text search"
-//	@Param			situacao	query		string	false	"Filter by situação"
-//	@Param			tag			query		string	false	"Filter by tag"
-//	@Param			responsavel	query		string	false	"Filter by responsável"
-//	@Param			has_https	query		string	false	"Filter by HTTPS"
-//	@Param			cert		query		string	false	"Filter by certificate state"
-//	@Param			sort_by		query		string	false	"Sort column"
-//	@Param			sort_dir	query		string	false	"Sort direction (asc, desc)"
-//	@Param			page		query		int		false	"Page (1-based)"
-//	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
-//	@Success		200			{object}	ListEnvelope[service.DNSListItem]
-//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Param			search			query		string	false	"Free-text search"
+//	@Param			situacao		query		string	false	"Filter by situação"
+//	@Param			tag				query		string	false	"Filter by tag"
+//	@Param			responsavel		query		string	false	"Filter by responsável"
+//	@Param			has_https		query		string	false	"Filter by HTTPS"
+//	@Param			has_hosts		query		string	false	"Linked to a host (yes, no)"
+//	@Param			has_services	query		string	false	"Linked to a service (yes, no)"
+//	@Param			cert			query		string	false	"Filter by certificate state"
+//	@Param			sort_by			query		string	false	"Sort column"
+//	@Param			sort_dir		query		string	false	"Sort direction (asc, desc)"
+//	@Param			page			query		int		false	"Page (1-based)"
+//	@Param			per_page		query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200				{object}	ListEnvelope[service.DNSListItem]
+//	@Failure		401				{object}	httpx.ErrorResponse
 //	@Router			/api/dns [get]
 func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	pp := parsePageParams(r)
@@ -44,6 +46,8 @@ func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 		Tag:         r.URL.Query().Get("tag"),
 		Responsavel: r.URL.Query().Get("responsavel"),
 		HasHTTPS:    r.URL.Query().Get("has_https"),
+		HasHosts:    r.URL.Query().Get("has_hosts"),
+		HasServices: r.URL.Query().Get("has_services"),
 		Cert:        r.URL.Query().Get("cert"),
 		SortBy:      r.URL.Query().Get("sort_by"),
 		SortDir:     r.URL.Query().Get("sort_dir"),

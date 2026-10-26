@@ -62,6 +62,8 @@ type DNSFilter struct {
 	Tag         string
 	Responsavel string
 	HasHTTPS    string
+	HasHosts    string // "yes" | "no": has / has no linked host
+	HasServices string // "yes" | "no": has / has no linked service
 	Cert        string
 	SortBy      string
 	SortDir     string
