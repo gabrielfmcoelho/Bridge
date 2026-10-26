@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/endoflife"
@@ -18,6 +19,9 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
+
+// osvVulnDelay slows every OSV advisory-detail answer (nanoseconds; 0 = none).
+var osvVulnDelay atomic.Int64
 
 // fakeAdvisories serves OSV, NVD and endoflife.date from one test server.
 // fail flips every endpoint to HTTP 500.
@@ -50,6 +54,13 @@ func fakeAdvisories(t *testing.T, fail *atomic.Bool) (*service.DependencyClients
 			}
 			w.Write([]byte(out + `]}`))
 		case strings.HasPrefix(r.URL.Path, "/osv/vulns/"):
+			if d := osvVulnDelay.Load(); d > 0 {
+				select {
+				case <-time.After(time.Duration(d)):
+				case <-r.Context().Done():
+					return
+				}
+			}
 			id := strings.TrimPrefix(r.URL.Path, "/osv/vulns/")
 			vec := "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L" // 5.3 medium
 			if id == "DEBIAN-CVE-2024-0727" {
@@ -177,6 +188,64 @@ func TestEvaluateDependencies_EndToEnd(t *testing.T) {
 	}
 	if v, _ := service.DependencyVulns(ctx, d.SQL, by["php"]); len(v) != 1 {
 		t.Fatalf("php CVEs lost after a failed refresh: %+v", v)
+	}
+}
+
+// A run that can't finish in time (prod: 22k OSV advisory details against a
+// 4-minute request) still succeeds: NVD and endoflife go first, the details
+// left over are deferred to the next run, and findings are applied.
+func TestEvaluateDependencies_DefersWhatDoesNotFit(t *testing.T) {
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { d.Close() })
+	ctx := context.Background()
+	h := &models.Host{Nickname: "vm-slow", OficialSlug: "vm-slow", Hostname: "10.0.0.9", Situacao: "active"}
+	if err := store.NewHostRepo(d.SQL).Create(ctx, h); err != nil {
+		t.Fatal(err)
+	}
+	web := sshtest.ContainerInfo{ID: "0123456789ab", Name: "portal", Image: "php:7.4-fpm", Status: "Up 1 hour"}
+	if err := store.NewServiceRepo(d.SQL).ReconcileDiscovered(ctx, h.ID, store.DiscoveredInventory{Containers: []sshtest.ContainerInfo{web}, ContainersKnown: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.RecordDependencies(ctx, d.SQL, h.ID, sshtest.VMInfo{ParsedContainers: []sshtest.ContainerInfo{web}, ContainersKnown: true,
+		Dependencies: []sshtest.DepScope{{Container: "portal", ContainerID: web.ID, Image: web.Image,
+			OS:       sshtest.OSRelease{ID: "debian", VersionID: "12"},
+			ImageEnv: map[string]string{"PHP_VERSION": "7.4.33"},
+			Packages: []sshtest.DepPackage{{Name: "libssl3", Version: "3.0.11-1~deb12u2", SrcName: "openssl", SrcVersion: "3.0.11-1~deb12u2"}},
+		}}}); err != nil {
+		t.Fatal(err)
+	}
+	var fail atomic.Bool
+	clients, _ := fakeAdvisories(t, &fail)
+	clients.Reserve = 300 * time.Millisecond
+
+	osvVulnDelay.Store(int64(time.Minute))
+	t.Cleanup(func() { osvVulnDelay.Store(0) })
+	rctx, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+	defer cancel()
+	res, err := service.EvaluateDependencies(rctx, d.SQL, clients)
+	if err != nil {
+		t.Fatalf("evaluate past its time box = %v; want the leftovers deferred", err)
+	}
+	if res.NVDQueried != 1 || res.EOLQueried != 2 || res.OSVVulnsDeferred != 2 || len(res.Errors) != 0 {
+		t.Fatalf("result = %+v; want NVD and EOL done, 2 details deferred, no errors", res)
+	}
+	if res.Findings == nil || res.Findings.New != 3 {
+		t.Fatalf("findings = %+v; want applied (2 OSV, details pending, + 1 NVD)", res.Findings)
+	}
+	var errRows int
+	d.SQL.QueryRow(`SELECT COUNT(*) FROM dependency_advisories WHERE error <> ''`).Scan(&errRows)
+	if errRows != 0 {
+		t.Fatalf("%d cache rows recorded the cut-off as an error", errRows)
+	}
+
+	// The next run picks the deferred details up.
+	osvVulnDelay.Store(0)
+	res, err = service.EvaluateDependencies(ctx, d.SQL, clients)
+	if err != nil || res.OSVVulnsDeferred != 0 || res.OSVVulns != 2 {
+		t.Fatalf("follow-up run = %+v %v; want the 2 details fetched", res, err)
 	}
 }
 

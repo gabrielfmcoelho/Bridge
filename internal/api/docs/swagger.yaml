@@ -5302,6 +5302,8 @@ definitions:
     type: object
   service.DependencyEvalResult:
     properties:
+      eol_deferred:
+        type: integer
       eol_queried:
         type: integer
       errors:
@@ -5317,6 +5319,9 @@ definitions:
       osv_queried:
         type: integer
       osv_vulns:
+        type: integer
+      osv_vulns_deferred:
+        description: Left for the next run when the time box closed first.
         type: integer
     type: object
   service.HostDetail:

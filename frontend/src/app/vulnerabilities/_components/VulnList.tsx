@@ -78,6 +78,7 @@ export default function VulnList() {
           osv: String(r.osv_queried), nvd: String(r.nvd_queried),
         }) +
           (r.nvd_deferred ? ` · ${t("vuln.deps.nvdDeferred", { count: String(r.nvd_deferred) })}` : "") +
+          (r.osv_vulns_deferred + r.eol_deferred ? ` · ${t("vuln.deps.timeDeferred", { count: String(r.osv_vulns_deferred + r.eol_deferred) })}` : "") +
           (r.errors.length ? ` · ${r.errors.slice(0, 3).join("; ")}` : ""),
       });
     },

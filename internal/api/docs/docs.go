@@ -26717,6 +26717,9 @@ const docTemplate = `{
         "service.DependencyEvalResult": {
             "type": "object",
             "properties": {
+                "eol_deferred": {
+                    "type": "integer"
+                },
                 "eol_queried": {
                     "type": "integer"
                 },
@@ -26739,6 +26742,10 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "osv_vulns": {
+                    "type": "integer"
+                },
+                "osv_vulns_deferred": {
+                    "description": "Left for the next run when the time box closed first.",
                     "type": "integer"
                 }
             }
