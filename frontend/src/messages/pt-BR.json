@@ -2200,7 +2200,8 @@
       "access": "Acesso",
       "catalog": "Catálogo",
       "integrations": "Integrações",
-      "data": "Dados"
+      "data": "Dados",
+      "hosts": "Hosts"
     },
     "restoreConfirmWord": "RESTAURAR",
     "situacaoRole": {
@@ -2300,11 +2301,28 @@
       "emptyFiltered": "Nenhum repositório corresponde a esses filtros.",
       "unlistedTitle": "Vinculados, mas invisíveis ao token",
       "unlistedHint": "Repositórios vinculados no Bridge que o token não lista: movidos, renomeados ou fora do seu alcance. Os planos de correção não conseguem lê-los."
+    },
+    "sshOps": {
+      "title": "Operações SSH",
+      "intro": "Scripts de shell que quem edita hosts pode executar pela aba Operações de um host. Escreva {{nome}} onde um valor deve ser pedido na execução.",
+      "name": "Nome",
+      "description": "Descrição",
+      "script": "Script",
+      "params": "Parâmetros",
+      "useSudo": "Executar com sudo (precisa da senha salva do host)",
+      "add": "Nova operação",
+      "edit": "Editar operação",
+      "loadError": "Não foi possível carregar as operações SSH.",
+      "empty": "Nenhuma operação SSH personalizada",
+      "emptyHint": "Salve um script uma vez e execute em qualquer host pela aba Operações.",
+      "paramsDetected": "Pedidos na execução: {params}",
+      "paramsHint": "Escreva {{nome}} (minúsculas, dígitos, _) onde um valor deve ser pedido na execução. Não use aspas: o valor já é colocado entre aspas.",
+      "errName": "Nome é obrigatório",
+      "errScript": "Script é obrigatório"
     }
   },
   "operation": {
     "builtIn": "Integradas",
-    "customScripts": "Scripts Personalizados",
     "networkTest": "Testar Rede",
     "networkTestDesc": "Verificar acessibilidade sem SSH: ping ICMP e teste TCP na porta SSH (e em uma porta personalizada opcional).",
     "networkTestFormDesc": "Executa a partir do servidor SSHCM, não deste navegador. Sempre faz ping no host e testa a porta SSH configurada. Informe uma porta abaixo para também testar um serviço como HTTP (80), HTTPS (443) ou um banco de dados.",
@@ -2356,7 +2374,6 @@
     "repairNotApplied": "Reparo não aplicado",
     "repairTip": "Dica: conceda sudo (NOPASSWD) para este usuário ou corrija /dev/null manualmente no host remoto.",
     "showCommand": "Mostrar comando",
-    "executedSuccessfully": "Executado com sucesso",
     "setPreferredAuth": "Host possui senha e chave. Defina a auth preferida antes de executar o reparo automático.",
     "confirmRepair": "Isto executará comandos privilegiados no host remoto para reparar /dev/null. Continuar?",
     "logs": "Logs de Operações",
@@ -2454,7 +2471,16 @@
       "docker": "Docker",
       "monitoring": "Monitoramento"
     },
-    "noLogs": "Nenhuma operação executada neste host."
+    "noLogs": "Nenhuma operação executada neste host.",
+    "custom": {
+      "title": "Operações personalizadas",
+      "empty": "Nenhuma operação personalizada ainda. Crie em Configurações › Operações SSH.",
+      "manage": "Gerenciar",
+      "needsPassword": "Precisa da senha salva do host (roda com sudo)",
+      "confirm": "Executar \"{name}\" neste host?",
+      "confirmSudo": "Executar \"{name}\" neste host com sudo (como root)?",
+      "paramsDesc": "Preencha os valores que o script desta operação pede. Cada valor entra como uma única palavra literal."
+    }
   },
   "alert": {
     "title": "Alertas",

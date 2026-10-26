@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import PageShell from "@/components/layout/PageShell";
@@ -17,18 +18,26 @@ import UsersTab from "./UsersTab";
 import AppearanceTab from "./AppearanceTab";
 import ImportTab from "./ImportTab";
 import BackupTab from "./BackupTab";
+import SSHCustomOpsTab from "./SSHCustomOpsTab";
 import ApiTokensPanel from "@/components/tokens/ApiTokensPanel";
 
-type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "import" | "backup" | "integrations" | "gitlab-repos" | "permissions" | "role-mappings" | "api-tokens";
+type Tab = "enums" | "users" | "entidades" | "offerings" | "appearance" | "import" | "backup" | "integrations" | "gitlab-repos" | "permissions" | "role-mappings" | "api-tokens" | "ssh-operations";
 
 export default function SettingsPage() {
+  // useSearchParams needs a Suspense boundary (static prerender).
+  return <Suspense><SettingsContent /></Suspense>;
+}
+
+function SettingsContent() {
   const { t } = useLocale();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   // ponytail: role gate until Phase B ships the catalog.manage permission;
   // then this becomes user?.permissions?.includes("catalog.manage").
   const canManageCatalog = isAdmin || user?.role === "editor";
-  const [activeTab, setActiveTab] = useState<Tab>("enums");
+  // ?tab=<key> opens a section directly (the Operações tab links here).
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<Tab>(() => (searchParams.get("tab") as Tab | null) ?? "enums");
 
   // Grouped like a side nav (ADS): ten flat tabs don't fit a phone and don't
   // say how the sections relate.
@@ -48,6 +57,7 @@ export default function SettingsPage() {
       { key: "api-tokens", label: t("settings.apiTokens.tabLabel") },
     ] },
     { title: t("settings.groups.catalog"), items: canManageCatalog ? [{ key: "offerings", label: t("settings.offerings.title") }] : [] },
+    { title: t("settings.groups.hosts"), items: isAdmin ? [{ key: "ssh-operations", label: t("settings.sshOps.title") }] : [] },
     { title: t("settings.groups.integrations"), items: isAdmin ? [
       { key: "integrations", label: t("settings.integrationsTabLabel") },
       { key: "gitlab-repos", label: t("settings.gitlabRepos.tabLabel") },
@@ -85,6 +95,7 @@ export default function SettingsPage() {
         {activeTab === "permissions" && isAdmin && <PermissionsTab />}
         {activeTab === "role-mappings" && isAdmin && <RoleMappingsTab />}
         {activeTab === "api-tokens" && <ApiTokensPanel />}
+        {activeTab === "ssh-operations" && isAdmin && <SSHCustomOpsTab />}
       </PageHeader>
     </PageShell>
   );

@@ -234,6 +234,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_SSHCustomOperation:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.SSHCustomOperation'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-models_SecretAuditLog:
     properties:
       data:
@@ -4622,6 +4631,43 @@ definitions:
         type: integer
       is_main:
         type: boolean
+    type: object
+  models.SSHCustomOperation:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: integer
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      script:
+        type: string
+      updated_at:
+        type: string
+      use_sudo:
+        type: boolean
+    type: object
+  models.SSHCustomOperationInput:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      script:
+        type: string
+      use_sudo:
+        type: boolean
+    type: object
+  models.SSHCustomOperationRun:
+    properties:
+      params:
+        additionalProperties:
+          type: string
+        type: object
     type: object
   models.SecretAuditAction:
     enum:
@@ -16652,6 +16698,208 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Create a sudo user on a host
+      tags:
+      - ssh
+  /api/ssh/custom-operations:
+    get:
+      description: Editor. The admin-written scripts runnable from a host's Operações
+        tab.
+      parameters:
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_SSHCustomOperation'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List custom SSH operations
+      tags:
+      - ssh
+    post:
+      consumes:
+      - application/json
+      description: Admin. name and script are required; double-brace placeholders
+        in the script (name inside two pairs of curly braces) are asked for at run
+        time.
+      parameters:
+      - description: Operation
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.SSHCustomOperationInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.SSHCustomOperation'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Create a custom SSH operation
+      tags:
+      - ssh
+  /api/ssh/custom-operations/{id}:
+    delete:
+      description: Admin. Its past runs stay in the hosts' operation history.
+      parameters:
+      - description: Operation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.StatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Delete a custom SSH operation
+      tags:
+      - ssh
+    put:
+      consumes:
+      - application/json
+      description: 'Admin. Partial: an omitted field keeps its value.'
+      parameters:
+      - description: Operation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.SSHCustomOperationInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SSHCustomOperation'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Update a custom SSH operation
+      tags:
+      - ssh
+  /api/ssh/custom-operations/{id}/run/{slug}:
+    post:
+      consumes:
+      - application/json
+      description: 'Editor. Body {"params": {name: value}} fills the script''s double-brace
+        placeholders, each shell-quoted. Operations with use_sudo need the host''s
+        stored password. Runs for at most 10 minutes; logged in the host''s operation
+        history as custom:<name>.'
+      parameters:
+      - description: Operation ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Host slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: Parameter values
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/models.SSHCustomOperationRun'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Run a custom SSH operation on a host
       tags:
       - ssh
   /api/ssh/delete-remote-user/{slug}:

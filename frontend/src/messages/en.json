@@ -2200,7 +2200,8 @@
       "access": "Access",
       "catalog": "Catalog",
       "integrations": "Integrations",
-      "data": "Data"
+      "data": "Data",
+      "hosts": "Hosts"
     },
     "restoreConfirmWord": "RESTORE",
     "situacaoRole": {
@@ -2300,11 +2301,28 @@
       "emptyFiltered": "No repository matches these filters.",
       "unlistedTitle": "Attached but not visible to the token",
       "unlistedHint": "Repositories attached in Bridge that the token does not list: moved, renamed, or out of its reach. Fix plans cannot read them."
+    },
+    "sshOps": {
+      "title": "SSH operations",
+      "intro": "Shell scripts anyone who edits hosts can run from a host's Operações tab. Write {{name}} where a value should be asked for at run time.",
+      "name": "Name",
+      "description": "Description",
+      "script": "Script",
+      "params": "Parameters",
+      "useSudo": "Run with sudo (needs the host's stored password)",
+      "add": "New operation",
+      "edit": "Edit operation",
+      "loadError": "Could not load the SSH operations.",
+      "empty": "No custom SSH operations",
+      "emptyHint": "Save a script once and run it on any host from its Operações tab.",
+      "paramsDetected": "Asked at run time: {params}",
+      "paramsHint": "Write {{name}} (lowercase, digits, _) where a value should be asked at run time. Don't quote it: the value is quoted for you.",
+      "errName": "Name is required",
+      "errScript": "Script is required"
     }
   },
   "operation": {
     "builtIn": "Built-in",
-    "customScripts": "Custom Scripts",
     "networkTest": "Test Network",
     "networkTestDesc": "Check reachability without SSH: ICMP ping plus TCP connect to the SSH port (and an optional custom port).",
     "networkTestFormDesc": "Runs from the SSHCM server, not from this browser. Always pings the host and probes the configured SSH port. Add a port below to also test a service like HTTP (80), HTTPS (443), or a database.",
@@ -2356,7 +2374,6 @@
     "repairNotApplied": "Repair not applied",
     "repairTip": "Tip: grant sudo for this user (NOPASSWD) or fix /dev/null manually on the remote host.",
     "showCommand": "Show command",
-    "executedSuccessfully": "Executed successfully",
     "setPreferredAuth": "Host has both password and key. Set preferred auth first before running auto-fix.",
     "confirmRepair": "This will run privileged commands on the remote host to repair /dev/null. Continue?",
     "logs": "Operation Logs",
@@ -2454,7 +2471,16 @@
       "docker": "Docker",
       "monitoring": "Monitoring"
     },
-    "noLogs": "No operations run on this host yet."
+    "noLogs": "No operations run on this host yet.",
+    "custom": {
+      "title": "Custom operations",
+      "empty": "No custom operations yet. Create them in Settings › SSH operations.",
+      "manage": "Manage",
+      "needsPassword": "Needs the host's stored password (runs with sudo)",
+      "confirm": "Run \"{name}\" on this host?",
+      "confirmSudo": "Run \"{name}\" on this host with sudo (as root)?",
+      "paramsDesc": "Fill in the values this operation's script asks for. Each value goes in as one literal word."
+    }
   },
   "alert": {
     "title": "Alerts",

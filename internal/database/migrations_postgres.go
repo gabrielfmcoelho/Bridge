@@ -2065,4 +2065,19 @@ var migrationsPostgres = []string{
 	INSERT INTO permissions (code, description, category) VALUES
 		('databases.users.manage', 'Set database credentials; create, rotate, disable and drop database users; reveal their passwords', 'databases')
 	ON CONFLICT DO NOTHING;`,
+
+	// Version 118: custom SSH operations — admin-written shell scripts that
+	// editors run on a host from its Operações tab. {{name}} placeholders in
+	// the script are filled at run time, shell-quoted. Not entidade-scoped:
+	// the library is global, the host's own visibility gates each run.
+	`CREATE TABLE IF NOT EXISTS ssh_custom_operations (
+		id          BIGSERIAL PRIMARY KEY,
+		name        TEXT NOT NULL UNIQUE,
+		description TEXT NOT NULL DEFAULT '',
+		script      TEXT NOT NULL,
+		use_sudo    BOOLEAN NOT NULL DEFAULT FALSE,
+		created_by  BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);`,
 }
