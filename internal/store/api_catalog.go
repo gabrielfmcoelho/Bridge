@@ -111,6 +111,31 @@ func (r *APICatalogRepo) Get(ctx context.Context, id int64) (*models.APICatalog,
 	return a, nil
 }
 
+// NamesByID returns id → name for the live, visible catalog rows among ids
+// (one query; missing ids are absent from the map).
+func (r *APICatalogRepo) NamesByID(ctx context.Context, ids []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	vis, vargs := VisibleExpr(ctx, AssetAPICatalog, "api_catalog.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT id, name FROM api_catalog WHERE id = ANY(?) AND deleted_at IS NULL AND `+vis,
+		append([]any{ids}, vargs...)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = name
+	}
+	return out, rows.Err()
+}
+
 // GetSpec returns the canonical spec JSON for a live catalog row, or ("", nil).
 func (r *APICatalogRepo) GetSpec(ctx context.Context, id int64) (string, error) {
 	var spec string

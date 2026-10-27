@@ -187,6 +187,10 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   totals) sum the local filesystems; `DiskPercent` (card, sorting,
   `alerta-recursos`, `sub-utilizado`, `host_scans.disk_pct`) is the **fullest**
   one (`DiskFullest`), like Sentinel; `df /` is only the fallback.
+- Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
+  names are read in bulk; wiki titles come from Outline at most once a day per
+  page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title
+  in the list until then. The redeem page always reads Outline live.
 - List endpoints return `{data, meta:{page,per_page,total}}`
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.
