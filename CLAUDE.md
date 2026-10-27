@@ -165,6 +165,9 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   many Debian/Ubuntu hosts needs ~20k) fill the rest, outbound calls stop
   10 min before the end so the fleet-wide findings rewrite (~120k rows) always
   runs, and what doesn't fit is reported as `*_deferred` for the next run.
+  The list (Vulnerabilidades › Dependências, and the host's Vulnerabilidades
+  tab with `host_id`) reads `GET …/dependencies/groups`: one row per
+  kind/name/version, worst CVEs first, with its hosts and installations.
 - Web servers in the scan (`internal/sshtest/webservers.go`): one session runs
   `nginx -T`, `apachectl -S` and the php-fpm pool grep on the host (as root with
   the stored password when there is one) and in every running container (cap

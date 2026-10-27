@@ -38,6 +38,21 @@ var dependencyKinds = map[string]bool{models.DepKindOS: true, models.DepKindRunt
 //	@Failure		401			{object}	httpx.ErrorResponse
 //	@Router			/api/vulnerabilities/dependencies [get]
 func (h *vulnHandlers) handleListDependencies(w http.ResponseWriter, r *http.Request) {
+	f, p, ok := dependencyFilter(w, r)
+	if !ok {
+		return
+	}
+	rows, total, err := store.NewDependencyRepo(h.db.SQL).List(r.Context(), f)
+	if err != nil {
+		jsonServerError(w, r, "failed to list dependencies", err)
+		return
+	}
+	jsonList(w, rows, metaFor(p, total))
+}
+
+// dependencyFilter reads the list / groups query: kind, host_id, service_id,
+// has_cves, eol, search and paging. Writes 400 on an unknown kind.
+func dependencyFilter(w http.ResponseWriter, r *http.Request) (models.DependencyFilter, PageParams, bool) {
 	q := r.URL.Query()
 	f := models.DependencyFilter{Search: q.Get("search"), HasCVEs: q.Get("has_cves") == "true", EOL: q.Get("eol") == "true"}
 	for _, k := range strings.Split(q.Get("kind"), ",") {
@@ -46,7 +61,7 @@ func (h *vulnHandlers) handleListDependencies(w http.ResponseWriter, r *http.Req
 		}
 		if !dependencyKinds[k] {
 			jsonError(w, http.StatusBadRequest, "invalid kind "+k)
-			return
+			return f, PageParams{}, false
 		}
 		f.Kinds = append(f.Kinds, k)
 	}
@@ -54,12 +69,38 @@ func (h *vulnHandlers) handleListDependencies(w http.ResponseWriter, r *http.Req
 	f.ServiceID, _ = strconv.ParseInt(q.Get("service_id"), 10, 64)
 	p := parsePageParams(r)
 	f.Page, f.PerPage = p.Page, p.PerPage
-	rows, total, err := store.NewDependencyRepo(h.db.SQL).List(r.Context(), f)
-	if err != nil {
-		jsonServerError(w, r, "failed to list dependencies", err)
+	return f, p, true
+}
+
+// handleListDependencyGroups godoc
+//
+//	@Summary		List dependency versions grouped by component
+//	@Description	The same rows and filters as the dependency list, one entry per component version (kind, name, version) with how many hosts and installations have it, the worst CVE count and severity among them, EOL, and up to 50 of its installations. Worst first, then the most widespread. Any role; visibility as the list.
+//	@Tags			vulnerabilities
+//	@Produce		json
+//	@Param			kind		query		string	false	"Comma-separated: os, runtime, package (default os,runtime)"
+//	@Param			host_id		query		int		false	"Only this host"
+//	@Param			service_id	query		int		false	"Only this service's container"
+//	@Param			has_cves	query		bool	false	"Only versions with CVEs"
+//	@Param			eol			query		bool	false	"Only end-of-life versions"
+//	@Param			search		query		string	false	"Name, version, container, image or host"
+//	@Param			page		query		int		false	"Page (1-based)"
+//	@Param			per_page	query		int		false	"Page size (max 200); omit for every row"
+//	@Success		200			{object}	ListEnvelope[models.DependencyGroup]
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Router			/api/vulnerabilities/dependencies/groups [get]
+func (h *vulnHandlers) handleListDependencyGroups(w http.ResponseWriter, r *http.Request) {
+	f, p, ok := dependencyFilter(w, r)
+	if !ok {
 		return
 	}
-	jsonList(w, rows, metaFor(p, total))
+	groups, total, err := store.NewDependencyRepo(h.db.SQL).ListGroups(r.Context(), f)
+	if err != nil {
+		jsonServerError(w, r, "failed to list dependency groups", err)
+		return
+	}
+	jsonList(w, groups, metaFor(p, total))
 }
 
 // handleGetDependency godoc

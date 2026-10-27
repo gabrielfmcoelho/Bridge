@@ -2719,7 +2719,8 @@
       "noAnswer": "no answer",
       "disks": "Disks",
       "unused": "unused",
-      "free": "free"
+      "free": "free",
+      "total": "total {used} / {size} in {count} partitions"
     }
   },
   "sshKey": {
@@ -4299,7 +4300,10 @@
       "timeDeferred": "{count} lookups left for the next run (time limit) — click again to continue",
       "evaluateStarted": "CVE evaluation started",
       "evaluateStartedHint": "It runs in the background — the result shows up here when it ends (a first run can take half an hour).",
-      "evaluatingSince": "Evaluating since {time}…"
+      "evaluatingSince": "Evaluating since {time}…",
+      "installs": "{count} installations",
+      "hostsInstalls": "{hosts} hosts · {installs} installations",
+      "moreInstalls": "+{count} more — narrow with the search"
     },
     "sourceInventory": "Inventory"
   }

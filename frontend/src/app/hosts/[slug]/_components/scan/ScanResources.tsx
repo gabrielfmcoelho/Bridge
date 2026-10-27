@@ -9,10 +9,15 @@ import { pctColor, type T } from "./shared";
 
 /** Usage at scan time (CPU/RAM/disk bars), every partition, plus the top consumers of each. */
 export default function ScanResources({ info, t }: { info: VMInfoType; t: T }) {
+  // The disk % is the fullest partition's: its bar shows that partition's own
+  // used / size (the totals are on the partition list's header).
+  const fullest = info.filesystems?.find((fs) => fs.mount === info.disk_fullest && !fs.network);
   const bars = [
     info.cpu_usage && <UsageBar key="cpu" label={t("vm.cpu")} total={info.cpu} used={info.cpu_usage} percent={info.cpu_usage} />,
     info.ram_percent && <UsageBar key="ram" label={t("vm.ram")} total={info.ram} used={info.ram_used} percent={info.ram_percent} />,
-    info.disk_percent && <UsageBar key="disk" label={info.disk_fullest ? t("scan.storage.diskFullest", { mount: info.disk_fullest }) : t("vm.disk")} total={info.storage} used={info.storage_used} percent={info.disk_percent} />,
+    info.disk_percent && (fullest
+      ? <UsageBar key="disk" label={t("scan.storage.diskFullest", { mount: fullest.mount })} total={humanizeBytesUI(fullest.size_bytes)} used={humanizeBytesUI(fullest.used_bytes)} percent={info.disk_percent} />
+      : <UsageBar key="disk" label={t("vm.disk")} total={info.storage} used={info.storage_used} percent={info.disk_percent} />),
   ].filter(Boolean);
   const top = info.resource_top;
   const hasTop = !!top && (top.top_cpu?.length || 0) + (top.top_mem?.length || 0) + (top.top_disk?.length || 0) > 0;
@@ -45,9 +50,17 @@ function StoragePanel({ info, t }: { info: VMInfoType; t: T }) {
   const disks = info.disks ?? [];
   const vgs = info.volume_groups ?? [];
   const disksTotal = disks.reduce((n, d) => n + d.size_bytes, 0);
+  const local = (info.filesystems ?? []).filter((fs) => !fs.network);
   return (
     <div>
-      <span className="block text-2xs text-[var(--text-faint)] mb-2">{t("scan.storage.partitions")}</span>
+      <span className="block text-2xs text-[var(--text-faint)] mb-2">
+        {t("scan.storage.partitions")}
+        {local.length > 0 && ` · ${t("scan.storage.total", {
+          used: humanizeBytesUI(local.reduce((n, fs) => n + fs.used_bytes, 0)),
+          size: humanizeBytesUI(local.reduce((n, fs) => n + fs.size_bytes, 0)),
+          count: String(local.length),
+        })}`}
+      </span>
       <div className="space-y-2.5">
         {(info.filesystems ?? []).map((fs) => (
           <div key={fs.mount} className="text-xs min-w-0">

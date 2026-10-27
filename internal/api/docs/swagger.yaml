@@ -148,6 +148,15 @@ definitions:
       meta:
         $ref: '#/definitions/api.Meta'
     type: object
+  api.ListEnvelope-models_DependencyGroup:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.DependencyGroup'
+        type: array
+      meta:
+        $ref: '#/definitions/api.Meta'
+    type: object
   api.ListEnvelope-models_Entidade:
     properties:
       data:
@@ -4036,6 +4045,57 @@ definitions:
         items:
           $ref: '#/definitions/models.DependencyVuln'
         type: array
+    type: object
+  models.DependencyGroup:
+    properties:
+      cve_count:
+        type: integer
+      eol:
+        type: boolean
+      eol_date:
+        type: string
+      evaluated:
+        description: installations with an answer
+        type: integer
+      hosts:
+        type: integer
+      installs:
+        type: integer
+      instances:
+        items:
+          $ref: '#/definitions/models.DependencyInstance'
+        type: array
+      kind:
+        type: string
+      lookup:
+        type: string
+      max_severity:
+        type: string
+      name:
+        type: string
+      version:
+        type: string
+      version_source:
+        type: string
+    type: object
+  models.DependencyInstance:
+    properties:
+      container:
+        type: string
+      cve_count:
+        type: integer
+      host_id:
+        type: integer
+      host_nickname:
+        type: string
+      host_slug:
+        type: string
+      id:
+        type: integer
+      image:
+        type: string
+      service_id:
+        type: integer
     type: object
   models.DependencyVuln:
     properties:
@@ -18909,6 +18969,64 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Check dependency versions for CVEs (background)
+      tags:
+      - vulnerabilities
+  /api/vulnerabilities/dependencies/groups:
+    get:
+      description: The same rows and filters as the dependency list, one entry per
+        component version (kind, name, version) with how many hosts and installations
+        have it, the worst CVE count and severity among them, EOL, and up to 50 of
+        its installations. Worst first, then the most widespread. Any role; visibility
+        as the list.
+      parameters:
+      - description: 'Comma-separated: os, runtime, package (default os,runtime)'
+        in: query
+        name: kind
+        type: string
+      - description: Only this host
+        in: query
+        name: host_id
+        type: integer
+      - description: Only this service's container
+        in: query
+        name: service_id
+        type: integer
+      - description: Only versions with CVEs
+        in: query
+        name: has_cves
+        type: boolean
+      - description: Only end-of-life versions
+        in: query
+        name: eol
+        type: boolean
+      - description: Name, version, container, image or host
+        in: query
+        name: search
+        type: string
+      - description: Page (1-based)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (max 200); omit for every row
+        in: query
+        name: per_page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListEnvelope-models_DependencyGroup'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List dependency versions grouped by component
       tags:
       - vulnerabilities
   /api/vulnerabilities/import/etipi:
