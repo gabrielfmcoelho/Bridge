@@ -239,7 +239,7 @@ export default function CardsSection() {
             (<code>grep -rl &quot;bg-[var(--bg-surface)]&quot; src --include=*.tsx | xargs grep -l &quot;rounded-&quot;
             | xargs grep -l &quot;border-[var(--border-&quot;</code>; heaviest: <code>app/issues/IssueBoard.tsx</code>,{" "}
             <code>app/chamados/page.tsx</code>, <code>app/wiki/page.tsx</code>, <code>app/share/[token]/page.tsx</code>,{" "}
-            <code>app/settings/integrations/*</code>, <code>components/glpi/*</code>).
+            <code>app/settings/_integrations/*</code>, <code>components/glpi/*</code>).
           </li>
         </ul>
       </div>

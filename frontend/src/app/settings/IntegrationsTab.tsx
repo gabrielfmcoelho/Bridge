@@ -2,22 +2,22 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { integrationsAPI } from "@/lib/api";
-import GeneralAuthSection from "./integrations/GeneralAuthSection";
-import LDAPSection from "./integrations/LDAPSection";
-import KeycloakSection from "./integrations/KeycloakSection";
-import KeycloakAPIsSection from "./integrations/KeycloakAPIsSection";
-import GitLabIntegrationSection from "./integrations/GitLabIntegrationSection";
-import OutlineIntegrationSection from "./integrations/OutlineIntegrationSection";
-import GLPIIntegrationSection from "./integrations/GLPIIntegrationSection";
-import GrafanaIntegrationSection from "./integrations/GrafanaIntegrationSection";
-import SignozIntegrationSection from "./integrations/SignozIntegrationSection";
-import LLMSection from "./integrations/LLMSection";
-import CoolifySection from "./integrations/CoolifySection";
-import SentinelSection from "./integrations/SentinelSection";
-import ProxmoxSection from "./integrations/ProxmoxSection";
-import WazuhSection from "./integrations/WazuhSection";
-import DependenciesSection from "./integrations/DependenciesSection";
-import SMTPSection from "./integrations/SMTPSection";
+import GeneralAuthSection from "./_integrations/GeneralAuthSection";
+import LDAPSection from "./_integrations/LDAPSection";
+import KeycloakSection from "./_integrations/KeycloakSection";
+import KeycloakAPIsSection from "./_integrations/KeycloakAPIsSection";
+import GitLabIntegrationSection from "./_integrations/GitLabIntegrationSection";
+import OutlineIntegrationSection from "./_integrations/OutlineIntegrationSection";
+import GLPIIntegrationSection from "./_integrations/GLPIIntegrationSection";
+import GrafanaIntegrationSection from "./_integrations/GrafanaIntegrationSection";
+import SignozIntegrationSection from "./_integrations/SignozIntegrationSection";
+import LLMSection from "./_integrations/LLMSection";
+import CoolifySection from "./_integrations/CoolifySection";
+import SentinelSection from "./_integrations/SentinelSection";
+import ProxmoxSection from "./_integrations/ProxmoxSection";
+import WazuhSection from "./_integrations/WazuhSection";
+import DependenciesSection from "./_integrations/DependenciesSection";
+import SMTPSection from "./_integrations/SMTPSection";
 
 export default function IntegrationsTab() {
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
