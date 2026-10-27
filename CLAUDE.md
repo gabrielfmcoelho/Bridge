@@ -111,10 +111,7 @@ element" of the slice — the next migration breaks that test (v99's did when v1
 - Frontend forms are hand-rolled: `useState` per field, manual validation,
   `useMutation`, `<FormError>`. `react-hook-form` and `next-intl` are in
   `package.json` but **100% unused** in `frontend/src` — do not start using
-  them. `zod` is used, but only to type the Atlas lineage schema
-  (`frontend/src/lib/lineage/types.ts`) — not for form validation. Forms
-  stay hand-rolled; don't take zod's presence there as a cue to convert
-  them.
+  them. Forms stay hand-rolled (no zod or other schema library).
 - Feedback: `useFlag()` (`contexts/FlagContext`) for the outcome of
   something the user started (a sync, a save) — bottom-left, success/info
   auto-dismiss after 8s, errors stay; `StatusAlert` for a problem with the

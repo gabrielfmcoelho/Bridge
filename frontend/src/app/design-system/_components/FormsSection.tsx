@@ -440,8 +440,7 @@ export default function FormsSection() {
           </li>
           <li>
             No shared search box beyond <code>ListToolbar</code>: <code>components/wiki/WikiSearchBar.tsx</code>,{" "}
-            <code>components/lineage/SearchOmnibar.tsx</code>,{" "}
-            <code>app/catalog/_components/CatalogSearch.tsx</code>, <code>components/lineage/TablesPanel.tsx</code>,
+            <code>app/catalog/_components/CatalogSearch.tsx</code>,
             plus the private ones inside <code>Select</code>, <code>CheckboxList</code> and{" "}
             <code>AsyncPicker</code>. The 300 ms debounce is duplicated in{" "}
             <code>CatalogSearch.tsx:59</code> and <code>app/requests/_components/RequestList.tsx:58</code>; no{" "}

@@ -180,9 +180,6 @@ export default function TablesSection() {
         title="Local KV helper"
         source="app/hosts/_components/BatchDockerLogsModal.tsx:290 Stat"
         alsoIn={[
-          "components/atlas/pipeline/PipelineNodeDetail.tsx:221 KV",
-          "components/atlas/catalog/TableDetailPanel.tsx:135 Stat",
-          "components/lineage/TablesPanel.tsx:154 Row",
           "app/hosts/FilterDrawer.tsx:164 FieldLabel",
           "<dl> in components/requests/RequestAnswers.tsx, app/requests/[id]/RequestDetail.tsx:241, app/catalog/_components/RequestFormModal.tsx:54",
         ]}
@@ -227,7 +224,7 @@ export default function TablesSection() {
         <p className="text-xs text-[var(--text-muted)] mb-1">Describe only:</p>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
           <li>
-            Trees ×4; <code>components/wiki/WikiTree.tsx</code> (role=tree), <code>components/atlas/catalog/DomainTree.tsx</code>,{" "}
+            Trees ×3; <code>components/wiki/WikiTree.tsx</code> (role=tree),{" "}
             <code>app/settings/EntidadesTab.tsx</code> (flattened via <code>lib/entidades.ts withDepth</code>),{" "}
             <code>components/atlas/apis/ShareBundleModal.tsx</code>
           </li>

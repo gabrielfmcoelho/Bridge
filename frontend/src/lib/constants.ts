@@ -97,9 +97,6 @@ export const NAV_SECTIONS: NavSection[] = [
     collapsible: true,
     items: [
       { href: "/atlas/topology", label: "nav.topology", icon: "Network" },
-      { href: "/atlas/lineage", label: "nav.lineage", icon: "GitBranch" },
-      { href: "/atlas/catalog", label: "nav.catalog", icon: "Table" },
-      { href: "/atlas/pipeline", label: "nav.pipeline", icon: "Workflow" },
       { href: "/atlas/apis", label: "nav.apis", icon: "Plug" },
       { href: "/atlas/databases", label: "nav.databases", icon: "Database" },
     ],

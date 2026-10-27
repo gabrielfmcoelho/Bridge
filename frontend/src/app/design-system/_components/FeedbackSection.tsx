@@ -10,11 +10,8 @@ import Spinner from "@/components/ui/Spinner";
 import StatusDot from "@/components/ui/StatusDot";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
-import LayerBadge from "@/components/atlas/shared/LayerBadge";
-import RoleBadge from "@/components/atlas/shared/RoleBadge";
 import AlertBadge from "@/app/hosts/_components/AlertBadge";
 import { UsageBar, ResourceCard } from "@/app/hosts/[slug]/_components/UsageBar";
-import { TABLE_LAYERS } from "@/lib/lineage/indexes";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 const STATUS_VARIANTS = ["success", "error", "warning", "info", "loading"] as const;
@@ -139,38 +136,9 @@ export default function FeedbackSection() {
           <StatusDot size="xs" color="warning" /> xs <StatusDot color="warning" /> sm <StatusDot size="md" color="warning" /> md
         </span>
         <p className="text-xs text-[var(--text-muted)] w-full mt-1">
-          21 literal dots in 9 files swept in; the ones built from a class expression (Badge, AlertBadge, LayerBadge,
+          21 literal dots in 9 files swept in; the ones built from a class expression (Badge, AlertBadge,
           AsyncPicker, TicketList) still draw their own span.
         </p>
-      </Specimen>
-
-      <Specimen title="LayerBadge" source="components/atlas/shared/LayerBadge.tsx" wide>
-        <div className="flex flex-wrap gap-1.5">
-          {TABLE_LAYERS.map((layer) => (
-            <LayerBadge key={layer} layer={layer} size="md" />
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {TABLE_LAYERS.map((layer) => (
-            <LayerBadge key={`sm-${layer}`} layer={layer} size="sm" />
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {TABLE_LAYERS.map((layer) => (
-            <LayerBadge key={`nodot-${layer}`} layer={layer} dot={false} />
-          ))}
-        </div>
-        <p className="text-xs text-[var(--text-muted)] mt-2">
-          5 badge implementations total: <code>Badge</code>, <code>LayerBadge</code>, <code>RoleBadge</code>,{" "}
-          <code>AlertBadge</code>, and ad-hoc role/entidade chips.
-        </p>
-      </Specimen>
-
-      <Specimen title="RoleBadge" source="components/atlas/shared/RoleBadge.tsx">
-        <RoleBadge role="source" size="sm" />
-        <RoleBadge role="source" size="md" />
-        <RoleBadge role="built" size="sm" />
-        <RoleBadge role="built" size="md" />
       </Specimen>
 
       <Specimen title="AlertBadge" source="app/hosts/_components/AlertBadge.tsx">

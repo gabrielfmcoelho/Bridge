@@ -81,8 +81,7 @@ export default function ButtonsSection() {
           </PillButton>
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-2">
-          Sets <code>aria-pressed</code>; absorbed <code>CatalogSearch.chipClass()</code>, <code>VaultPage.Chip</code> and{" "}
-          <code>PillFilter</code>&apos;s chips.
+          Sets <code>aria-pressed</code>; absorbed <code>CatalogSearch.chipClass()</code> and <code>VaultPage.Chip</code>.
         </p>
       </Specimen>
 
