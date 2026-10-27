@@ -91,6 +91,13 @@ func cleanUpstream(v string) string { return upstreamRe.FindString(v) }
 //  4. a probed runtime with no distro package (built from source) → NVD;
 //  5. every other package → OSV on its source package, when the distro is
 //     known; else shown only.
+//
+// kernelPackage matches distro kernel packages (Debian/Ubuntu linux-*,
+// Alpine linux-headers, RHEL kernel-*). Skipped inside containers, which run
+// the host's kernel — OSV pins every kernel CVE on them (prod: linux-libc-dev,
+// build-dep headers in images, was 35% of all matches).
+var kernelPackage = regexp.MustCompile(`^(linux-(libc-dev|headers|image|modules|kbuild|tools|source|compiler|lts|virt)|kernel(-[a-z]+)?$|kernel-(headers|devel|core|modules))`)
+
 func NormalizeDependencies(s sshtest.DepScope, serviceID *int64) []models.Dependency {
 	eco := osvEcosystem(s.OS)
 	base := models.Dependency{ServiceID: serviceID, Container: s.Container, Image: s.Image, ImageID: s.ImageID}
@@ -159,6 +166,9 @@ func NormalizeDependencies(s sshtest.DepScope, serviceID *int64) []models.Depend
 	}
 
 	for _, pk := range s.Packages {
+		if s.Container != "" && kernelPackage.MatchString(pk.Name) {
+			continue // a container runs the host's kernel: these CVEs don't apply
+		}
 		d := models.Dependency{Kind: models.DepKindPackage, Name: pk.Name, Version: pk.Version, VersionSource: models.DepSourcePackage}
 		if eco != "" && !suppressed[pk.Name] {
 			d.Lookup, d.Ecosystem, d.LookupName, d.LookupVersion = models.DepLookupOSV, eco, pk.SrcName, pk.SrcVersion
