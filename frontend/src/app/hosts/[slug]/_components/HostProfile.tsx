@@ -40,16 +40,12 @@ export default function HostProfile({
     <div className="space-y-5">
       <SectionCard title={t("host.profileTitle")}>
         <div className="grid grid-cols-2 gap-4">
-          <Field className="col-span-2" label={t("host.hostname")} value={host.hostname} mono />
+          <Field label={t("host.hostname")} value={host.hostname} mono />
           <Field label={t("host.hospedagem")} value={host.hospedagem} />
-          <Field label={t("host.tipoMaquina")} value={host.tipo_maquina} />
-          <Field label="Proxmox" value={host.proxmox_id ?? ""} mono />
-          <Field label={t("host.runsOn")} value={host.parent_host_slug ?? ""} href={host.parent_host_slug ? `/hosts/${host.parent_host_slug}` : undefined} mono />
         </div>
 
         <div className={block}>
-          <SectionHeading as="h3" className="!mb-1">{t("host.declared")}</SectionHeading>
-          <p className="text-xs text-[var(--text-muted)] mb-3">{t("host.declaredHint")}</p>
+          <SectionHeading as="h3" className="!mb-2">{t("host.declared")}</SectionHeading>
           <div className="grid grid-cols-3 gap-4">
             <Field label="CPU" value={host.recurso_cpu} mono />
             <Field label="RAM" value={host.recurso_ram} mono />

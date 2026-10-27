@@ -2,8 +2,10 @@ package sshtest
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -33,9 +35,8 @@ type ResourceProcess struct {
 	Command string  `json:"command"`
 }
 
-// ResourceDiskItem is one path's disk footprint. We probe a curated set of
-// well-known bloat locations rather than `du /` (which would walk the whole
-// filesystem and could take minutes on a large host).
+// ResourceDiskItem is one of the largest files across the host's local
+// partitions (diskTopScript).
 type ResourceDiskItem struct {
 	Path      string `json:"path"`
 	SizeBytes int64  `json:"size_bytes"`
@@ -48,64 +49,20 @@ type ResourceDiskItem struct {
 // under a few KB even on busy hosts.
 const commandFieldLimit = 200
 
-// diskProbePaths is the curated list of directories we size up. These are
-// the usual culprits for "where did all the disk go?" questions:
-//   - /var/log:      journald, app logs
-//   - /var/lib/docker: container images, volumes, overlay2
-//   - /var/cache:    apt/yum/dnf caches
-//   - /var/tmp /tmp: lingering temp files
-//   - /opt:          third-party app installs
-//   - /home /root:   user data
-//   - /usr/local:    locally compiled software
-//   - /var/lib/postgresql /var/lib/mysql: DB datadirs
-//   - /var/lib/snapd: snap caches/installs
-var diskProbePaths = []string{
-	"/var/log",
-	"/var/lib/docker",
-	"/var/cache",
-	"/var/tmp",
-	"/tmp",
-	"/opt",
-	"/home",
-	"/root",
-	"/usr/local",
-	"/var/lib/postgresql",
-	"/var/lib/mysql",
-	"/var/lib/snapd",
-}
-
-// captureResourceTop runs three lightweight probes in one SSH session:
-//   - top 10 processes by %CPU
-//   - top 10 processes by %MEM
-//   - sizes of well-known bloat directories
-// Each section is delimited so we can split with strings.Split and parse
-// independently. A 10-second `timeout` wraps the disk probe because a
-// heavily-fragmented filesystem can occasionally make `du` slow; we'd
-// rather return partial data than hang the scan.
-func captureResourceTop(client *ssh.Client) *ResourceUsageSnapshot {
+// captureResourceTop answers "who is eating CPU / RAM / disk": the top 10
+// processes by %CPU and by %MEM (one quick session), then the 10 largest
+// files across every local partition (diskTopScript, its own session — as
+// root with the stored password, so root-only data dirs count).
+func captureResourceTop(client *ssh.Client, sudoPassword string) *ResourceUsageSnapshot {
 	const delim = "---RESOURCE---"
-
-	// Build the disk-probe arg list once. shellEscape isn't strictly
-	// required (the paths are static and safe) but keeps us consistent
-	// with the rest of the codebase.
-	probeArgs := make([]string, 0, len(diskProbePaths))
-	for _, p := range diskProbePaths {
-		probeArgs = append(probeArgs, shellEscape(p))
-	}
-	diskCmd := `timeout 10s du -sb ` + strings.Join(probeArgs, " ") + ` 2>/dev/null | sort -k1 -n -r | head -10`
-
 	cmd := strings.Join([]string{
 		// Top 10 by %CPU. --no-headers + --sort=-%cpu gives us the rows
 		// already sorted; head -10 caps the payload.
 		`ps -eo pid,user,%cpu,%mem,rss,args --sort=-%cpu --no-headers 2>/dev/null | head -10`,
 		`echo '` + delim + `'`,
 		`ps -eo pid,user,%cpu,%mem,rss,args --sort=-%mem --no-headers 2>/dev/null | head -10`,
-		`echo '` + delim + `'`,
-		diskCmd,
 	}, "; ")
-
-	raw := runCmd(client, cmd)
-	sections := strings.Split(raw, delim)
+	sections := strings.Split(runCmd(client, cmd), delim)
 	section := func(i int) string {
 		if i < len(sections) {
 			return strings.TrimSpace(sections[i])
@@ -113,12 +70,49 @@ func captureResourceTop(client *ssh.Client) *ResourceUsageSnapshot {
 		return ""
 	}
 
-	snap := &ResourceUsageSnapshot{
+	disk := ""
+	if sudoPassword != "" {
+		out, err := runSudoCmd(client, sudoPassword, diskTopScript(true))
+		if out != "" {
+			disk = out
+		} else if err != nil {
+			log.Printf("[sshscan] largest files as root failed, falling back to unprivileged: %v", err)
+		}
+	}
+	if disk == "" {
+		disk, _ = runCmdWithDeadline(client, encodedScript(diskTopScript(false), "sh"), diskTopTimeout+15*time.Second)
+	}
+	return &ResourceUsageSnapshot{
 		TopCPU:  parseTopProcesses(section(0)),
 		TopMem:  parseTopProcesses(section(1)),
-		TopDisk: parseDiskTop(section(2)),
+		TopDisk: parseDiskTop(disk),
 	}
-	return snap
+}
+
+// diskTopTimeout bounds the find walk: it reads every inode of every local
+// partition, at idle I/O priority; on timeout the largest files found so
+// far are what's reported.
+// ponytail: a full metadata walk per scan; cache it or sample if a host with
+// tens of millions of files makes scans slow.
+const diskTopTimeout = 45 * time.Second
+
+// diskTopScript lists the 10 largest files (over 10 MB) of every local
+// partition — the same set the partition table shows (no tmpfs, overlays,
+// snaps, container-runtime mounts) — as "<bytes>\t<path>". Each start point
+// stays on its own filesystem (-xdev). Not root: find goes through sudo -n
+// when that is allowed, else sees what the SSH user can read.
+func diskTopScript(asRoot bool) string {
+	elevate := `S=""; sudo -n true 2>/dev/null && S="sudo -n"`
+	if asRoot {
+		elevate = `S=""`
+	}
+	return `export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
+T=""; command -v timeout >/dev/null 2>&1 && T="timeout ` + strconv.Itoa(int(diskTopTimeout.Seconds())) + `"
+N=""; command -v ionice >/dev/null 2>&1 && N="ionice -c3"; command -v nice >/dev/null 2>&1 && N="$N nice -n 19"
+` + elevate + `
+M=$(df -lP -x tmpfs -x devtmpfs -x overlay -x squashfs -x efivarfs 2>/dev/null | awk 'NR>1 && $6 !~ "^/(run|snap|sys|proc|dev)(/|$)" && $6 !~ "^/var/lib/docker/" {print $6}')
+[ -n "$M" ] && $S $T $N find $M -xdev -type f -size +10M -printf '%s\t%p\n' 2>/dev/null | sort -nr | head -10
+`
 }
 
 // parseTopProcesses parses `ps -eo pid,user,%cpu,%mem,rss,args` rows. The

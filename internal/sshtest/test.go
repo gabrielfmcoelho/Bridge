@@ -1795,9 +1795,9 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	go func() {
 		defer wg.Done()
 		s := time.Now()
-		// Top 10 by CPU, MEM, and disk-bloat paths. Cheap probes wrapped
-		// in `timeout 10s` so a stuck filesystem can't pin the scan.
-		resourceTop = captureResourceTop(client)
+		// Top 10 by CPU and MEM, then the 10 largest files of every local
+		// partition (find bounded at 45s, idle I/O priority).
+		resourceTop = captureResourceTop(client, sudoPassword)
 		timeSession("[par] resource-top", s)
 	}()
 	wg.Wait()
