@@ -1407,6 +1407,36 @@ export type DependencyKind = "os" | "runtime" | "package";
 
 /** One OS / runtime / package version the scan found on a host (container "")
  *  or inside one of its containers. lookup: where its CVEs come from. */
+/** One component version across its installations (…/dependencies/groups).
+ *  cve_count / max_severity are the worst of them; instances capped at 50. */
+export interface DependencyGroup {
+  kind: DependencyKind;
+  name: string;
+  version: string;
+  hosts: number;
+  installs: number;
+  cve_count: number;
+  max_severity: VulnSeverity | "";
+  eol: boolean;
+  eol_date: string;
+  /** Installations with an answer (0 = never evaluated). */
+  evaluated: number;
+  lookup: Dependency["lookup"];
+  version_source: Dependency["version_source"];
+  instances: DependencyInstance[];
+}
+
+export interface DependencyInstance {
+  id: number;
+  host_id: number;
+  host_nickname: string;
+  host_slug: string;
+  container: string;
+  image: string;
+  service_id: number | null;
+  cve_count: number;
+}
+
 export interface Dependency {
   id: number;
   host_id: number;
