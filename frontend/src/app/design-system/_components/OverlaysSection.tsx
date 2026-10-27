@@ -217,13 +217,8 @@ export default function OverlaysSection() {
       <div>
         <p className="text-xs text-[var(--text-muted)] mb-1">Describe only:</p>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
-          <li>
-            <code>components/lineage/SearchOmnibar.tsx</code>; the only command palette, ⌘K from{" "}
-            <code>AtlasToolbar</code>/<code>LineageToolbar</code>
-          </li>
           <li><code>components/ai/AiChatDrawer.tsx</code></li>
           <li><code>components/glpi/{"{FormcreatorFormDrawer,TicketDetailDrawer}"}.tsx</code></li>
-          <li><code>components/lineage/DetailDrawer.tsx</code></li>
           <li>
             <code>app/hosts/[slug]/_components/{"{ChamadoDrawer,SSHConfigDrawer,SSHOperations,IssueDrawers}"}.tsx</code>
           </li>

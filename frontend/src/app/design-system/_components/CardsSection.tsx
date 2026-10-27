@@ -10,12 +10,10 @@ import SituacaoText from "@/components/ui/SituacaoText";
 import KpiGrid from "@/components/inventory/KpiGrid";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorSeparator } from "@/components/inventory";
 import OfferingCard from "@/app/catalog/_components/OfferingCard";
-import TableCard from "@/components/atlas/catalog/TableCard";
 import LinkedEntityList from "@/components/ui/LinkedEntityList";
 import Badge from "@/components/ui/Badge";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import type { Offering } from "@/lib/types";
-import type { TableRecord } from "@/lib/atlas/types";
 
 const noop = () => {};
 
@@ -50,20 +48,6 @@ const OFFERING_2: Offering = {
   sort_order: 2,
 };
 
-const TABLE_RECORD: TableRecord = {
-  node: {
-    id: "gold.dim_users",
-    type: "table",
-    label: "dim_users",
-    data: { catalog: "prod", schema: "gold", table: "dim_users" },
-  },
-  namespace: "servidores",
-  layer: "gold",
-  role: "built",
-  columnCount: 14,
-  hasWarning: false,
-};
-
 export default function CardsSection() {
   return (
     <Section id="cards" title="Cards">
@@ -81,7 +65,7 @@ export default function CardsSection() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
           <Card accent="info" decorator="stripe-top" padding="sm">
             <p className="text-sm font-semibold font-mono">decorator=&quot;stripe-top&quot;</p>
-            <p className="text-xs text-[var(--text-muted)] mt-1">Atlas TableCard stripe.</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">A colour band across the top.</p>
           </Card>
           <Card accent="accent" padding="sm">
             <p className="text-sm font-semibold font-mono">decorator=&quot;stripe-left&quot; (default)</p>
@@ -221,15 +205,6 @@ export default function CardsSection() {
         </p>
       </Specimen>
 
-      <Specimen title="TableCard" source="components/atlas/catalog/TableCard.tsx" wide>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
-          <TableCard table={TABLE_RECORD} onClick={noop} />
-          <TableCard table={TABLE_RECORD} selected onClick={noop} />
-        </div>
-        <p className="text-xs text-[var(--text-muted)] mt-2">
-          <code>Card as=&quot;button&quot; decorator=&quot;stripe-top&quot; selected</code>; accent from <code>getLayerAccent()</code>.
-        </p>
-      </Specimen>
 
       <Specimen title="LinkedEntityList" source="components/ui/LinkedEntityList.tsx" wide>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -264,7 +239,7 @@ export default function CardsSection() {
             (<code>grep -rl &quot;bg-[var(--bg-surface)]&quot; src --include=*.tsx | xargs grep -l &quot;rounded-&quot;
             | xargs grep -l &quot;border-[var(--border-&quot;</code>; heaviest: <code>app/issues/IssueBoard.tsx</code>,{" "}
             <code>app/chamados/page.tsx</code>, <code>app/wiki/page.tsx</code>, <code>app/share/[token]/page.tsx</code>,{" "}
-            <code>app/settings/integrations/*</code>, <code>components/glpi/*</code>, <code>components/lineage/*</code>).
+            <code>app/settings/integrations/*</code>, <code>components/glpi/*</code>).
           </li>
         </ul>
       </div>

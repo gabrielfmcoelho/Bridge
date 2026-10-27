@@ -140,11 +140,6 @@ export default function NavSection() {
       <div>
         <p className="text-xs text-[var(--text-muted)] mb-1">Describe only:</p>
         <ul className="text-xs text-[var(--text-muted)] list-disc pl-5 space-y-1">
-          <li>
-            <code>components/atlas/shared/AtlasToolbar.tsx</code>; pill filters + counts + ⌘K (needs{" "}
-            <code>AtlasIndexes</code>)
-          </li>
-          <li><code>components/lineage/LineageToolbar.tsx</code></li>
           <li><code>components/layout/MobileBottomNav.tsx</code></li>
           <li><code>components/inventory/InventoryFAB.tsx</code></li>
           <li><code>hooks/useInventoryFilters.ts</code></li>

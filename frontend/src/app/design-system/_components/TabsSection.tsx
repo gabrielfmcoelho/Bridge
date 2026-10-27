@@ -4,9 +4,6 @@ import { useState } from "react";
 import { Section, Specimen } from "./Section";
 import TabBar from "@/components/ui/TabBar";
 import ViewToggle, { VIEW_ICONS } from "@/components/ui/ViewToggle";
-import ViewModeToggle from "@/components/atlas/shared/ViewModeToggle";
-import PillFilter from "@/components/atlas/shared/PillFilter";
-import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 const SETTINGS_TABS = [
@@ -27,9 +24,6 @@ export default function TabsSection() {
   const [settingsTab, setSettingsTab] = useState("enums");
   const [shareTab, setShareTab] = useState("secrets");
   const [view, setView] = useState("cards");
-  const [viewMode, setViewMode] = useState<"tree" | "list" | "graph">("tree");
-  const [layers, setLayers] = useState<string[]>([]);
-  const [layers2, setLayers2] = useState<string[]>(["silver"]);
 
   return (
     <Section id="tabs" title="Tabs & Toggles">
@@ -118,67 +112,10 @@ export default function TabsSection() {
         </span>
       </Specimen>
 
-      <Specimen
-        title="ViewModeToggle"
-        source="components/atlas/shared/ViewModeToggle.tsx"
-        alsoIn={[
-          "app/issues/IssueBoard.tsx:348-360 (inline kanban/list toggle)",
-        ]}
-        wide
-      >
-        <ViewModeToggle
-          value={viewMode}
-          onChange={setViewMode}
-          ariaLabel="View mode"
-          options={[
-            { value: "tree", label: "Tree", icon: <Icon path={ICON_PATHS.folder} className="w-3.5 h-3.5" /> },
-            { value: "list", label: "List", icon: <Icon path={ICON_PATHS.document} className="w-3.5 h-3.5" /> },
-            { value: "graph", label: "Graph", icon: <Icon path={ICON_PATHS.link} className="w-3.5 h-3.5" /> },
-          ]}
-        />
-        <p className="text-xs text-[var(--text-muted)] mt-3">
-          Generic over the value type and takes <code>ReactNode</code> icons instead of path strings. Its own
-          docblock says it &quot;mirrors the styling vocabulary of the existing ViewToggle&quot;; which is four
-          view-toggle implementations, not one.
-        </p>
-      </Specimen>
-
-      <Specimen title="PillFilter" source="components/atlas/shared/PillFilter.tsx" wide>
-        <div className="space-y-3">
-          <PillFilter
-            label="Layer"
-            value={layers}
-            onChange={setLayers}
-            renderLead={() => <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
-            options={[
-              { value: "gold", label: "Gold", count: 12 },
-              { value: "silver", label: "Silver", count: 34 },
-              { value: "bronze", label: "Bronze", count: 7 },
-            ]}
-          />
-          <PillFilter
-            label="Layer"
-            hideLabel
-            value={layers2}
-            onChange={setLayers2}
-            options={[
-              { value: "gold", label: "Gold", count: 12 },
-              { value: "silver", label: "Silver", count: 34 },
-              { value: "bronze", label: "Bronze", count: 7 },
-            ]}
-          />
-        </div>
-        <p className="text-xs text-[var(--text-muted)] mt-3">
-          Multi-select: an empty array means no filter, so the <code>All</code> pill lights up.{" "}
-          <code>renderLead</code> is how the lineage layer dots get in.
-        </p>
-      </Specimen>
-
       <Specimen title="Retired chips" source="components/ui/PillButton.tsx" wide>
         <p className="text-xs text-[var(--text-muted)]">
           <code>CatalogSearch.chipClass()</code> and <code>VaultPage.Chip</code> were deleted in phase 2 step 4; both
-          are <code>PillButton shape=&quot;pill&quot;</code> / <code>shape=&quot;rounded&quot;</code> now, and{" "}
-          <code>PillFilter</code> composes <code>PillButton size=&quot;sm&quot;</code>. See Buttons for the shapes.
+          are <code>PillButton shape=&quot;pill&quot;</code> / <code>shape=&quot;rounded&quot;</code> now. See Buttons for the shapes.
         </p>
       </Specimen>
 
@@ -194,16 +131,14 @@ export default function TabsSection() {
           </li>
           <li>
             Tab implementations still separate: <code>TabBar</code> (now also settings),{" "}
-            <code>app/share/[token]/page.tsx</code>,{" "}
-            <code>components/atlas/shared/ViewModeToggle.tsx</code>.
+            <code>app/share/[token]/page.tsx</code>.
           </li>
           <li>
-            View toggles: <code>ViewToggle</code> (now also settings users), <code>ViewModeToggle</code>,{" "}
+            View toggles: <code>ViewToggle</code> (now also settings users),{" "}
             <code>app/issues/IssueBoard.tsx:348-360</code> inline.
           </li>
           <li>
-            Filter chips: <code>PillButton</code> (absorbed <code>chipClass()</code> and <code>VaultPage.Chip</code>;{" "}
-            <code>PillFilter</code> composes it).
+            Filter chips: <code>PillButton</code> (absorbed <code>chipClass()</code> and <code>VaultPage.Chip</code>).
           </li>
           <li>
             <code>app/hosts/[slug]/_components/SSHConfigDrawer.tsx:40-62</code> also rolls its own two-button

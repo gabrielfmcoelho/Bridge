@@ -32,11 +32,8 @@ const WEIGHT_SIZE_COMBOS: [string, number][] = [
 const H1_ALSO_IN = [
   "app/ssh-config/page.tsx:99",
   "app/issues/IssueBoard.tsx:240",
-  "app/atlas/lineage/page.tsx:73",
   "app/atlas/topology/page.tsx:30",
   "app/tools/page.tsx:150",
-  "components/atlas/pipeline/PipelinePageInner.tsx:82",
-  "components/atlas/catalog/CatalogPageInner.tsx:111",
 ];
 
 export default function TypographySection() {
@@ -51,15 +48,6 @@ export default function TypographySection() {
             </h1>
             <code className="text-[11px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
               text-2xl font-bold mb-6 (app/page.tsx:175)
-            </code>
-          </div>
-          {/* specimen: components/atlas/catalog/CatalogPageInner.tsx:111 */}
-          <div className="flex flex-wrap items-baseline gap-3">
-            <h1 className="text-2xl font-bold tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
-              Hosts
-            </h1>
-            <code className="text-[11px] text-[var(--text-faint)]" style={{ fontFamily: "var(--font-mono)" }}>
-              text-2xl font-bold tracking-tight (CatalogPageInner.tsx:111)
             </code>
           </div>
           {/* specimen: app/setup/page.tsx:61 (also app/login/page.tsx:123) */}
