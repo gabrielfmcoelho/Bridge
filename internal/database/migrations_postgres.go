@@ -2080,4 +2080,20 @@ var migrationsPostgres = []string{
 		created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`,
+
+	// Version 119: a host can be linked to a whole GitLab group (every repo
+	// under it, subgroups included), like projetos already can. A group and a
+	// repo may share a GitLab id, so kind joins the unique key; the old
+	// unnamed UNIQUE constraint is dropped by lookup.
+	`ALTER TABLE gitlab_repo_links ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'project';
+	ALTER TABLE gitlab_repo_links DROP CONSTRAINT IF EXISTS gitlab_repo_links_kind_check;
+	ALTER TABLE gitlab_repo_links ADD CONSTRAINT gitlab_repo_links_kind_check
+		CHECK (kind = 'project' OR (kind = 'group' AND entity_type = 'host'));
+	DO $$ DECLARE c text; BEGIN
+		FOR c IN SELECT conname FROM pg_constraint WHERE conrelid = 'gitlab_repo_links'::regclass AND contype = 'u' LOOP
+			EXECUTE format('ALTER TABLE gitlab_repo_links DROP CONSTRAINT %I', c);
+		END LOOP;
+	END $$;
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_gitlab_repo_links
+		ON gitlab_repo_links (entity_type, entity_id, kind, gitlab_project_id, gitlab_base_url);`,
 }

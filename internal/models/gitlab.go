@@ -46,10 +46,12 @@ type ProjectGitLabLink struct {
 // GitLabRepoLink links a GitLab repo straight to a DNS record or host.
 // EntityName (the domain or host nickname) is filled on read.
 type GitLabRepoLink struct {
-	ID              int64     `json:"id"`
-	EntityType      string    `json:"entity_type"`
-	EntityID        int64     `json:"entity_id"`
-	EntityName      string    `json:"entity_name"`
+	ID         int64  `json:"id"`
+	EntityType string `json:"entity_type"`
+	EntityID   int64  `json:"entity_id"`
+	EntityName string `json:"entity_name"`
+	// Kind is "project" (one repo) or "group" (every repo under it; hosts only).
+	Kind            string    `json:"kind"`
 	GitLabProjectID int       `json:"gitlab_project_id"`
 	GitLabBaseURL   string    `json:"gitlab_base_url"`
 	GitLabPath      string    `json:"gitlab_path"`

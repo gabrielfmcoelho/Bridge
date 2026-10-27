@@ -33,6 +33,8 @@ func TestGitLabRepoInventory(t *testing.T) {
 		case "/api/v4/projects":
 			_, _ = w.Write([]byte(`[{"id":7,"name":"app","path_with_namespace":"sead/app","namespace":{"id":1,"full_path":"sead"}},
 				{"id":8,"name":"lake","path_with_namespace":"sead/dl/lake","namespace":{"id":2,"full_path":"sead/dl"}}]`))
+		case "/api/v4/groups/sead%2Fdl":
+			_, _ = w.Write([]byte(`{"id":2,"name":"dl","full_path":"sead/dl","parent_id":1}`))
 		case "/api/v4/projects/sead%2Fapp":
 			_, _ = w.Write([]byte(`{"id":7,"name":"app","path_with_namespace":"sead/app"}`))
 		default:
@@ -110,6 +112,40 @@ func TestGitLabRepoInventory(t *testing.T) {
 		}
 	}
 
+	// A whole group → host: every repo under sead/dl belongs to vm1.
+	linkGroup := func(typ string, eid int64, path string) *http.Response {
+		b, _ := json.Marshal(map[string]any{"entity_type": typ, "entity_id": eid, "path": path, "kind": "group"})
+		return env.do("POST", "/api/settings/gitlab/repo-links", string(b))
+	}
+	if resp := linkGroup("host", hostID, "sead/dl"); resp.StatusCode != http.StatusCreated {
+		t.Fatalf("link group = %d %s", resp.StatusCode, readBody(resp))
+	}
+	for _, c := range []struct {
+		typ  string
+		id   int64
+		path string
+		want int
+	}{
+		{"host", hostID, "sead/dl", http.StatusConflict},
+		{"dns", dnsID, "sead/dl", http.StatusBadRequest},
+		{"host", hostID, "sead/nope", http.StatusNotFound},
+	} {
+		if resp := linkGroup(c.typ, c.id, c.path); resp.StatusCode != c.want {
+			t.Fatalf("link group %s %d %s = %d, want %d", c.typ, c.id, c.path, resp.StatusCode, c.want)
+		}
+	}
+	// A repo sharing the group's GitLab id is a different link; the DB itself
+	// refuses a group link to a DNS record.
+	if _, err := d.SQL.Exec(`INSERT INTO gitlab_repo_links (entity_type, entity_id, kind, gitlab_project_id, gitlab_base_url, gitlab_path) VALUES ('host', ?, 'project', 2, ?, 'x/two')`, hostID, gl.URL); err != nil {
+		t.Fatalf("repo with the group's id: %v", err)
+	}
+	if _, err := d.SQL.Exec(`DELETE FROM gitlab_repo_links WHERE gitlab_path = 'x/two'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.SQL.Exec(`INSERT INTO gitlab_repo_links (entity_type, entity_id, kind, gitlab_project_id, gitlab_base_url, gitlab_path) VALUES ('dns', ?, 'group', 2, ?, 'sead/dl')`, dnsID, gl.URL); err == nil {
+		t.Fatal("group link to a DNS record was accepted by the DB")
+	}
+
 	var inv gitlabInventory
 	resp := env.do("GET", "/api/settings/gitlab/repos", "")
 	if resp.StatusCode != http.StatusOK {
@@ -118,7 +154,8 @@ func TestGitLabRepoInventory(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&inv); err != nil {
 		t.Fatal(err)
 	}
-	if len(inv.Groups) != 2 || inv.Groups[1].ParentID == nil || len(inv.Groups[1].Projetos) != 1 || inv.Groups[1].Projetos[0].Name != "Lake" {
+	if len(inv.Groups) != 2 || inv.Groups[1].ParentID == nil || len(inv.Groups[1].Projetos) != 1 || inv.Groups[1].Projetos[0].Name != "Lake" ||
+		len(inv.Groups[1].Hosts) != 1 || inv.Groups[1].Hosts[0].Name != "vm1" || inv.Groups[1].Hosts[0].LinkID == 0 || len(inv.Groups[0].Hosts) != 0 {
 		t.Fatalf("groups = %+v", inv.Groups)
 	}
 	app := inv.Repos[0]
