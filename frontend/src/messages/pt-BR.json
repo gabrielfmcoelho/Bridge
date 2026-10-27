@@ -1108,7 +1108,6 @@
     "pageDescription": "Servidores, VMs e containers do inventário: acesso, recursos, vínculos com serviços e DNS, e o estado de cada um.",
     "profileTitle": "Host",
     "declared": "Declarado",
-    "declaredHint": "O que foi cadastrado para este host; o último scan mostra o que existe de fato.",
     "tabMetrics": "Métricas",
     "authPickDefault": "Com senha e chave configuradas, escolha o método de autenticação padrão.",
     "syncCoolify": "Sincronizar do Coolify",
@@ -2541,7 +2540,7 @@
     "resourceTop": {
       "cpu": "Top 10 por CPU",
       "mem": "Top 10 por RAM",
-      "disk": "Top 10 caminhos em disco"
+      "disk": "Maiores arquivos (todas as partições)"
     },
     "cron": {
       "daemonActive": "ativo",
