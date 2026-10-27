@@ -153,7 +153,8 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   each host scan probes the host and, through `docker exec`, one running
   container per image (`internal/sshtest/deps.go`); `service.NormalizeDependencies`
   decides per row whether advisories come from OSV (distro package) or NVD
-  (upstream build). Container env is **never** read — versions from env come
+  (upstream build). Kernel packages (`linux-*`, `kernel-*`) are kept only on
+  the host: a container runs the host's kernel. Container env is **never** read — versions from env come
   from the *image* config, filtered to `*_VERSION` keys on the remote side.
   The admin "Evaluate CVEs" button (`service.EvaluateDependencies`, settings
   group `dependencies`) caches OSV / NVD / endoflife.date answers in

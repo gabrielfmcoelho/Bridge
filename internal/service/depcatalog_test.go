@@ -88,6 +88,36 @@ func TestNormalize_PHPImageEnvAndUnknownDistro(t *testing.T) {
 	}
 }
 
+// A container runs the host's kernel: kernel packages in its image (headers
+// pulled in as build deps) carry every kernel CVE and none applies — in prod
+// linux-libc-dev alone was 35% of all matches. On the host they stay.
+func TestNormalize_KernelPackagesOnlyOnTheHost(t *testing.T) {
+	pkgs := []sshtest.DepPackage{
+		{Name: "linux-libc-dev", Version: "6.1.106-3", SrcName: "linux", SrcVersion: "6.1.106-3"},
+		{Name: "linux-headers-6.1.0-25-amd64", Version: "6.1.106-3", SrcName: "linux", SrcVersion: "6.1.106-3"},
+		{Name: "linux-image-6.1.0-25-amd64", Version: "6.1.106-3", SrcName: "linux-signed-amd64", SrcVersion: "6.1.106+3"},
+		{Name: "libssl3", Version: "3.0.11-1~deb12u2", SrcName: "openssl", SrcVersion: "3.0.11-1~deb12u2"},
+		{Name: "linuxdoc-tools", Version: "0.9.82-1", SrcName: "linuxdoc-tools", SrcVersion: "0.9.82-1"},
+	}
+	os := sshtest.OSRelease{ID: "debian", VersionID: "12"}
+	ctr := byKey(NormalizeDependencies(sshtest.DepScope{Container: "app", OS: os, Packages: pkgs}, nil))
+	for _, n := range []string{"linux-libc-dev", "linux-headers-6.1.0-25-amd64", "linux-image-6.1.0-25-amd64"} {
+		if _, ok := ctr["package:"+n]; ok {
+			t.Errorf("container kept kernel package %s", n)
+		}
+	}
+	if _, ok := ctr["package:libssl3"]; !ok {
+		t.Error("container lost libssl3")
+	}
+	if _, ok := ctr["package:linuxdoc-tools"]; !ok {
+		t.Error("linuxdoc-tools is not a kernel package")
+	}
+	host := byKey(NormalizeDependencies(sshtest.DepScope{OS: os, Packages: pkgs}, nil))
+	if d, ok := host["package:linux-image-6.1.0-25-amd64"]; !ok || d.Lookup != models.DepLookupOSV {
+		t.Errorf("host kernel package = %+v %v; want kept with its OSV lookup", d, ok)
+	}
+}
+
 func TestOSVEcosystemAndCleanUpstream(t *testing.T) {
 	for in, want := range map[sshtest.OSRelease]string{
 		{ID: "debian", VersionID: "12"}:      "Debian:12",
