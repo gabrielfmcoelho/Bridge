@@ -2109,7 +2109,10 @@
       "empty": "O token não enxerga nenhum repositório.",
       "emptyFiltered": "Nenhum repositório corresponde a esses filtros.",
       "unlistedTitle": "Vinculados, mas invisíveis ao token",
-      "unlistedHint": "Repositórios vinculados no Bridge que o token não lista: movidos, renomeados ou fora do seu alcance. Os planos de correção não conseguem lê-los."
+      "unlistedHint": "Repositórios vinculados no Bridge que o token não lista: movidos, renomeados ou fora do seu alcance. Os planos de correção não conseguem lê-los.",
+      "via": "via grupo {group}",
+      "attachGroupTitle": "Vincular o grupo {repo}",
+      "attachGroupHint": "Todos os repositórios deste grupo e dos subgrupos — atuais e futuros — passam a ser do que você escolher."
     },
     "sshOps": {
       "title": "Operações SSH",

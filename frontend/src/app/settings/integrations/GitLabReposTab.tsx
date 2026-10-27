@@ -18,7 +18,7 @@ import AsyncPicker, { type AsyncPickerItem } from "@/components/ui/AsyncPicker";
 import StatusAlert from "@/components/ui/StatusAlert";
 import EmptyState from "@/components/ui/EmptyState";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import { buildTree, repoMatches, repoTotal, type GroupNode, type RepoFilter } from "./gitlabRepoTree";
+import { buildTree, inheritedByGroup, repoMatches, repoTotal, type GroupNode, type InheritedRef, type RepoFilter } from "./gitlabRepoTree";
 
 type Kind = "projetos" | "services" | "dns" | "hosts";
 const KINDS: Kind[] = ["projetos", "services", "dns", "hosts"];
@@ -32,8 +32,13 @@ const FETCHERS: Record<Kind, (q: string) => Promise<AsyncPickerItem[]>> = {
   hosts: async (q) => (await hostsAPI.listPaginated({ search: q, per_page: "20" })).data.map((h) => ({ id: h.id, label: h.nickname, secondary: h.hostname || undefined })),
 };
 
+/** What the attach modal links: one repo, or a whole group (every repo under
+ *  it, subgroups included — to a projeto or a host). */
+type AttachTarget = { path: string; group: boolean; webUrl: string };
+
 /** Every group, subgroup and repo the GitLab service token sees, with where
- *  each repo is attached in Bridge. Attach / detach go to each entity's own
+ *  each repo is attached in Bridge — its own links and the projeto / host
+ *  links of the groups above it. Attach / detach go to each entity's own
  *  home: projeto links, the service's repository_url, DNS/host repo links. */
 export default function GitLabReposTab() {
   const { t } = useLocale();
@@ -47,13 +52,15 @@ export default function GitLabReposTab() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<RepoFilter>("all");
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
-  const [attachTo, setAttachTo] = useState<GitLabInventoryRepo | null>(null);
+  const [attachTo, setAttachTo] = useState<AttachTarget | null>(null);
 
-  const keep = (r: GitLabInventoryRepo) => repoMatches(r, query, filter);
+  const inherited = useMemo(() => (inv ? inheritedByGroup(inv.groups) : new Map<number, InheritedRef[]>()), [inv]);
+  const inheritedOf = (r: GitLabInventoryRepo) => (r.id !== 0 && inherited.get(r.namespace_id)) || [];
+  const keep = (r: GitLabInventoryRepo) => repoMatches(r, query, filter, inheritedOf(r));
   const filtering = filter !== "all" || query.trim() !== "";
   const tree = useMemo(
-    () => (inv ? buildTree(inv.groups, inv.repos, (r) => repoMatches(r, query, filter), filtering) : { roots: [], loose: [] }),
-    [inv, query, filter, filtering],
+    () => (inv ? buildTree(inv.groups, inv.repos, (r) => repoMatches(r, query, filter, (r.id !== 0 && inherited.get(r.namespace_id)) || []), filtering) : { roots: [], loose: [] }),
+    [inv, query, filter, filtering, inherited],
   );
   const unlisted = (inv?.unlisted ?? []).filter(keep);
 
@@ -81,7 +88,15 @@ export default function GitLabReposTab() {
     );
   }
 
-  const chips = (r: GitLabInventoryRepo) => (
+  // A link a group above gives: shown, not removable here (it is removed on
+  // the group that holds it).
+  const inheritedChips = (list: InheritedRef[]) => list.map((i) => (
+    <span key={`via-${i.kind}-${i.ref.link_id}-${i.via}`} className="opacity-60">
+      <Tag>{`${t(`settings.gitlabRepos.kind.${i.kind}`)}: ${i.ref.name} · ${t("settings.gitlabRepos.via", { group: i.via })}`}</Tag>
+    </span>
+  ));
+
+  const chips = (r: GitLabInventoryRepo, inh: InheritedRef[] = []) => (
     <div className="flex flex-wrap gap-1.5">
       {KINDS.flatMap((kind) => r[kind].map((ref) => {
         // A service repo written by the Coolify sync (or the legacy field) is
@@ -93,6 +108,7 @@ export default function GitLabReposTab() {
             removeLabel={t("settings.gitlabRepos.detach")}>{label}</Tag>
         );
       }))}
+      {inheritedChips(inh)}
     </div>
   );
 
@@ -103,12 +119,12 @@ export default function GitLabReposTab() {
         <a href={r.web_url} target="_blank" rel="noopener noreferrer" className="truncate text-sm text-[var(--accent)] hover:underline" title={r.path_with_namespace}>{r.name}</a>
       </div>
       <div className="min-w-0 flex-1">
-        {r.projetos.length + r.services.length + r.dns.length + r.hosts.length > 0
-          ? chips(r)
+        {r.projetos.length + r.services.length + r.dns.length + r.hosts.length + inheritedOf(r).length > 0
+          ? chips(r, inheritedOf(r))
           : <span className="text-xs text-[var(--text-muted)]">{t("settings.gitlabRepos.noLinks")}</span>}
       </div>
       {r.id !== 0 && (
-        <Button size="sm" variant="secondary" onClick={() => setAttachTo(r)}>{t("settings.gitlabRepos.attach")}</Button>
+        <Button size="sm" variant="secondary" onClick={() => setAttachTo({ path: r.path_with_namespace, group: false, webUrl: r.web_url })}>{t("settings.gitlabRepos.attach")}</Button>
       )}
     </li>
   );
@@ -129,11 +145,15 @@ export default function GitLabReposTab() {
             {n.group.name}
           </button>
           <span className="text-xs text-[var(--text-muted)]">{t("settings.gitlabRepos.repoCount", { n: String(repoTotal(n)) })}</span>
-          {n.group.projetos.map((p) => (
-            <Tag key={p.link_id} onRemove={() => askDetach("projetos", p, n.group.full_path)} removeLabel={t("settings.gitlabRepos.detach")}>
-              {`${t("settings.gitlabRepos.kind.projetos")}: ${p.name}`}
+          {(["projetos", "hosts"] as const).flatMap((kind) => (n.group[kind] ?? []).map((p) => (
+            <Tag key={`${kind}-${p.link_id}`} onRemove={() => askDetach(kind, p, n.group.full_path)} removeLabel={t("settings.gitlabRepos.detach")}>
+              {`${t(`settings.gitlabRepos.kind.${kind}`)}: ${p.name}`}
             </Tag>
-          ))}
+          )))}
+          {inheritedChips(n.group.parent_id != null ? inherited.get(n.group.parent_id) ?? [] : [])}
+          <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setAttachTo({ path: n.group.full_path, group: true, webUrl: n.group.web_url })}>
+            {t("settings.gitlabRepos.attach")}
+          </Button>
         </div>
         {open && (
           <ul>
@@ -186,43 +206,47 @@ export default function GitLabReposTab() {
         </SectionCard>
       )}
 
-      {attachTo && <AttachModal repo={attachTo} onClose={() => setAttachTo(null)} onDone={() => { setAttachTo(null); refresh(); }} />}
+      {attachTo && <AttachModal target={attachTo} onClose={() => setAttachTo(null)} onDone={() => { setAttachTo(null); refresh(); }} />}
     </div>
   );
 }
 
-function AttachModal({ repo, onClose, onDone }: { repo: GitLabInventoryRepo; onClose: () => void; onDone: () => void }) {
+/** Links a repo to a projeto, service, DNS record or host — or a whole group
+ *  (every repo under it) to a projeto or host. */
+function AttachModal({ target, onClose, onDone }: { target: AttachTarget; onClose: () => void; onDone: () => void }) {
   const { t } = useLocale();
   const confirm = useConfirm();
   const flag = useFlag();
-  const [kind, setKind] = useState<Kind>("dns");
+  const kinds: Kind[] = target.group ? ["projetos", "hosts"] : KINDS;
+  const [kind, setKind] = useState<Kind>(target.group ? "projetos" : "dns");
   const [picked, setPicked] = useState<AsyncPickerItem | null>(null);
 
   const attach = useMutation({
     mutationFn: async () => {
       const id = picked!.id;
-      if (kind === "projetos") return projectGitlabAPI.addLink(id, { kind: "project", path: repo.path_with_namespace });
+      const linkKind = target.group ? "group" : "project";
+      if (kind === "projetos") return projectGitlabAPI.addLink(id, { kind: linkKind, path: target.path });
       if (kind === "services") {
         // A service holds one repo: replacing it is a choice, not a side effect.
         const current = picked!.secondary;
-        if (current && current !== repo.web_url &&
+        if (current && current !== target.webUrl &&
           !(await confirm({ title: t("settings.gitlabRepos.replaceConfirm", { name: picked!.label, current }), confirmLabel: t("settings.gitlabRepos.replace") }))) {
           return null;
         }
-        return servicesAPI.update(id, { repository_url: repo.web_url });
+        return servicesAPI.update(id, { repository_url: target.webUrl });
       }
-      return gitlabReposAPI.link({ entity_type: kind === "dns" ? "dns" : "host", entity_id: id, path: repo.path_with_namespace });
+      return gitlabReposAPI.link({ entity_type: kind === "dns" ? "dns" : "host", entity_id: id, path: target.path, kind: linkKind });
     },
     onSuccess: (res) => {
       if (res === null) return;
-      flag({ appearance: "success", title: t("settings.gitlabRepos.attached", { name: picked!.label, repo: repo.path_with_namespace }) });
+      flag({ appearance: "success", title: t("settings.gitlabRepos.attached", { name: picked!.label, repo: target.path }) });
       onDone();
     },
     onError: (e: Error) => flag({ appearance: "error", title: t("settings.gitlabRepos.attachFailed"), description: e.message }),
   });
 
   return (
-    <Modal open onClose={onClose} title={t("settings.gitlabRepos.attachTitle", { repo: repo.path_with_namespace })}
+    <Modal open onClose={onClose} title={t(target.group ? "settings.gitlabRepos.attachGroupTitle" : "settings.gitlabRepos.attachTitle", { repo: target.path })}
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>{t("common.cancel")}</Button>
@@ -230,8 +254,9 @@ function AttachModal({ repo, onClose, onDone }: { repo: GitLabInventoryRepo; onC
         </div>
       }>
       <div className="space-y-4">
+        {target.group && <p className="text-xs text-[var(--text-muted)]">{t("settings.gitlabRepos.attachGroupHint")}</p>}
         <div className="flex flex-wrap gap-1.5">
-          {KINDS.map((k) => (
+          {kinds.map((k) => (
             <PillButton key={k} active={kind === k} onClick={() => { setKind(k); setPicked(null); }}>{t(`settings.gitlabRepos.kind.${k}`)}</PillButton>
           ))}
         </div>
