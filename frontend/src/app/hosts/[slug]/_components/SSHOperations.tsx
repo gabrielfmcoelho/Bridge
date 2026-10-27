@@ -818,7 +818,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         count={customOps.length}
         body="flush"
         empty={customOps.length === 0 ? t("operation.custom.empty") : undefined}
-        controls={isAdmin ? <Link href="/settings?tab=ssh-operations" className="text-xs text-[var(--accent)] hover:underline">{t("operation.custom.manage")}</Link> : undefined}
+        controls={isAdmin ? <Link href="/settings/ssh-operations" className="text-xs text-[var(--accent)] hover:underline">{t("operation.custom.manage")}</Link> : undefined}
       >
       <div className="divide-y divide-[var(--border-subtle)]">
         {customOps.map((op) => (
