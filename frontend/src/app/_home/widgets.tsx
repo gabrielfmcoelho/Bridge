@@ -255,10 +255,8 @@ function Atlas() {
   if (q.error) return <Failed title={title} error={q.error} />;
   const recent = [...(q.data ?? [])].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, ROWS);
   const links = [
-    { href: "/atlas/catalog", label: "nav.catalog", icon: NAV_ICONS.Database },
-    { href: "/atlas/lineage", label: "nav.lineage", icon: NAV_ICONS.GitBranch },
     { href: "/atlas/topology", label: "nav.topology", icon: NAV_ICONS.Network },
-    { href: "/atlas/pipeline", label: "nav.pipeline", icon: NAV_ICONS.Workflow },
+    { href: "/atlas/databases", label: "nav.databases", icon: NAV_ICONS.Database },
   ];
   return (
     <SectionCard as="h3" title={title} icon={NAV_ICONS.Plug} body="flush" description={t("home.w.atlasHint")}>
@@ -295,7 +293,7 @@ const PERSONA_ACTIONS: Record<Persona, string[]> = {
   dev: ["/projects", "/issues", "/atlas/apis"],
   chamados: ["/catalog", "/chamados"],
   suporte: ["/chamados"],
-  atlas: ["/atlas/catalog", "/atlas/lineage", "/atlas/apis"],
+  atlas: ["/atlas/apis", "/atlas/databases", "/atlas/topology"],
 };
 
 function QuickActions({ personas }: { personas: Persona[] }) {

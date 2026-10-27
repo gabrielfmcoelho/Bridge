@@ -35,7 +35,7 @@ test("stored prefs: not onboarded → null, unknown ids dropped", () => {
 });
 
 test("pending steps: deduplicated across personas, done ones hidden, wiki last", () => {
-  assert.deepEqual(pendingSteps(["dev", "atlas"], ["issues"]).map((s) => s.id), ["projects", "apis", "atlasCatalog", "lineage", "wiki"]);
+  assert.deepEqual(pendingSteps(["dev", "atlas"], ["issues"]).map((s) => s.id), ["projects", "apis", "wiki"]);
   assert.deepEqual(pendingSteps(["chamados"], ["openChamado", "catalog", "wiki"]), []);
 });
 

@@ -122,8 +122,6 @@ const STEPS: Record<Persona, Step[]> = {
     { id: "chamados", labelKey: "home.steps.chamados", href: "/chamados" },
   ],
   atlas: [
-    { id: "atlasCatalog", labelKey: "home.steps.atlasCatalog", href: "/atlas/catalog" },
-    { id: "lineage", labelKey: "home.steps.lineage", href: "/atlas/lineage" },
     { id: "apis", labelKey: "home.steps.apis", href: "/atlas/apis" },
   ],
 };
