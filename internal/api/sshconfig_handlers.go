@@ -254,19 +254,22 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		}
 		setTestStatus("success")
 
-		// Auto-update host resource fields if empty
+		// The host's CPU / RAM / disk specs follow every scan that measured
+		// them: a resized VM, or a disk total that now counts every partition
+		// (storage.go), would otherwise keep its first value forever.
 		updated := false
-		if host.RecursoCPU == "" && vmInfo.CPU != "" {
-			host.RecursoCPU = vmInfo.CPU
-			updated = true
-		}
-		if host.RecursoRAM == "" && vmInfo.RAM != "" {
-			host.RecursoRAM = vmInfo.RAM
-			updated = true
-		}
-		if host.RecursoArmazenamento == "" && vmInfo.Storage != "" {
-			host.RecursoArmazenamento = vmInfo.Storage
-			updated = true
+		for _, spec := range []struct {
+			field   *string
+			scanned string
+		}{
+			{&host.RecursoCPU, vmInfo.CPU},
+			{&host.RecursoRAM, vmInfo.RAM},
+			{&host.RecursoArmazenamento, vmInfo.Storage},
+		} {
+			if spec.scanned != "" && spec.scanned != " vCPU" && *spec.field != spec.scanned {
+				*spec.field = spec.scanned
+				updated = true
+			}
 		}
 		// Check resource usage thresholds
 		cpuPct := parsePercent(vmInfo.CPUUsage)
