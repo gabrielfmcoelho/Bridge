@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -124,7 +125,9 @@ func DedupeDependencies(rows []models.Dependency) []models.Dependency {
 
 // List returns the visible rows matching f, ordered by host, container,
 // kind and name, with the total for pagination. f.PerPage <= 0 = all rows.
-func (r *DependencyRepo) List(ctx context.Context, f models.DependencyFilter) ([]models.Dependency, int, error) {
+// dependencyWhere is the FROM/WHERE of List and ListGroups: visible rows of
+// live hosts, by kind (default os + runtime), host, service, flags and search.
+func dependencyWhere(ctx context.Context, f models.DependencyFilter) (string, []any) {
 	vis, args := dependencyVisible(ctx)
 	where := ` FROM dependency_inventory d JOIN hosts h ON h.id = d.host_id AND h.deleted_at IS NULL WHERE ` + vis
 	kinds := f.Kinds
@@ -153,6 +156,11 @@ func (r *DependencyRepo) List(ctx context.Context, f models.DependencyFilter) ([
 			OR LOWER(d.image) LIKE ? OR LOWER(h.nickname) LIKE ?)`
 		args = append(args, like, like, like, like, like)
 	}
+	return where, args
+}
+
+func (r *DependencyRepo) List(ctx context.Context, f models.DependencyFilter) ([]models.Dependency, int, error) {
+	where, args := dependencyWhere(ctx, f)
 	var total int
 	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*)`+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
@@ -175,6 +183,51 @@ func (r *DependencyRepo) List(ctx context.Context, f models.DependencyFilter) ([
 			return nil, 0, err
 		}
 		out = append(out, d)
+	}
+	return out, total, rows.Err()
+}
+
+// ListGroups is List grouped by component version (kind, name, version):
+// worst CVE count and severity first, then the most widespread.
+func (r *DependencyRepo) ListGroups(ctx context.Context, f models.DependencyFilter) ([]models.DependencyGroup, int, error) {
+	where, args := dependencyWhere(ctx, f)
+	const group = ` GROUP BY d.kind, d.name, d.version`
+	var total int
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM (SELECT 1`+where+group+`) g`, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	q := `SELECT d.kind, d.name, d.version, COUNT(DISTINCT d.host_id), COUNT(*), MAX(d.cve_count),
+		MAX(CASE d.max_severity WHEN 'critical' THEN 5 WHEN 'high' THEN 4 WHEN 'medium' THEN 3 WHEN 'low' THEN 2 WHEN 'info' THEN 1 ELSE 0 END) AS sev,
+		BOOL_OR(d.eol), MAX(d.eol_date), COUNT(d.evaluated_at), MAX(d.lookup), MIN(d.version_source),
+		to_json((ARRAY_AGG(json_build_object('id', d.id, 'host_id', d.host_id, 'host_nickname', h.nickname, 'host_slug', h.oficial_slug,
+			'container', d.container, 'image', d.image, 'service_id', d.service_id, 'cve_count', d.cve_count)
+			ORDER BY h.nickname, d.container))[1:50])::text` + where + group + `
+		ORDER BY sev DESC, MAX(d.cve_count) DESC, COUNT(DISTINCT d.host_id) DESC, d.name, d.version`
+	if f.PerPage > 0 {
+		page := max(f.Page, 1)
+		q += " LIMIT ? OFFSET ?"
+		args = append(args, f.PerPage, (page-1)*f.PerPage)
+	}
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	severity := []string{"", "info", "low", "medium", "high", "critical"}
+	out := []models.DependencyGroup{}
+	for rows.Next() {
+		var g models.DependencyGroup
+		var sev int
+		var instances string
+		if err := rows.Scan(&g.Kind, &g.Name, &g.Version, &g.Hosts, &g.Installs, &g.CVECount, &sev,
+			&g.EOL, &g.EOLDate, &g.Evaluated, &g.Lookup, &g.VersionSource, &instances); err != nil {
+			return nil, 0, err
+		}
+		g.MaxSeverity = severity[sev]
+		if err := json.Unmarshal([]byte(instances), &g.Instances); err != nil {
+			return nil, 0, err
+		}
+		out = append(out, g)
 	}
 	return out, total, rows.Err()
 }

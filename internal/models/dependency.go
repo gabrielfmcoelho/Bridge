@@ -60,6 +60,38 @@ type DependencyFilter struct {
 	PerPage   int
 }
 
+// DependencyGroup is one component version across every place it is
+// installed (GET /api/vulnerabilities/dependencies/groups). CVECount and
+// MaxSeverity are the worst of its installations (an OSV answer can differ
+// per distro release); Instances is capped at 50.
+type DependencyGroup struct {
+	Kind          string               `json:"kind"`
+	Name          string               `json:"name"`
+	Version       string               `json:"version"`
+	Hosts         int                  `json:"hosts"`
+	Installs      int                  `json:"installs"`
+	CVECount      int                  `json:"cve_count"`
+	MaxSeverity   string               `json:"max_severity"`
+	EOL           bool                 `json:"eol"`
+	EOLDate       string               `json:"eol_date"`
+	Evaluated     int                  `json:"evaluated"` // installations with an answer
+	Lookup        string               `json:"lookup"`
+	VersionSource string               `json:"version_source"`
+	Instances     []DependencyInstance `json:"instances"`
+}
+
+// DependencyInstance is one installation of a DependencyGroup.
+type DependencyInstance struct {
+	ID           int64  `json:"id"`
+	HostID       int64  `json:"host_id"`
+	HostNickname string `json:"host_nickname"`
+	HostSlug     string `json:"host_slug"`
+	Container    string `json:"container"`
+	Image        string `json:"image"`
+	ServiceID    *int64 `json:"service_id"`
+	CVECount     int    `json:"cve_count"`
+}
+
 // DependencyVuln is one advisory matching a dependency.
 type DependencyVuln struct {
 	ID       string  `json:"id"` // CVE-… (or the OSV id when no CVE alias)

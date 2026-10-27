@@ -17964,6 +17964,88 @@
                 }
             }
         },
+        "/api/vulnerabilities/dependencies/groups": {
+            "get": {
+                "description": "The same rows and filters as the dependency list, one entry per component version (kind, name, version) with how many hosts and installations have it, the worst CVE count and severity among them, EOL, and up to 50 of its installations. Worst first, then the most widespread. Any role; visibility as the list.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vulnerabilities"
+                ],
+                "summary": "List dependency versions grouped by component",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Comma-separated: os, runtime, package (default os,runtime)",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only this host",
+                        "name": "host_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only this service's container",
+                        "name": "service_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only versions with CVEs",
+                        "name": "has_cves",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Only end-of-life versions",
+                        "name": "eol",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Name, version, container, image or host",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page (1-based)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (max 200); omit for every row",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_DependencyGroup"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/vulnerabilities/dependencies/{id}": {
             "get": {
                 "description": "One inventory row with its known advisories and the findings they produced. Invisible rows answer 404. Any role.",
@@ -19104,6 +19186,20 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.Dependency"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
+        "api.ListEnvelope-models_DependencyGroup": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.DependencyGroup"
                     }
                 },
                 "meta": {
@@ -24889,6 +24985,83 @@
                     "items": {
                         "$ref": "#/definitions/models.DependencyVuln"
                     }
+                }
+            }
+        },
+        "models.DependencyGroup": {
+            "type": "object",
+            "properties": {
+                "cve_count": {
+                    "type": "integer"
+                },
+                "eol": {
+                    "type": "boolean"
+                },
+                "eol_date": {
+                    "type": "string"
+                },
+                "evaluated": {
+                    "description": "installations with an answer",
+                    "type": "integer"
+                },
+                "hosts": {
+                    "type": "integer"
+                },
+                "installs": {
+                    "type": "integer"
+                },
+                "instances": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.DependencyInstance"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "lookup": {
+                    "type": "string"
+                },
+                "max_severity": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "version_source": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.DependencyInstance": {
+            "type": "object",
+            "properties": {
+                "container": {
+                    "type": "string"
+                },
+                "cve_count": {
+                    "type": "integer"
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "host_nickname": {
+                    "type": "string"
+                },
+                "host_slug": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "service_id": {
+                    "type": "integer"
                 }
             }
         },

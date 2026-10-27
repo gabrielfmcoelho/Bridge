@@ -919,6 +919,8 @@ export const vulnAPI = {
   dependencies: (params: Record<string, string>) =>
     api.getListPaginated<import("./types").Dependency>(`/api/vulnerabilities/dependencies?${new URLSearchParams(params).toString()}`),
   dependency: (id: number) => api.get<import("./types").DependencyDetail>(`/api/vulnerabilities/dependencies/${id}`),
+  dependencyGroups: (params: Record<string, string>) =>
+    api.getListPaginated<import("./types").DependencyGroup>(`/api/vulnerabilities/dependencies/groups?${new URLSearchParams(params).toString()}`),
   // Starts the background run (OSV / NVD / endoflife.date, then findings);
   // answers at once with its status — poll evaluationStatus for the result.
   evaluateDependencies: () =>

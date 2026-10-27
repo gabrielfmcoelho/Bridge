@@ -2719,7 +2719,8 @@
       "noAnswer": "sem resposta",
       "disks": "Discos",
       "unused": "sem uso",
-      "free": "livre"
+      "free": "livre",
+      "total": "total {used} / {size} em {count} partições"
     }
   },
   "sshKey": {
@@ -4299,7 +4300,10 @@
       "timeDeferred": "{count} consultas ficaram para a próxima rodada (limite de tempo) — clique de novo para continuar",
       "evaluateStarted": "Avaliação de CVEs iniciada",
       "evaluateStartedHint": "Roda em segundo plano — o resultado aparece aqui quando terminar (a primeira rodada pode levar meia hora).",
-      "evaluatingSince": "Avaliando desde {time}…"
+      "evaluatingSince": "Avaliando desde {time}…",
+      "installs": "{count} instalações",
+      "hostsInstalls": "{hosts} hosts · {installs} instalações",
+      "moreInstalls": "+{count} outras — refine com a busca"
     },
     "sourceInventory": "Inventário"
   }

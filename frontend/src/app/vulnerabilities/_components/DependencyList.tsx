@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import Drawer from "@/components/ui/Drawer";
@@ -16,7 +16,9 @@ import { tableClasses } from "@/components/ui/Table";
 import { useLocale } from "@/contexts/LocaleContext";
 import { vulnAPI } from "@/lib/api";
 import { VULN_SEVERITY_BADGE } from "@/lib/alert-colors";
-import type { Dependency } from "@/lib/types";
+import type { Dependency, DependencyInstance } from "@/lib/types";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
 
 const PER_PAGE = 50;
 
@@ -25,30 +27,35 @@ export type DependencyFlag = "" | "cves" | "eol";
 
 const KINDS: Record<DependencyKindFilter, string> = { components: "os,runtime", packages: "package", all: "os,runtime,package" };
 
-/** The Dependencies tab: every OS / runtime / package version the host scans
- *  found, on the host or inside a container, with its CVE count and EOL flag.
- *  A row opens its advisories and the findings they produced. */
-export default function DependencyList({ search, kind, flag, onOpenFinding }: {
+/** The Dependencies view: every OS / runtime / package version the host
+ *  scans found, one row per component version with how many hosts and
+ *  installations have it. A row expands to its installations; one opens its
+ *  advisories and the findings they produced. With hostId, that host only
+ *  (its host and container installations of a version are one row). */
+export default function DependencyList({ search, kind, flag, onOpenFinding, hostId }: {
   search: string;
   kind: DependencyKindFilter;
   flag: DependencyFlag;
   onOpenFinding: (id: number) => void;
+  hostId?: number;
 }) {
   const { t } = useLocale();
-  const key = [search, kind, flag].join("|");
+  const key = [search, kind, flag, hostId].join("|");
   const [paged, setPaged] = useState({ key, page: 1 });
   const page = paged.key === key ? paged.page : 1;
   const [openId, setOpenId] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const params: Record<string, string> = { page: String(page), per_page: String(PER_PAGE), kind: KINDS[kind] };
   if (search) params.search = search;
   if (flag === "cves") params.has_cves = "true";
   if (flag === "eol") params.eol = "true";
+  if (hostId) params.host_id = String(hostId);
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["vulnerabilities", "dependencies", params],
-    queryFn: () => vulnAPI.dependencies(params),
+    queryKey: ["vulnerabilities", "dependency-groups", params],
+    queryFn: () => vulnAPI.dependencyGroups(params),
   });
-  const rows = data?.data ?? [];
+  const groups = data?.data ?? [];
   const total = data?.meta.total ?? 0;
 
   return (
@@ -57,7 +64,7 @@ export default function DependencyList({ search, kind, flag, onOpenFinding }: {
         <SkeletonTable rows={8} />
       ) : isError ? (
         <StatusAlert variant="error">{(error as Error)?.message}</StatusAlert>
-      ) : rows.length === 0 ? (
+      ) : groups.length === 0 ? (
         <EmptyState icon="search" title={t("vuln.empty.dependencies")} description={t("vuln.deps.emptyHint")} />
       ) : (
         <div className="space-y-3">
@@ -74,21 +81,57 @@ export default function DependencyList({ search, kind, flag, onOpenFinding }: {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((d, i) => (
-                  <tr key={d.id} className={`${tableClasses.row} cursor-pointer ${i % 2 === 1 ? tableClasses.rowAlt : ""}`} onClick={() => setOpenId(d.id)}>
-                    <td className={tableClasses.td}>
-                      <span className="inline-flex items-center gap-2">
-                        <Lozenge appearance={d.kind === "os" ? "inprogress" : d.kind === "runtime" ? "new" : "default"}>{t(`vuln.deps.kind.${d.kind}`)}</Lozenge>
-                        <span className="font-medium text-[var(--text-primary)]">{d.name}</span>
-                      </span>
-                    </td>
-                    <td className={`${tableClasses.td} font-mono text-xs`}>{d.version}</td>
-                    <td className={tableClasses.td}><Where d={d} /></td>
-                    <td className={`${tableClasses.td} text-[var(--text-muted)] whitespace-nowrap`}>{t(`vuln.deps.source.${d.version_source}`)}</td>
-                    <td className={tableClasses.td}>{d.eol ? <Badge color="danger">{d.eol_date || t("vuln.deps.eolYes")}</Badge> : <span className="text-[var(--text-muted)]">—</span>}</td>
-                    <td className={tableClasses.td}><CveCell d={d} /></td>
-                  </tr>
-                ))}
+                {groups.map((g, i) => {
+                  const gk = `${g.kind}|${g.name}|${g.version}`;
+                  const open = expanded === gk;
+                  return (
+                    <Fragment key={gk}>
+                      <tr className={`${tableClasses.row} cursor-pointer ${i % 2 === 1 ? tableClasses.rowAlt : ""}`}
+                        onClick={() => (g.installs === 1 ? setOpenId(g.instances[0].id) : setExpanded(open ? null : gk))}
+                        aria-expanded={g.installs > 1 ? open : undefined}>
+                        <td className={tableClasses.td}>
+                          <span className="inline-flex items-center gap-2">
+                            {g.installs > 1 && (
+                              <Icon path={ICON_PATHS.chevronRight} className={`w-3.5 h-3.5 shrink-0 text-[var(--text-muted)] transition-transform ${open ? "rotate-90" : ""}`} />
+                            )}
+                            <Lozenge appearance={g.kind === "os" ? "inprogress" : g.kind === "runtime" ? "new" : "default"}>{t(`vuln.deps.kind.${g.kind}`)}</Lozenge>
+                            <span className="font-medium text-[var(--text-primary)]">{g.name}</span>
+                          </span>
+                        </td>
+                        <td className={`${tableClasses.td} font-mono text-xs`}>{g.version}</td>
+                        <td className={tableClasses.td}>
+                          {g.installs === 1 ? <Where d={g.instances[0]} /> : (
+                            <span className="text-[var(--text-secondary)]">
+                              {hostId ? t("vuln.deps.installs", { count: String(g.installs) })
+                                : t("vuln.deps.hostsInstalls", { hosts: String(g.hosts), installs: String(g.installs) })}
+                            </span>
+                          )}
+                        </td>
+                        <td className={`${tableClasses.td} text-[var(--text-muted)] whitespace-nowrap`}>{t(`vuln.deps.source.${g.version_source}`)}</td>
+                        <td className={tableClasses.td}>{g.eol ? <Badge color="danger">{g.eol_date || t("vuln.deps.eolYes")}</Badge> : <span className="text-[var(--text-muted)]">—</span>}</td>
+                        <td className={tableClasses.td}>
+                          <CveCell kind={g.kind} lookup={g.lookup} versionSource={g.version_source} evaluated={g.evaluated > 0} cves={g.cve_count} severity={g.max_severity} />
+                        </td>
+                      </tr>
+                      {open && g.instances.map((inst) => (
+                        <tr key={inst.id} className={`${tableClasses.row} cursor-pointer bg-[var(--bg-elevated)]/40`} onClick={() => setOpenId(inst.id)}>
+                          <td className={tableClasses.td} />
+                          <td className={tableClasses.td} />
+                          <td className={tableClasses.td} colSpan={3}><Where d={inst} /></td>
+                          <td className={`${tableClasses.td} font-mono text-xs text-[var(--text-muted)]`}>{g.evaluated > 0 ? inst.cve_count : ""}</td>
+                        </tr>
+                      ))}
+                      {open && g.installs > g.instances.length && (
+                        <tr className={tableClasses.row}>
+                          <td className={tableClasses.td} colSpan={2} />
+                          <td className={`${tableClasses.td} text-xs text-[var(--text-muted)]`} colSpan={4}>
+                            {t("vuln.deps.moreInstalls", { count: String(g.installs - g.instances.length) })}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -102,7 +145,7 @@ export default function DependencyList({ search, kind, flag, onOpenFinding }: {
 }
 
 /** "vm-app · web (nginx:1.25)" — the host, and the container when there is one. */
-function Where({ d }: { d: Dependency }) {
+function Where({ d }: { d: DependencyInstance }) {
   const { t } = useLocale();
   return (
     <span className="text-[var(--text-secondary)]">
@@ -118,20 +161,23 @@ function Where({ d }: { d: Dependency }) {
   );
 }
 
-function CveCell({ d }: { d: Dependency }) {
+function CveCell({ kind, lookup, versionSource, evaluated, cves, severity }: {
+  kind: Dependency["kind"]; lookup: Dependency["lookup"]; versionSource: Dependency["version_source"];
+  evaluated: boolean; cves: number; severity: Dependency["max_severity"];
+}) {
   const { t } = useLocale();
-  if (!d.lookup) {
+  if (!lookup) {
     // The OS has an EOL, not CVEs; a probed runtime without a lookup has its
     // CVEs on the distro package that ships it (e.g. openssl → libssl3).
-    if (d.kind === "os") return <span className="text-[var(--text-muted)]">—</span>;
-    return <span className="text-[var(--text-muted)]">{d.kind === "runtime" && d.version_source === "probe" ? t("vuln.deps.viaPackage") : t("vuln.deps.noLookup")}</span>;
+    if (kind === "os") return <span className="text-[var(--text-muted)]">—</span>;
+    return <span className="text-[var(--text-muted)]">{kind === "runtime" && versionSource === "probe" ? t("vuln.deps.viaPackage") : t("vuln.deps.noLookup")}</span>;
   }
-  if (!d.evaluated_at) return <span className="text-[var(--text-muted)]">{t("vuln.deps.notEvaluated")}</span>;
-  if (d.cve_count === 0) return <span className="text-[var(--text-muted)]">0</span>;
+  if (!evaluated) return <span className="text-[var(--text-muted)]">{t("vuln.deps.notEvaluated")}</span>;
+  if (cves === 0) return <span className="text-[var(--text-muted)]">0</span>;
   return (
     <span className="inline-flex items-center gap-2">
-      <span className="font-mono">{d.cve_count}</span>
-      {d.max_severity && <Badge color={VULN_SEVERITY_BADGE[d.max_severity]}>{t(`vuln.severityLevel.${d.max_severity}`)}</Badge>}
+      <span className="font-mono">{cves}</span>
+      {severity && <Badge color={VULN_SEVERITY_BADGE[severity]}>{t(`vuln.severityLevel.${severity}`)}</Badge>}
     </span>
   );
 }

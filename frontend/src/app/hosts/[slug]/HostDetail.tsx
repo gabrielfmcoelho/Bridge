@@ -29,6 +29,7 @@ import SSHConfigDrawer from "./_components/SSHConfigDrawer";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
+import HostDependencies from "./_components/HostDependencies";
 
 type TabKey = "overview" | "operations" | "alerts" | "vulns" | "topology" | "metrics" | "requests" | "sentinel";
 
@@ -239,7 +240,12 @@ export default function HostDetail({ slug }: { slug: string }) {
             />
           )}
 
-          {activeTab === "vulns" && <EntityVulnsTab entityType="host" entityId={data.host.id} />}
+          {activeTab === "vulns" && (
+            <div className="space-y-6">
+              <EntityVulnsTab entityType="host" entityId={data.host.id} />
+              <HostDependencies hostId={data.host.id} />
+            </div>
+          )}
 
           {/* ═══ TOPOLOGY TAB ═══ */}
           {activeTab === "topology" && (
