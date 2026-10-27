@@ -9,7 +9,7 @@ import (
 )
 
 // GitLabRepoLinkRepo owns SQL for gitlab_repo_links (GitLab repo ↔ DNS record
-// or host). Reads join the live parent, so links of a trashed record are
+// or host, or GitLab group ↔ host). Reads join the live parent, so links of a trashed record are
 // hidden until it is restored.
 type GitLabRepoLinkRepo struct {
 	db *sql.DB
@@ -20,7 +20,7 @@ func NewGitLabRepoLinkRepo(db *sql.DB) *GitLabRepoLinkRepo {
 	return &GitLabRepoLinkRepo{db: db}
 }
 
-const gitlabRepoLinkSelect = `SELECT l.id, l.entity_type, l.entity_id, COALESCE(d.domain, h.nickname, ''),
+const gitlabRepoLinkSelect = `SELECT l.id, l.entity_type, l.entity_id, COALESCE(d.domain, h.nickname, ''), l.kind,
 		l.gitlab_project_id, l.gitlab_base_url, l.gitlab_path, l.created_at
 	FROM gitlab_repo_links l
 	LEFT JOIN dns_records d ON l.entity_type = 'dns' AND d.id = l.entity_id AND d.deleted_at IS NULL
@@ -36,7 +36,7 @@ func (r *GitLabRepoLinkRepo) query(ctx context.Context, where string, args ...an
 	var out []models.GitLabRepoLink
 	for rows.Next() {
 		var l models.GitLabRepoLink
-		if err := rows.Scan(&l.ID, &l.EntityType, &l.EntityID, &l.EntityName,
+		if err := rows.Scan(&l.ID, &l.EntityType, &l.EntityID, &l.EntityName, &l.Kind,
 			&l.GitLabProjectID, &l.GitLabBaseURL, &l.GitLabPath, &l.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -63,10 +63,13 @@ func (r *GitLabRepoLinkRepo) ListFor(ctx context.Context, entityType string, ids
 // Create inserts a link and sets l.ID. A duplicate violates the UNIQUE
 // constraint and returns its error.
 func (r *GitLabRepoLinkRepo) Create(ctx context.Context, l *models.GitLabRepoLink, createdBy *int64) error {
+	if l.Kind == "" {
+		l.Kind = models.GitLabLinkKindProject // a single repo unless said otherwise
+	}
 	id, err := database.InsertReturningID(r.db, `
-		INSERT INTO gitlab_repo_links (entity_type, entity_id, gitlab_project_id, gitlab_base_url, gitlab_path, created_by)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		l.EntityType, l.EntityID, l.GitLabProjectID, l.GitLabBaseURL, l.GitLabPath, createdBy)
+		INSERT INTO gitlab_repo_links (entity_type, entity_id, kind, gitlab_project_id, gitlab_base_url, gitlab_path, created_by)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		l.EntityType, l.EntityID, l.Kind, l.GitLabProjectID, l.GitLabBaseURL, l.GitLabPath, createdBy)
 	if err != nil {
 		return err
 	}

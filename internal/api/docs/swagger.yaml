@@ -1197,6 +1197,11 @@ definitions:
     properties:
       full_path:
         type: string
+      hosts:
+        description: Hosts linked to the whole group (every repo under it).
+        items:
+          $ref: '#/definitions/api.gitlabRepoRef'
+        type: array
       id:
         type: integer
       name:
@@ -1258,8 +1263,18 @@ definitions:
         - dns
         - host
         type: string
+      kind:
+        description: |-
+          Kind is "project" (default: one repo) or "group" (every repo under it,
+          subgroups included; hosts only).
+        enum:
+        - project
+        - group
+        type: string
       path:
-        description: Path is the repo's path with namespace, e.g. "seadpi/sgi".
+        description: |-
+          Path is the repo's path with namespace ("seadpi/sgi") or the group's
+          full path ("seadpi/dl").
         type: string
     type: object
   api.gitlabRepoRef:
@@ -4198,6 +4213,10 @@ definitions:
         type: integer
       id:
         type: integer
+      kind:
+        description: Kind is "project" (one repo) or "group" (every repo under it;
+          hosts only).
+        type: string
     type: object
   models.GlpiDropdownCatalogue:
     properties:
@@ -15325,9 +15344,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Admin. The repo is resolved by path with the service token, so
-        it must be readable by it. Projetos and services are attached through their
-        own endpoints.
+      description: Admin. The repo or group is resolved by path with the service token,
+        so it must be readable by it. kind "group" links every repo under the group,
+        subgroups included, and is for hosts only. Projetos and services are attached
+        through their own endpoints.
       parameters:
       - description: Entity and repo path
         in: body
@@ -15362,7 +15382,7 @@ paths:
           description: Conflict
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
-      summary: Link a GitLab repo to a DNS record or host
+      summary: Link a GitLab repo (or group) to a DNS record or host
       tags:
       - gitlab
   /api/settings/gitlab/repo-links/{id}:

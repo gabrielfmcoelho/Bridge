@@ -29,6 +29,8 @@ type gitlabInventoryGroup struct {
 	ParentID *int            `json:"parent_id"`
 	WebURL   string          `json:"web_url"`
 	Projetos []gitlabRepoRef `json:"projetos"`
+	// Hosts linked to the whole group (every repo under it).
+	Hosts []gitlabRepoRef `json:"hosts"`
 }
 
 type gitlabInventoryRepo struct {
@@ -101,7 +103,7 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 	groupAt := map[int]int{}
 	for _, g := range groups {
 		groupAt[g.ID] = len(inv.Groups)
-		inv.Groups = append(inv.Groups, gitlabInventoryGroup{ID: g.ID, Name: g.Name, FullPath: g.FullPath, ParentID: g.ParentID, WebURL: g.WebURL, Projetos: []gitlabRepoRef{}})
+		inv.Groups = append(inv.Groups, gitlabInventoryGroup{ID: g.ID, Name: g.Name, FullPath: g.FullPath, ParentID: g.ParentID, WebURL: g.WebURL, Projetos: []gitlabRepoRef{}, Hosts: []gitlabRepoRef{}})
 	}
 	repoAt := map[int]int{}
 	repoByPath := map[string]int{}
@@ -186,7 +188,7 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 		}
 	}
 
-	// DNS records and hosts.
+	// DNS records and hosts; a host's group link attaches to the group row.
 	direct, err := store.NewGitLabRepoLinkRepo(h.db.SQL).List(ctx)
 	if err != nil {
 		jsonServerError(w, r, "failed to list repo links", err)
@@ -196,8 +198,14 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 		if !sameGitLab(l.GitLabBaseURL, settings.BaseURL) {
 			continue
 		}
-		rp := repoFor(l.GitLabProjectID, l.GitLabPath)
 		ref := gitlabRepoRef{LinkID: l.ID, ID: l.EntityID, Name: l.EntityName}
+		if l.Kind == models.GitLabLinkKindGroup {
+			if i, ok := groupAt[l.GitLabProjectID]; ok {
+				inv.Groups[i].Hosts = append(inv.Groups[i].Hosts, ref)
+			}
+			continue
+		}
+		rp := repoFor(l.GitLabProjectID, l.GitLabPath)
 		if l.EntityType == "dns" {
 			rp.DNS = append(rp.DNS, ref)
 		} else {
@@ -211,14 +219,19 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 type gitlabRepoLinkRequest struct {
 	EntityType string `json:"entity_type" enums:"dns,host"`
 	EntityID   int64  `json:"entity_id"`
-	// Path is the repo's path with namespace, e.g. "seadpi/sgi".
+	// Kind is "project" (default: one repo) or "group" (every repo under it,
+	// subgroups included; hosts only).
+	Kind string `json:"kind" enums:"project,group"`
+	// Path is the repo's path with namespace ("seadpi/sgi") or the group's
+	// full path ("seadpi/dl").
 	Path string `json:"path"`
 }
 
-// handleCreateRepoLink links a GitLab repo straight to a DNS record or host.
+// handleCreateRepoLink links a GitLab repo straight to a DNS record or host,
+// or a whole GitLab group to a host.
 //
-//	@Summary		Link a GitLab repo to a DNS record or host
-//	@Description	Admin. The repo is resolved by path with the service token, so it must be readable by it. Projetos and services are attached through their own endpoints.
+//	@Summary		Link a GitLab repo (or group) to a DNS record or host
+//	@Description	Admin. The repo or group is resolved by path with the service token, so it must be readable by it. kind "group" links every repo under the group, subgroups included, and is for hosts only. Projetos and services are attached through their own endpoints.
 //	@Tags			gitlab
 //	@Accept			json
 //	@Produce		json
@@ -242,7 +255,18 @@ func (h *projectGitLabHandlers) handleCreateRepoLink(w http.ResponseWriter, r *h
 		jsonError(w, http.StatusBadRequest, "path is required")
 		return
 	}
-	link := models.GitLabRepoLink{EntityType: req.EntityType, EntityID: req.EntityID}
+	if req.Kind == "" {
+		req.Kind = models.GitLabLinkKindProject
+	}
+	if req.Kind != models.GitLabLinkKindProject && req.Kind != models.GitLabLinkKindGroup {
+		jsonError(w, http.StatusBadRequest, "kind must be 'project' or 'group'")
+		return
+	}
+	if req.Kind == models.GitLabLinkKindGroup && req.EntityType != "host" {
+		jsonError(w, http.StatusBadRequest, "a GitLab group can be linked to a host or a projeto, not a "+req.EntityType)
+		return
+	}
+	link := models.GitLabRepoLink{EntityType: req.EntityType, EntityID: req.EntityID, Kind: req.Kind}
 	switch req.EntityType {
 	case "dns":
 		d, err := store.NewDNSRepo(h.db.SQL).Get(ctx, req.EntityID)
@@ -271,12 +295,22 @@ func (h *projectGitLabHandlers) handleCreateRepoLink(w http.ResponseWriter, r *h
 		jsonError(w, http.StatusBadRequest, "GitLab service token not configured")
 		return
 	}
-	p, err := client.SearchProjectByPath(req.Path)
-	if err != nil {
-		jsonError(w, http.StatusNotFound, "GitLab project not found: "+err.Error())
-		return
+	if req.Kind == models.GitLabLinkKindGroup {
+		g, err := client.SearchGroupByPath(req.Path)
+		if err != nil {
+			jsonError(w, http.StatusNotFound, "GitLab group not found: "+err.Error())
+			return
+		}
+		link.GitLabProjectID, link.GitLabPath = g.ID, g.FullPath
+	} else {
+		p, err := client.SearchProjectByPath(req.Path)
+		if err != nil {
+			jsonError(w, http.StatusNotFound, "GitLab project not found: "+err.Error())
+			return
+		}
+		link.GitLabProjectID, link.GitLabPath = p.ID, p.PathWithNamespace
 	}
-	link.GitLabProjectID, link.GitLabPath, link.GitLabBaseURL = p.ID, p.PathWithNamespace, settings.BaseURL
+	link.GitLabBaseURL = settings.BaseURL
 	var by *int64
 	if u := auth.UserFromContext(ctx); u != nil {
 		by = &u.ID

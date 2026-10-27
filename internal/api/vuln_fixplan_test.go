@@ -386,3 +386,52 @@ func TestBuildFixScope_DNSRepoLink(t *testing.T) {
 		t.Fatalf("notes = %v", sc.notes)
 	}
 }
+
+// A host linked to a whole GitLab group: the fix plan reads every repo under
+// it, subgroups included.
+func TestBuildFixScope_HostGroupLink(t *testing.T) {
+	ctx := context.Background()
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	gl := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v4/groups/2/projects" && r.URL.Query().Get("include_subgroups") == "true" {
+			_, _ = w.Write([]byte(`[{"id":8,"name":"lake","path_with_namespace":"sead/dl/lake"},{"id":11,"name":"ingest","path_with_namespace":"sead/dl/raw/ingest"}]`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(gl.Close)
+
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('vm-dl', 'vm-dl') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.NewGitLabRepoLinkRepo(d.SQL).Create(ctx, &models.GitLabRepoLink{EntityType: "host", EntityID: hostID,
+		Kind: models.GitLabLinkKindGroup, GitLabProjectID: 2, GitLabBaseURL: gl.URL, GitLabPath: "sead/dl"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	vulns := store.NewVulnRepo(d.SQL)
+	if _, err := vulns.ApplyImport(ctx, "etipi", []models.VulnFinding{{Fingerprint: "y", Title: "OpenSSH", Severity: "high", Target: "vm-dl"}}, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	all, _, _ := vulns.List(ctx, models.VulnFilter{})
+	if err := vulns.AddLink(ctx, all[0].ID, "host", hostID); err != nil {
+		t.Fatal(err)
+	}
+	f, err := vulns.Get(ctx, all[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gls := gitlabclient.Settings{Enabled: true, BaseURL: gl.URL, ServiceToken: "tok", DefaultRef: "main"}
+	sc := buildFixScope(ctx, d, f, gitlabclient.NewServiceClient(gls), gls)
+	var keys []string
+	for _, r := range sc.repos {
+		keys = append(keys, r.Key)
+	}
+	if strings.Join(keys, ",") != "sead/dl/lake,sead/dl/raw/ingest" {
+		t.Fatalf("repos = %v, notes %v", keys, sc.notes)
+	}
+}

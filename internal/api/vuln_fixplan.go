@@ -270,6 +270,18 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 			if !sameGitLab(l.GitLabBaseURL, gls.BaseURL) {
 				continue
 			}
+			if l.Kind == models.GitLabLinkKindGroup {
+				// A host linked to a whole group: every repo under it.
+				ps, err := gl.ListGroupProjects(l.GitLabProjectID, true)
+				if err != nil {
+					sc.notes = append(sc.notes, "grupo "+l.GitLabPath+" ligado a "+l.EntityName+" não acessível")
+					continue
+				}
+				for _, p := range ps {
+					addRepo(fixRepo{Key: p.PathWithNamespace, ID: p.ID, Name: p.Name, Ref: gls.DefaultRef})
+				}
+				continue
+			}
 			p, err := gl.GetProject(l.GitLabProjectID)
 			if err != nil {
 				sc.notes = append(sc.notes, "repo "+l.GitLabPath+" ligado a "+l.EntityName+" não acessível")

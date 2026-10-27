@@ -13139,7 +13139,7 @@ const docTemplate = `{
         },
         "/api/settings/gitlab/repo-links": {
             "post": {
-                "description": "Admin. The repo is resolved by path with the service token, so it must be readable by it. Projetos and services are attached through their own endpoints.",
+                "description": "Admin. The repo or group is resolved by path with the service token, so it must be readable by it. kind \"group\" links every repo under the group, subgroups included, and is for hosts only. Projetos and services are attached through their own endpoints.",
                 "consumes": [
                     "application/json"
                 ],
@@ -13149,7 +13149,7 @@ const docTemplate = `{
                 "tags": [
                     "gitlab"
                 ],
-                "summary": "Link a GitLab repo to a DNS record or host",
+                "summary": "Link a GitLab repo (or group) to a DNS record or host",
                 "parameters": [
                     {
                         "description": "Entity and repo path",
@@ -20783,6 +20783,13 @@ const docTemplate = `{
                 "full_path": {
                     "type": "string"
                 },
+                "hosts": {
+                    "description": "Hosts linked to the whole group (every repo under it).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -20873,8 +20880,16 @@ const docTemplate = `{
                         "host"
                     ]
                 },
+                "kind": {
+                    "description": "Kind is \"project\" (default: one repo) or \"group\" (every repo under it,\nsubgroups included; hosts only).",
+                    "type": "string",
+                    "enum": [
+                        "project",
+                        "group"
+                    ]
+                },
                 "path": {
-                    "description": "Path is the repo's path with namespace, e.g. \"seadpi/sgi\".",
+                    "description": "Path is the repo's path with namespace (\"seadpi/sgi\") or the group's\nfull path (\"seadpi/dl\").",
                     "type": "string"
                 }
             }
@@ -25218,6 +25233,10 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "kind": {
+                    "description": "Kind is \"project\" (one repo) or \"group\" (every repo under it; hosts only).",
+                    "type": "string"
                 }
             }
         },

@@ -2109,7 +2109,10 @@
       "empty": "The token sees no repositories.",
       "emptyFiltered": "No repository matches these filters.",
       "unlistedTitle": "Attached but not visible to the token",
-      "unlistedHint": "Repositories attached in Bridge that the token does not list: moved, renamed, or out of its reach. Fix plans cannot read them."
+      "unlistedHint": "Repositories attached in Bridge that the token does not list: moved, renamed, or out of its reach. Fix plans cannot read them.",
+      "via": "via group {group}",
+      "attachGroupTitle": "Link the group {repo}",
+      "attachGroupHint": "Every repo in this group and its subgroups — now and later — belongs to what you pick."
     },
     "sshOps": {
       "title": "SSH operations",

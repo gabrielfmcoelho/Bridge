@@ -1521,6 +1521,8 @@ export interface GitLabInventoryGroup {
   parent_id: number | null;
   web_url: string;
   projetos: GitLabRepoRef[];
+  /** Hosts linked to the whole group (every repo under it). */
+  hosts: GitLabRepoRef[];
 }
 
 export interface GitLabInventoryRepo {

@@ -1506,7 +1506,8 @@ export const projectGitlabAPI = {
 // repo is attached. Projetos and services attach through their own endpoints.
 export const gitlabReposAPI = {
   list: () => api.get<import("./types").GitLabInventory>("/api/settings/gitlab/repos"),
-  link: (data: { entity_type: "dns" | "host"; entity_id: number; path: string }) =>
+  // kind "group": a whole GitLab group (every repo under it) — hosts only.
+  link: (data: { entity_type: "dns" | "host"; entity_id: number; path: string; kind?: "project" | "group" }) =>
     api.post<{ id: number }>("/api/settings/gitlab/repo-links", data),
   unlink: (id: number) => api.delete(`/api/settings/gitlab/repo-links/${id}`),
 };
