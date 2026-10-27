@@ -791,15 +791,79 @@ func (r *SecretRepo) scanBundleViews(ctx context.Context, rows *sql.Rows) ([]Bun
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	// Attach item labels (small N; fine for an owner list).
+	// Attach item labels: one items query and one labelling pass for the whole
+	// list (names in bulk, wiki titles cached) — not a round trip per bundle.
+	ids := make([]int64, len(out))
 	for i := range out {
-		items, err := r.loadBundleItems(ctx, out[i].ID)
-		if err != nil {
-			return nil, err
-		}
-		out[i].Items = r.labelItems(ctx, items)
+		ids[i] = out[i].ID
+	}
+	byBundle, err := r.loadItemsByBundle(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	var flat []bundleItemRow
+	for i := range out {
+		flat = append(flat, byBundle[out[i].ID]...)
+	}
+	views := r.labelItems(ctx, flat)
+	for i := range out {
+		n := len(byBundle[out[i].ID])
+		out[i].Items, views = views[:n:n], views[n:]
 	}
 	return out, nil
+}
+
+// loadItemsByBundle reads the items of every given bundle in one query, each
+// bundle's in its display order.
+func (r *SecretRepo) loadItemsByBundle(ctx context.Context, bundleIDs []int64) (map[int64][]bundleItemRow, error) {
+	out := make(map[int64][]bundleItemRow, len(bundleIDs))
+	if len(bundleIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT bundle_id, item_type, ref_id, ref_key, selector FROM share_bundle_items
+		  WHERE bundle_id = ANY(?) ORDER BY bundle_id, sort_order, id`, bundleIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var bid int64
+		var it bundleItemRow
+		var refKey, sel sql.NullString
+		if err := rows.Scan(&bid, &it.itemType, &it.refID, &refKey, &sel); err != nil {
+			return nil, err
+		}
+		it.refKey, it.selector = refKey.String, sel.String
+		out[bid] = append(out[bid], it)
+	}
+	return out, rows.Err()
+}
+
+// secretNames returns id → name for the live secrets among ids the caller can
+// see (same filter as loadView), in one query.
+func (r *SecretRepo) secretNames(ctx context.Context, ids []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	vis, vargs := secretVisibleSQL(ctx, "secrets")
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, name FROM secrets WHERE id = ANY(?) AND deleted_at IS NULL AND `+vis,
+		append([]any{ids}, vargs...)...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = name
+	}
+	return out, rows.Err()
 }
 
 // ListBundles returns the bundles in the actor's ownerScope (metadata + item
@@ -989,49 +1053,42 @@ func (r *SecretRepo) UpdateBundleDetails(ctx context.Context, actor ActorContext
 }
 
 func (r *SecretRepo) labelItems(ctx context.Context, items []bundleItemRow) []BundleItemView {
-	views := make([]BundleItemView, 0, len(items))
-	// Outline client is built lazily on the first wiki item and reused for the
-	// rest of this bundle's labels (nil if the integration is down — those items
-	// then fall back to their "(deleted)" label).
-	var (
-		wikiClient *outlineclient.Client
-		wikiInit   bool
-	)
+	var secretIDs, apiIDs []int64
+	var wikiItems []bundleItemRow
 	for _, it := range items {
-		bv := BundleItemView{Type: it.itemType, RefID: it.refID, RefKey: it.refKey, Label: "(deleted)"}
 		switch it.itemType {
 		case BundleItemSecret:
-			if v, err := r.loadView(ctx, it.refID, false); err == nil {
-				bv.Label = v.Name
-			}
+			secretIDs = append(secretIDs, it.refID)
 		case BundleItemAPIDoc:
-			if a, err := store.NewAPICatalogRepo(r.db).Get(ctx, it.refID); err == nil && a != nil {
-				bv.Label = a.Name
-			}
+			apiIDs = append(apiIDs, it.refID)
+		case BundleItemWikiDoc, BundleItemWikiCollection:
+			wikiItems = append(wikiItems, it)
+		}
+	}
+	// A lookup that fails leaves its items on the "(deleted)" label, as before.
+	secretNames, _ := r.secretNames(ctx, secretIDs)
+	apiNames, _ := store.NewAPICatalogRepo(r.db).NamesByID(ctx, apiIDs)
+	wikiNames := r.wikiTitles(ctx, wikiItems)
+
+	views := make([]BundleItemView, 0, len(items))
+	for _, it := range items {
+		bv := BundleItemView{Type: it.itemType, RefID: it.refID, RefKey: it.refKey, Label: "(deleted)"}
+		var name string
+		var ok bool
+		switch it.itemType {
+		case BundleItemSecret:
+			name, ok = secretNames[it.refID]
+		case BundleItemAPIDoc:
+			name, ok = apiNames[it.refID]
 			if it.selector != "" {
 				s := it.selector
 				bv.Selector = &s
 			}
 		case BundleItemWikiDoc, BundleItemWikiCollection:
-			if !wikiInit {
-				wikiInit = true
-				if c, _, err := r.wikiClient(ctx); err == nil {
-					wikiClient = c
-				}
-			}
-			if wikiClient != nil && it.refKey != "" {
-				lctx, cancel := context.WithTimeout(ctx, wikiAuthTimeout)
-				if it.itemType == BundleItemWikiDoc {
-					if d, err := wikiClient.DocumentInfo(lctx, it.refKey); err == nil {
-						bv.Label = d.Title
-					}
-				} else {
-					if c, err := wikiClient.CollectionInfo(lctx, it.refKey); err == nil {
-						bv.Label = c.Name
-					}
-				}
-				cancel()
-			}
+			name, ok = wikiNames[wikiTitleKey(it)]
+		}
+		if ok {
+			bv.Label = name
 		}
 		views = append(views, bv)
 	}

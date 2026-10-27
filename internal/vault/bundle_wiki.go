@@ -260,3 +260,100 @@ func (r *SecretRepo) fillWikiBodies(ctx context.Context, client *outlineclient.C
 	}
 	fill(tree)
 }
+
+// Wiki titles in the share lists. Outline is asked once per page per
+// wikiTitleTTL, not on every list load: a renamed page keeps its old title in
+// the lists until then (the redeem page always reads Outline live).
+const (
+	wikiTitleTTL         = 24 * time.Hour
+	wikiTitleConcurrency = 8
+)
+
+type cachedWikiTitle struct {
+	title string
+	at    time.Time
+}
+
+// ponytail: in-memory per process and never pruned; bounded by the distinct
+// wiki items ever shared. Move to a table if several API replicas must agree.
+var wikiTitleCache = struct {
+	sync.Mutex
+	m map[string]cachedWikiTitle
+}{m: map[string]cachedWikiTitle{}}
+
+func wikiTitleKey(it bundleItemRow) string { return it.itemType + ":" + it.refKey }
+
+// wikiTitles resolves the titles of wiki items from Outline (see resolveWikiTitles).
+func (r *SecretRepo) wikiTitles(ctx context.Context, items []bundleItemRow) map[string]string {
+	var (
+		once   sync.Once
+		client *outlineclient.Client
+	)
+	return resolveWikiTitles(ctx, items, time.Now(), func(lctx context.Context, it bundleItemRow) (string, error) {
+		once.Do(func() { client, _, _ = r.wikiClient(ctx) })
+		if client == nil {
+			return "", ErrBundleWikiUnavailable
+		}
+		if it.itemType == BundleItemWikiDoc {
+			d, err := client.DocumentInfo(lctx, it.refKey)
+			if err != nil {
+				return "", err
+			}
+			return d.Title, nil
+		}
+		c, err := client.CollectionInfo(lctx, it.refKey)
+		if err != nil {
+			return "", err
+		}
+		return c.Name, nil
+	})
+}
+
+// resolveWikiTitles answers wikiTitleKey → title: cached titles younger than
+// wikiTitleTTL as they are, the rest through fetch, each distinct item once and
+// wikiTitleConcurrency at a time. A failed fetch is not cached and its item is
+// absent from the result (the caller labels it "(deleted)").
+func resolveWikiTitles(ctx context.Context, items []bundleItemRow, now time.Time,
+	fetch func(context.Context, bundleItemRow) (string, error)) map[string]string {
+	out := make(map[string]string, len(items))
+	seen := make(map[string]bool, len(items))
+	var miss []bundleItemRow
+	wikiTitleCache.Lock()
+	for _, it := range items {
+		k := wikiTitleKey(it)
+		if it.refKey == "" || seen[k] {
+			continue
+		}
+		seen[k] = true
+		if c, ok := wikiTitleCache.m[k]; ok && now.Sub(c.at) < wikiTitleTTL {
+			out[k] = c.title
+		} else {
+			miss = append(miss, it)
+		}
+	}
+	wikiTitleCache.Unlock()
+
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, wikiTitleConcurrency)
+	for _, it := range miss {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(it bundleItemRow) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			lctx, cancel := context.WithTimeout(ctx, wikiAuthTimeout)
+			defer cancel()
+			title, err := fetch(lctx, it)
+			if err != nil {
+				return
+			}
+			k := wikiTitleKey(it)
+			wikiTitleCache.Lock()
+			wikiTitleCache.m[k] = cachedWikiTitle{title: title, at: now}
+			out[k] = title // out is only touched under this lock while goroutines run
+			wikiTitleCache.Unlock()
+		}(it)
+	}
+	wg.Wait()
+	return out
+}
