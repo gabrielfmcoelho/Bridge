@@ -61,8 +61,9 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
     openIssues: { n: stats?.open_issues ?? 0, label: t("host.openIssuesTitle", { count: String(stats?.open_issues ?? 0) }) },
   };
   const [closedSections, setClosedSections] = useLocalStorage<Record<string, boolean>>("sidebar_closed_sections", {});
-  const closed = (sec: NavSection) =>
-    !!sec.collapsible && !!closedSections[sec.key] && !sec.items.some((i) => isNavItemActive(i, pathname));
+  // What the user chose wins; a section never chosen starts as defaultClosed says.
+  const isFolded = (sec: NavSection) => closedSections[sec.key] ?? !!sec.defaultClosed;
+  const closed = (sec: NavSection) => isFolded(sec) && !sec.items.some((i) => isNavItemActive(i, pathname));
 
   // Labels stay mounted and fade, so opening animates as one motion: the width
   // grows (overflow clipped) while the text fades in. Icons never move — they
@@ -110,23 +111,17 @@ export default function Sidebar({ collapsed, mobileOpen, onCloseMobile }: Sideba
                 slide together instead of jumping. */}
             {section.label && (
               <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                {section.collapsible ? (
-                  <button
-                    type="button"
-                    onClick={() => setClosedSections((c) => ({ ...c, [section.key]: !c[section.key] }))}
-                    aria-expanded={!closed(section)}
-                    aria-controls={`nav-section-${section.key}`}
-                    tabIndex={expanded ? 0 : -1}
-                    className={`overflow-hidden flex w-full items-center justify-between px-3 text-2xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-secondary)] ${fade}`}
-                  >
-                    <span className="block pb-1.5">{t(section.label)}</span>
-                    <Icon path={ICON_PATHS.chevronRight} className={`mb-1.5 w-3 h-3 transition-transform duration-150 ${closed(section) ? "" : "rotate-90"}`} />
-                  </button>
-                ) : (
-                  <p className={`overflow-hidden px-3 text-2xs font-semibold text-[var(--text-muted)] ${fade}`} aria-hidden={!expanded}>
-                    <span className="block pb-1.5">{t(section.label)}</span>
-                  </p>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setClosedSections((c) => ({ ...c, [section.key]: !isFolded(section) }))}
+                  aria-expanded={!closed(section)}
+                  aria-controls={`nav-section-${section.key}`}
+                  tabIndex={expanded ? 0 : -1}
+                  className={`overflow-hidden flex w-full items-center justify-between px-3 text-2xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-secondary)] ${fade}`}
+                >
+                  <span className="block pb-1.5">{t(section.label)}</span>
+                  <Icon path={ICON_PATHS.chevronRight} className={`mb-1.5 w-3 h-3 transition-transform duration-150 ${closed(section) ? "" : "rotate-90"}`} />
+                </button>
               </div>
             )}
             {/* A folded section keeps its items in the collapsed rail (icons are the

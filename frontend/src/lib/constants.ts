@@ -51,8 +51,9 @@ export const ROLE_COLORS: Record<string, string> = {
 // `count` names a live number shown after the label (ADS side-nav elemAfter).
 // `also`: other route prefixes this item stands for (one entry, several pages).
 export type NavItem = { href: string; label: string; icon: string; permission?: string; role?: "admin"; count?: "openIssues"; also?: string[] };
-// `collapsible` sections fold their items under the heading (expanded sidebar only).
-export type NavSection = { key: string; label?: string; items: NavItem[]; collapsible?: boolean };
+// Every labelled section folds its items under the heading (expanded sidebar
+// only); `defaultClosed` ones start folded until the user opens them.
+export type NavSection = { key: string; label?: string; items: NavItem[]; defaultClosed?: boolean };
 
 export const NAV_SECTIONS: NavSection[] = [
   {
@@ -83,6 +84,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: "serviceCatalog",
     label: "nav.selfService",
+    defaultClosed: true,
     items: [
       { href: "/catalog", label: "nav.serviceCatalog", icon: "Store" },
       // One entry, two ways to ask for something: GLPI tickets and Bridge's own
@@ -94,7 +96,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     key: "atlas",
     label: "nav.atlas",
-    collapsible: true,
+    defaultClosed: true,
     items: [
       { href: "/atlas/topology", label: "nav.topology", icon: "Network" },
       { href: "/atlas/apis", label: "nav.apis", icon: "Plug" },
