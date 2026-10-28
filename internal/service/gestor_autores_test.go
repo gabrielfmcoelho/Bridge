@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -236,5 +237,82 @@ func TestCtxCanceladoPeloPausaParaSugestoes(t *testing.T) {
 	_, err := svc.VarrerAutores(ctx)
 	if err == nil || time.Since(t0) > 5*time.Second {
 		t.Fatalf("err=%v after %v", err, time.Since(t0))
+	}
+}
+
+// fakeGestorStatus: like fakeGestor, but h also picks the HTTP status.
+func fakeGestorStatus(t *testing.T, h func(q map[string][]string) (int, string)) *gestor.Client {
+	t.Helper()
+	fake, kcSrv, _ := kcfake.New(t, "keycloak.example", "apis", nil)
+	fake.Mu.Lock()
+	fake.Creds["gc"] = "gs"
+	fake.Mu.Unlock()
+	gw := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		code, body := h(r.URL.Query())
+		w.WriteHeader(code)
+		fmt.Fprint(w, body)
+	}))
+	t.Cleanup(gw.Close)
+	kc := kcadmin.New(kcadmin.Config{BaseURL: "http://keycloak.example", InternalURL: kcSrv.URL, HostHeader: "keycloak.example", Realm: "apis"})
+	return gestor.NewClient(gestor.Settings{Enabled: true, BaseURL: gw.URL, ClientID: "gc", ClientSecret: "gs"}, kc)
+}
+
+func TestSemSugestaoNaoRepeteNaSemana(t *testing.T) {
+	ctx := context.Background()
+	d, _ := dbtest.Open(t)
+	defer d.Close()
+	var chamadas atomic.Int32
+	gs := fakeGestor(t, func(map[string][]string) string { chamadas.Add(1); return nenhum })
+	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), gs, []string{"g"}, 0)
+	if _, err := svc.VarrerAutores(ctx); err != nil {
+		t.Fatal(err)
+	}
+	antes := chamadas.Load()
+	if antes == 0 {
+		t.Fatal("primeira varredura não consultou o Gestor")
+	}
+	if _, err := svc.VarrerAutores(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if depois := chamadas.Load(); depois != antes {
+		t.Errorf("segunda varredura repetiu %d consultas de quem não teve sugestão", depois-antes)
+	}
+}
+
+func TestErro4xxDeUmAutorNaoParaAVarredura(t *testing.T) {
+	ctx := context.Background()
+	d, _ := dbtest.Open(t)
+	defer d.Close()
+	gs := fakeGestorStatus(t, func(q map[string][]string) (int, string) {
+		if e := q["email"]; len(e) > 0 {
+			if e[0] == "a@x.com" {
+				return 400, `{"detail":"Erro ao buscar pessoas"}`
+			}
+			return 200, nenhum
+		}
+		if q["pessoa"][0] == "bia" {
+			return 200, `{"pessoa":[` + pessoa(22, "Bia") + `]}`
+		}
+		return 200, nenhum
+	})
+	contrib := map[string]string{"1": `[{"name":"Ana","email":"a@x.com","commits":5},{"name":"Bia","email":"b@x.com","commits":1}]`}
+	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contrib), gs, []string{"g"}, 0)
+	res, err := svc.VarrerAutores(ctx)
+	if err != nil || res.Sugestoes != 1 {
+		t.Fatalf("res=%+v err=%v", res, err)
+	}
+	// a/forbidden (403 no GitLab) sempre entra nos erros; o que importa é o
+	// erro do a@x.com estar lá e a varredura não ter parado como "indisponível".
+	var doA, indisponivel bool
+	for _, e := range res.Erros {
+		doA = doA || strings.HasPrefix(e, "a@x.com: ")
+		indisponivel = indisponivel || e == "gestor indisponível"
+	}
+	if !doA || indisponivel {
+		t.Errorf("erros = %v", res.Erros)
+	}
+	pend, _ := store.NewGitLabAutorRepo(d.SQL).PendentesDeSugestao(ctx)
+	if len(pend) != 0 {
+		t.Errorf("a@x.com devia ficar marcado como tentado: %+v", pend)
 	}
 }

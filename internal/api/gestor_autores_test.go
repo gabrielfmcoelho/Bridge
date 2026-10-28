@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
+
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 )
 
 func (e *gestorEnv) autor(t *testing.T, email string, sug bool) int64 {
@@ -129,5 +132,28 @@ func TestPessoas(t *testing.T) {
 	_ = json.Unmarshal([]byte(raw), &o2)
 	if o2["enabled"] != false {
 		t.Errorf("off enabled = %v", o2["enabled"])
+	}
+}
+
+func TestVarreduraUmaPorVezEStatus(t *testing.T) {
+	j := &autoresJob{}
+	solta := make(chan struct{})
+	st, ok := j.start(func() (*service.ResumoVarredura, error) {
+		<-solta
+		return &service.ResumoVarredura{Repos: 3, Sugestoes: 1}, nil
+	})
+	if !ok || !st.Running || st.StartedAt == nil {
+		t.Fatalf("start = %+v %v", st, ok)
+	}
+	if _, ok := j.start(func() (*service.ResumoVarredura, error) { return nil, nil }); ok {
+		t.Fatal("segunda varredura começou com a primeira em andamento")
+	}
+	close(solta)
+	for i := 0; i < 200 && j.get().Running; i++ {
+		time.Sleep(10 * time.Millisecond)
+	}
+	fim := j.get()
+	if fim.Running || fim.FinishedAt == nil || fim.Result == nil || fim.Result.Repos != 3 || fim.Error != "" {
+		t.Fatalf("status final = %+v", fim)
 	}
 }

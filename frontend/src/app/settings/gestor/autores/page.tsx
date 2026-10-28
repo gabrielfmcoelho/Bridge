@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { gestorAPI } from "@/lib/api";
 import type { GitLabAutor, GitLabAutorUpdate } from "@/lib/types";
@@ -43,19 +43,38 @@ export default function GestorAutoresPage() {
     onError: (err) => flag({ appearance: "error", title: t("settings.gestorAutores.updateError"), description: err instanceof Error ? err.message : undefined }),
   });
 
+  // The scan runs in the background: POST starts it, the status query polls
+  // while it runs and the outcome flag shows when it ends.
+  const { data: varredura } = useQuery({
+    queryKey: ["gestor-varredura"],
+    queryFn: gestorAPI.varredura,
+    refetchInterval: (query) => (query.state.data?.running ? 3000 : false),
+  });
   const scan = useMutation({
     mutationFn: gestorAPI.varrer,
-    onSuccess: (r) => {
-      queryClient.invalidateQueries({ queryKey: ["gestor-autores"] });
-      const erros = r.erros ?? [];
-      flag({
-        appearance: erros.length ? "warning" : "success",
-        title: t("settings.gestorAutores.scanDone", { repos: String(r.repos), novos: String(r.autores_novos), atualizados: String(r.autores_atualizados), sugestoes: String(r.sugestoes) }),
-        description: erros.length ? t("settings.gestorAutores.scanErrors", { erros: erros.slice(0, 3).join("; ") + (erros.length > 3 ? ` (+${erros.length - 3})` : "") }) : undefined,
-      });
-    },
+    onSuccess: (st) => queryClient.setQueryData(["gestor-varredura"], st),
     onError: (err) => flag({ appearance: "error", title: t("settings.gestorAutores.scanError"), description: err instanceof Error ? err.message : undefined }),
   });
+  const running = scan.isPending || !!varredura?.running;
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (!varredura) return;
+    if (wasRunning.current && !varredura.running) {
+      queryClient.invalidateQueries({ queryKey: ["gestor-autores"] });
+      const r = varredura.result;
+      if (varredura.error || !r) {
+        flag({ appearance: "error", title: t("settings.gestorAutores.scanError"), description: varredura.error });
+      } else {
+        const erros = r.erros ?? [];
+        flag({
+          appearance: erros.length ? "warning" : "success",
+          title: t("settings.gestorAutores.scanDone", { repos: String(r.repos), novos: String(r.autores_novos), atualizados: String(r.autores_atualizados), sugestoes: String(r.sugestoes) }),
+          description: erros.length ? t("settings.gestorAutores.scanErrors", { erros: erros.slice(0, 3).join("; ") + (erros.length > 3 ? ` (+${erros.length - 3})` : "") }) : undefined,
+        });
+      }
+    }
+    wasRunning.current = varredura.running;
+  }, [varredura, flag, queryClient, t]);
 
   const unlink = async (a: GitLabAutor) => {
     const ok = await confirm({
@@ -74,7 +93,7 @@ export default function GestorAutoresPage() {
       title={t("settings.gestorAutores.title")}
       description={t("settings.gestorAutores.description")}
       count={autores.length}
-      controls={<Button size="sm" loading={scan.isPending} onClick={() => scan.mutate()}>{scan.isPending ? t("settings.gestorAutores.scanning") : t("settings.gestorAutores.scan")}</Button>}
+      controls={<Button size="sm" loading={running} disabled={running} onClick={() => scan.mutate()}>{running ? t("settings.gestorAutores.scanning") : t("settings.gestorAutores.scan")}</Button>}
     >
       {pessoas && !pessoas.enabled && <div className="mb-4"><StatusAlert variant="warning">{t("settings.gestorAutores.off")}</StatusAlert></div>}
       <div className="flex flex-wrap gap-3 mb-4">

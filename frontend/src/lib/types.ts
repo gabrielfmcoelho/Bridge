@@ -1150,6 +1150,15 @@ export interface GitLabVarredura {
   erros: string[];
 }
 
+/** The background author scan: under way, or how the last one ended. */
+export interface GitLabVarreduraStatus {
+  running: boolean;
+  started_at?: string;
+  finished_at?: string;
+  result?: GitLabVarredura;
+  error?: string;
+}
+
 export interface GestorPessoa { id: number; nome: string; email: string; lotacao: string }
 
 /** GET /api/gestor/pessoas: enabled=false when the integration is off; error when the Gestor failed. */

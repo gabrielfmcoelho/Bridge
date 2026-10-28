@@ -53,14 +53,22 @@ func (r *GitLabAutorRepo) UpsertContagem(ctx context.Context, email, nome string
 	return novo, err
 }
 
-// PendentesDeSugestao lists rows with no link, not ignored and no suggestion yet.
+// PendentesDeSugestao lists rows with no link, not ignored, no suggestion yet
+// and not asked about in the last 7 days.
 func (r *GitLabAutorRepo) PendentesDeSugestao(ctx context.Context) ([]models.GitLabAutor, error) {
-	return r.query(ctx, ` WHERE gestor_pessoa_id IS NULL AND NOT ignorado AND sugestao_pessoa_id IS NULL`)
+	return r.query(ctx, ` WHERE gestor_pessoa_id IS NULL AND NOT ignorado AND sugestao_pessoa_id IS NULL
+		AND (sugestao_tentada_em IS NULL OR sugestao_tentada_em < CURRENT_TIMESTAMP - INTERVAL '7 days')`)
 }
 
 func (r *GitLabAutorRepo) SetSugestao(ctx context.Context, id, pessoaID int64, nome, motivo string) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE gitlab_autores SET sugestao_pessoa_id = ?, sugestao_nome = ?, sugestao_motivo = ?,
-		atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`, pessoaID, nome, motivo, id)
+		sugestao_tentada_em = CURRENT_TIMESTAMP, atualizado_em = CURRENT_TIMESTAMP WHERE id = ?`, pessoaID, nome, motivo, id)
+	return err
+}
+
+// MarcarTentativa records that the scan asked Gestor about this e-mail.
+func (r *GitLabAutorRepo) MarcarTentativa(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE gitlab_autores SET sugestao_tentada_em = CURRENT_TIMESTAMP WHERE id = ?`, id)
 	return err
 }
 

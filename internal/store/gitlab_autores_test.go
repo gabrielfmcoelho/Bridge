@@ -90,3 +90,37 @@ func TestListFiltros(t *testing.T) {
 		t.Errorf("pendentes = %+v", pend)
 	}
 }
+
+func TestPendentesPulaQuemFoiTentadoNaSemana(t *testing.T) {
+	ctx := context.Background()
+	d := openDB(t)
+	r := store.NewGitLabAutorRepo(d.SQL)
+	now := time.Now()
+	for _, e := range []string{"novo@x.com", "recente@x.com", "antigo@x.com"} {
+		if _, err := r.UpsertContagem(ctx, e, "N", 1, 1, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ids := map[string]int64{}
+	all, _ := r.List(ctx, "todos", "")
+	for _, a := range all {
+		ids[a.Email] = a.ID
+	}
+	if err := r.MarcarTentativa(ctx, ids["recente@x.com"]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.SQL.Exec(`UPDATE gitlab_autores SET sugestao_tentada_em = CURRENT_TIMESTAMP - INTERVAL '8 days' WHERE email = 'antigo@x.com'`); err != nil {
+		t.Fatal(err)
+	}
+	pend, err := r.PendentesDeSugestao(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, a := range pend {
+		got[a.Email] = true
+	}
+	if len(got) != 2 || !got["novo@x.com"] || !got["antigo@x.com"] {
+		t.Errorf("pendentes = %v", got)
+	}
+}

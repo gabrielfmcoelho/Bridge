@@ -234,6 +234,7 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/gestor/projetos"},
 		{"GET", "/api/gestor/autores"},
 		{"POST", "/api/gestor/autores/varrer"},
+		{"GET", "/api/gestor/autores/varrer"},
 		{"PUT", "/api/gestor/autores/1"},
 		{"GET", "/api/gestor/pessoas"},
 

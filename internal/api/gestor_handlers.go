@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -8,8 +9,10 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gestor"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
@@ -76,6 +79,7 @@ func (h *gestorHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("editor", "GET /api/gestor/projetos", h.handleProjetos)
 	rr.role("admin", "GET /api/gestor/autores", h.handleAutores)
 	rr.role("admin", "POST /api/gestor/autores/varrer", h.handleVarrer)
+	rr.role("admin", "GET /api/gestor/autores/varrer", h.handleVarreduraStatus)
 	rr.role("admin", "PUT /api/gestor/autores/{id}", h.handleAutorUpdate)
 	rr.role("admin", "GET /api/gestor/pessoas", h.handlePessoas)
 }
@@ -102,25 +106,55 @@ func (h *gestorHandlers) handleAutores(w http.ResponseWriter, r *http.Request) {
 	jsonPaged(w, r, rows)
 }
 
-// handleVarrer scans GitLab synchronously and stores authors and suggestions.
+// handleVarrer starts, in the background, the scan of GitLab authors and of
+// their Gestor suggestions.
 //
-//	@Summary	Scan GitLab authors
-//	@Tags		gestor
-//	@Produce	json
-//	@Success	200	{object}	service.ResumoVarredura
-//	@Failure	400	{object}	httpx.ErrorResponse
-//	@Failure	502	{object}	httpx.ErrorResponse
-//	@Router		/api/gestor/autores/varrer [post]
+//	@Summary		Scan GitLab authors (background)
+//	@Description	Admin. Answers 202 with the run's status at once; a scan already under way is returned instead of starting another. Poll GET for the result. E-mails asked about in the last 7 days without a match are skipped. 400 when GitLab is not configured.
+//	@Tags			gestor
+//	@Produce		json
+//	@Success		202	{object}	AutoresVarreduraStatus
+//	@Failure		400	{object}	httpx.ErrorResponse
+//	@Failure		502	{object}	httpx.ErrorResponse
+//	@Router			/api/gestor/autores/varrer [post]
 func (h *gestorHandlers) handleVarrer(w http.ResponseWriter, r *http.Request) {
-	res, err := service.NewGestorAutoresService(h.db.SQL, h.db.Encryptor).VarrerAutores(r.Context())
-	switch {
+	svc := service.NewGestorAutoresService(h.db.SQL, h.db.Encryptor)
+	switch err := svc.Pronto(); {
 	case errors.Is(err, service.ErrGitLabNaoConfigurado):
 		jsonError(w, http.StatusBadRequest, err.Error())
+		return
 	case err != nil:
 		jsonErrorLogged(w, r, http.StatusBadGateway, "Falha na varredura; veja os logs do servidor", err)
-	default:
-		jsonOK(w, res)
+		return
 	}
+	// Detached: the scan outlives this request (and a proxy cutting it).
+	base := context.WithoutCancel(r.Context())
+	st, _ := varreduraAutores.start(func() (*service.ResumoVarredura, error) {
+		ctx, cancel := context.WithTimeout(base, varreduraAutoresTimeout)
+		defer cancel()
+		start := time.Now()
+		res, err := svc.VarrerAutores(ctx)
+		if err != nil {
+			log.Printf("[gestor] varredura de autores falhou após %s: %v", time.Since(start).Round(time.Second), err)
+		} else {
+			log.Printf("[gestor] varredura de autores em %s: repos=%d novos=%d atualizados=%d sugestoes=%d erros=%d",
+				time.Since(start).Round(time.Second), res.Repos, res.AutoresNovos, res.AutoresAtualizados, res.Sugestoes, len(res.Erros))
+		}
+		return &res, err
+	})
+	httpx.WriteJSON(w, http.StatusAccepted, st)
+}
+
+// handleVarreduraStatus godoc
+//
+//	@Summary		Status of the background GitLab-author scan
+//	@Description	Admin. Whether a scan is under way, and the result or error of the last one (since the server started).
+//	@Tags			gestor
+//	@Produce		json
+//	@Success		200	{object}	AutoresVarreduraStatus
+//	@Router			/api/gestor/autores/varrer [get]
+func (h *gestorHandlers) handleVarreduraStatus(w http.ResponseWriter, r *http.Request) {
+	jsonOK(w, varreduraAutores.get())
 }
 
 type autorUpdate struct {
