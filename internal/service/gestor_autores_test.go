@@ -179,7 +179,7 @@ func TestGestorIndisponivelMantemContagem(t *testing.T) {
 	}
 	var n int
 	for _, e := range res.Erros {
-		if strings.HasPrefix(e, "gestor indisponível: ") {
+		if e == "gestor indisponível" {
 			n++
 		}
 	}

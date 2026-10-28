@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -114,7 +115,7 @@ func (h *gestorHandlers) handleVarrer(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, service.ErrGitLabNaoConfigurado):
 		jsonError(w, http.StatusBadRequest, err.Error())
 	case err != nil:
-		jsonErrorLogged(w, r, http.StatusBadGateway, "Falha na varredura: "+err.Error(), err)
+		jsonErrorLogged(w, r, http.StatusBadGateway, "Falha na varredura; veja os logs do servidor", err)
 	default:
 		jsonOK(w, res)
 	}
@@ -221,16 +222,19 @@ func (h *gestorHandlers) handlePessoas(w http.ResponseWriter, r *http.Request) {
 		jsonOK(w, map[string]any{"enabled": false, "data": []gestor.Pessoa{}})
 		return
 	}
-	out := map[string]any{"enabled": true, "data": []map[string]any{}}
-	ps, err := c.BuscarPessoas(r.Context(), gestor.PessoaQuery{Nome: strings.TrimSpace(r.URL.Query().Get("q")), Limite: 20})
+	out := map[string]any{"enabled": true, "data": []gestor.Pessoa{}}
+	// Empty q: the screen only asks whether the integration is on.
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if q == "" {
+		jsonOK(w, out)
+		return
+	}
+	ps, err := c.BuscarPessoas(r.Context(), gestor.PessoaQuery{Nome: q, Limite: 20})
 	if err != nil {
-		out["error"] = err.Error()
+		log.Printf("[api] GET /api/gestor/pessoas: %v", err)
+		out["error"] = "Gestor indisponível"
 	} else {
-		data := make([]map[string]any, 0, len(ps))
-		for _, p := range ps {
-			data = append(data, map[string]any{"id": p.IDPessoa, "nome": p.Nome, "email": p.Email, "lotacao": p.Lotacao})
-		}
-		out["data"] = data
+		out["data"] = ps
 	}
 	jsonOK(w, out)
 }

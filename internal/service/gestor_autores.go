@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -213,7 +214,8 @@ func (s *GestorAutoresService) VarrerAutores(ctx context.Context) (ResumoVarredu
 			return res, ctx.Err()
 		}
 		if err != nil {
-			res.Erros = append(res.Erros, "gestor indisponível: "+err.Error())
+			log.Printf("[gestor] sugestão de autores: %v", err)
+			res.Erros = append(res.Erros, "gestor indisponível")
 			break
 		}
 		if pessoa == nil {

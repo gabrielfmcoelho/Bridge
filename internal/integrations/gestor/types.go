@@ -4,10 +4,10 @@ import "fmt"
 
 // Pessoa is a person in Gestor's directory.
 type Pessoa struct {
-	IDPessoa int64
-	Nome     string
-	Email    string
-	Lotacao  string
+	IDPessoa int64  `json:"id"`
+	Nome     string `json:"nome"`
+	Email    string `json:"email"`
+	Lotacao  string `json:"lotacao"`
 }
 
 // PessoaQuery filters BuscarPessoas; empty fields are not sent.
