@@ -99,3 +99,11 @@ type BlobHit struct {
 	Data      string `json:"data"`
 	Ref       string `json:"ref"`
 }
+
+// Contributor is one author of a repository, as GitLab aggregates them.
+// Email comes as returned (callers normalize case).
+type Contributor struct {
+	Name    string `json:"name"`
+	Email   string `json:"email"`
+	Commits int    `json:"commits"`
+}

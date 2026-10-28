@@ -317,3 +317,52 @@ func (c *Client) SearchBlobs(projectID int, query, ref string) ([]BlobHit, error
 	var hits []BlobHit
 	return hits, json.Unmarshal(body, &hits)
 }
+
+// maxFullPages is the safety cap of listEvery: 200 pages = 20k items.
+const maxFullPages = 200
+
+// listEvery walks a paged endpoint to the end; unlike listAll it errors,
+// instead of truncating, when the safety cap is hit.
+func listEvery[T any](c *Client, path string, q url.Values) ([]T, error) {
+	q.Set("per_page", "100")
+	var all []T
+	for page := 1; page <= maxFullPages; page++ {
+		q.Set("page", strconv.Itoa(page))
+		body, err := c.get(path, q)
+		if err != nil {
+			return nil, err
+		}
+		var batch []T
+		if err := json.Unmarshal(body, &batch); err != nil {
+			return nil, err
+		}
+		all = append(all, batch...)
+		if len(batch) < 100 {
+			return all, nil
+		}
+	}
+	return nil, fmt.Errorf("gitlab api %s: page cap of %d reached, result would be truncated", path, maxFullPages)
+}
+
+// ListGroupProjectsAll returns every project of a group (numeric id or full
+// path) including subgroups, with no page cap beyond the safety limit.
+// Archived projects are included only when includeArchived.
+func (c *Client) ListGroupProjectsAll(group string, includeArchived bool) ([]Project, error) {
+	q := url.Values{}
+	q.Set("include_subgroups", "true")
+	q.Set("simple", "true")
+	if !includeArchived {
+		q.Set("archived", "false")
+	}
+	return listEvery[Project](c, "/groups/"+encodeNamespacedPath(group)+"/projects", q)
+}
+
+// ListContributors returns the repository contributors of a project. A 404
+// (repository without default branch) means no contributors.
+func (c *Client) ListContributors(projectID int) ([]Contributor, error) {
+	out, err := listEvery[Contributor](c, fmt.Sprintf("/projects/%d/repository/contributors", projectID), url.Values{})
+	if err != nil && strings.Contains(err.Error(), ": 404 ") {
+		return []Contributor{}, nil
+	}
+	return out, err
+}

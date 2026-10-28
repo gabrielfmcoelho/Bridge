@@ -124,3 +124,85 @@ func TestListGroupsParent(t *testing.T) {
 		t.Fatalf("got %+v truncated=%v err=%v", gs, truncated, err)
 	}
 }
+
+func TestListGroupProjectsAllPaginaAteOFim(t *testing.T) {
+	var pages []string
+	c := fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if r.URL.Path != "/api/v4/groups/5/projects" || q.Get("include_subgroups") != "true" {
+			t.Errorf("unexpected request %s", r.URL)
+		}
+		if _, has := q["archived"]; has {
+			t.Errorf("archived must be absent when includeArchived, got %s", r.URL)
+		}
+		pages = append(pages, q.Get("page"))
+		n := 100
+		if q.Get("page") == "3" {
+			n = 7
+		}
+		items := make([]string, n)
+		for i := range items {
+			items[i] = fmt.Sprintf(`{"id":%d}`, i)
+		}
+		_, _ = w.Write([]byte("[" + strings.Join(items, ",") + "]"))
+	})
+	all, err := c.ListGroupProjectsAll("5", true)
+	if err != nil || len(all) != 207 || strings.Join(pages, ",") != "1,2,3" {
+		t.Fatalf("projects=%d pages=%v err=%v, want 207 over 1,2,3", len(all), pages, err)
+	}
+}
+
+func TestListGroupProjectsAllPorCaminho(t *testing.T) {
+	c := fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.EscapedPath() != "/api/v4/groups/seadpi%2Fgestor/projects" || r.URL.Query().Get("archived") != "false" {
+			t.Errorf("unexpected request %s", r.URL)
+		}
+		_, _ = w.Write([]byte(`[{"id":1}]`))
+	})
+	all, err := c.ListGroupProjectsAll("seadpi/gestor", false)
+	if err != nil || len(all) != 1 {
+		t.Fatalf("all=%v err=%v", all, err)
+	}
+}
+
+func TestListGroupProjectsAllTetoDeSeguranca(t *testing.T) {
+	c := fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		items := make([]string, 100)
+		for i := range items {
+			items[i] = `{"id":1}`
+		}
+		_, _ = w.Write([]byte("[" + strings.Join(items, ",") + "]"))
+	})
+	if _, err := c.ListGroupProjectsAll("5", true); err == nil || !strings.Contains(err.Error(), "cap") {
+		t.Fatalf("want cap error, got %v", err)
+	}
+}
+
+func TestListContributors(t *testing.T) {
+	c := fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v4/projects/9/repository/contributors" {
+			t.Errorf("unexpected request %s", r.URL)
+		}
+		_, _ = w.Write([]byte(`[{"name":"Ana","email":"Ana@x.gov.br","commits":4,"additions":1,"deletions":2}]`))
+	})
+	got, err := c.ListContributors(9)
+	if err != nil || len(got) != 1 || got[0] != (Contributor{"Ana", "Ana@x.gov.br", 4}) {
+		t.Fatalf("got=%v err=%v", got, err)
+	}
+}
+
+func TestListContributorsRepoVazio(t *testing.T) {
+	c := fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v4/projects/1/repository/contributors" {
+			_, _ = w.Write([]byte(`[]`))
+			return
+		}
+		http.Error(w, `{"message":"404 Not Found"}`, http.StatusNotFound)
+	})
+	for _, id := range []int{1, 2} {
+		got, err := c.ListContributors(id)
+		if err != nil || len(got) != 0 {
+			t.Fatalf("id=%d got=%v err=%v, want empty", id, got, err)
+		}
+	}
+}
