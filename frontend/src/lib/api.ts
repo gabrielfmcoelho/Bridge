@@ -2150,8 +2150,9 @@ export const gestorAPI = {
   /** Partial: gestor_pessoa_id null unlinks; a person other than the suggestion needs gestor_nome. */
   updateAutor: (id: number, body: import("./types").GitLabAutorUpdate) =>
     api.put<import("./types").GitLabAutor>(`/api/gestor/autores/${id}`, body),
-  // Lists every repo's contributors and looks each new e-mail up: can outlive the 120s default.
-  varrer: () => request<import("./types").GitLabVarredura>("/api/gestor/autores/varrer", { method: "POST" }, 10 * 60_000),
+  // Starts the scan in the background (202); poll varredura() for the result.
+  varrer: () => api.post<import("./types").GitLabVarreduraStatus>("/api/gestor/autores/varrer"),
+  varredura: () => api.get<import("./types").GitLabVarreduraStatus>("/api/gestor/autores/varrer"),
   pessoas: (q: string) =>
     api.get<import("./types").GestorPessoasResult>(`/api/gestor/pessoas?q=${encodeURIComponent(q)}`),
 };
