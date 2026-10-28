@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -46,8 +47,8 @@ func TestHostScanRepo_WriteAndReadAggregates(t *testing.T) {
 		t.Fatalf("statuses missing host %d: %+v", hostID, statuses)
 	}
 
-	bulk, err := repo.LatestDataBulk(ctx)
-	if err != nil || bulk[hostID] != `{"cpu":"4"}` {
+	bulk, err := repo.LatestListSummaryBulk(ctx)
+	if err != nil || bulk[hostID] != `{"cpu": "4"}` {
 		t.Fatalf("bulk = %+v, %v", bulk, err)
 	}
 
@@ -99,5 +100,64 @@ func TestHostScanRepo_PopulatesNumericMetrics(t *testing.T) {
 	}
 	if cpu2 != nil {
 		t.Fatalf("absent cpu_usage should be NULL, got %v", *cpu2)
+	}
+}
+
+// The host list reads only a few fields of the latest scan; the summary keeps
+// those, drops the rest, uses the newest scan, and skips a row that isn't JSON.
+func TestHostScanRepo_LatestListSummaryBulk(t *testing.T) {
+	ctx := context.Background()
+	d := openDB(t)
+	seed := func(slug string) int64 {
+		var id int64
+		if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ($1, $1) RETURNING id`, slug).Scan(&id); err != nil {
+			t.Fatalf("seed host: %v", err)
+		}
+		return id
+	}
+	full, bad := seed("full"), seed("bad")
+	repo := store.NewHostScanRepo(d.SQL)
+	if err := repo.Create(ctx, full, `{"cpu":"2"}`); err != nil {
+		t.Fatal(err)
+	}
+	// Newer scan of the same host, with fields the list never reads.
+	if _, err := d.SQL.Exec(`INSERT INTO host_scans (host_id, data, scanned_at) VALUES ($1, $2, now() + interval '1 minute')`, full,
+		`{"cpu":"4","cpu_usage":"45%","ram":"8G","ram_percent":"50%","storage":"100G","disk_percent":"40%",
+		  "services":["nginx"],"containers":["c1","c2"],
+		  "profile":{"idle":true,"reasons":["no traffic"],"counterfacts":["x"],"signals":{"big":1}},
+		  "storage_detail":{"filesystems":[{"mount":"/"}]},"web_servers":[{"kind":"nginx"}]}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.SQL.Exec(`INSERT INTO host_scans (host_id, data) VALUES ($1, 'not json')`, bad); err != nil {
+		t.Fatal(err)
+	}
+
+	bulk, err := repo.LatestListSummaryBulk(ctx)
+	if err != nil {
+		t.Fatalf("summary: %v", err)
+	}
+	if _, ok := bulk[bad]; ok {
+		t.Errorf("invalid scan JSON should be skipped, got %q", bulk[bad])
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(bulk[full]), &got); err != nil {
+		t.Fatalf("summary not JSON: %v (%q)", err, bulk[full])
+	}
+	for _, k := range []string{"cpu", "cpu_usage", "ram", "ram_percent", "storage", "disk_percent", "services", "containers", "profile"} {
+		if _, ok := got[k]; !ok {
+			t.Errorf("summary missing %q: %v", k, got)
+		}
+	}
+	if got["cpu"] != "4" {
+		t.Errorf("cpu = %v, want the newest scan's 4", got["cpu"])
+	}
+	for _, k := range []string{"storage_detail", "web_servers"} {
+		if _, ok := got[k]; ok {
+			t.Errorf("summary should drop %q", k)
+		}
+	}
+	prof, _ := got["profile"].(map[string]any)
+	if prof["idle"] != true || prof["signals"] != nil {
+		t.Errorf("profile = %v, want idle/reasons/counterfacts only", prof)
 	}
 }

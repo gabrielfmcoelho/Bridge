@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { hostsAPI, sshAPI, proxmoxAPI, coolifyAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useFlag } from "@/contexts/FlagContext";
@@ -14,6 +14,7 @@ import Button from "@/components/ui/Button";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import Drawer from "@/components/ui/Drawer";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useExportCSV } from "@/hooks/useExportCSV";
 import ListToolbar from "@/components/ui/ListToolbar";
 import TrashButton from "@/components/inventory/TrashDrawer";
@@ -140,7 +141,9 @@ export default function HostsPage() {
   const [sort, setSort] = useLocalStorage<HostSortConfig>("hosts_sort", { field: "nickname", direction: "asc" });
   const [groupBy, setGroupBy] = useLocalStorage<GroupEntity | "">("hosts_groupBy", "");
 
-  useEffect(() => { setVisibleCount(24); setTablePage(1); }, [search, filters, sort]);
+  // Typing asks the server once the user pauses, not once per key.
+  const searchQ = useDebounce(search.trim(), 250);
+  useEffect(() => { setVisibleCount(24); setTablePage(1); }, [searchQ, filters, sort]);
   useEffect(() => {
     const el = loadMoreRef.current;
     if (!el) return;
@@ -152,10 +155,12 @@ export default function HostsPage() {
   }, []);
 
   const { data: hosts = [], isLoading } = useQuery({
-    queryKey: ["hosts", search, filters, sort],
+    queryKey: ["hosts", searchQ, filters, sort],
+    // Keep the current cards on screen while the next search loads.
+    placeholderData: keepPreviousData,
     queryFn: () => {
       const params: Record<string, string> = {};
-      if (search) params.search = search;
+      if (searchQ) params.search = searchQ;
       Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
       // Server-authoritative sort (incl. scan metrics resolved against the
       // latest scan's numeric columns — P3). sort.field maps 1:1 to the backend
@@ -177,12 +182,13 @@ export default function HostsPage() {
   // Only enabled in table mode; card/scan keep using the full list above.
   const TABLE_PER_PAGE = 20;
   const tableQuery = useQuery({
-    queryKey: ["hosts-table", search, filters, sort, tablePage],
+    queryKey: ["hosts-table", searchQ, filters, sort, tablePage],
+    placeholderData: keepPreviousData,
     // Grouped, the table shows every (filtered) row per group from the full list.
     enabled: viewMode === "table" && !groupBy,
     queryFn: () => {
       const params: Record<string, string> = {};
-      if (search) params.search = search;
+      if (searchQ) params.search = searchQ;
       Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
       params.sort_by = sort.field;
       params.sort_dir = sort.direction;

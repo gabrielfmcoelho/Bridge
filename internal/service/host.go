@@ -9,6 +9,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -184,37 +185,63 @@ func (s *HostService) Get(ctx context.Context, slug string) (*HostDetail, error)
 // Post-enrichment filters (alert_level, idle) and the pagination envelope are
 // applied by the caller.
 func (s *HostService) List(ctx context.Context, f models.HostFilter) ([]HostListItem, error) {
-	hosts, err := s.hosts.List(ctx, f)
-	if err != nil {
-		return nil, err
+	// The host query and every enrichment are independent reads: run them at
+	// once, so the list costs one database round trip instead of ~17 in a row
+	// (≈2 s from a dev machine over the VPN). Enrichment errors are ignored, as
+	// before: a missing count must not hide the list.
+	var (
+		wg                sync.WaitGroup
+		hosts             []models.Host
+		hostsErr          error
+		tagMap            map[int64][]string
+		scanStatuses      map[int64]time.Time
+		scanDataBulk      map[int64]string
+		thresholds        *models.AlertThresholds
+		sentinelHosts     map[int64]models.SentinelHostSnapshot
+		sentinelAll       map[int64]models.SentinelServiceSnapshot
+		projCounts        map[int64]int
+		svcCounts         map[int64]int
+		dnsCounts         map[int64]int
+		issueCounts       map[int64]int
+		mainRespNames     map[int64]string
+		mainEntidades     map[int64]string
+		chamadosCounts    map[int64]int
+		manualAlertsBulk  map[int64][]models.HostAlert
+		alertLinkedIssues map[int64]int64
+	)
+	run := func(fn func()) {
+		wg.Add(1)
+		go func() { defer wg.Done(); fn() }()
+	}
+	run(func() { hosts, hostsErr = s.hosts.List(ctx, f) })
+	run(func() { tagMap, _ = s.tags.GetAll(ctx, "host") })
+	run(func() { scanStatuses, _ = s.scans.Statuses(ctx) })
+	run(func() { scanDataBulk, _ = s.scans.LatestListSummaryBulk(ctx) })
+	run(func() { thresholds, _ = s.alertCfg.GetThresholds(ctx) })
+	run(func() { sentinelHosts, _ = s.sentinel.HostsBulk(ctx) })
+	run(func() { sentinelAll, _ = s.sentinel.ServicesBulk(ctx, 0) })
+	run(func() { projCounts, _ = s.services.ProjectCountsByHost(ctx) })
+	run(func() { svcCounts, _ = s.services.CountsByHost(ctx) })
+	run(func() { dnsCounts, _ = s.dns.CountsByHost(ctx) })
+	run(func() { issueCounts, _ = models.GetIssueCountsByEntity(s.sqlDB, "host") })
+	run(func() { mainRespNames, _ = s.responsaveis.MainNamesBulk(ctx, "host") })
+	run(func() { mainEntidades, _ = s.grants.CreatorNamesBulk(ctx, store.AssetHost) })
+	run(func() { chamadosCounts, _ = s.chamados.CountsBulk(ctx) })
+	run(func() { manualAlertsBulk, _ = s.alerts.ListBulk(ctx) })
+	run(func() { alertLinkedIssues, _ = s.alerts.LinkedIssueIDsBulk(ctx) })
+	wg.Wait()
+	if hostsErr != nil {
+		return nil, hostsErr
 	}
 
-	tagMap, _ := s.tags.GetAll(ctx, "host")
-	scanStatuses, _ := s.scans.Statuses(ctx)
-	scanDataBulk, _ := s.scans.LatestDataBulk(ctx)
-
-	thresholds, thErr := s.alertCfg.GetThresholds(ctx)
-	if thErr != nil || thresholds == nil {
+	if thresholds == nil {
 		d := models.DefaultAlertThresholds()
 		thresholds = &d
 	}
-	sentinelHosts, _ := s.sentinel.HostsBulk(ctx)
 	sentinelSvcs := map[int64][]models.SentinelServiceSnapshot{}
-	if all, err := s.sentinel.ServicesBulk(ctx, 0); err == nil {
-		for _, v := range all {
-			sentinelSvcs[v.HostID] = append(sentinelSvcs[v.HostID], v)
-		}
+	for _, v := range sentinelAll {
+		sentinelSvcs[v.HostID] = append(sentinelSvcs[v.HostID], v)
 	}
-
-	projCounts, _ := s.services.ProjectCountsByHost(ctx)
-	svcCounts, _ := s.services.CountsByHost(ctx)
-	dnsCounts, _ := s.dns.CountsByHost(ctx)
-	issueCounts, _ := models.GetIssueCountsByEntity(s.sqlDB, "host")
-	mainRespNames, _ := s.responsaveis.MainNamesBulk(ctx, "host")
-	mainEntidades, _ := s.grants.CreatorNamesBulk(ctx, store.AssetHost)
-	chamadosCounts, _ := s.chamados.CountsBulk(ctx)
-	manualAlertsBulk, _ := s.alerts.ListBulk(ctx)
-	alertLinkedIssues, _ := s.alerts.LinkedIssueIDsBulk(ctx)
 
 	result := make([]HostListItem, len(hosts))
 	for i, host := range hosts {
