@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { projectsAPI, enumsAPI, contactsAPI, integrationsAPI, glpiAPI, coolifyAPI } from "@/lib/api";
+import { projectsAPI, enumsAPI, contactsAPI, integrationsAPI, glpiAPI, coolifyAPI, gestorAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSituacao } from "@/hooks/useSituacao";
@@ -20,7 +20,8 @@ import RelationPicker from "@/components/forms/RelationPicker";
 import { useRelationOptions } from "@/components/forms/useRelationOptions";
 import GitLabLinksEditor from "./[id]/_components/GitLabLinksEditor";
 import CoolifyLinksEditor from "./[id]/_components/CoolifyLinksEditor";
-import type { Project, EntityResponsavel, AssetGrants, AssetGrantsInput, ProjectCoolifyLink } from "@/lib/types";
+import GestorLinksEditor from "./[id]/_components/GestorLinksEditor";
+import type { Project, EntityResponsavel, AssetGrants, AssetGrantsInput, ProjectCoolifyLink, ProjectGestorLink } from "@/lib/types";
 
 const URL_RE = /^https?:\/\/\S+$/i;
 
@@ -35,6 +36,7 @@ interface ProjectFormProps {
   initialHostIds?: number[];
   initialDnsIds?: number[];
   initialCoolifyLinks?: ProjectCoolifyLink[];
+  initialGestorLinks?: ProjectGestorLink[];
   onSuccess: () => void;
   onClose?: () => void;
   onSubHeaderChange?: (subHeader: React.ReactNode) => void;
@@ -48,7 +50,7 @@ interface ProjectFormProps {
  * anything else not shown here are kept.
  */
 export default function ProjectForm({
-  initial, initialGrants, initialTags, initialResponsaveis, initialServiceIds, initialHostIds, initialDnsIds, initialCoolifyLinks, onSuccess, onClose, onSubHeaderChange, onFooterChange,
+  initial, initialGrants, initialTags, initialResponsaveis, initialServiceIds, initialHostIds, initialDnsIds, initialCoolifyLinks, initialGestorLinks, onSuccess, onClose, onSubHeaderChange, onFooterChange,
 }: ProjectFormProps) {
   const { t } = useLocale();
   const { user } = useAuth();
@@ -76,6 +78,7 @@ export default function ProjectForm({
   const [hostIds, setHostIds] = useState<number[]>(initialHostIds ?? []);
   const [dnsIds, setDnsIds] = useState<number[]>(initialDnsIds ?? []);
   const [coolifyLinks, setCoolifyLinks] = useState<ProjectCoolifyLink[]>(initialCoolifyLinks ?? []);
+  const [gestorLinks, setGestorLinks] = useState<ProjectGestorLink[]>(initialGestorLinks ?? []);
   const relationOptions = useRelationOptions(["services", "hosts", "dns"]);
   const [error, setError] = useState("");
   const [attempted, setAttempted] = useState(false);
@@ -91,6 +94,17 @@ export default function ProjectForm({
   const glpiEnabled = integrations?.glpi?.glpi_enabled === "true";
   const { data: glpiProfiles = [] } = useQuery({ queryKey: ["glpi-profiles"], queryFn: glpiAPI.listProfiles, enabled: glpiEnabled, retry: false });
   const { data: coolifyStatus } = useQuery({ queryKey: ["coolify-status"], queryFn: coolifyAPI.status, staleTime: 60_000, retry: false });
+
+  // Same key as the editor's empty search. Gestor off or failing: the field
+  // stays hidden and gestor_links isn't sent, so the saved links survive.
+  const { data: gestorStatus } = useQuery({ queryKey: ["gestor-projetos", ""], queryFn: () => gestorAPI.projetos(""), staleTime: 60_000, retry: false });
+  const gestorOn = !!gestorStatus?.enabled && !gestorStatus.error;
+  // Unchanged set -> omit gestor_links (PUT is partial), so saving never needs Gestor.
+  const gestorChanged = (() => {
+    const a = new Set((initialGestorLinks ?? []).map((l) => l.gestor_projeto_id));
+    const b = new Set(gestorLinks.map((l) => l.gestor_projeto_id));
+    return a.size !== b.size || [...b].some((id) => !a.has(id));
+  })();
 
   const set = (key: keyof typeof form, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
   useDefaultSituacao(form.situacao, (v) => set("situacao", v), !isEdit);
@@ -108,6 +122,7 @@ export default function ProjectForm({
         // Only sent when the integration is on, so a project's mapping isn't
         // wiped by a form that couldn't show it.
         ...(coolifyStatus?.enabled ? { coolify_links: coolifyLinks.filter((l) => l.coolify_project) } : {}),
+        ...(gestorOn && gestorChanged ? { gestor_links: gestorLinks.map((l) => ({ gestor_projeto_id: l.gestor_projeto_id })) } : {}),
         ...grants,
       };
       return initial ? projectsAPI.update(initial.id, payload) : projectsAPI.create(payload);
@@ -188,6 +203,11 @@ export default function ProjectForm({
         {coolifyStatus?.enabled && (
           <FormField label={t("project.coolifyMapping")} hint={t("project.coolifyMappingHint")}>
             <CoolifyLinksEditor value={coolifyLinks} onChange={setCoolifyLinks} />
+          </FormField>
+        )}
+        {gestorOn && (
+          <FormField label={t("project.gestorLinks")} hint={t("project.gestorLinksHint")}>
+            <GestorLinksEditor value={gestorLinks} onChange={setGestorLinks} />
           </FormField>
         )}
         {glpiEnabled && (

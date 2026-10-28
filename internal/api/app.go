@@ -86,7 +86,7 @@ func newApp(db *database.DB, configPath string) *App {
 		apiKey:              &apiKeyHandlers{db: db},
 		host:                &hostHandlers{host: deps.Host, db: db},
 		dns:                 &dnsHandlers{dns: deps.DNS},
-		project:             &projectHandlers{project: deps.Project},
+		project:             &projectHandlers{project: deps.Project, db: db},
 		service:             &serviceHandlers{service: deps.Service, db: db},
 		orchestrator:        &orchestratorHandlers{db: db},
 		ssh:                 &sshHandlers{db: db, configPath: configPath},

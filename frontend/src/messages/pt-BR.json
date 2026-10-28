@@ -1181,7 +1181,15 @@
     "coolifyEnvironment": "Ambiente",
     "coolifyAllEnvironments": "Todos os ambientes",
     "coolifyAddMapping": "Adicionar projeto do Coolify",
-    "coolifyUnavailable": "Não foi possível listar os projetos do Coolify."
+    "coolifyUnavailable": "Não foi possível listar os projetos do Coolify.",
+    "gestorLinks": "Projetos no Gestor",
+    "gestorLinksHint": "Só referência: não altera nada no Gestor. Um projeto do Gestor fica em um único projeto do Bridge.",
+    "gestorSearch": "Buscar projeto do Gestor pelo nome",
+    "gestorNoResults": "Nenhum projeto do Gestor encontrado.",
+    "gestorUnavailable": "Gestor indisponível no momento.",
+    "gestorConcluido": "concluído",
+    "gestorArquivado": "arquivado",
+    "gestorTitle": "Gestor"
   },
   "service": {
     "title": "Serviços",
@@ -1827,6 +1835,13 @@
         "chatOk": "chat OK",
         "chatOkWithReply": "chat OK — respondeu: \"{reply}\""
       },
+      "gestor": {
+        "hint": "Gestor da SEAD (projetos e pessoas) — vincula projetos do Bridge a projetos do Gestor e autores do GitLab a pessoas. Usa um client próprio do Keycloak no realm das APIs.",
+        "ariaEnable": "Ativar Gestor",
+        "gitlabGroups": "Grupos do GitLab",
+        "gitlabGroupsHint": "Grupos cujos autores de commits são associados a pessoas do Gestor. Separe por vírgula ou linha; padrão seadpi.",
+        "authorsLink": "Autores do GitLab"
+      },
       "coolify": {
         "hint": "Plataforma de self-hosting — gerencie servidores diretamente pelo SSHCM.",
         "ariaEnableCoolify": "Habilitar Coolify",
@@ -2019,6 +2034,47 @@
       "maintenance": "manutenção"
     },
     "situacaoRolesHint": "Os papéis entre parênteses dizem ao sistema qual opção significa ativo, desligado e em manutenção (SSH config, sync do Proxmox e do Coolify). Renomear mantém o papel; excluir a opção o remove.",
+    "gestorAutores": {
+      "filterLabel": "Filtrar autores",
+      "title": "Autores do GitLab",
+      "description": "Vincule cada e-mail de commit a um usuário do Gestor. Sugestões não valem até você aceitar.",
+      "off": "Integração com o Gestor desligada ou incompleta: não há como sugerir ou buscar pessoas.",
+      "scan": "Varrer GitLab",
+      "scanning": "Varrendo…",
+      "scanDone": "Varredura concluída: {repos} repositórios, {novos} autores novos, {atualizados} atualizados, {sugestoes} sugestões",
+      "scanErrors": "Erros: {erros}",
+      "scanError": "Falha na varredura",
+      "search": "Buscar por e-mail ou nome",
+      "filter": {
+        "sem_vinculo": "Sem vínculo",
+        "com_sugestao": "Com sugestão",
+        "vinculados": "Vinculados",
+        "ignorados": "Ignorados",
+        "todos": "Todos"
+      },
+      "email": "E-mail",
+      "gitlabName": "Nome no GitLab",
+      "commits": "Commits",
+      "repos": "Repos",
+      "link": "Vínculo",
+      "suggestion": "Sugestão: {nome}",
+      "reason": { "email": "pelo e-mail", "nome": "pelo nome" },
+      "empty": "Nenhum autor neste filtro.",
+      "loadError": "Não foi possível carregar os autores.",
+      "accept": "Aceitar",
+      "choose": "Escolher…",
+      "unlink": "Desfazer",
+      "unlinkConfirm": "Desfazer o vínculo de {email}?",
+      "unlinkConfirmBody": "O e-mail volta para \"sem vínculo\". Nada muda no Gestor.",
+      "ignore": "Ignorar",
+      "reactivate": "Reativar",
+      "ignored": "ignorado",
+      "updateError": "Não foi possível salvar",
+      "pickTitle": "Vincular {email} a uma pessoa do Gestor",
+      "pickSearch": "Nome da pessoa",
+      "pickEmpty": "Nenhuma pessoa encontrada.",
+      "pickError": "Gestor indisponível no momento."
+    },
     "apiTokens": {
       "tabLabel": "Tokens de API",
       "title": "Tokens de API pessoais",

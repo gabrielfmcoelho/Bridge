@@ -2096,4 +2096,38 @@ var migrationsPostgres = []string{
 	END $$;
 	CREATE UNIQUE INDEX IF NOT EXISTS uq_gitlab_repo_links
 		ON gitlab_repo_links (entity_type, entity_id, kind, gitlab_project_id, gitlab_base_url);`,
+
+	// Version 120: a Bridge project references N Gestor projects (id + name
+	// snapshot). UNIQUE(gestor_projeto_id): a Gestor project sits in one
+	// Bridge project only.
+	`CREATE TABLE IF NOT EXISTS project_gestor_links (
+		project_id          BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		gestor_projeto_id   BIGINT NOT NULL,
+		gestor_projeto_nome TEXT NOT NULL DEFAULT '',
+		PRIMARY KEY (project_id, gestor_projeto_id),
+		UNIQUE (gestor_projeto_id)
+	);`,
+
+	// Version 121: one row per GitLab commit e-mail (lowercase), filled by the
+	// on-demand scan. sugestao_* is only a suggestion; gestor_* is the link a
+	// human sets. No CPF is ever stored.
+	`CREATE TABLE IF NOT EXISTS gitlab_autores (
+		id                 BIGSERIAL PRIMARY KEY,
+		email              TEXT NOT NULL UNIQUE,
+		nome_gitlab        TEXT NOT NULL DEFAULT '',
+		commits            INT NOT NULL DEFAULT 0,
+		repos              INT NOT NULL DEFAULT 0,
+		visto_em           TIMESTAMPTZ,
+		sugestao_pessoa_id BIGINT,
+		sugestao_nome      TEXT NOT NULL DEFAULT '',
+		sugestao_motivo    TEXT NOT NULL DEFAULT '',
+		gestor_pessoa_id   BIGINT,
+		gestor_nome        TEXT NOT NULL DEFAULT '',
+		gestor_email       TEXT NOT NULL DEFAULT '',
+		vinculado_por      BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		vinculado_em       TIMESTAMPTZ,
+		ignorado           BOOLEAN NOT NULL DEFAULT FALSE,
+		criado_em          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		atualizado_em      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);`,
 }

@@ -12,6 +12,7 @@ import GLPIIntegrationSection from "./_integrations/GLPIIntegrationSection";
 import GrafanaIntegrationSection from "./_integrations/GrafanaIntegrationSection";
 import SignozIntegrationSection from "./_integrations/SignozIntegrationSection";
 import LLMSection from "./_integrations/LLMSection";
+import GestorSection from "./_integrations/GestorSection";
 import CoolifySection from "./_integrations/CoolifySection";
 import SentinelSection from "./_integrations/SentinelSection";
 import ProxmoxSection from "./_integrations/ProxmoxSection";
@@ -36,6 +37,7 @@ export default function IntegrationsTab() {
       <GLPIIntegrationSection />
       <SMTPSection />
       <LLMSection />
+      <GestorSection />
       <CoolifySection />
       <SentinelSection />
       <ProxmoxSection />
