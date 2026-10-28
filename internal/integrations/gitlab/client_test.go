@@ -137,7 +137,13 @@ func TestListGroupProjectsAllPaginaAteOFim(t *testing.T) {
 		}
 		pages = append(pages, q.Get("page"))
 		n := 100
-		if q.Get("page") == "3" {
+		switch q.Get("page") {
+		case "1":
+			n = 40 // short but not last: must keep going
+			w.Header().Set("X-Next-Page", "2")
+		case "2":
+			w.Header().Set("X-Next-Page", "3")
+		case "3":
 			n = 7
 		}
 		items := make([]string, n)
@@ -147,8 +153,8 @@ func TestListGroupProjectsAllPaginaAteOFim(t *testing.T) {
 		_, _ = w.Write([]byte("[" + strings.Join(items, ",") + "]"))
 	})
 	all, err := c.ListGroupProjectsAll("5", true)
-	if err != nil || len(all) != 207 || strings.Join(pages, ",") != "1,2,3" {
-		t.Fatalf("projects=%d pages=%v err=%v, want 207 over 1,2,3", len(all), pages, err)
+	if err != nil || len(all) != 147 || strings.Join(pages, ",") != "1,2,3" {
+		t.Fatalf("projects=%d pages=%v err=%v, want 147 over 1,2,3", len(all), pages, err)
 	}
 }
 
@@ -167,6 +173,7 @@ func TestListGroupProjectsAllPorCaminho(t *testing.T) {
 
 func TestListGroupProjectsAllTetoDeSeguranca(t *testing.T) {
 	c := fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Next-Page", "1")
 		items := make([]string, 100)
 		for i := range items {
 			items[i] = `{"id":1}`

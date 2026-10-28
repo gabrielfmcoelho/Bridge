@@ -2,6 +2,7 @@ package gitlab
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -40,7 +41,22 @@ func NewClient(baseURL, token string) *Client {
 	}
 }
 
+// StatusError is a GitLab API response with status >= 400.
+type StatusError struct {
+	Code       int
+	Path, Body string
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("gitlab api %s: %d %s", e.Path, e.Code, e.Body)
+}
+
 func (c *Client) get(path string, params url.Values) ([]byte, error) {
+	body, _, err := c.getResp(path, params)
+	return body, err
+}
+
+func (c *Client) getResp(path string, params url.Values) ([]byte, http.Header, error) {
 	u := fmt.Sprintf("%s/api/v4%s", c.baseURL, path)
 	if len(params) > 0 {
 		u += "?" + params.Encode()
@@ -48,13 +64,13 @@ func (c *Client) get(path string, params url.Values) ([]byte, error) {
 
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("PRIVATE-TOKEN", c.token)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
@@ -62,12 +78,12 @@ func (c *Client) get(path string, params url.Values) ([]byte, error) {
 	// bigger body is cut, not streamed.
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("gitlab api %s: %d %s", path, resp.StatusCode, string(body))
+		return nil, nil, &StatusError{resp.StatusCode, path, string(body)}
 	}
-	return body, nil
+	return body, resp.Header, nil
 }
 
 // GetCurrentUser returns the authenticated user.
@@ -328,7 +344,7 @@ func listEvery[T any](c *Client, path string, q url.Values) ([]T, error) {
 	var all []T
 	for page := 1; page <= maxFullPages; page++ {
 		q.Set("page", strconv.Itoa(page))
-		body, err := c.get(path, q)
+		body, h, err := c.getResp(path, q)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +353,7 @@ func listEvery[T any](c *Client, path string, q url.Values) ([]T, error) {
 			return nil, err
 		}
 		all = append(all, batch...)
-		if len(batch) < 100 {
+		if h.Get("X-Next-Page") == "" {
 			return all, nil
 		}
 	}
@@ -361,7 +377,8 @@ func (c *Client) ListGroupProjectsAll(group string, includeArchived bool) ([]Pro
 // (repository without default branch) means no contributors.
 func (c *Client) ListContributors(projectID int) ([]Contributor, error) {
 	out, err := listEvery[Contributor](c, fmt.Sprintf("/projects/%d/repository/contributors", projectID), url.Values{})
-	if err != nil && strings.Contains(err.Error(), ": 404 ") {
+	var se *StatusError
+	if errors.As(err, &se) && se.Code == http.StatusNotFound {
 		return []Contributor{}, nil
 	}
 	return out, err
