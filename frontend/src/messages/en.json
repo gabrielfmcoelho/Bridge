@@ -2035,6 +2035,7 @@
     },
     "situacaoRolesHint": "The roles in parentheses tell the system which option means active, off and under maintenance (SSH config, Proxmox and Coolify sync). Renaming keeps the role; deleting the option drops it.",
     "gestorAutores": {
+      "filterLabel": "Filter authors",
       "title": "GitLab authors",
       "description": "Link each commit e-mail to a Gestor user. Suggestions do not count until you accept them.",
       "off": "Gestor integration is off or incomplete: people cannot be suggested or searched.",

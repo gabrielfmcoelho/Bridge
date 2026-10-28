@@ -343,7 +343,16 @@ func (s *ProjectService) Delete(ctx context.Context, actor models.ActorContext, 
 	if err := s.tags.Delete(ctx, "project", id); err != nil {
 		return err
 	}
+	// Soft delete never fires ON DELETE CASCADE: free the Gestor projects here.
+	if err := s.projects.SetGestorLinks(ctx, id, nil); err != nil {
+		return err
+	}
 	return store.DeleteParent(ctx, s.db, actor, models.SecretScopeProjeto, id)
+}
+
+// GestorLinksFor: see ProjectRepo.GestorLinksFor.
+func (s *ProjectService) GestorLinksFor(ctx context.Context, projectID int64) ([]models.ProjectGestorLink, error) {
+	return s.projects.GestorLinksFor(ctx, projectID)
 }
 
 // ListTrash returns soft-deleted projects (the trash view).

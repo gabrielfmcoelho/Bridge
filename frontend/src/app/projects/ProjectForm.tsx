@@ -99,6 +99,12 @@ export default function ProjectForm({
   // stays hidden and gestor_links isn't sent, so the saved links survive.
   const { data: gestorStatus } = useQuery({ queryKey: ["gestor-projetos", ""], queryFn: () => gestorAPI.projetos(""), staleTime: 60_000, retry: false });
   const gestorOn = !!gestorStatus?.enabled && !gestorStatus.error;
+  // Unchanged set -> omit gestor_links (PUT is partial), so saving never needs Gestor.
+  const gestorChanged = (() => {
+    const a = new Set((initialGestorLinks ?? []).map((l) => l.gestor_projeto_id));
+    const b = new Set(gestorLinks.map((l) => l.gestor_projeto_id));
+    return a.size !== b.size || [...b].some((id) => !a.has(id));
+  })();
 
   const set = (key: keyof typeof form, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
   useDefaultSituacao(form.situacao, (v) => set("situacao", v), !isEdit);
@@ -116,7 +122,7 @@ export default function ProjectForm({
         // Only sent when the integration is on, so a project's mapping isn't
         // wiped by a form that couldn't show it.
         ...(coolifyStatus?.enabled ? { coolify_links: coolifyLinks.filter((l) => l.coolify_project) } : {}),
-        ...(gestorOn ? { gestor_links: gestorLinks.map((l) => ({ gestor_projeto_id: l.gestor_projeto_id })) } : {}),
+        ...(gestorOn && gestorChanged ? { gestor_links: gestorLinks.map((l) => ({ gestor_projeto_id: l.gestor_projeto_id })) } : {}),
         ...grants,
       };
       return initial ? projectsAPI.update(initial.id, payload) : projectsAPI.create(payload);

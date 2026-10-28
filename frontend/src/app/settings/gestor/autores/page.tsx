@@ -78,7 +78,7 @@ export default function GestorAutoresPage() {
     >
       {pessoas && !pessoas.enabled && <div className="mb-4"><StatusAlert variant="warning">{t("settings.gestorAutores.off")}</StatusAlert></div>}
       <div className="flex flex-wrap gap-3 mb-4">
-        <NativeSelect aria-label={t("settings.gestorAutores.link")} value={status} onChange={(e) => setStatus(e.target.value as (typeof FILTERS)[number])}>
+        <NativeSelect aria-label={t("settings.gestorAutores.filterLabel")} value={status} onChange={(e) => setStatus(e.target.value as (typeof FILTERS)[number])}>
           {FILTERS.map((f) => <option key={f} value={f}>{t(`settings.gestorAutores.filter.${f}`)}</option>)}
         </NativeSelect>
         <Input className="min-w-64" placeholder={t("settings.gestorAutores.search")} value={q} onChange={(e) => setQ(e.target.value)} />
@@ -124,7 +124,7 @@ export default function GestorAutoresPage() {
                   <td className={`${td} whitespace-nowrap`}>
                     <div className="flex gap-1 justify-end">
                       {a.gestor_pessoa_id == null && a.sugestao_pessoa_id != null && !a.ignorado && (
-                        <Button size="sm" onClick={() => update.mutate({ id: a.id, body: { gestor_pessoa_id: a.sugestao_pessoa_id } })}>{t("settings.gestorAutores.accept")}</Button>
+                        <Button size="sm" onClick={() => update.mutate({ id: a.id, body: { gestor_pessoa_id: a.sugestao_pessoa_id, ...(a.sugestao_motivo === "email" ? { gestor_email: a.email } : {}) } })}>{t("settings.gestorAutores.accept")}</Button>
                       )}
                       {!a.ignorado && <Button size="sm" variant="secondary" onClick={() => setPicking(a)}>{t("settings.gestorAutores.choose")}</Button>}
                       {a.gestor_pessoa_id != null && <Button size="sm" variant="danger" onClick={() => unlink(a)}>{t("settings.gestorAutores.unlink")}</Button>}

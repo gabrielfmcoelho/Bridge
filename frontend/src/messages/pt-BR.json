@@ -2035,6 +2035,7 @@
     },
     "situacaoRolesHint": "Os papéis entre parênteses dizem ao sistema qual opção significa ativo, desligado e em manutenção (SSH config, sync do Proxmox e do Coolify). Renomear mantém o papel; excluir a opção o remove.",
     "gestorAutores": {
+      "filterLabel": "Filtrar autores",
       "title": "Autores do GitLab",
       "description": "Vincule cada e-mail de commit a um usuário do Gestor. Sugestões não valem até você aceitar.",
       "off": "Integração com o Gestor desligada ou incompleta: não há como sugerir ou buscar pessoas.",

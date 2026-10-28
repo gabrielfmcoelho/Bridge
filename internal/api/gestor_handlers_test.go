@@ -151,11 +151,11 @@ func TestPutProjetoGestorLinksGravaNome(t *testing.T) {
 		t.Errorf("links = %+v", got)
 	}
 	// Gestor unknown id -> 400, Gestor down -> 502; both leave the links as they were.
-	if code, _ := e.do(e.editor, "PUT", path, `{"gestor_links":[{"gestor_projeto_id":99}]}`); code != 400 {
-		t.Errorf("unknown gestor project = %d, want 400", code)
+	if code, raw := e.do(e.editor, "PUT", path, `{"gestor_links":[{"gestor_projeto_id":99}]}`); code != 400 || !strings.Contains(raw, "Projeto do Gestor 99 não encontrado") {
+		t.Errorf("unknown gestor project = %d %s, want 400 with id", code, raw)
 	}
 	*e.down = true
-	if code, _ := e.do(e.editor, "PUT", path, `{"gestor_links":[{"gestor_projeto_id":10}]}`); code != 502 {
+	if code, _ := e.do(e.editor, "PUT", path, `{"gestor_links":[{"gestor_projeto_id":12}]}`); code != 502 {
 		t.Errorf("gestor down = %d, want 502", code)
 	}
 	*e.down = false
@@ -231,6 +231,9 @@ func TestGestorProjetosBuscaRepassaQ(t *testing.T) {
 	if code != 200 || out.Error == "" || len(out.Data) != 0 || !out.Enabled {
 		t.Errorf("upstream error = %d %s", code, raw)
 	}
+	if strings.Contains(raw, "boom") || strings.Contains(raw, "http://") || strings.Contains(raw, "127.0.0.1") {
+		t.Errorf("upstream detail leaked: %s", raw)
+	}
 }
 
 func TestGestorProjetosDesligadoDevolveEnabledFalse(t *testing.T) {
@@ -278,5 +281,34 @@ func TestPostProjetoGestorLinks(t *testing.T) {
 	e.db.QueryRow(`SELECT COUNT(*) FROM projects WHERE name = 'duplicado'`).Scan(&n)
 	if n != 0 {
 		t.Errorf("409 left %d project rows", n)
+	}
+}
+
+func TestPutGestorLinksJaLigadosSemGestor(t *testing.T) {
+	e := newGestorEnv(t, true)
+	id := e.newProj("p")
+	path := fmt.Sprintf("/api/projects/%d", id)
+	e.do(e.editor, "PUT", path, `{"gestor_links":[{"gestor_projeto_id":10}]}`)
+	*e.down = true
+	if code, raw := e.do(e.editor, "PUT", path, `{"gestor_links":[{"gestor_projeto_id":10}]}`); code != 200 {
+		t.Fatalf("re-send = %d %s, want 200 with Gestor down", code, raw)
+	}
+	if got := e.links(t, id); len(got) != 1 || got[0].GestorProjetoNome != "Alfa" {
+		t.Errorf("links = %+v", got)
+	}
+	if code, _ := e.do(e.editor, "PUT", path, `{"gestor_links":[{"gestor_projeto_id":10},{"gestor_projeto_id":11}]}`); code != 502 {
+		t.Errorf("new id with Gestor down = %d, want 502", code)
+	}
+}
+
+func TestDeleteProjetoLiberaGestorLinks(t *testing.T) {
+	e := newGestorEnv(t, true)
+	a, b := e.newProj("a"), e.newProj("b")
+	e.do(e.editor, "PUT", fmt.Sprintf("/api/projects/%d", a), `{"gestor_links":[{"gestor_projeto_id":10}]}`)
+	if code, raw := e.do(e.admin, "DELETE", fmt.Sprintf("/api/projects/%d", a), ""); code >= 300 {
+		t.Fatalf("DELETE = %d %s", code, raw)
+	}
+	if code, raw := e.do(e.editor, "PUT", fmt.Sprintf("/api/projects/%d", b), `{"gestor_links":[{"gestor_projeto_id":10}]}`); code != 200 {
+		t.Errorf("link after delete = %d %s, want 200", code, raw)
 	}
 }

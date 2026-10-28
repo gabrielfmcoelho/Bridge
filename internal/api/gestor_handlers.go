@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -58,7 +59,8 @@ func (h *gestorHandlers) handleProjetos(w http.ResponseWriter, r *http.Request) 
 	out := map[string]any{"enabled": enabled, "configured": true, "data": []map[string]any{}}
 	ps, err := c.BuscarProjetos(r.Context(), strings.TrimSpace(r.URL.Query().Get("q")), 20)
 	if err != nil {
-		out["error"] = err.Error()
+		log.Printf("[api] GET /api/gestor/projetos: %v", err)
+		out["error"] = "Gestor indisponível"
 		jsonOK(w, out)
 		return
 	}
@@ -248,15 +250,20 @@ func (h *projectHandlers) resolveGestorLinks(w http.ResponseWriter, r *http.Requ
 	}
 	links := []models.ProjectGestorLink{}
 	if len(*in) > 0 {
-		c, _, err := gestorClientFor(h.db)
-		if err != nil {
-			jsonServerError(w, r, "failed to read gestor settings", err)
-			return false
+		// Ids already linked to this project keep their stored name and never
+		// call Gestor, so re-saving a project works while Gestor is down.
+		stored := map[int64]string{}
+		if projectID != 0 {
+			cur, err := h.project.GestorLinksFor(r.Context(), projectID)
+			if err != nil {
+				jsonServerError(w, r, "failed to read gestor links", err)
+				return false
+			}
+			for _, l := range cur {
+				stored[l.GestorProjetoID] = l.GestorProjetoNome
+			}
 		}
-		if c == nil {
-			jsonError(w, http.StatusBadRequest, "A integração com o Gestor está desligada ou incompleta")
-			return false
-		}
+		var c *gestor.Client
 		seen := map[int64]bool{}
 		// ponytail: one Projeto() call per link, sequential; batch if lists grow large.
 		for _, l := range *in {
@@ -264,11 +271,27 @@ func (h *projectHandlers) resolveGestorLinks(w http.ResponseWriter, r *http.Requ
 				continue
 			}
 			seen[l.GestorProjetoID] = true
+			if nome, ok := stored[l.GestorProjetoID]; ok {
+				links = append(links, models.ProjectGestorLink{GestorProjetoID: l.GestorProjetoID, GestorProjetoNome: nome})
+				continue
+			}
+			if c == nil {
+				var err error
+				c, _, err = gestorClientFor(h.db)
+				if err != nil {
+					jsonServerError(w, r, "failed to read gestor settings", err)
+					return false
+				}
+				if c == nil {
+					jsonError(w, http.StatusBadRequest, "A integração com o Gestor está desligada ou incompleta")
+					return false
+				}
+			}
 			p, err := c.Projeto(r.Context(), l.GestorProjetoID)
 			var ge *gestor.Error
 			switch {
 			case errors.As(err, &ge) && ge.Status == http.StatusNotFound:
-				jsonError(w, http.StatusBadRequest, "Projeto do Gestor não encontrado")
+				jsonError(w, http.StatusBadRequest, fmt.Sprintf("Projeto do Gestor %d não encontrado", l.GestorProjetoID))
 				return false
 			case err != nil:
 				jsonErrorLogged(w, r, http.StatusBadGateway, "Gestor indisponível", err)
