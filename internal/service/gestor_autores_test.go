@@ -7,14 +7,15 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gestor"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/kcadmin"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/kcadmin/kcfake"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 )
 
 // fakeGitLab: group "g" has repos 1 (a/one) and 2 (a/two) and 3 (a/forbidden).
@@ -73,7 +74,7 @@ func TestVarrerAgregaPorEmailMinusculo(t *testing.T) {
 	ctx := context.Background()
 	d, _ := dbtest.Open(t)
 	defer d.Close()
-	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), nil, []string{"g"})
+	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), nil, []string{"g"}, 0)
 	res, err := svc.VarrerAutores(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +91,7 @@ func TestVarrerAgregaPorEmailMinusculo(t *testing.T) {
 func TestVarrerRepoComErroSegue(t *testing.T) {
 	d, _ := dbtest.Open(t)
 	defer d.Close()
-	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), nil, []string{"g"})
+	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), nil, []string{"g"}, 0)
 	res, err := svc.VarrerAutores(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +121,7 @@ func TestSugestaoPorEmailDepoisNome(t *testing.T) {
 		return `{"pessoa":[` + pessoa(22, "Bia Açaí") + `]}`
 	})
 	contrib := map[string]string{"1": `[{"name":"  Bía   AÇAÍ ","email":"b@x.com","commits":1},{"name":"Ana","email":"a@x.com","commits":2}]`}
-	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contrib), gs, []string{"g"})
+	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contrib), gs, []string{"g"}, 0)
 	res, err := svc.VarrerAutores(ctx)
 	if err != nil || res.Sugestoes != 2 {
 		t.Fatalf("res=%+v err=%v", res, err)
@@ -152,7 +153,7 @@ func TestNomeAmbiguoNaoSugere(t *testing.T) {
 		}
 		return `{"pessoa":[` + pessoa(1, "Ana A") + `,` + pessoa(2, "Ana B") + `]}`
 	})
-	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), gs, []string{"g"})
+	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), gs, []string{"g"}, 0)
 	res, err := svc.VarrerAutores(ctx)
 	if err != nil || res.Sugestoes != 0 {
 		t.Fatalf("res=%+v err=%v", res, err)
@@ -171,7 +172,7 @@ func TestGestorIndisponivelMantemContagem(t *testing.T) {
 	fake.Mu.Unlock()
 	kc := kcadmin.New(kcadmin.Config{BaseURL: "http://keycloak.example", InternalURL: kcSrv.URL, HostHeader: "keycloak.example", Realm: "apis"})
 	gs := gestor.NewClient(gestor.Settings{Enabled: true, BaseURL: gw.URL, ClientID: "gc", ClientSecret: "gs"}, kc)
-	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), gs, []string{"g"})
+	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), gs, []string{"g"}, 0)
 	res, err := svc.VarrerAutores(ctx)
 	if err != nil || res.AutoresNovos != 2 {
 		t.Fatalf("res=%+v err=%v", res, err)
@@ -190,7 +191,7 @@ func TestGestorIndisponivelMantemContagem(t *testing.T) {
 func TestGitLabNaoConfiguradoErra(t *testing.T) {
 	d, _ := dbtest.Open(t)
 	defer d.Close()
-	if _, err := service.NewGestorAutoresServiceWith(d.SQL, nil, nil, []string{"g"}).VarrerAutores(context.Background()); err == nil {
+	if _, err := service.NewGestorAutoresServiceWith(d.SQL, nil, nil, []string{"g"}, 0).VarrerAutores(context.Background()); err == nil {
 		t.Fatal("want error")
 	}
 }
@@ -199,7 +200,7 @@ func TestRevarrerMantemVinculoEIgnorado(t *testing.T) {
 	ctx := context.Background()
 	d, _ := dbtest.Open(t)
 	defer d.Close()
-	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), nil, []string{"g"})
+	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), nil, []string{"g"}, 0)
 	if _, err := svc.VarrerAutores(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -221,5 +222,19 @@ func TestRevarrerMantemVinculoEIgnorado(t *testing.T) {
 		if a.Email == "b@x.com" && !a.Ignorado {
 			t.Errorf("ignorado lost: %+v", a)
 		}
+	}
+}
+
+func TestCtxCanceladoPeloPausaParaSugestoes(t *testing.T) {
+	d, _ := dbtest.Open(t)
+	defer d.Close()
+	gs := fakeGestor(t, func(map[string][]string) string { return nenhum })
+	svc := service.NewGestorAutoresServiceWith(d.SQL, fakeGitLab(t, contribDefault), gs, []string{"g"}, time.Hour)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	t0 := time.Now()
+	_, err := svc.VarrerAutores(ctx)
+	if err == nil || time.Since(t0) > 5*time.Second {
+		t.Fatalf("err=%v after %v", err, time.Since(t0))
 	}
 }

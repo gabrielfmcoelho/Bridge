@@ -39,11 +39,28 @@ type fontesAutores struct {
 type GestorAutoresService struct {
 	repo *store.GitLabAutorRepo
 	load func() (fontesAutores, error)
+	// pausa precedes every Gestor lookup, to stay under the Bridge key's
+	// 600 req/min limit.
+	// ponytail: 150ms ≈ 400 lookups/min; add a sugestao_tentada_em column
+	// (skip recently tried no-match rows) if scans become too slow.
+	pausa time.Duration
+}
+
+func (s *GestorAutoresService) esperar(ctx context.Context) error {
+	if s.pausa <= 0 {
+		return ctx.Err()
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(s.pausa):
+		return nil
+	}
 }
 
 // NewGestorAutoresService resolves the clients from settings on each scan.
 func NewGestorAutoresService(db *sql.DB, enc *database.Encryptor) *GestorAutoresService {
-	return &GestorAutoresService{repo: store.NewGitLabAutorRepo(db), load: func() (fontesAutores, error) {
+	return &GestorAutoresService{repo: store.NewGitLabAutorRepo(db), pausa: 150 * time.Millisecond, load: func() (fontesAutores, error) {
 		gls, err := gitlab.LoadSettings(db, enc)
 		if err != nil {
 			return fontesAutores{}, err
@@ -64,8 +81,8 @@ func NewGestorAutoresService(db *sql.DB, enc *database.Encryptor) *GestorAutores
 }
 
 // NewGestorAutoresServiceWith uses fixed clients (tests). gs may be nil.
-func NewGestorAutoresServiceWith(db *sql.DB, gl *gitlab.Client, gs *gestor.Client, grupos []string) *GestorAutoresService {
-	return &GestorAutoresService{repo: store.NewGitLabAutorRepo(db), load: func() (fontesAutores, error) {
+func NewGestorAutoresServiceWith(db *sql.DB, gl *gitlab.Client, gs *gestor.Client, grupos []string, pausa time.Duration) *GestorAutoresService {
+	return &GestorAutoresService{repo: store.NewGitLabAutorRepo(db), pausa: pausa, load: func() (fontesAutores, error) {
 		if gl == nil {
 			return fontesAutores{}, errors.New("GitLab não configurado")
 		}
@@ -120,8 +137,17 @@ func (s *GestorAutoresService) VarrerAutores(ctx context.Context) (ResumoVarredu
 	sem := make(chan struct{}, 5)
 	var wg sync.WaitGroup
 	for _, p := range projs {
+		if ctx.Err() != nil {
+			break
+		}
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+		}
+		if ctx.Err() != nil {
+			break
+		}
 		wg.Add(1)
-		sem <- struct{}{}
 		go func() {
 			defer wg.Done()
 			defer func() { <-sem }()
@@ -153,6 +179,9 @@ func (s *GestorAutoresService) VarrerAutores(ctx context.Context) (ResumoVarredu
 		}()
 	}
 	wg.Wait()
+	if err := ctx.Err(); err != nil {
+		return res, err
+	}
 
 	now := time.Now()
 	for e, a := range agg {
@@ -176,7 +205,10 @@ func (s *GestorAutoresService) VarrerAutores(ctx context.Context) (ResumoVarredu
 		return res, err
 	}
 	for _, a := range pend {
-		pessoa, motivo, err := sugerir(ctx, f.gs, a.Email, a.NomeGitLab)
+		pessoa, motivo, err := s.sugerir(ctx, f.gs, a.Email, a.NomeGitLab)
+		if ctx.Err() != nil {
+			return res, ctx.Err()
+		}
 		if err != nil {
 			res.Erros = append(res.Erros, "gestor indisponível: "+err.Error())
 			break
@@ -194,7 +226,10 @@ func (s *GestorAutoresService) VarrerAutores(ctx context.Context) (ResumoVarredu
 
 // sugerir: by e-mail first, then by normalized full name; only a single
 // result counts as a suggestion.
-func sugerir(ctx context.Context, gs *gestor.Client, email, nome string) (*gestor.Pessoa, string, error) {
+func (s *GestorAutoresService) sugerir(ctx context.Context, gs *gestor.Client, email, nome string) (*gestor.Pessoa, string, error) {
+	if err := s.esperar(ctx); err != nil {
+		return nil, "", err
+	}
 	ps, err := gs.BuscarPessoas(ctx, gestor.PessoaQuery{Email: email, Limite: 5})
 	if err != nil {
 		return nil, "", err
@@ -205,6 +240,9 @@ func sugerir(ctx context.Context, gs *gestor.Client, email, nome string) (*gesto
 	n := normalizarNome(nome)
 	if n == "" {
 		return nil, "", nil
+	}
+	if err := s.esperar(ctx); err != nil {
+		return nil, "", err
 	}
 	ps, err = gs.BuscarPessoas(ctx, gestor.PessoaQuery{Nome: n, Limite: 5})
 	if err != nil {
