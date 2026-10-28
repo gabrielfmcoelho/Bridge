@@ -18,6 +18,7 @@ import (
 
 type gestorEnv struct {
 	do        func(tok, method, path, body string) (int, string)
+	admin     string // session token
 	editor    string // session token
 	db        *sql.DB
 	queries   *[]string // "nome_projeto" values searched
@@ -55,6 +56,8 @@ func newGestorEnv(t *testing.T, on bool) *gestorEnv {
 			_ = json.NewDecoder(r.Body).Decode(&b)
 			*e.queries = append(*e.queries, fmt.Sprintf("%s|%d", b.Nome, b.Limite))
 			fmt.Fprint(w, `{"projetos":{"Alfa":{"id_projeto":10,"concluido":true,"arquivado":false}}}`)
+		case r.Method == "GET" && r.URL.Path == "/pessoa/":
+			fmt.Fprint(w, `{"pessoa":[{"id_pessoa":7,"nome":"Ana Souza","email":"ana@x.gov","lotacao":"SEAD"}]}`)
 		case strings.HasPrefix(r.URL.Path, "/projeto/detalhe/"):
 			var id int64
 			fmt.Sscan(strings.TrimPrefix(r.URL.Path, "/projeto/detalhe/"), &id)
@@ -80,7 +83,7 @@ func newGestorEnv(t *testing.T, on bool) *gestorEnv {
 		return tok
 	}
 	admin, editor := mk("adm", "admin"), mk("ed", "editor")
-	e.editor = editor
+	e.editor, e.admin = editor, admin
 	e.do = func(tok, method, path, body string) (int, string) {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")

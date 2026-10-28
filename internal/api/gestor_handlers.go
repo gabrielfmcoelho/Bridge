@@ -1,6 +1,8 @@
 package api
 
 import (
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -69,6 +71,168 @@ func (h *gestorHandlers) handleProjetos(w http.ResponseWriter, r *http.Request) 
 
 func (h *gestorHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("editor", "GET /api/gestor/projetos", h.handleProjetos)
+	rr.role("admin", "GET /api/gestor/autores", h.handleAutores)
+	rr.role("admin", "POST /api/gestor/autores/varrer", h.handleVarrer)
+	rr.role("admin", "PUT /api/gestor/autores/{id}", h.handleAutorUpdate)
+	rr.role("admin", "GET /api/gestor/pessoas", h.handlePessoas)
+}
+
+// handleAutores lists GitLab commit authors. status: sem_vinculo (default), com_sugestao, vinculados, ignorados, todos.
+//
+//	@Summary	List GitLab authors
+//	@Tags		gestor
+//	@Produce	json
+//	@Param		status	query		string	false	"sem_vinculo|com_sugestao|vinculados|ignorados|todos"
+//	@Param		q		query		string	false	"E-mail or name fragment"
+//	@Success	200		{object}	ListEnvelope[models.GitLabAutor]
+//	@Router		/api/gestor/autores [get]
+func (h *gestorHandlers) handleAutores(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	if status == "" {
+		status = "sem_vinculo"
+	}
+	rows, err := store.NewGitLabAutorRepo(h.db.SQL).List(r.Context(), status, strings.TrimSpace(r.URL.Query().Get("q")))
+	if err != nil {
+		jsonServerError(w, r, "failed to list authors", err)
+		return
+	}
+	jsonPaged(w, r, rows)
+}
+
+// handleVarrer scans GitLab synchronously and stores authors and suggestions.
+//
+//	@Summary	Scan GitLab authors
+//	@Tags		gestor
+//	@Produce	json
+//	@Success	200	{object}	service.ResumoVarredura
+//	@Failure	400	{object}	httpx.ErrorResponse
+//	@Failure	502	{object}	httpx.ErrorResponse
+//	@Router		/api/gestor/autores/varrer [post]
+func (h *gestorHandlers) handleVarrer(w http.ResponseWriter, r *http.Request) {
+	res, err := service.NewGestorAutoresService(h.db.SQL, h.db.Encryptor).VarrerAutores(r.Context())
+	switch {
+	case errors.Is(err, service.ErrGitLabNaoConfigurado):
+		jsonError(w, http.StatusBadRequest, err.Error())
+	case err != nil:
+		jsonErrorLogged(w, r, http.StatusBadGateway, "Falha na varredura: "+err.Error(), err)
+	default:
+		jsonOK(w, res)
+	}
+}
+
+type autorUpdate struct {
+	// Present-but-null unlinks, so presence is tracked via the raw message.
+	GestorPessoaID json.RawMessage `json:"gestor_pessoa_id"`
+	GestorNome     *string         `json:"gestor_nome"`
+	GestorEmail    *string         `json:"gestor_email"`
+	Ignorado       *bool           `json:"ignorado"`
+}
+
+// handleAutorUpdate links/unlinks and/or (un)ignores one author. The Gestor
+// has no lookup by id, so the person's name comes from the stored suggestion
+// or from the client (the search result it picked).
+//
+//	@Summary	Update a GitLab author link
+//	@Tags		gestor
+//	@Accept		json
+//	@Produce	json
+//	@Param		id		path		int			true	"Author id"
+//	@Param		body	body		autorUpdate	true	"Partial update"
+//	@Success	200		{object}	models.GitLabAutor
+//	@Router		/api/gestor/autores/{id} [put]
+func (h *gestorHandlers) handleAutorUpdate(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var req autorUpdate
+	if !decodeBody(w, r, &req) {
+		return
+	}
+	repo := store.NewGitLabAutorRepo(h.db.SQL)
+	a, err := repo.Get(r.Context(), id)
+	if errors.Is(err, sql.ErrNoRows) {
+		jsonError(w, http.StatusNotFound, "Autor não encontrado")
+		return
+	} else if err != nil {
+		jsonServerError(w, r, "failed to load author", err)
+		return
+	}
+	if req.GestorPessoaID != nil {
+		if string(req.GestorPessoaID) == "null" {
+			err = repo.SetVinculo(r.Context(), id, nil, "", "", 0)
+		} else {
+			var pid int64
+			if json.Unmarshal(req.GestorPessoaID, &pid) != nil || pid <= 0 {
+				jsonError(w, http.StatusBadRequest, "gestor_pessoa_id inválido")
+				return
+			}
+			nome, email := "", ""
+			if req.GestorNome != nil {
+				nome = strings.TrimSpace(*req.GestorNome)
+			}
+			if req.GestorEmail != nil {
+				email = strings.TrimSpace(*req.GestorEmail)
+			}
+			if a.SugestaoPessoaID != nil && *a.SugestaoPessoaID == pid && nome == "" {
+				nome = a.SugestaoNome
+			}
+			if nome == "" {
+				jsonError(w, http.StatusBadRequest, "gestor_nome é obrigatório")
+				return
+			}
+			err = repo.SetVinculo(r.Context(), id, &pid, nome, email, actorID(r))
+		}
+		if err != nil {
+			jsonServerError(w, r, "failed to link author", err)
+			return
+		}
+	}
+	if req.Ignorado != nil {
+		if err := repo.SetIgnorado(r.Context(), id, *req.Ignorado); err != nil {
+			jsonServerError(w, r, "failed to update author", err)
+			return
+		}
+	}
+	a, err = repo.Get(r.Context(), id)
+	if err != nil {
+		jsonServerError(w, r, "failed to load author", err)
+		return
+	}
+	jsonOK(w, a)
+}
+
+// handlePessoas searches Gestor people by name for the "Escolher…" picker.
+// Always 200: a Gestor failure comes back in "error" so the screen degrades.
+//
+//	@Summary	Search Gestor people
+//	@Tags		gestor
+//	@Produce	json
+//	@Param		q	query		string	false	"Name fragment"
+//	@Success	200	{object}	map[string]interface{}
+//	@Router		/api/gestor/pessoas [get]
+func (h *gestorHandlers) handlePessoas(w http.ResponseWriter, r *http.Request) {
+	c, _, err := gestorClientFor(h.db)
+	if err != nil {
+		jsonServerError(w, r, "failed to read gestor settings", err)
+		return
+	}
+	if c == nil {
+		jsonOK(w, map[string]any{"enabled": false, "data": []gestor.Pessoa{}})
+		return
+	}
+	out := map[string]any{"enabled": true, "data": []map[string]any{}}
+	ps, err := c.BuscarPessoas(r.Context(), gestor.PessoaQuery{Nome: strings.TrimSpace(r.URL.Query().Get("q")), Limite: 20})
+	if err != nil {
+		out["error"] = err.Error()
+	} else {
+		data := make([]map[string]any, 0, len(ps))
+		for _, p := range ps {
+			data = append(data, map[string]any{"id": p.IDPessoa, "nome": p.Nome, "email": p.Email, "lotacao": p.Lotacao})
+		}
+		out["data"] = data
+	}
+	jsonOK(w, out)
 }
 
 // resolveGestorLinks fills wr.GestorLinks from the request: ids deduped, each

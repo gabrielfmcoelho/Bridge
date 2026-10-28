@@ -232,6 +232,10 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/wiki/documents/1"},
 
 		{"GET", "/api/gestor/projetos"},
+		{"GET", "/api/gestor/autores"},
+		{"POST", "/api/gestor/autores/varrer"},
+		{"PUT", "/api/gestor/autores/1"},
+		{"GET", "/api/gestor/pessoas"},
 
 		// Coolify integration
 		{"GET", "/api/coolify/status"},

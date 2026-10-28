@@ -18,6 +18,9 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
+// ErrGitLabNaoConfigurado: the scan cannot start (the handler answers 400).
+var ErrGitLabNaoConfigurado = errors.New("GitLab não configurado")
+
 // ResumoVarredura is the outcome of VarrerAutores.
 type ResumoVarredura struct {
 	Repos              int      `json:"repos"`
@@ -66,11 +69,11 @@ func NewGestorAutoresService(db *sql.DB, enc *database.Encryptor) *GestorAutores
 			return fontesAutores{}, err
 		}
 		if !gls.Enabled {
-			return fontesAutores{}, errors.New("integração GitLab desativada")
+			return fontesAutores{}, fmt.Errorf("%w: integração desativada", ErrGitLabNaoConfigurado)
 		}
 		gl := gitlab.NewServiceClient(gls)
 		if gl == nil {
-			return fontesAutores{}, errors.New("GitLab sem token de serviço configurado")
+			return fontesAutores{}, fmt.Errorf("%w: sem token de serviço", ErrGitLabNaoConfigurado)
 		}
 		gss, err := gestor.LoadSettings(db, enc)
 		if err != nil {
@@ -84,7 +87,7 @@ func NewGestorAutoresService(db *sql.DB, enc *database.Encryptor) *GestorAutores
 func NewGestorAutoresServiceWith(db *sql.DB, gl *gitlab.Client, gs *gestor.Client, grupos []string, pausa time.Duration) *GestorAutoresService {
 	return &GestorAutoresService{repo: store.NewGitLabAutorRepo(db), pausa: pausa, load: func() (fontesAutores, error) {
 		if gl == nil {
-			return fontesAutores{}, errors.New("GitLab não configurado")
+			return fontesAutores{}, ErrGitLabNaoConfigurado
 		}
 		return fontesAutores{gl: gl, gs: gs, grupos: grupos}, nil
 	}}

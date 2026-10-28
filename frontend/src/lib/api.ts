@@ -2145,6 +2145,15 @@ export const sentinelAPI = {
 export const gestorAPI = {
   projetos: (q: string) =>
     api.get<import("./types").GestorProjetosResult>(`/api/gestor/projetos?q=${encodeURIComponent(q)}`),
+  autores: (status: string, q: string) =>
+    api.getList<import("./types").GitLabAutor>(`/api/gestor/autores?status=${status}&q=${encodeURIComponent(q)}`),
+  /** Partial: gestor_pessoa_id null unlinks; a person other than the suggestion needs gestor_nome. */
+  updateAutor: (id: number, body: import("./types").GitLabAutorUpdate) =>
+    api.put<import("./types").GitLabAutor>(`/api/gestor/autores/${id}`, body),
+  // Lists every repo's contributors and looks each new e-mail up: can outlive the 120s default.
+  varrer: () => request<import("./types").GitLabVarredura>("/api/gestor/autores/varrer", { method: "POST" }, 10 * 60_000),
+  pessoas: (q: string) =>
+    api.get<import("./types").GestorPessoasResult>(`/api/gestor/pessoas?q=${encodeURIComponent(q)}`),
 };
 
 // Coolify integration

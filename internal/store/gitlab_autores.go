@@ -111,3 +111,15 @@ func (r *GitLabAutorRepo) List(ctx context.Context, status, q string) ([]models.
 	}
 	return r.query(ctx, where, args...)
 }
+
+// Get returns one author, or sql.ErrNoRows.
+func (r *GitLabAutorRepo) Get(ctx context.Context, id int64) (*models.GitLabAutor, error) {
+	rows, err := r.query(ctx, ` WHERE id = ?`, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return &rows[0], nil
+}
