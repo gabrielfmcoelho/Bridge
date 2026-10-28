@@ -1,7 +1,11 @@
 package api
 
 import (
+	"errors"
 	"net/http"
+
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
@@ -12,6 +16,7 @@ import (
 // enrichment/orchestration lives in service.ProjectService.
 type projectHandlers struct {
 	project *service.ProjectService
+	db      *database.DB
 }
 
 // handleList godoc
@@ -102,6 +107,9 @@ type projectWriteRequest struct {
 	// Coolify projects/environments mapped to this project (environment "" =
 	// all). Absent = leave unchanged; [] = clear.
 	CoolifyLinks *[]models.ProjectCoolifyLink `json:"coolify_links"`
+	// Gestor projects referenced by this project; the name is fetched from
+	// Gestor. Absent = leave unchanged; [] = clear.
+	GestorLinks *[]gestorLinkInput `json:"gestor_links"`
 }
 
 func (req *projectWriteRequest) toWrite() *service.ProjectWrite {
@@ -136,7 +144,13 @@ func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wr.Grants = &grants
+	if !h.resolveGestorLinks(w, r, req.GestorLinks, wr) {
+		return
+	}
 	if err := h.project.Create(r.Context(), wr); err != nil {
+		if h.gestorInUse(w, err) {
+			return
+		}
 		jsonServerError(w, r, "failed to create project", err)
 		return
 	}
@@ -187,8 +201,14 @@ func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		wr.Grants = &grants
 	}
+	if !h.resolveGestorLinks(w, r, req.GestorLinks, wr) {
+		return
+	}
 	found, err := h.project.Update(r.Context(), id, wr)
 	if err != nil {
+		if h.gestorInUse(w, err) {
+			return
+		}
 		jsonServerError(w, r, "failed to update project", err)
 		return
 	}
@@ -280,4 +300,14 @@ func (h *projectHandlers) handleRestore(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	jsonOK(w, map[string]string{"status": "restored"})
+}
+
+// gestorInUse answers 409 (generic: the owner may be invisible to the caller)
+// when a Gestor project is already linked elsewhere.
+func (h *projectHandlers) gestorInUse(w http.ResponseWriter, err error) bool {
+	if !errors.Is(err, store.ErrGestorProjetoEmUso) {
+		return false
+	}
+	jsonError(w, http.StatusConflict, "Projeto do Gestor já está ligado a outro projeto do Bridge")
+	return true
 }

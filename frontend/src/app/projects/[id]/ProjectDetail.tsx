@@ -22,6 +22,7 @@ import IssuesBoard from "@/components/issues/IssuesBoard";
 import { useFlag } from "@/contexts/FlagContext";
 import ProjectForm from "../ProjectForm";
 import ProjectProfile from "./_components/ProjectProfile";
+import ProjectGestorLinks from "./_components/ProjectGestorLinks";
 import ProjectServices from "./_components/ProjectServices";
 import ProjectAiAnalysis from "./_components/ProjectAiAnalysis";
 import CommitsTab from "./_components/CommitsTab";
@@ -148,6 +149,7 @@ export default function ProjectDetail({ id }: { id: number }) {
               <DetailSplit profile={<ProjectProfile project={data.project} tags={data.tags || []} responsaveis={data.responsaveis || []} onEditResponsaveis={canEdit ? () => setShowEditDrawer(true) : undefined} />}>
                 <ProjectAiAnalysis projectId={id} />
                 <ProjectServices services={data.services || []} />
+                <ProjectGestorLinks links={data.gestor_links || []} />
               </DetailSplit>
             )}
             {activeTab === "topology" && (() => {
@@ -199,6 +201,7 @@ export default function ProjectDetail({ id }: { id: number }) {
               initialHostIds={data.direct_host_ids}
               initialDnsIds={data.direct_dns_ids}
               initialCoolifyLinks={data.coolify_links}
+              initialGestorLinks={data.gestor_links}
               onClose={() => setShowEditDrawer(false)}
               onSubHeaderChange={setFormSubHeader}
               onFooterChange={setFormFooter}

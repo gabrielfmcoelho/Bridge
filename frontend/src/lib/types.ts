@@ -1102,6 +1102,23 @@ export interface ProjectCoolifyLink {
   coolify_environment: string;
 }
 
+/** A Bridge project's reference to a Gestor project (name = snapshot from the last save). */
+export interface ProjectGestorLink {
+  gestor_projeto_id: number;
+  gestor_projeto_nome: string;
+  /** Only known for projects picked in the current editing session. */
+  concluido?: boolean;
+  arquivado?: boolean;
+}
+
+/** GET /api/gestor/projetos: the Gestor search the project form uses. */
+export interface GestorProjetosResult {
+  enabled: boolean;
+  configured: boolean;
+  data: { id: number; nome: string; concluido: boolean; arquivado: boolean }[];
+  error?: string;
+}
+
 // ── Assistant (POST /api/ai/chat) ──────────────────────────────────────────
 
 /** A Bridge page a tool result pointed to; cited in the answer as a markdown link. */

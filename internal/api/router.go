@@ -146,8 +146,9 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	glh.registerRoutes(rr) // /api/gitlab/*
 
 	// GitLab Code Management — per-project link management + aggregated commits (uses shared service PAT)
-	pglh.registerRoutes(rr)             // /api/projects/{id}/gitlab/*
-	app.projectEmbed.registerRoutes(rr) // /api/projects/{id}/embeds/*
+	pglh.registerRoutes(rr)                          // /api/projects/{id}/gitlab/*
+	app.projectEmbed.registerRoutes(rr)              // /api/projects/{id}/embeds/*
+	(&gestorHandlers{db: app.db}).registerRoutes(rr) // /api/gestor/*
 
 	// AI / LLM integration
 	aih.registerRoutes(rr) // /api/ai/*, /api/projects/{id}/ai/analyze

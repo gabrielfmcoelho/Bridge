@@ -38,6 +38,13 @@ type ProjectFilter struct {
 	PerPage  int
 }
 
+// ProjectGestorLink references a Gestor project from a Bridge project (name = snapshot).
+type ProjectGestorLink struct {
+	ProjectID         int64  `json:"project_id"`
+	GestorProjetoID   int64  `json:"gestor_projeto_id"`
+	GestorProjetoNome string `json:"gestor_projeto_nome"`
+}
+
 // ProjectCoolifyLink maps a Bridge project to a Coolify project and, optionally,
 // one of its environments ("" = every environment). The Coolify sync gives
 // services of that project/environment this Bridge project when they have none.

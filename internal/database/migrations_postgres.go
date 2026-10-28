@@ -2096,4 +2096,15 @@ var migrationsPostgres = []string{
 	END $$;
 	CREATE UNIQUE INDEX IF NOT EXISTS uq_gitlab_repo_links
 		ON gitlab_repo_links (entity_type, entity_id, kind, gitlab_project_id, gitlab_base_url);`,
+
+	// Version 120: a Bridge project references N Gestor projects (id + name
+	// snapshot). UNIQUE(gestor_projeto_id): a Gestor project sits in one
+	// Bridge project only.
+	`CREATE TABLE IF NOT EXISTS project_gestor_links (
+		project_id          BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		gestor_projeto_id   BIGINT NOT NULL,
+		gestor_projeto_nome TEXT NOT NULL DEFAULT '',
+		PRIMARY KEY (project_id, gestor_projeto_id),
+		UNIQUE (gestor_projeto_id)
+	);`,
 }

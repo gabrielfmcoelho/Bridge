@@ -231,6 +231,8 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/wiki/tree"},
 		{"GET", "/api/wiki/documents/1"},
 
+		{"GET", "/api/gestor/projetos"},
+
 		// Coolify integration
 		{"GET", "/api/coolify/status"},
 		{"POST", "/api/coolify/test"},

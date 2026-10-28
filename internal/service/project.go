@@ -70,6 +70,8 @@ type ProjectDetail struct {
 	// CoolifyLinks maps the project to Coolify projects/environments; the
 	// Coolify sync gives their unassigned services this project.
 	CoolifyLinks []models.ProjectCoolifyLink `json:"coolify_links"`
+	// GestorLinks references Gestor projects (id + name snapshot).
+	GestorLinks []models.ProjectGestorLink `json:"gestor_links"`
 }
 
 // ProjectWrite carries the create/update payload (project + relations). For
@@ -85,6 +87,7 @@ type ProjectWrite struct {
 	DirectHostIDs *[]int64
 	DirectDNSIDs  *[]int64
 	CoolifyLinks  *[]models.ProjectCoolifyLink // nil = leave unchanged
+	GestorLinks   *[]models.ProjectGestorLink  // nil = leave unchanged; names already resolved
 	Grants        *models.AssetGrants          // nil = leave unchanged
 }
 
@@ -205,7 +208,12 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	if err != nil {
 		return nil, err
 	}
+	gestorLinks, err := s.projects.GestorLinksFor(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	return &ProjectDetail{
+		GestorLinks:   gestorLinks,
 		Project:       p,
 		Tags:          tags,
 		Responsaveis:  resp,
@@ -318,6 +326,11 @@ func (s *ProjectService) applyLinks(ctx context.Context, id int64, w *ProjectWri
 			}
 		}
 		if err := s.projects.SetCoolifyLinks(ctx, id, links); err != nil {
+			return err
+		}
+	}
+	if w.GestorLinks != nil {
+		if err := s.projects.SetGestorLinks(ctx, id, *w.GestorLinks); err != nil {
 			return err
 		}
 	}

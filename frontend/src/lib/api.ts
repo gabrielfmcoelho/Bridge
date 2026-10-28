@@ -644,6 +644,8 @@ type ProjectWrite = Partial<import("./types").Project> & {
   host_ids?: number[];
   dns_ids?: number[];
   coolify_links?: import("./types").ProjectCoolifyLink[];
+  /** Ids only: the server fetches the names from Gestor. */
+  gestor_links?: { gestor_projeto_id: number }[];
 };
 
 export const projectsAPI = {
@@ -665,6 +667,7 @@ export const projectsAPI = {
       direct_dns_ids?: number[];
       entidades?: import("./types").AssetGrants;
       coolify_links?: import("./types").ProjectCoolifyLink[];
+      gestor_links?: import("./types").ProjectGestorLink[];
     }>(`/api/projects/${id}`),
   create: (data: ProjectWrite) =>
     api.post<import("./types").Project>("/api/projects", data),
@@ -2136,6 +2139,12 @@ export const sentinelAPI = {
   hosts: () => api.getList<import("./types").SentinelHostRow>("/api/sentinel/hosts"),
   // Visits every Coolify host over SSH, 4 at a time: can outlive the 120s default.
   sync: () => request<import("./types").SentinelSyncReport>("/api/sentinel/sync", { method: "POST" }, 10 * 60_000),
+};
+
+// Gestor integration
+export const gestorAPI = {
+  projetos: (q: string) =>
+    api.get<import("./types").GestorProjetosResult>(`/api/gestor/projetos?q=${encodeURIComponent(q)}`),
 };
 
 // Coolify integration

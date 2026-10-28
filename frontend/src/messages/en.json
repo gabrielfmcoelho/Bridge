@@ -1181,7 +1181,15 @@
     "coolifyEnvironment": "Environment",
     "coolifyAllEnvironments": "All environments",
     "coolifyAddMapping": "Add Coolify project",
-    "coolifyUnavailable": "Couldn't list Coolify projects."
+    "coolifyUnavailable": "Couldn't list Coolify projects.",
+    "gestorLinks": "Gestor projects",
+    "gestorLinksHint": "Reference only: nothing changes in Gestor. A Gestor project belongs to a single Bridge project.",
+    "gestorSearch": "Search Gestor projects by name",
+    "gestorNoResults": "No Gestor projects found.",
+    "gestorUnavailable": "Gestor is unavailable right now.",
+    "gestorConcluido": "completed",
+    "gestorArquivado": "archived",
+    "gestorTitle": "Gestor"
   },
   "service": {
     "title": "Services",
