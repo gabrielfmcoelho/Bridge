@@ -25,13 +25,15 @@ func TestTestGestorConexao(t *testing.T) {
 	fake.Creds["gestor-bridge"] = "g3st0r"
 
 	status := http.StatusOK
+	var gotPath, gotQuery string
 	gw := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotQuery = r.URL.Path, r.URL.Query().Get("pessoa")+"|"+r.URL.Query().Get("limite")
 		if status != http.StatusOK {
 			w.WriteHeader(status)
 			fmt.Fprint(w, `{"detail":"escopo gestor:projetos ausente"}`)
 			return
 		}
-		fmt.Fprint(w, `{"projetos":{}}`)
+		fmt.Fprint(w, `{"pessoa":[]}`)
 	}))
 	t.Cleanup(gw.Close)
 
@@ -59,6 +61,9 @@ func TestTestGestorConexao(t *testing.T) {
 	code, raw := do("POST", "/api/settings/integrations/test/gestor", "")
 	if code != 200 || !strings.Contains(raw, `"success":true`) {
 		t.Errorf("ok case = %d %s", code, raw)
+	}
+	if gotPath != "/pessoa/" || gotQuery != "__teste__|1" {
+		t.Errorf("test called %s ?%s, want /pessoa/ ?__teste__|1", gotPath, gotQuery)
 	}
 	status = http.StatusUnauthorized
 	code, raw = do("POST", "/api/settings/integrations/test/gestor", "")

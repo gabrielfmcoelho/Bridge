@@ -148,5 +148,6 @@ func (c *Client) Projeto(ctx context.Context, id int64) (*Projeto, error) {
 	if err := c.do(ctx, http.MethodGet, "/projeto/detalhe/"+strconv.FormatInt(id, 10), nil, &out); err != nil {
 		return nil, err
 	}
+	// Gestor's "objetivo" IS the project name.
 	return &Projeto{ID: out.ID, Nome: out.Objetivo, Concluido: out.Concluido, Arquivado: out.Arquivado}, nil
 }

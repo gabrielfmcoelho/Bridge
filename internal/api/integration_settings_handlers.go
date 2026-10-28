@@ -819,7 +819,7 @@ func (h *integrationSettingsHandlers) handleTestGitLabCode(w http.ResponseWriter
 	})
 }
 
-// handleTestGestor asks Gestor for one project with the saved settings (the
+// handleTestGestor asks Gestor for one person with the saved settings (the
 // integration may still be off: the test is how an admin checks it first).
 //
 //	@Summary		Test the Gestor connection
@@ -842,7 +842,7 @@ func (h *integrationSettingsHandlers) handleTestGestor(w http.ResponseWriter, r 
 		jsonOK(w, map[string]any{"success": false, "error": "Client id and secret are required"})
 		return
 	}
-	if _, err := c.BuscarProjetos(r.Context(), "", 1); err != nil {
+	if _, err := c.BuscarPessoas(r.Context(), gestor.PessoaQuery{Nome: "__teste__", Limite: 1}); err != nil {
 		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
 		return
 	}
