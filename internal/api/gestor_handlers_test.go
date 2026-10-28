@@ -183,7 +183,12 @@ func TestPutGestorLinks409Generico(t *testing.T) {
 	e := newGestorEnv(t, true)
 	a, b := e.newProj("p-a"), e.newProj("segredo-do-outro")
 	e.do(e.editor, "PUT", fmt.Sprintf("/api/projects/%d", b), `{"gestor_links":[{"gestor_projeto_id":10}]}`)
-	code, raw := e.do(e.editor, "PUT", fmt.Sprintf("/api/projects/%d", a), `{"gestor_links":[{"gestor_projeto_id":10}]}`)
+	code, raw := e.do(e.editor, "PUT", fmt.Sprintf("/api/projects/%d", a), `{"description":"mudou","gestor_links":[{"gestor_projeto_id":10}]}`)
+	var desc string
+	e.db.QueryRow(`SELECT description FROM projects WHERE id = ?`, a).Scan(&desc)
+	if desc == "mudou" {
+		t.Error("409 left the project's other fields written")
+	}
 	if code != 409 {
 		t.Fatalf("PUT = %d %s, want 409", code, raw)
 	}
@@ -247,5 +252,28 @@ func TestGestorLinksProjetoInvisivel404(t *testing.T) {
 	db.QueryRow(`SELECT COUNT(*) FROM project_gestor_links WHERE project_id = ?`, hidden).Scan(&n)
 	if n != 0 {
 		t.Errorf("wrote %d links on a hidden project", n)
+	}
+}
+
+func TestPostProjetoGestorLinks(t *testing.T) {
+	e := newGestorEnv(t, true)
+	code, raw := e.do(e.editor, "POST", "/api/projects", `{"name":"novo","gestor_links":[{"gestor_projeto_id":10}]}`)
+	if code != 201 {
+		t.Fatalf("POST = %d %s", code, raw)
+	}
+	var p struct{ ID int64 }
+	_ = json.Unmarshal([]byte(raw), &p)
+	if got := e.links(t, p.ID); len(got) != 1 || got[0].GestorProjetoNome != "Alfa" {
+		t.Errorf("links = %+v", got)
+	}
+	// 10 is taken now: a second create must 409 and leave no project behind.
+	code, raw = e.do(e.editor, "POST", "/api/projects", `{"name":"duplicado","gestor_links":[{"gestor_projeto_id":10}]}`)
+	if code != 409 {
+		t.Fatalf("POST dup = %d %s, want 409", code, raw)
+	}
+	var n int
+	e.db.QueryRow(`SELECT COUNT(*) FROM projects WHERE name = 'duplicado'`).Scan(&n)
+	if n != 0 {
+		t.Errorf("409 left %d project rows", n)
 	}
 }

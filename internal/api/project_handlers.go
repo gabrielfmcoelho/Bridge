@@ -5,10 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
-
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // projectHandlers is a Phase 2 (R2) handler: it holds a domain service (not a
@@ -144,7 +143,7 @@ func (h *projectHandlers) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	wr.Grants = &grants
-	if !h.resolveGestorLinks(w, r, req.GestorLinks, wr) {
+	if !h.resolveGestorLinks(w, r, 0, req.GestorLinks, wr) {
 		return
 	}
 	if err := h.project.Create(r.Context(), wr); err != nil {
@@ -201,7 +200,7 @@ func (h *projectHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 		wr.Grants = &grants
 	}
-	if !h.resolveGestorLinks(w, r, req.GestorLinks, wr) {
+	if !h.resolveGestorLinks(w, r, id, req.GestorLinks, wr) {
 		return
 	}
 	found, err := h.project.Update(r.Context(), id, wr)

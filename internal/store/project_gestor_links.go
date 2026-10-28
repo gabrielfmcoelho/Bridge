@@ -29,6 +29,15 @@ func (r *ProjectRepo) GestorLinksFor(ctx context.Context, projectID int64) ([]mo
 	return out, rows.Err()
 }
 
+// GestorLinksOwnedByOthers reports whether any of the Gestor projects is linked
+// to a Bridge project other than projectID (0 = a project not created yet).
+func (r *ProjectRepo) GestorLinksOwnedByOthers(ctx context.Context, projectID int64, ids []int64) (bool, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM project_gestor_links WHERE gestor_projeto_id = ANY(?) AND project_id <> ?`, ids, projectID).Scan(&n)
+	return n > 0, err
+}
+
 // SetGestorLinks replaces a project's Gestor links (one tx). A Gestor project
 // linked elsewhere yields ErrGestorProjetoEmUso and nothing changes.
 func (r *ProjectRepo) SetGestorLinks(ctx context.Context, projectID int64, links []models.ProjectGestorLink) error {

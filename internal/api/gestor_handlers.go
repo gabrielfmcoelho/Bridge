@@ -9,6 +9,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gestor"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 type gestorHandlers struct {
@@ -72,8 +73,8 @@ func (h *gestorHandlers) registerRoutes(rr routeRegistrar) {
 
 // resolveGestorLinks fills wr.GestorLinks from the request: ids deduped, each
 // name fetched from Gestor. Nothing is written here; on failure it answers
-// (400 unknown project, 502 Gestor unavailable) and returns false.
-func (h *projectHandlers) resolveGestorLinks(w http.ResponseWriter, r *http.Request, in *[]gestorLinkInput, wr *service.ProjectWrite) bool {
+// (400 unknown project, 502 Gestor unavailable, 409 already linked elsewhere) and returns false.
+func (h *projectHandlers) resolveGestorLinks(w http.ResponseWriter, r *http.Request, projectID int64, in *[]gestorLinkInput, wr *service.ProjectWrite) bool {
 	if in == nil {
 		return true
 	}
@@ -89,6 +90,7 @@ func (h *projectHandlers) resolveGestorLinks(w http.ResponseWriter, r *http.Requ
 			return false
 		}
 		seen := map[int64]bool{}
+		// ponytail: one Projeto() call per link, sequential; batch if lists grow large.
 		for _, l := range *in {
 			if seen[l.GestorProjetoID] {
 				continue
@@ -105,6 +107,20 @@ func (h *projectHandlers) resolveGestorLinks(w http.ResponseWriter, r *http.Requ
 				return false
 			}
 			links = append(links, models.ProjectGestorLink{GestorProjetoID: p.ID, GestorProjetoNome: p.Nome})
+		}
+		// Checked before any write; the UNIQUE index stays the race backstop.
+		ids := make([]int64, len(links))
+		for i, l := range links {
+			ids[i] = l.GestorProjetoID
+		}
+		taken, err := h.project.GestorLinksOwnedByOthers(r.Context(), projectID, ids)
+		if err != nil {
+			jsonServerError(w, r, "failed to check gestor links", err)
+			return false
+		}
+		if taken {
+			h.gestorInUse(w, store.ErrGestorProjetoEmUso)
+			return false
 		}
 	}
 	wr.GestorLinks = &links

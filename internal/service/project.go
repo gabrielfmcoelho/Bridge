@@ -213,7 +213,6 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 		return nil, err
 	}
 	return &ProjectDetail{
-		GestorLinks:   gestorLinks,
 		Project:       p,
 		Tags:          tags,
 		Responsaveis:  resp,
@@ -224,6 +223,7 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 		DirectDNSIDs:  directDNS,
 		Entidades:     grants,
 		CoolifyLinks:  coolifyLinks,
+		GestorLinks:   gestorLinks,
 	}, nil
 }
 
@@ -354,4 +354,9 @@ func (s *ProjectService) ListTrash(ctx context.Context) ([]models.Project, error
 // Restore un-deletes a project (and cascade-restores its secrets) by id.
 func (s *ProjectService) Restore(ctx context.Context, actor models.ActorContext, id int64) error {
 	return store.RestoreParent(ctx, s.db, actor, models.SecretScopeProjeto, id)
+}
+
+// GestorLinksOwnedByOthers: see ProjectRepo.GestorLinksOwnedByOthers.
+func (s *ProjectService) GestorLinksOwnedByOthers(ctx context.Context, projectID int64, ids []int64) (bool, error) {
+	return s.projects.GestorLinksOwnedByOthers(ctx, projectID, ids)
 }
