@@ -44,9 +44,9 @@ type GestorAutoresService struct {
 	repo *store.GitLabAutorRepo
 	load func() (fontesAutores, error)
 	// pausa precedes every Gestor lookup, to stay under the Bridge key's
-	// 600 req/min limit.
-	// ponytail: 150ms ≈ 400 lookups/min; add a sugestao_tentada_em column
-	// (skip recently tried no-match rows) if scans become too slow.
+	// 600 req/min limit (150ms ≈ 400 lookups/min). Rows asked about in the
+	// last 7 days are skipped (sugestao_tentada_em), so a scan only asks
+	// about new or stale e-mails.
 	pausa time.Duration
 }
 
@@ -112,6 +112,13 @@ func (a *acumulado) nome() (best string) {
 // VarrerAutores lists every repo of the configured groups, aggregates the
 // contributors per lowercase e-mail, upserts the counts and suggests Gestor
 // users for rows still without link or suggestion.
+// Pronto tells, before a background scan starts, whether it can run (GitLab
+// configured); ErrGitLabNaoConfigurado otherwise.
+func (s *GestorAutoresService) Pronto() error {
+	_, err := s.load()
+	return err
+}
+
 func (s *GestorAutoresService) VarrerAutores(ctx context.Context) (ResumoVarredura, error) {
 	var res ResumoVarredura
 	f, err := s.load()
@@ -213,12 +220,25 @@ func (s *GestorAutoresService) VarrerAutores(ctx context.Context) (ResumoVarredu
 		if ctx.Err() != nil {
 			return res, ctx.Err()
 		}
+		var ge *gestor.Error
+		if errors.As(err, &ge) && ge.Status >= 400 && ge.Status < 500 {
+			// Gestor refused this one e-mail or name: note it and go on.
+			log.Printf("[gestor] sugestão de autores (%s): %v", a.Email, err)
+			res.Erros = append(res.Erros, fmt.Sprintf("%s: %v", a.Email, err))
+			if err := s.repo.MarcarTentativa(ctx, a.ID); err != nil {
+				return res, err
+			}
+			continue
+		}
 		if err != nil {
 			log.Printf("[gestor] sugestão de autores: %v", err)
 			res.Erros = append(res.Erros, "gestor indisponível")
 			break
 		}
 		if pessoa == nil {
+			if err := s.repo.MarcarTentativa(ctx, a.ID); err != nil {
+				return res, err
+			}
 			continue
 		}
 		if err := s.repo.SetSugestao(ctx, a.ID, pessoa.IDPessoa, pessoa.Nome, motivo); err != nil {

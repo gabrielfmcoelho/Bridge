@@ -2130,4 +2130,9 @@ var migrationsPostgres = []string{
 		criado_em          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		atualizado_em      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`,
+
+	// Version 122: when the scan last asked Gestor about an e-mail. A row with
+	// no suggestion is not asked again for 7 days, so a scan doesn't repeat
+	// the misses of the last one.
+	`ALTER TABLE gitlab_autores ADD COLUMN IF NOT EXISTS sugestao_tentada_em TIMESTAMPTZ;`,
 }
