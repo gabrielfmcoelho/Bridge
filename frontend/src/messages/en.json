@@ -1181,7 +1181,15 @@
     "coolifyEnvironment": "Environment",
     "coolifyAllEnvironments": "All environments",
     "coolifyAddMapping": "Add Coolify project",
-    "coolifyUnavailable": "Couldn't list Coolify projects."
+    "coolifyUnavailable": "Couldn't list Coolify projects.",
+    "gestorLinks": "Gestor projects",
+    "gestorLinksHint": "Reference only: nothing changes in Gestor. A Gestor project belongs to a single Bridge project.",
+    "gestorSearch": "Search Gestor projects by name",
+    "gestorNoResults": "No Gestor projects found.",
+    "gestorUnavailable": "Gestor is unavailable right now.",
+    "gestorConcluido": "completed",
+    "gestorArquivado": "archived",
+    "gestorTitle": "Gestor"
   },
   "service": {
     "title": "Services",
@@ -1827,6 +1835,13 @@
         "chatOk": "chat OK",
         "chatOkWithReply": "chat OK — replied: \"{reply}\""
       },
+      "gestor": {
+        "hint": "SEAD Gestor (projects and people) — links Bridge projects to Gestor projects and GitLab authors to people. Uses its own Keycloak client in the APIs realm.",
+        "ariaEnable": "Enable Gestor",
+        "gitlabGroups": "GitLab groups",
+        "gitlabGroupsHint": "Groups whose commit authors are matched to Gestor people. Comma or line separated; defaults to seadpi.",
+        "authorsLink": "GitLab authors"
+      },
       "coolify": {
         "hint": "Self-hosting platform — manage servers directly from SSHCM.",
         "ariaEnableCoolify": "Enable Coolify",
@@ -2019,6 +2034,47 @@
       "maintenance": "maintenance"
     },
     "situacaoRolesHint": "The roles in parentheses tell the system which option means active, off and under maintenance (SSH config, Proxmox and Coolify sync). Renaming keeps the role; deleting the option drops it.",
+    "gestorAutores": {
+      "filterLabel": "Filter authors",
+      "title": "GitLab authors",
+      "description": "Link each commit e-mail to a Gestor user. Suggestions do not count until you accept them.",
+      "off": "Gestor integration is off or incomplete: people cannot be suggested or searched.",
+      "scan": "Scan GitLab",
+      "scanning": "Scanning…",
+      "scanDone": "Scan finished: {repos} repositories, {novos} new authors, {atualizados} updated, {sugestoes} suggestions",
+      "scanErrors": "Errors: {erros}",
+      "scanError": "Scan failed",
+      "search": "Search by e-mail or name",
+      "filter": {
+        "sem_vinculo": "Unlinked",
+        "com_sugestao": "With suggestion",
+        "vinculados": "Linked",
+        "ignorados": "Ignored",
+        "todos": "All"
+      },
+      "email": "E-mail",
+      "gitlabName": "GitLab name",
+      "commits": "Commits",
+      "repos": "Repos",
+      "link": "Link",
+      "suggestion": "Suggestion: {nome}",
+      "reason": { "email": "by e-mail", "nome": "by name" },
+      "empty": "No authors in this filter.",
+      "loadError": "Could not load the authors.",
+      "accept": "Accept",
+      "choose": "Choose…",
+      "unlink": "Unlink",
+      "unlinkConfirm": "Unlink {email}?",
+      "unlinkConfirmBody": "The e-mail goes back to \"unlinked\". Nothing changes in Gestor.",
+      "ignore": "Ignore",
+      "reactivate": "Reactivate",
+      "ignored": "ignored",
+      "updateError": "Could not save",
+      "pickTitle": "Link {email} to a Gestor person",
+      "pickSearch": "Person name",
+      "pickEmpty": "No person found.",
+      "pickError": "Gestor is unavailable right now."
+    },
     "apiTokens": {
       "tabLabel": "API tokens",
       "title": "Personal API tokens",

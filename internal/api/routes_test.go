@@ -144,6 +144,7 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"PUT", "/api/settings/integrations/x"},
 		{"POST", "/api/settings/integrations/test/ldap"},
 		{"POST", "/api/settings/integrations/test/gitlab-code"},
+		{"POST", "/api/settings/integrations/test/gestor"},
 		{"POST", "/api/settings/integrations/test/llm"},
 		{"POST", "/api/settings/integrations/test/grafana"},
 		{"POST", "/api/settings/integrations/test/outline"},
@@ -229,6 +230,12 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"GET", "/api/wiki/collections"},
 		{"GET", "/api/wiki/tree"},
 		{"GET", "/api/wiki/documents/1"},
+
+		{"GET", "/api/gestor/projetos"},
+		{"GET", "/api/gestor/autores"},
+		{"POST", "/api/gestor/autores/varrer"},
+		{"PUT", "/api/gestor/autores/1"},
+		{"GET", "/api/gestor/pessoas"},
 
 		// Coolify integration
 		{"GET", "/api/coolify/status"},

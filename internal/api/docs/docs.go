@@ -5543,6 +5543,179 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/gestor/autores": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gestor"
+                ],
+                "summary": "List GitLab authors",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "sem_vinculo|com_sugestao|vinculados|ignorados|todos",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "E-mail or name fragment",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_GitLabAutor"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/gestor/autores/varrer": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gestor"
+                ],
+                "summary": "Scan GitLab authors",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/service.ResumoVarredura"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/gestor/autores/{id}": {
+            "put": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gestor"
+                ],
+                "summary": "Update a GitLab author link",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Author id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Partial update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.autorUpdate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.GitLabAutor"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/gestor/pessoas": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gestor"
+                ],
+                "summary": "Search Gestor people",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name fragment",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/gestor/projetos": {
+            "get": {
+                "description": "Editor+. Always 200: {enabled, configured, data:[{id,nome,concluido,arquivado}], error?}; a Gestor failure comes back in \"error\" so the form degrades.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gestor"
+                ],
+                "summary": "Search Gestor projects",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Name fragment",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/gitlab/projects/{id}/commits": {
             "get": {
                 "description": "Any role. Uses the caller's own token; 20 most recent commits of the first link.",
@@ -13824,6 +13997,39 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/settings/integrations/test/gestor": {
+            "post": {
+                "description": "Admin. Always 200: {\"success\": true} or {\"success\": false, \"error\": \"...\"}.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "integration-settings"
+                ],
+                "summary": "Test the Gestor connection",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/settings/integrations/test/gitlab-code": {
             "post": {
                 "description": "Admin. Body is optional; empty fields fall back to the saved settings. Always 200: {\"success\": false, \"error\": \"...\"} or {\"success\": true, \"username\", \"name\"}.",
@@ -19256,6 +19462,20 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ListEnvelope-models_GitLabAutor": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.GitLabAutor"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
         "api.ListEnvelope-models_GlpiToken": {
             "type": "object",
             "properties": {
@@ -19908,6 +20128,27 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "api.autorUpdate": {
+            "type": "object",
+            "properties": {
+                "gestor_email": {
+                    "type": "string"
+                },
+                "gestor_nome": {
+                    "type": "string"
+                },
+                "gestor_pessoa_id": {
+                    "description": "Present-but-null unlinks, so presence is tracked via the raw message.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "ignorado": {
+                    "type": "boolean"
                 }
             }
         },
@@ -20744,6 +20985,14 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "api.gestorLinkInput": {
+            "type": "object",
+            "properties": {
+                "gestor_projeto_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -22362,6 +22611,13 @@ const docTemplate = `{
                 },
                 "documentation_url": {
                     "type": "string"
+                },
+                "gestor_links": {
+                    "description": "Gestor projects referenced by this project; the name is fetched from\nGestor. Absent = leave unchanged; [] = clear.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gestorLinkInput"
+                    }
                 },
                 "gitlab_url": {
                     "type": "string"
@@ -25207,6 +25463,63 @@ const docTemplate = `{
                 }
             }
         },
+        "models.GitLabAutor": {
+            "type": "object",
+            "properties": {
+                "atualizado_em": {
+                    "type": "string"
+                },
+                "commits": {
+                    "type": "integer"
+                },
+                "criado_em": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "gestor_email": {
+                    "type": "string"
+                },
+                "gestor_nome": {
+                    "type": "string"
+                },
+                "gestor_pessoa_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "ignorado": {
+                    "type": "boolean"
+                },
+                "nome_gitlab": {
+                    "type": "string"
+                },
+                "repos": {
+                    "type": "integer"
+                },
+                "sugestao_motivo": {
+                    "description": "\"email\" | \"nome\" | \"\"",
+                    "type": "string"
+                },
+                "sugestao_nome": {
+                    "type": "string"
+                },
+                "sugestao_pessoa_id": {
+                    "type": "integer"
+                },
+                "vinculado_em": {
+                    "type": "string"
+                },
+                "vinculado_por": {
+                    "type": "integer"
+                },
+                "visto_em": {
+                    "type": "string"
+                }
+            }
+        },
         "models.GitLabRepoLink": {
             "type": "object",
             "properties": {
@@ -25838,6 +26151,20 @@ const docTemplate = `{
                 },
                 "url": {
                     "type": "string"
+                }
+            }
+        },
+        "models.ProjectGestorLink": {
+            "type": "object",
+            "properties": {
+                "gestor_projeto_id": {
+                    "type": "integer"
+                },
+                "gestor_projeto_nome": {
+                    "type": "string"
+                },
+                "project_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -27278,6 +27605,13 @@ const docTemplate = `{
                 "entidades": {
                     "$ref": "#/definitions/models.AssetGrants"
                 },
+                "gestor_links": {
+                    "description": "GestorLinks references Gestor projects (id + name snapshot).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ProjectGestorLink"
+                    }
+                },
                 "host_ids": {
                     "type": "array",
                     "items": {
@@ -27398,6 +27732,29 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "service.ResumoVarredura": {
+            "type": "object",
+            "properties": {
+                "autores_atualizados": {
+                    "type": "integer"
+                },
+                "autores_novos": {
+                    "type": "integer"
+                },
+                "erros": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "repos": {
+                    "type": "integer"
+                },
+                "sugestoes": {
+                    "type": "integer"
                 }
             }
         },

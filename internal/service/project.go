@@ -70,6 +70,8 @@ type ProjectDetail struct {
 	// CoolifyLinks maps the project to Coolify projects/environments; the
 	// Coolify sync gives their unassigned services this project.
 	CoolifyLinks []models.ProjectCoolifyLink `json:"coolify_links"`
+	// GestorLinks references Gestor projects (id + name snapshot).
+	GestorLinks []models.ProjectGestorLink `json:"gestor_links"`
 }
 
 // ProjectWrite carries the create/update payload (project + relations). For
@@ -85,6 +87,7 @@ type ProjectWrite struct {
 	DirectHostIDs *[]int64
 	DirectDNSIDs  *[]int64
 	CoolifyLinks  *[]models.ProjectCoolifyLink // nil = leave unchanged
+	GestorLinks   *[]models.ProjectGestorLink  // nil = leave unchanged; names already resolved
 	Grants        *models.AssetGrants          // nil = leave unchanged
 }
 
@@ -205,6 +208,10 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	if err != nil {
 		return nil, err
 	}
+	gestorLinks, err := s.projects.GestorLinksFor(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	return &ProjectDetail{
 		Project:       p,
 		Tags:          tags,
@@ -216,6 +223,7 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 		DirectDNSIDs:  directDNS,
 		Entidades:     grants,
 		CoolifyLinks:  coolifyLinks,
+		GestorLinks:   gestorLinks,
 	}, nil
 }
 
@@ -321,6 +329,11 @@ func (s *ProjectService) applyLinks(ctx context.Context, id int64, w *ProjectWri
 			return err
 		}
 	}
+	if w.GestorLinks != nil {
+		if err := s.projects.SetGestorLinks(ctx, id, *w.GestorLinks); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -330,7 +343,16 @@ func (s *ProjectService) Delete(ctx context.Context, actor models.ActorContext, 
 	if err := s.tags.Delete(ctx, "project", id); err != nil {
 		return err
 	}
+	// Soft delete never fires ON DELETE CASCADE: free the Gestor projects here.
+	if err := s.projects.SetGestorLinks(ctx, id, nil); err != nil {
+		return err
+	}
 	return store.DeleteParent(ctx, s.db, actor, models.SecretScopeProjeto, id)
+}
+
+// GestorLinksFor: see ProjectRepo.GestorLinksFor.
+func (s *ProjectService) GestorLinksFor(ctx context.Context, projectID int64) ([]models.ProjectGestorLink, error) {
+	return s.projects.GestorLinksFor(ctx, projectID)
 }
 
 // ListTrash returns soft-deleted projects (the trash view).
@@ -341,4 +363,9 @@ func (s *ProjectService) ListTrash(ctx context.Context) ([]models.Project, error
 // Restore un-deletes a project (and cascade-restores its secrets) by id.
 func (s *ProjectService) Restore(ctx context.Context, actor models.ActorContext, id int64) error {
 	return store.RestoreParent(ctx, s.db, actor, models.SecretScopeProjeto, id)
+}
+
+// GestorLinksOwnedByOthers: see ProjectRepo.GestorLinksOwnedByOthers.
+func (s *ProjectService) GestorLinksOwnedByOthers(ctx context.Context, projectID int64, ids []int64) (bool, error) {
+	return s.projects.GestorLinksOwnedByOthers(ctx, projectID, ids)
 }

@@ -1102,6 +1102,59 @@ export interface ProjectCoolifyLink {
   coolify_environment: string;
 }
 
+/** A Bridge project's reference to a Gestor project (name = snapshot from the last save). */
+export interface ProjectGestorLink {
+  gestor_projeto_id: number;
+  gestor_projeto_nome: string;
+  /** Only known for projects picked in the current editing session. */
+  concluido?: boolean;
+  arquivado?: boolean;
+}
+
+/** GET /api/gestor/projetos: the Gestor search the project form uses. */
+export interface GestorProjetosResult {
+  enabled: boolean;
+  configured: boolean;
+  data: { id: number; nome: string; concluido: boolean; arquivado: boolean }[];
+  error?: string;
+}
+
+/** A GitLab commit e-mail with its Gestor link (human-made) and the scan's suggestion. */
+export interface GitLabAutor {
+  id: number;
+  email: string;
+  nome_gitlab: string;
+  commits: number;
+  repos: number;
+  sugestao_pessoa_id: number | null;
+  sugestao_nome: string;
+  sugestao_motivo: "email" | "nome" | "";
+  gestor_pessoa_id: number | null;
+  gestor_nome: string;
+  gestor_email: string;
+  ignorado: boolean;
+}
+
+export interface GitLabAutorUpdate {
+  gestor_pessoa_id?: number | null;
+  gestor_nome?: string;
+  gestor_email?: string;
+  ignorado?: boolean;
+}
+
+export interface GitLabVarredura {
+  repos: number;
+  autores_novos: number;
+  autores_atualizados: number;
+  sugestoes: number;
+  erros: string[];
+}
+
+export interface GestorPessoa { id: number; nome: string; email: string; lotacao: string }
+
+/** GET /api/gestor/pessoas: enabled=false when the integration is off; error when the Gestor failed. */
+export interface GestorPessoasResult { enabled: boolean; data: GestorPessoa[]; error?: string }
+
 // ── Assistant (POST /api/ai/chat) ──────────────────────────────────────────
 
 /** A Bridge page a tool result pointed to; cited in the answer as a markdown link. */
