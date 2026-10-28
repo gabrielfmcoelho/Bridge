@@ -1827,6 +1827,13 @@
         "chatOk": "chat OK",
         "chatOkWithReply": "chat OK — respondeu: \"{reply}\""
       },
+      "gestor": {
+        "hint": "Gestor da SEAD (projetos e pessoas) — vincula projetos do Bridge a projetos do Gestor e autores do GitLab a pessoas. Usa um client próprio do Keycloak no realm das APIs.",
+        "ariaEnable": "Ativar Gestor",
+        "gitlabGroups": "Grupos do GitLab",
+        "gitlabGroupsHint": "Grupos cujos autores de commits são associados a pessoas do Gestor. Separe por vírgula ou linha; padrão seadpi.",
+        "authorsLink": "Autores do GitLab"
+      },
       "coolify": {
         "hint": "Plataforma de self-hosting — gerencie servidores diretamente pelo SSHCM.",
         "ariaEnableCoolify": "Habilitar Coolify",

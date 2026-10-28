@@ -1827,6 +1827,13 @@
         "chatOk": "chat OK",
         "chatOkWithReply": "chat OK — replied: \"{reply}\""
       },
+      "gestor": {
+        "hint": "SEAD Gestor (projects and people) — links Bridge projects to Gestor projects and GitLab authors to people. Uses its own Keycloak client in the APIs realm.",
+        "ariaEnable": "Enable Gestor",
+        "gitlabGroups": "GitLab groups",
+        "gitlabGroupsHint": "Groups whose commit authors are matched to Gestor people. Comma or line separated; defaults to seadpi.",
+        "authorsLink": "GitLab authors"
+      },
       "coolify": {
         "hint": "Self-hosting platform — manage servers directly from SSHCM.",
         "ariaEnableCoolify": "Enable Coolify",

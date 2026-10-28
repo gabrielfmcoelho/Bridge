@@ -9,6 +9,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth/providers"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gestor"
 	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/llm"
@@ -75,6 +76,15 @@ var integrationGroups = map[string][]string{
 		"llm_model_text",
 		"llm_model_vision",
 		"llm_max_tokens",
+	},
+	// Gestor (SEAD projects/people API): authenticates with its own
+	// client_credentials client in the keycloak_apis realm.
+	"gestor": {
+		"gestor_integration_enabled",
+		"gestor_base_url",
+		"gestor_client_id",
+		"gestor_client_secret",
+		"gestor_gitlab_grupos",
 	},
 	"coolify": {
 		"coolify_enabled",
@@ -166,6 +176,7 @@ var secretKeys = map[string]bool{
 	"gitlab_code_service_token":          true,
 	"llm_api_key":                        true,
 	"coolify_api_token":                  true,
+	"gestor_client_secret":               true,
 	"grafana_api_token":                  true,
 	"grafana_webhook_secret":             true,
 	"grafana_prom_remote_write_password": true,
@@ -808,6 +819,36 @@ func (h *integrationSettingsHandlers) handleTestGitLabCode(w http.ResponseWriter
 	})
 }
 
+// handleTestGestor asks Gestor for one project with the saved settings (the
+// integration may still be off: the test is how an admin checks it first).
+//
+//	@Summary		Test the Gestor connection
+//	@Description	Admin. Always 200: {"success": true} or {"success": false, "error": "..."}.
+//	@Tags			integration-settings
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Router			/api/settings/integrations/test/gestor [post]
+func (h *integrationSettingsHandlers) handleTestGestor(w http.ResponseWriter, r *http.Request) {
+	s, err := gestor.LoadSettings(h.db.SQL, h.db.Encryptor)
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": "failed to read settings"})
+		return
+	}
+	s.Enabled = true
+	c := gestor.NewClient(s, gestor.KeycloakFromSettings(h.db.SQL))
+	if c == nil {
+		jsonOK(w, map[string]any{"success": false, "error": "Client id and secret are required"})
+		return
+	}
+	if _, err := c.BuscarProjetos(r.Context(), "", 1); err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	jsonOK(w, map[string]any{"success": true})
+}
+
 // --- Permissions management ---
 
 // handleGetPermissions returns all permissions and the role-permission matrix.
@@ -980,6 +1021,7 @@ func (h *integrationSettingsHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "PUT /api/settings/integrations/{group}", h.handleUpdateIntegrationGroup)
 	rr.role("admin", "POST /api/settings/integrations/test/ldap", h.handleTestLDAP)
 	rr.role("admin", "POST /api/settings/integrations/test/gitlab-code", h.handleTestGitLabCode)
+	rr.role("admin", "POST /api/settings/integrations/test/gestor", h.handleTestGestor)
 	rr.role("admin", "POST /api/settings/integrations/test/llm", h.handleTestLLM)
 	rr.role("admin", "POST /api/settings/integrations/test/grafana", h.handleTestGrafana)
 	rr.role("admin", "POST /api/settings/integrations/test/outline", h.handleTestOutline)

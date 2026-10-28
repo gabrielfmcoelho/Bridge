@@ -137,9 +137,9 @@ func (c Config) Reserved(clientID string) bool {
 // ErrUsageNotConfigured: the usage client (kc_apis_usage_client_*) isn't set.
 var ErrUsageNotConfigured = errors.New("keycloak: the usage client (kc_apis_usage_client_id/secret) is not configured")
 
-// token returns a client_credentials access token of clientID, optionally
+// Token returns a client_credentials access token of clientID, optionally
 // asking for scope, cached until 30s before it expires.
-func (c *Client) token(ctx context.Context, clientID, secret, scope string) (string, error) {
+func (c *Client) Token(ctx context.Context, clientID, secret, scope string) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	key := clientID + "|" + scope
@@ -186,7 +186,7 @@ func (c *Client) admin(ctx context.Context, method, p string, body, out any) (ht
 	if !c.cfg.Configured() {
 		return nil, fmt.Errorf("keycloak: the keycloak_apis integration is not configured")
 	}
-	tok, err := c.token(ctx, c.cfg.ClientID, c.cfg.ClientSecret, "")
+	tok, err := c.Token(ctx, c.cfg.ClientID, c.cfg.ClientSecret, "")
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +575,7 @@ func (c *Client) Usage(ctx context.Context, baseURL, prefix, clientID string) (*
 	if c.cfg.UsageClientID == "" || c.cfg.UsageClientSecret == "" {
 		return nil, ErrUsageNotConfigured
 	}
-	tok, err := c.token(ctx, c.cfg.UsageClientID, c.cfg.UsageClientSecret, prefix+":admin.uso")
+	tok, err := c.Token(ctx, c.cfg.UsageClientID, c.cfg.UsageClientSecret, prefix+":admin.uso")
 	if err != nil {
 		return nil, err
 	}

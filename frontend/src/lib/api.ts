@@ -1391,6 +1391,7 @@ export const integrationsAPI = {
   get: () => api.get<Record<string, Record<string, string>>>("/api/settings/integrations"),
   update: (group: string, data: Record<string, string>) =>
     api.put<{ status: string }>(`/api/settings/integrations/${group}`, data),
+  testGestor: () => api.post<{ success: boolean; error?: string }>("/api/settings/integrations/test/gestor"),
   testLDAP: () => api.post<{ success: boolean; error?: string }>("/api/settings/integrations/test/ldap"),
   testGitLabCode: (data?: { base_url?: string; token?: string }) =>
     api.post<{ success: boolean; error?: string; username?: string; name?: string }>(

@@ -144,6 +144,7 @@ func TestSelfRegisteredRoutes_Wired(t *testing.T) {
 		{"PUT", "/api/settings/integrations/x"},
 		{"POST", "/api/settings/integrations/test/ldap"},
 		{"POST", "/api/settings/integrations/test/gitlab-code"},
+		{"POST", "/api/settings/integrations/test/gestor"},
 		{"POST", "/api/settings/integrations/test/llm"},
 		{"POST", "/api/settings/integrations/test/grafana"},
 		{"POST", "/api/settings/integrations/test/outline"},
