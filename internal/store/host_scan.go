@@ -108,13 +108,32 @@ func (r *HostScanRepo) RecentWithHost(ctx context.Context, limit int) ([]map[str
 	return results, rows.Err()
 }
 
-// LatestDataBulk returns the latest scan JSON per host for all scanned hosts.
-func (r *HostScanRepo) LatestDataBulk(ctx context.Context) (map[int64]string, error) {
+// LatestListSummaryBulk returns, per scanned host, a JSON object with only the
+// fields of its latest scan that the host list reads (resources, service and
+// container names, idle verdict). The full scan JSON (disks, web servers,
+// dependencies…) is ~30 KB a host and growing; this is ~1 KB. Each latest row
+// is parsed once (MATERIALIZED), and a row that isn't valid JSON is skipped.
+// No "?" jsonb operator here: the rebind driver turns every ? into a parameter.
+func (r *HostScanRepo) LatestListSummaryBulk(ctx context.Context) (map[int64]string, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT hs.host_id, hs.data
-		FROM host_scans hs
-		INNER JOIN (SELECT host_id, MAX(scanned_at) AS max_at FROM host_scans GROUP BY host_id) latest
-		ON hs.host_id = latest.host_id AND hs.scanned_at = latest.max_at`)
+		WITH latest AS MATERIALIZED (
+			SELECT hs.host_id, hs.data::jsonb AS d
+			FROM host_scans hs
+			JOIN (SELECT host_id, MAX(scanned_at) AS max_at FROM host_scans GROUP BY host_id) l
+			  ON hs.host_id = l.host_id AND hs.scanned_at = l.max_at
+			WHERE pg_input_is_valid(hs.data, 'jsonb')
+		)
+		SELECT host_id, jsonb_strip_nulls(jsonb_build_object(
+			'cpu', d->'cpu', 'cpu_usage', d->'cpu_usage',
+			'ram', d->'ram', 'ram_percent', d->'ram_percent',
+			'storage', d->'storage', 'disk_percent', d->'disk_percent',
+			'services', d->'services', 'containers', d->'containers',
+			'profile', CASE WHEN d->'profile' IS NOT NULL THEN jsonb_build_object(
+				'idle', d->'profile'->'idle',
+				'reasons', d->'profile'->'reasons',
+				'counterfacts', d->'profile'->'counterfacts') END
+		))::text
+		FROM latest`)
 	if err != nil {
 		return nil, err
 	}
