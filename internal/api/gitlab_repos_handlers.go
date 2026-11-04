@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
+	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
@@ -178,7 +179,7 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 	for _, s := range services {
 		seen := map[string]bool{}
 		for _, f := range [][2]string{{"repository_url", s.RepositoryURL}, {"gitlab_url", s.GitlabURL}, {"git_repository", s.GitRepository}} {
-			path, ok := gitlabRepoPath(f[1], settings.BaseURL)
+			path, ok := gitlabclient.RepoPath(f[1], settings.BaseURL)
 			if !ok || seen[strings.ToLower(path)] {
 				continue
 			}

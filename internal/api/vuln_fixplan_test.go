@@ -17,24 +17,6 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
-func TestGitlabRepoPath(t *testing.T) {
-	base := "https://gitlab.sead.pi.gov.br"
-	for raw, want := range map[string]string{
-		"git@gitlab.sead.pi.gov.br:sead/app.git":                    "sead/app",
-		"ssh://git@gitlab.sead.pi.gov.br:2222/sead/sub/app.git":     "sead/sub/app",
-		"https://gitlab.sead.pi.gov.br/sead/app":                    "sead/app",
-		"https://gitlab.sead.pi.gov.br/sead/app/-/tree/main/docker": "sead/app",
-		"https://github.com/sead/app":                               "", // another host
-		"https://gitlab.sead.pi.gov.br/sead":                        "", // a group, not a repo
-		"":                                                          "",
-	} {
-		got, ok := gitlabRepoPath(raw, base)
-		if got != want || ok != (want != "") {
-			t.Errorf("gitlabRepoPath(%q) = %q, %v; want %q", raw, got, ok, want)
-		}
-	}
-}
-
 func TestUnsupportedVersions(t *testing.T) {
 	evidence := "Containers: metabase (metabase/metabase:v0.46.1) · Ubuntu 22.04 · host 10.0.122.40"
 	plan := "Imagem v0.46.1 em uso. Atualize para 0.49.3 (geralmente 0.46.2 ou superior); repita 0.49.3. Ubuntu 22.04."
