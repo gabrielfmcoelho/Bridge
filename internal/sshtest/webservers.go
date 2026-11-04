@@ -76,8 +76,8 @@ func webProbeScript(asRoot bool) string {
 
 // hostAndContainersScript runs inner on the host, then inside every running
 // container (up to max) through docker exec, each framed by
-// "@@CTR <id> <name> <image>", its output capped at outCap bytes and its run
-// at ctrTimeout seconds. budget > 0: a container reached that many seconds
+// "@@CTR <id> <name> <image>" and closed by "@@exit <docker exec status>",
+// its output capped at outCap bytes and its run at ctrTimeout seconds. budget > 0: a container reached that many seconds
 // after the loop began isn't run, its frame says "@@skipped". asRoot: the
 // script already runs as root (runSudoCmd), so no sudo -n retries; otherwise
 // inner sees SUDO=1.
@@ -97,7 +97,7 @@ B0=$(date +%s 2>/dev/null || echo 0)
 $T $D ps --format '{{.ID}} {{.Names}} {{.Image}}' 2>/dev/null | head -n {MAX} | while read id name image; do
   echo "@@CTR $id $name $image"
   if [ {BUDGET} -gt 0 ] && [ $(( $(date +%s 2>/dev/null || echo 0) - B0 )) -ge {BUDGET} ]; then echo @@skipped; continue; fi
-  printf %s {B64} | base64 -d | $TO $D exec -i "$id" sh 2>/dev/null | head -c {CAP}
+  { printf %s {B64} | base64 -d | $TO $D exec -i "$id" sh 2>/dev/null; r=$?; echo; echo "@@exit $r"; } | head -c {CAP}
   echo
 done
 `)
@@ -123,11 +123,21 @@ func collectWebServers(client *ssh.Client, sudoPassword string) (servers []WebSe
 var ctrHeader = regexp.MustCompile(`^@@CTR ([0-9a-f]{12,64}) (\S+) (\S+)$`)
 
 // ctrFrame is one container's part of a hostAndContainersScript output.
-type ctrFrame struct{ ID, Name, Image, Body string }
+// Exit is the docker exec status the host shell saw (126/127: no shell in
+// the image; 1: paused, restarting…), -1 when the frame has none (skipped,
+// or cut by the output cap).
+type ctrFrame struct {
+	ID, Name, Image, Body string
+	Exit                  int
+}
+
+var ctrExit = regexp.MustCompile(`\n@@exit ([0-9]{1,3})\s*$`)
 
 // splitCtrFrames splits a hostAndContainersScript output into the host part
-// and one frame per container. A frame whose header doesn't validate is
-// dropped whole: container output is untrusted.
+// and one frame per container, with the exec status taken off the body's
+// end (only the last marker counts: the container prints whatever it likes
+// before it). A frame whose header doesn't validate is dropped whole:
+// container output is untrusted.
 func splitCtrFrames(raw string) (string, []ctrFrame) {
 	parts := strings.Split("\n"+raw, "\n@@CTR ")
 	var frames []ctrFrame
@@ -137,7 +147,13 @@ func splitCtrFrames(raw string) (string, []ctrFrame) {
 		if m == nil {
 			continue
 		}
-		frames = append(frames, ctrFrame{ID: m[1], Name: m[2], Image: m[3], Body: body})
+		f := ctrFrame{ID: m[1], Name: m[2], Image: m[3], Body: body, Exit: -1}
+		s := "\n" + body
+		if e := ctrExit.FindStringSubmatchIndex(s); e != nil {
+			f.Exit, _ = strconv.Atoi(s[e[2]:e[3]])
+			f.Body = strings.TrimPrefix(s[:e[0]], "\n")
+		}
+		frames = append(frames, f)
 	}
 	return parts[0], frames
 }

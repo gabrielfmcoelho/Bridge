@@ -37,7 +37,7 @@ func TestParseGitProbe(t *testing.T) {
 		"[remote \"origin\"]\n" +
 		"url = https://gitlab.example.gov.br/sead/api.git\n" +
 		"@@gitend\n" +
-		"@@CTR deadbeef0000 distroless gcr.io/distroless/static\n" + // no shell: never ran, not partial
+		"@@CTR deadbeef0000 distroless gcr.io/distroless/static\n@@exit 126\n" + // no shell: never ran, not partial
 		"@@CTR nothex! evil img\n" +
 		"@@git\n" +
 		"@@repo /pwn\n" +
@@ -280,6 +280,71 @@ func TestGitFallbackAfterFailedRoot(t *testing.T) {
 func TestGitProbePrunes(t *testing.T) {
 	if strings.Contains(gitInnerScript, "-path /usr/share ") || !strings.Contains(gitInnerScript, "-path /.snapshots ") {
 		t.Fatal("prune list: walk /usr/share, skip /.snapshots")
+	}
+}
+
+// Each container frame ends with the docker exec status the host shell saw
+// ("@@exit N"): split off the body (the web parser never sees it), the last
+// one wins (a container can print its own), absent = -1.
+func TestSplitCtrFramesExit(t *testing.T) {
+	_, frames := splitCtrFrames("host\n@@CTR 0123456789ab a img\nbody\n@@exit 7\n\n" +
+		"@@CTR 0123456789ac b img\n@@exit 0\nmore\n@@exit 126\n" +
+		"@@CTR 0123456789ad c img\ncut by the cap")
+	if len(frames) != 3 {
+		t.Fatalf("frames = %+v", frames)
+	}
+	if f := frames[0]; f.Exit != 7 || strings.Contains(f.Body, "@@exit") || !strings.Contains(f.Body, "body") {
+		t.Fatalf("frame a = %+v", f)
+	}
+	if f := frames[1]; f.Exit != 126 || !strings.Contains(f.Body, "@@exit 0") {
+		t.Fatalf("frame b = %+v, want the last marker, the container's own kept in the body", f)
+	}
+	if f := frames[2]; f.Exit != -1 {
+		t.Fatalf("frame c = %+v, want -1 without a marker", f)
+	}
+}
+
+// A container that never started the walk is fine only when its image has no
+// shell (exec 126/127). Paused, restarting or killed (any other status, or no
+// status at all) means it wasn't searched: the list is incomplete.
+func TestParseGitProbeExecFailure(t *testing.T) {
+	host := "@@git\n@@gitend\n"
+	for status, complete := range map[string]bool{"126": true, "127": true, "1": false, "124": false} {
+		raw := host + "@@CTR 0123456789ab c img\n@@exit " + status + "\n"
+		if _, got := parseGitProbe(raw); got != complete {
+			t.Errorf("exec status %s: complete = %v, want %v", status, got, complete)
+		}
+	}
+	if _, got := parseGitProbe(host + "@@CTR 0123456789ab c img\n"); got {
+		t.Error("a frame with no walk and no exec status must be incomplete")
+	}
+}
+
+// End to end with a fake docker: a paused container makes the list
+// incomplete; one without a shell doesn't.
+func TestGitProbeContainerExecStatus(t *testing.T) {
+	for name, c := range map[string]struct {
+		second   string
+		complete bool
+	}{
+		"no shell": {second: "exit 126", complete: true},
+		"paused":   {second: "echo 'Container is paused' >&2; exit 1", complete: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := fakeBin(t, map[string]string{"docker": `case "$1" in
+ps) echo '0123456789ab ok img:1'; echo '0123456789ac other img:2';;
+exec) [ "$3" = 0123456789ab ] && exec sh; ` + c.second + `;;
+esac`})
+			cmd := exec.Command("sh", "-c", gitProbeScript(true))
+			cmd.Env = append(os.Environ(), "GITPROBE_ROOTS="+t.TempDir(), path)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("script: %v\n%s", err, out)
+			}
+			if _, complete := parseGitProbe(string(out)); complete != c.complete {
+				t.Fatalf("complete = %v, want %v\n%s", complete, c.complete, out)
+			}
+		})
 	}
 }
 

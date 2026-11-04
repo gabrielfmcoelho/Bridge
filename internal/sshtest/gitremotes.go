@@ -117,7 +117,12 @@ func parseGitProbe(raw string) ([]GitRemote, bool) {
 	}
 	for _, f := range frames {
 		rs, started, done := parseGitPart(f.Body, f.Name, f.Image)
-		if started && !done {
+		switch {
+		case started && !done:
+			complete = false
+		case !started && f.Exit != 126 && f.Exit != 127:
+			// Not searched at all — paused, restarting, killed — and not
+			// because the image has no shell: this container's links stay.
 			complete = false
 		}
 		remotes = append(remotes, rs...)
