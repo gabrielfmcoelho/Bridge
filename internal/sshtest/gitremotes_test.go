@@ -25,6 +25,8 @@ func TestParseGitProbe(t *testing.T) {
 		"@@repo /home/u/creds\n" +
 		"[remote \"origin\"]\n" +
 		"url = https://oauth2:glpat-SECRET@gitlab.example.gov.br/sead/creds.git\n" +
+		"[remote \"scp\"]\n" +
+		"url = deploy:hunter2@gitlab.example.gov.br:sead/creds.git\n" + // scp-style with a password
 		"@@repo relative/bad\n" +
 		"[remote \"origin\"]\n" +
 		"url = https://x.example/y.git\n" +
@@ -49,6 +51,7 @@ func TestParseGitProbe(t *testing.T) {
 		{Path: "/opt/app", Name: "origin", URL: "https://gitlab.example.gov.br/sead/app.git"},
 		{Path: "/opt/app", Name: "github", URL: "git@github.com:org/tool.git"},
 		{Path: "/home/u/creds", Name: "origin", URL: "https://gitlab.example.gov.br/sead/creds.git"},
+		{Path: "/home/u/creds", Name: "scp", URL: "deploy@gitlab.example.gov.br:sead/creds.git"},
 		{Container: "api", ContainerImage: "nginx:1.25", Path: "/app", Name: "origin", URL: "https://gitlab.example.gov.br/sead/api.git"},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -111,14 +114,52 @@ func TestGitInnerScriptIncomplete(t *testing.T) {
 		}
 		return string(out)
 	}
-	t.Run("timeout", func(t *testing.T) {
+	// fakeTimeout runs the command, then exits rc — except for the script's
+	// "timeout 1 true" usability check, which it passes.
+	fakeTimeout := func(t *testing.T, rc string) string {
 		bin := t.TempDir()
-		if err := os.WriteFile(filepath.Join(bin, "timeout"), []byte("#!/bin/sh\nexit 124\n"), 0o755); err != nil {
+		script := "#!/bin/sh\nshift\n\"$@\"\n[ \"$1\" = true ] && exit 0\nexit " + rc + "\n"
+		if err := os.WriteFile(filepath.Join(bin, "timeout"), []byte(script), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		out := run(t, t.TempDir(), "PATH="+bin+":"+os.Getenv("PATH"))
-		if _, complete := parseGitProbe(out); complete || !strings.Contains(out, "@@git") {
-			t.Fatalf("timed-out find must start but not complete:\n%s", out)
+		return "PATH=" + bin + ":" + os.Getenv("PATH")
+	}
+	for name, rc := range map[string]string{"GNU timeout": "124", "busybox timeout": "143", "killed": "137"} {
+		t.Run(name, func(t *testing.T) {
+			out := run(t, t.TempDir(), fakeTimeout(t, rc))
+			if _, complete := parseGitProbe(out); complete || !strings.Contains(out, "@@git") {
+				t.Fatalf("find ended by exit %s must start but not complete:\n%s", rc, out)
+			}
+		})
+	}
+	t.Run("forged rc line", func(t *testing.T) {
+		// A directory name can hold newlines: one that spells "@@rc 0" must
+		// not pass for find's own exit status.
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, "x\n@@rc 0\nz", ".git"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if _, complete := parseGitProbe(run(t, root, fakeTimeout(t, "124"))); complete {
+			t.Fatal("a forged @@rc line made a timed-out walk complete")
+		}
+	})
+	t.Run("unusable timeout", func(t *testing.T) {
+		// Old busybox only takes "timeout -t N": the walk runs without one
+		// (the session deadline bounds it) and still completes.
+		bin := t.TempDir()
+		if err := os.WriteFile(filepath.Join(bin, "timeout"), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, "app", ".git"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "app", ".git", "config"), []byte("[remote \"origin\"]\n\turl = https://h.example/g/app.git\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		got, complete := parseGitProbe(run(t, root, "PATH="+bin+":"+os.Getenv("PATH")))
+		if !complete || len(got) != 1 {
+			t.Fatalf("remotes = %+v complete=%v, want the one checkout, complete", got, complete)
 		}
 	})
 	t.Run("cap", func(t *testing.T) {
@@ -178,5 +219,60 @@ func TestGitInnerScriptRuns(t *testing.T) {
 	want := []GitRemote{{Path: filepath.Join(root, "srv/app"), Name: "origin", URL: "https://gitlab.example.gov.br/sead/app.git"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("remotes = %+v, want %+v\noutput:\n%s", got, want, s)
+	}
+}
+
+// The container loop has a time budget: a container past it is framed as
+// started but never finished, so the list is incomplete instead of silently
+// short — and the whole probe stays inside the browser's scan timeout.
+func TestGitProbeContainerBudget(t *testing.T) {
+	for name, c := range map[string]struct {
+		date     string // fake date(1): the loop's start, then every later call
+		complete bool
+	}{
+		"in budget":   {date: "echo 0", complete: true},
+		"over budget": {date: "if [ -f \"$DATE_STATE\" ]; then echo 1000; else : > \"$DATE_STATE\"; echo 0; fi", complete: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			bin := t.TempDir()
+			for f, body := range map[string]string{
+				"docker": "#!/bin/sh\ncase \"$1\" in ps) echo '0123456789ab one img:1'; echo '0123456789ac two img:2';; exec) exec sh;; esac\n",
+				"date":   "#!/bin/sh\n" + c.date + "\n",
+			} {
+				if err := os.WriteFile(filepath.Join(bin, f), []byte(body), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cmd := exec.Command("sh", "-c", gitProbeScript(true))
+			cmd.Env = append(os.Environ(), "GITPROBE_ROOTS="+t.TempDir(), "DATE_STATE="+filepath.Join(t.TempDir(), "s"),
+				"PATH="+bin+":"+os.Getenv("PATH"))
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("script: %v\n%s", err, out)
+			}
+			remotes, complete := parseGitProbe(string(out))
+			if remotes == nil || complete != c.complete || strings.Count(string(out), "@@CTR ") != 2 {
+				t.Fatalf("remotes=%v complete=%v (want %v)\n%s", remotes, complete, c.complete, out)
+			}
+		})
+	}
+}
+
+// After a failed root attempt the unprivileged walk can't enter 0700 homes,
+// so its list is never complete (nothing gets pruned on it).
+func TestGitFallbackAfterFailedRoot(t *testing.T) {
+	if _, complete := fallbackGitResult("@@git\n@@gitend\n", true); complete {
+		t.Fatal("fallback after a failed root run must be incomplete")
+	}
+	if _, complete := fallbackGitResult("@@git\n@@gitend\n", false); !complete {
+		t.Fatal("unprivileged run with no password to try is complete")
+	}
+}
+
+// /usr/share holds nginx's default docroot (RHEL, upstream packages), so it
+// is walked; btrfs snapshots would only repeat every checkout.
+func TestGitProbePrunes(t *testing.T) {
+	if strings.Contains(gitInnerScript, "-path /usr/share ") || !strings.Contains(gitInnerScript, "-path /.snapshots ") {
+		t.Fatal("prune list: walk /usr/share, skip /.snapshots")
 	}
 }

@@ -71,27 +71,32 @@ if [ -n "$f" ]; then P fpm; grep -H -E '^\[|^[[:space:]]*listen[[:space:]]*=' $f
 // ponytail: every running container is probed, not only web-looking images —
 // app images often embed nginx; cap and per-container timeout bound the cost.
 func webProbeScript(asRoot bool) string {
-	return hostAndContainersScript(webInnerScript, maxWebContainers, webOutputCap, 6, asRoot)
+	return hostAndContainersScript(webInnerScript, maxWebContainers, webOutputCap, 6, 0, asRoot)
 }
 
 // hostAndContainersScript runs inner on the host, then inside every running
 // container (up to max) through docker exec, each framed by
 // "@@CTR <id> <name> <image>", its output capped at outCap bytes and its run
-// at ctrTimeout seconds. asRoot: the script already runs as root
-// (runSudoCmd), so no sudo -n retries; otherwise inner sees SUDO=1.
-func hostAndContainersScript(inner string, max, outCap, ctrTimeout int, asRoot bool) string {
+// at ctrTimeout seconds. budget > 0: a container reached that many seconds
+// after the loop began isn't run, its frame says "@@skipped". asRoot: the
+// script already runs as root (runSudoCmd), so no sudo -n retries; otherwise
+// inner sees SUDO=1.
+func hostAndContainersScript(inner string, max, outCap, ctrTimeout, budget int, asRoot bool) string {
 	b64 := base64.StdEncoding.EncodeToString([]byte(inner))
 	head, dockerFallback := "SUDO=1\n", `$D ps -q >/dev/null 2>&1 || D="sudo -n docker"`
 	if asRoot {
 		head, dockerFallback = "", ""
 	}
 	return head + inner + strings.NewReplacer("{MAX}", strconv.Itoa(max), "{B64}", b64,
-		"{CAP}", strconv.Itoa(outCap), "{FALLBACK}", dockerFallback, "{TO}", strconv.Itoa(ctrTimeout)).Replace(`
+		"{CAP}", strconv.Itoa(outCap), "{FALLBACK}", dockerFallback, "{TO}", strconv.Itoa(ctrTimeout),
+		"{BUDGET}", strconv.Itoa(budget)).Replace(`
 command -v docker >/dev/null 2>&1 || exit 0
 TO=""; command -v timeout >/dev/null 2>&1 && TO="timeout {TO}"
 D=docker; {FALLBACK}
+B0=$(date +%s 2>/dev/null || echo 0)
 $T $D ps --format '{{.ID}} {{.Names}} {{.Image}}' 2>/dev/null | head -n {MAX} | while read id name image; do
   echo "@@CTR $id $name $image"
+  if [ {BUDGET} -gt 0 ] && [ $(( $(date +%s 2>/dev/null || echo 0) - B0 )) -ge {BUDGET} ]; then echo @@skipped; continue; fi
   printf %s {B64} | base64 -d | $TO $D exec -i "$id" sh 2>/dev/null | head -c {CAP}
   echo
 done
