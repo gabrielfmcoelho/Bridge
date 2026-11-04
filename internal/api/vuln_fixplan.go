@@ -281,7 +281,12 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 				}
 				continue
 			}
-			p, err := gl.GetProject(l.GitLabProjectID)
+			// Scan links carry no GitLab id (0): look them up by path.
+			lookup := func() (*gitlabclient.Project, error) { return gl.GetProject(l.GitLabProjectID) }
+			if l.GitLabProjectID == 0 {
+				lookup = func() (*gitlabclient.Project, error) { return gl.SearchProjectByPath(l.GitLabPath) }
+			}
+			p, err := lookup()
 			if err != nil {
 				sc.notes = append(sc.notes, "repo "+l.GitLabPath+" ligado a "+l.EntityName+" não acessível")
 				continue

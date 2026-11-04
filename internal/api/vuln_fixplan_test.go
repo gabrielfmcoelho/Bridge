@@ -417,3 +417,50 @@ func TestBuildFixScope_HostGroupLink(t *testing.T) {
 		t.Fatalf("repos = %v, notes %v", keys, sc.notes)
 	}
 }
+
+// Scan links carry no GitLab id: the fix plan finds them by path. One the
+// token can't see is reported, not offered.
+func TestBuildFixScope_HostScanLinks(t *testing.T) {
+	ctx := context.Background()
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	gl := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.EscapedPath() == "/api/v4/projects/sead%2Fapp" {
+			_, _ = w.Write([]byte(`{"id":12,"name":"app","path_with_namespace":"sead/app"}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(gl.Close)
+
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('vm-git', 'vm-git') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.NewGitLabRepoLinkRepo(d.SQL).SyncScanLinks(ctx, hostID, gl.URL, []string{"sead/app", "sead/hidden"}, true); err != nil {
+		t.Fatal(err)
+	}
+	vulns := store.NewVulnRepo(d.SQL)
+	if _, err := vulns.ApplyImport(ctx, "etipi", []models.VulnFinding{{Fingerprint: "z", Title: "OpenSSH", Severity: "high", Target: "vm-git"}}, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	all, _, _ := vulns.List(ctx, models.VulnFilter{})
+	if err := vulns.AddLink(ctx, all[0].ID, "host", hostID); err != nil {
+		t.Fatal(err)
+	}
+	f, err := vulns.Get(ctx, all[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gls := gitlabclient.Settings{Enabled: true, BaseURL: gl.URL, ServiceToken: "tok", DefaultRef: "main"}
+	sc := buildFixScope(ctx, d, f, gitlabclient.NewServiceClient(gls), gls)
+	if len(sc.repos) != 1 || sc.repos[0].Key != "sead/app" || sc.repos[0].ID != 12 {
+		t.Fatalf("repos = %+v, notes %v", sc.repos, sc.notes)
+	}
+	if !strings.Contains(strings.Join(sc.notes, "\n"), "sead/hidden ligado a vm-git não acessível") {
+		t.Fatalf("notes = %v", sc.notes)
+	}
+}

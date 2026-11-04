@@ -21,6 +21,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
@@ -358,6 +359,17 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 			result["web_dns_error"] = webErr.Error()
 		} else {
 			result["web_dns"] = webDNS
+		}
+		// Git remotes on the configured GitLab → this host's scan links
+		// (path-keyed, visible to the token or not). Never fails the scan.
+		if gls, glErr := gitlabclient.LoadSettings(h.db.SQL, h.db.Encryptor); glErr != nil {
+			result["git_links_error"] = glErr.Error()
+		} else if gls.Enabled {
+			if sum, gitErr := service.RecordGitLinks(r.Context(), h.db.SQL, host.ID, *vmInfo, gls.BaseURL); gitErr != nil {
+				result["git_links_error"] = gitErr.Error()
+			} else if sum != nil {
+				result["git_links"] = sum
+			}
 		}
 	} else {
 		testErr := sshtest.Test(client)
