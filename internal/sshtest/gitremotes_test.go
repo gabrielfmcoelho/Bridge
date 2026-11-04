@@ -197,6 +197,8 @@ func TestGitInnerScriptRuns(t *testing.T) {
 	extraHeader = AUTHORIZATION: basic c2VjcmV0
 [submodule "lib"]
 	url = https://gitlab.example.gov.br/sead/lib.git
+[REMOTE "Up"]
+	URL = https://deploy:tok-UP@gitlab.example.gov.br/sead/up.git
 `)
 	write("srv/app/node_modules/dep/.git/config", "[remote \"origin\"]\n\turl = https://example.com/dep.git\n")
 
@@ -207,7 +209,7 @@ func TestGitInnerScriptRuns(t *testing.T) {
 		t.Fatalf("script: %v\n%s", err, out)
 	}
 	s := string(out)
-	for _, secret := range []string{"glpat-SECRET", "hunter2", "c2VjcmV0", "extraHeader", "fetch", "dep.git"} {
+	for _, secret := range []string{"glpat-SECRET", "hunter2", "c2VjcmV0", "extraHeader", "fetch", "dep.git", "tok-UP"} {
 		if strings.Contains(s, secret) {
 			t.Fatalf("output leaks %q:\n%s", secret, s)
 		}
@@ -216,7 +218,11 @@ func TestGitInnerScriptRuns(t *testing.T) {
 	if !complete {
 		t.Fatalf("a finished run must be complete:\n%s", s)
 	}
-	want := []GitRemote{{Path: filepath.Join(root, "srv/app"), Name: "origin", URL: "https://gitlab.example.gov.br/sead/app.git"}}
+	// Section names and keys are case-insensitive in git: [REMOTE "Up"] / URL = count.
+	want := []GitRemote{
+		{Path: filepath.Join(root, "srv/app"), Name: "origin", URL: "https://gitlab.example.gov.br/sead/app.git"},
+		{Path: filepath.Join(root, "srv/app"), Name: "Up", URL: "https://gitlab.example.gov.br/sead/up.git"},
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("remotes = %+v, want %+v\noutput:\n%s", got, want, s)
 	}
@@ -274,5 +280,73 @@ func TestGitFallbackAfterFailedRoot(t *testing.T) {
 func TestGitProbePrunes(t *testing.T) {
 	if strings.Contains(gitInnerScript, "-path /usr/share ") || !strings.Contains(gitInnerScript, "-path /.snapshots ") {
 		t.Fatal("prune list: walk /usr/share, skip /.snapshots")
+	}
+}
+
+// fakeBin writes executable scripts into a fresh directory and returns a PATH
+// that finds them first.
+func fakeBin(t *testing.T, scripts map[string]string) string {
+	t.Helper()
+	bin := t.TempDir()
+	for name, body := range scripts {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return "PATH=" + bin + ":" + os.Getenv("PATH")
+}
+
+// gitTree makes <root>/<rel>/.git/config with one origin remote per entry.
+func gitTree(t *testing.T, root string, rels ...string) {
+	t.Helper()
+	for _, rel := range rels {
+		dir := filepath.Join(root, rel, ".git")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		cfg := "[remote \"origin\"]\n\turl = https://h.example/g/" + filepath.Base(rel) + ".git\n"
+		if err := os.WriteFile(filepath.Join(dir, "config"), []byte(cfg), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// On a host where sudo needs no password, the whole walk runs under one
+// privileged shell: two entries in the auth log per scan, not two per checkout.
+func TestGitInnerScriptOnePrivilegedShell(t *testing.T) {
+	root, log := t.TempDir(), filepath.Join(t.TempDir(), "calls")
+	gitTree(t, root, "a", "b", "c")
+	// The fake logs each call, drops -n and runs the rest as is.
+	path := fakeBin(t, map[string]string{"sudo": `echo "$*" >> "$PRIV_LOG"; shift; exec "$@"`})
+	cmd := exec.Command("sh", "-c", "SUDO=1\n"+gitInnerScript)
+	cmd.Env = append(os.Environ(), "GITPROBE_ROOTS="+root, "PRIV_LOG="+log, path)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("script: %v\n%s", err, out)
+	}
+	if got, complete := parseGitProbe(string(out)); len(got) != 3 || !complete {
+		t.Fatalf("remotes = %+v complete=%v\n%s", got, complete, out)
+	}
+	calls, _ := os.ReadFile(log)
+	if n := strings.Count(string(calls), "\n"); n != 2 {
+		t.Fatalf("privileged calls = %d, want 2 (the check and one shell):\n%s", n, calls)
+	}
+}
+
+// Docker's data root, wherever it is configured, is skipped: its volumes and
+// layers would repeat checkouts (and eat the 100 cap).
+func TestGitInnerScriptPrunesDockerRoot(t *testing.T) {
+	root := t.TempDir()
+	gitTree(t, root, "app", "dockerdata/volumes/v/_data/copy")
+	path := fakeBin(t, map[string]string{"docker": `[ "$1" = info ] && echo "$DOCKER_ROOT"`})
+	cmd := exec.Command("sh", "-c", gitInnerScript)
+	cmd.Env = append(os.Environ(), "GITPROBE_ROOTS="+root, "DOCKER_ROOT="+filepath.Join(root, "dockerdata"), path)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("script: %v\n%s", err, out)
+	}
+	got, _ := parseGitProbe(string(out))
+	if len(got) != 1 || got[0].Path != filepath.Join(root, "app") {
+		t.Fatalf("remotes = %+v, want only the app checkout\n%s", got, out)
 	}
 }

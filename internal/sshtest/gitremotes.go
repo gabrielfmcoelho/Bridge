@@ -1,6 +1,7 @@
 package sshtest
 
 import (
+	"encoding/base64"
 	"log"
 	"strings"
 	"time"
@@ -36,33 +37,43 @@ const (
 	maxGitURLLen     = 1024
 )
 
-// gitInnerScript runs on the host (SUDO=1: read as sudo -n when allowed) and
-// inside each container. It walks "/" and every other local filesystem
-// (-xdev each, depth 6, pseudo/docker/cache/snapshot trees and node_modules
-// pruned) for .git directories, up to 100. Per checkout: "@@repo <worktree>",
-// then only its config's section headers and url lines — headers other than
-// [remote "…"] blanked to [x], user:password@ cut. Nothing else of the
-// config (extraHeader, credential helpers) leaves the machine.
-// @@git opens the run; @@gitend closes it only when find exited 0 or 1
-// (1 = some directory unreadable) and the cap wasn't hit, so a cut list never
-// deletes links. find's status stays out of the output: a directory name can
-// hold any line. timeout(1) is used only if "timeout 1 true" works (old
-// busybox wants -t). GITPROBE_ROOTS overrides the start points (tests).
-const gitInnerScript = `export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
-echo @@git
-T=""; command -v timeout >/dev/null 2>&1 && timeout 1 true 2>/dev/null && T="timeout 20"
-P=""; [ -n "$SUDO" ] && sudo -n true 2>/dev/null && P="sudo -n"
+// gitWalkScript walks "/" and every other local filesystem (-xdev each,
+// depth 6; pseudo, docker — wherever its data root is —, podman, cache and
+// snapshot trees and node_modules pruned) for .git directories, up to 100.
+// Per checkout: "@@repo <worktree>", then only its config's section headers
+// and url lines — headers other than [remote "…"] blanked to [x],
+// user:password@ cut; git's names are case-insensitive, so the matching is
+// too. Nothing else of the config (extraHeader, credential helpers) leaves
+// the machine. @@gitend closes the run only when find exited 0 or 1 (1 = some
+// directory unreadable) and the cap wasn't hit, so a cut list never deletes
+// links. find's status stays out of the output: a directory name can hold any
+// line. timeout(1) is used only if "timeout 1 true" works (old busybox wants
+// -t). GITPROBE_ROOTS overrides the start points (tests).
+const gitWalkScript = `T=""; TI=""; command -v timeout >/dev/null 2>&1 && timeout 1 true 2>/dev/null && T="timeout 20" && TI="timeout 5"
 R="$GITPROBE_ROOTS"
 [ -n "$R" ] || R="/ $(awk '$3 ~ /^(ext[234]|xfs|btrfs|zfs|f2fs)$/ && $2 != "/" {print $2}' /proc/mounts 2>/dev/null | sort -u | tr '\n' ' ')"
-L=$($P $T find $R -xdev -maxdepth 6 \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /var/lib/docker -o -path /var/lib/containerd -o -path /snap -o -path /var/cache -o -path /.snapshots -o -path /usr/lib -o -name node_modules -o -name .cache \) -prune -o -type d -name .git -print -prune 2>/dev/null)
+X=""; DR=$($TI docker info --format '{{.DockerRootDir}}' 2>/dev/null); case "$DR" in /?*) X="-o -path $DR";; esac
+L=$($T find $R -xdev -maxdepth 6 \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path /var/lib/docker -o -path /var/lib/containerd -o -path /var/lib/containers -o -path /snap -o -path /var/cache -o -path /.snapshots -o -path /usr/lib -o -name node_modules -o -name .cache $X \) -prune -o -type d -name .git -print -prune 2>/dev/null)
 rc=$?
 printf '%s\n' "$L" | head -n 101 | { n=0; while IFS= read -r g; do
   [ -n "$g" ] || continue
   n=$((n+1)); [ "$n" -gt 100 ] && exit 0
-  $P test -f "$g/config" || continue
+  [ -f "$g/config" ] || continue
   printf '@@repo %s\n' "${g%/.git}"
-  $P head -c 65536 "$g/config" | grep -E '^[[:space:]]*(\[|url[[:space:]]*=)' | sed -e 's#://[^@]*@#://#' -e '/^[[:space:]]*\[remote /!s/^[[:space:]]*\[.*/[x]/' | head -n 40
+  head -c 65536 "$g/config" | grep -iE '^[[:space:]]*(\[|url[[:space:]]*=)' | sed -e 's#://[^@]*@#://#' -e '/^[[:space:]]*\[[Rr][Ee][Mm][Oo][Tt][Ee] /!s/^[[:space:]]*\[.*/[x]/' | head -n 40
 done; [ "$rc" -gt 1 ] || echo @@gitend; }
+`
+
+// gitInnerScript runs on the host and inside each container: @@git opens the
+// run, then the walk. On the host with SUDO=1 and a sudo that needs no
+// password, the whole walk runs in one privileged shell — two entries in the
+// auth log per scan, not two per checkout.
+var gitInnerScript = `export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
+echo @@git
+if [ -n "$SUDO" ] && sudo -n true 2>/dev/null; then
+  printf %s ` + base64.StdEncoding.EncodeToString([]byte(gitWalkScript)) + ` | base64 -d | sudo -n sh
+else
+` + gitWalkScript + `fi
 `
 
 // gitProbeScript is the whole remote script: host, then every running
@@ -132,8 +143,8 @@ func parseGitPart(text, container, image string) (out []GitRemote, started, comp
 			}
 		case strings.HasPrefix(line, "["):
 			remote = ""
-			if name, ok := strings.CutPrefix(line, `[remote "`); ok {
-				remote, _, _ = strings.Cut(name, `"`)
+			if len(line) > 9 && strings.EqualFold(line[:9], `[remote "`) { // git section names are case-insensitive
+				remote, _, _ = strings.Cut(line[9:], `"`)
 			}
 		case path != "" && remote != "":
 			key, val, ok := strings.Cut(line, "=")
