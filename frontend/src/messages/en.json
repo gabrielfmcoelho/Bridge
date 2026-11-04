@@ -2166,6 +2166,11 @@
       "emptyFiltered": "No repository matches these filters.",
       "unlistedTitle": "Attached but not visible to the token",
       "unlistedHint": "Repositories attached in Bridge that the token does not list: moved, renamed, or out of its reach. Fix plans cannot read them.",
+      "foundTitle": "Found on hosts, not visible to the token",
+      "foundHint": "Repositories that a git checkout on a host points at, but the token does not list. The scan already links those hosts; give the token access so fix plans can read the code.",
+      "foundChip": "Found by the host scan",
+      "foreignTitle": "Outside this GitLab",
+      "foreignHint": "Remotes found on hosts that point at another server (GitHub, another GitLab). Listed only, never linked.",
       "via": "via group {group}",
       "attachGroupTitle": "Link the group {repo}",
       "attachGroupHint": "Every repo in this group and its subgroups — now and later — belongs to what you pick."
@@ -2550,7 +2555,8 @@
         "services": "Services",
         "packages": "Packages and schedules",
         "security": "Security",
-        "webservers": "Web servers"
+        "webservers": "Web servers",
+        "git": "Git repositories"
       },
       "empty": {
         "resources": "No usage data in this scan.",
@@ -2561,8 +2567,14 @@
         "services": "No services or agents found in the last scan.",
         "packages": "No packages or schedules found in the last scan.",
         "security": "No firewall or SSH policy data in this scan.",
-        "webservers": "No nginx, Apache or PHP-FPM found."
+        "webservers": "No nginx, Apache or PHP-FPM found.",
+        "git": "No git checkouts found."
       }
+    },
+    "git": {
+      "summary": "Git checkouts on this host and in its containers, with each remote (credentials are removed on the host). Remotes on the configured GitLab link this host to their repository.",
+      "partial": "The search stopped early (time limit, or more than 100 checkouts): some repositories may be missing, and no link was removed.",
+      "notRun": "This scan didn't look for git checkouts. Run a new scan."
     },
     "web": {
       "summary": "Sites each server answers for. Green names are linked to a DNS record in Bridge: the scan links records that exist and creates new ones that resolve in DNS.",

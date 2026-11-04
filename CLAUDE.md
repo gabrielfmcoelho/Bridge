@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v121**. Use idempotent idioms:
+per element, currently at **v123**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -179,6 +179,25 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   name resolves from the Bridge server. Only adds; trashed records are never
   recreated; stopped host servers contribute nothing. `LinkableName` and
   `frontend/src/lib/webDns.ts` `linkableName` are twins.
+- Git checkouts in the scan (`internal/sshtest/gitremotes.go`): one session
+  walks every local filesystem (depth 6, pseudo/docker/cache trees and
+  `node_modules` pruned, 100 checkouts max) for `.git` directories on the host
+  (as root with the stored password when there is one) and in every running
+  container (cap 30). Only `[remote]` urls leave the VM, `user:password@` cut
+  on both sides. `git_remotes` is `null` when the probe didn't run, `[]` when
+  it found none; `git_remotes_partial` marks a cut list (timeout, cap).
+  `service.RecordGitLinks` turns remotes on the configured GitLab into the
+  host's **scan links** (`gitlab_repo_links.source = 'scan'`, v123):
+  `gitlab_project_id` 0, keyed by lowercase path, so a repo the token can't
+  see is linked too. It adds what's found (never next to a manual link of the
+  same repo) and prunes only scan links, only on a complete list; manual links
+  are never touched. Readers resolve id 0 by path (the inventory's `repoFor`,
+  the fix plan's `SearchProjectByPath`). Settings › Repositórios GitLab
+  (`GET /api/settings/gitlab/repos`) reads every live host's latest scan
+  (`HostScanRepo.LatestGitRemotes`): `found` on each repo (scan links show
+  there, not as host refs), found repos the token doesn't list in `unlisted`,
+  and remotes on other servers in `foreign`, grouped by
+  `gitlab.RemoteHostPath`.
 - Disk in the scan (`internal/sshtest/storage.go`): every local filesystem
   (`df -lPTB1`, no tmpfs/overlay/snap/container mounts, bind mounts once),
   network mounts (listed, never counted), raw disks (`lsblk`, "unused" when

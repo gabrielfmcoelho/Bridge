@@ -1,13 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildTree, inheritedByGroup, repoMatches, repoTotal } from "./gitlabRepoTree.ts";
-import type { GitLabInventoryGroup, GitLabInventoryRepo } from "../../../lib/types";
+import { buildTree, foreignMatches, foundLabel, inheritedByGroup, repoMatches, repoTotal, splitUnlisted } from "./gitlabRepoTree.ts";
+import type { GitLabFoundRef, GitLabInventoryGroup, GitLabInventoryRepo } from "../../../lib/types";
 
 const group = (id: number, full_path: string, parent_id: number | null): GitLabInventoryGroup =>
   ({ id, name: full_path.split("/").pop()!, full_path, parent_id, web_url: "", projetos: [], hosts: [] });
 const repo = (id: number, path: string, namespace_id: number, dns: string[] = []): GitLabInventoryRepo => ({
   id, name: path.split("/").pop()!, path_with_namespace: path, namespace_id, web_url: "", default_branch: "main",
-  projetos: [], services: [], dns: dns.map((name, i) => ({ id: i + 1, link_id: i + 1, name })), hosts: [],
+  projetos: [], services: [], dns: dns.map((name, i) => ({ id: i + 1, link_id: i + 1, name })), hosts: [], found: [],
 });
 
 const groups = [group(2, "sead/dl", 1), group(1, "sead", null), group(3, "sead/empty", 1)];
@@ -50,4 +50,28 @@ test("a group's projeto / host links reach every repo and subgroup below it", ()
   assert.ok(repoMatches(raw, "", "linked", inh.get(4)) && !repoMatches(raw, "", "unlinked", inh.get(4)));
   assert.ok(repoMatches(raw, "", "hosts", inh.get(4)) && !repoMatches(raw, "", "dns", inh.get(4)));
   assert.ok(repoMatches(raw, "vm-dl", "all", inh.get(4)), "search finds the inherited host");
+});
+
+const onVM: GitLabFoundRef = { host_id: 3, host_name: "vm-sei", host_slug: "vm-sei", container: "api", path: "/app" };
+
+test("checkouts found on hosts count as host attachments and are searchable", () => {
+  const r = { ...repo(10, "sead/hidden", 1), found: [onVM] };
+  assert.ok(repoMatches(r, "", "linked") && repoMatches(r, "", "hosts") && !repoMatches(r, "", "unlinked"));
+  assert.ok(repoMatches(r, "VM-SEI", "all") && repoMatches(r, "/app", "all") && !repoMatches(r, "nope", "all"));
+  assert.equal(foundLabel(onVM), "vm-sei · api:/app");
+  assert.equal(foundLabel({ ...onVM, container: undefined }), "vm-sei · /app");
+});
+
+test("unlisted splits into attached in Bridge and found on hosts; a repo with both is in each", () => {
+  const manual = repo(0, "sead/gone", 0, ["x.example"]);
+  const found = { ...repo(0, "sead/hidden", 0), found: [onVM] };
+  const both = { ...repo(0, "sead/both", 0, ["y.example"]), found: [onVM] };
+  const { attached, onHosts } = splitUnlisted([manual, found, both]);
+  assert.deepEqual(attached.map((r) => r.path_with_namespace), ["sead/gone", "sead/both"]);
+  assert.deepEqual(onHosts.map((r) => r.path_with_namespace), ["sead/hidden", "sead/both"]);
+});
+
+test("foreign remotes match their URL or where they were found", () => {
+  const fr = { url: "github.com/o/tool", found: [onVM] };
+  assert.ok(foreignMatches(fr, "") && foreignMatches(fr, "GITHUB") && foreignMatches(fr, "vm-sei") && !foreignMatches(fr, "gitlab"));
 });

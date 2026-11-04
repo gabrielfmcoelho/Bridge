@@ -2166,6 +2166,11 @@
       "emptyFiltered": "Nenhum repositório corresponde a esses filtros.",
       "unlistedTitle": "Vinculados, mas invisíveis ao token",
       "unlistedHint": "Repositórios vinculados no Bridge que o token não lista: movidos, renomeados ou fora do seu alcance. Os planos de correção não conseguem lê-los.",
+      "foundTitle": "Encontrados nas VMs, invisíveis ao token",
+      "foundHint": "Repositórios para os quais aponta um checkout git em alguma VM, mas que o token não lista. O scan já vincula essas VMs; dê acesso ao token para que os planos de correção leiam o código.",
+      "foundChip": "Encontrado pelo scan da VM",
+      "foreignTitle": "Fora deste GitLab",
+      "foreignHint": "Remotes encontrados nas VMs que apontam para outro servidor (GitHub, outro GitLab). Só listados, nunca vinculados.",
       "via": "via grupo {group}",
       "attachGroupTitle": "Vincular o grupo {repo}",
       "attachGroupHint": "Todos os repositórios deste grupo e dos subgrupos — atuais e futuros — passam a ser do que você escolher."
@@ -2550,7 +2555,8 @@
         "services": "Serviços",
         "packages": "Pacotes e agendamentos",
         "security": "Segurança",
-        "webservers": "Servidores web"
+        "webservers": "Servidores web",
+        "git": "Repositórios git"
       },
       "empty": {
         "resources": "Sem dados de uso neste scan.",
@@ -2561,8 +2567,14 @@
         "services": "Nenhum serviço ou agente encontrado no último scan.",
         "packages": "Nenhum pacote ou agendamento encontrado no último scan.",
         "security": "Sem dados de firewall ou política SSH neste scan.",
-        "webservers": "Nenhum nginx, Apache ou PHP-FPM encontrado."
+        "webservers": "Nenhum nginx, Apache ou PHP-FPM encontrado.",
+        "git": "Nenhum checkout git encontrado."
       }
+    },
+    "git": {
+      "summary": "Checkouts git deste host e dos seus containers, com cada remote (as credenciais são removidas no próprio host). Remotes do GitLab configurado vinculam este host ao repositório.",
+      "partial": "A busca parou antes do fim (limite de tempo ou mais de 100 checkouts): pode faltar algum repositório, e nenhum vínculo foi removido.",
+      "notRun": "Este scan não procurou checkouts git. Execute um novo scan."
     },
     "web": {
       "summary": "Sites que cada servidor atende. Nomes em verde estão vinculados a um DNS do Bridge: o scan vincula os registros existentes e cria os novos que resolvem no DNS.",
