@@ -464,3 +464,63 @@ func TestBuildFixScope_HostScanLinks(t *testing.T) {
 		t.Fatalf("notes = %v", sc.notes)
 	}
 }
+
+// Scan links come last, after every curated source (service repos, manual
+// links, projetos), and stop being looked up once the plan is full: a host
+// with many checkouts never crowds out the repos someone chose.
+func TestBuildFixScope_ScanLinksLast(t *testing.T) {
+	ctx := context.Background()
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	var pathLookups atomic.Int32
+	gl := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.EscapedPath()
+		switch {
+		case p == "/api/v4/projects/7":
+			_, _ = w.Write([]byte(`{"id":7,"name":"manual","path_with_namespace":"sead/manual"}`))
+		case strings.HasPrefix(p, "/api/v4/projects/sead%2Fs"):
+			pathLookups.Add(1)
+			n := strings.TrimPrefix(p, "/api/v4/projects/sead%2Fs")
+			_, _ = w.Write([]byte(`{"id":10` + n + `,"name":"s` + n + `","path_with_namespace":"sead/s` + n + `"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(gl.Close)
+
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('vm-many', 'vm-many') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatal(err)
+	}
+	links := store.NewGitLabRepoLinkRepo(d.SQL)
+	if _, _, err := links.SyncScanLinks(ctx, hostID, gl.URL, []string{"sead/s0", "sead/s1", "sead/s2", "sead/s3", "sead/s4", "sead/s5", "sead/s6"}, true); err != nil {
+		t.Fatal(err)
+	}
+	// The manual link comes after the scan links in id order.
+	if err := links.Create(ctx, &models.GitLabRepoLink{EntityType: "host", EntityID: hostID, GitLabProjectID: 7, GitLabBaseURL: gl.URL, GitLabPath: "sead/manual"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	vulns := store.NewVulnRepo(d.SQL)
+	if _, err := vulns.ApplyImport(ctx, "etipi", []models.VulnFinding{{Fingerprint: "m", Title: "OpenSSH", Severity: "high", Target: "vm-many"}}, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	all, _, _ := vulns.List(ctx, models.VulnFilter{})
+	if err := vulns.AddLink(ctx, all[0].ID, "host", hostID); err != nil {
+		t.Fatal(err)
+	}
+	f, err := vulns.Get(ctx, all[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gls := gitlabclient.Settings{Enabled: true, BaseURL: gl.URL, ServiceToken: "tok", DefaultRef: "main"}
+	sc := buildFixScope(ctx, d, f, gitlabclient.NewServiceClient(gls), gls)
+	if len(sc.repos) != fixPlanMaxRepos || sc.repos[0].Key != "sead/manual" {
+		t.Fatalf("repos = %+v, want the manual one first, then scan links up to the cap", sc.repos)
+	}
+	if n := pathLookups.Load(); n != fixPlanMaxRepos-1 {
+		t.Fatalf("scan links looked up %d times, want %d (stop once full)", n, fixPlanMaxRepos-1)
+	}
+}

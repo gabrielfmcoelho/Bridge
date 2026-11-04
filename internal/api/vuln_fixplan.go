@@ -254,6 +254,7 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 	// Repos linked straight to the finding's DNS records and hosts.
 	direct := store.NewGitLabRepoLinkRepo(db.SQL)
 	var dnsIDs, hostIDs []int64
+	var scanLinks []models.GitLabRepoLink
 	for _, d := range records {
 		dnsIDs = append(dnsIDs, d.ID)
 	}
@@ -269,6 +270,10 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 			if !sameGitLab(l.GitLabBaseURL, gls.BaseURL) {
 				continue
 			}
+			if l.Source == models.GitLabLinkSourceScan {
+				scanLinks = append(scanLinks, l) // after every curated source
+				continue
+			}
 			if l.Kind == models.GitLabLinkKindGroup {
 				// A host linked to a whole group: every repo under it.
 				ps, err := gl.ListGroupProjects(l.GitLabProjectID, true)
@@ -281,12 +286,7 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 				}
 				continue
 			}
-			// Scan links carry no GitLab id (0): look them up by path.
-			lookup := func() (*gitlabclient.Project, error) { return gl.GetProject(l.GitLabProjectID) }
-			if l.GitLabProjectID == 0 {
-				lookup = func() (*gitlabclient.Project, error) { return gl.SearchProjectByPath(l.GitLabPath) }
-			}
-			p, err := lookup()
+			p, err := gl.GetProject(l.GitLabProjectID)
 			if err != nil {
 				sc.notes = append(sc.notes, "repo "+l.GitLabPath+" ligado a "+l.EntityName+" não acessível")
 				continue
@@ -305,6 +305,20 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 		for _, t := range targets {
 			addRepo(fixRepo{Key: t.Path, ID: t.ID, Name: t.Name, Ref: t.Ref})
 		}
+	}
+	// Repos the host scan found checked out on the finding's hosts: last, so
+	// they never crowd out a chosen repo, and not looked up once the plan is
+	// full. They carry no GitLab id: found by path.
+	for _, l := range scanLinks {
+		if len(sc.repos) >= fixPlanMaxRepos {
+			break
+		}
+		p, err := gl.SearchProjectByPath(l.GitLabPath)
+		if err != nil {
+			sc.notes = append(sc.notes, "repo "+l.GitLabPath+" ligado a "+l.EntityName+" não acessível")
+			continue
+		}
+		addRepo(fixRepo{Key: p.PathWithNamespace, ID: p.ID, Name: p.Name, Ref: gls.DefaultRef})
 	}
 	if len(sc.repos) == 0 {
 		sc.notes = append(sc.notes, "Nenhum repositório GitLab ligado aos projetos, serviços, DNS ou hosts deste achado.")

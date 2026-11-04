@@ -2574,7 +2574,7 @@
     "git": {
       "summary": "Checkouts git deste host e dos seus containers, com cada remote (as credenciais são removidas no próprio host). Remotes do GitLab configurado vinculam este host ao repositório.",
       "partial": "A busca parou antes do fim (limite de tempo ou mais de 100 checkouts): pode faltar algum repositório, e nenhum vínculo foi removido.",
-      "notRun": "Este scan não procurou checkouts git. Execute um novo scan."
+      "notRun": "A busca por checkouts git não rodou ou não terminou neste scan."
     },
     "web": {
       "summary": "Sites que cada servidor atende. Nomes em verde estão vinculados a um DNS do Bridge: o scan vincula os registros existentes e cria os novos que resolvem no DNS.",

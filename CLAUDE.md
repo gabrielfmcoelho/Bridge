@@ -180,20 +180,28 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   recreated; stopped host servers contribute nothing. `LinkableName` and
   `frontend/src/lib/webDns.ts` `linkableName` are twins.
 - Git checkouts in the scan (`internal/sshtest/gitremotes.go`): one session
-  walks every local filesystem (depth 6, pseudo/docker/cache trees and
-  `node_modules` pruned, 100 checkouts max) for `.git` directories on the host
-  (as root with the stored password when there is one) and in every running
-  container (cap 30). Only `[remote]` urls leave the VM, `user:password@` cut
-  on both sides. `git_remotes` is `null` when the probe didn't run, `[]` when
-  it found none; `git_remotes_partial` marks a cut list (timeout, cap).
+  walks every local filesystem (depth 6, pseudo/docker/cache/snapshot trees
+  and `node_modules` pruned, 100 checkouts max) for `.git` directories on the
+  host (as root with the stored password when there is one) and in every
+  running container (cap 30). Of each `.git/config` only section headers
+  (all but `[remote "…"]` blanked) and `url =` lines leave the VM,
+  `user:password@` cut on both sides; Go keeps only remote urls. It must stay
+  well inside the browser's 120 s scan request or the whole scan is lost:
+  host walk 20 s, containers started within 30 s (8 s each), unprivileged
+  deadline 60 s. `git_remotes` is `null` when the probe didn't run, `[]` when
+  it found none; `git_remotes_partial` marks a list that may be short (find
+  exit > 1, cap, a container skipped or cut, or the unprivileged fallback
+  after a failed root run).
   `service.RecordGitLinks` turns remotes on the configured GitLab into the
   host's **scan links** (`gitlab_repo_links.source = 'scan'`, v123):
   `gitlab_project_id` 0, keyed by lowercase path, so a repo the token can't
   see is linked too. It adds what's found (never next to a manual link of the
   same repo) and prunes only scan links, only on a complete list; manual links
   are never touched. Readers resolve id 0 by path (the inventory's `repoFor`,
-  the fix plan's `SearchProjectByPath`). Settings › Repositórios GitLab
-  (`GET /api/settings/gitlab/repos`) reads every live host's latest scan
+  the fix plan's `SearchProjectByPath`); the fix plan takes scan links last,
+  after every curated source, so they never crowd out a chosen repo.
+  Settings › Repositórios GitLab (`GET /api/settings/gitlab/repos`) reads
+  every live host's latest scan
   (`HostScanRepo.LatestGitRemotes`): `found` on each repo (scan links show
   there, not as host refs), found repos the token doesn't list in `unlisted`,
   and remotes on other servers in `foreign`, grouped by
