@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"database/sql"
+	"sort"
+	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -21,7 +23,7 @@ func NewGitLabRepoLinkRepo(db *sql.DB) *GitLabRepoLinkRepo {
 }
 
 const gitlabRepoLinkSelect = `SELECT l.id, l.entity_type, l.entity_id, COALESCE(d.domain, h.nickname, ''), l.kind,
-		l.gitlab_project_id, l.gitlab_base_url, l.gitlab_path, l.created_at
+		l.gitlab_project_id, l.gitlab_base_url, l.gitlab_path, l.source, l.created_at
 	FROM gitlab_repo_links l
 	LEFT JOIN dns_records d ON l.entity_type = 'dns' AND d.id = l.entity_id AND d.deleted_at IS NULL
 	LEFT JOIN hosts h ON l.entity_type = 'host' AND h.id = l.entity_id AND h.deleted_at IS NULL
@@ -37,7 +39,7 @@ func (r *GitLabRepoLinkRepo) query(ctx context.Context, where string, args ...an
 	for rows.Next() {
 		var l models.GitLabRepoLink
 		if err := rows.Scan(&l.ID, &l.EntityType, &l.EntityID, &l.EntityName, &l.Kind,
-			&l.GitLabProjectID, &l.GitLabBaseURL, &l.GitLabPath, &l.CreatedAt); err != nil {
+			&l.GitLabProjectID, &l.GitLabBaseURL, &l.GitLabPath, &l.Source, &l.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, l)
@@ -85,4 +87,49 @@ func (r *GitLabRepoLinkRepo) Delete(ctx context.Context, id int64) (bool, error)
 	}
 	n, err := res.RowsAffected()
 	return n > 0, err
+}
+
+// SyncScanLinks makes the host's scan links (source 'scan', GitLab id 0,
+// keyed by lowercase path) on baseURL match the repo paths its latest scan
+// found: adds the missing ones, skipping a repo the host already links by
+// hand, and, when prune (the scan's list is complete), deletes the scan
+// links whose repo is gone. Manual links and other GitLabs are never touched.
+func (r *GitLabRepoLinkRepo) SyncScanLinks(ctx context.Context, hostID int64, baseURL string, paths []string, prune bool) (added, removed int, err error) {
+	baseURL = strings.TrimRight(baseURL, "/")
+	keys, found := []string{}, map[string]string{}
+	for _, p := range paths {
+		if k := strings.ToLower(p); found[k] == "" {
+			found[k] = p
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+	const sameHost = `entity_type = 'host' AND entity_id = ? AND lower(rtrim(gitlab_base_url, '/')) = lower(?)`
+	if prune {
+		res, err := tx.ExecContext(ctx, `DELETE FROM gitlab_repo_links WHERE `+sameHost+`
+			AND source = 'scan' AND NOT (lower(gitlab_path) = ANY(?))`, hostID, baseURL, keys)
+		if err != nil {
+			return 0, 0, err
+		}
+		n, _ := res.RowsAffected()
+		removed = int(n)
+	}
+	for _, k := range keys {
+		res, err := tx.ExecContext(ctx, `
+			INSERT INTO gitlab_repo_links (entity_type, entity_id, kind, gitlab_project_id, gitlab_base_url, gitlab_path, source)
+			SELECT 'host', ?::bigint, 'project', 0, ?::text, ?::text, 'scan'
+			WHERE NOT EXISTS (SELECT 1 FROM gitlab_repo_links WHERE `+sameHost+` AND kind = 'project' AND lower(gitlab_path) = ?)
+			ON CONFLICT DO NOTHING`, hostID, baseURL, found[k], hostID, baseURL, k)
+		if err != nil {
+			return 0, 0, err
+		}
+		n, _ := res.RowsAffected()
+		added += int(n)
+	}
+	return added, removed, tx.Commit()
 }
