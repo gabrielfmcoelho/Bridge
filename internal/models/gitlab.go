@@ -50,6 +50,8 @@ type GitLabRepoLink struct {
 	EntityType string `json:"entity_type"`
 	EntityID   int64  `json:"entity_id"`
 	EntityName string `json:"entity_name"`
+	// EntitySlug is the host's oficial_slug (its page URL); "" for DNS.
+	EntitySlug string `json:"entity_slug,omitempty"`
 	// Kind is "project" (one repo) or "group" (every repo under it; hosts only).
 	Kind            string `json:"kind"`
 	GitLabProjectID int    `json:"gitlab_project_id"`

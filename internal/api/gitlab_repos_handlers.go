@@ -219,9 +219,14 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 		jsonServerError(w, r, "failed to list repo links", err)
 		return
 	}
+	var scanLinks []models.GitLabRepoLink
 	for _, l := range direct {
+		if !sameGitLab(l.GitLabBaseURL, settings.BaseURL) {
+			continue
+		}
 		// Scan links show as the found refs below, with where.
-		if !sameGitLab(l.GitLabBaseURL, settings.BaseURL) || l.Source == models.GitLabLinkSourceScan {
+		if l.Source == models.GitLabLinkSourceScan {
+			scanLinks = append(scanLinks, l)
 			continue
 		}
 		ref := gitlabRepoRef{LinkID: l.ID, ID: l.EntityID, Name: l.EntityName}
@@ -270,9 +275,21 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 		} else {
 			continue
 		}
-		if k := key + "\x00" + strconv.FormatInt(g.HostID, 10) + "\x00" + g.Container + "\x00" + g.Path; !seen[k] {
+		host := key + "\x00" + strconv.FormatInt(g.HostID, 10)
+		seen[host] = true
+		if k := host + "\x00" + g.Container + "\x00" + g.Path; !seen[k] {
 			seen[k] = true
 			*found = append(*found, ref)
+		}
+	}
+	// A scan link the latest scan doesn't account for — its git search didn't
+	// run or was cut short, so the link was kept — still shows, as the host
+	// without a path: Settings and the fix plan see the same links.
+	for _, l := range scanLinks {
+		if host := "gl:" + strings.ToLower(l.GitLabPath) + "\x00" + strconv.FormatInt(l.EntityID, 10); !seen[host] {
+			seen[host] = true
+			rp := repoFor(0, l.GitLabPath)
+			rp.Found = append(rp.Found, gitlabFoundRef{HostID: l.EntityID, HostName: l.EntityName, HostSlug: l.EntitySlug})
 		}
 	}
 	sort.Slice(inv.Foreign, func(i, j int) bool { return inv.Foreign[i].URL < inv.Foreign[j].URL })

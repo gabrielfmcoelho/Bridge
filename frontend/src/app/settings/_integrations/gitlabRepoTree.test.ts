@@ -60,6 +60,8 @@ test("checkouts found on hosts count as host attachments and are searchable", ()
   assert.ok(repoMatches(r, "VM-SEI", "all") && repoMatches(r, "/app", "all") && !repoMatches(r, "nope", "all"));
   assert.equal(foundLabel(onVM), "vm-sei · api:/app");
   assert.equal(foundLabel({ ...onVM, container: undefined }), "vm-sei · /app");
+  // Kept by an earlier scan (the latest one's search didn't run): no path.
+  assert.equal(foundLabel({ ...onVM, container: undefined, path: "" }), "vm-sei");
 });
 
 test("unlisted splits into attached in Bridge and found on hosts; a repo with both is in each", () => {

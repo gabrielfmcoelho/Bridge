@@ -180,18 +180,23 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   recreated; stopped host servers contribute nothing. `LinkableName` and
   `frontend/src/lib/webDns.ts` `linkableName` are twins.
 - Git checkouts in the scan (`internal/sshtest/gitremotes.go`): one session
-  walks every local filesystem (depth 6, pseudo/docker/cache/snapshot trees
-  and `node_modules` pruned, 100 checkouts max) for `.git` directories on the
-  host (as root with the stored password when there is one) and in every
-  running container (cap 30). Of each `.git/config` only section headers
-  (all but `[remote "…"]` blanked) and `url =` lines leave the VM,
-  `user:password@` cut on both sides; Go keeps only remote urls. It must stay
-  well inside the browser's 120 s scan request or the whole scan is lost:
+  walks every local filesystem (depth 6; pseudo, docker — wherever `docker
+  info` puts its data root —, podman, cache and snapshot trees and
+  `node_modules` pruned; 100 checkouts max) for `.git` directories on the
+  host (as root with the stored password when there is one, else in one
+  `sudo -n` shell when that needs no password) and in every running container
+  (cap 30). Of each `.git/config` only section headers (all but
+  `[remote "…"]` blanked, case-insensitive like git) and `url =` lines leave
+  the VM, `user:password@` cut on both sides; Go keeps only remote urls. Each
+  container frame ends with its `docker exec` status (`@@exit N`, taken off
+  by `splitCtrFrames`): a walk that never started counts as done only for
+  126/127 (no shell in the image). It must stay well inside the browser's
+  120 s scan request or the whole scan is lost:
   host walk 20 s, containers started within 30 s (8 s each), unprivileged
   deadline 60 s. `git_remotes` is `null` when the probe didn't run, `[]` when
   it found none; `git_remotes_partial` marks a list that may be short (find
-  exit > 1, cap, a container skipped or cut, or the unprivileged fallback
-  after a failed root run).
+  exit > 1, cap, a container skipped, cut, paused or restarting, or the
+  unprivileged fallback after a failed root run).
   `service.RecordGitLinks` turns remotes on the configured GitLab into the
   host's **scan links** (`gitlab_repo_links.source = 'scan'`, v123):
   `gitlab_project_id` 0, keyed by lowercase path, so a repo the token can't
@@ -201,11 +206,16 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   the fix plan's `SearchProjectByPath`); the fix plan takes scan links last,
   after every curated source, so they never crowd out a chosen repo.
   Settings › Repositórios GitLab (`GET /api/settings/gitlab/repos`) reads
-  every live host's latest scan
-  (`HostScanRepo.LatestGitRemotes`): `found` on each repo (scan links show
-  there, not as host refs), found repos the token doesn't list in `unlisted`,
-  and remotes on other servers in `foreign`, grouped by
-  `gitlab.RemoteHostPath`.
+  every live host's latest scan (`HostScanRepo.LatestGitRemotes`): `found`
+  on each repo (scan links show
+  there, not as host refs; one the latest scan couldn't check shows as the
+  host with no path), found repos the token doesn't list in `unlisted`, and
+  remotes on other servers in `foreign`, grouped by `gitlab.RemoteHostPath`.
+  **Trust boundary:** scan links come from data the VM controls — any user
+  who can write a `.git/config`, any container's own shell. They are hints
+  about what runs where, never authorization: the fix-plan model reads every
+  scan-linked repo the token can see (after the curated ones), so never give
+  scan links more weight than that.
 - Disk in the scan (`internal/sshtest/storage.go`): every local filesystem
   (`df -lPTB1`, no tmpfs/overlay/snap/container mounts, bind mounts once),
   network mounts (listed, never counted), raw disks (`lsblk`, "unused" when

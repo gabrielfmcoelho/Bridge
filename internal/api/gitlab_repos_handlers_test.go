@@ -251,6 +251,19 @@ func TestGitLabRepoInventoryFoundOnHosts(t *testing.T) {
 	if _, _, err := store.NewGitLabRepoLinkRepo(d.SQL).SyncScanLinks(ctx, hostID, gl.URL, []string{"sead/app", "sead/hidden"}, true); err != nil {
 		t.Fatal(err)
 	}
+	// vm-old: scan links from an earlier scan, but its latest git search
+	// didn't run. The links still show — as the host, with no path.
+	var oldID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('vm-old', 'vm-old-slug') RETURNING id`).Scan(&oldID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.NewHostScanRepo(d.SQL).Create(ctx, oldID, `{"git_remotes":null}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.NewGitLabRepoLinkRepo(d.SQL).SyncScanLinks(ctx, oldID, gl.URL, []string{"sead/hidden"}, true); err != nil {
+		t.Fatal(err)
+	}
+	old := gitlabFoundRef{HostID: oldID, HostName: "vm-old", HostSlug: "vm-old-slug"}
 
 	var inv gitlabInventory
 	resp := env.do("GET", "/api/settings/gitlab/repos", "")
@@ -270,7 +283,7 @@ func TestGitLabRepoInventoryFoundOnHosts(t *testing.T) {
 		t.Fatalf("unlisted = %+v", inv.Unlisted)
 	}
 	if h := inv.Unlisted[0]; h.PathWithNamespace != "sead/hidden" || len(h.Hosts) != 0 ||
-		len(h.Found) != 2 || h.Found[0] != at("", "/opt/hidden") || h.Found[1] != at("api", "/app") {
+		len(h.Found) != 3 || h.Found[0] != at("", "/opt/hidden") || h.Found[1] != at("api", "/app") || h.Found[2] != old {
 		t.Fatalf("sead/hidden = %+v", h)
 	}
 	if len(inv.Foreign) != 1 || inv.Foreign[0].URL != "github.com/o/tool" ||

@@ -46,9 +46,10 @@ export function attachmentCount(r: GitLabInventoryRepo, inherited: InheritedRef[
   return r.projetos.length + r.services.length + r.dns.length + r.hosts.length + (r.found ?? []).length + inherited.length;
 }
 
-/** "host · container:path" — where a scan found a checkout. */
+/** "host · container:path" — where a scan found a checkout; just "host" when
+ *  an earlier scan linked it and the latest one's search didn't run. */
 export function foundLabel(f: GitLabFoundRef): string {
-  return `${f.host_name} · ${f.container ? `${f.container}:` : ""}${f.path}`;
+  return f.path ? `${f.host_name} · ${f.container ? `${f.container}:` : ""}${f.path}` : f.host_name;
 }
 
 /** Search matches the repo path or the name of anything it is attached to —

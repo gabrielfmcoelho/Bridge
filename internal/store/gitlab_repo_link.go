@@ -22,7 +22,7 @@ func NewGitLabRepoLinkRepo(db *sql.DB) *GitLabRepoLinkRepo {
 	return &GitLabRepoLinkRepo{db: db}
 }
 
-const gitlabRepoLinkSelect = `SELECT l.id, l.entity_type, l.entity_id, COALESCE(d.domain, h.nickname, ''), l.kind,
+const gitlabRepoLinkSelect = `SELECT l.id, l.entity_type, l.entity_id, COALESCE(d.domain, h.nickname, ''), COALESCE(h.oficial_slug, ''), l.kind,
 		l.gitlab_project_id, l.gitlab_base_url, l.gitlab_path, l.source, l.created_at
 	FROM gitlab_repo_links l
 	LEFT JOIN dns_records d ON l.entity_type = 'dns' AND d.id = l.entity_id AND d.deleted_at IS NULL
@@ -38,7 +38,7 @@ func (r *GitLabRepoLinkRepo) query(ctx context.Context, where string, args ...an
 	var out []models.GitLabRepoLink
 	for rows.Next() {
 		var l models.GitLabRepoLink
-		if err := rows.Scan(&l.ID, &l.EntityType, &l.EntityID, &l.EntityName, &l.Kind,
+		if err := rows.Scan(&l.ID, &l.EntityType, &l.EntityID, &l.EntityName, &l.EntitySlug, &l.Kind,
 			&l.GitLabProjectID, &l.GitLabBaseURL, &l.GitLabPath, &l.Source, &l.CreatedAt); err != nil {
 			return nil, err
 		}

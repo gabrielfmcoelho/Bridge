@@ -1603,7 +1603,8 @@ export interface GitLabInventoryRepo {
   found: GitLabFoundRef[];
 }
 
-/** Where a host's latest scan found a checkout: on the host, or in `container`. */
+/** Where a host's latest scan found a checkout: on the host, or in `container`.
+ *  path "" = a link an earlier scan made that the latest one couldn't check. */
 export interface GitLabFoundRef {
   host_id: number;
   host_name: string;

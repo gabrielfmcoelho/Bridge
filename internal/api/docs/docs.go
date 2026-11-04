@@ -25619,6 +25619,10 @@ const docTemplate = `{
                 "entity_name": {
                     "type": "string"
                 },
+                "entity_slug": {
+                    "description": "EntitySlug is the host's oficial_slug (its page URL); \"\" for DNS.",
+                    "type": "string"
+                },
                 "entity_type": {
                     "type": "string"
                 },
