@@ -19,3 +19,23 @@ func TestRepoPath(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteHostPath(t *testing.T) {
+	for raw, want := range map[string]string{
+		"git@GitHub.com:o/tool.git":             "github.com/o/tool",
+		"https://github.com/o/tool.git/":        "github.com/o/tool",
+		"ssh://git@gl.example:2222/g/sub/r.git": "gl.example/g/sub/r",
+		"https://gl.example/g/r/-/tree/main":    "gl.example/g/r",
+		"/srv/git/bare.git":                     "", // a local path, no host
+		"":                                      "",
+	} {
+		host, path, ok := RemoteHostPath(raw)
+		got := ""
+		if ok {
+			got = host + "/" + path
+		}
+		if got != want || ok != (want != "") {
+			t.Errorf("RemoteHostPath(%q) = %q, %v; want %q", raw, got, ok, want)
+		}
+	}
+}

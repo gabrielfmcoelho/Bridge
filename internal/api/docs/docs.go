@@ -5577,19 +5577,38 @@ const docTemplate = `{
             }
         },
         "/api/gestor/autores/varrer": {
-            "post": {
+            "get": {
+                "description": "Admin. Whether a scan is under way, and the result or error of the last one (since the server started).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "gestor"
                 ],
-                "summary": "Scan GitLab authors",
+                "summary": "Status of the background GitLab-author scan",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/service.ResumoVarredura"
+                            "$ref": "#/definitions/api.AutoresVarreduraStatus"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Admin. Answers 202 with the run's status at once; a scan already under way is returned instead of starting another. Poll GET for the result. E-mails asked about in the last 7 days without a match are skipped. 400 when GitLab is not configured.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "gestor"
+                ],
+                "summary": "Scan GitLab authors (background)",
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/api.AutoresVarreduraStatus"
                         }
                     },
                     "400": {
@@ -13429,7 +13448,7 @@ const docTemplate = `{
         },
         "/api/settings/gitlab/repos": {
             "get": {
-                "description": "Admin. Groups and repos visible to the GitLab service token, with their Bridge attachments (projeto links, service repo fields, DNS/host links). unlisted holds repos attached in Bridge that the token does not list. 400 when the integration is disabled or has no token.",
+                "description": "Admin. Groups and repos visible to the GitLab service token, with their Bridge attachments (projeto links, service repo fields, DNS/host links) and found (checkouts in hosts' latest scans). unlisted holds repos attached in Bridge or found on hosts that the token does not list; foreign holds remotes found on hosts that point at another host. 400 when the integration is disabled or has no token.",
                 "produces": [
                     "application/json"
                 ],
@@ -19176,6 +19195,26 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "api.AutoresVarreduraStatus": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "result": {
+                    "$ref": "#/definitions/service.ResumoVarredura"
+                },
+                "running": {
+                    "type": "boolean"
+                },
+                "started_at": {
+                    "type": "string"
+                }
+            }
+        },
         "api.DependencyEvalStatus": {
             "type": "object",
             "properties": {
@@ -20996,11 +21035,52 @@ const docTemplate = `{
                 }
             }
         },
+        "api.gitlabForeignRepo": {
+            "type": "object",
+            "properties": {
+                "found": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabFoundRef"
+                    }
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.gitlabFoundRef": {
+            "type": "object",
+            "properties": {
+                "container": {
+                    "type": "string"
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "host_name": {
+                    "type": "string"
+                },
+                "host_slug": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                }
+            }
+        },
         "api.gitlabInventory": {
             "type": "object",
             "properties": {
                 "base_url": {
                     "type": "string"
+                },
+                "foreign": {
+                    "description": "Foreign are remotes found in hosts' scans that point elsewhere.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabForeignRepo"
+                    }
                 },
                 "groups": {
                     "type": "array",
@@ -21018,7 +21098,7 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "unlisted": {
-                    "description": "Unlisted are repos attached in Bridge that the token does not list:\nmoved, renamed, or out of the token's reach (GitLab answers 404).",
+                    "description": "Unlisted are repos attached in Bridge, or found in hosts' scans, that\nthe token does not list: moved, renamed, or out of the token's reach.",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/api.gitlabInventoryRepo"
@@ -21069,6 +21149,13 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/api.gitlabRepoRef"
+                    }
+                },
+                "found": {
+                    "description": "Found: checkouts of this repo in hosts' latest scans (git remotes).\nThe scan also links each host (source 'scan'); those links show here,\nnot in Hosts.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.gitlabFoundRef"
                     }
                 },
                 "hosts": {
@@ -25549,6 +25636,10 @@ const docTemplate = `{
                 },
                 "kind": {
                     "description": "Kind is \"project\" (one repo) or \"group\" (every repo under it; hosts only).",
+                    "type": "string"
+                },
+                "source": {
+                    "description": "Source is \"manual\" (an admin attached it) or \"scan\" (the host scan\nfound the repo's remote; GitLabProjectID 0, keyed by path).",
                     "type": "string"
                 }
             }
