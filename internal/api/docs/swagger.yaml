@@ -1,5 +1,18 @@
 basePath: /
 definitions:
+  api.AutoresVarreduraStatus:
+    properties:
+      error:
+        type: string
+      finished_at:
+        type: string
+      result:
+        $ref: '#/definitions/service.ResumoVarredura'
+      running:
+        type: boolean
+      started_at:
+        type: string
+    type: object
   api.DependencyEvalStatus:
     properties:
       error:
@@ -1200,10 +1213,37 @@ definitions:
       gestor_projeto_id:
         type: integer
     type: object
+  api.gitlabForeignRepo:
+    properties:
+      found:
+        items:
+          $ref: '#/definitions/api.gitlabFoundRef'
+        type: array
+      url:
+        type: string
+    type: object
+  api.gitlabFoundRef:
+    properties:
+      container:
+        type: string
+      host_id:
+        type: integer
+      host_name:
+        type: string
+      host_slug:
+        type: string
+      path:
+        type: string
+    type: object
   api.gitlabInventory:
     properties:
       base_url:
         type: string
+      foreign:
+        description: Foreign are remotes found in hosts' scans that point elsewhere.
+        items:
+          $ref: '#/definitions/api.gitlabForeignRepo'
+        type: array
       groups:
         items:
           $ref: '#/definitions/api.gitlabInventoryGroup'
@@ -1216,8 +1256,8 @@ definitions:
         type: boolean
       unlisted:
         description: |-
-          Unlisted are repos attached in Bridge that the token does not list:
-          moved, renamed, or out of the token's reach (GitLab answers 404).
+          Unlisted are repos attached in Bridge, or found in hosts' scans, that
+          the token does not list: moved, renamed, or out of the token's reach.
         items:
           $ref: '#/definitions/api.gitlabInventoryRepo'
         type: array
@@ -1251,6 +1291,14 @@ definitions:
       dns:
         items:
           $ref: '#/definitions/api.gitlabRepoRef'
+        type: array
+      found:
+        description: |-
+          Found: checkouts of this repo in hosts' latest scans (git remotes).
+          The scan also links each host (source 'scan'); those links show here,
+          not in Hosts.
+        items:
+          $ref: '#/definitions/api.gitlabFoundRef'
         type: array
       hosts:
         items:
@@ -4277,6 +4325,10 @@ definitions:
         type: integer
       entity_name:
         type: string
+      entity_slug:
+        description: EntitySlug is the host's oficial_slug (its page URL); "" for
+          DNS.
+        type: string
       entity_type:
         type: string
       gitlab_base_url:
@@ -4290,6 +4342,11 @@ definitions:
       kind:
         description: Kind is "project" (one repo) or "group" (every repo under it;
           hosts only).
+        type: string
+      source:
+        description: |-
+          Source is "manual" (an admin attached it) or "scan" (the host scan
+          found the repo's remote; GitLabProjectID 0, keyed by path).
         type: string
     type: object
   models.GlpiDropdownCatalogue:
@@ -10306,14 +10363,31 @@ paths:
       tags:
       - gestor
   /api/gestor/autores/varrer:
-    post:
+    get:
+      description: Admin. Whether a scan is under way, and the result or error of
+        the last one (since the server started).
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/service.ResumoVarredura'
+            $ref: '#/definitions/api.AutoresVarreduraStatus'
+      summary: Status of the background GitLab-author scan
+      tags:
+      - gestor
+    post:
+      description: Admin. Answers 202 with the run's status at once; a scan already
+        under way is returned instead of starting another. Poll GET for the result.
+        E-mails asked about in the last 7 days without a match are skipped. 400 when
+        GitLab is not configured.
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/api.AutoresVarreduraStatus'
         "400":
           description: Bad Request
           schema:
@@ -10322,7 +10396,7 @@ paths:
           description: Bad Gateway
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
-      summary: Scan GitLab authors
+      summary: Scan GitLab authors (background)
       tags:
       - gestor
   /api/gestor/pessoas:
@@ -15639,9 +15713,11 @@ paths:
   /api/settings/gitlab/repos:
     get:
       description: Admin. Groups and repos visible to the GitLab service token, with
-        their Bridge attachments (projeto links, service repo fields, DNS/host links).
-        unlisted holds repos attached in Bridge that the token does not list. 400
-        when the integration is disabled or has no token.
+        their Bridge attachments (projeto links, service repo fields, DNS/host links)
+        and found (checkouts in hosts' latest scans). unlisted holds repos attached
+        in Bridge or found on hosts that the token does not list; foreign holds remotes
+        found on hosts that point at another host. 400 when the integration is disabled
+        or has no token.
       produces:
       - application/json
       responses:

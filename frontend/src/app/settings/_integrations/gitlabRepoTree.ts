@@ -1,6 +1,6 @@
 // Pure helpers for the GitLab repos tab: the group tree and its filters.
 // Runtime-import free so `node --test` can run gitlabRepoTree.test.ts.
-import type { GitLabInventoryGroup, GitLabInventoryRepo, GitLabRepoRef } from "../../../lib/types";
+import type { GitLabForeignRepo, GitLabFoundRef, GitLabInventoryGroup, GitLabInventoryRepo, GitLabRepoRef } from "../../../lib/types";
 
 export type RepoFilter = "all" | "linked" | "unlinked" | "projetos" | "services" | "dns" | "hosts";
 
@@ -40,22 +40,47 @@ export function inheritedByGroup(groups: GitLabInventoryGroup[]): Map<number, In
   return memo;
 }
 
+/** Checkouts found on hosts count as host attachments: the scan links each
+ *  of those hosts to the repo. */
 export function attachmentCount(r: GitLabInventoryRepo, inherited: InheritedRef[] = []): number {
-  return r.projetos.length + r.services.length + r.dns.length + r.hosts.length + inherited.length;
+  return r.projetos.length + r.services.length + r.dns.length + r.hosts.length + (r.found ?? []).length + inherited.length;
+}
+
+/** "host · container:path" — where a scan found a checkout; just "host" when
+ *  an earlier scan linked it and the latest one's search didn't run. */
+export function foundLabel(f: GitLabFoundRef): string {
+  return f.path ? `${f.host_name} · ${f.container ? `${f.container}:` : ""}${f.path}` : f.host_name;
 }
 
 /** Search matches the repo path or the name of anything it is attached to —
- *  links inherited from its groups included. */
+ *  links inherited from its groups and checkouts found on hosts included. */
 export function repoMatches(r: GitLabInventoryRepo, query: string, filter: RepoFilter, inherited: InheritedRef[] = []): boolean {
   const n = attachmentCount(r, inherited);
+  const found = r.found ?? [];
   if (filter === "linked" && n === 0) return false;
   if (filter === "unlinked" && n > 0) return false;
   if (filter !== "all" && filter !== "linked" && filter !== "unlinked" &&
-    r[filter].length + inherited.filter((i) => i.kind === filter).length === 0) return false;
+    r[filter].length + inherited.filter((i) => i.kind === filter).length + (filter === "hosts" ? found.length : 0) === 0) return false;
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [r.path_with_namespace, ...[r.projetos, r.services, r.dns, r.hosts].flat().map((x) => x.name), ...inherited.map((i) => i.ref.name)]
+  return [r.path_with_namespace, ...[r.projetos, r.services, r.dns, r.hosts].flat().map((x) => x.name), ...inherited.map((i) => i.ref.name), ...found.map(foundLabel)]
     .some((s) => s.toLowerCase().includes(q));
+}
+
+/** Repos the token doesn't list, split by why Bridge knows them: attached
+ *  here (a link or service field), or found in hosts' scans. A repo with
+ *  both is in each list. */
+export function splitUnlisted(unlisted: GitLabInventoryRepo[]): { attached: GitLabInventoryRepo[]; onHosts: GitLabInventoryRepo[] } {
+  return {
+    attached: unlisted.filter((r) => r.projetos.length + r.services.length + r.dns.length + r.hosts.length > 0),
+    onHosts: unlisted.filter((r) => (r.found ?? []).length > 0),
+  };
+}
+
+/** Search for the "outside this GitLab" list: the URL or where it was found. */
+export function foreignMatches(f: GitLabForeignRepo, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  return !q || [f.url, ...f.found.map(foundLabel)].some((s) => s.toLowerCase().includes(q));
 }
 
 /** Nests groups by parent_id and puts each kept repo under its namespace.
