@@ -18,6 +18,8 @@ import Modal from "@/components/ui/Modal";
 import AsyncPicker, { type AsyncPickerItem } from "@/components/ui/AsyncPicker";
 import StatusAlert from "@/components/ui/StatusAlert";
 import EmptyState from "@/components/ui/EmptyState";
+import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
+import { useExportCSV } from "@/hooks/useExportCSV";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import {
   attachmentCount, buildTree, foreignMatches, foundLabel, inheritedByGroup, repoMatches, repoTotal, splitUnlisted,
@@ -27,6 +29,12 @@ import {
 type Kind = "projetos" | "services" | "dns" | "hosts";
 const KINDS: Kind[] = ["projetos", "services", "dns", "hosts"];
 const FILTERS: RepoFilter[] = ["all", "linked", "unlinked", ...KINDS];
+
+// CSV of a "found on hosts" list: one row per place a scan found the repo.
+type FoundRow = { repo: string; host: string; container: string; path: string };
+const FOUND_CSV = (["repo", "host", "container", "path"] as const).map((key) => ({ key, header: key }));
+const foundRows = (items: { repo: string; found: GitLabFoundRef[] }[]): FoundRow[] =>
+  items.flatMap((i) => i.found.map((f) => ({ repo: i.repo, host: f.host_name, container: f.container ?? "", path: f.path })));
 
 // Search fetchers for the attach picker: the first 20 matches of each list.
 const FETCHERS: Record<Kind, (q: string) => Promise<AsyncPickerItem[]>> = {
@@ -68,6 +76,9 @@ export default function GitLabReposTab() {
   );
   const unlisted = splitUnlisted((inv?.unlisted ?? []).filter(keep));
   const foreign = (inv?.foreign ?? []).filter((f) => foreignMatches(f, query));
+  // Exports what the lists show: the search filters them too.
+  const exportFound = useExportCSV(foundRows(unlisted.onHosts.map((r) => ({ repo: r.path_with_namespace, found: r.found }))), FOUND_CSV, "gitlab_encontrados_nas_vms");
+  const exportForeign = useExportCSV(foundRows(foreign.map((f) => ({ repo: f.url, found: f.found }))), FOUND_CSV, "gitlab_fora_deste_gitlab");
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["gitlab-repos"] });
   const detach = useMutation({
@@ -208,7 +219,8 @@ export default function GitLabReposTab() {
       </SectionCard>
 
       {unlisted.onHosts.length > 0 && (
-        <SectionCard as="h3" title={t("settings.gitlabRepos.foundTitle")} description={t("settings.gitlabRepos.foundHint")}>
+        <SectionCard as="h3" title={t("settings.gitlabRepos.foundTitle")} description={t("settings.gitlabRepos.foundHint")}
+          controls={<ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportFound} />}>
           <ul className="divide-y divide-[var(--border-subtle)]">
             {unlisted.onHosts.map((r) => (
               <li key={r.path_with_namespace} className="flex flex-col gap-1.5 py-2 sm:flex-row sm:items-start sm:gap-3">
@@ -234,7 +246,8 @@ export default function GitLabReposTab() {
       )}
 
       {foreign.length > 0 && (
-        <SectionCard as="h3" title={t("settings.gitlabRepos.foreignTitle")} description={t("settings.gitlabRepos.foreignHint")}>
+        <SectionCard as="h3" title={t("settings.gitlabRepos.foreignTitle")} description={t("settings.gitlabRepos.foreignHint")}
+          controls={<ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportForeign} />}>
           <ul className="divide-y divide-[var(--border-subtle)]">
             {foreign.map((f) => (
               <li key={f.url} className="flex flex-col gap-1.5 py-2 sm:flex-row sm:items-start sm:gap-3">
