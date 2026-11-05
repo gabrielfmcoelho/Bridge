@@ -3,9 +3,11 @@ package api
 import (
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
+	gitlabclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/gitlab"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
@@ -45,16 +47,39 @@ type gitlabInventoryRepo struct {
 	Services          []gitlabRepoRef `json:"services"`
 	DNS               []gitlabRepoRef `json:"dns"`
 	Hosts             []gitlabRepoRef `json:"hosts"`
+	// Found: checkouts of this repo in hosts' latest scans (git remotes).
+	// The scan also links each host (source 'scan'); those links show here,
+	// not in Hosts.
+	Found []gitlabFoundRef `json:"found"`
+}
+
+// gitlabFoundRef is where a host's latest scan found a checkout: on the host
+// (Container "") or inside a container, at Path.
+type gitlabFoundRef struct {
+	HostID    int64  `json:"host_id"`
+	HostName  string `json:"host_name"`
+	HostSlug  string `json:"host_slug"`
+	Container string `json:"container,omitempty"`
+	Path      string `json:"path"`
+}
+
+// gitlabForeignRepo is a remote on another host than the configured GitLab
+// (github.com, another GitLab), as "host/path", with where it was found.
+type gitlabForeignRepo struct {
+	URL   string           `json:"url"`
+	Found []gitlabFoundRef `json:"found"`
 }
 
 type gitlabInventory struct {
 	BaseURL string                 `json:"base_url"`
 	Groups  []gitlabInventoryGroup `json:"groups"`
 	Repos   []gitlabInventoryRepo  `json:"repos"`
-	// Unlisted are repos attached in Bridge that the token does not list:
-	// moved, renamed, or out of the token's reach (GitLab answers 404).
-	Unlisted  []gitlabInventoryRepo `json:"unlisted"`
-	Truncated bool                  `json:"truncated"`
+	// Unlisted are repos attached in Bridge, or found in hosts' scans, that
+	// the token does not list: moved, renamed, or out of the token's reach.
+	Unlisted []gitlabInventoryRepo `json:"unlisted"`
+	// Foreign are remotes found in hosts' scans that point elsewhere.
+	Foreign   []gitlabForeignRepo `json:"foreign"`
+	Truncated bool                `json:"truncated"`
 }
 
 // sameGitLab compares two GitLab base URLs ignoring case and a trailing slash.
@@ -67,7 +92,7 @@ func sameGitLab(a, b string) bool {
 // attached to in Bridge.
 //
 //	@Summary		GitLab repo inventory
-//	@Description	Admin. Groups and repos visible to the GitLab service token, with their Bridge attachments (projeto links, service repo fields, DNS/host links). unlisted holds repos attached in Bridge that the token does not list. 400 when the integration is disabled or has no token.
+//	@Description	Admin. Groups and repos visible to the GitLab service token, with their Bridge attachments (projeto links, service repo fields, DNS/host links) and found (checkouts in hosts' latest scans). unlisted holds repos attached in Bridge or found on hosts that the token does not list; foreign holds remotes found on hosts that point at another host. 400 when the integration is disabled or has no token.
 //	@Tags			gitlab
 //	@Produce		json
 //	@Success		200	{object}	gitlabInventory
@@ -99,7 +124,7 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 	}
 
 	inv := gitlabInventory{BaseURL: settings.BaseURL, Truncated: gTrunc || pTrunc,
-		Groups: []gitlabInventoryGroup{}, Repos: []gitlabInventoryRepo{}, Unlisted: []gitlabInventoryRepo{}}
+		Groups: []gitlabInventoryGroup{}, Repos: []gitlabInventoryRepo{}, Unlisted: []gitlabInventoryRepo{}, Foreign: []gitlabForeignRepo{}}
 	groupAt := map[int]int{}
 	for _, g := range groups {
 		groupAt[g.ID] = len(inv.Groups)
@@ -112,7 +137,7 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 		repoByPath[strings.ToLower(p.PathWithNamespace)] = len(inv.Repos)
 		inv.Repos = append(inv.Repos, gitlabInventoryRepo{ID: p.ID, Name: p.Name, PathWithNamespace: p.PathWithNamespace,
 			NamespaceID: p.Namespace.ID, WebURL: p.WebURL, DefaultBranch: p.DefaultBranch,
-			Projetos: []gitlabRepoRef{}, Services: []gitlabRepoRef{}, DNS: []gitlabRepoRef{}, Hosts: []gitlabRepoRef{}})
+			Projetos: []gitlabRepoRef{}, Services: []gitlabRepoRef{}, DNS: []gitlabRepoRef{}, Hosts: []gitlabRepoRef{}, Found: []gitlabFoundRef{}})
 	}
 	// repoFor finds the listed repo, or the unlisted entry for path (created
 	// on first use).
@@ -132,7 +157,7 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 			name := path[strings.LastIndex(path, "/")+1:]
 			inv.Unlisted = append(inv.Unlisted, gitlabInventoryRepo{Name: name, PathWithNamespace: path,
 				WebURL:   strings.TrimRight(settings.BaseURL, "/") + "/" + path,
-				Projetos: []gitlabRepoRef{}, Services: []gitlabRepoRef{}, DNS: []gitlabRepoRef{}, Hosts: []gitlabRepoRef{}})
+				Projetos: []gitlabRepoRef{}, Services: []gitlabRepoRef{}, DNS: []gitlabRepoRef{}, Hosts: []gitlabRepoRef{}, Found: []gitlabFoundRef{}})
 		}
 		return &inv.Unlisted[i]
 	}
@@ -178,7 +203,7 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 	for _, s := range services {
 		seen := map[string]bool{}
 		for _, f := range [][2]string{{"repository_url", s.RepositoryURL}, {"gitlab_url", s.GitlabURL}, {"git_repository", s.GitRepository}} {
-			path, ok := gitlabRepoPath(f[1], settings.BaseURL)
+			path, ok := gitlabclient.RepoPath(f[1], settings.BaseURL)
 			if !ok || seen[strings.ToLower(path)] {
 				continue
 			}
@@ -194,8 +219,14 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 		jsonServerError(w, r, "failed to list repo links", err)
 		return
 	}
+	var scanLinks []models.GitLabRepoLink
 	for _, l := range direct {
 		if !sameGitLab(l.GitLabBaseURL, settings.BaseURL) {
+			continue
+		}
+		// Scan links show as the found refs below, with where.
+		if l.Source == models.GitLabLinkSourceScan {
+			scanLinks = append(scanLinks, l)
 			continue
 		}
 		ref := gitlabRepoRef{LinkID: l.ID, ID: l.EntityID, Name: l.EntityName}
@@ -212,6 +243,56 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 			rp.Hosts = append(rp.Hosts, ref)
 		}
 	}
+
+	// Git remotes in hosts' latest scans: this GitLab's go on their repo
+	// (unlisted when the token doesn't list it), the rest to foreign by
+	// host/path, so every spelling of one URL is one row. A local-path
+	// remote names no server and is skipped. Once per checkout per repo.
+	remotes, err := store.NewHostScanRepo(h.db.SQL).LatestGitRemotes(ctx)
+	if err != nil {
+		jsonServerError(w, r, "failed to read scanned git remotes", err)
+		return
+	}
+	foreignAt := map[string]int{}
+	seen := map[string]bool{}
+	for _, g := range remotes {
+		ref := gitlabFoundRef{HostID: g.HostID, HostName: g.HostName, HostSlug: g.HostSlug, Container: g.Container, Path: g.Path}
+		var found *[]gitlabFoundRef
+		key := ""
+		if path, ok := gitlabclient.RepoPath(g.URL, settings.BaseURL); ok {
+			key = "gl:" + strings.ToLower(path)
+			found = &repoFor(0, path).Found
+		} else if host, path, ok := gitlabclient.RemoteHostPath(g.URL); ok {
+			remote := host + "/" + path
+			key = "fx:" + strings.ToLower(remote)
+			i, ok := foreignAt[key]
+			if !ok {
+				i = len(inv.Foreign)
+				foreignAt[key] = i
+				inv.Foreign = append(inv.Foreign, gitlabForeignRepo{URL: remote, Found: []gitlabFoundRef{}})
+			}
+			found = &inv.Foreign[i].Found
+		} else {
+			continue
+		}
+		host := key + "\x00" + strconv.FormatInt(g.HostID, 10)
+		seen[host] = true
+		if k := host + "\x00" + g.Container + "\x00" + g.Path; !seen[k] {
+			seen[k] = true
+			*found = append(*found, ref)
+		}
+	}
+	// A scan link the latest scan doesn't account for — its git search didn't
+	// run or was cut short, so the link was kept — still shows, as the host
+	// without a path: Settings and the fix plan see the same links.
+	for _, l := range scanLinks {
+		if host := "gl:" + strings.ToLower(l.GitLabPath) + "\x00" + strconv.FormatInt(l.EntityID, 10); !seen[host] {
+			seen[host] = true
+			rp := repoFor(0, l.GitLabPath)
+			rp.Found = append(rp.Found, gitlabFoundRef{HostID: l.EntityID, HostName: l.EntityName, HostSlug: l.EntitySlug})
+		}
+	}
+	sort.Slice(inv.Foreign, func(i, j int) bool { return inv.Foreign[i].URL < inv.Foreign[j].URL })
 	sort.Slice(inv.Unlisted, func(i, j int) bool { return inv.Unlisted[i].PathWithNamespace < inv.Unlisted[j].PathWithNamespace })
 	jsonOK(w, inv)
 }
