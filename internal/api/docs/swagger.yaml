@@ -2170,7 +2170,7 @@ definitions:
   api.keyManagementRequest:
     properties:
       admin_base_url:
-        example: http://10.0.122.91:8000
+        example: http://10.99.0.91:8000
         type: string
       key_management:
         example: keycloak

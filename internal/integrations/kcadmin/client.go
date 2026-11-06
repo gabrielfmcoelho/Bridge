@@ -34,7 +34,7 @@ const RateLimitClaim = "rate_limit_per_minute"
 
 // Config is the keycloak_apis integration settings group.
 type Config struct {
-	BaseURL      string // public root, e.g. http://keycloak.10.0.122.89.sslip.io (the issuer's host)
+	BaseURL      string // public root, e.g. http://keycloak.10.99.0.89.sslip.io (the issuer's host)
 	InternalURL  string // where Bridge reaches Keycloak; "" = BaseURL
 	HostHeader   string // Host sent to InternalURL; "" sends the URL's own
 	Realm        string

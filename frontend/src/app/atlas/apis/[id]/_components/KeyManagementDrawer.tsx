@@ -87,7 +87,7 @@ export default function KeyManagementDrawer({ api, open, onClose }: { api: ApiCa
                 hint={t("atlas.apis.keys.adminBaseUrlHint")}
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="http://10.0.122.91:8000"
+                placeholder="http://10.99.0.91:8000"
                 required
               />
             )}

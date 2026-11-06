@@ -18,7 +18,7 @@ import (
 )
 
 func TestUnsupportedVersions(t *testing.T) {
-	evidence := "Containers: metabase (metabase/metabase:v0.46.1) · Ubuntu 22.04 · host 10.0.122.40"
+	evidence := "Containers: metabase (metabase/metabase:v0.46.1) · Ubuntu 22.04 · host 10.99.0.40"
 	plan := "Imagem v0.46.1 em uso. Atualize para 0.49.3 (geralmente 0.46.2 ou superior); repita 0.49.3. Ubuntu 22.04."
 	if got := strings.Join(unsupportedVersions(plan, evidence), ","); got != "0.49.3,0.46.2" {
 		t.Fatalf("unsupported = %q, want the two invented versions once each", got)

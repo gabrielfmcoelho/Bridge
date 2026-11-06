@@ -36,7 +36,7 @@ const TEMPLATES: OfferingTemplate[] = [
 ];
 
 const HITS: CatalogHit[] = [
-  { kind: "asset", asset_type: "host", id: 1, name: "vm-postgres-02", description: "PostgreSQL de homologação", detail: "vm-postgres-02.sead.pi.gov.br", href: "#catalog", entidade_name: "SGA" },
+  { kind: "asset", asset_type: "host", id: 1, name: "vm-postgres-02", description: "PostgreSQL de homologação", detail: "vm-postgres-02.exemplo.internal", href: "#catalog", entidade_name: "SGA" },
   { kind: "asset", asset_type: "service", id: 2, name: "api-gateway", description: "Edge proxy", detail: "nginx · :8080", href: "#catalog", entidade_name: "SGA" },
   { kind: "asset", asset_type: "dns", id: 3, name: "portal.pi.gov.br", description: "Portal do Servidor", detail: "A · 10.0.0.4", href: "#catalog", entidade_name: "SEAD" },
 ];

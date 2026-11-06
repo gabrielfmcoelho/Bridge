@@ -64,3 +64,6 @@ Thumbs.db
 
 # Playwright MCP screenshots / console logs
 .playwright-mcp/
+
+# Binário gerado por go build ./cmd/seed-maintenance-user
+/seed-maintenance-user

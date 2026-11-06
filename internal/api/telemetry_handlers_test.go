@@ -227,7 +227,7 @@ func TestRedactSpan(t *testing.T) {
 
 func TestCleanDomain(t *testing.T) {
 	for in, want := range map[string]string{
-		"Bridge.10.0.122.91.sslip.io":    "bridge.10.0.122.91.sslip.io",
+		"Bridge.10.99.0.91.sslip.io":    "bridge.10.99.0.91.sslip.io",
 		"https://App.Example:8443/x?y=1": "app.example",
 		" gateway.sead.pi.gov.br ":       "gateway.sead.pi.gov.br",
 		"a,b.example":                    "",
@@ -242,8 +242,8 @@ func TestCleanDomain(t *testing.T) {
 func TestIsCollectorDomain(t *testing.T) {
 	for d, want := range map[string]bool{
 		"otel-collector-m0cwcowwg0gsk8kscggwc4w0": true,
-		"otelcollectorhttp.10.0.122.91.sslip.io":  true,
-		"api-bridge.10.0.122.91.sslip.io":         false,
+		"otelcollectorhttp.10.99.0.91.sslip.io":  true,
+		"api-bridge.10.99.0.91.sslip.io":         false,
 		"gerenciador.sead.pi.gov.br":              false,
 	} {
 		if got := isCollectorDomain(d); got != want {

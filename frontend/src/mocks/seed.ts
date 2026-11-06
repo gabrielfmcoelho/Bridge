@@ -74,15 +74,15 @@ function users(): User[] {
   return [
     // Two memberships on purpose: exercises the requester step's entity picker
     // and the "above sees all that below sees" union in toActor().
-    mk(1, "Marcos Vinícius Rêgo Sousa", "marcos.sousa", "editor", SGA, "SGA", "sga", [SGI, "SGI", "sgi"]),
-    mk(2, "Francisca das Chagas Lima Ferraz", "francisca.ferraz", "viewer", SGP, "SGP", "sgp"),
-    mk(3, "Antônio Carlos Bezerra Melo", "antonio.melo", "editor", ETIPI, "ETIPI", "etipi"),
-    mk(4, "Raimunda Nonata Ferreira Castro", "raimunda.castro", "editor", GOVPI, "GovPI", "govpi"),
-    mk(5, "José Ribamar Coelho Aguiar", "jose.aguiar", "viewer", SGA, "SGA", "sga"),
-    mk(6, "Luciana Maria Pereira Rocha", "luciana.rocha", "editor", TRIN, "Trin", "trin"),
-    mk(7, "Paulo Sérgio Nunes Cavalcante", "paulo.cavalcante", "editor", NTGD, "NTGD", "ntgd"),
-    mk(8, "Socorro Helena Dias Brito", "socorro.brito", "editor", SGI, "SGI", "sgi"),
-    mk(9, "Wellington Régis Carvalho Nunes", "wellington.nunes", "admin", GOVPI, "GovPI", "govpi"),
+    mk(1, "Ana Clara Exemplo", "ana.exemplo", "editor", SGA, "SGA", "sga", [SGI, "SGI", "sgi"]),
+    mk(2, "Bruno Exemplo Lima", "bruno.exemplo", "viewer", SGP, "SGP", "sgp"),
+    mk(3, "Carla Exemplo Souza", "carla.exemplo", "editor", ETIPI, "ETIPI", "etipi"),
+    mk(4, "Davi Exemplo Rocha", "davi.exemplo", "editor", GOVPI, "GovPI", "govpi"),
+    mk(5, "Elisa Exemplo Moraes", "elisa.exemplo", "viewer", SGA, "SGA", "sga"),
+    mk(6, "Fábio Exemplo Nunes", "fabio.exemplo", "editor", TRIN, "Trin", "trin"),
+    mk(7, "Gabriela Exemplo Dias", "gabriela.exemplo", "editor", NTGD, "NTGD", "ntgd"),
+    mk(8, "Heitor Exemplo Castro", "heitor.exemplo", "editor", SGI, "SGI", "sgi"),
+    mk(9, "Iara Exemplo Ferraz", "iara.exemplo", "admin", GOVPI, "GovPI", "govpi"),
   ];
 }
 
@@ -117,8 +117,8 @@ function mkHost(o: Partial<Host> & Pick<Host, "id" | "nickname" | "oficial_slug"
     proxy_jump: "",
     forward_agent: "no",
     setor_responsavel: "ETIPI",
-    responsavel_interno: "Antônio Carlos Bezerra Melo",
-    contato_responsavel_interno: "antonio.melo@sead.pi.gov.br",
+    responsavel_interno: "Carla Exemplo Souza",
+    contato_responsavel_interno: "carla.exemplo@sead.pi.gov.br",
     acesso_empresa_externa: false,
     empresa_responsavel: "",
     responsavel_externo: "",
@@ -140,35 +140,35 @@ function hosts(): Host[] {
   return [
     mkHost({
       id: 1, nickname: "vm-postgres-02", oficial_slug: "vm-postgres-02",
-      hostname: "vm-postgres-02.sead.pi.gov.br",
+      hostname: "vm-postgres-02.exemplo.internal",
       description: "Servidor dedicado ao PostgreSQL de homologação.",
     }),
     mkHost({
       id: 2, nickname: "srv-sga-web01", oficial_slug: "srv-sga-web01",
-      hostname: "srv-sga-web01.sead.pi.gov.br",
+      hostname: "srv-sga-web01.exemplo.internal",
       description: "Servidor web do Portal do Servidor Estadual (produção).",
-      setor_responsavel: "SGA", responsavel_interno: "Marcos Vinícius Rêgo Sousa",
-      contato_responsavel_interno: "marcos.sousa@sead.pi.gov.br",
+      setor_responsavel: "SGA", responsavel_interno: "Ana Clara Exemplo",
+      contato_responsavel_interno: "ana.exemplo@sead.pi.gov.br",
     }),
     mkHost({
       id: 3, nickname: "vm-etipi-mon01", oficial_slug: "vm-etipi-mon01",
-      hostname: "mon01.etipi.pi.gov.br",
+      hostname: "mon01.exemplo.internal",
       description: "Servidor de monitoramento Grafana/Prometheus da ETIPI.",
     }),
     mkHost({
       id: 4, nickname: "srv-ntgd-backup01", oficial_slug: "srv-ntgd-backup01",
-      hostname: "backup01.ntgd.pi.gov.br",
+      hostname: "backup01.exemplo.internal",
       description: "Servidor de backups incrementais do NTGD.",
-      setor_responsavel: "NTGD", responsavel_interno: "Paulo Sérgio Nunes Cavalcante",
-      contato_responsavel_interno: "paulo.cavalcante@sead.pi.gov.br",
+      setor_responsavel: "NTGD", responsavel_interno: "Gabriela Exemplo Dias",
+      contato_responsavel_interno: "gabriela.exemplo@sead.pi.gov.br",
       situacao: "maintenance", precisa_manutencao: true,
     }),
     mkHost({
       id: 5, nickname: "vm-sgi-chamados01", oficial_slug: "vm-sgi-chamados01",
-      hostname: "chamados01.sgi.pi.gov.br",
+      hostname: "chamados01.exemplo.internal",
       description: "Hospeda a API e o worker do sistema de chamados da SGI.",
-      setor_responsavel: "SGI", responsavel_interno: "Socorro Helena Dias Brito",
-      contato_responsavel_interno: "socorro.brito@sead.pi.gov.br",
+      setor_responsavel: "SGI", responsavel_interno: "Heitor Exemplo Castro",
+      contato_responsavel_interno: "heitor.exemplo@sead.pi.gov.br",
     }),
   ];
 }
@@ -272,10 +272,10 @@ function dns(): DNSRecord[] {
     created_at: "2025-10-01T09:00:00Z", updated_at: "2026-05-01T09:00:00Z",
   });
   return [
-    mk(1, "portal.sead.pi.gov.br", true, "active", "Antônio Carlos Bezerra Melo"),
-    mk(2, "chamados.sead.pi.gov.br", true, "active", "Socorro Helena Dias Brito"),
-    mk(3, "sso.pi.gov.br", true, "active", "Antônio Carlos Bezerra Melo"),
-    mk(4, "homolog.sead.pi.gov.br", false, "maintenance", "Paulo Sérgio Nunes Cavalcante"),
+    mk(1, "portal.sead.pi.gov.br", true, "active", "Carla Exemplo Souza"),
+    mk(2, "chamados.sead.pi.gov.br", true, "active", "Heitor Exemplo Castro"),
+    mk(3, "sso.pi.gov.br", true, "active", "Carla Exemplo Souza"),
+    mk(4, "homolog.sead.pi.gov.br", false, "maintenance", "Gabriela Exemplo Dias"),
   ];
 }
 
@@ -288,9 +288,9 @@ function projects(): Project[] {
     created_at: "2025-09-20T09:00:00Z", updated_at: "2026-05-01T09:00:00Z",
   });
   return [
-    mk(1, "Portal do Servidor Estadual", "Portal unificado de serviços para servidores públicos do Piauí.", "SGA", "Marcos Vinícius Rêgo Sousa"),
-    mk(2, "Modernização do Sistema de Chamados", "Reescrita do sistema de chamados técnicos da SGI.", "SGI", "Socorro Helena Dias Brito"),
-    mk(3, "Migração de Infraestrutura para Contêineres", "Migração gradual dos serviços legados da ETIPI para orquestração em contêineres.", "ETIPI", "Antônio Carlos Bezerra Melo"),
+    mk(1, "Portal do Servidor Estadual", "Portal unificado de serviços para servidores públicos do Piauí.", "SGA", "Ana Clara Exemplo"),
+    mk(2, "Modernização do Sistema de Chamados", "Reescrita do sistema de chamados técnicos da SGI.", "SGI", "Heitor Exemplo Castro"),
+    mk(3, "Migração de Infraestrutura para Contêineres", "Migração gradual dos serviços legados da ETIPI para orquestração em contêineres.", "ETIPI", "Carla Exemplo Souza"),
   ];
 }
 
@@ -337,7 +337,7 @@ function tools(): ExternalTool[] {
   return [
     {
       id: 1, name: "Grafana ETIPI", description: "Dashboards de observabilidade da infraestrutura da ETIPI.",
-      url: "https://mon01.etipi.pi.gov.br/grafana", icon: "chart-bar", embed_enabled: true, sort_order: 1,
+      url: "https://mon01.exemplo.internal/grafana", icon: "chart-bar", embed_enabled: true, sort_order: 1,
       service_id: null, dns_id: null, source: "manual", has_credentials: false,
       created_at: "2025-12-05T09:00:00Z", updated_at: "2026-03-01T09:00:00Z",
     },
@@ -631,7 +631,7 @@ function requests(offeringList: Offering[]): ServiceRequest[] {
       created_at: "2026-05-11T14:00:00Z", updated_at: "2026-05-13T11:00:00Z",
     }),
     R({
-      id: 4, offering_id: 4, title: "Vincular novo serviço de cache ao host mon01.etipi",
+      id: 4, offering_id: 4, title: "Vincular novo serviço de cache ao host mon01.exemplo",
       status: "in_progress", priority: "low", requester_user_id: 3, requester_entidade_id: ETIPI,
       form_data: { host_alvo: 3, porta: "6380" },
       assignee_user_id: 3, decided_by_user_id: 3, decided_at: "2026-06-03T09:00:00Z",
@@ -953,13 +953,13 @@ function shares(): Pick<Seed, "contacts" | "shareBundles" | "shareAccessLog"> {
   const contact = (id: number, name: string, entity: string): Contact => ({
     id, name, phone: "", role: "", entity, notes: "", is_external: true,
   });
-  const base = { description: "", max_views: null, view_count: 0, created_by: 1, created_by_name: "Marcos Vinícius Rêgo Sousa", revoked_at: null, deleted_at: null, recipient_label: "" };
+  const base = { description: "", max_views: null, view_count: 0, created_by: 1, created_by_name: "Ana Clara Exemplo", revoked_at: null, deleted_at: null, recipient_label: "" };
   return {
-    contacts: [contact(1, "Paulo Maneco", "PGE"), contact(2, "Linara Moura", "Vobys")],
+    contacts: [contact(1, "João Exemplo", "PGE"), contact(2, "Lia Exemplo", "Vobys")],
     shareBundles: [
       {
         ...base, id: 1, title: "PGE — Servidores e SEI", created_at: "2026-09-20T10:00:00Z", expires_at: "2026-11-01T00:00:00Z",
-        has_passphrase: true, recoverable: true, recipient_contact_id: 1, recipient_name: "Paulo Maneco", recipient_label: "PGE",
+        has_passphrase: true, recoverable: true, recipient_contact_id: 1, recipient_name: "João Exemplo", recipient_label: "PGE",
         view_count: 3, last_access_at: "2026-09-28T14:12:00Z",
         items: [
           { type: "api_doc", ref_id: 1, label: "API Servidores" },
@@ -977,7 +977,7 @@ function shares(): Pick<Seed, "contacts" | "shareBundles" | "shareAccessLog"> {
       {
         ...base, id: 3, title: "Vobys", created_at: "2026-05-10T09:00:00Z", expires_at: "2026-06-10T09:00:00Z",
         has_passphrase: true, recoverable: true, revoked_at: "2026-06-01T09:00:00Z",
-        recipient_contact_id: 2, recipient_name: "Linara Moura",
+        recipient_contact_id: 2, recipient_name: "Lia Exemplo",
         items: [{ type: "wiki_collection", ref_id: 0, ref_key: "c-1", label: "Integrações" }],
         token: "mock-token-vobys", passphrase: "vobys",
       },

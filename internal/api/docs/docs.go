@@ -22453,7 +22453,7 @@ const docTemplate = `{
             "properties": {
                 "admin_base_url": {
                     "type": "string",
-                    "example": "http://10.0.122.91:8000"
+                    "example": "http://10.99.0.91:8000"
                 },
                 "key_management": {
                     "type": "string",
