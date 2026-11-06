@@ -82,7 +82,7 @@ func TestHostScanRepoLatestGitRemotes(t *testing.T) {
 	d := openDB(t)
 	host := func(name string) int64 {
 		var id int64
-		if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES (?, ?) RETURNING id`, name, name+"-slug").Scan(&id); err != nil {
+		if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug, hostname) VALUES (?, ?, ?) RETURNING id`, name, name+"-slug", name+".example").Scan(&id); err != nil {
 			t.Fatal(err)
 		}
 		return id
@@ -95,8 +95,8 @@ func TestHostScanRepoLatestGitRemotes(t *testing.T) {
 	}
 	live, gone, broken, never := host("live"), host("gone"), host("broken"), host("never")
 	scan(live, `{"git_remotes":[{"path":"/old","name":"origin","url":"https://gl.example/g/old.git"}]}`, "2026-01-01")
-	scan(live, `{"git_remotes":[{"path":"/opt/app","name":"origin","url":"https://gl.example/g/app.git"},`+
-		`{"container":"api","container_image":"api:1","path":"/app","name":"origin","url":"https://github.com/o/api"}]}`, "2026-01-02")
+	scan(live, `{"git_remotes":[{"path":"/opt/app","name":"origin","url":"https://gl.example/g/app.git","commit":"0123456789abcdef0123456789abcdef01234567","branch":"main","pulled_at":1700001000,"pull_kind":"pull"},`+
+		`{"container":"api","container_image":"api:1","path":"/app","name":"origin","url":"https://github.com/o/api","pulled_at":"soon"}]}`, "2026-01-02")
 	scan(gone, `{"git_remotes":[{"path":"/x","name":"origin","url":"https://gl.example/g/x.git"}]}`, "2026-01-02")
 	if _, err := d.SQL.Exec(`UPDATE hosts SET deleted_at = NOW() WHERE id = ?`, gone); err != nil {
 		t.Fatal(err)
@@ -110,8 +110,8 @@ func TestHostScanRepoLatestGitRemotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []models.HostGitRemote{
-		{HostID: live, HostName: "live", HostSlug: "live-slug", Path: "/opt/app", Name: "origin", URL: "https://gl.example/g/app.git"},
-		{HostID: live, HostName: "live", HostSlug: "live-slug", Container: "api", ContainerImage: "api:1", Path: "/app", Name: "origin", URL: "https://github.com/o/api"},
+		{HostID: live, HostName: "live", HostSlug: "live-slug", HostAddress: "live.example", Path: "/opt/app", Name: "origin", URL: "https://gl.example/g/app.git", Commit: "0123456789abcdef0123456789abcdef01234567", Branch: "main", PulledAt: 1700001000, PullKind: "pull"},
+		{HostID: live, HostName: "live", HostSlug: "live-slug", HostAddress: "live.example", Container: "api", ContainerImage: "api:1", Path: "/app", Name: "origin", URL: "https://github.com/o/api"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("LatestGitRemotes = %+v, want %+v", got, want)

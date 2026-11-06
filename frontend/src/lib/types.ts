@@ -1609,8 +1609,15 @@ export interface GitLabFoundRef {
   host_id: number;
   host_name: string;
   host_slug: string;
+  /** The host's hostname: its IP or name. */
+  host_address: string;
   container?: string;
   path: string;
+  /** HEAD of the checkout, its branch, and when it last came from the remote (unix). */
+  commit?: string;
+  branch?: string;
+  pulled_at?: number;
+  pull_kind?: "clone" | "pull" | "fetch";
 }
 
 /** A remote found on hosts that points outside the configured GitLab, as "host/path". */

@@ -1,15 +1,18 @@
 "use client";
 
 import SectionCard from "@/components/ui/SectionCard";
+import { useLocale } from "@/contexts/LocaleContext";
 import type { GitRemote, VMInfoType } from "@/lib/api";
-import { Row, Rows, SubBlock, type T } from "./shared";
+import { Detail, Row, Rows, SubBlock, type T } from "./shared";
 
 /**
  * Git checkouts the scan found on the host and in its containers, each remote
  * on a row (credentials are cut on the VM). Remotes on the configured GitLab
- * link this host to their repo (Settings › Repositórios GitLab).
+ * link this host to their repo (Settings › Repositórios GitLab). A row opens to
+ * the checkout's commit, branch and last clone / pull / fetch.
  */
 export default function ScanGitRemotes({ info, t }: { info: VMInfoType; t: T }) {
+  const { formatDateTime } = useLocale();
   const remotes = info.git_remotes;
   const empty = remotes == null ? t("scan.git.notRun")
     : remotes.length === 0 ? t(info.git_remotes_partial ? "scan.git.partial" : "scan.pane.empty.git")
@@ -28,8 +31,17 @@ export default function ScanGitRemotes({ info, t }: { info: VMInfoType; t: T }) 
               <Row key={i} summary={<>
                 <span className="min-w-0 truncate font-mono text-[var(--text-primary)]" title={r.path}>{r.path}</span>
                 <span className="shrink-0 text-[var(--text-muted)]">{r.name}</span>
+                {r.commit && <span className="shrink-0 font-mono text-[var(--text-muted)]" title={r.commit}>{r.commit.slice(0, 8)}</span>}
                 <span className="ml-auto min-w-0 truncate font-mono text-[var(--text-secondary)]" title={r.url}>{r.url}</span>
-              </>} />
+              </>}>
+                {(r.commit || r.pulled_at) ? <>
+                  {r.branch && <Detail label={t("scan.git.branch")}>{r.branch}</Detail>}
+                  {r.commit && <Detail label={t("scan.git.commit")}>{r.commit}</Detail>}
+                  {r.pulled_at && r.pull_kind && (
+                    <Detail label={t(`scan.git.kind.${r.pull_kind}`)} mono={false}>{formatDateTime(new Date(r.pulled_at * 1000))}</Detail>
+                  )}
+                </> : undefined}
+              </Row>
             ))}
           </Rows>
         </SubBlock>

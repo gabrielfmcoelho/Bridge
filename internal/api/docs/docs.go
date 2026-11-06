@@ -21052,7 +21052,18 @@ const docTemplate = `{
         "api.gitlabFoundRef": {
             "type": "object",
             "properties": {
+                "branch": {
+                    "type": "string"
+                },
+                "commit": {
+                    "description": "The checkout's HEAD and when it last came from the remote (unix; kind clone, pull or fetch).",
+                    "type": "string"
+                },
                 "container": {
+                    "type": "string"
+                },
+                "host_address": {
+                    "description": "hosts.hostname: IP or name",
                     "type": "string"
                 },
                 "host_id": {
@@ -21066,6 +21077,12 @@ const docTemplate = `{
                 },
                 "path": {
                     "type": "string"
+                },
+                "pull_kind": {
+                    "type": "string"
+                },
+                "pulled_at": {
+                    "type": "integer"
                 }
             }
         },
@@ -25611,6 +25628,10 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
+                    "type": "string"
+                },
+                "entity_address": {
+                    "description": "EntityAddress is the host's hostname (IP or name); \"\" for DNS.",
                     "type": "string"
                 },
                 "entity_id": {

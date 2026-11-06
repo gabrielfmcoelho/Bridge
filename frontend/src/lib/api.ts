@@ -217,6 +217,12 @@ export type GitRemote = {
   path: string;
   name: string;
   url: string;
+  /** HEAD of the checkout (40 or 64 hex) and its branch (absent when detached). */
+  commit?: string;
+  branch?: string;
+  /** Unix seconds of the last clone, pull or fetch, and which one. */
+  pulled_at?: number;
+  pull_kind?: "clone" | "pull" | "fetch";
 };
 
 /** What the scan's web-server step did to DNS records (POST /api/ssh/test). */
