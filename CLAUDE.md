@@ -187,7 +187,12 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   `sudo -n` shell when that needs no password) and in every running container
   (cap 30). Of each `.git/config` only section headers (all but
   `[remote "…"]` blanked, case-insensitive like git) and `url =` lines leave
-  the VM, `user:password@` cut on both sides; Go keeps only remote urls. Each
+  the VM, `user:password@` cut on both sides; Go keeps only remote urls.
+  Per checkout it also reads HEAD from the files (`commit`, `branch`; a ref
+  only under `refs/heads` with no `..`, since the walk may run as root) and
+  `pulled_at`/`pull_kind`: the reflog's last clone/pull, or `FETCH_HEAD`'s
+  mtime when a fetch came later. Only hash, branch, time and kind leave the
+  VM, never a reflog line (author, clone URL). Each
   container frame ends with its `docker exec` status (`@@exit N`, taken off
   by `splitCtrFrames`): a walk that never started counts as done only for
   126/127 (no shell in the image). It must stay well inside the browser's
@@ -207,7 +212,9 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   after every curated source, so they never crowd out a chosen repo.
   Settings › Repositórios GitLab (`GET /api/settings/gitlab/repos`) reads
   every live host's latest scan (`HostScanRepo.LatestGitRemotes`): `found`
-  on each repo (scan links show
+  on each repo (host, its `hostname` as `host_address`, path, commit, last
+  pull; the "found on VMs" and "outside this GitLab" lists export it as CSV;
+  scan links show
   there, not as host refs; one the latest scan couldn't check shows as the
   host with no path), found repos the token doesn't list in `unlisted`, and
   remotes on other servers in `foreign`, grouped by `gitlab.RemoteHostPath`.

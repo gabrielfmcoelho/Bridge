@@ -31,10 +31,12 @@ const KINDS: Kind[] = ["projetos", "services", "dns", "hosts"];
 const FILTERS: RepoFilter[] = ["all", "linked", "unlinked", ...KINDS];
 
 // CSV of a "found on hosts" list: one row per place a scan found the repo.
-type FoundRow = { repo: string; host: string; container: string; path: string };
-const FOUND_CSV = (["repo", "host", "container", "path"] as const).map((key) => ({ key, header: key }));
-const foundRows = (items: { repo: string; found: GitLabFoundRef[] }[]): FoundRow[] =>
-  items.flatMap((i) => i.found.map((f) => ({ repo: i.repo, host: f.host_name, container: f.container ?? "", path: f.path })));
+const FOUND_CSV = (["repo", "host", "ip", "container", "path", "commit", "branch", "pulled_at", "pull_kind"] as const).map((key) => ({ key, header: key }));
+const foundRows = (items: { repo: string; found: GitLabFoundRef[] }[]) =>
+  items.flatMap((i) => i.found.map((f) => ({
+    repo: i.repo, host: f.host_name, ip: f.host_address, container: f.container ?? "", path: f.path,
+    commit: f.commit ?? "", branch: f.branch ?? "", pulled_at: f.pulled_at ? new Date(f.pulled_at * 1000).toISOString() : "", pull_kind: f.pull_kind ?? "",
+  })));
 
 // Search fetchers for the attach picker: the first 20 matches of each list.
 const FETCHERS: Record<Kind, (q: string) => Promise<AsyncPickerItem[]>> = {

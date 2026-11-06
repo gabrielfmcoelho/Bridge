@@ -56,11 +56,17 @@ type gitlabInventoryRepo struct {
 // gitlabFoundRef is where a host's latest scan found a checkout: on the host
 // (Container "") or inside a container, at Path.
 type gitlabFoundRef struct {
-	HostID    int64  `json:"host_id"`
-	HostName  string `json:"host_name"`
-	HostSlug  string `json:"host_slug"`
-	Container string `json:"container,omitempty"`
-	Path      string `json:"path"`
+	HostID      int64  `json:"host_id"`
+	HostName    string `json:"host_name"`
+	HostSlug    string `json:"host_slug"`
+	HostAddress string `json:"host_address"` // hosts.hostname: IP or name
+	Container   string `json:"container,omitempty"`
+	Path        string `json:"path"`
+	// The checkout's HEAD and when it last came from the remote (unix; kind clone, pull or fetch).
+	Commit   string `json:"commit,omitempty"`
+	Branch   string `json:"branch,omitempty"`
+	PulledAt int64  `json:"pulled_at,omitempty"`
+	PullKind string `json:"pull_kind,omitempty"`
 }
 
 // gitlabForeignRepo is a remote on another host than the configured GitLab
@@ -256,7 +262,8 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 	foreignAt := map[string]int{}
 	seen := map[string]bool{}
 	for _, g := range remotes {
-		ref := gitlabFoundRef{HostID: g.HostID, HostName: g.HostName, HostSlug: g.HostSlug, Container: g.Container, Path: g.Path}
+		ref := gitlabFoundRef{HostID: g.HostID, HostName: g.HostName, HostSlug: g.HostSlug, HostAddress: g.HostAddress, Container: g.Container, Path: g.Path,
+			Commit: g.Commit, Branch: g.Branch, PulledAt: g.PulledAt, PullKind: g.PullKind}
 		var found *[]gitlabFoundRef
 		key := ""
 		if path, ok := gitlabclient.RepoPath(g.URL, settings.BaseURL); ok {
@@ -289,7 +296,7 @@ func (h *projectGitLabHandlers) handleRepoInventory(w http.ResponseWriter, r *ht
 		if host := "gl:" + strings.ToLower(l.GitLabPath) + "\x00" + strconv.FormatInt(l.EntityID, 10); !seen[host] {
 			seen[host] = true
 			rp := repoFor(0, l.GitLabPath)
-			rp.Found = append(rp.Found, gitlabFoundRef{HostID: l.EntityID, HostName: l.EntityName, HostSlug: l.EntitySlug})
+			rp.Found = append(rp.Found, gitlabFoundRef{HostID: l.EntityID, HostName: l.EntityName, HostSlug: l.EntitySlug, HostAddress: l.EntityAddress})
 		}
 	}
 	sort.Slice(inv.Foreign, func(i, j int) bool { return inv.Foreign[i].URL < inv.Foreign[j].URL })

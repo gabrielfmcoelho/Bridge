@@ -235,11 +235,11 @@ func TestGitLabRepoInventoryFoundOnHosts(t *testing.T) {
 	}
 
 	var hostID int64
-	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('vm-git', 'vm-git-slug') RETURNING id`).Scan(&hostID); err != nil {
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug, hostname) VALUES ('vm-git', 'vm-git-slug', '10.0.0.5') RETURNING id`).Scan(&hostID); err != nil {
 		t.Fatal(err)
 	}
-	scan, _ := json.Marshal(map[string]any{"git_remotes": []map[string]string{
-		{"path": "/opt/app", "name": "origin", "url": gl.URL + "/sead/app.git"},
+	scan, _ := json.Marshal(map[string]any{"git_remotes": []map[string]any{
+		{"path": "/opt/app", "name": "origin", "url": gl.URL + "/sead/app.git", "commit": "0123456789abcdef0123456789abcdef01234567", "branch": "main", "pulled_at": 1700001000, "pull_kind": "pull"},
 		{"path": "/opt/hidden", "name": "origin", "url": gl.URL + "/sead/hidden"},
 		{"container": "api", "path": "/app", "name": "origin", "url": "git@" + glHost + ":sead/hidden.git"},
 		{"path": "/opt/tool", "name": "upstream", "url": "https://github.com/o/tool.git"},
@@ -254,7 +254,7 @@ func TestGitLabRepoInventoryFoundOnHosts(t *testing.T) {
 	// vm-old: scan links from an earlier scan, but its latest git search
 	// didn't run. The links still show — as the host, with no path.
 	var oldID int64
-	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('vm-old', 'vm-old-slug') RETURNING id`).Scan(&oldID); err != nil {
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug, hostname) VALUES ('vm-old', 'vm-old-slug', 'vm-old.example') RETURNING id`).Scan(&oldID); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.NewHostScanRepo(d.SQL).Create(ctx, oldID, `{"git_remotes":null}`); err != nil {
@@ -263,7 +263,7 @@ func TestGitLabRepoInventoryFoundOnHosts(t *testing.T) {
 	if _, _, err := store.NewGitLabRepoLinkRepo(d.SQL).SyncScanLinks(ctx, oldID, gl.URL, []string{"sead/hidden"}, true); err != nil {
 		t.Fatal(err)
 	}
-	old := gitlabFoundRef{HostID: oldID, HostName: "vm-old", HostSlug: "vm-old-slug"}
+	old := gitlabFoundRef{HostID: oldID, HostName: "vm-old", HostSlug: "vm-old-slug", HostAddress: "vm-old.example"}
 
 	var inv gitlabInventory
 	resp := env.do("GET", "/api/settings/gitlab/repos", "")
@@ -274,9 +274,11 @@ func TestGitLabRepoInventoryFoundOnHosts(t *testing.T) {
 		t.Fatal(err)
 	}
 	at := func(c, p string) gitlabFoundRef {
-		return gitlabFoundRef{HostID: hostID, HostName: "vm-git", HostSlug: "vm-git-slug", Container: c, Path: p}
+		return gitlabFoundRef{HostID: hostID, HostName: "vm-git", HostSlug: "vm-git-slug", HostAddress: "10.0.0.5", Container: c, Path: p}
 	}
-	if app := inv.Repos[0]; len(app.Hosts) != 0 || len(app.Found) != 1 || app.Found[0] != at("", "/opt/app") {
+	appAt := at("", "/opt/app")
+	appAt.Commit, appAt.Branch, appAt.PulledAt, appAt.PullKind = "0123456789abcdef0123456789abcdef01234567", "main", 1700001000, "pull"
+	if app := inv.Repos[0]; len(app.Hosts) != 0 || len(app.Found) != 1 || app.Found[0] != appAt {
 		t.Fatalf("sead/app = %+v", app)
 	}
 	if len(inv.Unlisted) != 1 {

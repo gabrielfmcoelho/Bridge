@@ -163,14 +163,15 @@ func (r *HostScanRepo) LatestGitRemotes(ctx context.Context) ([]models.HostGitRe
 			  ON hs.host_id = l.host_id AND hs.scanned_at = l.max_at
 			WHERE pg_input_is_valid(hs.data, 'jsonb')
 		)
-		SELECT h.id, h.nickname, h.oficial_slug,
+		SELECT h.id, h.nickname, h.oficial_slug, h.hostname,
 			COALESCE(g->>'container', ''), COALESCE(g->>'container_image', ''),
-			COALESCE(g->>'path', ''), COALESCE(g->>'name', ''), COALESCE(g->>'url', '')
+			COALESCE(g->>'path', ''), COALESCE(g->>'name', ''), COALESCE(g->>'url', ''),
+			COALESCE(g->>'commit', ''), COALESCE(g->>'branch', ''), COALESCE(g->>'pulled_at', ''), COALESCE(g->>'pull_kind', '')
 		FROM latest
 		JOIN hosts h ON h.id = latest.host_id AND h.deleted_at IS NULL
 		CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(d->'git_remotes') = 'array'
 			THEN d->'git_remotes' ELSE '[]'::jsonb END) g
-		ORDER BY h.nickname, h.id, 4, 6, 7`)
+		ORDER BY h.nickname, h.id, 5, 7, 8`)
 	if err != nil {
 		return nil, err
 	}
@@ -178,9 +179,12 @@ func (r *HostScanRepo) LatestGitRemotes(ctx context.Context) ([]models.HostGitRe
 	var out []models.HostGitRemote
 	for rows.Next() {
 		var g models.HostGitRemote
-		if err := rows.Scan(&g.HostID, &g.HostName, &g.HostSlug, &g.Container, &g.ContainerImage, &g.Path, &g.Name, &g.URL); err != nil {
+		var pulledAt string // text: a value that isn't a number reads as unknown, not as a failed query
+		if err := rows.Scan(&g.HostID, &g.HostName, &g.HostSlug, &g.HostAddress, &g.Container, &g.ContainerImage, &g.Path, &g.Name, &g.URL,
+			&g.Commit, &g.Branch, &pulledAt, &g.PullKind); err != nil {
 			return nil, err
 		}
+		g.PulledAt, _ = strconv.ParseInt(pulledAt, 10, 64)
 		out = append(out, g)
 	}
 	return out, rows.Err()

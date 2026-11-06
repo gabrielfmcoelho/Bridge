@@ -3,6 +3,8 @@ package sshtest
 import (
 	"encoding/base64"
 	"log"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -22,6 +24,12 @@ type GitRemote struct {
 	Path           string `json:"path"` // the working tree (the .git directory's parent)
 	Name           string `json:"name"` // remote name, e.g. origin
 	URL            string `json:"url"`  // credentials stripped
+	// The checkout's HEAD and when it last came from the remote. Per
+	// checkout, so every remote of one checkout carries the same values.
+	Commit   string `json:"commit,omitempty"`    // 40 or 64 hex
+	Branch   string `json:"branch,omitempty"`    // "" when HEAD is detached
+	PulledAt int64  `json:"pulled_at,omitempty"` // unix seconds
+	PullKind string `json:"pull_kind,omitempty"` // clone, pull or fetch
 }
 
 // The whole probe must finish well inside the browser's 120 s scan request
@@ -49,6 +57,14 @@ const (
 // links. find's status stays out of the output: a directory name can hold any
 // line. timeout(1) is used only if "timeout 1 true" works (old busybox wants
 // -t). GITPROBE_ROOTS overrides the start points (tests).
+// After "@@repo", "@@head <commit> <branch> <unix> <kind>" ("-" = unknown):
+// HEAD read from the files (no git binary needed), the branch's ref only
+// under refs/heads with no ".." (the walk may run as root: a planted HEAD
+// must not make it read another file), the commit printed only if hex. The
+// time is the reflog's last clone/pull, or FETCH_HEAD's mtime when a fetch
+// came later; of the reflog only that number and word leave (its lines also
+// hold the author and the clone URL).
+// ponytail: refs/heads only; a HEAD on a tag or a nested symref reads as unknown.
 const gitWalkScript = `T=""; TI=""; command -v timeout >/dev/null 2>&1 && timeout 1 true 2>/dev/null && T="timeout 20" && TI="timeout 5"
 R="$GITPROBE_ROOTS"
 [ -n "$R" ] || R="/ $(awk '$3 ~ /^(ext[234]|xfs|btrfs|zfs|f2fs)$/ && $2 != "/" {print $2}' /proc/mounts 2>/dev/null | sort -u | tr '\n' ' ')"
@@ -60,6 +76,21 @@ printf '%s\n' "$L" | head -n 101 | { n=0; while IFS= read -r g; do
   n=$((n+1)); [ "$n" -gt 100 ] && exit 0
   [ -f "$g/config" ] || continue
   printf '@@repo %s\n' "${g%/.git}"
+  C=-; B=-; H=$(head -c 300 "$g/HEAD" 2>/dev/null | head -n 1)
+  case "$H" in
+    "ref: refs/heads/"?*) r=${H#ref: }
+      case "$r" in *..*|*[!A-Za-z0-9._/-]*) ;; *) B=${r#refs/heads/}
+        C=$(head -c 100 "$g/$r" 2>/dev/null | head -n 1)
+        [ -n "$C" ] || C=$(awk -v r="$r" '$2 == r { print $1; exit }' "$g/packed-refs" 2>/dev/null);; esac;;
+    "ref: "*) ;;
+    *) C=$H;;
+  esac
+  case "$C" in ""|*[!0-9a-f]*) C=-;; esac
+  P=$(tail -n 2000 "$g/logs/HEAD" 2>/dev/null | awk -F'\t' '$2 ~ /^(pull|clone)/ { n = split($1, a, " "); t = a[n-1]; k = $2; sub(/[ :].*/, "", k) } END { if (t != "") print t, k }')
+  F=$(stat -c %Y "$g/FETCH_HEAD" 2>/dev/null)
+  case "$F" in ""|*[!0-9]*) ;; *) { [ -n "$P" ] && [ "${P%% *}" -ge "$F" ] 2>/dev/null; } || P="$F fetch";; esac
+  case "$P" in [0-9]*" "[a-z]*) ;; *) P="- -";; esac
+  printf '@@head %s %s %s\n' "$C" "$B" "$P"
   head -c 65536 "$g/config" | grep -iE '^[[:space:]]*(\[|url[[:space:]]*=)' | sed -e 's#://[^@]*@#://#' -e '/^[[:space:]]*\[[Rr][Ee][Mm][Oo][Tt][Ee] /!s/^[[:space:]]*\[.*/[x]/' | head -n 40
 done; [ "$rc" -gt 1 ] || echo @@gitend; }
 `
@@ -133,7 +164,7 @@ func parseGitProbe(raw string) ([]GitRemote, bool) {
 func parseGitPart(text, container, image string) (out []GitRemote, started, complete bool) {
 	out = []GitRemote{}
 	seen := map[GitRemote]bool{}
-	path, remote := "", ""
+	path, remote, head := "", "", GitRemote{}
 	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimSpace(line)
 		switch {
@@ -142,10 +173,12 @@ func parseGitPart(text, container, image string) (out []GitRemote, started, comp
 		case line == "@@gitend":
 			complete = true
 		case strings.HasPrefix(line, "@@repo "):
-			path, remote = strings.TrimPrefix(line, "@@repo "), ""
+			path, remote, head = strings.TrimPrefix(line, "@@repo "), "", GitRemote{}
 			if !validGitPath(path) {
 				path = ""
 			}
+		case strings.HasPrefix(line, "@@head "):
+			head = parseGitHead(line)
 		case strings.HasPrefix(line, "["):
 			remote = ""
 			if len(line) > 9 && strings.EqualFold(line[:9], `[remote "`) { // git section names are case-insensitive
@@ -160,7 +193,8 @@ func parseGitPart(text, container, image string) (out []GitRemote, started, comp
 			if url == "" || len(url) > maxGitURLLen || strings.ContainsFunc(url, unicode.IsControl) {
 				continue
 			}
-			r := GitRemote{Container: container, ContainerImage: image, Path: path, Name: remote, URL: url}
+			r := GitRemote{Container: container, ContainerImage: image, Path: path, Name: remote, URL: url,
+				Commit: head.Commit, Branch: head.Branch, PulledAt: head.PulledAt, PullKind: head.PullKind}
 			if !seen[r] {
 				seen[r] = true
 				out = append(out, r)
@@ -168,6 +202,34 @@ func parseGitPart(text, container, image string) (out []GitRemote, started, comp
 		}
 	}
 	return out, started, complete
+}
+
+var (
+	gitCommitRe = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
+	gitBranchRe = regexp.MustCompile(`^[A-Za-z0-9._/-]{1,255}$`)
+)
+
+// parseGitHead reads "@@head <commit> <branch> <unix> <kind>" into the
+// head fields of a GitRemote. The VM wrote it: each field is kept only if
+// valid ("-" = unknown); a time past 2100 is forged.
+func parseGitHead(line string) (h GitRemote) {
+	f := strings.Fields(strings.TrimPrefix(line, "@@head "))
+	if len(f) != 4 {
+		return h
+	}
+	if gitCommitRe.MatchString(f[0]) {
+		h.Commit = f[0]
+	}
+	if f[1] != "-" && gitBranchRe.MatchString(f[1]) {
+		h.Branch = f[1]
+	}
+	if t, err := strconv.ParseInt(f[2], 10, 64); err == nil && t > 0 && t < 4102444800 {
+		switch f[3] {
+		case "clone", "pull", "fetch":
+			h.PulledAt, h.PullKind = t, f[3]
+		}
+	}
+	return h
 }
 
 // stripSCPPassword cuts a password from an scp-style remote

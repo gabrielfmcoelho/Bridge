@@ -52,6 +52,8 @@ type GitLabRepoLink struct {
 	EntityName string `json:"entity_name"`
 	// EntitySlug is the host's oficial_slug (its page URL); "" for DNS.
 	EntitySlug string `json:"entity_slug,omitempty"`
+	// EntityAddress is the host's hostname (IP or name); "" for DNS.
+	EntityAddress string `json:"entity_address,omitempty"`
 	// Kind is "project" (one repo) or "group" (every repo under it; hosts only).
 	Kind            string `json:"kind"`
 	GitLabProjectID int    `json:"gitlab_project_id"`
@@ -71,9 +73,14 @@ type HostGitRemote struct {
 	HostID         int64
 	HostName       string
 	HostSlug       string
+	HostAddress    string // hosts.hostname: the IP or name the scan connects to
 	Container      string
 	ContainerImage string
 	Path           string
 	Name           string
 	URL            string
+	Commit         string // HEAD of the checkout
+	Branch         string
+	PulledAt       int64 // unix: last clone, pull or fetch; 0 = unknown
+	PullKind       string
 }

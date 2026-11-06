@@ -1,19 +1,23 @@
 package sshtest
 
 import (
+	"context"
 	"encoding/base64"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseGitProbe(t *testing.T) {
 	raw := "@@git\n" +
 		"@@repo /opt/app\n" +
+		"@@head 0123456789abcdef0123456789abcdef01234567 main 1700001000 pull\n" +
 		"[x]\n" +
 		"[remote \"origin\"]\n" +
 		"url = https://gitlab.example.gov.br/sead/app.git\n" +
@@ -23,6 +27,7 @@ func TestParseGitProbe(t *testing.T) {
 		"url = \"git@github.com:org/tool.git\"\n" +
 		"url = git@github.com:org/tool.git\n" + // duplicate
 		"@@repo /home/u/creds\n" +
+		"@@head NOTHEX main;rm 99999999999 rm\n" + // forged: every field rejected
 		"[remote \"origin\"]\n" +
 		"url = https://oauth2:glpat-SECRET@gitlab.example.gov.br/sead/creds.git\n" +
 		"[remote \"scp\"]\n" +
@@ -34,6 +39,7 @@ func TestParseGitProbe(t *testing.T) {
 		"@@CTR 0123456789ab api nginx:1.25\n" +
 		"@@git\n" +
 		"@@repo /app\n" +
+		"@@head abababababababababababababababababababababababababababababababab - - -\n" + // detached HEAD, sha256 repo, no pull known
 		"[remote \"origin\"]\n" +
 		"url = https://gitlab.example.gov.br/sead/api.git\n" +
 		"@@gitend\n" +
@@ -48,11 +54,11 @@ func TestParseGitProbe(t *testing.T) {
 		t.Fatal("every part that ran reached its end marker: want complete")
 	}
 	want := []GitRemote{
-		{Path: "/opt/app", Name: "origin", URL: "https://gitlab.example.gov.br/sead/app.git"},
-		{Path: "/opt/app", Name: "github", URL: "git@github.com:org/tool.git"},
+		{Path: "/opt/app", Name: "origin", URL: "https://gitlab.example.gov.br/sead/app.git", Commit: "0123456789abcdef0123456789abcdef01234567", Branch: "main", PulledAt: 1700001000, PullKind: "pull"},
+		{Path: "/opt/app", Name: "github", URL: "git@github.com:org/tool.git", Commit: "0123456789abcdef0123456789abcdef01234567", Branch: "main", PulledAt: 1700001000, PullKind: "pull"},
 		{Path: "/home/u/creds", Name: "origin", URL: "https://gitlab.example.gov.br/sead/creds.git"},
 		{Path: "/home/u/creds", Name: "scp", URL: "deploy@gitlab.example.gov.br:sead/creds.git"},
-		{Container: "api", ContainerImage: "nginx:1.25", Path: "/app", Name: "origin", URL: "https://gitlab.example.gov.br/sead/api.git"},
+		{Container: "api", ContainerImage: "nginx:1.25", Path: "/app", Name: "origin", URL: "https://gitlab.example.gov.br/sead/api.git", Commit: "abababababababababababababababababababababababababababababababab"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("parseGitProbe =\n%+v\nwant\n%+v", got, want)
@@ -201,15 +207,61 @@ func TestGitInnerScriptRuns(t *testing.T) {
 	URL = https://deploy:tok-UP@gitlab.example.gov.br/sead/up.git
 `)
 	write("srv/app/node_modules/dep/.git/config", "[remote \"origin\"]\n\turl = https://example.com/dep.git\n")
+	// HEAD on a branch file; the reflog's last pull is newer than FETCH_HEAD.
+	// Its lines carry the author and the clone URL: neither may leave.
+	write("srv/app/.git/HEAD", "ref: refs/heads/main\n")
+	write("srv/app/.git/refs/heads/main", "0123456789abcdef0123456789abcdef01234567\n")
+	write("srv/app/.git/logs/HEAD", "0000000000000000000000000000000000000000 aaaa Dev Person <dev@example.com> 1700000000 -0300\tclone: from https://oauth2:glpat-SECRET@gitlab.example.gov.br/sead/app.git\n"+
+		"aaaa bbbb Dev Person <dev@example.com> 1700000500 -0300\tcommit: x\n"+
+		"bbbb cccc Dev Person <dev@example.com> 1700001000 -0300\tpull: Fast-forward\n")
+	write("srv/app/.git/FETCH_HEAD", "x\n")
+	touch := func(rel string, unix int64) {
+		if err := os.Chtimes(filepath.Join(root, rel), time.Unix(unix, 0), time.Unix(unix, 0)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	touch("srv/app/.git/FETCH_HEAD", 1690000000)
+	// Branch only in packed-refs, no reflog: the last fetch is the update.
+	write("srv/api/.git/config", "[remote \"origin\"]\n\turl = https://gitlab.example.gov.br/sead/api.git\n")
+	write("srv/api/.git/HEAD", "ref: refs/heads/dev\n")
+	write("srv/api/.git/packed-refs", "# pack-refs with: peeled\nfefefefefefefefefefefefefefefefefefefefe refs/heads/dev\n")
+	write("srv/api/.git/FETCH_HEAD", "x\n")
+	touch("srv/api/.git/FETCH_HEAD", 1700002000)
+	// A ref pointing out of .git: the probe may run as root, so it must not
+	// read (and report) another file through it.
+	write("secret.txt", "s3cr3t-line\n")
+	write("srv/evil/.git/config", "[remote \"origin\"]\n\turl = https://gitlab.example.gov.br/sead/evil.git\n")
+	write("srv/evil/.git/HEAD", "ref: refs/heads/../../../../secret.txt\n")
+	// FIFOs where HEAD, the ref, packed-refs and the reflog belong: reading one
+	// would block the walk (or, as /dev/stdin, eat the list of checkouts).
+	fifo := func(rel string) {
+		if out, err := exec.Command("mkfifo", filepath.Join(root, rel)).CombinedOutput(); err != nil {
+			t.Fatalf("mkfifo: %v %s", err, out)
+		}
+	}
+	write("srv/fifo-a/.git/config", "[remote \"origin\"]\n\turl = https://gitlab.example.gov.br/sead/fa.git\n")
+	write("srv/fifo-a/.git/logs/.keep", "")
+	fifo("srv/fifo-a/.git/HEAD")
+	fifo("srv/fifo-a/.git/logs/HEAD")
+	write("srv/fifo-b/.git/config", "[remote \"origin\"]\n\turl = https://gitlab.example.gov.br/sead/fb.git\n")
+	write("srv/fifo-b/.git/HEAD", "ref: refs/heads/main\n")
+	write("srv/fifo-b/.git/refs/heads/.keep", "")
+	fifo("srv/fifo-b/.git/refs/heads/main")
+	fifo("srv/fifo-b/.git/packed-refs")
+	// Only a numeric time and the words pull / clone may leave the reflog.
+	write("srv/fifo-b/.git/logs/HEAD", "a b N <n@x> 12abc -0300\tpullEVIL: x\n")
 
-	cmd := exec.Command("sh", "-c", gitInnerScript)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "sh", "-c", gitInnerScript)
+	cmd.WaitDelay = time.Second // a child blocked on a FIFO keeps the pipe open
 	cmd.Env = append(os.Environ(), "GITPROBE_ROOTS="+root)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("script: %v\n%s", err, out)
 	}
 	s := string(out)
-	for _, secret := range []string{"glpat-SECRET", "hunter2", "c2VjcmV0", "extraHeader", "fetch", "dep.git", "tok-UP"} {
+	for _, secret := range []string{"glpat-SECRET", "hunter2", "c2VjcmV0", "extraHeader", "fetch =", "dep.git", "tok-UP", "dev@example.com", "Dev Person", "s3cr3t", "EVIL", "12abc"} {
 		if strings.Contains(s, secret) {
 			t.Fatalf("output leaks %q:\n%s", secret, s)
 		}
@@ -219,10 +271,18 @@ func TestGitInnerScriptRuns(t *testing.T) {
 		t.Fatalf("a finished run must be complete:\n%s", s)
 	}
 	// Section names and keys are case-insensitive in git: [REMOTE "Up"] / URL = count.
-	want := []GitRemote{
-		{Path: filepath.Join(root, "srv/app"), Name: "origin", URL: "https://gitlab.example.gov.br/sead/app.git"},
-		{Path: filepath.Join(root, "srv/app"), Name: "Up", URL: "https://gitlab.example.gov.br/sead/up.git"},
+	app := func(name, url string) GitRemote {
+		return GitRemote{Path: filepath.Join(root, "srv/app"), Name: name, URL: url, Commit: "0123456789abcdef0123456789abcdef01234567", Branch: "main", PulledAt: 1700001000, PullKind: "pull"}
 	}
+	want := []GitRemote{
+		{Path: filepath.Join(root, "srv/api"), Name: "origin", URL: "https://gitlab.example.gov.br/sead/api.git", Commit: "fefefefefefefefefefefefefefefefefefefefe", Branch: "dev", PulledAt: 1700002000, PullKind: "fetch"},
+		app("Up", "https://gitlab.example.gov.br/sead/up.git"),
+		app("origin", "https://gitlab.example.gov.br/sead/app.git"),
+		{Path: filepath.Join(root, "srv/evil"), Name: "origin", URL: "https://gitlab.example.gov.br/sead/evil.git"},
+		{Path: filepath.Join(root, "srv/fifo-a"), Name: "origin", URL: "https://gitlab.example.gov.br/sead/fa.git"},
+		{Path: filepath.Join(root, "srv/fifo-b"), Name: "origin", URL: "https://gitlab.example.gov.br/sead/fb.git", Branch: "main"},
+	}
+	sort.Slice(got, func(i, j int) bool { return got[i].Path+got[i].Name < got[j].Path+got[j].Name }) // find's order is the directory's
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("remotes = %+v, want %+v\noutput:\n%s", got, want, s)
 	}

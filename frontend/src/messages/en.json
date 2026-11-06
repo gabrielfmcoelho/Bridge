@@ -2574,7 +2574,14 @@
     "git": {
       "summary": "Git checkouts on this host and in its containers, with each remote (credentials are removed on the host). Remotes on the configured GitLab link this host to their repository.",
       "partial": "The search stopped early (time limit, or more than 100 checkouts): some repositories may be missing, and no link was removed.",
-      "notRun": "The search for git checkouts didn't run or didn't finish in this scan."
+      "notRun": "The search for git checkouts didn't run or didn't finish in this scan.",
+      "commit": "Commit",
+      "branch": "Branch",
+      "kind": {
+        "clone": "Cloned",
+        "pull": "Last pull",
+        "fetch": "Last fetch"
+      }
     },
     "web": {
       "summary": "Sites each server answers for. Green names are linked to a DNS record in Bridge: the scan links records that exist and creates new ones that resolve in DNS.",
