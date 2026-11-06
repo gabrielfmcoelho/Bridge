@@ -53,7 +53,7 @@ export default function LLMSection() {
           label={t("settings.integrations.llm.apiBaseUrl")}
           value={f.form.llm_base_url ?? ""}
           onChange={(e) => f.set("llm_base_url", e.target.value)}
-          placeholder="https://api.sobdemanda.mandu.piaui.pro/v1"
+          placeholder="https://new-plataforma.sobdemanda.mandu.piaui.pro/v1"
         />
         <SecretInputWithClear form={f} name="llm_api_key" label={t("settings.integrations.llm.apiKey")} />
       </div>

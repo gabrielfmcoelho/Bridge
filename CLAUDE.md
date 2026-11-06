@@ -192,7 +192,10 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   only under `refs/heads` with no `..`, since the walk may run as root) and
   `pulled_at`/`pull_kind`: the reflog's last clone/pull, or `FETCH_HEAD`'s
   mtime when a fetch came later. Only hash, branch, time and kind leave the
-  VM, never a reflog line (author, clone URL). Each
+  VM, never a reflog line (author, clone URL). Every file is read only after
+  `[ -f ]` (a FIFO planted at HEAD, a ref, `packed-refs` or `logs/HEAD` would
+  block the walk), and a reflog line counts only with an all-digit time and the
+  word exactly `pull` or `clone` (`TestGitInnerScriptRuns` plants both). Each
   container frame ends with its `docker exec` status (`@@exit N`, taken off
   by `splitCtrFrames`): a walk that never started counts as done only for
   126/127 (no shell in the image). It must stay well inside the browser's
