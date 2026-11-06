@@ -64,6 +64,7 @@ const (
 // time is the reflog's last clone/pull, or FETCH_HEAD's mtime when a fetch
 // came later; of the reflog only that number and word leave (its lines also
 // hold the author and the clone URL).
+// Every file is read only after [ -f ]: opening a FIFO there would block the walk.
 // ponytail: refs/heads only; a HEAD on a tag or a nested symref reads as unknown.
 const gitWalkScript = `T=""; TI=""; command -v timeout >/dev/null 2>&1 && timeout 1 true 2>/dev/null && T="timeout 20" && TI="timeout 5"
 R="$GITPROBE_ROOTS"
@@ -76,17 +77,17 @@ printf '%s\n' "$L" | head -n 101 | { n=0; while IFS= read -r g; do
   n=$((n+1)); [ "$n" -gt 100 ] && exit 0
   [ -f "$g/config" ] || continue
   printf '@@repo %s\n' "${g%/.git}"
-  C=-; B=-; H=$(head -c 300 "$g/HEAD" 2>/dev/null | head -n 1)
+  C=-; B=-; H=$([ -f "$g/HEAD" ] && head -c 300 "$g/HEAD" 2>/dev/null | head -n 1)
   case "$H" in
     "ref: refs/heads/"?*) r=${H#ref: }
       case "$r" in *..*|*[!A-Za-z0-9._/-]*) ;; *) B=${r#refs/heads/}
-        C=$(head -c 100 "$g/$r" 2>/dev/null | head -n 1)
-        [ -n "$C" ] || C=$(awk -v r="$r" '$2 == r { print $1; exit }' "$g/packed-refs" 2>/dev/null);; esac;;
+        C=$([ -f "$g/$r" ] && head -c 100 "$g/$r" 2>/dev/null | head -n 1)
+        [ -n "$C" ] || C=$([ -f "$g/packed-refs" ] && awk -v r="$r" '$2 == r { print $1; exit }' "$g/packed-refs" 2>/dev/null);; esac;;
     "ref: "*) ;;
     *) C=$H;;
   esac
   case "$C" in ""|*[!0-9a-f]*) C=-;; esac
-  P=$(tail -n 2000 "$g/logs/HEAD" 2>/dev/null | awk -F'\t' '$2 ~ /^(pull|clone)/ { n = split($1, a, " "); t = a[n-1]; k = $2; sub(/[ :].*/, "", k) } END { if (t != "") print t, k }')
+  P=$([ -f "$g/logs/HEAD" ] && tail -n 2000 "$g/logs/HEAD" 2>/dev/null | awk -F'\t' '$2 ~ /^(pull|clone)/ { n = split($1, a, " "); w = $2; sub(/[ :].*/, "", w); if (a[n-1] ~ /^[0-9]+$/ && (w == "pull" || w == "clone")) { t = a[n-1]; k = w } } END { if (t != "") print t, k }')
   F=$(stat -c %Y "$g/FETCH_HEAD" 2>/dev/null)
   case "$F" in ""|*[!0-9]*) ;; *) { [ -n "$P" ] && [ "${P%% *}" -ge "$F" ] 2>/dev/null; } || P="$F fetch";; esac
   case "$P" in [0-9]*" "[a-z]*) ;; *) P="- -";; esac
