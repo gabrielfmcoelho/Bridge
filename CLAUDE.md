@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v123**. Use idempotent idioms:
+per element, currently at **v124**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -234,6 +234,19 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   totals) sum the local filesystems; `DiskPercent` (card, sorting,
   `alerta-recursos`, `sub-utilizado`, `host_scans.disk_pct`) is the **fullest**
   one (`DiskFullest`), like Sentinel; `df /` is only the fallback.
+- OS map and updates (Hosts › Sistemas operacionais): a host's OS is its own
+  `dependency_inventory` row with `kind='os' AND container = ''` (`scope=host`
+  on the dependency endpoints); the scan adds `arch` and `reboot_required`.
+  Update runs (`/api/ssh/os-updates/*`, admin, `internal/api/os_update_job.go`)
+  run `check | packages | security` on a set of hosts in the background and
+  write every step to `os_update_runs` / `os_update_results` (a restart marks
+  what it cut `interrupted`). On the host one script (`sshtest/osupdate.go`)
+  picks apt / dnf / yum / apk itself, runs **detached** as root (setsid, log and
+  exit code in `/var/lib/bridge-osupdate/run-<id>.*`, world-readable so polling
+  needs no sudo) and reports through `@@key value` lines; never run apt on the
+  SSH session itself — a dropped session kills dpkg halfway. Containers are
+  never upgraded (rebuild the image). Each host is rescanned through
+  `sshHandlers.recordScan`, the scan's own post-capture path.
 - Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
   names are read in bulk; wiki titles come from Outline at most once a day per
   page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title

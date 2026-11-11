@@ -672,8 +672,71 @@
       "version": "Versão",
       "hosts": "Hosts",
       "hostsCount": "{count} hosts",
-      "eolCount": "{count} sem suporte",
-      "more": "+{count} outros"
+      "eolCount": "{count} sem suporte"
+    },
+    "osUpdate": {
+      "open": "Atualizar…",
+      "title": "Atualizar sistemas operacionais",
+      "start": "Iniciar",
+      "kind": "Tipo",
+      "kindCheck": "Verificar atualizações",
+      "kindSecurity": "Atualizações de segurança",
+      "kindPackages": "Todas as atualizações de pacotes",
+      "kindHint": {
+        "check": "Atualiza as listas de pacotes e conta o que pode ser atualizado. Não altera nada.",
+        "security": "Instala só as atualizações de segurança (apt: suítes *-security; dnf/yum: avisos de segurança). Alpine não tem canal separado.",
+        "packages": "Instala todas as atualizações da versão atual (apt upgrade, dnf/yum upgrade, apk upgrade). Nunca muda a versão do sistema."
+      },
+      "versions": "Versões ({count} hosts)",
+      "reboot": "Reiniciar quando necessário",
+      "rebootHint": "Depois de uma atualização bem-sucedida, reinicia os hosts que pedem (kernel, libc novos) e espera eles voltarem.",
+      "concurrency": "Hosts por vez",
+      "concurrencyHint": "De 1 a 10.",
+      "concurrencyRange": "Entre 1 e 10.",
+      "privilegeHint": "Roda como root: o usuário SSH se for root, sudo com a senha guardada ou sudo sem senha. Hosts sem nenhum desses são pulados. Arquivos de configuração alterados mantêm a versão local.",
+      "started": "Execução #{id} iniciada em {count} hosts",
+      "confirmWord": "atualizar",
+      "confirmTitle": {
+        "security": "Instalar atualizações de segurança em {count} hosts?",
+        "packages": "Instalar todas as atualizações de pacotes em {count} hosts?"
+      },
+      "confirmReboot": "Os hosts que precisarem serão reiniciados.",
+      "confirmNoReboot": "Nenhum host será reiniciado.",
+      "finished": "Execução #{id} concluída",
+      "runs": "Execuções de atualização",
+      "status": "Situação",
+      "hosts": "Hosts",
+      "when": "Quando",
+      "kindShort": {
+        "check": "Verificação",
+        "packages": "Pacotes",
+        "security": "Segurança",
+        "release": "Troca de versão"
+      },
+      "withReboot": "com reinício",
+      "runStatus": {
+        "running": "Em andamento",
+        "done": "Concluída",
+        "cancelled": "Cancelada",
+        "interrupted": "Interrompida"
+      },
+      "resultStatus": {
+        "pending": "Na fila",
+        "running": "Em andamento",
+        "success": "OK",
+        "failed": "Falhou",
+        "skipped": "Pulado"
+      },
+      "runTitle": "Execução de atualização #{id}",
+      "cancel": "Cancelar execução",
+      "cancelHint": "Cancelar pula os hosts que ainda não começaram; os que já estão atualizando terminam.",
+      "host": "Host",
+      "pending": "Atualizações pendentes",
+      "upgraded": "Atualizados",
+      "rebooted": "Reiniciado",
+      "securityShort": "{count} seg.",
+      "pendingTitle": "Atualizações pendentes na última execução",
+      "pendingShort": "{text} pendentes"
     },
     "tipoMaquina": "Tipo de Máquina",
     "user": "Usuário",

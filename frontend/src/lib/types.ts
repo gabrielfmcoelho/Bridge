@@ -1485,6 +1485,45 @@ export interface HostOS {
   reboot_required?: boolean;
 }
 
+export type OSUpdateKind = "check" | "packages" | "security";
+export type OSUpdateResultStatus = "pending" | "running" | "success" | "failed" | "skipped";
+
+/** One check / upgrade over a set of hosts (GET /api/ssh/os-updates/runs). */
+export interface OSUpdateRun {
+  id: number;
+  kind: OSUpdateKind | "release";
+  reboot: boolean;
+  concurrency: number;
+  status: "running" | "done" | "cancelled" | "interrupted";
+  requested_name?: string;
+  created_at: string;
+  finished_at?: string;
+  /** Hosts per result status. */
+  counts: Partial<Record<OSUpdateResultStatus, number>>;
+  results?: OSUpdateResult[];
+}
+
+export interface OSUpdateResult {
+  run_id: number;
+  host_id: number;
+  host_nickname: string;
+  host_slug: string;
+  status: OSUpdateResultStatus;
+  reason?: string;
+  pkg_manager?: string;
+  os_before?: string;
+  os_after?: string;
+  /** Still upgradable once the run was over (all / security). */
+  upgradable?: number;
+  security_upgradable?: number;
+  upgraded?: number;
+  reboot_required: boolean;
+  rebooted: boolean;
+  output?: string;
+  started_at?: string;
+  finished_at?: string;
+}
+
 export interface DependencyGroup {
   kind: DependencyKind;
   name: string;

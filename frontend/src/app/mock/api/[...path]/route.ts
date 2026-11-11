@@ -14,7 +14,7 @@ import { canTransition } from "@/lib/requests";
 import { extractJSON, coerceToSchema, coercePriority } from "@/lib/aiDraft";
 import type {
   Offering, ServiceRequest, RequestEvent, RequestStatus, CatalogHit, AssetGrantsInput,
-  Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool, Database,
+  Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool, Database, OSUpdateRun, OSUpdateResult,
 } from "@/lib/types";
 import {
   db, resetDB, currentUser, switchUser, requestVisible, abilitiesForRequest,
@@ -26,6 +26,8 @@ export const dynamic = "force-dynamic";
 // Single named constant so latency can be dialed to 0 for fast test runs.
 const LATENCY_MS = 150;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const mockOSRuns: OSUpdateRun[] = [];
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
@@ -452,6 +454,34 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
       groups.set(k, g);
     }
     return json(paginate([...groups.values()], qs.get("page"), qs.get("per_page")));
+  }
+  // OS update runs: a run finishes at once, each host "upgrades" 3 packages.
+  // ponytail: module memory, not reset by __reset.
+  if (p === "ssh/os-updates/runs" && method === "POST") {
+    const body = await readJSON<{ kind: OSUpdateRun["kind"]; host_ids: number[]; reboot: boolean; concurrency: number }>(request);
+    const id = mockOSRuns.length + 1;
+    const now = new Date().toISOString();
+    const results: OSUpdateResult[] = body.host_ids.map((hid) => {
+      const h = db.hosts.find((x) => x.id === hid)!;
+      const check = body.kind === "check";
+      return { run_id: id, host_id: hid, host_nickname: h.nickname, host_slug: h.oficial_slug, status: "success", pkg_manager: "apt",
+        os_before: h.os?.pretty, os_after: h.os?.pretty, upgradable: check ? 3 : 0, security_upgradable: check ? 1 : 0, upgraded: check ? undefined : 3,
+        reboot_required: !check && !body.reboot, rebooted: !check && body.reboot, output: "@@pm apt\n@@upgradable 3\n@@security 1\n", started_at: now, finished_at: now };
+    });
+    const run: OSUpdateRun = { id, kind: body.kind, reboot: body.reboot, concurrency: body.concurrency, status: "done", requested_name: "Mock",
+      created_at: now, finished_at: now, counts: { success: results.length }, results };
+    mockOSRuns.unshift(run);
+    return json(run, 202);
+  }
+  if (p === "ssh/os-updates/runs" && method === "GET") return json(mockOSRuns.map((r) => ({ ...r, results: undefined })));
+  if (p.startsWith("ssh/os-updates/runs/") && method === "GET") {
+    const run = mockOSRuns.find((r) => r.id === Number(p.split("/")[3]));
+    return run ? json(run) : json({ error: "run not found" }, 404);
+  }
+  if (p === "ssh/os-updates/latest" && method === "GET") {
+    const seen = new Map<number, OSUpdateResult>();
+    for (const r of mockOSRuns) for (const x of r.results ?? []) if (!seen.has(x.host_id)) seen.set(x.host_id, { ...x, output: undefined });
+    return json([...seen.values()]);
   }
   if (method === "GET" && p === "hosts") return json(paginate(db.hosts, qs.get("page"), qs.get("per_page")));
   if (method === "GET" && p === "services") return json(paginate(db.services, qs.get("page"), qs.get("per_page")));

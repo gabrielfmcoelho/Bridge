@@ -1,0 +1,91 @@
+package store_test
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
+)
+
+// A run's lifecycle: pending → running → finished per host, counts per
+// status, cancel skips what's pending, a restart interrupts what's left,
+// and the latest counted result per host feeds the "pending updates" column.
+func TestOSUpdateRepo_Lifecycle(t *testing.T) {
+	ctx := context.Background()
+	d := openDB(t)
+	var hosts []int64
+	for _, n := range []string{"vm-a", "vm-b", "vm-c"} {
+		var id int64
+		if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ($1, $1) RETURNING id`, n).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		hosts = append(hosts, id)
+	}
+	repo := store.NewOSUpdateRepo(d.SQL)
+	run := &models.OSUpdateRun{Kind: "check", Concurrency: 2}
+	if err := repo.CreateRun(ctx, run, hosts); err != nil {
+		t.Fatal(err)
+	}
+	if run.ID == 0 || run.Status != models.OSRunRunning {
+		t.Fatalf("run = %+v", run)
+	}
+	pending, _ := repo.PendingHosts(ctx, run.ID)
+	if len(pending) != 3 {
+		t.Fatalf("pending = %v", pending)
+	}
+
+	if ok, err := repo.StartResult(ctx, run.ID, hosts[0], "ubuntu 22.04"); !ok || err != nil {
+		t.Fatalf("start = %v %v", ok, err)
+	}
+	if ok, _ := repo.StartResult(ctx, run.ID, hosts[0], "x"); ok {
+		t.Fatal("a running host can't start twice")
+	}
+	three, one := 3, 1
+	if err := repo.FinishResult(ctx, &models.OSUpdateResult{RunID: run.ID, HostID: hosts[0], Status: models.OSResultSuccess,
+		PkgManager: "apt", OSAfter: "ubuntu 22.04", Upgradable: &three, SecurityUpgradable: &one, Output: "@@pm apt"}); err != nil {
+		t.Fatal(err)
+	}
+	repo.StartResult(ctx, run.ID, hosts[1], "")
+
+	// Cancel: what's still pending is skipped.
+	if err := repo.SkipPending(ctx, run.ID, "cancelled"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.GetRun(ctx, run.ID)
+	if err != nil || got == nil {
+		t.Fatalf("get = %v %v", got, err)
+	}
+	if got.Counts["success"] != 1 || got.Counts["running"] != 1 || got.Counts["skipped"] != 1 || len(got.Results) != 3 {
+		t.Fatalf("counts = %v results = %d", got.Counts, len(got.Results))
+	}
+	if r := got.Results[0]; r.HostNickname != "vm-a" || *r.Upgradable != 3 || r.OSBefore != "ubuntu 22.04" || r.FinishedAt == nil {
+		t.Fatalf("vm-a = %+v", r)
+	}
+
+	// A restart: the running host fails with an explanation, the run is interrupted.
+	if err := repo.MarkInterrupted(ctx); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = repo.GetRun(ctx, run.ID)
+	if got.Status != models.OSRunInterrupted || got.FinishedAt == nil || got.Results[1].Status != models.OSResultFailed ||
+		!strings.Contains(got.Results[1].Reason, "restart") {
+		t.Fatalf("interrupted = %+v / %+v", got, got.Results[1])
+	}
+	if ok, _ := repo.FinishRun(ctx, run.ID, models.OSRunDone); ok {
+		t.Fatal("an interrupted run can't be finished again")
+	}
+
+	latest, err := repo.LatestByHost(ctx)
+	if err != nil || len(latest) != 1 || latest[0].HostID != hosts[0] || *latest[0].SecurityUpgradable != 1 || latest[0].Output != "" {
+		t.Fatalf("latest = %+v %v", latest, err)
+	}
+	runs, err := repo.ListRuns(ctx, 10)
+	if err != nil || len(runs) != 1 || runs[0].Counts["failed"] != 1 {
+		t.Fatalf("runs = %+v %v", runs, err)
+	}
+	if missing, err := repo.GetRun(ctx, 999); missing != nil || err != nil {
+		t.Fatalf("missing = %v %v", missing, err)
+	}
+}

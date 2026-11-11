@@ -73,6 +73,12 @@ var webCmd = &cobra.Command{
 			log.Printf("[atlas] seed bridge catalogue entry: %v", err)
 		}
 
+		// OS update runs the last shutdown cut short can't resume (their
+		// goroutines are gone): close them as interrupted.
+		if err := store.NewOSUpdateRepo(db.SQL).MarkInterrupted(ctx); err != nil {
+			log.Printf("[osupdate] mark interrupted runs: %v", err)
+		}
+
 		// Background: clean up expired share links every hour (Phase 3 Task 3.4).
 		// Stops when ctx is cancelled (shutdown signal).
 		vault.NewShareLinkJanitor(db.SQL).Start(ctx)

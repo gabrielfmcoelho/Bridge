@@ -558,7 +558,7 @@ export default function HostsPage() {
               />
           </InventoryOverview>
         ) : pageTab === "os" ? (
-          <HostsOSView />
+          <HostsOSView hosts={hosts} isAdmin={user?.role === "admin"} />
         ) : (
           <HostsDashboard
             hosts={hosts}
