@@ -20,11 +20,22 @@ export function peakUsage(h: Host): number | null {
 
 export const HIGH_USAGE = 80;
 
-/** "ubuntu 22.04" from the os-release id/version, else the pretty name. */
+// Brand names of os-release IDs (same in every language); an ID not listed
+// shows as is.
+const OS_NAMES: Record<string, string> = {
+  ubuntu: "Ubuntu", debian: "Debian", centos: "CentOS", ol: "Oracle Linux", rhel: "Red Hat Enterprise Linux",
+  rocky: "Rocky Linux", almalinux: "AlmaLinux", alpine: "Alpine", amzn: "Amazon Linux", fedora: "Fedora",
+  sles: "SUSE Linux Enterprise", "opensuse-leap": "openSUSE Leap", arch: "Arch Linux",
+};
+
+/** "Oracle Linux" for "ol": an os-release ID's brand name. */
+export const osName = (id: string) => OS_NAMES[id] ?? id;
+
+/** "Ubuntu 22.04" from the os-release id/version, else the pretty name. */
 export function osLabel(h: Host): string {
   const o = h.os;
   if (!o) return "";
-  return o.id ? `${o.id} ${o.version ?? ""}`.trim() : o.pretty ?? "";
+  return o.id ? `${osName(o.id)} ${o.version ?? ""}`.trim() : o.pretty ?? "";
 }
 
 /** How the page reads situação roles (useSituacao); the defaults treat the

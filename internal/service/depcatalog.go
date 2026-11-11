@@ -39,7 +39,7 @@ var depProducts = []depProduct{
 // osEOL maps an os-release ID to its endoflife.date slug.
 var osEOL = map[string]string{
 	"debian": "debian", "ubuntu": "ubuntu", "alpine": "alpine-linux", "rhel": "rhel",
-	"rocky": "rocky-linux", "almalinux": "almalinux", "centos": "centos",
+	"rocky": "rocky-linux", "almalinux": "almalinux", "centos": "centos", "ol": "oracle-linux",
 }
 
 // osvEcosystem names the OSV ecosystem of a distro release ("" = OSV can't

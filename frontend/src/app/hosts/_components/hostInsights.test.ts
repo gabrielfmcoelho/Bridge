@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hostInsights, hostBreakdowns, peakUsage, resourcesBy, recentScans, sumSizes } from "./hostInsights.ts";
+import { hostInsights, hostBreakdowns, osLabel, osName, peakUsage, resourcesBy, recentScans, sumSizes } from "./hostInsights.ts";
 import type { Host } from "@/lib/types";
 
 const t = (k: string, v?: Record<string, string>) => (v ? `${k}(${Object.values(v).join(",")})` : k);
@@ -52,6 +52,13 @@ test("breakdowns count per value, most frequent first, with filters", () => {
   assert.deepEqual(b.alerts.map((r) => [r.key, r.count]), [["critical", 1], ["warning", 0], ["info", 0]]);
 });
 
+test("OS names: brand for known ids, the id itself otherwise", () => {
+  assert.equal(osName("ol"), "Oracle Linux");
+  assert.equal(osName("centos"), "CentOS");
+  assert.equal(osName("nixos"), "nixos");
+  assert.equal(osLabel(host({ id: 1, os: { id: "ol", version: "8.9" } })), "Oracle Linux 8.9");
+});
+
 test("OS breakdown uses id + version, falls back to the pretty name", () => {
   const b = hostBreakdowns([
     host({ id: 1, os: { id: "ubuntu", version: "22.04", pretty: "Ubuntu 22.04.4 LTS" } }),
@@ -59,7 +66,7 @@ test("OS breakdown uses id + version, falls back to the pretty name", () => {
     host({ id: 3, os: { pretty: "FreeBSD" } }),
     host({ id: 4 }),
   ]);
-  assert.deepEqual(b.os.map((r) => [r.key, r.count]), [["ubuntu 22.04", 2], ["host.dash.osUnknown", 1], ["FreeBSD", 1]]);
+  assert.deepEqual(b.os.map((r) => [r.key, r.count]), [["Ubuntu 22.04", 2], ["host.dash.osUnknown", 1], ["FreeBSD", 1]]);
 });
 
 test("situação KPIs follow roles when the values are renamed", () => {
