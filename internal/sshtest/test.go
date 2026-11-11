@@ -129,6 +129,11 @@ type VMInfo struct {
 	// WebServers: nginx / Apache / php-fpm on the host and in running
 	// containers, with their sites (webservers.go).
 	WebServers []WebServer `json:"web_servers,omitempty"`
+	// GitRemotes: remotes of the git checkouts on the host and in running
+	// containers (gitremotes.go). nil = the probe didn't run, [] = none.
+	// GitRemotesPartial: a part stopped early, so the list may miss repos.
+	GitRemotes        []GitRemote `json:"git_remotes"`
+	GitRemotesPartial bool        `json:"git_remotes_partial,omitempty"`
 	// Dependencies is the host's and each container's OS, runtimes and
 	// packages (deps.go). Kept out of the stored scan JSON: the scan handler
 	// writes it to dependency_inventory; container package lists would
@@ -1676,6 +1681,8 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		storageRaw     string
 		nginxConfig    string
 		webServers     []WebServer
+		gitRemotes     []GitRemote
+		gitComplete    bool
 		hostInv        *hostInventory
 		dockerPsRaw    string
 		dockerStatsRaw string
@@ -1695,6 +1702,11 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		s := time.Now()
 		cronInfo = captureCronInfo(client, sudoPassword)
 		timeSession("[par] session 6b cron", s)
+		// Git checkouts on the host and in containers, chained here (cron
+		// is quick) so the block keeps 10 sessions.
+		s = time.Now()
+		gitRemotes, gitComplete = collectGitRemotes(client, sudoPassword)
+		timeSession("[par] session 6b+ git remotes", s)
 	}()
 	go func() {
 		defer wg.Done()
@@ -2025,6 +2037,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	// Web servers: a host one whose systemd unit isn't running is "stopped".
 	markStoppedHostServers(webServers, info.SystemdServices)
 	info.WebServers = webServers
+	info.GitRemotes, info.GitRemotesPartial = gitRemotes, gitRemotes != nil && !gitComplete
 
 	// Build a map of docker host port → container for fast lookup.
 	dockerHostPorts := dockerHostPortMap(info.ParsedContainers)

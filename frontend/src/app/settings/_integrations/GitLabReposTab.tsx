@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useFlag } from "@/contexts/FlagContext";
 import { dnsAPI, gitlabReposAPI, hostsAPI, integrationsAPI, projectGitlabAPI, projectsAPI, servicesAPI } from "@/lib/api";
-import type { GitLabInventoryRepo, GitLabRepoRef } from "@/lib/types";
+import type { GitLabFoundRef, GitLabInventoryRepo, GitLabRepoRef } from "@/lib/types";
 import SectionCard from "@/components/ui/SectionCard";
 import Input from "@/components/ui/Input";
 import PillButton from "@/components/ui/PillButton";
@@ -17,12 +18,25 @@ import Modal from "@/components/ui/Modal";
 import AsyncPicker, { type AsyncPickerItem } from "@/components/ui/AsyncPicker";
 import StatusAlert from "@/components/ui/StatusAlert";
 import EmptyState from "@/components/ui/EmptyState";
+import ToolbarActionButton from "@/components/ui/ToolbarActionButton";
+import { useExportCSV } from "@/hooks/useExportCSV";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import { buildTree, inheritedByGroup, repoMatches, repoTotal, type GroupNode, type InheritedRef, type RepoFilter } from "./gitlabRepoTree";
+import {
+  attachmentCount, buildTree, foreignMatches, foundLabel, inheritedByGroup, repoMatches, repoTotal, splitUnlisted,
+  type GroupNode, type InheritedRef, type RepoFilter,
+} from "./gitlabRepoTree";
 
 type Kind = "projetos" | "services" | "dns" | "hosts";
 const KINDS: Kind[] = ["projetos", "services", "dns", "hosts"];
 const FILTERS: RepoFilter[] = ["all", "linked", "unlinked", ...KINDS];
+
+// CSV of a "found on hosts" list: one row per place a scan found the repo.
+const FOUND_CSV = (["repo", "host", "ip", "container", "path", "commit", "branch", "pulled_at", "pull_kind"] as const).map((key) => ({ key, header: key }));
+const foundRows = (items: { repo: string; found: GitLabFoundRef[] }[]) =>
+  items.flatMap((i) => i.found.map((f) => ({
+    repo: i.repo, host: f.host_name, ip: f.host_address, container: f.container ?? "", path: f.path,
+    commit: f.commit ?? "", branch: f.branch ?? "", pulled_at: f.pulled_at ? new Date(f.pulled_at * 1000).toISOString() : "", pull_kind: f.pull_kind ?? "",
+  })));
 
 // Search fetchers for the attach picker: the first 20 matches of each list.
 const FETCHERS: Record<Kind, (q: string) => Promise<AsyncPickerItem[]>> = {
@@ -62,7 +76,11 @@ export default function GitLabReposTab() {
     () => (inv ? buildTree(inv.groups, inv.repos, (r) => repoMatches(r, query, filter, (r.id !== 0 && inherited.get(r.namespace_id)) || []), filtering) : { roots: [], loose: [] }),
     [inv, query, filter, filtering, inherited],
   );
-  const unlisted = (inv?.unlisted ?? []).filter(keep);
+  const unlisted = splitUnlisted((inv?.unlisted ?? []).filter(keep));
+  const foreign = (inv?.foreign ?? []).filter((f) => foreignMatches(f, query));
+  // Exports what the lists show: the search filters them too.
+  const exportFound = useExportCSV(foundRows(unlisted.onHosts.map((r) => ({ repo: r.path_with_namespace, found: r.found }))), FOUND_CSV, "gitlab_encontrados_nas_vms");
+  const exportForeign = useExportCSV(foundRows(foreign.map((f) => ({ repo: f.url, found: f.found }))), FOUND_CSV, "gitlab_fora_deste_gitlab");
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["gitlab-repos"] });
   const detach = useMutation({
@@ -96,6 +114,14 @@ export default function GitLabReposTab() {
     </span>
   ));
 
+  // Where hosts' scans found a checkout. The scan links those hosts itself,
+  // so there is nothing to detach here: the next scan would link them again.
+  const foundChips = (list: GitLabFoundRef[]) => list.map((f) => (
+    <Link key={`found-${f.host_id}-${f.container ?? ""}-${f.path}`} href={`/hosts/${f.host_slug}`} aria-label={`${t("settings.gitlabRepos.foundChip")}: ${foundLabel(f)}`}>
+      <Tag>{`${t("settings.gitlabRepos.kind.hosts")}: ${foundLabel(f)}`}</Tag>
+    </Link>
+  ));
+
   const chips = (r: GitLabInventoryRepo, inh: InheritedRef[] = []) => (
     <div className="flex flex-wrap gap-1.5">
       {KINDS.flatMap((kind) => r[kind].map((ref) => {
@@ -108,6 +134,7 @@ export default function GitLabReposTab() {
             removeLabel={t("settings.gitlabRepos.detach")}>{label}</Tag>
         );
       }))}
+      {foundChips(r.found ?? [])}
       {inheritedChips(inh)}
     </div>
   );
@@ -119,7 +146,7 @@ export default function GitLabReposTab() {
         <a href={r.web_url} target="_blank" rel="noopener noreferrer" className="truncate text-sm text-[var(--accent)] hover:underline" title={r.path_with_namespace}>{r.name}</a>
       </div>
       <div className="min-w-0 flex-1">
-        {r.projetos.length + r.services.length + r.dns.length + r.hosts.length + inheritedOf(r).length > 0
+        {attachmentCount(r, inheritedOf(r)) > 0
           ? chips(r, inheritedOf(r))
           : <span className="text-xs text-[var(--text-muted)]">{t("settings.gitlabRepos.noLinks")}</span>}
       </div>
@@ -193,13 +220,41 @@ export default function GitLabReposTab() {
         </div>
       </SectionCard>
 
-      {unlisted.length > 0 && (
+      {unlisted.onHosts.length > 0 && (
+        <SectionCard as="h3" title={t("settings.gitlabRepos.foundTitle")} description={t("settings.gitlabRepos.foundHint")}
+          controls={<ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportFound} />}>
+          <ul className="divide-y divide-[var(--border-subtle)]">
+            {unlisted.onHosts.map((r) => (
+              <li key={r.path_with_namespace} className="flex flex-col gap-1.5 py-2 sm:flex-row sm:items-start sm:gap-3">
+                <a href={r.web_url} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-[var(--accent)] hover:underline sm:w-64 sm:shrink-0 break-all">{r.path_with_namespace}</a>
+                <div className="min-w-0 flex-1 flex flex-wrap gap-1.5">{foundChips(r.found)}</div>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
+
+      {unlisted.attached.length > 0 && (
         <SectionCard as="h3" title={t("settings.gitlabRepos.unlistedTitle")} description={t("settings.gitlabRepos.unlistedHint")}>
           <ul className="divide-y divide-[var(--border-subtle)]">
-            {unlisted.map((r) => (
+            {unlisted.attached.map((r) => (
               <li key={r.path_with_namespace} className="flex flex-col gap-1.5 py-2 sm:flex-row sm:items-start sm:gap-3">
                 <span className="font-mono text-xs text-[var(--text-secondary)] sm:w-64 sm:shrink-0 break-all">{r.path_with_namespace}</span>
                 <div className="min-w-0 flex-1">{chips(r)}</div>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      )}
+
+      {foreign.length > 0 && (
+        <SectionCard as="h3" title={t("settings.gitlabRepos.foreignTitle")} description={t("settings.gitlabRepos.foreignHint")}
+          controls={<ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportForeign} />}>
+          <ul className="divide-y divide-[var(--border-subtle)]">
+            {foreign.map((f) => (
+              <li key={f.url} className="flex flex-col gap-1.5 py-2 sm:flex-row sm:items-start sm:gap-3">
+                <a href={`https://${f.url}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-[var(--accent)] hover:underline sm:w-64 sm:shrink-0 break-all">{f.url}</a>
+                <div className="min-w-0 flex-1 flex flex-wrap gap-1.5">{foundChips(f.found)}</div>
               </li>
             ))}
           </ul>

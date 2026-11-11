@@ -189,3 +189,107 @@ func mustHost(t *testing.T, raw string) string {
 	}
 	return u.Hostname()
 }
+
+// Remotes in hosts' latest scans: a repo the token lists gets "found" refs, one
+// it doesn't lands in unlisted with them, one on another host goes to foreign
+// (grouped across URL spellings). Scan links never show up as host refs.
+func TestGitLabRepoInventoryFoundOnHosts(t *testing.T) {
+	ctx := context.Background()
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	gl := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.EscapedPath() {
+		case "/api/v4/groups":
+			_, _ = w.Write([]byte(`[]`))
+		case "/api/v4/projects":
+			_, _ = w.Write([]byte(`[{"id":7,"name":"app","path_with_namespace":"sead/app","namespace":{"id":1,"full_path":"sead"}}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(gl.Close)
+	glHost := mustHost(t, gl.URL)
+
+	u := &models.User{Username: "admin", DisplayName: "admin", Role: "admin", Email: "admin@example.com"}
+	if err := store.NewUserRepo(d.SQL).Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	mux := newEcho()
+	(&projectGitLabHandlers{db: d}).registerRoutes(routeRegistrar{e: mux})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mux.ServeHTTP(w, r.WithContext(auth.WithUser(r.Context(), u)))
+	}))
+	t.Cleanup(srv.Close)
+	env := &catalogEnv{t: t, d: d, server: srv, user: u}
+	settings := store.NewAppSettingsRepo(d.SQL)
+	for k, v := range map[string]string{"gitlab_integration_enabled": "true", "auth_gitlab_base_url": gl.URL} {
+		if err := settings.Set(ctx, k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.NewAppSecretRepo(d.SQL).Store(ctx, d.Encryptor, "gitlab_code_service_token", "tok"); err != nil {
+		t.Fatal(err)
+	}
+
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug, hostname) VALUES ('vm-git', 'vm-git-slug', '10.0.0.5') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatal(err)
+	}
+	scan, _ := json.Marshal(map[string]any{"git_remotes": []map[string]any{
+		{"path": "/opt/app", "name": "origin", "url": gl.URL + "/sead/app.git", "commit": "0123456789abcdef0123456789abcdef01234567", "branch": "main", "pulled_at": 1700001000, "pull_kind": "pull"},
+		{"path": "/opt/hidden", "name": "origin", "url": gl.URL + "/sead/hidden"},
+		{"container": "api", "path": "/app", "name": "origin", "url": "git@" + glHost + ":sead/hidden.git"},
+		{"path": "/opt/tool", "name": "upstream", "url": "https://github.com/o/tool.git"},
+		{"container": "web", "path": "/srv", "name": "origin", "url": "git@GitHub.com:o/tool"},
+	}})
+	if err := store.NewHostScanRepo(d.SQL).Create(ctx, hostID, string(scan)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.NewGitLabRepoLinkRepo(d.SQL).SyncScanLinks(ctx, hostID, gl.URL, []string{"sead/app", "sead/hidden"}, true); err != nil {
+		t.Fatal(err)
+	}
+	// vm-old: scan links from an earlier scan, but its latest git search
+	// didn't run. The links still show — as the host, with no path.
+	var oldID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug, hostname) VALUES ('vm-old', 'vm-old-slug', 'vm-old.example') RETURNING id`).Scan(&oldID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.NewHostScanRepo(d.SQL).Create(ctx, oldID, `{"git_remotes":null}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.NewGitLabRepoLinkRepo(d.SQL).SyncScanLinks(ctx, oldID, gl.URL, []string{"sead/hidden"}, true); err != nil {
+		t.Fatal(err)
+	}
+	old := gitlabFoundRef{HostID: oldID, HostName: "vm-old", HostSlug: "vm-old-slug", HostAddress: "vm-old.example"}
+
+	var inv gitlabInventory
+	resp := env.do("GET", "/api/settings/gitlab/repos", "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("inventory = %d %s", resp.StatusCode, readBody(resp))
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&inv); err != nil {
+		t.Fatal(err)
+	}
+	at := func(c, p string) gitlabFoundRef {
+		return gitlabFoundRef{HostID: hostID, HostName: "vm-git", HostSlug: "vm-git-slug", HostAddress: "10.0.0.5", Container: c, Path: p}
+	}
+	appAt := at("", "/opt/app")
+	appAt.Commit, appAt.Branch, appAt.PulledAt, appAt.PullKind = "0123456789abcdef0123456789abcdef01234567", "main", 1700001000, "pull"
+	if app := inv.Repos[0]; len(app.Hosts) != 0 || len(app.Found) != 1 || app.Found[0] != appAt {
+		t.Fatalf("sead/app = %+v", app)
+	}
+	if len(inv.Unlisted) != 1 {
+		t.Fatalf("unlisted = %+v", inv.Unlisted)
+	}
+	if h := inv.Unlisted[0]; h.PathWithNamespace != "sead/hidden" || len(h.Hosts) != 0 ||
+		len(h.Found) != 3 || h.Found[0] != at("", "/opt/hidden") || h.Found[1] != at("api", "/app") || h.Found[2] != old {
+		t.Fatalf("sead/hidden = %+v", h)
+	}
+	if len(inv.Foreign) != 1 || inv.Foreign[0].URL != "github.com/o/tool" ||
+		len(inv.Foreign[0].Found) != 2 || inv.Foreign[0].Found[0] != at("", "/opt/tool") || inv.Foreign[0].Found[1] != at("web", "/srv") {
+		t.Fatalf("foreign = %+v", inv.Foreign)
+	}
+}

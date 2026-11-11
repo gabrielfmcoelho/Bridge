@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -239,7 +238,7 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 	// A service's own repo first: its Coolify branch is what is deployed.
 	for _, s := range services {
 		for _, raw := range []string{s.GitRepository, s.GitlabURL, s.RepositoryURL} {
-			path, ok := gitlabRepoPath(raw, gls.BaseURL)
+			path, ok := gitlabclient.RepoPath(raw, gls.BaseURL)
 			if !ok {
 				continue
 			}
@@ -255,6 +254,7 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 	// Repos linked straight to the finding's DNS records and hosts.
 	direct := store.NewGitLabRepoLinkRepo(db.SQL)
 	var dnsIDs, hostIDs []int64
+	var scanLinks []models.GitLabRepoLink
 	for _, d := range records {
 		dnsIDs = append(dnsIDs, d.ID)
 	}
@@ -268,6 +268,10 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 		ls, _ := direct.ListFor(ctx, q.kind, q.ids)
 		for _, l := range ls {
 			if !sameGitLab(l.GitLabBaseURL, gls.BaseURL) {
+				continue
+			}
+			if l.Source == models.GitLabLinkSourceScan {
+				scanLinks = append(scanLinks, l) // after every curated source
 				continue
 			}
 			if l.Kind == models.GitLabLinkKindGroup {
@@ -302,6 +306,20 @@ func buildFixScope(ctx context.Context, db *database.DB, f *models.VulnFinding, 
 			addRepo(fixRepo{Key: t.Path, ID: t.ID, Name: t.Name, Ref: t.Ref})
 		}
 	}
+	// Repos the host scan found checked out on the finding's hosts: last, so
+	// they never crowd out a chosen repo, and not looked up once the plan is
+	// full. They carry no GitLab id: found by path.
+	for _, l := range scanLinks {
+		if len(sc.repos) >= fixPlanMaxRepos {
+			break
+		}
+		p, err := gl.SearchProjectByPath(l.GitLabPath)
+		if err != nil {
+			sc.notes = append(sc.notes, "repo "+l.GitLabPath+" ligado a "+l.EntityName+" não acessível")
+			continue
+		}
+		addRepo(fixRepo{Key: p.PathWithNamespace, ID: p.ID, Name: p.Name, Ref: gls.DefaultRef})
+	}
 	if len(sc.repos) == 0 {
 		sc.notes = append(sc.notes, "Nenhum repositório GitLab ligado aos projetos, serviços, DNS ou hosts deste achado.")
 	}
@@ -323,43 +341,6 @@ func orDash(s string) string {
 		return "—"
 	}
 	return s
-}
-
-// gitlabRepoPath extracts "group/repo" from a clone or web URL (https, ssh://
-// or scp-style git@host:path) when it points at the configured GitLab host.
-func gitlabRepoPath(raw, baseURL string) (string, bool) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "", false
-	}
-	base, err := url.Parse(baseURL)
-	if err != nil || base.Host == "" {
-		return "", false
-	}
-	var host, path string
-	if !strings.Contains(raw, "://") && strings.Contains(raw, "@") && strings.Contains(raw, ":") {
-		// scp-style: git@host:group/repo.git
-		at := raw[strings.Index(raw, "@")+1:]
-		host, path, _ = strings.Cut(at, ":")
-	} else {
-		u, err := url.Parse(raw)
-		if err != nil {
-			return "", false
-		}
-		host, path = u.Host, u.Path
-	}
-	if !strings.EqualFold(strings.Split(host, ":")[0], base.Hostname()) {
-		return "", false
-	}
-	path = strings.Trim(strings.TrimSuffix(strings.Trim(path, "/"), ".git"), "/")
-	// Web URLs may point inside the repo: …/group/repo/-/tree/main
-	if i := strings.Index(path, "/-/"); i >= 0 {
-		path = path[:i]
-	}
-	if !strings.Contains(path, "/") {
-		return "", false
-	}
-	return path, true
 }
 
 // repo resolves a tool's repo argument against the allowlist.

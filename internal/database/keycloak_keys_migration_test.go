@@ -52,8 +52,8 @@ func TestMigrationV98_SEADToKeycloak(t *testing.T) {
 		}
 		return id
 	}
-	folha := api("API Servidores", "sead", "http://10.0.122.91:8000")
-	sei := api("Processos", "sead", "http://10.0.122.91:8001/sei")
+	folha := api("API Servidores", "sead", "http://10.99.0.91:8000")
+	sei := api("Processos", "sead", "http://10.99.0.91:8001/sei")
 	other := api("Outra", "manual", "")
 	mustExec(`INSERT INTO api_keys (api_id, label, source, external_label, notes) VALUES (?, 'painel', 'sead', 'painel', ''), (?, 'bot', 'sead', 'bot', 'do RH'), (?, 'm', 'manual', NULL, '')`, folha, sei, other)
 

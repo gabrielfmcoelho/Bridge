@@ -113,7 +113,7 @@ func (o *optional[T]) UnmarshalJSON(b []byte) error {
 // GET /escopos and GET /admin/uso live) and its scope prefix.
 type keyManagementRequest struct {
 	KeyManagement string `json:"key_management" example:"keycloak"`
-	AdminBaseURL  string `json:"admin_base_url" example:"http://10.0.122.91:8000"`
+	AdminBaseURL  string `json:"admin_base_url" example:"http://10.99.0.91:8000"`
 	ScopePrefix   string `json:"scope_prefix" example:"servidores"`
 }
 

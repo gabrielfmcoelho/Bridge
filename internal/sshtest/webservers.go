@@ -67,25 +67,37 @@ if [ -n "$f" ]; then P fpm; grep -H -E '^\[|^[[:space:]]*listen[[:space:]]*=' $f
 `
 
 // webProbeScript is the whole remote script: the host part, then every
-// running container (up to maxWebContainers) through docker exec, each
-// framed by "@@CTR <id> <name> <image>". One SSH session.
+// running container (up to maxWebContainers) through docker exec. One SSH session.
 // ponytail: every running container is probed, not only web-looking images —
 // app images often embed nginx; cap and per-container timeout bound the cost.
-// asRoot: the script already runs as root (runSudoCmd), so no sudo -n retries.
 func webProbeScript(asRoot bool) string {
-	inner := base64.StdEncoding.EncodeToString([]byte(webInnerScript))
+	return hostAndContainersScript(webInnerScript, maxWebContainers, webOutputCap, 6, 0, asRoot)
+}
+
+// hostAndContainersScript runs inner on the host, then inside every running
+// container (up to max) through docker exec, each framed by
+// "@@CTR <id> <name> <image>" and closed by "@@exit <docker exec status>",
+// its output capped at outCap bytes and its run at ctrTimeout seconds. budget > 0: a container reached that many seconds
+// after the loop began isn't run, its frame says "@@skipped". asRoot: the
+// script already runs as root (runSudoCmd), so no sudo -n retries; otherwise
+// inner sees SUDO=1.
+func hostAndContainersScript(inner string, max, outCap, ctrTimeout, budget int, asRoot bool) string {
+	b64 := base64.StdEncoding.EncodeToString([]byte(inner))
 	head, dockerFallback := "SUDO=1\n", `$D ps -q >/dev/null 2>&1 || D="sudo -n docker"`
 	if asRoot {
 		head, dockerFallback = "", ""
 	}
-	return head + webInnerScript + strings.NewReplacer("{MAX}", strconv.Itoa(maxWebContainers), "{B64}", inner,
-		"{CAP}", strconv.Itoa(webOutputCap), "{FALLBACK}", dockerFallback).Replace(`
+	return head + inner + strings.NewReplacer("{MAX}", strconv.Itoa(max), "{B64}", b64,
+		"{CAP}", strconv.Itoa(outCap), "{FALLBACK}", dockerFallback, "{TO}", strconv.Itoa(ctrTimeout),
+		"{BUDGET}", strconv.Itoa(budget)).Replace(`
 command -v docker >/dev/null 2>&1 || exit 0
-TO=""; command -v timeout >/dev/null 2>&1 && TO="timeout 6"
+TO=""; command -v timeout >/dev/null 2>&1 && TO="timeout {TO}"
 D=docker; {FALLBACK}
+B0=$(date +%s 2>/dev/null || echo 0)
 $T $D ps --format '{{.ID}} {{.Names}} {{.Image}}' 2>/dev/null | head -n {MAX} | while read id name image; do
   echo "@@CTR $id $name $image"
-  printf %s {B64} | base64 -d | $TO $D exec -i "$id" sh 2>/dev/null | head -c {CAP}
+  if [ {BUDGET} -gt 0 ] && [ $(( $(date +%s 2>/dev/null || echo 0) - B0 )) -ge {BUDGET} ]; then echo @@skipped; continue; fi
+  { printf %s {B64} | base64 -d | $TO $D exec -i "$id" sh 2>/dev/null; r=$?; echo; echo "@@exit $r"; } | head -c {CAP}
   echo
 done
 `)
@@ -110,20 +122,51 @@ func collectWebServers(client *ssh.Client, sudoPassword string) (servers []WebSe
 
 var ctrHeader = regexp.MustCompile(`^@@CTR ([0-9a-f]{12,64}) (\S+) (\S+)$`)
 
-// parseWebProbe splits the probe output into the host part and one part per
-// container and builds their servers.
-func parseWebProbe(raw string) ([]WebServer, string) {
+// ctrFrame is one container's part of a hostAndContainersScript output.
+// Exit is the docker exec status the host shell saw (126/127: no shell in
+// the image; 1: paused, restarting…), -1 when the frame has none (skipped,
+// or cut by the output cap).
+type ctrFrame struct {
+	ID, Name, Image, Body string
+	Exit                  int
+}
+
+var ctrExit = regexp.MustCompile(`\n@@exit ([0-9]{1,3})\s*$`)
+
+// splitCtrFrames splits a hostAndContainersScript output into the host part
+// and one frame per container, with the exec status taken off the body's
+// end (only the last marker counts: the container prints whatever it likes
+// before it). A frame whose header doesn't validate is dropped whole:
+// container output is untrusted.
+func splitCtrFrames(raw string) (string, []ctrFrame) {
 	parts := strings.Split("\n"+raw, "\n@@CTR ")
-	hostSec := webSections(parts[0])
-	servers := webServersFrom(hostSec)
+	var frames []ctrFrame
 	for _, p := range parts[1:] {
 		head, body, _ := strings.Cut(p, "\n")
 		m := ctrHeader.FindStringSubmatch("@@CTR " + strings.TrimSpace(head))
 		if m == nil {
 			continue
 		}
-		for _, ws := range webServersFrom(webSections(body)) {
-			ws.ContainerID, ws.Container, ws.ContainerImage = m[1], m[2], m[3]
+		f := ctrFrame{ID: m[1], Name: m[2], Image: m[3], Body: body, Exit: -1}
+		s := "\n" + body
+		if e := ctrExit.FindStringSubmatchIndex(s); e != nil {
+			f.Exit, _ = strconv.Atoi(s[e[2]:e[3]])
+			f.Body = strings.TrimPrefix(s[:e[0]], "\n")
+		}
+		frames = append(frames, f)
+	}
+	return parts[0], frames
+}
+
+// parseWebProbe splits the probe output into the host part and one part per
+// container and builds their servers.
+func parseWebProbe(raw string) ([]WebServer, string) {
+	host, frames := splitCtrFrames(raw)
+	hostSec := webSections(host)
+	servers := webServersFrom(hostSec)
+	for _, f := range frames {
+		for _, ws := range webServersFrom(webSections(f.Body)) {
+			ws.ContainerID, ws.Container, ws.ContainerImage = f.ID, f.Name, f.Image
 			servers = append(servers, ws)
 		}
 	}

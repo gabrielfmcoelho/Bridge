@@ -163,6 +163,10 @@ export type VMInfoType = {
   parsed_containers?: ParsedContainer[];
   ssh_auth_policy?: SSHAuthPolicy;
   web_servers?: WebServer[];
+  /** Remotes of git checkouts on the host and in containers. null = probe didn't run. */
+  git_remotes?: GitRemote[] | null;
+  /** Some part of the git probe stopped early: the list may miss repos. */
+  git_remotes_partial?: boolean;
   /** Every partition (storage.go); storage / disk_percent sum them / take the fullest. */
   filesystems?: Filesystem[];
   disks?: BlockDisk[];
@@ -205,6 +209,21 @@ export type WebSite = {
 };
 
 export type FPMPool = { name: string; listen?: string };
+
+/** One remote of a git checkout (the working tree at `path`), credentials stripped. */
+export type GitRemote = {
+  container?: string;
+  container_image?: string;
+  path: string;
+  name: string;
+  url: string;
+  /** HEAD of the checkout (40 or 64 hex) and its branch (absent when detached). */
+  commit?: string;
+  branch?: string;
+  /** Unix seconds of the last clone, pull or fetch, and which one. */
+  pulled_at?: number;
+  pull_kind?: "clone" | "pull" | "fetch";
+};
 
 /** What the scan's web-server step did to DNS records (POST /api/ssh/test). */
 export type WebDNSSummary = {

@@ -23,7 +23,7 @@ export default function KeycloakAPIsSection() {
           label={t("settings.integrations.keycloakApis.publicUrl")}
           value={f.form.kc_apis_base_url ?? ""}
           onChange={(e) => f.set("kc_apis_base_url", e.target.value)}
-          placeholder="http://keycloak.10.0.122.89.sslip.io"
+          placeholder="http://keycloak.10.99.0.89.sslip.io"
         />
         <Input
           label="Realm"
@@ -36,14 +36,14 @@ export default function KeycloakAPIsSection() {
           hint={t("settings.integrations.keycloakApis.internalUrlHint")}
           value={f.form.kc_apis_internal_url ?? ""}
           onChange={(e) => f.set("kc_apis_internal_url", e.target.value)}
-          placeholder="http://10.0.122.89"
+          placeholder="http://10.99.0.89"
         />
         <Input
           label={t("settings.integrations.keycloakApis.hostHeader")}
           hint={t("settings.integrations.keycloakApis.hostHeaderHint")}
           value={f.form.kc_apis_host_header ?? ""}
           onChange={(e) => f.set("kc_apis_host_header", e.target.value)}
-          placeholder="keycloak.10.0.122.89.sslip.io"
+          placeholder="keycloak.10.99.0.89.sslip.io"
         />
         <Input
           label={t("settings.integrations.keycloak.clientId")}

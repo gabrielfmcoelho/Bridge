@@ -2135,4 +2135,17 @@ var migrationsPostgres = []string{
 	// no suggestion is not asked again for 7 days, so a scan doesn't repeat
 	// the misses of the last one.
 	`ALTER TABLE gitlab_autores ADD COLUMN IF NOT EXISTS sugestao_tentada_em TIMESTAMPTZ;`,
+
+	// Version 123: host links the scan makes from the git remotes it finds
+	// (source 'scan'). A repo the token can't see has no GitLab id, so scan
+	// links carry gitlab_project_id 0 and are keyed by lowercase path: the
+	// id-keyed unique index now skips id 0 and a path-keyed one covers it.
+	`ALTER TABLE gitlab_repo_links ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual';
+	ALTER TABLE gitlab_repo_links DROP CONSTRAINT IF EXISTS gitlab_repo_links_source_check;
+	ALTER TABLE gitlab_repo_links ADD CONSTRAINT gitlab_repo_links_source_check CHECK (source IN ('manual','scan'));
+	DROP INDEX IF EXISTS uq_gitlab_repo_links;
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_gitlab_repo_links
+		ON gitlab_repo_links (entity_type, entity_id, kind, gitlab_project_id, gitlab_base_url) WHERE gitlab_project_id <> 0;
+	CREATE UNIQUE INDEX IF NOT EXISTS uq_gitlab_repo_links_path
+		ON gitlab_repo_links (entity_type, entity_id, kind, gitlab_base_url, lower(gitlab_path)) WHERE gitlab_project_id = 0;`,
 }

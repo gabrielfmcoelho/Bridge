@@ -150,6 +150,46 @@ func (r *HostScanRepo) LatestListSummaryBulk(ctx context.Context) (map[int64]str
 	return m, rows.Err()
 }
 
+// LatestGitRemotes returns the git remotes of every live host's latest scan
+// (git_remotes in the JSON), host-level first, then by container and path.
+// Same latest-row rules as LatestListSummaryBulk; a latest scan that isn't
+// valid JSON or has no git_remotes array contributes nothing.
+func (r *HostScanRepo) LatestGitRemotes(ctx context.Context) ([]models.HostGitRemote, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		WITH latest AS MATERIALIZED (
+			SELECT hs.host_id, hs.data::jsonb AS d
+			FROM host_scans hs
+			JOIN (SELECT host_id, MAX(scanned_at) AS max_at FROM host_scans GROUP BY host_id) l
+			  ON hs.host_id = l.host_id AND hs.scanned_at = l.max_at
+			WHERE pg_input_is_valid(hs.data, 'jsonb')
+		)
+		SELECT h.id, h.nickname, h.oficial_slug, h.hostname,
+			COALESCE(g->>'container', ''), COALESCE(g->>'container_image', ''),
+			COALESCE(g->>'path', ''), COALESCE(g->>'name', ''), COALESCE(g->>'url', ''),
+			COALESCE(g->>'commit', ''), COALESCE(g->>'branch', ''), COALESCE(g->>'pulled_at', ''), COALESCE(g->>'pull_kind', '')
+		FROM latest
+		JOIN hosts h ON h.id = latest.host_id AND h.deleted_at IS NULL
+		CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(d->'git_remotes') = 'array'
+			THEN d->'git_remotes' ELSE '[]'::jsonb END) g
+		ORDER BY h.nickname, h.id, 5, 7, 8`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.HostGitRemote
+	for rows.Next() {
+		var g models.HostGitRemote
+		var pulledAt string // text: a value that isn't a number reads as unknown, not as a failed query
+		if err := rows.Scan(&g.HostID, &g.HostName, &g.HostSlug, &g.HostAddress, &g.Container, &g.ContainerImage, &g.Path, &g.Name, &g.URL,
+			&g.Commit, &g.Branch, &pulledAt, &g.PullKind); err != nil {
+			return nil, err
+		}
+		g.PulledAt, _ = strconv.ParseInt(pulledAt, 10, 64)
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
 // parseScanMetrics extracts the sortable resource numerics from a scan's JSON
 // blob. cpu/ram/disk are display strings like "45%" → *float64 (nil when
 // absent/unparseable, so they store as NULL — distinct from a real 0%).

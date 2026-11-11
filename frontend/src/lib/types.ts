@@ -1599,13 +1599,40 @@ export interface GitLabInventoryRepo {
   services: GitLabRepoRef[];
   dns: GitLabRepoRef[];
   hosts: GitLabRepoRef[];
+  /** Checkouts of this repo in hosts' latest scans (the scan also links those hosts). */
+  found: GitLabFoundRef[];
+}
+
+/** Where a host's latest scan found a checkout: on the host, or in `container`.
+ *  path "" = a link an earlier scan made that the latest one couldn't check. */
+export interface GitLabFoundRef {
+  host_id: number;
+  host_name: string;
+  host_slug: string;
+  /** The host's hostname: its IP or name. */
+  host_address: string;
+  container?: string;
+  path: string;
+  /** HEAD of the checkout, its branch, and when it last came from the remote (unix). */
+  commit?: string;
+  branch?: string;
+  pulled_at?: number;
+  pull_kind?: "clone" | "pull" | "fetch";
+}
+
+/** A remote found on hosts that points outside the configured GitLab, as "host/path". */
+export interface GitLabForeignRepo {
+  url: string;
+  found: GitLabFoundRef[];
 }
 
 export interface GitLabInventory {
   base_url: string;
   groups: GitLabInventoryGroup[];
   repos: GitLabInventoryRepo[];
+  /** Attached in Bridge or found on hosts, but not listed by the token. */
   unlisted: GitLabInventoryRepo[];
+  foreign: GitLabForeignRepo[];
   truncated: boolean;
 }
 
