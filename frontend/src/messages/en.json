@@ -3523,7 +3523,8 @@
       "requestFailed": "Request failed: {detail}"
     },
     "asyncPicker": {
-      "clearSelection": "— clear selection —"
+      "clearSelection": "— clear selection —",
+      "groupNotSelectable": "Group only — pick one of its items below"
     }
   },
   "inventory": {

@@ -142,6 +142,7 @@ export default function CreateTicketModal({
           id: r.id,
           label: r.name,
           path: glpiAncestorPath(r.completename, r.name),
+          disabled: r.disabled,
         } as AsyncPickerItem)
     );
   };

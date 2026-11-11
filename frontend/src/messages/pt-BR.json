@@ -3523,7 +3523,8 @@
       "requestFailed": "A requisição falhou: {detail}"
     },
     "asyncPicker": {
-      "clearSelection": "— limpar seleção —"
+      "clearSelection": "— limpar seleção —",
+      "groupNotSelectable": "Apenas agrupamento — escolha um dos itens abaixo"
     }
   },
   "inventory": {
