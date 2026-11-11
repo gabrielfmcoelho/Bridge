@@ -11,6 +11,7 @@ import Field from "@/components/ui/Field";
 import Badge from "@/components/ui/Badge";
 import { glpiAPI, integrationsAPI } from "@/lib/api";
 import type { HostChamado } from "@/lib/types";
+import { glpiStatusLabelKey } from "@/lib/glpiStatus";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 
@@ -209,7 +210,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const [profileID, setProfileID] = useState<number | null>(null);
-  const [liveStatus, setLiveStatus] = useState<{ label: string; slug: string } | null>(null);
+  const [liveStatus, setLiveStatus] = useState<{ slug: string } | null>(null);
 
   const { data: integrations } = useQuery({
     queryKey: ["integrations"],
@@ -239,7 +240,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
   const mutation = useMutation({
     mutationFn: () => glpiAPI.refreshChamadoCache(slug, chamado.id!, profileID!),
     onSuccess: (res) => {
-      setLiveStatus({ label: res.status_label, slug: res.status_slug });
+      setLiveStatus({ slug: res.status_slug });
       queryClient.invalidateQueries({ queryKey: ["chamados", slug] });
     },
   });
@@ -259,7 +260,7 @@ function GlpiRefreshBlock({ slug, chamado }: { slug: string; chamado: HostChamad
           {(chamado.cached_status || liveStatus) && (
             <div className="flex items-center gap-2 mt-1">
               <Badge className="text-2xs">
-                {liveStatus?.label ?? chamado.cached_status}
+                {t(glpiStatusLabelKey(liveStatus?.slug ?? chamado.cached_status))}
               </Badge>
               {chamado.external_url && (
                 <Link

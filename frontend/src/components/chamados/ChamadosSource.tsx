@@ -8,13 +8,15 @@ import PillButton from "@/components/ui/PillButton";
 
 const SOURCES = [
   { key: "glpi", href: "/chamados", label: "chamados.source.glpi", icon: NAV_ICONS.Ticket },
+  { key: "glpi-sead", href: "/chamados-sead", label: "chamados.source.glpiSead", icon: NAV_ICONS.Ticket },
   { key: "bridge", href: "/requests", label: "chamados.source.bridge", icon: NAV_ICONS.ClipboardList },
 ] as const;
 
-/** Chamados is one sidebar entry with two ways to ask for something: GLPI
- *  tickets (/chamados) and Bridge's own requests (/requests). This switch
- *  sits under the title of both pages. */
-export default function ChamadosSource({ active }: { active: "glpi" | "bridge" }) {
+/** Chamados is one sidebar entry with three ways to ask for something: GLPI
+ *  (ETIPI) tickets (/chamados), GLPI SEAD/NTGD tickets (/chamados-sead), and
+ *  Bridge's own requests (/requests). This switch sits under the title of
+ *  all three pages. */
+export default function ChamadosSource({ active }: { active: "glpi" | "glpi-sead" | "bridge" }) {
   const { t } = useLocale();
   const router = useRouter();
   return (

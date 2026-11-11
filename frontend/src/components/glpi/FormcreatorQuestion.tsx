@@ -10,6 +10,7 @@ import DateTimeInput from "@/components/ui/DateTimeInput";
 import AsyncPicker, { type AsyncPickerItem } from "@/components/ui/AsyncPicker";
 import FormcreatorFileInput, { type UploadedDoc } from "@/components/glpi/FormcreatorFileInput";
 import { glpiAPI, type FormcreatorQuestion as Question } from "@/lib/api";
+import { glpiAncestorPath } from "@/lib/glpiHierarchy";
 import { useLocale } from "@/contexts/LocaleContext";
 
 // Local copies of the helpers in TicketDetailDrawer.tsx so this component
@@ -476,7 +477,7 @@ export default function FormcreatorQuestion({
       return (
         <DropdownWithFallback
           label={labelText}
-          itemtype={readItemtype(question.values)}
+          itemtype={question.itemtype || readItemtype(question.values)}
           value={value}
           onChange={onChange}
           profileID={profileID}
@@ -692,17 +693,31 @@ function DropdownWithFallback({
         selectedLabel={labelFromValue}
         fetcher={async (q) => {
           if (!profileID) return [];
+          // "User" dropdowns (e.g. Formcreator's Observador/glpiselect fields)
+          // read from the dedicated user-search endpoint so results show
+          // "Firstname Lastname" with the login as a secondary line, same as
+          // the actor field type, instead of the generic itemtype search.
+          if (itemtype === "User") {
+            const res = await glpiAPI.searchUsers(profileID, q);
+            return res.users.map(
+              (u) =>
+                ({
+                  id: u.id,
+                  label: u.display || u.login,
+                  secondary: u.login && u.display && u.login !== u.display ? u.login : undefined,
+                } as AsyncPickerItem)
+            );
+          }
           const res = await glpiAPI.searchDropdown(itemtype, profileID, q);
           return res.items.map(
             (r) =>
               ({
+                // Hierarchical itemtypes (ITILCategory, Location) get ancestor
+                // header rows + indentation, same convention GLPI's own
+                // picker uses, instead of repeating the full breadcrumb.
                 id: r.id,
                 label: r.name,
-                // For hierarchical itemtypes (ITILCategory, Location), the
-                // catalogue may provide a full path like "A > B > C" — show it
-                // as a secondary line so users can disambiguate same-named
-                // leaves under different parents.
-                secondary: r.completename && r.completename !== r.name ? r.completename : undefined,
+                path: glpiAncestorPath(r.completename, r.name),
               } as AsyncPickerItem)
           );
         }}

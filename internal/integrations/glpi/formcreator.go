@@ -203,6 +203,11 @@ type FormcreatorQuestion struct {
 	Width         flexInt `json:"width"`
 	SectionsID    flexInt `json:"plugin_formcreator_sections_id"`
 	RegexPattern  string  `json:"regex"`
+	// ItemType is the GLPI class a dropdown/glpiselect/itemtype question
+	// targets (e.g. "ITILCategory", "User", "Location"). GLPI returns it as a
+	// top-level field on the question resource, separate from — and not
+	// always present inside — the `values` JSON blob, so it needs its own tag.
+	ItemType string `json:"itemtype"`
 }
 
 // FormcreatorCondition carries a show/hide rule for either a question or a

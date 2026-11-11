@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLocale } from "@/contexts/LocaleContext";
 import { getTimeAgo } from "@/lib/utils";
+import { glpiStatusLabelKey } from "@/lib/glpiStatus";
 import type { GlpiTicketSummary } from "@/lib/api";
 
 function formatDate(d?: string, locale: string = "pt-BR") {
@@ -75,7 +76,7 @@ export default function TicketList({
               </span>
             )}
             <span className={`shrink-0 text-2xs px-1.5 py-0.5 rounded border ${statusColor[tk.status_slug] || statusColor.unknown}`}>
-              {tk.status_label}
+              {t(glpiStatusLabelKey(tk.status_slug))}
             </span>
           </div>
         );

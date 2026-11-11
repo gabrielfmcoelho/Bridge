@@ -1638,10 +1638,52 @@ export type GlpiTicketSummary = {
   status: number;
   status_label: string;
   status_slug: "new" | "assigned" | "planned" | "waiting" | "solved" | "closed" | "unknown";
+  type?: number; // 1=incidente 2=requisição
   priority: number;
+  urgency?: number;
+  impact?: number;
   entities_id: number;
+  itilcategories_id?: number;
+  locations_id?: number;
+  requesttypes_id?: number;
+  slas_id_tto?: number;
+  slas_id_ttr?: number;
   date?: string;
   url: string;
+};
+
+export type GlpiTicketActor = {
+  id: number;
+  role: number; // 1=requester 2=observer 3=assign
+  is_group: boolean;
+  actor_id: number;
+  name: string;
+};
+
+export type GlpiTicketDocument = {
+  id: number;
+  doc_id: number;
+  filename: string;
+};
+
+export type GlpiTicketValidation = {
+  id: number;
+  tickets_id: number;
+  users_id_validate: number;
+  users_id: number;
+  status: number; // 1=waiting 2=accepted 3=refused
+  comment_submission: string;
+  comment_validation: string;
+  submission_date: string;
+  validation_date: string;
+};
+
+export type GlpiTicketSatisfaction = {
+  id: number;
+  tickets_id: number;
+  satisfaction: number; // 1-5
+  comment: string;
+  date_answered: string;
 };
 
 export type GlpiTicketEvent = {
@@ -1660,6 +1702,10 @@ export type GlpiTicketDetails = {
   ticket: GlpiTicketSummary & { content?: string; date_mod?: string };
   glpi_base_url: string;
   requester: { id: number; name: string };
+  actors: GlpiTicketActor[];
+  documents: GlpiTicketDocument[];
+  validations: GlpiTicketValidation[];
+  satisfaction?: GlpiTicketSatisfaction;
   events: GlpiTicketEvent[];
   event_counts: { followup: number; task: number; solution: number };
   warnings?: string[];
@@ -1702,6 +1748,7 @@ export type FormcreatorQuestion = {
   width?: number;
   plugin_formcreator_sections_id: number;
   regex?: string;
+  itemtype?: string;
 };
 
 export type FormcreatorCondition = {
@@ -1773,8 +1820,20 @@ export const glpiAPI = {
     profile_id: number;
     title: string;
     description?: string;
+    type?: number; // 1=incidente 2=requisição
     entity_id?: number;
     category_id?: number;
+    location_id?: number;
+    request_type_id?: number;
+    sla_id_tto?: number;
+    sla_id_ttr?: number;
+    urgency?: number;
+    impact?: number;
+    priority?: number;
+    requester_ids?: number[];
+    watcher_ids?: number[];
+    assign_user_id?: number;
+    assign_group_id?: number;
     host_slug?: string;
     alert_id?: number;
     link_computer?: boolean;
@@ -1792,6 +1851,84 @@ export const glpiAPI = {
     api.get<GlpiTicketDetails>(
       `/api/glpi/tickets/${ticketID}/details?profile_id=${profileID}`
     ),
+  updateTicket: (
+    ticketID: number,
+    profileID: number,
+    data: {
+      title?: string;
+      status?: number;
+      type?: number;
+      category_id?: number;
+      location_id?: number;
+      sla_id_tto?: number;
+      sla_id_ttr?: number;
+      urgency?: number;
+      impact?: number;
+      priority?: number;
+    }
+  ) => api.put<{ status: string }>(`/api/glpi/tickets/${ticketID}?profile_id=${profileID}`, data),
+  addTicketFollowup: (ticketID: number, profileID: number, content: string, isPrivate?: boolean) =>
+    api.post<{ id: number }>(`/api/glpi/tickets/${ticketID}/followups?profile_id=${profileID}`, {
+      content,
+      is_private: !!isPrivate,
+    }),
+  addTicketTask: (ticketID: number, profileID: number, content: string, actiontime?: number) =>
+    api.post<{ id: number }>(`/api/glpi/tickets/${ticketID}/tasks?profile_id=${profileID}`, {
+      content,
+      actiontime: actiontime ?? 0,
+    }),
+  addTicketSolution: (ticketID: number, profileID: number, content: string) =>
+    api.post<{ id: number }>(`/api/glpi/tickets/${ticketID}/solution?profile_id=${profileID}`, { content }),
+  addTicketActor: (
+    ticketID: number,
+    profileID: number,
+    data: { user_id?: number; group_id?: number; role: number }
+  ) => api.post<{ status: string }>(`/api/glpi/tickets/${ticketID}/actors?profile_id=${profileID}`, data),
+  removeTicketActor: (ticketID: number, actorRowID: number, profileID: number, isGroup: boolean) =>
+    api.delete<{ status: string }>(
+      `/api/glpi/tickets/${ticketID}/actors/${actorRowID}?profile_id=${profileID}&is_group=${isGroup}`
+    ),
+  uploadTicketDocument: async (ticketID: number, profileID: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(
+      `${API_BASE}/api/glpi/tickets/${ticketID}/documents?profile_id=${profileID}`,
+      { method: "POST", credentials: "include", body: form }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Upload failed: ${res.status}`);
+    }
+    return res.json() as Promise<{ id: number; filename: string }>;
+  },
+  addTicketValidation: (ticketID: number, profileID: number, approverID: number, comment?: string) =>
+    api.post<{ id: number }>(`/api/glpi/tickets/${ticketID}/validations?profile_id=${profileID}`, {
+      approver_id: approverID,
+      comment: comment ?? "",
+    }),
+  answerTicketValidation: (
+    ticketID: number,
+    validationID: number,
+    profileID: number,
+    status: number,
+    comment?: string
+  ) =>
+    api.put<{ status: string }>(
+      `/api/glpi/tickets/${ticketID}/validations/${validationID}?profile_id=${profileID}`,
+      { status, comment: comment ?? "" }
+    ),
+  submitTicketSatisfaction: (
+    ticketID: number,
+    profileID: number,
+    satisfactionID: number,
+    rating: number,
+    comment?: string
+  ) =>
+    api.put<{ status: string }>(`/api/glpi/tickets/${ticketID}/satisfaction?profile_id=${profileID}`, {
+      satisfaction_id: satisfactionID,
+      rating,
+      comment: comment ?? "",
+    }),
   listForms: (profileID: number, q?: string) => {
     const params = new URLSearchParams({ profile_id: String(profileID) });
     if (q) params.set("q", q);
@@ -1880,6 +2017,93 @@ export const glpiAPI = {
     ),
   refreshChamadoCache: (slug: string, chamadoID: number, profileID: number) =>
     api.post<GlpiTicketSummary>(`/api/hosts/${encodeURIComponent(slug)}/chamados/${chamadoID}/glpi/refresh?profile_id=${profileID}`),
+};
+
+// ─── GLPI SEAD/NTGD (High-Level REST API v2) ────────────────────────────────
+// Independent integration from glpiAPI above (different GLPI instance,
+// different protocol/auth — OAuth2, configured via GLPI_SEAD_* env vars, no
+// per-profile token picker). Refs are GLPI v2's nested {id,name} shape.
+export type GlpiSeadRef = { id: number; name?: string; completename?: string };
+
+export type GlpiSeadTicket = {
+  id: number;
+  name: string;
+  content?: string;
+  type?: number; // 1=incidente 2=requisição
+  urgency?: number;
+  impact?: number;
+  priority?: number;
+  status: GlpiSeadRef;
+  category?: GlpiSeadRef;
+  location?: GlpiSeadRef;
+  request_type?: GlpiSeadRef;
+  entity?: GlpiSeadRef;
+  date?: string;
+  date_mod?: string;
+  date_creation?: string;
+};
+
+export type GlpiSeadTeamMember = {
+  id: number;
+  name: string;
+  type: string; // "User" | "Group"
+  role: string; // "requester" | "observer" | "assigned"
+};
+
+// GLPI v2's Timeline endpoint wraps each entry as {type, item} — `type` is
+// the kind ("Followup"|"Task"|"Solution"|"Document"|"Validation") and `item`
+// holds that kind's own fields (content/date/is_private/...).
+export type GlpiSeadTimelineItem = {
+  type: string;
+  item: Record<string, unknown> & {
+    content?: string;
+    date?: string;
+    is_private?: boolean;
+  };
+};
+
+export const glpiSeadAPI = {
+  status: () => api.get<{ enabled: boolean }>("/api/glpi-sead/status"),
+  listTickets: (opts?: { q?: string; start?: number; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (opts?.q) params.set("q", opts.q);
+    if (opts?.start != null) params.set("start", String(opts.start));
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    return api.get<{ tickets: GlpiSeadTicket[]; count: number }>(
+      `/api/glpi-sead/tickets${qs ? `?${qs}` : ""}`
+    );
+  },
+  getTicket: (id: number) => api.get<GlpiSeadTicket>(`/api/glpi-sead/tickets/${id}`),
+  getTimeline: (id: number) =>
+    api.get<{ items: GlpiSeadTimelineItem[]; count: number }>(`/api/glpi-sead/tickets/${id}/timeline`),
+  getTeam: (id: number) =>
+    api.get<{ team: GlpiSeadTeamMember[]; count: number }>(`/api/glpi-sead/tickets/${id}/team`),
+  createTicket: (data: {
+    title: string;
+    description?: string;
+    type?: number;
+    urgency?: number;
+    impact?: number;
+    priority?: number;
+    category_id?: number;
+    location_id?: number;
+    request_type_id?: number;
+    entity_id?: number;
+  }) => api.post<{ ticket_id: number }>("/api/glpi-sead/tickets", data),
+  addFollowup: (id: number, content: string, isPrivate?: boolean) =>
+    api.post<{ id: number }>(`/api/glpi-sead/tickets/${id}/followups`, {
+      content,
+      is_private: !!isPrivate,
+    }),
+  searchDropdown: (itemtype: string, q: string) =>
+    api.get<{ items: GlpiSeadRef[]; count: number }>(
+      `/api/glpi-sead/dropdowns/${encodeURIComponent(itemtype)}/search?q=${encodeURIComponent(q)}`
+    ),
+  searchAdministration: (itemtype: string, q: string) =>
+    api.get<{ items: GlpiSeadRef[]; count: number }>(
+      `/api/glpi-sead/administration/${encodeURIComponent(itemtype)}/search?q=${encodeURIComponent(q)}`
+    ),
 };
 
 // Outline (wiki) integration
