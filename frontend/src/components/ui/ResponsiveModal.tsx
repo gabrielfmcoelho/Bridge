@@ -14,9 +14,11 @@ interface ResponsiveModalProps {
   children: ReactNode;
   /** Desktop width (phones get the bottom drawer). */
   size?: ModalSize;
+  /** Desktop: above an open drawer (see Modal). */
+  onTop?: boolean;
 }
 
-export default function ResponsiveModal({ open, onClose, title, subHeader, footer, children, size }: ResponsiveModalProps) {
+export default function ResponsiveModal({ open, onClose, title, subHeader, footer, children, size, onTop }: ResponsiveModalProps) {
   const isMobile = useMediaQuery("(max-width: 767px)");
 
   if (isMobile) {
@@ -28,7 +30,7 @@ export default function ResponsiveModal({ open, onClose, title, subHeader, foote
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={title} subHeader={subHeader} footer={footer} size={size}>
+    <Modal open={open} onClose={onClose} title={title} subHeader={subHeader} footer={footer} size={size} onTop={onTop}>
       {children}
     </Modal>
   );

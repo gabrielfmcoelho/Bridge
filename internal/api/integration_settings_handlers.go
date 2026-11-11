@@ -14,6 +14,7 @@ import (
 	grafanaclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/grafana"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/llm"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/mailer"
+	minioclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/minio"
 	outlineclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/outline"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -142,6 +143,19 @@ var integrationGroups = map[string][]string{
 	"proxmox": {
 		"proxmox_enabled", // master switch; the servers live in proxmox_servers (v106)
 	},
+	// MinIO (S3) for OS update backups, and what those backups take.
+	"minio": {
+		"minio_enabled",
+		"minio_endpoint",
+		"minio_public_url",
+		"minio_access_key",
+		"minio_secret_key",
+		"minio_bucket",
+		"minio_use_ssl",
+		"osbackup_prefix",
+		"osbackup_include",
+		"osbackup_exclude",
+	},
 	"glpi": {
 		"glpi_enabled",
 		"glpi_base_url",
@@ -188,6 +202,7 @@ var secretKeys = map[string]bool{
 	"kc_apis_client_secret":              true,
 	"kc_apis_usage_client_secret":        true,
 	"smtp_password":                      true,
+	"minio_secret_key":                   true,
 }
 
 // handleGetIntegrations returns all integration settings grouped by provider.
@@ -1025,6 +1040,7 @@ func (h *integrationSettingsHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "POST /api/settings/integrations/test/llm", h.handleTestLLM)
 	rr.role("admin", "POST /api/settings/integrations/test/grafana", h.handleTestGrafana)
 	rr.role("admin", "POST /api/settings/integrations/test/outline", h.handleTestOutline)
+	rr.role("admin", "POST /api/settings/integrations/test/minio", h.handleTestMinio)
 	rr.role("admin", "POST /api/settings/integrations/test/smtp", h.handleTestSMTP)
 	rr.role("admin", "DELETE /api/settings/integrations/{group}/secret/{key}", h.handleClearIntegrationSecret)
 
@@ -1036,4 +1052,35 @@ func (h *integrationSettingsHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "GET /api/settings/role-mappings", h.handleGetRoleMappings)
 	rr.role("admin", "POST /api/settings/role-mappings", h.handleCreateRoleMapping)
 	rr.role("admin", "DELETE /api/settings/role-mappings/{id}", h.handleDeleteRoleMapping)
+}
+
+// handleTestMinio godoc
+//
+//	@Summary		Test the MinIO integration
+//	@Description	Admin. Checks the saved MinIO settings: the credentials work and the bucket exists. Always 200: {"success": false, "error"} or {"success": true, "bucket"}.
+//	@Tags			integration-settings
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Router			/api/settings/integrations/test/minio [post]
+func (h *integrationSettingsHandlers) handleTestMinio(w http.ResponseWriter, r *http.Request) {
+	s, err := minioclient.LoadSettings(h.db.SQL, h.db.Encryptor)
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": "failed to read settings"})
+		return
+	}
+	if s.Endpoint == "" || s.AccessKey == "" || s.SecretKey == "" || s.Bucket == "" {
+		jsonOK(w, map[string]any{"success": false, "error": "endpoint, access key, secret key and bucket are required: save them first"})
+		return
+	}
+	c, err := minioclient.New(s)
+	if err == nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		err = c.Check(ctx)
+	}
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	jsonOK(w, map[string]any{"success": true, "bucket": s.Bucket})
 }

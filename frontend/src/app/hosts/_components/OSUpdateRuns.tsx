@@ -11,6 +11,7 @@ import StatusAlert from "@/components/ui/StatusAlert";
 import { tableClasses } from "@/components/ui/Table";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useFlag } from "@/contexts/FlagContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { osUpdateAPI } from "@/lib/api";
 import { getTimeAgo } from "@/lib/utils";
 import type { OSUpdateResult, OSUpdateRun } from "@/lib/types";
@@ -100,6 +101,22 @@ function RunDrawer({ id, onClose }: { id: number; onClose: () => void }) {
     mutationFn: () => osUpdateAPI.cancel(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["os-updates"] }),
   });
+  const flag = useFlag();
+  const confirm = useConfirm();
+  // The link goes straight to MinIO (no Bridge proxy in the way of a big file).
+  const download = useMutation({
+    mutationFn: (x: OSUpdateResult) => osUpdateAPI.backupLink(id, x.host_id),
+    onSuccess: (link) => { window.location.href = link.url; },
+    onError: (err) => flag({ appearance: "error", title: t("host.osUpdate.backupLinkFailed"), description: (err as Error).message }),
+  });
+  const removeBackup = useMutation({
+    mutationFn: (x: OSUpdateResult) => osUpdateAPI.deleteBackup(id, x.host_id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["os-updates", "run", id] }),
+    onError: (err) => flag({ appearance: "error", title: t("host.osUpdate.backupDeleteFailed"), description: (err as Error).message }),
+  });
+  const askRemove = async (x: OSUpdateResult) => {
+    if (await confirm({ title: t("host.osUpdate.backupDeleteTitle", { host: x.host_nickname }), confirmLabel: t("common.delete"), danger: true })) removeBackup.mutate(x);
+  };
 
   return (
     <Drawer open onClose={onClose} wide title={t("host.osUpdate.runTitle", { id: String(id) })}
@@ -118,6 +135,7 @@ function RunDrawer({ id, onClose }: { id: number; onClose: () => void }) {
                 <th className={tableClasses.th}>{t("host.osUpdate.pending")}</th>
                 <th className={tableClasses.th}>{t("host.osUpdate.upgraded")}</th>
                 <th className={tableClasses.th}>{t("host.os")}</th>
+                {run.backup && <th className={tableClasses.th}>{t("host.osUpdate.backupCol")}</th>}
               </tr>
             </thead>
             <tbody>
@@ -138,10 +156,23 @@ function RunDrawer({ id, onClose }: { id: number; onClose: () => void }) {
                       {x.rebooted && <Lozenge appearance="inprogress" className="ml-1.5">{t("host.osUpdate.rebooted")}</Lozenge>}
                       {!x.rebooted && x.reboot_required && <Lozenge appearance="moved" className="ml-1.5">{t("host.rebootPending")}</Lozenge>}
                     </td>
+                    {run.backup && (
+                      <td className={`${tableClasses.td} text-xs whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
+                        {x.backup_status === "done" ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="tabular-nums text-[var(--text-secondary)]">{x.backup_size != null ? gib(x.backup_size) : ""}</span>
+                            <Button size="sm" variant="secondary" onClick={() => download.mutate(x)} disabled={download.isPending}>{t("host.osUpdate.backupDownload")}</Button>
+                            <Button size="sm" variant="ghost" onClick={() => askRemove(x)} disabled={removeBackup.isPending}>{t("common.delete")}</Button>
+                          </span>
+                        ) : x.backup_status ? (
+                          <span className={x.backup_status === "failed" ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}>{t(`host.osUpdate.backupStatus.${x.backup_status}`)}</span>
+                        ) : <span className="text-[var(--text-muted)]">–</span>}
+                      </td>
+                    )}
                   </tr>
                   {openHost === x.host_id && (
                     <tr className={tableClasses.row}>
-                      <td className={tableClasses.td} colSpan={5}>
+                      <td className={tableClasses.td} colSpan={run.backup ? 6 : 5}>
                         <pre className="text-xs font-mono whitespace-pre-wrap max-h-80 overflow-auto bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-3">{x.output}</pre>
                       </td>
                     </tr>
@@ -161,3 +192,6 @@ export function pendingText(x: Pick<OSUpdateResult, "upgradable" | "security_upg
   if (x.upgradable == null) return "–";
   return x.security_upgradable ? `${x.upgradable} (${t("host.osUpdate.securityShort", { count: String(x.security_upgradable) })})` : String(x.upgradable);
 }
+
+/** 3400000000 → "3.2 GiB". */
+const gib = (n: number) => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(1)} GiB` : `${Math.max(1, Math.round(n / (1 << 20)))} MiB`);

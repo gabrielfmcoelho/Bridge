@@ -19,6 +19,7 @@ import ProxmoxSection from "./_integrations/ProxmoxSection";
 import WazuhSection from "./_integrations/WazuhSection";
 import DependenciesSection from "./_integrations/DependenciesSection";
 import SMTPSection from "./_integrations/SMTPSection";
+import MinioSection from "./_integrations/MinioSection";
 
 export default function IntegrationsTab() {
   const { data } = useQuery({ queryKey: ["integrations"], queryFn: integrationsAPI.get });
@@ -41,6 +42,7 @@ export default function IntegrationsTab() {
       <CoolifySection />
       <SentinelSection />
       <ProxmoxSection />
+      <MinioSection />
       <WazuhSection />
       <DependenciesSection />
     </div>

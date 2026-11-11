@@ -88,4 +88,27 @@ func TestOSUpdateRepo_Lifecycle(t *testing.T) {
 	if missing, err := repo.GetRun(ctx, 999); missing != nil || err != nil {
 		t.Fatalf("missing = %v %v", missing, err)
 	}
+
+	// Backup fields round-trip; a backup can later be marked deleted.
+	brun := &models.OSUpdateRun{Kind: "packages", Concurrency: 1, Backup: true, KeepBackup: true}
+	if err := repo.CreateRun(ctx, brun, hosts[:1]); err != nil {
+		t.Fatal(err)
+	}
+	repo.StartResult(ctx, brun.ID, hosts[0], "")
+	size := int64(1 << 30)
+	if err := repo.FinishResult(ctx, &models.OSUpdateResult{RunID: brun.ID, HostID: hosts[0], Status: models.OSResultSuccess,
+		BackupKey: "bridge/os-backups/vm-a/x.tar.zst", BackupSize: &size, BackupStatus: models.OSBackupDone}); err != nil {
+		t.Fatal(err)
+	}
+	x, err := repo.GetResult(ctx, brun.ID, hosts[0])
+	if err != nil || x == nil || x.BackupKey != "bridge/os-backups/vm-a/x.tar.zst" || *x.BackupSize != size || x.BackupStatus != models.OSBackupDone {
+		t.Fatalf("result = %+v %v", x, err)
+	}
+	repo.SetBackupStatus(ctx, brun.ID, hosts[0], models.OSBackupDeleted)
+	if got, _ := repo.GetRun(ctx, brun.ID); !got.Backup || !got.KeepBackup || got.Results[0].BackupStatus != models.OSBackupDeleted {
+		t.Fatalf("run = %+v", got)
+	}
+	if none, err := repo.GetResult(ctx, brun.ID, hosts[2]); none != nil || err != nil {
+		t.Fatalf("no result = %v %v", none, err)
+	}
 }

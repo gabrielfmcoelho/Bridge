@@ -675,6 +675,8 @@
       "eolCount": "{count} sem suporte"
     },
     "osRelease": {
+      "withBackup": "O host recebe um backup no MinIO antes, mantido se a troca falhar.",
+      "noBackup": "Nenhum backup é feito: o MinIO não está configurado.",
       "action": "trocar versão",
       "confirmTitle": "Levar {host} ({os}) para a próxima versão?",
       "confirmMessage": "Faça um snapshot da VM antes: uma troca de versão que falhe pode deixá-la sem dar boot. Suportado: Ubuntu LTS → próxima LTS, Debian N → N+1, Alpine 3.x → 3.x+1. O host não pode ter atualizações de pacotes pendentes nem reinício pendente, e precisa de 5 GB livres em /. Ele é reiniciado no fim e pode levar até 3 horas.",
@@ -682,6 +684,22 @@
       "failed": "Não foi possível iniciar a troca de versão"
     },
     "osUpdate": {
+      "backup": "Fazer backup no MinIO antes",
+      "backupHint": "Envia {paths} (sem os caminhos excluídos e os sistemas de arquivos virtuais e de rede) para o MinIO antes de mexer no host. Se o backup falhar, o host não é atualizado.",
+      "keepBackup": "Manter o backup depois do sucesso",
+      "keepBackupHint": "Por padrão o backup é apagado quando a atualização deu certo e o host voltou a responder. Hosts que falharam sempre mantêm o seu.",
+      "backupUnavailable": "O backup antes de atualizar precisa do MinIO: Configurações › Integrações › MinIO.",
+      "confirmBackup": "Cada host recebe um backup no MinIO antes.",
+      "confirmNoBackup": "Nenhum backup é feito.",
+      "backupCol": "Backup",
+      "backupDownload": "Baixar",
+      "backupLinkFailed": "Não foi possível gerar o link de download",
+      "backupDeleteFailed": "Não foi possível apagar o backup",
+      "backupDeleteTitle": "Apagar o backup de {host} do MinIO?",
+      "backupStatus": {
+        "failed": "falhou",
+        "deleted": "apagado"
+      },
       "open": "Atualizar…",
       "title": "Atualizar sistemas operacionais",
       "start": "Iniciar",
@@ -1770,6 +1788,23 @@
       }
     },
     "integrations": {
+      "minio": {
+        "hint": "Onde as execuções de atualização guardam o backup dos hosts antes de mexer neles; hosts que falharam mantêm o seu, para baixar pela execução.",
+        "ariaEnable": "Ativar backups no MinIO",
+        "endpoint": "Endpoint (host:porta que o Bridge alcança)",
+        "protocol": "Protocolo",
+        "publicUrl": "URL pública (opcional)",
+        "publicUrlHint": "O endereço que os navegadores alcançam, para os links de download. Vazio = o endpoint acima.",
+        "accessKey": "Access key",
+        "secretKey": "Secret key",
+        "bucket": "Bucket",
+        "prefix": "Prefixo do caminho",
+        "include": "Caminhos do backup",
+        "includeHint": "Separados por espaço ou linha. Padrão: /",
+        "exclude": "Caminhos fora do backup",
+        "excludeHint": "Sistemas de arquivos virtuais, de containers e de rede sempre ficam de fora. Exclua as pastas de dados de bancos em uso: copiadas com o banco rodando podem ficar inconsistentes.",
+        "bucketOk": "Bucket {bucket} acessível"
+      },
       "enabled": "Habilitado",
       "disabled": "Desabilitado",
       "testConnection": "Testar conexão",

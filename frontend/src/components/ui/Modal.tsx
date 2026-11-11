@@ -26,9 +26,12 @@ interface ModalProps {
    *  half rendered them inline and they scrolled away with the content. */
   footer?: ReactNode;
   children: ReactNode;
+  /** Above an open drawer (confirmations): a higher layer that takes clicks
+   *  and that the drawer doesn't treat as "outside" (data-portal-dropdown). */
+  onTop?: boolean;
 }
 
-export default function Modal({ open, onClose, title, subHeader, footer, children, size = "md" }: ModalProps) {
+export default function Modal({ open, onClose, title, subHeader, footer, children, size = "md", onTop }: ModalProps) {
   const { t } = useLocale();
   const titleId = useId();
 
@@ -59,7 +62,8 @@ export default function Modal({ open, onClose, title, subHeader, footer, childre
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center animate-fade-in"
+      className={`fixed inset-0 ${onTop ? "z-[70] pointer-events-auto" : "z-50"} flex items-end md:items-center justify-center animate-fade-in`}
+      data-portal-dropdown={onTop ? "" : undefined}
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />

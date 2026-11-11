@@ -740,13 +740,19 @@ export const orchestratorsAPI = {
 // SSH
 // OS update runs (admin): background check / package / security upgrades.
 export const osUpdateAPI = {
-  start: (body: { kind: import("./types").OSUpdateKind; host_ids: number[]; reboot: boolean; concurrency: number }) =>
+  start: (body: { kind: import("./types").OSUpdateKind; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean }) =>
     api.post<import("./types").OSUpdateRun>("/api/ssh/os-updates/runs", body),
   runs: () => api.get<import("./types").OSUpdateRun[]>("/api/ssh/os-updates/runs"),
   run: (id: number) => api.get<import("./types").OSUpdateRun>(`/api/ssh/os-updates/runs/${id}`),
   cancel: (id: number) => api.post<import("./types").OSUpdateRun>(`/api/ssh/os-updates/runs/${id}/cancel`),
   /** Per host, the newest run that counted pending upgrades. */
   latest: () => api.get<import("./types").OSUpdateResult[]>("/api/ssh/os-updates/latest"),
+  /** Whether hosts can be backed up to MinIO first, and what a backup takes. */
+  config: () => api.get<{ backup_available: boolean; backup_include: string[]; backup_exclude: string[] }>("/api/ssh/os-updates/config"),
+  /** A one-hour link straight to MinIO that downloads a kept backup. */
+  backupLink: (runId: number, hostId: number) =>
+    api.get<{ url: string; key: string; size?: number; expires_in: number }>(`/api/ssh/os-updates/runs/${runId}/hosts/${hostId}/backup`),
+  deleteBackup: (runId: number, hostId: number) => api.delete(`/api/ssh/os-updates/runs/${runId}/hosts/${hostId}/backup`),
 };
 
 export const sshAPI = {
@@ -1455,6 +1461,7 @@ export const integrationsAPI = {
       name?: string;
       org_id?: number;
     }>("/api/settings/integrations/test/grafana", data ?? {}),
+  testMinio: () => api.post<{ success: boolean; error?: string; bucket?: string }>("/api/settings/integrations/test/minio", {}),
   testOutline: (data?: { base_url?: string; token?: string }) =>
     api.post<{
       success: boolean;

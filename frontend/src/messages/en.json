@@ -675,6 +675,8 @@
       "eolCount": "{count} past end of life"
     },
     "osRelease": {
+      "withBackup": "The host is backed up to MinIO first and the backup is kept if the upgrade fails.",
+      "noBackup": "No backup is taken: MinIO is not configured.",
       "action": "change version",
       "confirmTitle": "Upgrade {host} ({os}) to its next release?",
       "confirmMessage": "Take a snapshot of the VM first: a failed release upgrade can leave it unbootable. Supported: Ubuntu LTS → next LTS, Debian N → N+1, Alpine 3.x → 3.x+1. The host must have no pending package updates, no pending reboot and 5 GB free on /. It is rebooted at the end and can take up to 3 hours.",
@@ -682,6 +684,22 @@
       "failed": "Could not start the release upgrade"
     },
     "osUpdate": {
+      "backup": "Back up to MinIO first",
+      "backupHint": "Streams {paths} (minus the excluded paths and pseudo/network filesystems) to MinIO before touching the host. If the backup fails, the host is not updated.",
+      "keepBackup": "Keep the backup after a success",
+      "keepBackupHint": "By default the backup is deleted once the update succeeded and the host answered again. Failed hosts always keep theirs.",
+      "backupUnavailable": "Backups before updating need MinIO: Settings › Integrations › MinIO.",
+      "confirmBackup": "Each host is backed up to MinIO first.",
+      "confirmNoBackup": "No backup is taken.",
+      "backupCol": "Backup",
+      "backupDownload": "Download",
+      "backupLinkFailed": "Could not get the download link",
+      "backupDeleteFailed": "Could not delete the backup",
+      "backupDeleteTitle": "Delete the backup of {host} from MinIO?",
+      "backupStatus": {
+        "failed": "failed",
+        "deleted": "deleted"
+      },
       "open": "Update…",
       "title": "Update operating systems",
       "start": "Start",
@@ -1770,6 +1788,23 @@
       }
     },
     "integrations": {
+      "minio": {
+        "hint": "Where OS update runs back hosts up before touching them; failed hosts keep theirs, downloadable from the run.",
+        "ariaEnable": "Enable MinIO backups",
+        "endpoint": "Endpoint (host:port Bridge reaches)",
+        "protocol": "Protocol",
+        "publicUrl": "Public URL (optional)",
+        "publicUrlHint": "The address browsers reach, for download links. Empty = the endpoint above.",
+        "accessKey": "Access key",
+        "secretKey": "Secret key",
+        "bucket": "Bucket",
+        "prefix": "Path prefix",
+        "include": "Paths to back up",
+        "includeHint": "Separated by spaces or lines. Default: /",
+        "exclude": "Paths to leave out",
+        "excludeHint": "Pseudo, container and network filesystems are always left out. Exclude live database data folders: copied while running they may be inconsistent.",
+        "bucketOk": "Bucket {bucket} reachable"
+      },
       "enabled": "Enabled",
       "disabled": "Disabled",
       "testConnection": "Test Connection",
