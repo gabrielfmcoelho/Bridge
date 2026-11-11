@@ -85,18 +85,28 @@ func TestOSUpdateRuns_Handlers(t *testing.T) {
 	ids := func(xs ...int64) string { b, _ := json.Marshal(xs); return string(b) }
 
 	for body, want := range map[string]int{
-		`{"kind":"release","host_ids":[1]}`:                        http.StatusBadRequest,
-		`{"kind":"check","host_ids":[]}`:                           http.StatusBadRequest,
-		`{"kind":"check","host_ids":[1],"concurrency":11}`:         http.StatusBadRequest,
-		`{"kind":"check","host_ids":` + ids(hostIDs[0], 9999) + `}`: http.StatusNotFound,
+		`{"kind":"bogus","host_ids":[1]}`:                                   http.StatusBadRequest,
+		`{"kind":"release","host_ids":` + ids(hostIDs[0], hostIDs[1]) + `}`: http.StatusBadRequest,
+		`{"kind":"check","host_ids":[]}`:                                    http.StatusBadRequest,
+		`{"kind":"check","host_ids":[1],"concurrency":11}`:                  http.StatusBadRequest,
+		`{"kind":"check","host_ids":` + ids(hostIDs[0], 9999) + `}`:         http.StatusNotFound,
 	} {
 		if code, _ := call("POST", "/api/ssh/os-updates/runs", body); code != want {
 			t.Errorf("%s = %d, want %d", body, code, want)
 		}
 	}
 
+	// A release upgrade: one host, one at a time, always rebooting.
+	code, body := call("POST", "/api/ssh/os-updates/runs", `{"kind":"release","reboot":false,"concurrency":5,"host_ids":`+ids(hostIDs[0])+`}`)
+	var rel models.OSUpdateRun
+	json.Unmarshal([]byte(body), &rel)
+	if code != http.StatusAccepted || !rel.Reboot || rel.Concurrency != 1 {
+		t.Fatalf("release = %d %+v", code, rel)
+	}
+	waitRun(rel.ID, models.OSRunDone)
+
 	// A check on every host, two at a time; reboot is ignored for a check.
-	code, body := call("POST", "/api/ssh/os-updates/runs", `{"kind":"check","reboot":true,"concurrency":2,"host_ids":`+ids(hostIDs...)+`}`)
+	code, body = call("POST", "/api/ssh/os-updates/runs", `{"kind":"check","reboot":true,"concurrency":2,"host_ids":`+ids(hostIDs...)+`}`)
 	if code != http.StatusAccepted {
 		t.Fatalf("start = %d %s", code, body)
 	}

@@ -674,6 +674,13 @@
       "hostsCount": "{count} hosts",
       "eolCount": "{count} sem suporte"
     },
+    "osRelease": {
+      "action": "trocar versão",
+      "confirmTitle": "Levar {host} ({os}) para a próxima versão?",
+      "confirmMessage": "Faça um snapshot da VM antes: uma troca de versão que falhe pode deixá-la sem dar boot. Suportado: Ubuntu LTS → próxima LTS, Debian N → N+1, Alpine 3.x → 3.x+1. O host não pode ter atualizações de pacotes pendentes nem reinício pendente, e precisa de 5 GB livres em /. Ele é reiniciado no fim e pode levar até 3 horas.",
+      "start": "Trocar versão",
+      "failed": "Não foi possível iniciar a troca de versão"
+    },
     "osUpdate": {
       "open": "Atualizar…",
       "title": "Atualizar sistemas operacionais",
