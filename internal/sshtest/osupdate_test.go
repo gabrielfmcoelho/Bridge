@@ -15,7 +15,7 @@ import (
 func fakeHost(t *testing.T, stubs map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
-	for _, tool := range []string{"sh", "grep", "cut", "awk", "wc", "sort", "cat", "touch"} {
+	for _, tool := range []string{"sh", "grep", "cut", "awk", "wc", "sort", "cat", "touch", "cp", "rm", "sed"} {
 		p, err := exec.LookPath(tool)
 		if err != nil {
 			t.Skipf("%s not available", tool)
@@ -116,7 +116,7 @@ esac`})
 	if r := runInner(t, OSUpdateCheck, fakeHost(t, nil)); r.Skip == "" || r.PkgManager != "" {
 		t.Fatalf("no manager = %+v", r)
 	}
-	if _, err := OSUpdateInnerScript("release"); err == nil {
+	if _, err := OSUpdateInnerScript("bogus"); err == nil {
 		t.Fatal("unknown kind must error")
 	}
 }

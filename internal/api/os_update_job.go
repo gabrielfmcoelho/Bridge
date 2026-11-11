@@ -38,6 +38,7 @@ const (
 var (
 	osUpdatePoll        = 15 * time.Second
 	osUpdateHostTimeout = 60 * time.Minute
+	osReleaseTimeout    = 3 * time.Hour    // a release upgrade downloads and installs the whole system
 	osUpdateRebootWait  = 90 * time.Second // before trying to reconnect
 	osUpdateRebootLimit = 10 * time.Minute // for the host to answer SSH again
 )
@@ -203,12 +204,16 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 	}
 
 	// Poll on fresh connections until the exit file shows up.
-	deadline := time.Now().Add(osUpdateHostTimeout)
+	limit := osUpdateHostTimeout
+	if run.Kind == sshtest.OSUpdateRelease {
+		limit = osReleaseTimeout
+	}
+	deadline := time.Now().Add(limit)
 	var exitCode int
 	var logTail string
 	for done := false; !done; {
 		if time.Now().After(deadline) {
-			res.Reason, res.Output = fmt.Sprintf("no result after %s: the update may still be running on the host", osUpdateHostTimeout), logTail
+			res.Reason, res.Output = fmt.Sprintf("no result after %s: the update may still be running on the host", limit), logTail
 			return res
 		}
 		time.Sleep(osUpdatePoll)
@@ -326,12 +331,12 @@ type osUpdateRunRequest struct {
 	Concurrency int     `json:"concurrency"`
 }
 
-var osUpdateKinds = map[string]bool{sshtest.OSUpdateCheck: true, sshtest.OSUpdatePackages: true, sshtest.OSUpdateSecurity: true}
+var osUpdateKinds = map[string]bool{sshtest.OSUpdateCheck: true, sshtest.OSUpdatePackages: true, sshtest.OSUpdateSecurity: true, sshtest.OSUpdateRelease: true}
 
 // handleStartOSUpdate godoc
 //
 //	@Summary		Start an OS update run
-//	@Description	Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.
+//	@Description	Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.
 //	@Tags			ssh
 //	@Accept			json
 //	@Produce		json
@@ -347,8 +352,17 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if !osUpdateKinds[req.Kind] {
-		jsonError(w, http.StatusBadRequest, "kind must be check, packages or security")
+		jsonError(w, http.StatusBadRequest, "kind must be check, packages, security or release")
 		return
+	}
+	// A release upgrade can leave a host unbootable: one host per run, and it
+	// always reboots (the release finishes on boot).
+	if req.Kind == sshtest.OSUpdateRelease {
+		if len(req.HostIDs) != 1 {
+			jsonError(w, http.StatusBadRequest, "a release upgrade takes exactly one host")
+			return
+		}
+		req.Concurrency, req.Reboot = 1, true
 	}
 	if len(req.HostIDs) == 0 || len(req.HostIDs) > osUpdateMaxHosts {
 		jsonError(w, http.StatusBadRequest, fmt.Sprintf("host_ids must have 1 to %d hosts", osUpdateMaxHosts))

@@ -674,6 +674,13 @@
       "hostsCount": "{count} hosts",
       "eolCount": "{count} past end of life"
     },
+    "osRelease": {
+      "action": "change version",
+      "confirmTitle": "Upgrade {host} ({os}) to its next release?",
+      "confirmMessage": "Take a snapshot of the VM first: a failed release upgrade can leave it unbootable. Supported: Ubuntu LTS → next LTS, Debian N → N+1, Alpine 3.x → 3.x+1. The host must have no pending package updates, no pending reboot and 5 GB free on /. It is rebooted at the end and can take up to 3 hours.",
+      "start": "Upgrade release",
+      "failed": "Could not start the release upgrade"
+    },
     "osUpdate": {
       "open": "Update…",
       "title": "Update operating systems",

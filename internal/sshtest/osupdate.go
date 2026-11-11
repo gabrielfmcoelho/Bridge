@@ -23,6 +23,7 @@ const (
 	OSUpdateCheck    = "check"    // refresh the package lists, count what's upgradable
 	OSUpdatePackages = "packages" // every upgrade inside the current release
 	OSUpdateSecurity = "security" // security upgrades only
+	OSUpdateRelease  = "release"  // next release (osReleaseScript)
 )
 
 // osUpdateDir holds each run's script, log and exit code on the host.
@@ -104,12 +105,83 @@ reboot_flag
 exit 0
 `
 
+// osReleaseScript moves the host to its next release, as root. Supported:
+// Ubuntu LTS → next LTS (do-release-upgrade), Debian N → N+1 (codename
+// rewritten in the apt sources, then full-upgrade) and Alpine 3.x → 3.x+1
+// (repositories bumped, apk upgrade --available). It skips, changing
+// nothing, when a reboot is pending, / has under 5 GB free, packages are
+// still waiting for a package update, or the path isn't supported (RHEL
+// family: Leapp/ELevate). Debian / Alpine sources are backed up first and
+// restored when the new release's lists can't be fetched; once the upgrade
+// itself has started nothing is rolled back (a half-restored system is
+// worse). It always ends with "@@reboot yes": the release finishes on boot.
+// BRIDGE_ROOT prefixes the files it reads and writes (tests only).
+const osReleaseScript = `R="${BRIDGE_ROOT:-}"
+export DEBIAN_FRONTEND=noninteractive
+say() { echo "@@$*"; }
+APTOPTS='-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
+osr() ( . "$R/etc/os-release" 2>/dev/null; echo "$ID $VERSION_ID" )
+. "$R/etc/os-release" 2>/dev/null || { say skip "no /etc/os-release"; exit 0; }
+say release_from "$(osr)"
+if [ -f "$R/var/run/reboot-required" ]; then say skip "a reboot is pending: reboot the host first"; exit 0; fi
+FREE=$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}')
+if [ "${FREE:-0}" -lt 5242880 ]; then say skip "less than 5 GB free on /"; exit 0; fi
+apt_pending() {
+  apt-get update -q || { say error apt-get update failed; exit 1; }
+  N=$(apt list --upgradable 2>/dev/null | grep -c '\[upgradable')
+  if [ "$N" -gt 0 ]; then say skip "$N packages waiting: run a package update first"; exit 0; fi
+}
+case "$ID" in
+ubuntu)
+  MAJ=${VERSION_ID%%.*}
+  if [ "${VERSION_ID#*.}" != 04 ] || [ $((MAJ % 2)) -ne 0 ]; then say skip "only LTS to LTS upgrades are supported"; exit 0; fi
+  command -v do-release-upgrade >/dev/null 2>&1 || { say skip "do-release-upgrade is not installed (ubuntu-release-upgrader-core)"; exit 0; }
+  apt_pending
+  [ -f "$R/etc/update-manager/release-upgrades" ] && sed -i 's/^Prompt=.*/Prompt=lts/' "$R/etc/update-manager/release-upgrades"
+  do-release-upgrade -c >/dev/null 2>&1 || { say skip "no newer LTS release is available yet"; exit 0; }
+  do-release-upgrade -f DistUpgradeViewNonInteractive || { say error do-release-upgrade failed; exit 1; } ;;
+debian)
+  case "$VERSION_CODENAME" in
+  buster) NEXT=bullseye ;; bullseye) NEXT=bookworm ;; bookworm) NEXT=trixie ;;
+  *) say skip "no supported next release for Debian ${VERSION_CODENAME:-$VERSION_ID}"; exit 0 ;;
+  esac
+  apt_pending
+  B="$R/etc/apt.bridge-backup-$VERSION_CODENAME"
+  rm -rf "$B" && cp -a "$R/etc/apt" "$B" || { say error could not back up /etc/apt; exit 1; }
+  say backup "$B"
+  for f in "$R/etc/apt/sources.list" "$R"/etc/apt/sources.list.d/*.list "$R"/etc/apt/sources.list.d/*.sources; do
+    [ -f "$f" ] && sed -i -e "s/\b$VERSION_CODENAME\b/$NEXT/g" -e "s#$NEXT/updates#$NEXT-security#g" "$f"
+  done
+  apt-get update -q || { rm -rf "$R/etc/apt" && cp -a "$B" "$R/etc/apt"; say error "apt-get update failed on $NEXT: sources restored"; exit 1; }
+  apt-get $APTOPTS upgrade --without-new-pkgs || { say error "apt-get upgrade failed halfway to $NEXT: fix it on the host (backup in $B)"; exit 1; }
+  apt-get $APTOPTS full-upgrade || { say error "apt-get full-upgrade failed halfway to $NEXT: fix it on the host (backup in $B)"; exit 1; } ;;
+alpine)
+  CUR=$(echo "$VERSION_ID" | cut -d. -f1,2); MIN=${CUR#*.}; NEXT="${CUR%%.*}.$((MIN + 1))"
+  REPOS="$R/etc/apk/repositories"
+  grep -q "/v$CUR/" "$REPOS" 2>/dev/null || { say skip "the repositories don't pin v$CUR (edge?)"; exit 0; }
+  cp "$REPOS" "$REPOS.bridge-backup" || { say error could not back up the repositories; exit 1; }
+  say backup "$REPOS.bridge-backup"
+  sed -i "s#/v$CUR/#/v$NEXT/#g" "$REPOS"
+  apk update -q || { cp "$REPOS.bridge-backup" "$REPOS"; say error "apk update failed on v$NEXT (not released yet?): repositories restored"; exit 1; }
+  apk upgrade --available -q || { say error "apk upgrade failed halfway to v$NEXT: fix it on the host"; exit 1; } ;;
+rhel|rocky|almalinux|centos|ol|fedora)
+  say skip "major upgrades of the RHEL family (Leapp / ELevate) are not supported"; exit 0 ;;
+*)
+  say skip "release upgrades of $ID are not supported"; exit 0 ;;
+esac
+say release_to "$(osr)"
+say reboot yes
+exit 0
+`
+
 // OSUpdateInnerScript returns the root script for kind, or an error for an
 // unknown kind.
 func OSUpdateInnerScript(kind string) (string, error) {
 	switch kind {
 	case OSUpdateCheck, OSUpdatePackages, OSUpdateSecurity:
 		return fmt.Sprintf(osUpdateScript, kind), nil
+	case OSUpdateRelease:
+		return osReleaseScript, nil
 	}
 	return "", fmt.Errorf("unknown OS update kind %q", kind)
 }

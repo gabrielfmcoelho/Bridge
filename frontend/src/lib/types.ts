@@ -1485,13 +1485,13 @@ export interface HostOS {
   reboot_required?: boolean;
 }
 
-export type OSUpdateKind = "check" | "packages" | "security";
+export type OSUpdateKind = "check" | "packages" | "security" | "release";
 export type OSUpdateResultStatus = "pending" | "running" | "success" | "failed" | "skipped";
 
 /** One check / upgrade over a set of hosts (GET /api/ssh/os-updates/runs). */
 export interface OSUpdateRun {
   id: number;
-  kind: OSUpdateKind | "release";
+  kind: OSUpdateKind;
   reboot: boolean;
   concurrency: number;
   status: "running" | "done" | "cancelled" | "interrupted";

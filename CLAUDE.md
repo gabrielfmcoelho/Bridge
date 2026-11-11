@@ -247,6 +247,12 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   SSH session itself — a dropped session kills dpkg halfway. Containers are
   never upgraded (rebuild the image). Each host is rescanned through
   `sshHandlers.recordScan`, the scan's own post-capture path.
+  `release` (`osReleaseScript`) is one host per run, always reboots, 3 h:
+  Ubuntu LTS → LTS, Debian N → N+1 (codename rewritten in the apt sources,
+  `/etc/apt` backed up and restored only if the new lists can't be fetched),
+  Alpine 3.x → 3.x+1; RHEL family is skipped. It skips, changing nothing,
+  with a reboot pending, < 5 GB on `/` or packages still waiting. Its tests
+  run it on a fake root through `BRIDGE_ROOT`.
 - Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
   names are read in bulk; wiki titles come from Outline at most once a day per
   page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title
