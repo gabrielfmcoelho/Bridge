@@ -1804,6 +1804,10 @@ export type GlpiCatalogueOption = {
   name: string;
   completename?: string;
   parent_id?: number;
+  // Group/header node (e.g. an ITILCategory that only organizes children) —
+  // GLPI itself disables these in its own tree dropdown, so a ticket can
+  // never reference one; keep that flag through the catalogue round-trip.
+  disabled?: boolean;
 };
 
 export type GlpiDropdownCatalogueSummary = {
@@ -1966,7 +1970,7 @@ export const glpiAPI = {
     const params = new URLSearchParams({ profile_id: String(profileID) });
     if (q) params.set("q", q);
     return api.get<{
-      items: { id: number; name: string; completename?: string }[];
+      items: { id: number; name: string; completename?: string; disabled?: boolean }[];
       count: number;
       source?: "catalogue" | "rest";
     }>(`/api/glpi/dropdowns/${encodeURIComponent(itemtype)}/search?${params.toString()}`);

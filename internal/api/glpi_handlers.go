@@ -1815,6 +1815,12 @@ type catalogueOption struct {
 	Name         string `json:"name"`
 	Completename string `json:"completename,omitempty"`
 	ParentID     int    `json:"parent_id,omitempty"`
+	// Selectable mirrors GLPI's own tree dropdown: group/header nodes (e.g. an
+	// ITILCategory that only exists to hold children) come back from GLPI's
+	// select2 payload as disabled — GLPI itself refuses to attach a ticket to
+	// one, so a catalogue entry scraped with that flag must stay non-pickable
+	// here too, or the submission dies later with a bare ERROR_GLPI_ADD.
+	Disabled bool `json:"disabled,omitempty"`
 }
 
 // serveDropdownFromCatalogue reads the manual catalogue for an itemtype and,
@@ -1844,6 +1850,9 @@ func (h *glpiHandlers) serveDropdownFromCatalogue(w http.ResponseWriter, r *http
 		row := map[string]any{"id": o.ID, "name": o.Name}
 		if o.Completename != "" {
 			row["completename"] = o.Completename
+		}
+		if o.Disabled {
+			row["disabled"] = true
 		}
 		out = append(out, row)
 		if len(out) >= 50 {

@@ -22,6 +22,8 @@ const SCRAPER_SNIPPET = `copy(JSON.stringify(
     .map(o => ({
       id: parseInt(o.value || o.dataset.id || '', 10),
       name: (o.textContent || '').trim(),
+      disabled: o.disabled || o.getAttribute('aria-disabled') === 'true'
+        || o.classList.contains('select2-results__option--disabled') || undefined,
     }))
     .filter(o => Number.isFinite(o.id) && o.id > 0 && o.name),
   null, 2
@@ -93,6 +95,7 @@ export default function DropdownCatalogueEditorModal({ itemtype, open, onClose, 
           const p = typeof row.parent_id === "number" ? row.parent_id : parseInt(String(row.parent_id), 10);
           if (Number.isFinite(p) && p > 0) clean.parent_id = p;
         }
+        if (row.disabled === true) clean.disabled = true;
         out.push(clean);
       }
       setParseErr(null);

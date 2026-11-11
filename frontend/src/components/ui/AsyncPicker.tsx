@@ -17,6 +17,10 @@ export interface AsyncPickerItem {
    *  GLPI's own dropdown picker uses — deduplicated against the previous
    *  row's path so a shared ancestor only prints once. */
   path?: string[];
+  /** Group/header node (GLPI itself disables these in its own tree dropdown —
+   *  a ticket can never be filed against one, only against a leaf). Rendered
+   *  like an ancestor header: visible, but not clickable. */
+  disabled?: boolean;
 }
 
 // Single-select variant.
@@ -61,6 +65,7 @@ function renderTreeRows(
     selectedIDs: Set<number>;
     selectedValue: number | null | undefined;
     onPick: (item: AsyncPickerItem) => void;
+    groupNotSelectableLabel: string;
   }
 ): ReactNode[] {
   const rows: ReactNode[] = [];
@@ -92,6 +97,24 @@ function renderTreeRows(
       // Everything below this depth is now stale and must reprint too.
       shown = shown.slice(0, depth);
       shown[depth] = path[depth];
+    }
+
+    if (item.disabled) {
+      // A group/header node GLPI itself refuses to attach a ticket to —
+      // show it (so the tree still reads right) but never as a pickable row.
+      rows.push(
+        <div
+          key={item.id}
+          style={indent(path.length)}
+          className="pr-3 py-1 text-xs font-medium text-[var(--text-faint)] truncate"
+          title={opts.groupNotSelectableLabel}
+        >
+          {path.length > 0 ? "»" : ""}
+          {item.label}
+        </div>
+      );
+      shown = [...path, item.label];
+      continue;
     }
 
     const picked = opts.multi ? opts.selectedIDs.has(item.id) : item.id === opts.selectedValue;
@@ -327,6 +350,7 @@ export default function AsyncPicker(props: Props) {
                 selectedIDs,
                 selectedValue: !multi ? props.value : undefined,
                 onPick: (item) => (multi ? toggleMulti(item) : pickSingle(item)),
+                groupNotSelectableLabel: t("ui.asyncPicker.groupNotSelectable"),
               })}
             </div>
           </Popover.Content>
