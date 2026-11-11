@@ -60,6 +60,7 @@ type App struct {
 	vuln                *vulnHandlers
 	outline             *outlineHandlers
 	glpi                *glpiHandlers
+	glpiv2              *glpiv2Handlers
 	entidade            *entidadeHandlers
 }
 
@@ -120,6 +121,7 @@ func newApp(db *database.DB, configPath string) *App {
 		vuln:                &vulnHandlers{db: db, nvd: nvd.New()},
 		outline:             &outlineHandlers{db: db},
 		glpi:                &glpiHandlers{db: db, cache: glpiclient.NewSessionCache(30 * time.Minute)},
+		glpiv2:              newGlpiv2Handlers(),
 		entidade:            newEntidadeHandlers(db),
 	}
 }

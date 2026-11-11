@@ -54,6 +54,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	gwh := app.grafanaWebhook
 	olh := app.outline
 	glpih := app.glpi
+	glpiv2h := app.glpiv2
 
 	// Self-registering handler groups own their route+role tables next to their
 	// handler (R2). The integration/misc groups further below are not yet
@@ -163,7 +164,8 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	gwh.registerRoutes(rr) // POST /api/webhooks/grafana/alerts
 
 	// GLPI integration
-	glpih.registerRoutes(rr) // /api/settings/integrations/glpi/*, /api/glpi/*, project/host glpi tickets
+	glpih.registerRoutes(rr)   // /api/settings/integrations/glpi/*, /api/glpi/*, project/host glpi tickets
+	glpiv2h.registerRoutes(rr) // /api/glpi-sead/* (SEAD/NTGD GLPI, independent integration)
 
 	// Outline (wiki) integration
 	olh.registerRoutes(rr) // /api/projects/{id}/wiki/*, /api/wiki/*

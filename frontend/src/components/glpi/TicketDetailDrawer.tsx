@@ -1,12 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Drawer from "@/components/ui/Drawer";
 import { Skeleton } from "@/components/ui/Skeleton";
+import Button from "@/components/ui/Button";
+import Select from "@/components/ui/Select";
+import Textarea from "@/components/ui/Textarea";
+import AsyncPicker, { type AsyncPickerItem } from "@/components/ui/AsyncPicker";
 import { glpiAPI, type GlpiTicketEvent } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLocale } from "@/contexts/LocaleContext";
 import { getTimeAgo } from "@/lib/utils";
+import { glpiStatusLabelKey } from "@/lib/glpiStatus";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -131,8 +138,69 @@ const solutionStatusLabel: Record<number, string> = {
   3: "glpi.solutionStatusRejected",
 };
 
+const STATUS_VALUES = ["1", "2", "3", "4", "5", "6"];
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  "1": "glpi.statusNew",
+  "2": "glpi.statusAssigned",
+  "3": "glpi.statusPlanned",
+  "4": "glpi.statusWaiting",
+  "5": "glpi.statusSolved",
+  "6": "glpi.statusClosed",
+};
+const URGENCY_VALUES = ["1", "2", "3", "4", "5"];
+const URGENCY_LABEL_KEYS: Record<string, string> = {
+  "1": "glpi.urgencyVeryLow",
+  "2": "glpi.urgencyLow",
+  "3": "glpi.urgencyMedium",
+  "4": "glpi.urgencyHigh",
+  "5": "glpi.urgencyVeryHigh",
+};
+const IMPACT_VALUES = ["1", "2", "3", "4", "5"];
+const IMPACT_LABEL_KEYS: Record<string, string> = {
+  "1": "glpi.impactVeryLow",
+  "2": "glpi.impactLow",
+  "3": "glpi.impactMedium",
+  "4": "glpi.impactHigh",
+  "5": "glpi.impactVeryHigh",
+};
+const PRIORITY_VALUES = ["1", "2", "3", "4", "5", "6"];
+const PRIORITY_LABEL_KEYS: Record<string, string> = {
+  "1": "glpi.priorityVeryLow",
+  "2": "glpi.priorityLow",
+  "3": "glpi.priorityMedium",
+  "4": "glpi.priorityHigh",
+  "5": "glpi.priorityVeryHigh",
+  "6": "glpi.priorityMajor",
+};
+const ACTOR_ROLE_LABEL_KEYS: Record<number, string> = {
+  1: "glpi.actorRoleRequester",
+  2: "glpi.actorRoleObserver",
+  3: "glpi.actorRoleAssign",
+};
+const VALIDATION_STATUS_LABEL_KEYS: Record<number, string> = {
+  1: "glpi.validationStatusWaiting",
+  2: "glpi.validationStatusAccepted",
+  3: "glpi.validationStatusRefused",
+};
+
 export default function TicketDetailDrawer({ open, onClose, ticketID, profileID }: Props) {
   const { locale, t } = useLocale();
+  const { user } = useAuth();
+  const canEdit = user?.role === "admin" || user?.role === "editor";
+  const queryClient = useQueryClient();
+
+  const [followupText, setFollowupText] = useState("");
+  const [followupPrivate, setFollowupPrivate] = useState(false);
+  const [taskText, setTaskText] = useState("");
+  const [solutionText, setSolutionText] = useState("");
+  const [actorUser, setActorUser] = useState<AsyncPickerItem | null>(null);
+  const [actorGroup, setActorGroup] = useState<AsyncPickerItem | null>(null);
+  const [actorRole, setActorRole] = useState("1");
+  const [approver, setApprover] = useState<AsyncPickerItem | null>(null);
+  const [validationComment, setValidationComment] = useState("");
+  const [satisfactionRating, setSatisfactionRating] = useState("5");
+  const [satisfactionComment, setSatisfactionComment] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["glpi-ticket-details", ticketID, profileID],
@@ -140,6 +208,118 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
     enabled: open && !!ticketID && !!profileID,
     retry: false,
   });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["glpi-ticket-details", ticketID, profileID] });
+    queryClient.invalidateQueries({ queryKey: ["global-chamados"] });
+    queryClient.invalidateQueries({ queryKey: ["profile-chamados"] });
+  };
+
+  const updateMutation = useMutation({
+    mutationFn: (fields: Parameters<typeof glpiAPI.updateTicket>[2]) =>
+      glpiAPI.updateTicket(ticketID!, profileID!, fields),
+    onSuccess: invalidate,
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const followupMutation = useMutation({
+    mutationFn: () => glpiAPI.addTicketFollowup(ticketID!, profileID!, followupText.trim(), followupPrivate),
+    onSuccess: () => {
+      setFollowupText("");
+      setFollowupPrivate(false);
+      invalidate();
+    },
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const taskMutation = useMutation({
+    mutationFn: () => glpiAPI.addTicketTask(ticketID!, profileID!, taskText.trim()),
+    onSuccess: () => {
+      setTaskText("");
+      invalidate();
+    },
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const solutionMutation = useMutation({
+    mutationFn: () => glpiAPI.addTicketSolution(ticketID!, profileID!, solutionText.trim()),
+    onSuccess: () => {
+      setSolutionText("");
+      invalidate();
+    },
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const actorMutation = useMutation({
+    mutationFn: () =>
+      glpiAPI.addTicketActor(ticketID!, profileID!, {
+        user_id: actorUser?.id,
+        group_id: actorGroup?.id,
+        role: parseInt(actorRole, 10),
+      }),
+    onSuccess: () => {
+      setActorUser(null);
+      setActorGroup(null);
+      invalidate();
+    },
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const removeActorMutation = useMutation({
+    mutationFn: (actor: { id: number; is_group: boolean }) =>
+      glpiAPI.removeTicketActor(ticketID!, actor.id, profileID!, actor.is_group),
+    onSuccess: invalidate,
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const uploadDocMutation = useMutation({
+    mutationFn: (file: File) => glpiAPI.uploadTicketDocument(ticketID!, profileID!, file),
+    onSuccess: invalidate,
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const validationMutation = useMutation({
+    mutationFn: () => glpiAPI.addTicketValidation(ticketID!, profileID!, approver!.id, validationComment.trim()),
+    onSuccess: () => {
+      setApprover(null);
+      setValidationComment("");
+      invalidate();
+    },
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const answerValidationMutation = useMutation({
+    mutationFn: (args: { validationID: number; status: number }) =>
+      glpiAPI.answerTicketValidation(ticketID!, args.validationID, profileID!, args.status),
+    onSuccess: invalidate,
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const satisfactionMutation = useMutation({
+    mutationFn: () =>
+      glpiAPI.submitTicketSatisfaction(
+        ticketID!,
+        profileID!,
+        data!.satisfaction!.id,
+        parseInt(satisfactionRating, 10),
+        satisfactionComment.trim()
+      ),
+    onSuccess: invalidate,
+    onError: (err: Error) => setEditError(err.message),
+  });
+
+  const userFetcher = async (q: string) => {
+    if (!profileID) return [];
+    const res = await glpiAPI.searchUsers(profileID, q);
+    return res.users.map(
+      (u) => ({ id: u.id, label: u.display || u.login } as AsyncPickerItem)
+    );
+  };
+  const groupFetcher = async (q: string) => {
+    if (!profileID) return [];
+    const res = await glpiAPI.searchDropdown("Group", profileID, q);
+    return res.items.map((r) => ({ id: r.id, label: r.completename || r.name } as AsyncPickerItem));
+  };
 
   const title = data?.ticket
     ? `#${data.ticket.id} · ${data.ticket.name || t("glpi.untitled")}`
@@ -188,7 +368,7 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
             {/* Metadata row */}
             <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
               <span className="px-2 py-0.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)]">
-                {data.ticket.status_label}
+                {t(glpiStatusLabelKey(data.ticket.status_slug))}
               </span>
               {data.ticket.date && (
                 <span title={getTimeAgo(data.ticket.date.replace(" ", "T"), locale)}>
@@ -212,6 +392,289 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
                   <p key={i}>{w}</p>
                 ))}
               </div>
+            )}
+
+            {editError && (
+              <div className="rounded-[var(--radius-md)] border border-[var(--danger)]/30 bg-[var(--danger)]/10 text-[var(--danger)] text-xs px-3 py-2">
+                {editError}
+              </div>
+            )}
+
+            {/* Quick edit — status/urgency/impact/priority, mirrors GLPI's own ticket form fields */}
+            {canEdit && (
+              <section>
+                <SectionHeading as="h3">{t("glpi.editSectionTitle")}</SectionHeading>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <Select
+                    label={t("glpi.statusLabel")}
+                    options={STATUS_VALUES.map((v) => ({ value: v, label: t(STATUS_LABEL_KEYS[v]) }))}
+                    value={String(data.ticket.status)}
+                    onChange={(e) => updateMutation.mutate({ status: parseInt(e.target.value, 10) })}
+                  />
+                  <Select
+                    label={t("glpi.urgencyLabel")}
+                    options={URGENCY_VALUES.map((v) => ({ value: v, label: t(URGENCY_LABEL_KEYS[v]) }))}
+                    value={String(data.ticket.urgency ?? 3)}
+                    onChange={(e) => updateMutation.mutate({ urgency: parseInt(e.target.value, 10) })}
+                  />
+                  <Select
+                    label={t("glpi.impactLabel")}
+                    options={IMPACT_VALUES.map((v) => ({ value: v, label: t(IMPACT_LABEL_KEYS[v]) }))}
+                    value={String(data.ticket.impact ?? 3)}
+                    onChange={(e) => updateMutation.mutate({ impact: parseInt(e.target.value, 10) })}
+                  />
+                  <Select
+                    label={t("glpi.priorityLabel")}
+                    options={PRIORITY_VALUES.map((v) => ({ value: v, label: t(PRIORITY_LABEL_KEYS[v]) }))}
+                    value={String(data.ticket.priority ?? 3)}
+                    onChange={(e) => updateMutation.mutate({ priority: parseInt(e.target.value, 10) })}
+                  />
+                </div>
+              </section>
+            )}
+
+            {/* Actors */}
+            <section>
+              <SectionHeading as="h3">{t("glpi.actorsHeading")}</SectionHeading>
+              {data.actors.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)]">{t("glpi.noActors")}</p>
+              ) : (
+                <ul className="flex flex-wrap gap-1.5 mb-2">
+                  {data.actors.map((a) => (
+                    <li
+                      key={`${a.is_group ? "g" : "u"}-${a.id}`}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-xs"
+                    >
+                      <span className="text-[var(--text-faint)]">{t(ACTOR_ROLE_LABEL_KEYS[a.role] ?? "glpi.actorRoleAssign")}:</span>
+                      <span className="text-[var(--text-primary)]">{a.name}</span>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => removeActorMutation.mutate({ id: a.id, is_group: a.is_group })}
+                          className="w-4 h-4 inline-flex items-center justify-center rounded-[var(--radius-sm)] text-[var(--text-faint)] hover:text-[var(--danger)] hover:bg-[var(--bg-overlay)]"
+                          aria-label={t("common.removeItem", { label: a.name })}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canEdit && (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="w-48">
+                    <AsyncPicker
+                      label={t("glpi.assignToUserLabel")}
+                      value={actorUser?.id ?? null}
+                      selectedLabel={actorUser?.label}
+                      fetcher={userFetcher}
+                      onChange={(it) => {
+                        setActorUser(it);
+                        if (it) setActorGroup(null);
+                      }}
+                      placeholder={t("glpi.searchUserPlaceholder")}
+                    />
+                  </div>
+                  <div className="w-48">
+                    <AsyncPicker
+                      label={t("glpi.assignToGroupLabel")}
+                      value={actorGroup?.id ?? null}
+                      selectedLabel={actorGroup?.label}
+                      fetcher={groupFetcher}
+                      onChange={(it) => {
+                        setActorGroup(it);
+                        if (it) setActorUser(null);
+                      }}
+                      placeholder={t("glpi.searchItemtypePlaceholder", { itemtype: "Group" })}
+                    />
+                  </div>
+                  <div className="w-36">
+                    <Select
+                      label={t("glpi.actorRoleFieldLabel")}
+                      options={[1, 2, 3].map((r) => ({ value: String(r), label: t(ACTOR_ROLE_LABEL_KEYS[r]) }))}
+                      value={actorRole}
+                      onChange={(e) => setActorRole(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => actorMutation.mutate()}
+                    loading={actorMutation.isPending}
+                    disabled={!actorUser && !actorGroup}
+                  >
+                    {t("glpi.addActorButton")}
+                  </Button>
+                </div>
+              )}
+            </section>
+
+            {/* SLA */}
+            {(data.ticket.slas_id_tto || data.ticket.slas_id_ttr) && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                {!!data.ticket.slas_id_tto && (
+                  <span className="px-2 py-0.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)]">
+                    {t("glpi.slaTTOLabel")}: #{data.ticket.slas_id_tto}
+                  </span>
+                )}
+                {!!data.ticket.slas_id_ttr && (
+                  <span className="px-2 py-0.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)]">
+                    {t("glpi.slaTTRLabel")}: #{data.ticket.slas_id_ttr}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Documents */}
+            <section>
+              <SectionHeading as="h3">{t("glpi.documentsHeading")}</SectionHeading>
+              {data.documents.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)]">{t("glpi.noDocuments")}</p>
+              ) : (
+                <ul className="space-y-1 mb-2">
+                  {data.documents.map((doc) => (
+                    <li key={doc.id}>
+                      <Link
+                        href={`/api/glpi/documents/${doc.doc_id}${profileID ? `?profile_id=${profileID}` : ""}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-[var(--accent)] hover:underline inline-flex items-center gap-1"
+                      >
+                        <Icon path={ICON_PATHS.externalLink} className="w-3 h-3" />
+                        {doc.filename}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canEdit && (
+                <label className="inline-flex items-center gap-2 text-xs text-[var(--accent)] hover:underline cursor-pointer">
+                  {t("glpi.addDocumentButton")}
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadDocMutation.mutate(file);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
+            </section>
+
+            {/* Validations */}
+            <section>
+              <SectionHeading as="h3">{t("glpi.validationsHeading")}</SectionHeading>
+              {data.validations.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)]">{t("glpi.noValidations")}</p>
+              ) : (
+                <ul className="space-y-1.5 mb-2">
+                  {data.validations.map((v) => (
+                    <li
+                      key={v.id}
+                      className="flex items-center justify-between gap-2 border border-[var(--border-subtle)] rounded-[var(--radius-md)] px-2.5 py-1.5 bg-[var(--bg-elevated)] text-xs"
+                    >
+                      <span>
+                        {t(VALIDATION_STATUS_LABEL_KEYS[v.status] ?? "glpi.validationStatusWaiting")}
+                        {v.comment_submission ? ` — ${v.comment_submission}` : ""}
+                      </span>
+                      {v.status === 1 && canEdit && (
+                        <span className="flex gap-1.5 shrink-0">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => answerValidationMutation.mutate({ validationID: v.id, status: 2 })}
+                          >
+                            {t("glpi.validationAccept")}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => answerValidationMutation.mutate({ validationID: v.id, status: 3 })}
+                          >
+                            {t("glpi.validationRefuse")}
+                          </Button>
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canEdit && (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="w-48">
+                    <AsyncPicker
+                      label={t("glpi.validationApproverLabel")}
+                      value={approver?.id ?? null}
+                      selectedLabel={approver?.label}
+                      fetcher={userFetcher}
+                      onChange={setApprover}
+                      placeholder={t("glpi.searchUserPlaceholder")}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[160px]">
+                    <Textarea
+                      label={t("glpi.validationCommentLabel")}
+                      value={validationComment}
+                      onChange={(e) => setValidationComment(e.target.value)}
+                      rows={1}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => validationMutation.mutate()}
+                    loading={validationMutation.isPending}
+                    disabled={!approver}
+                  >
+                    {t("glpi.validationRequestButton")}
+                  </Button>
+                </div>
+              )}
+            </section>
+
+            {/* Satisfaction */}
+            {data.satisfaction && (
+              <section>
+                <SectionHeading as="h3">{t("glpi.satisfactionHeading")}</SectionHeading>
+                {data.satisfaction.satisfaction > 0 ? (
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    {t("glpi.satisfactionRatingValue", { rating: String(data.satisfaction.satisfaction) })}
+                    {data.satisfaction.comment ? ` — ${data.satisfaction.comment}` : ""}
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="w-28">
+                      <Select
+                        label={t("glpi.satisfactionRatingLabel")}
+                        options={["1", "2", "3", "4", "5"].map((v) => ({ value: v, label: v }))}
+                        value={satisfactionRating}
+                        onChange={(e) => setSatisfactionRating(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-[160px]">
+                      <Textarea
+                        label={t("glpi.satisfactionCommentLabel")}
+                        value={satisfactionComment}
+                        onChange={(e) => setSatisfactionComment(e.target.value)}
+                        rows={1}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => satisfactionMutation.mutate()}
+                      loading={satisfactionMutation.isPending}
+                    >
+                      {t("glpi.satisfactionSubmitButton")}
+                    </Button>
+                  </div>
+                )}
+              </section>
             )}
 
             {/* Description */}
@@ -285,6 +748,77 @@ export default function TicketDetailDrawer({ open, onClose, ticketID, profileID 
                     </li>
                   ))}
                 </ul>
+              )}
+              {canEdit && (
+                <div className="mt-3 space-y-2">
+                  <Textarea
+                    label={t("glpi.addFollowupLabel")}
+                    value={followupText}
+                    onChange={(e) => setFollowupText(e.target.value)}
+                    rows={3}
+                    placeholder={t("glpi.addFollowupPlaceholder")}
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={followupPrivate}
+                        onChange={(e) => setFollowupPrivate(e.target.checked)}
+                        className="w-3.5 h-3.5 accent-[var(--accent)]"
+                      />
+                      {t("glpi.addFollowupPrivate")}
+                    </label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => followupMutation.mutate()}
+                      loading={followupMutation.isPending}
+                      disabled={!followupText.trim()}
+                    >
+                      {t("glpi.addFollowupSubmit")}
+                    </Button>
+                  </div>
+
+                  <Textarea
+                    label={t("glpi.addTaskLabel")}
+                    value={taskText}
+                    onChange={(e) => setTaskText(e.target.value)}
+                    rows={2}
+                    placeholder={t("glpi.addTaskPlaceholder")}
+                  />
+                  <div className="flex items-center justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => taskMutation.mutate()}
+                      loading={taskMutation.isPending}
+                      disabled={!taskText.trim()}
+                    >
+                      {t("glpi.addTaskSubmit")}
+                    </Button>
+                  </div>
+
+                  <Textarea
+                    label={t("glpi.addSolutionLabel")}
+                    value={solutionText}
+                    onChange={(e) => setSolutionText(e.target.value)}
+                    rows={3}
+                    placeholder={t("glpi.addSolutionPlaceholder")}
+                  />
+                  <div className="flex items-center justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => solutionMutation.mutate()}
+                      loading={solutionMutation.isPending}
+                      disabled={!solutionText.trim()}
+                    >
+                      {t("glpi.addSolutionSubmit")}
+                    </Button>
+                  </div>
+                </div>
               )}
             </section>
           </>

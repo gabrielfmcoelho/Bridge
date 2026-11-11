@@ -336,8 +336,8 @@ func (c *Client) UploadDocumentMultipart(ctx context.Context, sessionToken, file
 	}
 	payload := map[string]any{
 		"input": map[string]any{
-			"name":       filename,
-			"_filename":  []string{filename},
+			"name":      filename,
+			"_filename": []string{filename},
 		},
 	}
 	if err := json.NewEncoder(manifest).Encode(payload); err != nil {
@@ -442,8 +442,8 @@ func (c *Client) SearchTickets(ctx context.Context, sessionToken string, criteri
 	q.Add("range", fmt.Sprintf("%d-%d", rangeStart, rangeEnd))
 
 	var raw struct {
-		Totalcount int                       `json:"totalcount"`
-		Data       []map[string]any          `json:"data"`
+		Totalcount int              `json:"totalcount"`
+		Data       []map[string]any `json:"data"`
 	}
 	if err := c.do(ctx, "GET", "/search/Ticket", sessionToken, q, nil, &raw); err != nil {
 		return nil, err
@@ -509,8 +509,8 @@ func (c *Client) FindComputerByName(ctx context.Context, sessionToken, name stri
 	q.Add("criteria[0][field]", "1")
 	q.Add("criteria[0][searchtype]", "equals")
 	q.Add("criteria[0][value]", name)
-	q.Add("forcedisplay[0]", "2") // id
-	q.Add("forcedisplay[1]", "1") // name
+	q.Add("forcedisplay[0]", "2")  // id
+	q.Add("forcedisplay[1]", "1")  // name
 	q.Add("forcedisplay[2]", "80") // entities_id
 	q.Add("range", "0-1")
 	var raw struct {
@@ -529,6 +529,322 @@ func (c *Client) FindComputerByName(ctx context.Context, sessionToken, name stri
 		Name:       toString(row["1"]),
 		EntitiesID: toInt(row["80"]),
 	}, nil
+}
+
+// AddTicketUserActor attaches a user to a ticket as requester/observer/assign
+// (role is one of ActorRequester/ActorObserver/ActorAssign) via Ticket_User.
+func (c *Client) AddTicketUserActor(ctx context.Context, sessionToken string, ticketID, userID, role int) error {
+	body := struct {
+		Input struct {
+			TicketsID int `json:"tickets_id"`
+			UsersID   int `json:"users_id"`
+			Type      int `json:"type"`
+		} `json:"input"`
+	}{}
+	body.Input.TicketsID = ticketID
+	body.Input.UsersID = userID
+	body.Input.Type = role
+	return c.do(ctx, "POST", "/Ticket_User", sessionToken, nil, body, nil)
+}
+
+// AddTicketGroupActor attaches a group to a ticket as observer/assign (groups
+// can't be requesters in GLPI) via Group_Ticket.
+func (c *Client) AddTicketGroupActor(ctx context.Context, sessionToken string, ticketID, groupID, role int) error {
+	body := struct {
+		Input struct {
+			TicketsID int `json:"tickets_id"`
+			GroupsID  int `json:"groups_id"`
+			Type      int `json:"type"`
+		} `json:"input"`
+	}{}
+	body.Input.TicketsID = ticketID
+	body.Input.GroupsID = groupID
+	body.Input.Type = role
+	return c.do(ctx, "POST", "/Group_Ticket", sessionToken, nil, body, nil)
+}
+
+// TicketActor is a resolved Ticket_User or Group_Ticket row, display-ready.
+type TicketActor struct {
+	ID      int    `json:"id"`   // Ticket_User / Group_Ticket row id (for removal)
+	Role    int    `json:"role"` // ActorRequester / ActorObserver / ActorAssign
+	IsGroup bool   `json:"is_group"`
+	ActorID int    `json:"actor_id"` // users_id or groups_id
+	Name    string `json:"name"`
+}
+
+// ListTicketActors returns the ticket's requesters/observers/assignees — both
+// individual users (Ticket_User) and groups (Group_Ticket) — with names
+// resolved so the UI can render them without extra round-trips.
+func (c *Client) ListTicketActors(ctx context.Context, sessionToken string, ticketID int) ([]TicketActor, error) {
+	var userRows []struct {
+		ID      int `json:"id"`
+		UsersID int `json:"users_id"`
+		Type    int `json:"type"`
+	}
+	if err := c.do(ctx, "GET", fmt.Sprintf("/Ticket/%d/Ticket_User", ticketID), sessionToken, nil, nil, &userRows); err != nil {
+		return nil, err
+	}
+	var groupRows []struct {
+		ID       int `json:"id"`
+		GroupsID int `json:"groups_id"`
+		Type     int `json:"type"`
+	}
+	if err := c.do(ctx, "GET", fmt.Sprintf("/Ticket/%d/Group_Ticket", ticketID), sessionToken, nil, nil, &groupRows); err != nil {
+		return nil, err
+	}
+
+	out := make([]TicketActor, 0, len(userRows)+len(groupRows))
+	for _, r := range userRows {
+		if r.UsersID <= 0 {
+			continue
+		}
+		name := fmt.Sprintf("#%d", r.UsersID)
+		if u, err := c.GetUser(ctx, sessionToken, r.UsersID); err == nil && u != nil {
+			name = u.DisplayName()
+		}
+		out = append(out, TicketActor{ID: r.ID, Role: r.Type, ActorID: r.UsersID, Name: name})
+	}
+	for _, r := range groupRows {
+		if r.GroupsID <= 0 {
+			continue
+		}
+		name := fmt.Sprintf("#%d", r.GroupsID)
+		var g struct {
+			Name string `json:"name"`
+		}
+		if err := c.do(ctx, "GET", fmt.Sprintf("/Group/%d", r.GroupsID), sessionToken, nil, nil, &g); err == nil && g.Name != "" {
+			name = g.Name
+		}
+		out = append(out, TicketActor{ID: r.ID, Role: r.Type, IsGroup: true, ActorID: r.GroupsID, Name: name})
+	}
+	return out, nil
+}
+
+// RemoveTicketActor deletes a Ticket_User or Group_Ticket row by its own id
+// (TicketActor.ID, not the user/group id).
+func (c *Client) RemoveTicketActor(ctx context.Context, sessionToken string, actorRowID int, isGroup bool) error {
+	itemtype := "Ticket_User"
+	if isGroup {
+		itemtype = "Group_Ticket"
+	}
+	path := fmt.Sprintf("/%s/%d", itemtype, actorRowID)
+	return c.do(ctx, "DELETE", path, sessionToken, nil, nil, nil)
+}
+
+// AddDocumentToTicket links an already-uploaded Document to a ticket via
+// Document_Item — the same relation GLPI's own "add file" UI creates.
+func (c *Client) AddDocumentToTicket(ctx context.Context, sessionToken string, ticketID, docID int) error {
+	body := struct {
+		Input struct {
+			ItemType    string `json:"itemtype"`
+			ItemsID     int    `json:"items_id"`
+			DocumentsID int    `json:"documents_id"`
+		} `json:"input"`
+	}{}
+	body.Input.ItemType = "Ticket"
+	body.Input.ItemsID = ticketID
+	body.Input.DocumentsID = docID
+	return c.do(ctx, "POST", "/Document_Item", sessionToken, nil, body, nil)
+}
+
+// TicketDocument is a resolved attachment — the Document_Item link plus the
+// Document's own filename, ready for display.
+type TicketDocument struct {
+	ID       int    `json:"id"` // Document_Item row id (for removal)
+	DocID    int    `json:"doc_id"`
+	Filename string `json:"filename"`
+}
+
+// ListTicketDocuments returns the ticket's attachments with filenames resolved.
+func (c *Client) ListTicketDocuments(ctx context.Context, sessionToken string, ticketID int) ([]TicketDocument, error) {
+	var rows []struct {
+		ID          int `json:"id"`
+		DocumentsID int `json:"documents_id"`
+	}
+	if err := c.do(ctx, "GET", fmt.Sprintf("/Ticket/%d/Document_Item", ticketID), sessionToken, nil, nil, &rows); err != nil {
+		return nil, err
+	}
+	out := make([]TicketDocument, 0, len(rows))
+	for _, r := range rows {
+		if r.DocumentsID <= 0 {
+			continue
+		}
+		name := fmt.Sprintf("#%d", r.DocumentsID)
+		var d struct {
+			Name     string `json:"name"`
+			Filename string `json:"filename"`
+		}
+		if err := c.do(ctx, "GET", fmt.Sprintf("/Document/%d", r.DocumentsID), sessionToken, nil, nil, &d); err == nil {
+			if d.Filename != "" {
+				name = d.Filename
+			} else if d.Name != "" {
+				name = d.Name
+			}
+		}
+		out = append(out, TicketDocument{ID: r.ID, DocID: r.DocumentsID, Filename: name})
+	}
+	return out, nil
+}
+
+// AddTicketValidation requests an approval from a specific user. Returns the
+// new TicketValidation id.
+func (c *Client) AddTicketValidation(ctx context.Context, sessionToken string, ticketID, approverUserID int, comment string) (int, error) {
+	body := struct {
+		Input struct {
+			TicketsID         int    `json:"tickets_id"`
+			UsersIDValidate   int    `json:"users_id_validate"`
+			CommentSubmission string `json:"comment_submission"`
+		} `json:"input"`
+	}{}
+	body.Input.TicketsID = ticketID
+	body.Input.UsersIDValidate = approverUserID
+	body.Input.CommentSubmission = comment
+	var out struct {
+		ID int `json:"id"`
+	}
+	if err := c.do(ctx, "POST", "/TicketValidation", sessionToken, nil, body, &out); err != nil {
+		return 0, err
+	}
+	return out.ID, nil
+}
+
+// ListTicketValidations returns the approval requests attached to a ticket.
+func (c *Client) ListTicketValidations(ctx context.Context, sessionToken string, ticketID int) ([]TicketValidation, error) {
+	var out []TicketValidation
+	if err := c.do(ctx, "GET", fmt.Sprintf("/Ticket/%d/TicketValidation", ticketID), sessionToken, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AnswerTicketValidation accepts or refuses a pending validation (status is
+// ValidationAccepted/ValidationRefused).
+func (c *Client) AnswerTicketValidation(ctx context.Context, sessionToken string, validationID, status int, comment string) error {
+	body := struct {
+		Input struct {
+			ID                int    `json:"id"`
+			Status            int    `json:"status"`
+			CommentValidation string `json:"comment_validation"`
+		} `json:"input"`
+	}{}
+	body.Input.ID = validationID
+	body.Input.Status = status
+	body.Input.CommentValidation = comment
+	path := fmt.Sprintf("/TicketValidation/%d", validationID)
+	return c.do(ctx, "PUT", path, sessionToken, nil, body, nil)
+}
+
+// GetTicketSatisfaction returns the ticket's post-closure survey row, or nil
+// if none exists yet (GLPI only creates one once the ticket is solved/closed,
+// depending on entity config).
+func (c *Client) GetTicketSatisfaction(ctx context.Context, sessionToken string, ticketID int) (*TicketSatisfaction, error) {
+	var rows []TicketSatisfaction
+	if err := c.do(ctx, "GET", fmt.Sprintf("/Ticket/%d/TicketSatisfaction", ticketID), sessionToken, nil, nil, &rows); err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return &rows[0], nil
+}
+
+// SubmitTicketSatisfaction answers an existing satisfaction survey row
+// (rating 1-5 plus an optional comment).
+func (c *Client) SubmitTicketSatisfaction(ctx context.Context, sessionToken string, satisfactionID, rating int, comment string) error {
+	body := struct {
+		Input struct {
+			ID           int    `json:"id"`
+			Satisfaction int    `json:"satisfaction"`
+			Comment      string `json:"comment"`
+		} `json:"input"`
+	}{}
+	body.Input.ID = satisfactionID
+	body.Input.Satisfaction = rating
+	body.Input.Comment = comment
+	path := fmt.Sprintf("/TicketSatisfaction/%d", satisfactionID)
+	return c.do(ctx, "PUT", path, sessionToken, nil, body, nil)
+}
+
+// UpdateTicket sends a partial PUT /Ticket/{id}. fields is forwarded as-is
+// inside the {"input": {...}} envelope, so callers only include keys they
+// actually want to change — GLPI leaves omitted fields untouched.
+func (c *Client) UpdateTicket(ctx context.Context, sessionToken string, ticketID int, fields map[string]any) error {
+	fields["id"] = ticketID
+	body := struct {
+		Input map[string]any `json:"input"`
+	}{Input: fields}
+	path := fmt.Sprintf("/Ticket/%d", ticketID)
+	return c.do(ctx, "PUT", path, sessionToken, nil, body, nil)
+}
+
+// AddFollowup posts a new ITILFollowup on a ticket. Returns the new id.
+func (c *Client) AddFollowup(ctx context.Context, sessionToken string, ticketID int, content string, isPrivate bool) (int, error) {
+	body := struct {
+		Input struct {
+			ItemType  string `json:"itemtype"`
+			ItemsID   int    `json:"items_id"`
+			Content   string `json:"content"`
+			IsPrivate int    `json:"is_private"`
+		} `json:"input"`
+	}{}
+	body.Input.ItemType = "Ticket"
+	body.Input.ItemsID = ticketID
+	body.Input.Content = content
+	if isPrivate {
+		body.Input.IsPrivate = 1
+	}
+	var out struct {
+		ID int `json:"id"`
+	}
+	if err := c.do(ctx, "POST", "/ITILFollowup", sessionToken, nil, body, &out); err != nil {
+		return 0, err
+	}
+	return out.ID, nil
+}
+
+// AddTask posts a new TicketTask. actionTimeSeconds is optional planned
+// duration (0 = unset). Returns the new id.
+func (c *Client) AddTask(ctx context.Context, sessionToken string, ticketID int, content string, actionTimeSeconds int) (int, error) {
+	body := struct {
+		Input struct {
+			TicketsID  int    `json:"tickets_id"`
+			Content    string `json:"content"`
+			ActionTime int    `json:"actiontime,omitempty"`
+		} `json:"input"`
+	}{}
+	body.Input.TicketsID = ticketID
+	body.Input.Content = content
+	body.Input.ActionTime = actionTimeSeconds
+	var out struct {
+		ID int `json:"id"`
+	}
+	if err := c.do(ctx, "POST", "/TicketTask", sessionToken, nil, body, &out); err != nil {
+		return 0, err
+	}
+	return out.ID, nil
+}
+
+// AddSolution proposes an ITILSolution for a ticket. GLPI's own workflow
+// (acceptance/refusal) happens from the GLPI side; this only creates the
+// proposal. Returns the new id.
+func (c *Client) AddSolution(ctx context.Context, sessionToken string, ticketID int, content string) (int, error) {
+	body := struct {
+		Input struct {
+			ItemType string `json:"itemtype"`
+			ItemsID  int    `json:"items_id"`
+			Content  string `json:"content"`
+		} `json:"input"`
+	}{}
+	body.Input.ItemType = "Ticket"
+	body.Input.ItemsID = ticketID
+	body.Input.Content = content
+	var out struct {
+		ID int `json:"id"`
+	}
+	if err := c.do(ctx, "POST", "/ITILSolution", sessionToken, nil, body, &out); err != nil {
+		return 0, err
+	}
+	return out.ID, nil
 }
 
 // LinkComputerToTicket attaches a Computer asset to a Ticket via Ticket_Item.

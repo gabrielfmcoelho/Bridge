@@ -7,28 +7,87 @@ type initSessionResponse struct {
 
 // Ticket is a subset of GLPI's Ticket resource — just what sshcm renders.
 type Ticket struct {
-	ID              int    `json:"id"`
-	Name            string `json:"name"`     // = title
-	Content         string `json:"content"`  // description (HTML-ish)
-	Status          int    `json:"status"`   // 1=new 2=assigned 3=planned 4=waiting 5=solved 6=closed
-	Priority        int    `json:"priority"`
-	Urgency         int    `json:"urgency"`
-	Impact          int    `json:"impact"`
-	EntitiesID      int    `json:"entities_id"`
-	Date            string `json:"date"`
-	DateMod         string `json:"date_mod"`
-	UsersIDRequester int   `json:"users_id_requester,omitempty"`
+	ID               int    `json:"id"`
+	Name             string `json:"name"`    // = title
+	Content          string `json:"content"` // description (HTML-ish)
+	Status           int    `json:"status"`  // 1=new 2=assigned 3=planned 4=waiting 5=solved 6=closed
+	Type             int    `json:"type"`    // 1=incident 2=request (CommonITILObject::INCIDENT_TYPE/DEMAND_TYPE)
+	Priority         int    `json:"priority"`
+	Urgency          int    `json:"urgency"`
+	Impact           int    `json:"impact"`
+	EntitiesID       int    `json:"entities_id"`
+	ITILCategoriesID int    `json:"itilcategories_id"`
+	LocationsID      int    `json:"locations_id"`
+	RequestTypesID   int    `json:"requesttypes_id"`
+	SLAsIDTTO        int    `json:"slas_id_tto"` // time-to-own SLA
+	SLAsIDTTR        int    `json:"slas_id_ttr"` // time-to-resolve SLA
+	Date             string `json:"date"`
+	DateMod          string `json:"date_mod"`
+	TimeToResolve    string `json:"time_to_resolve,omitempty"`
+	UsersIDRequester int    `json:"users_id_requester,omitempty"`
 }
+
+// TicketType mirrors GLPI's CommonITILObject::*_TYPE constants used on
+// Ticket.type — only the two used by the create form.
+const (
+	TicketTypeIncident = 1
+	TicketTypeRequest  = 2
+)
+
+// Actor roles on a ticket (CommonITILActor::REQUESTER/OBSERVER/ASSIGN).
+// Shared by Ticket_User and Group_Ticket — the itemtype carries the
+// user-vs-group distinction, the role constant is the same either way.
+const (
+	ActorRequester = 1
+	ActorObserver  = 2
+	ActorAssign    = 3
+)
 
 // TicketCreateInput is the body for POST /apirest.php/Ticket.
 type TicketCreateInput struct {
-	Name       string `json:"name"`
-	Content    string `json:"content"`
-	EntitiesID int    `json:"entities_id,omitempty"`
-	ITILCategoriesID int `json:"itilcategories_id,omitempty"`
-	Priority   int    `json:"priority,omitempty"`
-	Urgency    int    `json:"urgency,omitempty"`
-	Impact     int    `json:"impact,omitempty"`
+	Name             string `json:"name"`
+	Content          string `json:"content"`
+	Type             int    `json:"type,omitempty"`
+	EntitiesID       int    `json:"entities_id,omitempty"`
+	ITILCategoriesID int    `json:"itilcategories_id,omitempty"`
+	LocationsID      int    `json:"locations_id,omitempty"`
+	RequestTypesID   int    `json:"requesttypes_id,omitempty"`
+	Priority         int    `json:"priority,omitempty"`
+	Urgency          int    `json:"urgency,omitempty"`
+	Impact           int    `json:"impact,omitempty"`
+	SLAsIDTTO        int    `json:"slas_id_tto,omitempty"`
+	SLAsIDTTR        int    `json:"slas_id_ttr,omitempty"`
+}
+
+// TicketValidation mirrors GLPI's TicketValidation — an approval request
+// routed to a specific user. status: 1=waiting 2=accepted 3=refused.
+type TicketValidation struct {
+	ID                int    `json:"id"`
+	TicketsID         int    `json:"tickets_id"`
+	UsersIDValidate   int    `json:"users_id_validate"`
+	UsersID           int    `json:"users_id"` // who requested the validation
+	Status            int    `json:"status"`
+	CommentSubmission string `json:"comment_submission"`
+	CommentValidation string `json:"comment_validation"`
+	SubmissionDate    string `json:"submission_date"`
+	ValidationDate    string `json:"validation_date"`
+}
+
+// ValidationStatus constants (TicketValidation::WAITING/ACCEPTED/REFUSED).
+const (
+	ValidationWaiting  = 1
+	ValidationAccepted = 2
+	ValidationRefused  = 3
+)
+
+// TicketSatisfaction mirrors GLPI's TicketSatisfaction — the post-closure
+// survey the requester fills in. satisfaction is 1-5.
+type TicketSatisfaction struct {
+	ID           int    `json:"id"`
+	TicketsID    int    `json:"tickets_id"`
+	Satisfaction int    `json:"satisfaction"`
+	Comment      string `json:"comment"`
+	DateAnswered string `json:"date_answered"`
 }
 
 // Followup is a single comment/message on a ticket (ITILFollowup).
@@ -45,15 +104,15 @@ type Followup struct {
 
 // Task is a TicketTask — internal work items tied to a ticket.
 type Task struct {
-	ID               int    `json:"id"`
-	TicketsID        int    `json:"tickets_id"`
-	Content          string `json:"content"`
-	State            int    `json:"state"`             // 0=info 1=todo 2=done
-	Date             string `json:"date"`
-	DateMod          string `json:"date_mod"`
-	ActionTime       int    `json:"actiontime"`        // seconds planned
-	UsersID          int    `json:"users_id"`
-	UsersIDTech      int    `json:"users_id_tech,omitempty"`
+	ID          int    `json:"id"`
+	TicketsID   int    `json:"tickets_id"`
+	Content     string `json:"content"`
+	State       int    `json:"state"` // 0=info 1=todo 2=done
+	Date        string `json:"date"`
+	DateMod     string `json:"date_mod"`
+	ActionTime  int    `json:"actiontime"` // seconds planned
+	UsersID     int    `json:"users_id"`
+	UsersIDTech int    `json:"users_id_tech,omitempty"`
 }
 
 // Solution is an ITILSolution attached to a ticket.
@@ -110,17 +169,17 @@ func (u *GlpiUser) DisplayName() string {
 
 // Entity mirrors GLPI's Entity resource.
 type Entity struct {
-	ID         int    `json:"id"`
-	Name       string `json:"name"`
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
 	CompleteName string `json:"completename"`
 }
 
 // Computer mirrors GLPI's Computer asset.
 type Computer struct {
-	ID         int    `json:"id"`
-	Name       string `json:"name"`
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
 	SerialNumber string `json:"serial,omitempty"`
-	EntitiesID int    `json:"entities_id"`
+	EntitiesID   int    `json:"entities_id"`
 }
 
 // MyProfilesResponse shapes GET /apirest.php/getMyProfiles.

@@ -39,17 +39,25 @@ func (c *Client) ListScopedTickets(ctx context.Context, sessionToken string, s T
 // with the client.
 func (c *Client) TicketView(t *Ticket) map[string]any {
 	return map[string]any{
-		"id":           t.ID,
-		"name":         t.Name,
-		"content":      t.Content,
-		"status":       t.Status,
-		"status_label": StatusLabel(t.Status),
-		"status_slug":  StatusSlug(t.Status),
-		"priority":     t.Priority,
-		"entities_id":  t.EntitiesID,
-		"date":         t.Date,
-		"date_mod":     t.DateMod,
-		"url":          fmt.Sprintf("%s/front/ticket.form.php?id=%d", c.WebBaseURL(), t.ID),
+		"id":                t.ID,
+		"name":              t.Name,
+		"content":           t.Content,
+		"status":            t.Status,
+		"status_label":      StatusLabel(t.Status),
+		"status_slug":       StatusSlug(t.Status),
+		"type":              t.Type,
+		"priority":          t.Priority,
+		"urgency":           t.Urgency,
+		"impact":            t.Impact,
+		"entities_id":       t.EntitiesID,
+		"itilcategories_id": t.ITILCategoriesID,
+		"locations_id":      t.LocationsID,
+		"requesttypes_id":   t.RequestTypesID,
+		"slas_id_tto":       t.SLAsIDTTO,
+		"slas_id_ttr":       t.SLAsIDTTR,
+		"date":              t.Date,
+		"date_mod":          t.DateMod,
+		"url":               fmt.Sprintf("%s/front/ticket.form.php?id=%d", c.WebBaseURL(), t.ID),
 	}
 }
 

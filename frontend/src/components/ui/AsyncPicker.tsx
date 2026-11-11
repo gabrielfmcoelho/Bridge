@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -11,6 +11,12 @@ export interface AsyncPickerItem {
   label: string;
   secondary?: string;
   color?: string;
+  /** Ancestor names (root → immediate parent), for tree-shaped itemtypes
+   *  (GLPI categories, locations, ...). When present, the list renders
+   *  non-selectable ancestor header rows above the item — same convention
+   *  GLPI's own dropdown picker uses — deduplicated against the previous
+   *  row's path so a shared ancestor only prints once. */
+  path?: string[];
 }
 
 // Single-select variant.
@@ -42,6 +48,95 @@ type Props = (SingleProps | MultiProps) & {
   emptyLabel?: string;
   disabled?: boolean;
 };
+
+// renderTreeRows walks the flat result list and, for items carrying a
+// `path`, interleaves non-selectable ancestor header rows — matching GLPI's
+// own dropdown: a shared ancestor (e.g. the same parent category) prints
+// once, immediately followed by its children, each indented one level
+// further and prefixed with a single "»" (not one "»" per depth level).
+function renderTreeRows(
+  items: AsyncPickerItem[],
+  opts: {
+    multi: boolean;
+    selectedIDs: Set<number>;
+    selectedValue: number | null | undefined;
+    onPick: (item: AsyncPickerItem) => void;
+  }
+): ReactNode[] {
+  const rows: ReactNode[] = [];
+  // The chain of labels already visible on screen, ending with whatever the
+  // previous row actually displayed (header OR selectable item) — so a
+  // parent that is itself selectable (shown as its own row) doesn't get
+  // reprinted as a separate header line right above its children.
+  let shown: string[] = [];
+  // GLPI's own tree search collapses depth to two visual tiers — the root
+  // group sits flush left with no marker, and every row below it (no matter
+  // how many real levels deep) gets the same single indent + single "»".
+  const indent = (depth: number) => ({ paddingLeft: depth > 0 ? "26px" : "12px" });
+  const marker = (depth: number) => (depth > 0 ? "»" : "");
+
+  for (const item of items) {
+    const path = item.path ?? [];
+    for (let depth = 0; depth < path.length; depth++) {
+      if (shown[depth] === path[depth]) continue;
+      rows.push(
+        <div
+          key={`hdr-${item.id}-${depth}`}
+          style={indent(depth)}
+          className="pr-3 py-1 text-xs font-medium text-[var(--text-faint)] truncate"
+        >
+          {marker(depth)}
+          {path[depth]}
+        </div>
+      );
+      // Everything below this depth is now stale and must reprint too.
+      shown = shown.slice(0, depth);
+      shown[depth] = path[depth];
+    }
+
+    const picked = opts.multi ? opts.selectedIDs.has(item.id) : item.id === opts.selectedValue;
+    rows.push(
+      <button
+        key={item.id}
+        type="button"
+        onClick={() => opts.onPick(item)}
+        style={indent(path.length)}
+        className={`w-full text-left pr-3 py-1.5 text-sm transition-colors flex items-start gap-2 ${
+          picked
+            ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+            : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
+        }`}
+      >
+        {opts.multi && (
+          <span
+            className={`mt-0.5 inline-flex items-center justify-center w-4 h-4 rounded-[var(--radius-sm)] border shrink-0 ${
+              picked
+                ? "bg-[var(--accent)] border-[var(--accent)] text-white"
+                : "border-[var(--border-default)]"
+            }`}
+            aria-hidden
+          >
+            {picked && <Icon path={ICON_PATHS.check} className="w-3 h-3" strokeWidth={3} />}
+          </span>
+        )}
+        <span className="flex-1 min-w-0">
+          <span className="flex items-center gap-1.5">
+            {item.color && (
+              <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+            )}
+            <span className="block truncate">
+              {path.length > 0 ? "»" : ""}
+              {item.label}
+            </span>
+          </span>
+          {item.secondary && <span className="block text-xs text-[var(--text-faint)]">{item.secondary}</span>}
+        </span>
+      </button>
+    );
+    shown = [...path, item.label];
+  }
+  return rows;
+}
 
 export default function AsyncPicker(props: Props) {
   const { t } = useLocale();
@@ -227,49 +322,11 @@ export default function AsyncPicker(props: Props) {
                   {emptyLabel ?? t("common.noResultsShort")}
                 </div>
               )}
-              {!loading && items.map((item) => {
-                const picked = multi ? selectedIDs.has(item.id) : item.id === props.value;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => (multi ? toggleMulti(item) : pickSingle(item))}
-                    className={`w-full text-left px-3 py-1.5 text-sm transition-colors flex items-start gap-2 ${
-                      picked
-                        ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)]"
-                    }`}
-                  >
-                    {multi && (
-                      <span
-                        className={`mt-0.5 inline-flex items-center justify-center w-4 h-4 rounded-[var(--radius-sm)] border shrink-0 ${
-                          picked
-                            ? "bg-[var(--accent)] border-[var(--accent)] text-white"
-                            : "border-[var(--border-default)]"
-                        }`}
-                        aria-hidden
-                      >
-                        {picked && (
-                          <Icon path={ICON_PATHS.check} className="w-3 h-3" strokeWidth={3} />
-                        )}
-                      </span>
-                    )}
-                    <span className="flex-1 min-w-0">
-                      <span className="flex items-center gap-1.5">
-                        {item.color && (
-                          <span
-                            className="inline-block w-2 h-2 rounded-full shrink-0"
-                            style={{ backgroundColor: item.color }}
-                          />
-                        )}
-                        <span className="block truncate">{item.label}</span>
-                      </span>
-                      {item.secondary && (
-                        <span className="block text-xs text-[var(--text-faint)]">{item.secondary}</span>
-                      )}
-                    </span>
-                  </button>
-                );
+              {!loading && renderTreeRows(items, {
+                multi,
+                selectedIDs,
+                selectedValue: !multi ? props.value : undefined,
+                onPick: (item) => (multi ? toggleMulti(item) : pickSingle(item)),
               })}
             </div>
           </Popover.Content>

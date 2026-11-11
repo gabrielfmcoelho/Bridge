@@ -445,7 +445,7 @@ func (h *glpiHandlers) handleDeleteDropdownCatalogue(w http.ResponseWriter, r *h
 // so the frontend can render checkbox rows.
 func allowedCatalogueItemtypes() []string {
 	return []string{
-		"Entity", "ITILCategory", "Location", "Supplier",
+		"Entity", "ITILCategory", "Location", "Supplier", "RequestType", "SLA",
 		"Computer", "Monitor", "NetworkEquipment", "Printer", "Phone",
 		"User", "Group", "Software", "State",
 	}
@@ -457,14 +457,26 @@ func allowedCatalogueItemtypes() []string {
 // host, or alert-scoped. The handler fills in sensible defaults from the context
 // before POSTing to GLPI.
 type createTicketRequest struct {
-	ProfileID    int64  `json:"profile_id"`
-	Title        string `json:"title"`
-	Description  string `json:"description"`
-	EntityID     int    `json:"entity_id"`
-	CategoryID   int    `json:"category_id"`
-	HostSlug     string `json:"host_slug,omitempty"`     // optional — persists as host_chamado
-	AlertID      int64  `json:"alert_id,omitempty"`      // optional — links via alert_chamado_links
-	LinkComputer bool   `json:"link_computer,omitempty"` // if true + host_slug, find & link GLPI Computer
+	ProfileID     int64  `json:"profile_id"`
+	Title         string `json:"title"`
+	Description   string `json:"description"`
+	Type          int    `json:"type,omitempty"` // 1=incident 2=request
+	EntityID      int    `json:"entity_id"`
+	CategoryID    int    `json:"category_id"`
+	LocationID    int    `json:"location_id,omitempty"`
+	RequestTypeID int    `json:"request_type_id,omitempty"`
+	SLAIDTTO      int    `json:"sla_id_tto,omitempty"`
+	SLAIDTTR      int    `json:"sla_id_ttr,omitempty"`
+	Urgency       int    `json:"urgency,omitempty"`
+	Impact        int    `json:"impact,omitempty"`
+	Priority      int    `json:"priority,omitempty"`
+	RequesterIDs  []int  `json:"requester_ids,omitempty"`
+	WatcherIDs    []int  `json:"watcher_ids,omitempty"`
+	AssignUserID  int    `json:"assign_user_id,omitempty"`
+	AssignGroupID int    `json:"assign_group_id,omitempty"`
+	HostSlug      string `json:"host_slug,omitempty"`     // optional — persists as host_chamado
+	AlertID       int64  `json:"alert_id,omitempty"`      // optional — links via alert_chamado_links
+	LinkComputer  bool   `json:"link_computer,omitempty"` // if true + host_slug, find & link GLPI Computer
 }
 
 type createTicketResponse struct {
@@ -536,8 +548,16 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 	ticketID, err := client.CreateTicket(ctx, session, glpiclient.TicketCreateInput{
 		Name:             req.Title,
 		Content:          req.Description,
+		Type:             req.Type,
 		EntitiesID:       entityID,
 		ITILCategoriesID: req.CategoryID,
+		LocationsID:      req.LocationID,
+		RequestTypesID:   req.RequestTypeID,
+		SLAsIDTTO:        req.SLAIDTTO,
+		SLAsIDTTR:        req.SLAIDTTR,
+		Priority:         req.Priority,
+		Urgency:          req.Urgency,
+		Impact:           req.Impact,
 	})
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "create failed: "+glpiclient.FriendlyError(err))
@@ -546,6 +566,37 @@ func (h *glpiHandlers) handleCreateTicket(w http.ResponseWriter, r *http.Request
 	ticketURL := fmt.Sprintf("%s/front/ticket.form.php?id=%d", client.WebBaseURL(), ticketID)
 
 	resp := createTicketResponse{TicketID: ticketID, TicketURL: ticketURL}
+
+	// Actors — best-effort, each failure is folded into the warning rather than
+	// failing the whole creation (the ticket already exists at this point).
+	var actorWarnings []string
+	for _, uid := range req.RequesterIDs {
+		if uid > 0 {
+			if aerr := client.AddTicketUserActor(ctx, session, ticketID, uid, glpiclient.ActorRequester); aerr != nil {
+				actorWarnings = append(actorWarnings, "requester: "+glpiclient.FriendlyError(aerr))
+			}
+		}
+	}
+	for _, uid := range req.WatcherIDs {
+		if uid > 0 {
+			if aerr := client.AddTicketUserActor(ctx, session, ticketID, uid, glpiclient.ActorObserver); aerr != nil {
+				actorWarnings = append(actorWarnings, "watcher: "+glpiclient.FriendlyError(aerr))
+			}
+		}
+	}
+	if req.AssignUserID > 0 {
+		if aerr := client.AddTicketUserActor(ctx, session, ticketID, req.AssignUserID, glpiclient.ActorAssign); aerr != nil {
+			actorWarnings = append(actorWarnings, "assign user: "+glpiclient.FriendlyError(aerr))
+		}
+	}
+	if req.AssignGroupID > 0 {
+		if aerr := client.AddTicketGroupActor(ctx, session, ticketID, req.AssignGroupID, glpiclient.ActorAssign); aerr != nil {
+			actorWarnings = append(actorWarnings, "assign group: "+glpiclient.FriendlyError(aerr))
+		}
+	}
+	if len(actorWarnings) > 0 {
+		resp.Warning = strings.Join(actorWarnings, "; ")
+	}
 
 	// Optional link to a GLPI Computer asset (matched by slug or hostname).
 	if req.HostSlug != "" && req.LinkComputer {
@@ -776,6 +827,664 @@ func (h *glpiHandlers) handleGetTicketDetails(w http.ResponseWriter, r *http.Req
 		return
 	}
 	jsonOK(w, detail)
+}
+
+// ticketUpdateRequest carries only the fields a caller wants to change — a nil
+// pointer means "leave as-is". Mirrors the partial-update convention used
+// elsewhere in the API (e.g. PUT /api/api-catalog/{id}).
+type ticketUpdateRequest struct {
+	Title      *string `json:"title"`
+	Status     *int    `json:"status"`
+	Type       *int    `json:"type"`
+	CategoryID *int    `json:"category_id"`
+	LocationID *int    `json:"location_id"`
+	SLAIDTTO   *int    `json:"sla_id_tto"`
+	SLAIDTTR   *int    `json:"sla_id_ttr"`
+	Urgency    *int    `json:"urgency"`
+	Impact     *int    `json:"impact"`
+	Priority   *int    `json:"priority"`
+}
+
+// handleUpdateTicket applies a partial update to a ticket's ITIL fields.
+// Route:
+//
+//	PUT /api/glpi/tickets/{id}?profile_id=<N>
+//
+//	@Summary		Update a GLPI ticket
+//	@Description	Editor+. Partial update — omitted fields keep their GLPI value. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id			path		int					true	"GLPI ticket ID"
+//	@Param			profile_id	query		int					true	"GLPI token profile ID whose session is used"
+//	@Param			body		body		ticketUpdateRequest	true	"Fields to change"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		401			{object}	httpx.ErrorResponse
+//	@Failure		403			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id} [put]
+func (h *glpiHandlers) handleUpdateTicket(w http.ResponseWriter, r *http.Request) {
+	ticketID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || ticketID <= 0 {
+		jsonError(w, http.StatusBadRequest, "invalid ticket id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	var req ticketUpdateRequest
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid JSON", err)
+		return
+	}
+	fields := map[string]any{}
+	if req.Title != nil {
+		fields["name"] = *req.Title
+	}
+	if req.Status != nil {
+		fields["status"] = *req.Status
+	}
+	if req.Type != nil {
+		fields["type"] = *req.Type
+	}
+	if req.CategoryID != nil {
+		fields["itilcategories_id"] = *req.CategoryID
+	}
+	if req.LocationID != nil {
+		fields["locations_id"] = *req.LocationID
+	}
+	if req.SLAIDTTO != nil {
+		fields["slas_id_tto"] = *req.SLAIDTTO
+	}
+	if req.SLAIDTTR != nil {
+		fields["slas_id_ttr"] = *req.SLAIDTTR
+	}
+	if req.Urgency != nil {
+		fields["urgency"] = *req.Urgency
+	}
+	if req.Impact != nil {
+		fields["impact"] = *req.Impact
+	}
+	if req.Priority != nil {
+		fields["priority"] = *req.Priority
+	}
+	if len(fields) == 0 {
+		jsonError(w, http.StatusBadRequest, "no fields to update")
+		return
+	}
+
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	if err := client.UpdateTicket(ctx, session, ticketID, fields); err != nil {
+		jsonError(w, http.StatusBadGateway, "update failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonOK(w, map[string]any{"status": "updated"})
+}
+
+// handleAddTicketFollowup posts a new acompanhamento (ITILFollowup). Route:
+//
+//	POST /api/glpi/tickets/{id}/followups?profile_id=<N>
+//
+//	@Summary		Add a followup to a GLPI ticket
+//	@Description	Editor+. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id			path		int		true	"GLPI ticket ID"
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			body		body		object{content=string,is_private=bool}	true	"Followup"
+//	@Success		201			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/followups [post]
+func (h *glpiHandlers) handleAddTicketFollowup(w http.ResponseWriter, r *http.Request) {
+	ticketID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || ticketID <= 0 {
+		jsonError(w, http.StatusBadRequest, "invalid ticket id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	var req struct {
+		Content   string `json:"content"`
+		IsPrivate bool   `json:"is_private"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid JSON", err)
+		return
+	}
+	req.Content = strings.TrimSpace(req.Content)
+	if req.Content == "" {
+		jsonError(w, http.StatusBadRequest, "content is required")
+		return
+	}
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	id, err := client.AddFollowup(ctx, session, ticketID, req.Content, req.IsPrivate)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "create failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonCreated(w, map[string]any{"id": id})
+}
+
+// handleAddTicketTask posts a new TicketTask. Route:
+//
+//	POST /api/glpi/tickets/{id}/tasks?profile_id=<N>
+//
+//	@Summary		Add a task to a GLPI ticket
+//	@Description	Editor+. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id			path		int		true	"GLPI ticket ID"
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			body		body		object{content=string,actiontime=int}	true	"Task"
+//	@Success		201			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/tasks [post]
+func (h *glpiHandlers) handleAddTicketTask(w http.ResponseWriter, r *http.Request) {
+	ticketID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || ticketID <= 0 {
+		jsonError(w, http.StatusBadRequest, "invalid ticket id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	var req struct {
+		Content    string `json:"content"`
+		ActionTime int    `json:"actiontime"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid JSON", err)
+		return
+	}
+	req.Content = strings.TrimSpace(req.Content)
+	if req.Content == "" {
+		jsonError(w, http.StatusBadRequest, "content is required")
+		return
+	}
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	id, err := client.AddTask(ctx, session, ticketID, req.Content, req.ActionTime)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "create failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonCreated(w, map[string]any{"id": id})
+}
+
+// handleAddTicketSolution proposes an ITILSolution. Route:
+//
+//	POST /api/glpi/tickets/{id}/solution?profile_id=<N>
+//
+//	@Summary		Propose a solution for a GLPI ticket
+//	@Description	Editor+. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id			path		int		true	"GLPI ticket ID"
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			body		body		object{content=string}	true	"Solution"
+//	@Success		201			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/solution [post]
+func (h *glpiHandlers) handleAddTicketSolution(w http.ResponseWriter, r *http.Request) {
+	ticketID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || ticketID <= 0 {
+		jsonError(w, http.StatusBadRequest, "invalid ticket id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid JSON", err)
+		return
+	}
+	req.Content = strings.TrimSpace(req.Content)
+	if req.Content == "" {
+		jsonError(w, http.StatusBadRequest, "content is required")
+		return
+	}
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	id, err := client.AddSolution(ctx, session, ticketID, req.Content)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "create failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonCreated(w, map[string]any{"id": id})
+}
+
+// handleAddTicketActor attaches a requester/observer/assignee (user or group)
+// to an existing ticket. Route:
+//
+//	POST /api/glpi/tickets/{id}/actors?profile_id=<N>
+//
+//	@Summary		Add an actor to a GLPI ticket
+//	@Description	Editor+. Exactly one of user_id/group_id must be set; role is 1=requester 2=observer 3=assign (groups can't be requesters). 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id			path		int		true	"GLPI ticket ID"
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			body		body		object{user_id=int,group_id=int,role=int}	true	"Actor"
+//	@Success		201			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/actors [post]
+func (h *glpiHandlers) handleAddTicketActor(w http.ResponseWriter, r *http.Request) {
+	ticketID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || ticketID <= 0 {
+		jsonError(w, http.StatusBadRequest, "invalid ticket id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	var req struct {
+		UserID  int `json:"user_id"`
+		GroupID int `json:"group_id"`
+		Role    int `json:"role"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid JSON", err)
+		return
+	}
+	if req.Role != glpiclient.ActorRequester && req.Role != glpiclient.ActorObserver && req.Role != glpiclient.ActorAssign {
+		jsonError(w, http.StatusBadRequest, "role must be 1 (requester), 2 (observer) or 3 (assign)")
+		return
+	}
+	if (req.UserID <= 0) == (req.GroupID <= 0) {
+		jsonError(w, http.StatusBadRequest, "exactly one of user_id/group_id is required")
+		return
+	}
+	if req.GroupID > 0 && req.Role == glpiclient.ActorRequester {
+		jsonError(w, http.StatusBadRequest, "a group can't be a requester")
+		return
+	}
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	if req.UserID > 0 {
+		err = client.AddTicketUserActor(ctx, session, ticketID, req.UserID, req.Role)
+	} else {
+		err = client.AddTicketGroupActor(ctx, session, ticketID, req.GroupID, req.Role)
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "add actor failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonCreated(w, map[string]any{"status": "added"})
+}
+
+// handleRemoveTicketActor deletes a Ticket_User/Group_Ticket row. Route:
+//
+//	DELETE /api/glpi/tickets/{id}/actors/{actorId}?profile_id=<N>&is_group=<bool>
+//
+//	@Summary		Remove an actor from a GLPI ticket
+//	@Description	Editor+. actorId is the Ticket_User/Group_Ticket row id (TicketActor.id from the details response), not the user/group id. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Produce		json
+//	@Param			id			path		int		true	"GLPI ticket ID"
+//	@Param			actorId		path		int		true	"Ticket_User/Group_Ticket row ID"
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			is_group	query		bool	false	"true if the row is a Group_Ticket rather than a Ticket_User"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/actors/{actorId} [delete]
+func (h *glpiHandlers) handleRemoveTicketActor(w http.ResponseWriter, r *http.Request) {
+	actorID, err := strconv.Atoi(r.PathValue("actorId"))
+	if err != nil || actorID <= 0 {
+		jsonError(w, http.StatusBadRequest, "invalid actor id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	isGroup := r.URL.Query().Get("is_group") == "true"
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	if err := client.RemoveTicketActor(ctx, session, actorID, isGroup); err != nil {
+		jsonError(w, http.StatusBadGateway, "remove actor failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonOK(w, map[string]any{"status": "removed"})
+}
+
+// handleUploadTicketDocument accepts a multipart file upload, forwards it to
+// GLPI as a Document, and links it to the ticket via Document_Item — the
+// native-ticket equivalent of the Formcreator file question. Route:
+//
+//	POST /api/glpi/tickets/{id}/documents?profile_id=<N>   multipart "file"
+//
+//	@Summary		Attach a file to a GLPI ticket
+//	@Description	Editor+. Forwards the file (max 50 MiB) to GLPI as a Document and links it to the ticket. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			multipart/form-data
+//	@Produce		json
+//	@Param			id			path		int		true	"GLPI ticket ID"
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			file		formData	file	true	"File to upload"
+//	@Success		201			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/documents [post]
+func (h *glpiHandlers) handleUploadTicketDocument(w http.ResponseWriter, r *http.Request) {
+	ticketID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || ticketID <= 0 {
+		jsonError(w, http.StatusBadRequest, "invalid ticket id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	const maxUpload = 50 << 20
+	r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
+	if err := r.ParseMultipartForm(maxUpload); err != nil {
+		jsonBadRequest(w, r, "multipart parse failed", err)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		jsonBadRequest(w, r, "missing file field", err)
+		return
+	}
+	defer file.Close()
+
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	docID, err := client.UploadDocumentMultipart(ctx, session, header.Filename, header.Header.Get("Content-Type"), file)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "upload failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	if err := client.AddDocumentToTicket(ctx, session, ticketID, docID); err != nil {
+		jsonError(w, http.StatusBadGateway, "link failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonCreated(w, map[string]any{"id": docID, "filename": header.Filename})
+}
+
+// handleAddTicketValidation requests an approval from a specific user. Route:
+//
+//	POST /api/glpi/tickets/{id}/validations?profile_id=<N>
+//
+//	@Summary		Request a validation on a GLPI ticket
+//	@Description	Editor+. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id			path		int		true	"GLPI ticket ID"
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			body		body		object{approver_id=int,comment=string}	true	"Validation request"
+//	@Success		201			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/validations [post]
+func (h *glpiHandlers) handleAddTicketValidation(w http.ResponseWriter, r *http.Request) {
+	ticketID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || ticketID <= 0 {
+		jsonError(w, http.StatusBadRequest, "invalid ticket id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	var req struct {
+		ApproverID int    `json:"approver_id"`
+		Comment    string `json:"comment"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid JSON", err)
+		return
+	}
+	if req.ApproverID <= 0 {
+		jsonError(w, http.StatusBadRequest, "approver_id is required")
+		return
+	}
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	id, err := client.AddTicketValidation(ctx, session, ticketID, req.ApproverID, req.Comment)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "create failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonCreated(w, map[string]any{"id": id})
+}
+
+// handleAnswerTicketValidation accepts or refuses a pending validation. Route:
+//
+//	PUT /api/glpi/tickets/{id}/validations/{validationId}?profile_id=<N>
+//
+//	@Summary		Answer a GLPI ticket validation
+//	@Description	Editor+. status is 2 (accepted) or 3 (refused). 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id				path		int		true	"GLPI ticket ID"
+//	@Param			validationId	path		int		true	"TicketValidation ID"
+//	@Param			profile_id		query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			body			body		object{status=int,comment=string}	true	"Answer"
+//	@Success		200				{object}	map[string]interface{}
+//	@Failure		400				{object}	httpx.ErrorResponse
+//	@Failure		502				{object}	httpx.ErrorResponse
+//	@Failure		503				{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/validations/{validationId} [put]
+func (h *glpiHandlers) handleAnswerTicketValidation(w http.ResponseWriter, r *http.Request) {
+	validationID, err := strconv.Atoi(r.PathValue("validationId"))
+	if err != nil || validationID <= 0 {
+		jsonError(w, http.StatusBadRequest, "invalid validation id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	var req struct {
+		Status  int    `json:"status"`
+		Comment string `json:"comment"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid JSON", err)
+		return
+	}
+	if req.Status != glpiclient.ValidationAccepted && req.Status != glpiclient.ValidationRefused {
+		jsonError(w, http.StatusBadRequest, "status must be 2 (accepted) or 3 (refused)")
+		return
+	}
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	if err := client.AnswerTicketValidation(ctx, session, validationID, req.Status, req.Comment); err != nil {
+		jsonError(w, http.StatusBadGateway, "answer failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonOK(w, map[string]any{"status": "answered"})
+}
+
+// handleSubmitTicketSatisfaction answers the post-closure survey row. Route:
+//
+//	PUT /api/glpi/tickets/{id}/satisfaction?profile_id=<N>
+//
+//	@Summary		Answer a GLPI ticket satisfaction survey
+//	@Description	Any role (the requester, typically). satisfaction_id comes from the ticket details response. rating is 1-5. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+//	@Tags			glpi
+//	@Accept			json
+//	@Produce		json
+//	@Param			id			path		int		true	"GLPI ticket ID"
+//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			body		body		object{satisfaction_id=int,rating=int,comment=string}	true	"Answer"
+//	@Success		200			{object}	map[string]interface{}
+//	@Failure		400			{object}	httpx.ErrorResponse
+//	@Failure		502			{object}	httpx.ErrorResponse
+//	@Failure		503			{object}	httpx.ErrorResponse
+//	@Router			/api/glpi/tickets/{id}/satisfaction [put]
+func (h *glpiHandlers) handleSubmitTicketSatisfaction(w http.ResponseWriter, r *http.Request) {
+	_, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, "invalid ticket id")
+		return
+	}
+	profileID, err := strconv.ParseInt(r.URL.Query().Get("profile_id"), 10, 64)
+	if err != nil || profileID <= 0 {
+		jsonError(w, http.StatusBadRequest, "profile_id query param is required")
+		return
+	}
+	var req struct {
+		SatisfactionID int    `json:"satisfaction_id"`
+		Rating         int    `json:"rating"`
+		Comment        string `json:"comment"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid JSON", err)
+		return
+	}
+	if req.SatisfactionID <= 0 || req.Rating < 1 || req.Rating > 5 {
+		jsonError(w, http.StatusBadRequest, "satisfaction_id and rating (1-5) are required")
+		return
+	}
+	client, _, reason := h.resolveClient()
+	if client == nil {
+		jsonError(w, http.StatusServiceUnavailable, reason)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	session, err := h.sessionFor(ctx, client, profileID)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "auth failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	if err := client.SubmitTicketSatisfaction(ctx, session, req.SatisfactionID, req.Rating, req.Comment); err != nil {
+		jsonError(w, http.StatusBadGateway, "answer failed: "+glpiclient.FriendlyError(err))
+		return
+	}
+	jsonOK(w, map[string]any{"status": "answered"})
 }
 
 // ─── Formcreator ────────────────────────────────────────────────────────────
@@ -1174,7 +1883,7 @@ func toString(v any) string {
 
 func allowedDropdownItemtype(t string) bool {
 	switch t {
-	case "Entity", "ITILCategory", "Location", "Supplier", "Computer",
+	case "Entity", "ITILCategory", "Location", "Supplier", "RequestType", "SLA", "Computer",
 		"Monitor", "NetworkEquipment", "Printer", "Phone", "User",
 		"Group", "Software", "State":
 		return true
@@ -1741,6 +2450,16 @@ func (h *glpiHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("editor", "POST /api/glpi/tickets", h.handleCreateTicket)
 	rr.auth("GET /api/glpi/tickets/{id}", h.handleGetTicket)
 	rr.auth("GET /api/glpi/tickets/{id}/details", h.handleGetTicketDetails)
+	rr.role("editor", "PUT /api/glpi/tickets/{id}", h.handleUpdateTicket)
+	rr.role("editor", "POST /api/glpi/tickets/{id}/followups", h.handleAddTicketFollowup)
+	rr.role("editor", "POST /api/glpi/tickets/{id}/tasks", h.handleAddTicketTask)
+	rr.role("editor", "POST /api/glpi/tickets/{id}/solution", h.handleAddTicketSolution)
+	rr.role("editor", "POST /api/glpi/tickets/{id}/actors", h.handleAddTicketActor)
+	rr.role("editor", "DELETE /api/glpi/tickets/{id}/actors/{actorId}", h.handleRemoveTicketActor)
+	rr.role("editor", "POST /api/glpi/tickets/{id}/documents", h.handleUploadTicketDocument)
+	rr.role("editor", "POST /api/glpi/tickets/{id}/validations", h.handleAddTicketValidation)
+	rr.role("editor", "PUT /api/glpi/tickets/{id}/validations/{validationId}", h.handleAnswerTicketValidation)
+	rr.auth("PUT /api/glpi/tickets/{id}/satisfaction", h.handleSubmitTicketSatisfaction)
 	rr.auth("GET /api/glpi/documents/{id}", h.handleGetGlpiDocument)
 	rr.auth("GET /api/glpi/forms", h.handleListForms)
 	rr.auth("GET /api/glpi/forms/{id}", h.handleGetFormBundle)
