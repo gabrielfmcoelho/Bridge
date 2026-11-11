@@ -139,3 +139,11 @@ func TestOSVEcosystemAndCleanUpstream(t *testing.T) {
 		}
 	}
 }
+
+// Oracle Linux's os-release ID is "ol"; endoflife.date calls it oracle-linux.
+func TestNormalize_OracleLinuxEOL(t *testing.T) {
+	rows := byKey(NormalizeDependencies(sshtest.DepScope{OS: sshtest.OSRelease{ID: "ol", VersionID: "9.3"}}, nil))
+	if r := rows["os:ol"]; r.Version != "9.3" || r.EOLProduct != "oracle-linux" {
+		t.Fatalf("ol = %+v", r)
+	}
+}
