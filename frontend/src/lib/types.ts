@@ -132,6 +132,8 @@ export interface Host {
     storage?: string;
     disk_percent?: string;
   };
+  /** The host's own OS (containers excluded), from the latest scan. */
+  os?: HostOS;
   // Idle-VM heuristic (computed during scan). idle=true means every rule
   // (R1..R4) passed; idle_reasons lists which rules passed,
   // idle_counterfacts lists which rules failed (with brief explanations).
@@ -1471,6 +1473,57 @@ export type DependencyKind = "os" | "runtime" | "package";
  *  or inside one of its containers. lookup: where its CVEs come from. */
 /** One component version across its installations (…/dependencies/groups).
  *  cve_count / max_severity are the worst of them; instances capped at 50. */
+export interface HostOS {
+  /** os-release PRETTY_NAME, e.g. "Ubuntu 22.04.4 LTS". */
+  pretty?: string;
+  /** os-release ID / VERSION_ID, e.g. "ubuntu" / "22.04". */
+  id?: string;
+  version?: string;
+  arch?: string;
+  eol?: boolean;
+  eol_date?: string;
+  reboot_required?: boolean;
+}
+
+export type OSUpdateKind = "check" | "packages" | "security" | "release";
+export type OSUpdateResultStatus = "pending" | "running" | "success" | "failed" | "skipped";
+
+/** One check / upgrade over a set of hosts (GET /api/ssh/os-updates/runs). */
+export interface OSUpdateRun {
+  id: number;
+  kind: OSUpdateKind;
+  reboot: boolean;
+  concurrency: number;
+  status: "running" | "done" | "cancelled" | "interrupted";
+  requested_name?: string;
+  created_at: string;
+  finished_at?: string;
+  /** Hosts per result status. */
+  counts: Partial<Record<OSUpdateResultStatus, number>>;
+  results?: OSUpdateResult[];
+}
+
+export interface OSUpdateResult {
+  run_id: number;
+  host_id: number;
+  host_nickname: string;
+  host_slug: string;
+  status: OSUpdateResultStatus;
+  reason?: string;
+  pkg_manager?: string;
+  os_before?: string;
+  os_after?: string;
+  /** Still upgradable once the run was over (all / security). */
+  upgradable?: number;
+  security_upgradable?: number;
+  upgraded?: number;
+  reboot_required: boolean;
+  rebooted: boolean;
+  output?: string;
+  started_at?: string;
+  finished_at?: string;
+}
+
 export interface DependencyGroup {
   kind: DependencyKind;
   name: string;

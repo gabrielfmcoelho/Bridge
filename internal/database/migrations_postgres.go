@@ -2148,4 +2148,38 @@ var migrationsPostgres = []string{
 		ON gitlab_repo_links (entity_type, entity_id, kind, gitlab_project_id, gitlab_base_url) WHERE gitlab_project_id <> 0;
 	CREATE UNIQUE INDEX IF NOT EXISTS uq_gitlab_repo_links_path
 		ON gitlab_repo_links (entity_type, entity_id, kind, gitlab_base_url, lower(gitlab_path)) WHERE gitlab_project_id = 0;`,
+
+	// Version 124: OS update runs (check / package / security upgrades on a
+	// set of hosts) and each host's result. Kept in tables so a run's state
+	// survives a restart; a run cut by one is marked interrupted at startup.
+	`CREATE TABLE IF NOT EXISTS os_update_runs (
+		id           BIGSERIAL PRIMARY KEY,
+		kind         TEXT NOT NULL CHECK (kind IN ('check','packages','security','release')),
+		reboot       BOOLEAN NOT NULL DEFAULT false,
+		concurrency  INTEGER NOT NULL DEFAULT 3,
+		target       TEXT NOT NULL DEFAULT '',
+		status       TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running','done','cancelled','interrupted')),
+		requested_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+		finished_at  TIMESTAMPTZ
+	);
+	CREATE TABLE IF NOT EXISTS os_update_results (
+		run_id              BIGINT NOT NULL REFERENCES os_update_runs(id) ON DELETE CASCADE,
+		host_id             BIGINT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+		status              TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','success','failed','skipped')),
+		reason              TEXT NOT NULL DEFAULT '',
+		pkg_manager         TEXT NOT NULL DEFAULT '',
+		os_before           TEXT NOT NULL DEFAULT '',
+		os_after            TEXT NOT NULL DEFAULT '',
+		upgradable          INTEGER,
+		security_upgradable INTEGER,
+		upgraded            INTEGER,
+		reboot_required     BOOLEAN NOT NULL DEFAULT false,
+		rebooted            BOOLEAN NOT NULL DEFAULT false,
+		output              TEXT NOT NULL DEFAULT '',
+		started_at          TIMESTAMPTZ,
+		finished_at         TIMESTAMPTZ,
+		PRIMARY KEY (run_id, host_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_os_update_results_host ON os_update_results (host_id, finished_at DESC);`,
 }

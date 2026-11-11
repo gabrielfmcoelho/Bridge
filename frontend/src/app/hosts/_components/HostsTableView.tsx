@@ -1,6 +1,8 @@
 import SortableTable from "@/components/ui/SortableTable";
 import Pagination from "@/components/ui/Pagination";
 import Tag from "@/components/ui/Tag";
+import Lozenge from "@/components/ui/Lozenge";
+import { osLabel } from "./hostInsights";
 import ScanIndicator from "./ScanIndicator";
 import SituacaoCell from "./SituacaoCell";
 import IconButton from "@/components/ui/IconButton";
@@ -46,6 +48,7 @@ export default function HostsTableView({
           { key: "hostname" as const, label: t("host.hostname") },
           { key: "hospedagem" as const, label: t("host.hospedagem") },
           { key: "situacao" as const, label: t("host.situacao") },
+          { key: "os" as const, label: t("host.os"), sortable: false },
           { key: "scan" as const, label: t("host.scan"), align: "center", sortable: false },
           // Sentinel's last sync, beside (never instead of) the scan.
           { key: "sentinel_cpu" as const, label: t("sentinel.colCpu"), align: "right" },
@@ -53,10 +56,10 @@ export default function HostsTableView({
           { key: "tags" as const, label: t("common.tags"), sortable: false },
           { key: "actions" as const, label: t("common.actions"), align: "right", sortable: false },
         ]}
-        sortKey={sort.field as "nickname" | "hostname" | "hospedagem" | "situacao" | "scan" | "sentinel_cpu" | "sentinel_ram" | "tags" | "actions"}
+        sortKey={sort.field as "nickname" | "hostname" | "hospedagem" | "situacao" | "os" | "scan" | "sentinel_cpu" | "sentinel_ram" | "tags" | "actions"}
         sortDir={sort.direction}
         onSortChange={(key, dir) => {
-          if (key === "scan" || key === "tags" || key === "actions") return; // not server-sortable
+          if (key === "scan" || key === "os" || key === "tags" || key === "actions") return; // not server-sortable
           onSortChange({ field: key, direction: dir });
         }}
       >
@@ -72,6 +75,11 @@ export default function HostsTableView({
               <td className="px-4 py-2.5 text-[var(--text-secondary)]">{host.hospedagem || "-"}</td>
               <td className="px-4 py-2.5" onClick={(e) => { if (canEdit) e.stopPropagation(); }}>
                 <SituacaoCell host={host} canEdit={canEdit} t={t} />
+              </td>
+              <td className="px-4 py-2.5 whitespace-nowrap" title={host.os?.pretty}>
+                <span className="text-[var(--text-secondary)]">{osLabel(host) || "–"}</span>
+                {host.os?.eol && <Lozenge appearance="removed" className="ml-1.5">{t("host.osEol")}</Lozenge>}
+                {host.os?.reboot_required && <Lozenge appearance="moved" className="ml-1.5">{t("host.rebootPending")}</Lozenge>}
               </td>
               <td className="px-4 py-2.5 text-center"><ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} /></td>
               <td className="px-4 py-2.5 text-right tabular-nums whitespace-nowrap text-[var(--text-secondary)]" title={host.sentinel && host.sentinel.state !== "ok" ? t(`sentinel.reason.${host.sentinel.state}`) : undefined}>

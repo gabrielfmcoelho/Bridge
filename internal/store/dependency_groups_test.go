@@ -71,6 +71,11 @@ func TestDependencyRepo_ListGroups(t *testing.T) {
 	if len(groups) != 1 || !groups[0].EOL || groups[0].Name != "php" {
 		t.Fatalf("eol = %+v", groups)
 	}
+	// scope=host leaves the container installs out.
+	groups, _, _ = repo.ListGroups(ctx, models.DependencyFilter{Kinds: []string{"package"}, HostOnly: true, Search: "libssl3"})
+	if len(groups) != 2 || groups[0].Installs != 2 || groups[0].Hosts != 2 {
+		t.Fatalf("host only = %+v", groups)
+	}
 	// Paging counts groups.
 	groups, total, _ = repo.ListGroups(ctx, models.DependencyFilter{Kinds: []string{"package"}, Page: 2, PerPage: 2})
 	if total != 3 || len(groups) != 1 {

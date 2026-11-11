@@ -45,6 +45,8 @@ var validSSHPubKeyPrefix = regexp.MustCompile(`^(ssh-ed25519|ssh-rsa|ecdsa-sha2-
 type sshHandlers struct {
 	db         *database.DB
 	configPath string
+	// osHostRunner replaces the SSH work of an OS update run (tests).
+	osHostRunner hostRunner
 }
 
 func (h *sshHandlers) logOperation(r *http.Request, hostID int64, opType string, method *string, status string, output string) {
@@ -255,122 +257,8 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		}
 		setTestStatus("success")
 
-		// The host's CPU / RAM / disk specs follow every scan that measured
-		// them: a resized VM, or a disk total that now counts every partition
-		// (storage.go), would otherwise keep its first value forever.
-		updated := false
-		for _, spec := range []struct {
-			field   *string
-			scanned string
-		}{
-			{&host.RecursoCPU, vmInfo.CPU},
-			{&host.RecursoRAM, vmInfo.RAM},
-			{&host.RecursoArmazenamento, vmInfo.Storage},
-		} {
-			if spec.scanned != "" && spec.scanned != " vCPU" && *spec.field != spec.scanned {
-				*spec.field = spec.scanned
-				updated = true
-			}
-		}
-		// Check resource usage thresholds
-		cpuPct := parsePercent(vmInfo.CPUUsage)
-		ramPct := parsePercent(vmInfo.RAMPercent)
-		diskPct := parsePercent(vmInfo.DiskPercent)
-
-		if cpuPct > 80 || ramPct > 80 || diskPct > 80 {
-			host.PrecisaManutencao = true
-			updated = true
-			result["resource_alert"] = true
-			store.NewTagRepo(h.db.SQL).Add(r.Context(), "host", host.ID, "alerta-recursos")
-			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "sub-utilizado")
-		} else if cpuPct > 0 && cpuPct < 5 && ramPct > 0 && ramPct < 5 && diskPct > 0 && diskPct < 5 {
-			result["sub_utilized"] = true
-			store.NewTagRepo(h.db.SQL).Add(r.Context(), "host", host.ID, "sub-utilizado")
-			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "alerta-recursos")
-			if host.PrecisaManutencao {
-				host.PrecisaManutencao = false
-				updated = true
-			}
-		} else {
-			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "alerta-recursos")
-			store.NewTagRepo(h.db.SQL).Remove(r.Context(), "host", host.ID, "sub-utilizado")
-			if host.PrecisaManutencao {
-				host.PrecisaManutencao = false
-				updated = true
-			}
-		}
-
-		if updated {
-			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-		}
 		h.logOperation(r, host.ID, "test", &method, "success", "")
-		// Annotate scanned SSH keys with managed status from DB
-		if len(vmInfo.SSHKeys) > 0 {
-			dbKeys, _ := vault.SharedKeyNames(r.Context(), h.db.SQL)
-			matched := 0
-			for i, sk := range vmInfo.SSHKeys {
-				if name, ok := dbKeys[sk.Fingerprint]; ok && sk.Fingerprint != "" {
-					vmInfo.SSHKeys[i].Managed = true
-					vmInfo.SSHKeys[i].ManagedName = name
-					matched++
-				}
-				if !vmInfo.SSHKeys[i].Managed {
-					log.Printf("[ssh] scan-annotate host=%s unmatched user=%s source=%s fp=%s (no DB key with this fingerprint)",
-						host.OficialSlug, sk.User, sk.Source, sk.Fingerprint)
-				}
-			}
-			log.Printf("[ssh] scan-annotate host=%s scanned=%d matched=%d db_keys=%d",
-				host.OficialSlug, len(vmInfo.SSHKeys), matched, len(dbKeys))
-		}
-		// Store scan snapshot in DB
-		if scanJSON, err := json.Marshal(vmInfo); err == nil {
-			if dbErr := store.NewHostScanRepo(h.db.SQL).Create(r.Context(), host.ID, string(scanJSON)); dbErr != nil {
-				result["scan_save_error"] = dbErr.Error()
-			} else {
-				result["scan_saved"] = true
-			}
-		}
-
-		// Reconcile discovered services — containers plus host-level catalog
-		// hits. Runs on every scan, including one that found nothing: that is
-		// how a stopped workload gets marked offline. ContainersKnown tells
-		// the reconciler whether an empty container list means "none run here"
-		// or "docker wouldn't answer".
-		inv := store.DiscoveredInventory{
-			Containers:      vmInfo.ParsedContainers,
-			ContainersKnown: vmInfo.ContainersKnown,
-			Services:        vmInfo.ServiceInventory,
-		}
-		if reconcileErr := store.NewServiceRepo(h.db.SQL).ReconcileDiscovered(r.Context(), host.ID, inv); reconcileErr != nil {
-			result["reconcile_error"] = reconcileErr.Error()
-		} else {
-			result["services_reconciled"] = true
-		}
-		// Dependency inventory (versions on the host and in its containers),
-		// after reconcile so container rows can point at their service. A
-		// failure is reported, never fails the scan.
-		if depErr := service.RecordDependencies(r.Context(), h.db.SQL, host.ID, *vmInfo); depErr != nil {
-			result["dependencies_error"] = depErr.Error()
-		}
-		// Web-server site names → DNS records linked to this host and to the
-		// services serving them (created when new and resolvable). After
-		// reconcile, so the services exist. Never fails the scan.
-		if webDNS, webErr := service.RecordWebDNS(r.Context(), h.db.SQL, host, *vmInfo, service.LookupHost); webErr != nil {
-			result["web_dns_error"] = webErr.Error()
-		} else {
-			result["web_dns"] = webDNS
-		}
-		// Git remotes on the configured GitLab → this host's scan links
-		// (path-keyed, visible to the token or not). Never fails the scan.
-		if gls, glErr := gitlabclient.LoadSettings(h.db.SQL, h.db.Encryptor); glErr != nil {
-			result["git_links_error"] = glErr.Error()
-		} else if gls.Enabled {
-			if sum, gitErr := service.RecordGitLinks(r.Context(), h.db.SQL, host.ID, *vmInfo, gls.BaseURL); gitErr != nil {
-				result["git_links_error"] = gitErr.Error()
-			} else if sum != nil {
-				result["git_links"] = sum
-			}
-		}
+		h.recordScan(r.Context(), host, vmInfo, result)
 	} else {
 		testErr := sshtest.Test(client)
 		if testErr != nil {
@@ -1768,4 +1656,131 @@ func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "PUT /api/ssh/custom-operations/{id}", h.handleUpdateCustomOp)
 	rr.role("admin", "DELETE /api/ssh/custom-operations/{id}", h.handleDeleteCustomOp)
 	rr.role("editor", "POST /api/ssh/custom-operations/{id}/run/{slug}", h.handleRunCustomOp)
+	rr.role("admin", "POST /api/ssh/os-updates/runs", h.handleStartOSUpdate)
+	rr.role("admin", "GET /api/ssh/os-updates/runs", h.handleListOSUpdates)
+	rr.role("admin", "GET /api/ssh/os-updates/runs/{id}", h.handleGetOSUpdate)
+	rr.role("admin", "POST /api/ssh/os-updates/runs/{id}/cancel", h.handleCancelOSUpdate)
+	rr.role("admin", "GET /api/ssh/os-updates/latest", h.handleLatestOSUpdates)
+}
+
+// recordScan applies a successful capture to Bridge: the host's specs and
+// resource tags, the stored scan, then services, dependencies (OS row
+// included), web DNS and git links. Outcomes go into result; none of the
+// later steps fails the scan. Shared by the scan and the OS update runs.
+func (h *sshHandlers) recordScan(ctx context.Context, host *models.Host, vmInfo *sshtest.VMInfo, result map[string]any) {
+	// The host's CPU / RAM / disk specs follow every scan that measured
+	// them: a resized VM, or a disk total that now counts every partition
+	// (storage.go), would otherwise keep its first value forever.
+	updated := false
+	for _, spec := range []struct {
+		field   *string
+		scanned string
+	}{
+		{&host.RecursoCPU, vmInfo.CPU},
+		{&host.RecursoRAM, vmInfo.RAM},
+		{&host.RecursoArmazenamento, vmInfo.Storage},
+	} {
+		if spec.scanned != "" && spec.scanned != " vCPU" && *spec.field != spec.scanned {
+			*spec.field = spec.scanned
+			updated = true
+		}
+	}
+	// Check resource usage thresholds
+	cpuPct := parsePercent(vmInfo.CPUUsage)
+	ramPct := parsePercent(vmInfo.RAMPercent)
+	diskPct := parsePercent(vmInfo.DiskPercent)
+
+	if cpuPct > 80 || ramPct > 80 || diskPct > 80 {
+		host.PrecisaManutencao = true
+		updated = true
+		result["resource_alert"] = true
+		store.NewTagRepo(h.db.SQL).Add(ctx, "host", host.ID, "alerta-recursos")
+		store.NewTagRepo(h.db.SQL).Remove(ctx, "host", host.ID, "sub-utilizado")
+	} else if cpuPct > 0 && cpuPct < 5 && ramPct > 0 && ramPct < 5 && diskPct > 0 && diskPct < 5 {
+		result["sub_utilized"] = true
+		store.NewTagRepo(h.db.SQL).Add(ctx, "host", host.ID, "sub-utilizado")
+		store.NewTagRepo(h.db.SQL).Remove(ctx, "host", host.ID, "alerta-recursos")
+		if host.PrecisaManutencao {
+			host.PrecisaManutencao = false
+			updated = true
+		}
+	} else {
+		store.NewTagRepo(h.db.SQL).Remove(ctx, "host", host.ID, "alerta-recursos")
+		store.NewTagRepo(h.db.SQL).Remove(ctx, "host", host.ID, "sub-utilizado")
+		if host.PrecisaManutencao {
+			host.PrecisaManutencao = false
+			updated = true
+		}
+	}
+
+	if updated {
+		store.NewHostRepo(h.db.SQL).Update(ctx, host)
+	}
+	// Annotate scanned SSH keys with managed status from DB
+	if len(vmInfo.SSHKeys) > 0 {
+		dbKeys, _ := vault.SharedKeyNames(ctx, h.db.SQL)
+		matched := 0
+		for i, sk := range vmInfo.SSHKeys {
+			if name, ok := dbKeys[sk.Fingerprint]; ok && sk.Fingerprint != "" {
+				vmInfo.SSHKeys[i].Managed = true
+				vmInfo.SSHKeys[i].ManagedName = name
+				matched++
+			}
+			if !vmInfo.SSHKeys[i].Managed {
+				log.Printf("[ssh] scan-annotate host=%s unmatched user=%s source=%s fp=%s (no DB key with this fingerprint)",
+					host.OficialSlug, sk.User, sk.Source, sk.Fingerprint)
+			}
+		}
+		log.Printf("[ssh] scan-annotate host=%s scanned=%d matched=%d db_keys=%d",
+			host.OficialSlug, len(vmInfo.SSHKeys), matched, len(dbKeys))
+	}
+	// Store scan snapshot in DB
+	if scanJSON, err := json.Marshal(vmInfo); err == nil {
+		if dbErr := store.NewHostScanRepo(h.db.SQL).Create(ctx, host.ID, string(scanJSON)); dbErr != nil {
+			result["scan_save_error"] = dbErr.Error()
+		} else {
+			result["scan_saved"] = true
+		}
+	}
+
+	// Reconcile discovered services — containers plus host-level catalog
+	// hits. Runs on every scan, including one that found nothing: that is
+	// how a stopped workload gets marked offline. ContainersKnown tells
+	// the reconciler whether an empty container list means "none run here"
+	// or "docker wouldn't answer".
+	inv := store.DiscoveredInventory{
+		Containers:      vmInfo.ParsedContainers,
+		ContainersKnown: vmInfo.ContainersKnown,
+		Services:        vmInfo.ServiceInventory,
+	}
+	if reconcileErr := store.NewServiceRepo(h.db.SQL).ReconcileDiscovered(ctx, host.ID, inv); reconcileErr != nil {
+		result["reconcile_error"] = reconcileErr.Error()
+	} else {
+		result["services_reconciled"] = true
+	}
+	// Dependency inventory (versions on the host and in its containers),
+	// after reconcile so container rows can point at their service. A
+	// failure is reported, never fails the scan.
+	if depErr := service.RecordDependencies(ctx, h.db.SQL, host.ID, *vmInfo); depErr != nil {
+		result["dependencies_error"] = depErr.Error()
+	}
+	// Web-server site names → DNS records linked to this host and to the
+	// services serving them (created when new and resolvable). After
+	// reconcile, so the services exist. Never fails the scan.
+	if webDNS, webErr := service.RecordWebDNS(ctx, h.db.SQL, host, *vmInfo, service.LookupHost); webErr != nil {
+		result["web_dns_error"] = webErr.Error()
+	} else {
+		result["web_dns"] = webDNS
+	}
+	// Git remotes on the configured GitLab → this host's scan links
+	// (path-keyed, visible to the token or not). Never fails the scan.
+	if gls, glErr := gitlabclient.LoadSettings(h.db.SQL, h.db.Encryptor); glErr != nil {
+		result["git_links_error"] = glErr.Error()
+	} else if gls.Enabled {
+		if sum, gitErr := service.RecordGitLinks(ctx, h.db.SQL, host.ID, *vmInfo, gls.BaseURL); gitErr != nil {
+			result["git_links_error"] = gitErr.Error()
+		} else if sum != nil {
+			result["git_links"] = sum
+		}
+	}
 }

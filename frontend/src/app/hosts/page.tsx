@@ -8,6 +8,7 @@ import { useFlag } from "@/contexts/FlagContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOpenOnParam } from "@/hooks/useOpenOnParam";
 import { usePageTab } from "@/hooks/usePageTab";
+import HostsOSView from "./_components/HostsOSView";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import PageShell from "@/components/layout/PageShell";
 import Button from "@/components/ui/Button";
@@ -105,7 +106,7 @@ export default function HostsPage() {
   const [formSubHeader, setFormSubHeader] = useState<React.ReactNode>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  const [pageTab, selectTab] = usePageTab();
+  const [pageTab, selectTab] = usePageTab(["os"] as const);
   const [tablePage, setTablePage] = useState(1);
   const [visibleCount, setVisibleCount] = useState(24);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -474,6 +475,7 @@ export default function HostsPage() {
           items: [
             { key: "overview", label: t("inventory.view.overview"), icon: ICON_PATHS.viewCards },
             { key: "dashboard", label: t("inventory.view.dashboard"), icon: ICON_PATHS.layoutGrid },
+            { key: "os", label: t("host.osView.tab"), icon: ICON_PATHS.server },
           ],
         }}
         controls={
@@ -555,6 +557,8 @@ export default function HostsPage() {
                 loadMoreLabel={t("common.loadMore")}
               />
           </InventoryOverview>
+        ) : pageTab === "os" ? (
+          <HostsOSView hosts={hosts} isAdmin={user?.role === "admin"} />
         ) : (
           <HostsDashboard
             hosts={hosts}

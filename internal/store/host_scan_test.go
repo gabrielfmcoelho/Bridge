@@ -123,12 +123,18 @@ func TestHostScanRepo_LatestListSummaryBulk(t *testing.T) {
 	// Newer scan of the same host, with fields the list never reads.
 	if _, err := d.SQL.Exec(`INSERT INTO host_scans (host_id, data, scanned_at) VALUES ($1, $2, now() + interval '1 minute')`, full,
 		`{"cpu":"4","cpu_usage":"45%","ram":"8G","ram_percent":"50%","storage":"100G","disk_percent":"40%",
-		  "services":["nginx"],"containers":["c1","c2"],
+		  "services":["nginx"],"containers":["c1","c2"],"os":"Ubuntu 22.04.4 LTS","arch":"x86_64","reboot_required":true,
 		  "profile":{"idle":true,"reasons":["no traffic"],"counterfacts":["x"],"signals":{"big":1}},
 		  "storage_detail":{"filesystems":[{"mount":"/"}]},"web_servers":[{"kind":"nginx"}]}`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.SQL.Exec(`INSERT INTO host_scans (host_id, data) VALUES ($1, 'not json')`, bad); err != nil {
+		t.Fatal(err)
+	}
+	// The host's own os row feeds os_info; a container's os row doesn't.
+	if _, err := d.SQL.Exec(`INSERT INTO dependency_inventory (host_id, container, kind, name, version, version_source, eol, eol_date)
+		VALUES ($1, '', 'os', 'ubuntu', '22.04', 'os_release', false, '2027-04-01'),
+		       ($1, 'web', 'os', 'alpine', '3.12', 'os_release', true, '2022-05-01')`, full); err != nil {
 		t.Fatal(err)
 	}
 
@@ -159,5 +165,10 @@ func TestHostScanRepo_LatestListSummaryBulk(t *testing.T) {
 	prof, _ := got["profile"].(map[string]any)
 	if prof["idle"] != true || prof["signals"] != nil {
 		t.Errorf("profile = %v, want idle/reasons/counterfacts only", prof)
+	}
+	osInfo, _ := got["os_info"].(map[string]any)
+	if osInfo["id"] != "ubuntu" || osInfo["version"] != "22.04" || osInfo["pretty"] != "Ubuntu 22.04.4 LTS" ||
+		osInfo["arch"] != "x86_64" || osInfo["reboot_required"] != true || osInfo["eol"] != false || osInfo["eol_date"] != "2027-04-01" {
+		t.Errorf("os_info = %v", osInfo)
 	}
 }

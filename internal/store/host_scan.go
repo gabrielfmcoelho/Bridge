@@ -110,7 +110,9 @@ func (r *HostScanRepo) RecentWithHost(ctx context.Context, limit int) ([]map[str
 
 // LatestListSummaryBulk returns, per scanned host, a JSON object with only the
 // fields of its latest scan that the host list reads (resources, service and
-// container names, idle verdict). The full scan JSON (disks, web servers,
+// container names, idle verdict, OS: the pretty name, arch and pending reboot
+// from the scan, distro id/version/EOL from the host's own dependency_inventory
+// os row). The full scan JSON (disks, web servers,
 // dependencies…) is ~30 KB a host and growing; this is ~1 KB. Each latest row
 // is parsed once (MATERIALIZED), and a row that isn't valid JSON is skipped.
 // No "?" jsonb operator here: the rebind driver turns every ? into a parameter.
@@ -131,9 +133,14 @@ func (r *HostScanRepo) LatestListSummaryBulk(ctx context.Context) (map[int64]str
 			'profile', CASE WHEN d->'profile' IS NOT NULL THEN jsonb_build_object(
 				'idle', d->'profile'->'idle',
 				'reasons', d->'profile'->'reasons',
-				'counterfacts', d->'profile'->'counterfacts') END
+				'counterfacts', d->'profile'->'counterfacts') END,
+			'os_info', NULLIF(jsonb_strip_nulls(jsonb_build_object(
+				'pretty', d->'os', 'arch', d->'arch', 'reboot_required', d->'reboot_required',
+				'id', o.name, 'version', o.version, 'eol', o.eol, 'eol_date', NULLIF(o.eol_date, ''))), '{}'::jsonb)
 		))::text
-		FROM latest`)
+		FROM latest
+		LEFT JOIN LATERAL (SELECT di.name, di.version, di.eol, di.eol_date FROM dependency_inventory di
+			WHERE di.host_id = latest.host_id AND di.kind = 'os' AND di.container = '' LIMIT 1) o ON true`)
 	if err != nil {
 		return nil, err
 	}

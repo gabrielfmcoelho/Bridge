@@ -150,6 +150,9 @@ func dependencyWhere(ctx context.Context, f models.DependencyFilter) (string, []
 	if f.EOL {
 		where += " AND d.eol"
 	}
+	if f.HostOnly {
+		where += " AND d.container = ''"
+	}
 	if s := strings.TrimSpace(f.Search); s != "" {
 		like := "%" + strings.ToLower(s) + "%"
 		where += ` AND (LOWER(d.name) LIKE ? OR LOWER(d.version) LIKE ? OR LOWER(d.container) LIKE ?

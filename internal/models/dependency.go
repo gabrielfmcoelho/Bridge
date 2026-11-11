@@ -55,6 +55,7 @@ type DependencyFilter struct {
 	Kinds     []string // default: os + runtime
 	HasCVEs   bool
 	EOL       bool
+	HostOnly  bool   // container = '': the host itself, no containers
 	Search    string // name, version, container, image, host
 	Page      int
 	PerPage   int

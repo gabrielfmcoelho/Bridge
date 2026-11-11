@@ -142,6 +142,7 @@ function hosts(): Host[] {
       id: 1, nickname: "vm-postgres-02", oficial_slug: "vm-postgres-02",
       hostname: "vm-postgres-02.exemplo.internal",
       description: "Servidor dedicado ao PostgreSQL de homologação.",
+      os: { id: "ubuntu", version: "22.04", pretty: "Ubuntu 22.04.4 LTS", arch: "x86_64", eol_date: "2027-04-01", reboot_required: true },
     }),
     mkHost({
       id: 2, nickname: "srv-sga-web01", oficial_slug: "srv-sga-web01",
@@ -149,11 +150,13 @@ function hosts(): Host[] {
       description: "Servidor web do Portal do Servidor Estadual (produção).",
       setor_responsavel: "SGA", responsavel_interno: "Ana Clara Exemplo",
       contato_responsavel_interno: "ana.exemplo@sead.pi.gov.br",
+      os: { id: "ubuntu", version: "22.04", pretty: "Ubuntu 22.04.5 LTS", arch: "x86_64", eol_date: "2027-04-01" },
     }),
     mkHost({
       id: 3, nickname: "vm-etipi-mon01", oficial_slug: "vm-etipi-mon01",
       hostname: "mon01.exemplo.internal",
       description: "Servidor de monitoramento Grafana/Prometheus da ETIPI.",
+      os: { id: "debian", version: "12", pretty: "Debian GNU/Linux 12 (bookworm)", arch: "x86_64", eol_date: "2028-06-30" },
     }),
     mkHost({
       id: 4, nickname: "srv-ntgd-backup01", oficial_slug: "srv-ntgd-backup01",
@@ -162,6 +165,7 @@ function hosts(): Host[] {
       setor_responsavel: "NTGD", responsavel_interno: "Gabriela Exemplo Dias",
       contato_responsavel_interno: "gabriela.exemplo@sead.pi.gov.br",
       situacao: "maintenance", precisa_manutencao: true,
+      os: { id: "ubuntu", version: "18.04", pretty: "Ubuntu 18.04.6 LTS", arch: "x86_64", eol: true, eol_date: "2023-05-31" },
     }),
     mkHost({
       id: 5, nickname: "vm-sgi-chamados01", oficial_slug: "vm-sgi-chamados01",

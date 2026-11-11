@@ -80,6 +80,19 @@ type scanFull struct {
 	Services   []string            `json:"services"`
 	Containers []string            `json:"containers"`
 	Profile    *hostProfileSummary `json:"profile,omitempty"`
+	OSInfo     *HostOS             `json:"os_info,omitempty"`
+}
+
+// HostOS is the host's own OS (containers excluded): pretty name, arch and
+// pending reboot from the latest scan, id/version/EOL from its os inventory row.
+type HostOS struct {
+	Pretty         string `json:"pretty,omitempty"`
+	ID             string `json:"id,omitempty"`
+	Version        string `json:"version,omitempty"`
+	Arch           string `json:"arch,omitempty"`
+	EOL            bool   `json:"eol,omitempty"`
+	EOLDate        string `json:"eol_date,omitempty"`
+	RebootRequired bool   `json:"reboot_required,omitempty"`
 }
 
 // hostProfileSummary mirrors the relevant subset of sshtest.HostProfile — only
@@ -124,6 +137,7 @@ type HostListItem struct {
 	MainEntidade        string         `json:"main_entidade"`
 	ChamadosCount       int            `json:"chamados_count"`
 	ProjectsCount       int            `json:"projects_count"`
+	OS                  *HostOS        `json:"os,omitempty"`
 	// Sentinel is the latest Sentinel sync of the host, kept apart from the
 	// scan (ScanRes); nil when never synced.
 	Sentinel *models.SentinelHostSnapshot `json:"sentinel,omitempty"`
@@ -269,6 +283,9 @@ func (s *HostService) List(ctx context.Context, f models.HostFilter) ([]HostList
 				}
 				hwt.ContainersCount = len(sf.Containers)
 				hwt.ProcessesCount = len(sf.Services)
+				if o := sf.OSInfo; o != nil && (o.Pretty != "" || o.ID != "") {
+					hwt.OS = o
+				}
 				if sf.Profile != nil {
 					hwt.Idle = sf.Profile.Idle
 					hwt.IdleReasons = sf.Profile.Reasons
