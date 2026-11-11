@@ -143,6 +143,7 @@ export type VMInfoType = {
   ram: string; ram_used: string; ram_percent: string;
   storage: string; storage_used: string; disk_percent: string;
   os: string; kernel: string; uptime: string; hostname_remote: string;
+  arch?: string; reboot_required?: boolean;
   load_avg: string; logged_users: string; public_ip: string;
   swap_total: string; swap_used: string;
   last_logins: string[]; services: string[]; service_details: string[];

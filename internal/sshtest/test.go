@@ -84,6 +84,9 @@ type VMInfo struct {
 	DiskPercent    string   `json:"disk_percent"`
 	OS             string   `json:"os"`
 	Kernel         string   `json:"kernel"`
+	Arch           string   `json:"arch,omitempty"`
+	// RebootRequired: /var/run/reboot-required (deb) or needs-restarting -r (rpm).
+	RebootRequired bool `json:"reboot_required,omitempty"`
 	Uptime         string   `json:"uptime"`
 	LastLogins     []string `json:"last_logins"`
 	Services       []string `json:"services"`
@@ -1493,6 +1496,11 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		`cat /proc/loadavg 2>/dev/null | awk '{print $1, $2, $3}'`,
 		`echo '` + delim + `'`,
 		`who 2>/dev/null | wc -l`,
+		`echo '` + delim + `'`,
+		`uname -m`,
+		`echo '` + delim + `'`,
+		// needs-restarting -r exits 1 when a reboot is needed (rpm hosts).
+		`if [ -f /var/run/reboot-required ]; then echo yes; elif command -v needs-restarting >/dev/null 2>&1; then needs-restarting -r >/dev/null 2>&1; [ $? -eq 1 ] && echo yes; fi`,
 		`echo '` + delimSession + `'`,
 
 		// Session 2: public IP. Tightened to 1.5s per attempt so a
@@ -1567,6 +1575,9 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		Hostname:    field(12),
 		LoadAvg:     field(13),
 		Users:       field(14),
+		Arch:        field(15),
+
+		RebootRequired: field(16) == "yes",
 	}
 
 	// Session 2: public IP (single line).

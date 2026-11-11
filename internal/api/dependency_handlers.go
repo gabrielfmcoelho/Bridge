@@ -51,10 +51,11 @@ func (h *vulnHandlers) handleListDependencies(w http.ResponseWriter, r *http.Req
 }
 
 // dependencyFilter reads the list / groups query: kind, host_id, service_id,
-// has_cves, eol, search and paging. Writes 400 on an unknown kind.
+// has_cves, eol, scope=host (no container rows), search and paging. Writes 400 on an unknown kind.
 func dependencyFilter(w http.ResponseWriter, r *http.Request) (models.DependencyFilter, PageParams, bool) {
 	q := r.URL.Query()
-	f := models.DependencyFilter{Search: q.Get("search"), HasCVEs: q.Get("has_cves") == "true", EOL: q.Get("eol") == "true"}
+	f := models.DependencyFilter{Search: q.Get("search"), HasCVEs: q.Get("has_cves") == "true", EOL: q.Get("eol") == "true",
+		HostOnly: q.Get("scope") == "host"}
 	for _, k := range strings.Split(q.Get("kind"), ",") {
 		if k = strings.TrimSpace(k); k == "" {
 			continue

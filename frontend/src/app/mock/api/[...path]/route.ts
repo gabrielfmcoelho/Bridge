@@ -440,6 +440,19 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   }
 
   // ── Discovery fixtures ──────────────────────────────────────────────
+  // OS rows of the dependency inventory, derived from the seeded hosts' os.
+  if (method === "GET" && p === "vulnerabilities/dependencies/groups" && qs.get("kind") === "os") {
+    const groups = new Map<string, { kind: "os"; name: string; version: string; hosts: number; installs: number; cve_count: number; max_severity: ""; eol: boolean; eol_date: string; evaluated: number; lookup: ""; version_source: "os_release"; instances: { id: number; host_id: number; host_nickname: string; host_slug: string; container: string; image: string; service_id: null; cve_count: number }[] }>();
+    for (const h of db.hosts) {
+      if (!h.os?.id) continue;
+      const k = `${h.os.id}|${h.os.version}`;
+      const g = groups.get(k) ?? { kind: "os", name: h.os.id, version: h.os.version ?? "", hosts: 0, installs: 0, cve_count: 0, max_severity: "", eol: !!h.os.eol, eol_date: h.os.eol_date ?? "", evaluated: 1, lookup: "", version_source: "os_release", instances: [] };
+      g.hosts++; g.installs++;
+      g.instances.push({ id: h.id, host_id: h.id, host_nickname: h.nickname, host_slug: h.oficial_slug, container: "", image: "", service_id: null, cve_count: 0 });
+      groups.set(k, g);
+    }
+    return json(paginate([...groups.values()], qs.get("page"), qs.get("per_page")));
+  }
   if (method === "GET" && p === "hosts") return json(paginate(db.hosts, qs.get("page"), qs.get("per_page")));
   if (method === "GET" && p === "services") return json(paginate(db.services, qs.get("page"), qs.get("per_page")));
   if (method === "GET" && p === "dns") return json(paginate(db.dns, qs.get("page"), qs.get("per_page")));

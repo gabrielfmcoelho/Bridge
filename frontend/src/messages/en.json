@@ -661,6 +661,20 @@
     "oficialSlug": "Slug",
     "hostname": "Hostname / IP",
     "hospedagem": "Hosting",
+    "os": "OS",
+    "osEol": "EOL",
+    "rebootPending": "Reboot pending",
+    "osView": {
+      "tab": "Operating systems",
+      "empty": "No operating system found yet",
+      "emptyHint": "Scan the hosts: each scan reads /etc/os-release.",
+      "distro": "Distribution",
+      "version": "Version",
+      "hosts": "Hosts",
+      "hostsCount": "{count} hosts",
+      "eolCount": "{count} past end of life",
+      "more": "+{count} more"
+    },
     "tipoMaquina": "Machine Type",
     "user": "User",
     "port": "Port",
@@ -901,6 +915,8 @@
     "idleNotFlaggedShort": "Not idle",
     "dash": {
       "byHospedagem": "By hosting",
+      "byOS": "By operating system",
+      "osUnknown": "Unknown (not scanned)",
       "byUsage": "By peak usage",
       "usageLow": "Below 50%",
       "usageMid": "50–80%",
@@ -2640,6 +2656,8 @@
   "vm": {
     "os": "OS",
     "kernel": "Kernel",
+    "arch": "Architecture",
+    "reboot": "Reboot",
     "uptime": "Uptime",
     "hostname": "Hostname",
     "publicIp": "Public IP",

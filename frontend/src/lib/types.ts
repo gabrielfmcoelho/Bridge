@@ -132,6 +132,8 @@ export interface Host {
     storage?: string;
     disk_percent?: string;
   };
+  /** The host's own OS (containers excluded), from the latest scan. */
+  os?: HostOS;
   // Idle-VM heuristic (computed during scan). idle=true means every rule
   // (R1..R4) passed; idle_reasons lists which rules passed,
   // idle_counterfacts lists which rules failed (with brief explanations).
@@ -1471,6 +1473,18 @@ export type DependencyKind = "os" | "runtime" | "package";
  *  or inside one of its containers. lookup: where its CVEs come from. */
 /** One component version across its installations (…/dependencies/groups).
  *  cve_count / max_severity are the worst of them; instances capped at 50. */
+export interface HostOS {
+  /** os-release PRETTY_NAME, e.g. "Ubuntu 22.04.4 LTS". */
+  pretty?: string;
+  /** os-release ID / VERSION_ID, e.g. "ubuntu" / "22.04". */
+  id?: string;
+  version?: string;
+  arch?: string;
+  eol?: boolean;
+  eol_date?: string;
+  reboot_required?: boolean;
+}
+
 export interface DependencyGroup {
   kind: DependencyKind;
   name: string;
