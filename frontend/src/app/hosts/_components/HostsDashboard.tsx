@@ -37,6 +37,7 @@ export default function HostsDashboard({
     { title: t("host.dash.byUsage"), rows: b.usage },
     { title: t("host.dash.alertsByLevel"), rows: b.alerts },
     { title: t("host.dash.byHospedagem"), rows: b.hospedagem },
+    { title: t("host.dash.byOS"), rows: b.os },
     { title: t("inventory.dash.byEntidade"), rows: b.entidade },
     { title: t("inventory.dash.byTags"), rows: b.tags },
   ];

@@ -24,6 +24,8 @@ export default function ScanSystem({ info, locale, t }: { info: VMInfoType; loca
   const rows = [
     info.os && [t("vm.os"), info.os],
     info.kernel && [t("vm.kernel"), info.kernel],
+    info.arch && [t("vm.arch"), info.arch],
+    info.reboot_required && [t("vm.reboot"), t("host.rebootPending")],
     uptime && [t("vm.uptime"), uptime],
     info.hostname_remote && [t("vm.hostname"), info.hostname_remote],
     info.public_ip && [t("vm.publicIp"), info.public_ip],

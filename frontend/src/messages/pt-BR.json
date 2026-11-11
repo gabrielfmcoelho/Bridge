@@ -661,6 +661,20 @@
     "oficialSlug": "Slug Oficial",
     "hostname": "Hostname / IP",
     "hospedagem": "Hospedagem",
+    "os": "SO",
+    "osEol": "Fim de suporte",
+    "rebootPending": "Reinício pendente",
+    "osView": {
+      "tab": "Sistemas operacionais",
+      "empty": "Nenhum sistema operacional encontrado ainda",
+      "emptyHint": "Escaneie os hosts: cada scan lê o /etc/os-release.",
+      "distro": "Distribuição",
+      "version": "Versão",
+      "hosts": "Hosts",
+      "hostsCount": "{count} hosts",
+      "eolCount": "{count} sem suporte",
+      "more": "+{count} outros"
+    },
     "tipoMaquina": "Tipo de Máquina",
     "user": "Usuário",
     "port": "Porta",
@@ -901,6 +915,8 @@
     "idleNotFlaggedShort": "Não ociosa",
     "dash": {
       "byHospedagem": "Por hospedagem",
+      "byOS": "Por sistema operacional",
+      "osUnknown": "Desconhecido (sem scan)",
       "byUsage": "Por uso de pico",
       "usageLow": "Abaixo de 50%",
       "usageMid": "50–80%",
@@ -2640,6 +2656,8 @@
   "vm": {
     "os": "SO",
     "kernel": "Kernel",
+    "arch": "Arquitetura",
+    "reboot": "Reinício",
     "uptime": "Tempo Ativo",
     "hostname": "Hostname",
     "publicIp": "IP Público",

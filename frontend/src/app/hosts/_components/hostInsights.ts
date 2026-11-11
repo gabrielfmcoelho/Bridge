@@ -20,6 +20,13 @@ export function peakUsage(h: Host): number | null {
 
 export const HIGH_USAGE = 80;
 
+/** "ubuntu 22.04" from the os-release id/version, else the pretty name. */
+export function osLabel(h: Host): string {
+  const o = h.os;
+  if (!o) return "";
+  return o.id ? `${o.id} ${o.version ?? ""}`.trim() : o.pretty ?? "";
+}
+
 /** How the page reads situação roles (useSituacao); the defaults treat the
  *  factory values as their own roles, which is what the tests use. */
 export interface SituacaoRoles {
@@ -87,6 +94,7 @@ export interface HostBreakdowns {
   tags: BreakdownRow[];
   usage: BreakdownRow[];
   alerts: BreakdownRow[];
+  os: BreakdownRow[];
 }
 
 /** Counts per value, most frequent first; empty values under `emptyKey`. */
@@ -131,6 +139,7 @@ export function hostBreakdowns(hosts: Host[]): HostBreakdowns {
       count: hosts.filter((h) => h.alerts?.some((a) => a.level === l)).length,
       filter: { alert_level: l },
     })),
+    os: countBy(hosts, osLabel, "host.dash.osUnknown"),
   };
 }
 
