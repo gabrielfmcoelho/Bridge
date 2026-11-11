@@ -17,7 +17,7 @@ import { osUpdateAPI, vulnAPI } from "@/lib/api";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import type { Host } from "@/lib/types";
 import { hostIdsByOS, osFamilies, osKey, sortOSGroups } from "./osView";
-import { osLabel } from "./hostInsights";
+import { osLabel, osName } from "./hostInsights";
 import OSUpdateModal from "./OSUpdateModal";
 import OSUpdateRuns, { pendingText } from "./OSUpdateRuns";
 
@@ -74,7 +74,7 @@ export default function HostsOSView({ hosts, isAdmin }: { hosts: Host[]; isAdmin
       <div className="flex flex-wrap items-center gap-2">
         {families.map((f) => (
           <span key={f.name} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm">
-            <span className="font-medium text-[var(--text-primary)]">{f.name}</span>
+            <span className="font-medium text-[var(--text-primary)]">{osName(f.name)}</span>
             <span className="tabular-nums text-[var(--text-secondary)]">{t("host.osView.hostsCount", { count: String(f.hosts) })}</span>
             {f.eolHosts > 0 && <Badge color="danger">{t("host.osView.eolCount", { count: String(f.eolHosts) })}</Badge>}
           </span>
@@ -106,7 +106,7 @@ export default function HostsOSView({ hosts, isAdmin }: { hosts: Host[]; isAdmin
                     <td className={tableClasses.td}>
                       <span className="inline-flex items-center gap-2">
                         <Icon path={ICON_PATHS.chevronRight} className={`w-3.5 h-3.5 shrink-0 text-[var(--text-muted)] transition-transform ${open ? "rotate-90" : ""}`} />
-                        <span className="font-medium text-[var(--text-primary)]">{g.name}</span>
+                        <span className="font-medium text-[var(--text-primary)]" title={g.name}>{osName(g.name)}</span>
                       </span>
                     </td>
                     <td className={`${tableClasses.td} font-mono text-xs`}>{g.version}</td>
