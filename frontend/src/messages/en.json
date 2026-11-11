@@ -672,8 +672,71 @@
       "version": "Version",
       "hosts": "Hosts",
       "hostsCount": "{count} hosts",
-      "eolCount": "{count} past end of life",
-      "more": "+{count} more"
+      "eolCount": "{count} past end of life"
+    },
+    "osUpdate": {
+      "open": "Update…",
+      "title": "Update operating systems",
+      "start": "Start",
+      "kind": "Type",
+      "kindCheck": "Check for updates",
+      "kindSecurity": "Security updates",
+      "kindPackages": "All package updates",
+      "kindHint": {
+        "check": "Refreshes the package lists and counts what can be upgraded. Changes nothing.",
+        "security": "Installs only the security upgrades (apt: *-security suites; dnf/yum: security advisories). Alpine has no separate channel.",
+        "packages": "Installs every upgrade within the current release (apt upgrade, dnf/yum upgrade, apk upgrade). Never changes the release."
+      },
+      "versions": "Versions ({count} hosts)",
+      "reboot": "Reboot when needed",
+      "rebootHint": "After a successful upgrade, reboots the hosts that ask for it (new kernel, libc) and waits for them to come back.",
+      "concurrency": "Hosts at a time",
+      "concurrencyHint": "1 to 10.",
+      "concurrencyRange": "Between 1 and 10.",
+      "privilegeHint": "Runs as root: the SSH user if it is root, sudo with the stored password, or passwordless sudo. Hosts with none of these are skipped. Changed config files keep the local version.",
+      "started": "Run #{id} started on {count} hosts",
+      "confirmWord": "update",
+      "confirmTitle": {
+        "security": "Install security updates on {count} hosts?",
+        "packages": "Install all package updates on {count} hosts?"
+      },
+      "confirmReboot": "Hosts that need it will be rebooted.",
+      "confirmNoReboot": "No host will be rebooted.",
+      "finished": "Run #{id} finished",
+      "runs": "Update runs",
+      "status": "Status",
+      "hosts": "Hosts",
+      "when": "When",
+      "kindShort": {
+        "check": "Check",
+        "packages": "Packages",
+        "security": "Security",
+        "release": "Release upgrade"
+      },
+      "withReboot": "with reboot",
+      "runStatus": {
+        "running": "Running",
+        "done": "Done",
+        "cancelled": "Cancelled",
+        "interrupted": "Interrupted"
+      },
+      "resultStatus": {
+        "pending": "Pending",
+        "running": "Running",
+        "success": "OK",
+        "failed": "Failed",
+        "skipped": "Skipped"
+      },
+      "runTitle": "Update run #{id}",
+      "cancel": "Cancel run",
+      "cancelHint": "Cancelling skips the hosts not started yet; hosts already updating finish.",
+      "host": "Host",
+      "pending": "Pending updates",
+      "upgraded": "Upgraded",
+      "rebooted": "Rebooted",
+      "securityShort": "{count} sec.",
+      "pendingTitle": "Pending updates at the last run",
+      "pendingShort": "{text} pending"
     },
     "tipoMaquina": "Machine Type",
     "user": "User",

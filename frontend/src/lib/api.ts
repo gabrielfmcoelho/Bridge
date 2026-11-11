@@ -738,6 +738,17 @@ export const orchestratorsAPI = {
 };
 
 // SSH
+// OS update runs (admin): background check / package / security upgrades.
+export const osUpdateAPI = {
+  start: (body: { kind: import("./types").OSUpdateKind; host_ids: number[]; reboot: boolean; concurrency: number }) =>
+    api.post<import("./types").OSUpdateRun>("/api/ssh/os-updates/runs", body),
+  runs: () => api.get<import("./types").OSUpdateRun[]>("/api/ssh/os-updates/runs"),
+  run: (id: number) => api.get<import("./types").OSUpdateRun>(`/api/ssh/os-updates/runs/${id}`),
+  cancel: (id: number) => api.post<import("./types").OSUpdateRun>(`/api/ssh/os-updates/runs/${id}/cancel`),
+  /** Per host, the newest run that counted pending upgrades. */
+  latest: () => api.get<import("./types").OSUpdateResult[]>("/api/ssh/os-updates/latest"),
+};
+
 export const sshAPI = {
   previewConfig: () => api.get<{ content: string }>("/api/ssh/preview-config"),
   generateConfig: () => api.post<{ status: string; host_count: number; path: string }>("/api/ssh/generate-config"),

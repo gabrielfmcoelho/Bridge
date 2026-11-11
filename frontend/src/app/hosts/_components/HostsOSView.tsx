@@ -1,33 +1,44 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import EmptyState from "@/components/ui/EmptyState";
 import StatusAlert from "@/components/ui/StatusAlert";
 import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { tableClasses } from "@/components/ui/Table";
 import { useLocale } from "@/contexts/LocaleContext";
-import { vulnAPI } from "@/lib/api";
+import { osUpdateAPI, vulnAPI } from "@/lib/api";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import { osFamilies, sortOSGroups } from "./osView";
+import type { Host } from "@/lib/types";
+import { hostIdsByOS, osFamilies, osKey, sortOSGroups } from "./osView";
+import OSUpdateModal from "./OSUpdateModal";
+import OSUpdateRuns, { pendingText } from "./OSUpdateRuns";
 
 const params = { kind: "os", scope: "host", per_page: "200" };
 
 /** The hosts page's "Sistemas operacionais" tab: every distro version the
  *  scans found on the hosts themselves (containers excluded), with how many
- *  hosts run it and its end of life. A row expands to its hosts. */
-export default function HostsOSView() {
+ *  hosts run it and its end of life. A row expands to its hosts and their
+ *  pending updates (last run). Admins start OS update runs from here. */
+export default function HostsOSView({ hosts, isAdmin }: { hosts: Host[]; isAdmin: boolean }) {
   const { t } = useLocale();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showUpdate, setShowUpdate] = useState(false);
+  const [openRun, setOpenRun] = useState<number | null>(null);
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["vulnerabilities", "dependency-groups", params],
     queryFn: () => vulnAPI.dependencyGroups(params),
   });
+  const { data: latest = [] } = useQuery({ queryKey: ["os-updates", "latest"], queryFn: osUpdateAPI.latest, enabled: isAdmin });
   const groups = sortOSGroups(data?.data ?? []);
   const families = osFamilies(groups);
+  const idsByOS = useMemo(() => hostIdsByOS(hosts), [hosts]);
+  const hostById = useMemo(() => new Map(hosts.map((h) => [h.id, h])), [hosts]);
+  const latestByHost = useMemo(() => new Map(latest.map((x) => [x.host_id, x])), [latest]);
 
   if (isLoading) return <SkeletonTable rows={8} />;
   if (isError) return <StatusAlert variant="error">{(error as Error)?.message}</StatusAlert>;
@@ -35,7 +46,7 @@ export default function HostsOSView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {families.map((f) => (
           <span key={f.name} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-surface)] text-sm">
             <span className="font-medium text-[var(--text-primary)]">{f.name}</span>
@@ -43,6 +54,11 @@ export default function HostsOSView() {
             {f.eolHosts > 0 && <Badge color="danger">{t("host.osView.eolCount", { count: String(f.eolHosts) })}</Badge>}
           </span>
         ))}
+        {isAdmin && (
+          <Button size="sm" className="ml-auto" onClick={() => setShowUpdate(true)}>
+            <Icon path={ICON_PATHS.refresh} className="w-3.5 h-3.5" />{t("host.osUpdate.open")}
+          </Button>
+        )}
       </div>
       <div className={tableClasses.wrapper}>
         <table className={tableClasses.table}>
@@ -56,7 +72,7 @@ export default function HostsOSView() {
           </thead>
           <tbody>
             {groups.map((g, i) => {
-              const gk = `${g.name}|${g.version}`;
+              const gk = osKey(g.name, g.version);
               const open = expanded === gk;
               return (
                 <Fragment key={gk}>
@@ -80,15 +96,22 @@ export default function HostsOSView() {
                     <tr className={`${tableClasses.row} bg-[var(--bg-elevated)]/40`}>
                       <td className={tableClasses.td} />
                       <td className={tableClasses.td} colSpan={3}>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1">
-                          {g.instances.map((inst) => (
-                            <Link key={inst.id} href={`/hosts/${inst.host_slug}`} className="font-mono text-xs text-[var(--accent)] hover:underline">
-                              {inst.host_nickname}
-                            </Link>
-                          ))}
-                          {g.hosts > g.instances.length && (
-                            <span className="text-xs text-[var(--text-muted)]">{t("host.osView.more", { count: String(g.hosts - g.instances.length) })}</span>
-                          )}
+                        <div className="flex flex-wrap gap-x-5 gap-y-1">
+                          {(idsByOS.get(gk) ?? []).map((id) => {
+                            const h = hostById.get(id)!;
+                            const last = latestByHost.get(id);
+                            return (
+                              <span key={id} className="inline-flex items-center gap-1.5 text-xs">
+                                <Link href={`/hosts/${h.oficial_slug}`} className="font-mono text-[var(--accent)] hover:underline">{h.nickname}</Link>
+                                {last && (
+                                  <span className="text-[var(--text-muted)]" title={t("host.osUpdate.pendingTitle")}>
+                                    {t("host.osUpdate.pendingShort", { text: pendingText(last, t) })}
+                                  </span>
+                                )}
+                                {h.os?.reboot_required && <span className="text-[var(--warning)]">{t("host.rebootPending")}</span>}
+                              </span>
+                            );
+                          })}
                         </div>
                       </td>
                     </tr>
@@ -99,6 +122,11 @@ export default function HostsOSView() {
           </tbody>
         </table>
       </div>
+      {isAdmin && <OSUpdateRuns openId={openRun} onOpen={setOpenRun} />}
+      {showUpdate && (
+        <OSUpdateModal groups={groups} hostIds={idsByOS} onClose={() => setShowUpdate(false)}
+          onStarted={(run) => { setShowUpdate(false); setOpenRun(run.id); }} />
+      )}
     </div>
   );
 }
