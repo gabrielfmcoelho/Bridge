@@ -1661,6 +1661,9 @@ func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "GET /api/ssh/os-updates/runs/{id}", h.handleGetOSUpdate)
 	rr.role("admin", "POST /api/ssh/os-updates/runs/{id}/cancel", h.handleCancelOSUpdate)
 	rr.role("admin", "GET /api/ssh/os-updates/latest", h.handleLatestOSUpdates)
+	rr.role("admin", "GET /api/ssh/os-updates/config", h.handleOSUpdateConfig)
+	rr.role("admin", "GET /api/ssh/os-updates/runs/{id}/hosts/{host_id}/backup", h.handleOSBackupLink)
+	rr.role("admin", "DELETE /api/ssh/os-updates/runs/{id}/hosts/{host_id}/backup", h.handleOSBackupDelete)
 }
 
 // recordScan applies a successful capture to Bridge: the host's specs and

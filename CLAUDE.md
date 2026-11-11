@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v124**. Use idempotent idioms:
+per element, currently at **v125**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -253,6 +253,18 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   Alpine 3.x → 3.x+1; RHEL family is skipped. It skips, changing nothing,
   with a reboot pending, < 5 GB on `/` or packages still waiting. Its tests
   run it on a fake root through `BRIDGE_ROOT`.
+  Backups before updating (v125, `backup` / `keep_backup` on the run): the
+  host's files (`osbackup_include`, default `/`, minus `osbackup_exclude` and
+  every pseudo / container / network mount from `/proc/mounts`) leave the VM
+  as one `tar | zstd` stream on the SSH session's stdout (`sshtest.StreamBackup`)
+  and go straight into MinIO (`internal/integrations/minio`, settings group
+  `minio`, multipart 64 MiB parts) — nothing is written on the host and no
+  credentials go to it. No backup → no update. After a success whose rescan
+  answered, the object is deleted unless `keep_backup`; a failed host keeps
+  it, downloadable through a one-hour presigned link straight to MinIO
+  (`minio_public_url` when browsers can't reach the endpoint). Release runs
+  always back up when MinIO is set up. MinIO images now need a login, so the
+  tests sign links offline and stream into a fake instead of a container.
 - Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
   names are read in bulk; wiki titles come from Outline at most once a day per
   page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title

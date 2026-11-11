@@ -21,9 +21,9 @@ func (r *OSUpdateRepo) CreateRun(ctx context.Context, run *models.OSUpdateRun, h
 		return err
 	}
 	defer tx.Rollback()
-	if err := tx.QueryRowContext(ctx, `INSERT INTO os_update_runs (kind, reboot, concurrency, target, requested_by)
-		VALUES (?, ?, ?, ?, ?) RETURNING id, status, created_at`,
-		run.Kind, run.Reboot, run.Concurrency, run.Target, run.RequestedBy).Scan(&run.ID, &run.Status, &run.CreatedAt); err != nil {
+	if err := tx.QueryRowContext(ctx, `INSERT INTO os_update_runs (kind, reboot, concurrency, target, requested_by, backup, keep_backup)
+		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, status, created_at`,
+		run.Kind, run.Reboot, run.Concurrency, run.Target, run.RequestedBy, run.Backup, run.KeepBackup).Scan(&run.ID, &run.Status, &run.CreatedAt); err != nil {
 		return err
 	}
 	for _, id := range hostIDs {
@@ -34,7 +34,7 @@ func (r *OSUpdateRepo) CreateRun(ctx context.Context, run *models.OSUpdateRun, h
 	return tx.Commit()
 }
 
-const osRunCols = `r.id, r.kind, r.reboot, r.concurrency, r.target, r.status, r.requested_by, COALESCE(u.display_name, ''),
+const osRunCols = `r.id, r.kind, r.reboot, r.concurrency, r.target, r.status, r.requested_by, COALESCE(u.display_name, ''), r.backup, r.keep_backup,
 	r.created_at, r.finished_at,
 	(SELECT COALESCE(json_object_agg(s.status, s.n), '{}')::text FROM
 		(SELECT status, COUNT(*) AS n FROM os_update_results WHERE run_id = r.id GROUP BY status) s)
@@ -43,7 +43,7 @@ const osRunCols = `r.id, r.kind, r.reboot, r.concurrency, r.target, r.status, r.
 func scanOSRun(sc interface{ Scan(...any) error }, run *models.OSUpdateRun) error {
 	var counts string
 	if err := sc.Scan(&run.ID, &run.Kind, &run.Reboot, &run.Concurrency, &run.Target, &run.Status, &run.RequestedBy,
-		&run.RequestedName, &run.CreatedAt, &run.FinishedAt, &counts); err != nil {
+		&run.RequestedName, &run.Backup, &run.KeepBackup, &run.CreatedAt, &run.FinishedAt, &counts); err != nil {
 		return err
 	}
 	return json.Unmarshal([]byte(counts), &run.Counts)
@@ -91,12 +91,14 @@ func (r *OSUpdateRepo) GetRun(ctx context.Context, id int64) (*models.OSUpdateRu
 }
 
 const osResultCols = `x.run_id, x.host_id, h.nickname, h.oficial_slug, x.status, x.reason, x.pkg_manager, x.os_before, x.os_after,
-	x.upgradable, x.security_upgradable, x.upgraded, x.reboot_required, x.rebooted, x.output, x.started_at, x.finished_at
+	x.upgradable, x.security_upgradable, x.upgraded, x.reboot_required, x.rebooted, x.output, x.started_at, x.finished_at,
+	x.backup_key, x.backup_size, x.backup_status
 	FROM os_update_results x JOIN hosts h ON h.id = x.host_id`
 
 func scanOSResult(sc interface{ Scan(...any) error }, x *models.OSUpdateResult) error {
 	return sc.Scan(&x.RunID, &x.HostID, &x.HostNickname, &x.HostSlug, &x.Status, &x.Reason, &x.PkgManager, &x.OSBefore, &x.OSAfter,
-		&x.Upgradable, &x.SecurityUpgradable, &x.Upgraded, &x.RebootRequired, &x.Rebooted, &x.Output, &x.StartedAt, &x.FinishedAt)
+		&x.Upgradable, &x.SecurityUpgradable, &x.Upgraded, &x.RebootRequired, &x.Rebooted, &x.Output, &x.StartedAt, &x.FinishedAt,
+		&x.BackupKey, &x.BackupSize, &x.BackupStatus)
 }
 
 // PendingHosts returns the run's hosts still pending, in id order.
@@ -132,10 +134,11 @@ func (r *OSUpdateRepo) StartResult(ctx context.Context, runID, hostID int64, osB
 // FinishResult writes a host's outcome.
 func (r *OSUpdateRepo) FinishResult(ctx context.Context, x *models.OSUpdateResult) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE os_update_results SET status = ?, reason = ?, pkg_manager = ?, os_after = ?,
-		upgradable = ?, security_upgradable = ?, upgraded = ?, reboot_required = ?, rebooted = ?, output = ?, finished_at = now()
+		upgradable = ?, security_upgradable = ?, upgraded = ?, reboot_required = ?, rebooted = ?, output = ?, finished_at = now(),
+		backup_key = ?, backup_size = ?, backup_status = ?
 		WHERE run_id = ? AND host_id = ?`,
 		x.Status, x.Reason, x.PkgManager, x.OSAfter, x.Upgradable, x.SecurityUpgradable, x.Upgraded, x.RebootRequired, x.Rebooted, x.Output,
-		x.RunID, x.HostID)
+		x.BackupKey, x.BackupSize, x.BackupStatus, x.RunID, x.HostID)
 	return err
 }
 
@@ -193,4 +196,20 @@ func (r *OSUpdateRepo) LatestByHost(ctx context.Context) ([]models.OSUpdateResul
 		out = append(out, x)
 	}
 	return out, rows.Err()
+}
+
+// GetResult returns one host's result of a run, or (nil, nil).
+func (r *OSUpdateRepo) GetResult(ctx context.Context, runID, hostID int64) (*models.OSUpdateResult, error) {
+	x := &models.OSUpdateResult{}
+	err := scanOSResult(r.db.QueryRowContext(ctx, `SELECT `+osResultCols+` WHERE x.run_id = ? AND x.host_id = ?`, runID, hostID), x)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return x, err
+}
+
+// SetBackupStatus records what became of a result's backup (deleted by hand).
+func (r *OSUpdateRepo) SetBackupStatus(ctx context.Context, runID, hostID int64, status string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE os_update_results SET backup_status = ? WHERE run_id = ? AND host_id = ?`, status, runID, hostID)
+	return err
 }

@@ -1495,6 +1495,9 @@ export interface OSUpdateRun {
   reboot: boolean;
   concurrency: number;
   status: "running" | "done" | "cancelled" | "interrupted";
+  /** Each host backed up to MinIO first; kept after a success too. */
+  backup: boolean;
+  keep_backup: boolean;
   requested_name?: string;
   created_at: string;
   finished_at?: string;
@@ -1522,6 +1525,10 @@ export interface OSUpdateResult {
   output?: string;
   started_at?: string;
   finished_at?: string;
+  /** The host's backup in MinIO: there (done), failed, or deleted. */
+  backup_key?: string;
+  backup_size?: number;
+  backup_status?: "done" | "failed" | "deleted";
 }
 
 export interface DependencyGroup {

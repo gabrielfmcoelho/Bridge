@@ -37,6 +37,7 @@ export default function HostsOSView({ hosts, isAdmin }: { hosts: Host[]; isAdmin
     queryFn: () => vulnAPI.dependencyGroups(params),
   });
   const { data: latest = [] } = useQuery({ queryKey: ["os-updates", "latest"], queryFn: osUpdateAPI.latest, enabled: isAdmin });
+  const { data: updateConfig } = useQuery({ queryKey: ["os-updates", "config"], queryFn: osUpdateAPI.config, enabled: isAdmin });
   const groups = sortOSGroups(data?.data ?? []);
   const families = osFamilies(groups);
   const idsByOS = useMemo(() => hostIdsByOS(hosts), [hosts]);
@@ -57,7 +58,7 @@ export default function HostsOSView({ hosts, isAdmin }: { hosts: Host[]; isAdmin
   const startRelease = async (h: Host) => {
     const ok = await confirm({
       title: t("host.osRelease.confirmTitle", { host: h.nickname, os: osLabel(h) }),
-      message: t("host.osRelease.confirmMessage"),
+      message: `${t("host.osRelease.confirmMessage")} ${updateConfig?.backup_available ? t("host.osRelease.withBackup") : t("host.osRelease.noBackup")}`,
       confirmLabel: t("host.osRelease.start"),
       danger: true,
       requireText: h.nickname,

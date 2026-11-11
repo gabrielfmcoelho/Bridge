@@ -2182,4 +2182,15 @@ var migrationsPostgres = []string{
 		PRIMARY KEY (run_id, host_id)
 	);
 	CREATE INDEX IF NOT EXISTS idx_os_update_results_host ON os_update_results (host_id, finished_at DESC);`,
+
+	// Version 125: a run can back each host up to MinIO before touching it
+	// (backup), and keep that backup after a success (keep_backup); each
+	// result records its object and whether it is there, failed or deleted.
+	`ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS backup BOOLEAN NOT NULL DEFAULT false;
+	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS keep_backup BOOLEAN NOT NULL DEFAULT false;
+	ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS backup_key TEXT NOT NULL DEFAULT '';
+	ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS backup_size BIGINT;
+	ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS backup_status TEXT NOT NULL DEFAULT '';
+	ALTER TABLE os_update_results DROP CONSTRAINT IF EXISTS os_update_results_backup_status_check;
+	ALTER TABLE os_update_results ADD CONSTRAINT os_update_results_backup_status_check CHECK (backup_status IN ('','done','failed','deleted'));`,
 }
