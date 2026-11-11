@@ -19,6 +19,13 @@ const (
 	OSResultSkipped = "skipped"
 )
 
+// Backup statuses of a result.
+const (
+	OSBackupDone    = "done"
+	OSBackupFailed  = "failed"
+	OSBackupDeleted = "deleted"
+)
+
 // OSUpdateRun is one check / upgrade over a set of hosts (os_update_runs).
 // Counts are per result status, filled by the list and get queries.
 type OSUpdateRun struct {
@@ -27,6 +34,8 @@ type OSUpdateRun struct {
 	Reboot        bool             `json:"reboot"`
 	Concurrency   int              `json:"concurrency"`
 	Target        string           `json:"target,omitempty"`
+	Backup        bool             `json:"backup"`      // back each host up to MinIO first
+	KeepBackup    bool             `json:"keep_backup"` // keep it after a success too
 	Status        string           `json:"status"`
 	RequestedBy   *int64           `json:"requested_by,omitempty"`
 	RequestedName string           `json:"requested_name,omitempty"`
@@ -53,6 +62,9 @@ type OSUpdateResult struct {
 	RebootRequired     bool       `json:"reboot_required"`
 	Rebooted           bool       `json:"rebooted"`
 	Output             string     `json:"output,omitempty"`
+	BackupKey          string     `json:"backup_key,omitempty"`
+	BackupSize         *int64     `json:"backup_size,omitempty"`
+	BackupStatus       string     `json:"backup_status,omitempty"` // done | failed | deleted
 	StartedAt          *time.Time `json:"started_at,omitempty"`
 	FinishedAt         *time.Time `json:"finished_at,omitempty"`
 }

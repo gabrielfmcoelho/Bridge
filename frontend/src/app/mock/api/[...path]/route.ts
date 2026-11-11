@@ -458,7 +458,8 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   // OS update runs: a run finishes at once, each host "upgrades" 3 packages.
   // ponytail: module memory, not reset by __reset.
   if (p === "ssh/os-updates/runs" && method === "POST") {
-    const body = await readJSON<{ kind: OSUpdateRun["kind"]; host_ids: number[]; reboot: boolean; concurrency: number }>(request);
+    const body = await readJSON<{ kind: OSUpdateRun["kind"]; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean }>(request);
+    const backup = body.kind === "release" || (body.kind !== "check" && !!body.backup);
     const id = mockOSRuns.length + 1;
     const now = new Date().toISOString();
     const results: OSUpdateResult[] = body.host_ids.map((hid) => {
@@ -466,12 +467,22 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
       const check = body.kind === "check";
       return { run_id: id, host_id: hid, host_nickname: h.nickname, host_slug: h.oficial_slug, status: "success", pkg_manager: "apt",
         os_before: h.os?.pretty, os_after: h.os?.pretty, upgradable: check ? 3 : 0, security_upgradable: check ? 1 : 0, upgraded: check ? undefined : 3,
-        reboot_required: !check && !body.reboot, rebooted: !check && body.reboot, output: "@@pm apt\n@@upgradable 3\n@@security 1\n", started_at: now, finished_at: now };
+        reboot_required: !check && !body.reboot, rebooted: !check && body.reboot, output: "@@pm apt\n@@upgradable 3\n@@security 1\n", started_at: now, finished_at: now,
+        ...(backup ? { backup_key: `bridge/os-backups/${h.oficial_slug}/run${id}.tar.zst`, backup_size: 3_400_000_000, backup_status: body.keep_backup ? "done" as const : "deleted" as const } : {}) };
     });
     const run: OSUpdateRun = { id, kind: body.kind, reboot: body.reboot, concurrency: body.concurrency, status: "done", requested_name: "Mock",
+      backup, keep_backup: backup && !!body.keep_backup,
       created_at: now, finished_at: now, counts: { success: results.length }, results };
     mockOSRuns.unshift(run);
     return json(run, 202);
+  }
+  if (p === "ssh/os-updates/config" && method === "GET") return json({ backup_available: true, backup_include: ["/"], backup_exclude: ["/tmp", "/var/cache", "/var/lib/docker"] });
+  const backupPath = p.match(/^ssh\/os-updates\/runs\/(\d+)\/hosts\/(\d+)\/backup$/);
+  if (backupPath) {
+    const x = mockOSRuns.find((r) => r.id === Number(backupPath[1]))?.results?.find((r) => r.host_id === Number(backupPath[2]));
+    if (!x || x.backup_status !== "done") return json({ error: "no backup for this host in this run" }, 404);
+    if (method === "DELETE") { x.backup_status = "deleted"; return json({ status: "deleted" }); }
+    return json({ url: `data:text/plain,mock backup ${x.backup_key}`, key: x.backup_key, size: x.backup_size, expires_in: 3600 });
   }
   if (p === "ssh/os-updates/runs" && method === "GET") return json(mockOSRuns.map((r) => ({ ...r, results: undefined })));
   if (p.startsWith("ssh/os-updates/runs/") && method === "GET") {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -13,6 +14,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	minioclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/minio"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
@@ -196,6 +199,17 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 		res.Reason = "SSH connect: " + err.Error()
 		return res
 	}
+	// The backup comes first: no backup, no update.
+	if run.Backup && run.Kind != sshtest.OSUpdateCheck {
+		key, size, err := h.backupHost(ctx, run, host, client, priv)
+		if err != nil {
+			client.Close()
+			res.BackupStatus = models.OSBackupFailed
+			res.Reason = "backup failed, nothing was updated: " + err.Error()
+			return res
+		}
+		res.BackupKey, res.BackupSize, res.BackupStatus = key, &size, models.OSBackupDone
+	}
 	err = sshtest.StartOSUpdate(client, priv, run.ID, run.Kind)
 	client.Close()
 	if err != nil {
@@ -281,7 +295,88 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 	}
 	h.recordScan(ctx, host, info, map[string]any{})
 	res.OSAfter, res.RebootRequired = info.OS, info.RebootRequired
+	// Updated, and the host answered and rescanned: the backup has done its job.
+	if res.BackupStatus == models.OSBackupDone && !run.KeepBackup {
+		if c, _, err := h.minio(); err != nil {
+			res.Reason = joinReason(res.Reason, "backup kept: "+err.Error())
+		} else if err := c.Delete(ctx, res.BackupKey); err != nil {
+			res.Reason = joinReason(res.Reason, "backup kept, delete failed: "+err.Error())
+		} else {
+			res.BackupStatus = models.OSBackupDeleted
+		}
+	}
 	return res
+}
+
+// osBackupTimeout bounds one host's backup (a few hundred GB at LAN speed).
+var osBackupTimeout = 3 * time.Hour
+
+// minio returns a client on the configured MinIO and its settings, or an
+// error when it isn't set up.
+func (h *sshHandlers) minio() (*minioclient.Client, minioclient.Settings, error) {
+	s, err := minioclient.LoadSettings(h.db.SQL, h.db.Encryptor)
+	if err != nil {
+		return nil, s, err
+	}
+	if !s.Ready() {
+		return nil, s, errors.New("MinIO is not configured (Settings › Integrations › MinIO)")
+	}
+	c, err := minioclient.New(s)
+	return c, s, err
+}
+
+// backupHost streams the host's files to MinIO and returns the object key
+// and size. A failed backup leaves no object behind.
+func (h *sshHandlers) backupHost(ctx context.Context, run models.OSUpdateRun, host *models.Host, client *ssh.Client, priv sshtest.Privilege) (string, int64, error) {
+	c, s, err := h.minio()
+	if err != nil {
+		return "", 0, err
+	}
+	ext := sshtest.BackupExt(client)
+	contentType := "application/gzip"
+	if ext == "tar.zst" {
+		contentType = "application/zstd"
+	}
+	key := c.BackupKey(host.OficialSlug, run.ID, ext, time.Now())
+	ctx, cancel := context.WithTimeout(ctx, osBackupTimeout)
+	defer cancel()
+	size, err := streamTo(
+		func(r io.Reader) (int64, error) {
+			return c.Put(ctx, key, r, contentType)
+		},
+		func(w io.Writer) error { return sshtest.StreamBackup(ctx, client, priv, s.Include, s.Exclude, w) },
+	)
+	if err != nil {
+		c.Delete(context.WithoutCancel(ctx), key) // a partial upload may have completed
+		return "", 0, err
+	}
+	return key, size, nil
+}
+
+// streamTo pipes what produce writes into consume, concurrently: the archive
+// is never held whole. A produce error aborts consume (and the reverse).
+func streamTo(consume func(io.Reader) (int64, error), produce func(io.Writer) error) (int64, error) {
+	pr, pw := io.Pipe()
+	type result struct {
+		n   int64
+		err error
+	}
+	got := make(chan result, 1)
+	go func() {
+		n, err := consume(pr)
+		pr.CloseWithError(err) // unblocks produce if consume gave up
+		got <- result{n, err}
+	}()
+	perr := produce(pw)
+	pw.CloseWithError(perr)
+	r := <-got
+	if perr != nil {
+		return 0, perr
+	}
+	if r.err != nil {
+		return 0, r.err
+	}
+	return r.n, nil
 }
 
 // waitForSSH dials once, or for up to osUpdateRebootLimit after a reboot.
@@ -329,6 +424,8 @@ type osUpdateRunRequest struct {
 	HostIDs     []int64 `json:"host_ids"`
 	Reboot      bool    `json:"reboot"`
 	Concurrency int     `json:"concurrency"`
+	Backup      bool    `json:"backup"`      // back each host up to MinIO first
+	KeepBackup  bool    `json:"keep_backup"` // keep the backup after a success
 }
 
 var osUpdateKinds = map[string]bool{sshtest.OSUpdateCheck: true, sshtest.OSUpdatePackages: true, sshtest.OSUpdateSecurity: true, sshtest.OSUpdateRelease: true}
@@ -364,6 +461,18 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 		}
 		req.Concurrency, req.Reboot = 1, true
 	}
+	// A check changes nothing: no backup. A release upgrade always takes one
+	// when MinIO is set up.
+	_, _, minioErr := h.minio()
+	switch {
+	case req.Kind == sshtest.OSUpdateCheck:
+		req.Backup, req.KeepBackup = false, false
+	case req.Kind == sshtest.OSUpdateRelease && minioErr == nil:
+		req.Backup = true
+	case req.Backup && minioErr != nil:
+		jsonError(w, http.StatusBadRequest, minioErr.Error())
+		return
+	}
 	if len(req.HostIDs) == 0 || len(req.HostIDs) > osUpdateMaxHosts {
 		jsonError(w, http.StatusBadRequest, fmt.Sprintf("host_ids must have 1 to %d hosts", osUpdateMaxHosts))
 		return
@@ -382,7 +491,8 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 			return
 		}
 	}
-	run := models.OSUpdateRun{Kind: req.Kind, Reboot: req.Reboot && req.Kind != sshtest.OSUpdateCheck, Concurrency: req.Concurrency}
+	run := models.OSUpdateRun{Kind: req.Kind, Reboot: req.Reboot && req.Kind != sshtest.OSUpdateCheck, Concurrency: req.Concurrency,
+		Backup: req.Backup, KeepBackup: req.Backup && req.KeepBackup}
 	if u := auth.UserFromContext(r.Context()); u != nil {
 		run.RequestedBy = &u.ID
 	}
@@ -485,4 +595,98 @@ func (h *sshHandlers) handleLatestOSUpdates(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	jsonOK(w, rows)
+}
+
+// handleOSUpdateConfig godoc
+//
+//	@Summary		OS update options available
+//	@Description	Admin. Whether hosts can be backed up to MinIO before an update (the integration is on and complete), and the paths a backup takes.
+//	@Tags			ssh
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Router			/api/ssh/os-updates/config [get]
+func (h *sshHandlers) handleOSUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	_, s, err := h.minio()
+	jsonOK(w, map[string]any{"backup_available": err == nil, "backup_include": s.Include, "backup_exclude": s.Exclude})
+}
+
+// osBackupFromPath loads {id}/{host_id}'s result when it has a backup in
+// MinIO, or writes 404.
+func (h *sshHandlers) osBackupFromPath(w http.ResponseWriter, r *http.Request) *models.OSUpdateResult {
+	runID, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	hostID, _ := strconv.ParseInt(r.PathValue("host_id"), 10, 64)
+	x, err := store.NewOSUpdateRepo(h.db.SQL).GetResult(r.Context(), runID, hostID)
+	if err != nil {
+		jsonServerError(w, r, "failed to load the result", err)
+		return nil
+	}
+	if x == nil || x.BackupStatus != models.OSBackupDone || x.BackupKey == "" {
+		jsonError(w, http.StatusNotFound, "no backup for this host in this run")
+		return nil
+	}
+	return x
+}
+
+// osBackupLinkTTL is how long a download link works.
+const osBackupLinkTTL = time.Hour
+
+// handleOSBackupLink godoc
+//
+//	@Summary		Download link of a host's backup
+//	@Description	Admin. A link straight to MinIO, valid for one hour, that saves the backup (tar.zst / tar.gz) on the caller's computer. 404 when the result has no backup kept.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			id		path		int	true	"Run ID"
+//	@Param			host_id	path		int	true	"Host ID"
+//	@Success		200		{object}	map[string]interface{}
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/os-updates/runs/{id}/hosts/{host_id}/backup [get]
+func (h *sshHandlers) handleOSBackupLink(w http.ResponseWriter, r *http.Request) {
+	x := h.osBackupFromPath(w, r)
+	if x == nil {
+		return
+	}
+	c, _, err := h.minio()
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	u, err := c.DownloadURL(r.Context(), x.BackupKey, osBackupLinkTTL)
+	if err != nil {
+		jsonServerError(w, r, "failed to sign the link", err)
+		return
+	}
+	jsonOK(w, map[string]any{"url": u, "key": x.BackupKey, "size": x.BackupSize, "expires_in": int(osBackupLinkTTL.Seconds())})
+}
+
+// handleOSBackupDelete godoc
+//
+//	@Summary		Delete a host's backup
+//	@Description	Admin. Removes the backup from MinIO and marks it deleted. 404 when the result has no backup kept.
+//	@Tags			ssh
+//	@Param			id		path	int	true	"Run ID"
+//	@Param			host_id	path	int	true	"Host ID"
+//	@Produce		json
+//	@Success		200	{object}	map[string]string
+//	@Failure		404	{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/os-updates/runs/{id}/hosts/{host_id}/backup [delete]
+func (h *sshHandlers) handleOSBackupDelete(w http.ResponseWriter, r *http.Request) {
+	x := h.osBackupFromPath(w, r)
+	if x == nil {
+		return
+	}
+	c, _, err := h.minio()
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := c.Delete(r.Context(), x.BackupKey); err != nil {
+		jsonServerError(w, r, "failed to delete the backup", err)
+		return
+	}
+	if err := store.NewOSUpdateRepo(h.db.SQL).SetBackupStatus(r.Context(), x.RunID, x.HostID, models.OSBackupDeleted); err != nil {
+		jsonServerError(w, r, "failed to record the deletion", err)
+		return
+	}
+	jsonOK(w, map[string]string{"status": "deleted"})
 }

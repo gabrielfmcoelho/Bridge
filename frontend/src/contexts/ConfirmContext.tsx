@@ -63,6 +63,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         onClose={() => close(false)}
         title={options?.title}
         size="sm"
+        onTop
         footer={
           <FormFooter
             onCancel={() => close(false)}
