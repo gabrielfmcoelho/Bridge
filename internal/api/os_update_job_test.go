@@ -16,6 +16,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
@@ -393,5 +394,146 @@ func TestOSRestore_Handler(t *testing.T) {
 	repo.SetBackupStatus(ctx, src.ID, hostID, models.OSBackupDeleted)
 	if code, _ := call(body("staging", "[]")); code != http.StatusNotFound {
 		t.Fatalf("deleted backup = %d", code)
+	}
+}
+
+// Host backups: the profile (partial, [] inherits), the run's override over
+// it, backup-only runs (kept, no reboot), the kept list and the settings
+// groups (the connection apart from the feature).
+func TestHostBackups_Handlers(t *testing.T) {
+	ctx := context.Background()
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	admin := &models.User{Username: "admin", DisplayName: "Admin", Role: "admin", Email: "a@example.com"}
+	if err := store.NewUserRepo(d.SQL).Create(ctx, admin); err != nil {
+		t.Fatal(err)
+	}
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug, hostname, ssh_user) VALUES ('db1', 'db1', '10.0.0.2', 'root') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatal(err)
+	}
+	ran := make(chan models.OSUpdateRun, 4)
+	h := &sshHandlers{db: d, osHostRunner: func(ctx context.Context, run models.OSUpdateRun, host *models.Host) models.OSUpdateResult {
+		ran <- run
+		size := int64(4096)
+		return models.OSUpdateResult{Status: models.OSResultSuccess, BackupKey: "bridge/os-backups/db1/x.tar.zst", BackupSize: &size,
+			BackupStatus: models.OSBackupDone, BackupInclude: run.BackupInclude}
+	}}
+	mux := newEcho()
+	h.registerRoutes(routeRegistrar{e: mux})
+	call := func(method, path, body string) (int, string) {
+		t.Helper()
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, r.WithContext(auth.WithUser(r.Context(), admin)))
+		return w.Code, w.Body.String()
+	}
+	type view struct {
+		Profile   models.HostBackupProfile `json:"profile"`
+		Effective struct{ Include, Exclude []string }
+	}
+	profile := func(method, body string) (int, view) {
+		t.Helper()
+		code, raw := call(method, "/api/hosts/db1/backup-profile", body)
+		var v view
+		json.Unmarshal([]byte(raw), &v)
+		return code, v
+	}
+
+	// No profile: everything inherited.
+	if code, v := profile("GET", ""); code != http.StatusOK || v.Profile.Exclude != nil || strings.Join(v.Effective.Include, " ") != "/" ||
+		strings.Join(v.Effective.Exclude, " ") != service.DefaultBackupExclude {
+		t.Fatalf("no profile = %d %+v", code, v)
+	}
+	if code, v := profile("PUT", `{"exclude":["/tmp /var/lib/postgresql"]}`); code != http.StatusOK ||
+		strings.Join(v.Effective.Exclude, " ") != "/tmp /var/lib/postgresql" || strings.Join(v.Effective.Include, " ") != "/" {
+		t.Fatalf("exclude = %d %+v", code, v)
+	}
+	// Partial: include set, exclude kept.
+	if _, v := profile("PUT", `{"include":["/etc","/srv"]}`); strings.Join(v.Profile.Include, " ") != "/etc /srv" ||
+		strings.Join(v.Profile.Exclude, " ") != "/tmp /var/lib/postgresql" {
+		t.Fatalf("partial = %+v", v)
+	}
+	// [] goes back to the default.
+	if _, v := profile("PUT", `{"include":[]}`); v.Profile.Include != nil || strings.Join(v.Effective.Include, " ") != "/" {
+		t.Fatalf("reset = %+v", v)
+	}
+	if code, _ := profile("PUT", `{"include":["etc"]}`); code != http.StatusBadRequest {
+		t.Fatalf("relative = %d", code)
+	}
+	if code, _ := call("GET", "/api/hosts/nope/backup-profile", ""); code != http.StatusNotFound {
+		t.Fatalf("unknown host = %d", code)
+	}
+
+	// The run's override wins over the profile, list by list.
+	defaults := service.LoadBackupDefaults(ctx, d.SQL)
+	paths, err := h.backupPaths(ctx, models.OSUpdateRun{BackupInclude: []string{"/opt"}}, hostID, defaults)
+	if err != nil || strings.Join(paths.Include, " ") != "/opt" || strings.Join(paths.Exclude, " ") != "/tmp /var/lib/postgresql" {
+		t.Fatalf("effective = %+v %v", paths, err)
+	}
+
+	hosts := fmt.Sprintf("[%d]", hostID)
+	if code, raw := call("POST", "/api/ssh/os-updates/runs", `{"kind":"backup","host_ids":`+hosts+`}`); code != http.StatusBadRequest || !strings.Contains(raw, "MinIO") {
+		t.Fatalf("backup without MinIO = %d %s", code, raw)
+	}
+	settings := store.NewAppSettingsRepo(d.SQL)
+	for k, v := range map[string]string{"minio_enabled": "true", "minio_endpoint": "127.0.0.1:1", "minio_access_key": "ak", "minio_bucket": "ops", "osbackup_retention_days": "7"} {
+		settings.Set(ctx, k, v)
+	}
+	store.NewAppSecretRepo(d.SQL).Store(ctx, d.Encryptor, "minio_secret_key", "sk")
+	if code, _ := call("POST", "/api/ssh/os-updates/runs", `{"kind":"backup","backup_include":["etc"],"host_ids":`+hosts+`}`); code != http.StatusBadRequest {
+		t.Fatalf("relative override = %d", code)
+	}
+	code, raw := call("POST", "/api/ssh/os-updates/runs", `{"kind":"backup","reboot":true,"backup_include":["/etc /opt"],"host_ids":`+hosts+`}`)
+	var run models.OSUpdateRun
+	json.Unmarshal([]byte(raw), &run)
+	if code != http.StatusAccepted || !run.Backup || !run.KeepBackup || run.Reboot || strings.Join(run.BackupInclude, " ") != "/etc /opt" {
+		t.Fatalf("backup run = %d %s", code, raw)
+	}
+	<-ran
+	for range 100 {
+		if x, _ := store.NewOSUpdateRepo(d.SQL).GetResult(ctx, run.ID, hostID); x != nil && x.FinishedAt != nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// Kept backups: newest per host with its expiry; one host's list keeps
+	// what MinIO can't confirm (unreachable here).
+	var kept []models.OSUpdateResult
+	_, raw = call("GET", "/api/ssh/os-updates/backups", "")
+	json.Unmarshal([]byte(raw), &kept)
+	if len(kept) != 1 || kept[0].RunKind != "backup" || kept[0].ExpiresAt == nil ||
+		kept[0].ExpiresAt.Sub(*kept[0].FinishedAt) != 7*24*time.Hour || strings.Join(kept[0].BackupInclude, " ") != "/etc /opt" {
+		t.Fatalf("latest = %s", raw)
+	}
+	_, raw = call("GET", fmt.Sprintf("/api/ssh/os-updates/backups?host_id=%d", hostID), "")
+	if json.Unmarshal([]byte(raw), &kept); len(kept) != 1 {
+		t.Fatalf("host backups = %s", raw)
+	}
+	if code, _ := call("GET", "/api/ssh/os-updates/backups?host_id=9999", ""); code != http.StatusNotFound {
+		t.Fatalf("unknown host = %d", code)
+	}
+	var runs []models.OSUpdateRun
+	_, raw = call("GET", fmt.Sprintf("/api/ssh/os-updates/runs?host_id=%d", hostID), "")
+	if json.Unmarshal([]byte(raw), &runs); len(runs) != 1 || runs[0].ID != run.ID {
+		t.Fatalf("host runs = %s", raw)
+	}
+	if _, raw = call("GET", "/api/ssh/os-updates/runs?host_id=9999", ""); strings.TrimSpace(raw) != "[]" {
+		t.Fatalf("other host runs = %s", raw)
+	}
+
+	// The connection's group holds no feature settings, and the reverse.
+	for _, k := range integrationGroups["minio"] {
+		if strings.HasPrefix(k, "osbackup_") {
+			t.Fatalf("%s belongs to the osbackup group", k)
+		}
+	}
+	if len(integrationGroups["osbackup"]) != 4 {
+		t.Fatalf("osbackup group = %v", integrationGroups["osbackup"])
 	}
 }

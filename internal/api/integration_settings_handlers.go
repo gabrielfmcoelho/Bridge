@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	minioclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/minio"
 	outlineclient "github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/outline"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -143,7 +145,7 @@ var integrationGroups = map[string][]string{
 	"proxmox": {
 		"proxmox_enabled", // master switch; the servers live in proxmox_servers (v106)
 	},
-	// MinIO (S3) for OS update backups, and what those backups take.
+	// MinIO (S3): the connection only. Features keep their own settings.
 	"minio": {
 		"minio_enabled",
 		"minio_endpoint",
@@ -152,6 +154,10 @@ var integrationGroups = map[string][]string{
 		"minio_secret_key",
 		"minio_bucket",
 		"minio_use_ssl",
+	},
+	// Host backups (a feature on MinIO): the defaults a host's profile and a
+	// run override (service.BackupDefaults).
+	"osbackup": {
 		"osbackup_prefix",
 		"osbackup_include",
 		"osbackup_exclude",
@@ -209,7 +215,7 @@ var secretKeys = map[string]bool{
 // handleGetIntegrations returns all integration settings grouped by provider.
 //
 //	@Summary		Get integration settings
-//	@Description	Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, smtp, general) mapped to its key/value settings. Secret keys are never returned: they read "••••••••" when set, "" otherwise.
+//	@Description	Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, minio, osbackup, glpi, smtp, general) mapped to its key/value settings. Secret keys are never returned: they read "••••••••" when set, "" otherwise.
 //	@Tags			integration-settings
 //	@Produce		json
 //	@Success		200	{object}	map[string]map[string]string
@@ -1042,6 +1048,7 @@ func (h *integrationSettingsHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "POST /api/settings/integrations/test/grafana", h.handleTestGrafana)
 	rr.role("admin", "POST /api/settings/integrations/test/outline", h.handleTestOutline)
 	rr.role("admin", "POST /api/settings/integrations/test/minio", h.handleTestMinio)
+	rr.role("admin", "POST /api/settings/integrations/osbackup/retention", h.handleApplyBackupRetention)
 	rr.role("admin", "POST /api/settings/integrations/test/smtp", h.handleTestSMTP)
 	rr.role("admin", "DELETE /api/settings/integrations/{group}/secret/{key}", h.handleClearIntegrationSecret)
 
@@ -1058,7 +1065,7 @@ func (h *integrationSettingsHandlers) registerRoutes(rr routeRegistrar) {
 // handleTestMinio godoc
 //
 //	@Summary		Test the MinIO integration
-//	@Description	Admin. Checks the saved MinIO settings (the credentials work, the bucket exists) and applies the backup retention as Bridge's lifecycle rule on the bucket, keeping its other rules. Always 200: {"success": false, "error"} or {"success": true, "bucket", "retention_days", "lifecycle_error"?}.
+//	@Description	Admin. Checks the saved MinIO connection: the credentials work and the bucket exists. Changes nothing. Always 200: {"success": false, "error"} or {"success": true, "bucket"}.
 //	@Tags			integration-settings
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}
@@ -1083,11 +1090,35 @@ func (h *integrationSettingsHandlers) handleTestMinio(w http.ResponseWriter, r *
 		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
 		return
 	}
-	out := map[string]any{"success": true, "bucket": s.Bucket, "retention_days": s.RetentionDays}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	if err := c.EnsureLifecycle(ctx); err != nil {
-		out["lifecycle_error"] = err.Error() // e.g. the key may not manage lifecycle: backups still work
+	jsonOK(w, map[string]any{"success": true, "bucket": s.Bucket})
+}
+
+// handleApplyBackupRetention godoc
+//
+//	@Summary		Apply the host backups' retention
+//	@Description	Admin. Puts the saved retention (osbackup_retention_days under osbackup_prefix) on the MinIO bucket as Bridge's lifecycle rule, keeping the bucket's other rules; 0 removes Bridge's rule. Always 200: {"success": false, "error"} or {"success": true, "retention_days", "prefix"}.
+//	@Tags			integration-settings
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Router			/api/settings/integrations/osbackup/retention [post]
+func (h *integrationSettingsHandlers) handleApplyBackupRetention(w http.ResponseWriter, r *http.Request) {
+	d := service.LoadBackupDefaults(r.Context(), h.db.SQL)
+	s, err := minioclient.LoadSettings(h.db.SQL, h.db.Encryptor)
+	if err == nil && !s.Ready() {
+		err = errors.New("MinIO is not set up (Settings › Integrations › MinIO)")
 	}
-	jsonOK(w, out)
+	var c *minioclient.Client
+	if err == nil {
+		c, err = minioclient.New(s)
+	}
+	if err == nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		err = c.EnsureRule(ctx, service.BackupRuleID, d.Prefix, d.RetentionDays)
+	}
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	jsonOK(w, map[string]any{"success": true, "retention_days": d.RetentionDays, "prefix": d.Prefix})
 }

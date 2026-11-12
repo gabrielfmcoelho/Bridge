@@ -1,5 +1,6 @@
-// Package minio is Bridge's S3 store (the datalake's MinIO): where OS update
-// runs put each host's backup before touching it.
+// Package minio is Bridge's S3 connection (the datalake's MinIO): only the
+// connection lives here. What a feature stores and for how long is the
+// feature's (host backups: service.BackupDefaults).
 package minio
 
 import (
@@ -8,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,16 +20,6 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
-// Default backup paths: the whole root; pseudo and network filesystems are
-// left out by the backup script itself, these on top of them.
-const (
-	DefaultInclude = "/"
-	DefaultExclude = "/tmp /var/tmp /var/cache /var/lib/docker /var/lib/containerd /swapfile /swap.img /var/lib/bridge-osupdate /lost+found"
-	DefaultPrefix  = "bridge/os-backups"
-	// DefaultRetentionDays: kept backups expire after this many days.
-	DefaultRetentionDays = 30
-)
-
 // Settings is the minio_* group (app_settings; the secret key encrypted).
 type Settings struct {
 	Enabled   bool
@@ -39,15 +29,9 @@ type Settings struct {
 	SecretKey string
 	Bucket    string
 	UseSSL    bool
-	Prefix    string
-	Include   []string // paths backed up (osbackup_include)
-	Exclude   []string // paths left out (osbackup_exclude)
-	// RetentionDays: backups under Prefix expire after this many days (a
-	// bucket lifecycle rule); 0 keeps them until deleted by hand.
-	RetentionDays int
 }
 
-// LoadSettings reads the minio_* and osbackup_* settings.
+// LoadSettings reads the minio_* settings.
 func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 	repo := store.NewAppSettingsRepo(db)
 	get := func(k string) string { return strings.TrimSpace(repo.Value(context.Background(), k)) }
@@ -58,22 +42,6 @@ func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 		AccessKey: get("minio_access_key"),
 		Bucket:    get("minio_bucket"),
 		UseSSL:    get("minio_use_ssl") == "true",
-		Prefix:    strings.Trim(get("osbackup_prefix"), "/"),
-		Include:   strings.Fields(get("osbackup_include")),
-		Exclude:   strings.Fields(get("osbackup_exclude")),
-	}
-	if s.Prefix == "" {
-		s.Prefix = DefaultPrefix
-	}
-	if len(s.Include) == 0 {
-		s.Include = strings.Fields(DefaultInclude)
-	}
-	if get("osbackup_exclude") == "" {
-		s.Exclude = strings.Fields(DefaultExclude)
-	}
-	s.RetentionDays = DefaultRetentionDays
-	if n, err := strconv.Atoi(get("osbackup_retention_days")); err == nil && n >= 0 {
-		s.RetentionDays = n
 	}
 	secret, _, err := store.NewAppSecretRepo(db).Reveal(context.Background(), enc, "minio_secret_key")
 	if err != nil {
@@ -83,7 +51,7 @@ func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 	return s, nil
 }
 
-// Ready says whether backups can run: on, with an endpoint, keys and a bucket.
+// Ready says whether the connection is usable: on, with an endpoint, keys and a bucket.
 func (s Settings) Ready() bool {
 	return s.Enabled && s.Endpoint != "" && s.AccessKey != "" && s.SecretKey != "" && s.Bucket != ""
 }
@@ -136,11 +104,6 @@ func (c *Client) Check(ctx context.Context) error {
 	return nil
 }
 
-// BackupKey is where a host's backup of a run goes.
-func (c *Client) BackupKey(hostSlug string, runID int64, ext string, now time.Time) string {
-	return fmt.Sprintf("%s/%s/%s-run%d.%s", c.s.Prefix, hostSlug, now.UTC().Format("20060102-150405"), runID, ext)
-}
-
 // partSize bounds memory per upload (one part buffered) and the object size
 // (10 000 parts → 640 GiB).
 const partSize = 64 << 20
@@ -152,6 +115,17 @@ func (c *Client) Put(ctx context.Context, key string, r io.Reader, contentType s
 		return 0, err
 	}
 	return info.Size, nil
+}
+
+// Exists says whether key is in the bucket (false, nil when it isn't).
+func (c *Client) Exists(ctx context.Context, key string) (bool, error) {
+	if _, err := c.c.StatObject(ctx, c.s.Bucket, key, mc.StatObjectOptions{}); err != nil {
+		if mc.ToErrorResponse(err).Code == "NoSuchKey" {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // Delete removes key (no error when it's already gone).
@@ -175,23 +149,19 @@ func (c *Client) DownloadURL(ctx context.Context, key string, ttl time.Duration)
 	return u.String(), nil
 }
 
-// lifecycleRuleID names Bridge's rule among the bucket's (the datalake's
-// bucket may have rules of its own).
-const lifecycleRuleID = "bridge-os-backups"
-
-// withBackupRule returns rules with Bridge's rule set to expire objects under
-// prefix after days (and drop multipart uploads a cut backup left behind
-// after a day); days 0 removes it. Every other rule is kept as is.
-func withBackupRule(rules []lifecycle.Rule, prefix string, days int) []lifecycle.Rule {
+// withRule returns rules with the rule id set to expire objects under prefix
+// after days (and drop the multipart uploads a cut upload left behind after
+// a day); days 0 removes it. Every other rule is kept as is.
+func withRule(rules []lifecycle.Rule, id, prefix string, days int) []lifecycle.Rule {
 	out := make([]lifecycle.Rule, 0, len(rules)+1)
 	for _, r := range rules {
-		if r.ID != lifecycleRuleID {
+		if r.ID != id {
 			out = append(out, r)
 		}
 	}
 	if days > 0 {
 		out = append(out, lifecycle.Rule{
-			ID:                             lifecycleRuleID,
+			ID:                             id,
 			Status:                         "Enabled",
 			RuleFilter:                     lifecycle.Filter{Prefix: strings.Trim(prefix, "/") + "/"},
 			Expiration:                     lifecycle.Expiration{Days: lifecycle.ExpirationDays(days)},
@@ -201,9 +171,10 @@ func withBackupRule(rules []lifecycle.Rule, prefix string, days int) []lifecycle
 	return out
 }
 
-// EnsureLifecycle puts the settings' retention on the bucket as Bridge's
-// lifecycle rule, leaving the bucket's other rules alone. Idempotent.
-func (c *Client) EnsureLifecycle(ctx context.Context) error {
+// EnsureRule puts the lifecycle rule id (prefix, expire after days; 0
+// removes it) on the bucket, leaving the bucket's other rules alone (the
+// datalake's bucket may have its own). Idempotent.
+func (c *Client) EnsureRule(ctx context.Context, id, prefix string, days int) error {
 	cfg, err := c.c.GetBucketLifecycle(ctx, c.s.Bucket)
 	if err != nil {
 		if mc.ToErrorResponse(err).Code != "NoSuchLifecycleConfiguration" {
@@ -211,7 +182,7 @@ func (c *Client) EnsureLifecycle(ctx context.Context) error {
 		}
 		cfg = lifecycle.NewConfiguration()
 	}
-	cfg.Rules = withBackupRule(cfg.Rules, c.s.Prefix, c.s.RetentionDays)
+	cfg.Rules = withRule(cfg.Rules, id, prefix, days)
 	return c.c.SetBucketLifecycle(ctx, c.s.Bucket, cfg)
 }
 
