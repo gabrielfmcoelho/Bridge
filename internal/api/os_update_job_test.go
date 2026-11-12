@@ -297,3 +297,101 @@ func TestOSUpdateRuns_Backup(t *testing.T) {
 		t.Fatalf("other host = %d", code)
 	}
 }
+
+// Restores: validated, only from a kept backup, onto its host; in place
+// they back the chosen paths up first and keep that copy.
+func TestOSRestore_Handler(t *testing.T) {
+	ctx := context.Background()
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	admin := &models.User{Username: "admin", DisplayName: "Admin", Role: "admin", Email: "a@example.com"}
+	if err := store.NewUserRepo(d.SQL).Create(ctx, admin); err != nil {
+		t.Fatal(err)
+	}
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug, hostname, ssh_user) VALUES ('vm1', 'vm1', '10.0.0.1', 'root') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatal(err)
+	}
+	repo := store.NewOSUpdateRepo(d.SQL)
+	// A finished package run that kept vm1's backup.
+	src := &models.OSUpdateRun{Kind: "packages", Concurrency: 1, Backup: true, KeepBackup: true}
+	repo.CreateRun(ctx, src, []int64{hostID})
+	repo.StartResult(ctx, src.ID, hostID, "")
+	size := int64(10)
+	repo.FinishResult(ctx, &models.OSUpdateResult{RunID: src.ID, HostID: hostID, Status: models.OSResultFailed,
+		BackupKey: "bridge/os-backups/vm1/x.tar.zst", BackupSize: &size, BackupStatus: models.OSBackupDone})
+
+	ran := make(chan models.OSUpdateRun, 4)
+	h := &sshHandlers{db: d, osHostRunner: func(ctx context.Context, run models.OSUpdateRun, host *models.Host) models.OSUpdateResult {
+		ran <- run
+		return models.OSUpdateResult{Status: models.OSResultSuccess}
+	}}
+	mux := newEcho()
+	h.registerRoutes(routeRegistrar{e: mux})
+	call := func(body string) (int, map[string]any) {
+		t.Helper()
+		r := httptest.NewRequest("POST", "/api/ssh/os-updates/restores", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, r.WithContext(auth.WithUser(r.Context(), admin)))
+		var out map[string]any
+		json.NewDecoder(w.Result().Body).Decode(&out)
+		return w.Code, out
+	}
+	body := func(mode string, paths string) string {
+		return fmt.Sprintf(`{"run_id":%d,"host_id":%d,"mode":%q,"paths":%s}`, src.ID, hostID, mode, paths)
+	}
+
+	// MinIO not configured yet.
+	if code, out := call(body("staging", "[]")); code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(out["error"]), "MinIO") {
+		t.Fatalf("no MinIO = %d %v", code, out)
+	}
+	settings := store.NewAppSettingsRepo(d.SQL)
+	for k, v := range map[string]string{"minio_enabled": "true", "minio_endpoint": "127.0.0.1:1", "minio_access_key": "ak", "minio_bucket": "ops"} {
+		settings.Set(ctx, k, v)
+	}
+	store.NewAppSecretRepo(d.SQL).Store(ctx, d.Encryptor, "minio_secret_key", "sk")
+
+	for b, want := range map[string]int{
+		body("full", "[]"):                  http.StatusBadRequest,
+		body("paths", "[]"):                 http.StatusBadRequest,
+		body("paths", `["/"]`):              http.StatusBadRequest,
+		body("paths", `["etc"]`):            http.StatusBadRequest,
+		body("staging", `["/etc/../root"]`): http.StatusBadRequest,
+		fmt.Sprintf(`{"run_id":%d,"host_id":%d,"mode":"staging"}`, src.ID+99, hostID): http.StatusNotFound,
+	} {
+		if code, out := call(b); code != want {
+			t.Errorf("%s = %d %v, want %d", b, code, out, want)
+		}
+	}
+
+	// Review folder: no safety backup.
+	code, out := call(body("staging", "[]"))
+	if code != http.StatusAccepted || out["kind"] != "restore" || out["restore_mode"] != "staging" || out["backup"] != false {
+		t.Fatalf("staging = %d %v", code, out)
+	}
+	if got := <-ran; *got.SourceRunID != src.ID || *got.SourceHostID != hostID || got.Concurrency != 1 {
+		t.Fatalf("runner got %+v", got)
+	}
+
+	// In place: the chosen paths are backed up first and that copy is kept.
+	code, out = call(body("paths", `["/etc/nginx", " /opt/app "]`))
+	if code != http.StatusAccepted || out["backup"] != true || out["keep_backup"] != true {
+		t.Fatalf("paths = %d %v", code, out)
+	}
+	if got := <-ran; strings.Join(got.RestorePaths, "|") != "/etc/nginx|/opt/app" || got.RestoreMode != "paths" {
+		t.Fatalf("runner got %+v", got)
+	}
+	if run, _ := repo.GetRun(ctx, int64(out["id"].(float64))); strings.Join(run.RestorePaths, "|") != "/etc/nginx|/opt/app" {
+		t.Fatalf("stored paths = %q", run.RestorePaths)
+	}
+
+	// A backup no longer kept can't be restored.
+	repo.SetBackupStatus(ctx, src.ID, hostID, models.OSBackupDeleted)
+	if code, _ := call(body("staging", "[]")); code != http.StatusNotFound {
+		t.Fatalf("deleted backup = %d", code)
+	}
+}

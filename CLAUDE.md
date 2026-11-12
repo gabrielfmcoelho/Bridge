@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v125**. Use idempotent idioms:
+per element, currently at **v126**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -265,6 +265,17 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   (`minio_public_url` when browsers can't reach the endpoint). Release runs
   always back up when MinIO is set up. MinIO images now need a login, so the
   tests sign links offline and stream into a fake instead of a container.
+  Retention: `osbackup_retention_days` (default 30) is Bridge's own bucket
+  lifecycle rule `bridge-os-backups` on the prefix — read the bucket's
+  configuration, swap only that rule (the datalake's bucket has its own).
+  Restores (v126) are runs of kind `restore` (`POST …/os-updates/restores`,
+  `sshtest/osrestore.go`): a kept backup goes back onto its host, into
+  `/var/lib/bridge-restore/run-<id>` (root-only) or over the chosen paths —
+  those paths are backed up first and kept (the undo); all of `/` in place is
+  refused. The host downloads straight from MinIO through a six-hour
+  presigned link signed for the internal endpoint, fed to `curl -K -` on
+  stdin: a link on a command line is readable by every local user in /proc,
+  and it must never reach the world-readable log. Run scripts are `600`.
 - Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
   names are read in bulk; wiki titles come from Outline at most once a day per
   page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title

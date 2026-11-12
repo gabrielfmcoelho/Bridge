@@ -15,6 +15,7 @@ import { useConfirm } from "@/contexts/ConfirmContext";
 import { osUpdateAPI } from "@/lib/api";
 import { getTimeAgo } from "@/lib/utils";
 import type { OSUpdateResult, OSUpdateRun } from "@/lib/types";
+import OSRestoreModal from "./OSRestoreModal";
 
 const RUN_TONE: Record<OSUpdateRun["status"], LozengeAppearance> = { running: "inprogress", done: "success", cancelled: "default", interrupted: "moved" };
 const RESULT_TONE: Record<OSUpdateResult["status"], LozengeAppearance> = { pending: "default", running: "inprogress", success: "success", failed: "removed", skipped: "moved" };
@@ -23,6 +24,7 @@ const RESULT_TONE: Record<OSUpdateResult["status"], LozengeAppearance> = { pendi
  *  while a run is going and says when one ends. */
 export default function OSUpdateRuns({ openId, onOpen }: { openId: number | null; onOpen: (id: number | null) => void }) {
   const { t, locale } = useLocale();
+  const [restoring, setRestoring] = useState<OSUpdateResult | null>(null);
   const flag = useFlag();
   const queryClient = useQueryClient();
   const { data: runs = [], isError, error } = useQuery({
@@ -65,7 +67,7 @@ export default function OSUpdateRuns({ openId, onOpen }: { openId: number | null
             {runs.map((r, i) => (
               <tr key={r.id} className={`${tableClasses.row} cursor-pointer ${i % 2 === 1 ? tableClasses.rowAlt : ""}`} onClick={() => onOpen(r.id)}>
                 <td className={`${tableClasses.td} font-mono text-xs`}>{r.id}</td>
-                <td className={tableClasses.td}>{t(`host.osUpdate.kindShort.${r.kind}`)}{r.reboot ? ` · ${t("host.osUpdate.withReboot")}` : ""}</td>
+                <td className={tableClasses.td}>{t(`host.osUpdate.kindShort.${r.kind}`)}{r.kind === "restore" ? ` · ${t(`host.osRestore.modeShort.${r.restore_mode ?? "staging"}`)}` : r.reboot ? ` · ${t("host.osUpdate.withReboot")}` : ""}</td>
                 <td className={tableClasses.td}><Lozenge appearance={RUN_TONE[r.status]}>{t(`host.osUpdate.runStatus.${r.status}`)}</Lozenge></td>
                 <td className={`${tableClasses.td} text-xs text-[var(--text-secondary)]`}>{countsText(r, t)}</td>
                 <td className={`${tableClasses.td} text-xs text-[var(--text-muted)] whitespace-nowrap`}>
@@ -76,7 +78,11 @@ export default function OSUpdateRuns({ openId, onOpen }: { openId: number | null
           </tbody>
         </table>
       </div>
-      {openId !== null && <RunDrawer id={openId} onClose={() => onOpen(null)} />}
+      {openId !== null && <RunDrawer id={openId} onClose={() => onOpen(null)}
+        onRestore={(x) => { onOpen(null); setRestoring(x); }} />}
+      {/* Outside the drawer: a modal inside it would sit under it and lose focus to it. */}
+      {restoring && <OSRestoreModal backup={restoring} onClose={() => setRestoring(null)}
+        onStarted={(r) => { setRestoring(null); onOpen(r.id); }} />}
     </div>
   );
 }
@@ -88,7 +94,7 @@ function countsText(r: OSUpdateRun, t: (k: string, v?: Record<string, string>) =
     .join(" · ");
 }
 
-function RunDrawer({ id, onClose }: { id: number; onClose: () => void }) {
+function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () => void; onRestore: (x: OSUpdateResult) => void }) {
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const [openHost, setOpenHost] = useState<number | null>(null);
@@ -125,6 +131,12 @@ function RunDrawer({ id, onClose }: { id: number; onClose: () => void }) {
       ) : undefined}>
       {isError && <StatusAlert variant="error">{(error as Error)?.message}</StatusAlert>}
       {run?.status === "running" && <p className="text-xs text-[var(--text-muted)] mb-3">{t("host.osUpdate.cancelHint")}</p>}
+      {run?.kind === "restore" && (
+        <p className="text-xs text-[var(--text-secondary)] mb-3">
+          {t(`host.osRestore.summary.${run.restore_mode ?? "staging"}`, { paths: (run.restore_paths ?? []).join(" ") || "/", run: String(run.source_run_id ?? "") })}
+        </p>
+      )}
+
       {run && (
         <div className={tableClasses.wrapper}>
           <table className={tableClasses.table}>
@@ -157,11 +169,12 @@ function RunDrawer({ id, onClose }: { id: number; onClose: () => void }) {
                       {!x.rebooted && x.reboot_required && <Lozenge appearance="moved" className="ml-1.5">{t("host.rebootPending")}</Lozenge>}
                     </td>
                     {run.backup && (
-                      <td className={`${tableClasses.td} text-xs whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
+                      <td className={`${tableClasses.td} text-xs`} onClick={(e) => e.stopPropagation()}>
                         {x.backup_status === "done" ? (
-                          <span className="inline-flex items-center gap-1.5">
+                          <span className="flex flex-wrap items-center gap-1.5 min-w-[9rem]">
                             <span className="tabular-nums text-[var(--text-secondary)]">{x.backup_size != null ? gib(x.backup_size) : ""}</span>
                             <Button size="sm" variant="secondary" onClick={() => download.mutate(x)} disabled={download.isPending}>{t("host.osUpdate.backupDownload")}</Button>
+                            <Button size="sm" variant="secondary" onClick={() => onRestore(x)}>{t("host.osRestore.open")}</Button>
                             <Button size="sm" variant="ghost" onClick={() => askRemove(x)} disabled={removeBackup.isPending}>{t("common.delete")}</Button>
                           </span>
                         ) : x.backup_status ? (

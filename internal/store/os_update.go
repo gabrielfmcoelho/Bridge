@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 )
@@ -21,9 +22,11 @@ func (r *OSUpdateRepo) CreateRun(ctx context.Context, run *models.OSUpdateRun, h
 		return err
 	}
 	defer tx.Rollback()
-	if err := tx.QueryRowContext(ctx, `INSERT INTO os_update_runs (kind, reboot, concurrency, target, requested_by, backup, keep_backup)
-		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id, status, created_at`,
-		run.Kind, run.Reboot, run.Concurrency, run.Target, run.RequestedBy, run.Backup, run.KeepBackup).Scan(&run.ID, &run.Status, &run.CreatedAt); err != nil {
+	if err := tx.QueryRowContext(ctx, `INSERT INTO os_update_runs (kind, reboot, concurrency, target, requested_by, backup, keep_backup,
+		restore_mode, restore_paths, source_run_id, source_host_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, status, created_at`,
+		run.Kind, run.Reboot, run.Concurrency, run.Target, run.RequestedBy, run.Backup, run.KeepBackup,
+		run.RestoreMode, strings.Join(run.RestorePaths, "\n"), run.SourceRunID, run.SourceHostID).Scan(&run.ID, &run.Status, &run.CreatedAt); err != nil {
 		return err
 	}
 	for _, id := range hostIDs {
@@ -35,16 +38,20 @@ func (r *OSUpdateRepo) CreateRun(ctx context.Context, run *models.OSUpdateRun, h
 }
 
 const osRunCols = `r.id, r.kind, r.reboot, r.concurrency, r.target, r.status, r.requested_by, COALESCE(u.display_name, ''), r.backup, r.keep_backup,
+	r.restore_mode, r.restore_paths, r.source_run_id, r.source_host_id,
 	r.created_at, r.finished_at,
 	(SELECT COALESCE(json_object_agg(s.status, s.n), '{}')::text FROM
 		(SELECT status, COUNT(*) AS n FROM os_update_results WHERE run_id = r.id GROUP BY status) s)
 	FROM os_update_runs r LEFT JOIN users u ON u.id = r.requested_by`
 
 func scanOSRun(sc interface{ Scan(...any) error }, run *models.OSUpdateRun) error {
-	var counts string
+	var counts, paths string
 	if err := sc.Scan(&run.ID, &run.Kind, &run.Reboot, &run.Concurrency, &run.Target, &run.Status, &run.RequestedBy,
-		&run.RequestedName, &run.Backup, &run.KeepBackup, &run.CreatedAt, &run.FinishedAt, &counts); err != nil {
+		&run.RequestedName, &run.Backup, &run.KeepBackup, &run.RestoreMode, &paths, &run.SourceRunID, &run.SourceHostID, &run.CreatedAt, &run.FinishedAt, &counts); err != nil {
 		return err
+	}
+	if paths != "" {
+		run.RestorePaths = strings.Split(paths, "\n")
 	}
 	return json.Unmarshal([]byte(counts), &run.Counts)
 }

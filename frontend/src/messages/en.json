@@ -648,6 +648,35 @@
     "idleHint": "An idle VM has no user-deployed application services and no Docker containers. Hover the chip on each card for the rule trail."
   },
   "host": {
+    "osRestore": {
+      "open": "Restore…",
+      "title": "Restore the backup of {host}",
+      "start": "Restore",
+      "mode": "Where",
+      "modeStaging": "Into a review folder (changes nothing else)",
+      "modePaths": "Chosen paths, in place",
+      "modeHint": {
+        "staging": "Extracted into /var/lib/bridge-restore/run-<id> on the host, readable by root only. Compare or copy what you need by hand.",
+        "paths": "The chosen paths are first backed up to MinIO (kept: that copy undoes the restore), then overwritten with the backup's version. Files the backup doesn't have are left alone."
+      },
+      "paths": "Paths to restore",
+      "pathsOptional": "Paths to restore (optional: empty = everything)",
+      "pathsHint": "Absolute paths, separated by spaces or lines.",
+      "absolute": "Use absolute paths (starting with /).",
+      "noRoot": "Restoring all of / in place isn't supported: choose paths or use the review folder.",
+      "pathsRequired": "Choose at least one path.",
+      "warning": "Running services keep using what they already loaded: restart them (or reboot) after restoring their files.",
+      "confirmTitle": "Overwrite these paths on {host}?",
+      "confirmMessage": "{paths} will be replaced by the backup's version. They are backed up to MinIO first.",
+      "modeShort": {
+        "staging": "review folder",
+        "paths": "in place"
+      },
+      "summary": {
+        "staging": "Restore of run #{run}'s backup into the review folder (paths: {paths}).",
+        "paths": "Restore of run #{run}'s backup over {paths}. The backup in this run is what those paths held before: restore it to undo."
+      }
+    },
     "title": "Hosts",
     "idle": "Idle VM",
     "idleTooltipPrefix": "Flagged as idle:",
@@ -735,6 +764,7 @@
       "hosts": "Hosts",
       "when": "When",
       "kindShort": {
+        "restore": "Restore",
         "check": "Check",
         "packages": "Packages",
         "security": "Security",
