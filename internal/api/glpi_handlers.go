@@ -945,8 +945,8 @@ func (h *glpiHandlers) handleUpdateTicket(w http.ResponseWriter, r *http.Request
 //	@Tags			glpi
 //	@Accept			json
 //	@Produce		json
-//	@Param			id			path		int		true	"GLPI ticket ID"
-//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			id			path		int										true	"GLPI ticket ID"
+//	@Param			profile_id	query		int										true	"GLPI token profile ID whose session is used"
 //	@Param			body		body		object{content=string,is_private=bool}	true	"Followup"
 //	@Success		201			{object}	map[string]interface{}
 //	@Failure		400			{object}	httpx.ErrorResponse
@@ -1006,8 +1006,8 @@ func (h *glpiHandlers) handleAddTicketFollowup(w http.ResponseWriter, r *http.Re
 //	@Tags			glpi
 //	@Accept			json
 //	@Produce		json
-//	@Param			id			path		int		true	"GLPI ticket ID"
-//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			id			path		int										true	"GLPI ticket ID"
+//	@Param			profile_id	query		int										true	"GLPI token profile ID whose session is used"
 //	@Param			body		body		object{content=string,actiontime=int}	true	"Task"
 //	@Success		201			{object}	map[string]interface{}
 //	@Failure		400			{object}	httpx.ErrorResponse
@@ -1067,8 +1067,8 @@ func (h *glpiHandlers) handleAddTicketTask(w http.ResponseWriter, r *http.Reques
 //	@Tags			glpi
 //	@Accept			json
 //	@Produce		json
-//	@Param			id			path		int		true	"GLPI ticket ID"
-//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			id			path		int						true	"GLPI ticket ID"
+//	@Param			profile_id	query		int						true	"GLPI token profile ID whose session is used"
 //	@Param			body		body		object{content=string}	true	"Solution"
 //	@Success		201			{object}	map[string]interface{}
 //	@Failure		400			{object}	httpx.ErrorResponse
@@ -1128,8 +1128,8 @@ func (h *glpiHandlers) handleAddTicketSolution(w http.ResponseWriter, r *http.Re
 //	@Tags			glpi
 //	@Accept			json
 //	@Produce		json
-//	@Param			id			path		int		true	"GLPI ticket ID"
-//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			id			path		int											true	"GLPI ticket ID"
+//	@Param			profile_id	query		int											true	"GLPI token profile ID whose session is used"
 //	@Param			body		body		object{user_id=int,group_id=int,role=int}	true	"Actor"
 //	@Success		201			{object}	map[string]interface{}
 //	@Failure		400			{object}	httpx.ErrorResponse
@@ -1316,8 +1316,8 @@ func (h *glpiHandlers) handleUploadTicketDocument(w http.ResponseWriter, r *http
 //	@Tags			glpi
 //	@Accept			json
 //	@Produce		json
-//	@Param			id			path		int		true	"GLPI ticket ID"
-//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			id			path		int										true	"GLPI ticket ID"
+//	@Param			profile_id	query		int										true	"GLPI token profile ID whose session is used"
 //	@Param			body		body		object{approver_id=int,comment=string}	true	"Validation request"
 //	@Success		201			{object}	map[string]interface{}
 //	@Failure		400			{object}	httpx.ErrorResponse
@@ -1376,9 +1376,9 @@ func (h *glpiHandlers) handleAddTicketValidation(w http.ResponseWriter, r *http.
 //	@Tags			glpi
 //	@Accept			json
 //	@Produce		json
-//	@Param			id				path		int		true	"GLPI ticket ID"
-//	@Param			validationId	path		int		true	"TicketValidation ID"
-//	@Param			profile_id		query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			id				path		int									true	"GLPI ticket ID"
+//	@Param			validationId	path		int									true	"TicketValidation ID"
+//	@Param			profile_id		query		int									true	"GLPI token profile ID whose session is used"
 //	@Param			body			body		object{status=int,comment=string}	true	"Answer"
 //	@Success		200				{object}	map[string]interface{}
 //	@Failure		400				{object}	httpx.ErrorResponse
@@ -1436,8 +1436,8 @@ func (h *glpiHandlers) handleAnswerTicketValidation(w http.ResponseWriter, r *ht
 //	@Tags			glpi
 //	@Accept			json
 //	@Produce		json
-//	@Param			id			path		int		true	"GLPI ticket ID"
-//	@Param			profile_id	query		int		true	"GLPI token profile ID whose session is used"
+//	@Param			id			path		int														true	"GLPI ticket ID"
+//	@Param			profile_id	query		int														true	"GLPI token profile ID whose session is used"
 //	@Param			body		body		object{satisfaction_id=int,rating=int,comment=string}	true	"Answer"
 //	@Success		200			{object}	map[string]interface{}
 //	@Failure		400			{object}	httpx.ErrorResponse

@@ -6022,6 +6022,439 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/glpi-sead/administration/{itemtype}/search": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi-sead"
+                ],
+                "summary": "Search GLPI SEAD/NTGD users/entities/groups",
+                "parameters": [
+                    {
+                        "enum": [
+                            "User",
+                            "Entity",
+                            "Group"
+                        ],
+                        "type": "string",
+                        "description": "GLPI itemtype",
+                        "name": "itemtype",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Substring filter",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi-sead/dropdowns/{itemtype}/search": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi-sead"
+                ],
+                "summary": "Search a GLPI SEAD/NTGD dropdown",
+                "parameters": [
+                    {
+                        "enum": [
+                            "ITILCategory",
+                            "Location",
+                            "RequestType",
+                            "TaskCategory"
+                        ],
+                        "type": "string",
+                        "description": "GLPI itemtype",
+                        "name": "itemtype",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Substring filter",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi-sead/status": {
+            "get": {
+                "description": "Any role. {enabled: bool}.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi-sead"
+                ],
+                "summary": "GLPI SEAD/NTGD integration status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi-sead/tickets": {
+            "get": {
+                "description": "Any role. q filters by ticket name substring (RSQL ` + "`" + `name=like=` + "`" + `). 503 when not configured; 502 when GLPI rejects the call.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi-sead"
+                ],
+                "summary": "List GLPI SEAD/NTGD tickets",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Substring filter on ticket name",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Pagination offset (default 0)",
+                        "name": "start",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Editor+.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi-sead"
+                ],
+                "summary": "Create a GLPI SEAD/NTGD ticket",
+                "parameters": [
+                    {
+                        "description": "Ticket",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.createTicketSeadRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi-sead/tickets/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi-sead"
+                ],
+                "summary": "Get a GLPI SEAD/NTGD ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/glpiv2.Ticket"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi-sead/tickets/{id}/followups": {
+            "post": {
+                "description": "Editor+.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi-sead"
+                ],
+                "summary": "Add a followup to a GLPI SEAD/NTGD ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Followup",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "content": {
+                                    "type": "string"
+                                },
+                                "is_private": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi-sead/tickets/{id}/team": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi-sead"
+                ],
+                "summary": "GLPI SEAD/NTGD ticket requesters/observers/assignees",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi-sead/tickets/{id}/timeline": {
+            "get": {
+                "description": "Raw timeline rows (followups/tasks/solutions/documents/validations) — each row carries its own ` + "`" + `itemtype` + "`" + ` field.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi-sead"
+                ],
+                "summary": "GLPI SEAD/NTGD ticket timeline",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/glpi/documents/{id}": {
             "get": {
                 "description": "Any role. Streams the document through Bridge, forwarding the upstream Content-Type and Content-Disposition; cached privately for 5 minutes. Errors are JSON. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
@@ -6691,6 +7124,229 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "put": {
+                "description": "Editor+. Partial update — omitted fields keep their GLPI value. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Update a GLPI ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to change",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ticketUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi/tickets/{id}/actors": {
+            "post": {
+                "description": "Editor+. Exactly one of user_id/group_id must be set; role is 1=requester 2=observer 3=assign (groups can't be requesters). 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Add an actor to a GLPI ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Actor",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "group_id": {
+                                    "type": "integer"
+                                },
+                                "role": {
+                                    "type": "integer"
+                                },
+                                "user_id": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi/tickets/{id}/actors/{actorId}": {
+            "delete": {
+                "description": "Editor+. actorId is the Ticket_User/Group_Ticket row id (TicketActor.id from the details response), not the user/group id. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Remove an actor from a GLPI ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Ticket_User/Group_Ticket row ID",
+                        "name": "actorId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "true if the row is a Group_Ticket rather than a Ticket_User",
+                        "name": "is_group",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/api/glpi/tickets/{id}/details": {
@@ -6734,6 +7390,528 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi/tickets/{id}/documents": {
+            "post": {
+                "description": "Editor+. Forwards the file (max 50 MiB) to GLPI as a Document and links it to the ticket. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Attach a file to a GLPI ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "File to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi/tickets/{id}/followups": {
+            "post": {
+                "description": "Editor+. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Add a followup to a GLPI ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Followup",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "content": {
+                                    "type": "string"
+                                },
+                                "is_private": {
+                                    "type": "boolean"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi/tickets/{id}/satisfaction": {
+            "put": {
+                "description": "Any role (the requester, typically). satisfaction_id comes from the ticket details response. rating is 1-5. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Answer a GLPI ticket satisfaction survey",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Answer",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "comment": {
+                                    "type": "string"
+                                },
+                                "rating": {
+                                    "type": "integer"
+                                },
+                                "satisfaction_id": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi/tickets/{id}/solution": {
+            "post": {
+                "description": "Editor+. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Propose a solution for a GLPI ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Solution",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "content": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi/tickets/{id}/tasks": {
+            "post": {
+                "description": "Editor+. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Add a task to a GLPI ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Task",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "actiontime": {
+                                    "type": "integer"
+                                },
+                                "content": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi/tickets/{id}/validations": {
+            "post": {
+                "description": "Editor+. 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Request a validation on a GLPI ticket",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Validation request",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "approver_id": {
+                                    "type": "integer"
+                                },
+                                "comment": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/glpi/tickets/{id}/validations/{validationId}": {
+            "put": {
+                "description": "Editor+. status is 2 (accepted) or 3 (refused). 503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects the session or the call.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "glpi"
+                ],
+                "summary": "Answer a GLPI ticket validation",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "GLPI ticket ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "TicketValidation ID",
+                        "name": "validationId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "GLPI token profile ID whose session is used",
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Answer",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "comment": {
+                                    "type": "string"
+                                },
+                                "status": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -17175,7 +18353,7 @@ const docTemplate = `{
         },
         "/api/ssh/setup-key/{slug}": {
             "post": {
-                "description": "Editor+. mode \"generate\" makes a new key, \"existing\" reuses existing_key_path.",
+                "description": "Editor+. mode \"generate\" makes a new key; \"existing\" installs the host's vault key (the linked shared key, else its own), or existing_key_path when given.",
                 "consumes": [
                     "application/json"
                 ],
@@ -20756,6 +21934,10 @@ const docTemplate = `{
                 "completename": {
                     "type": "string"
                 },
+                "disabled": {
+                    "description": "Selectable mirrors GLPI's own tree dropdown: group/header nodes (e.g. an\nITILCategory that only exists to hold children) come back from GLPI's\nselect2 payload as disabled — GLPI itself refuses to attach a ticket to\none, so a catalogue entry scraped with that flag must stay non-pickable\nhere too, or the submission dies later with a bare ERROR_GLPI_ADD.",
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -21095,6 +22277,12 @@ const docTemplate = `{
                     "description": "optional — links via alert_chamado_links",
                     "type": "integer"
                 },
+                "assign_group_id": {
+                    "type": "integer"
+                },
+                "assign_user_id": {
+                    "type": "integer"
+                },
                 "category_id": {
                     "type": "integer"
                 },
@@ -21108,15 +22296,52 @@ const docTemplate = `{
                     "description": "optional — persists as host_chamado",
                     "type": "string"
                 },
+                "impact": {
+                    "type": "integer"
+                },
                 "link_computer": {
                     "description": "if true + host_slug, find \u0026 link GLPI Computer",
                     "type": "boolean"
                 },
+                "location_id": {
+                    "type": "integer"
+                },
+                "priority": {
+                    "type": "integer"
+                },
                 "profile_id": {
+                    "type": "integer"
+                },
+                "request_type_id": {
+                    "type": "integer"
+                },
+                "requester_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "sla_id_tto": {
+                    "type": "integer"
+                },
+                "sla_id_ttr": {
                     "type": "integer"
                 },
                 "title": {
                     "type": "string"
+                },
+                "type": {
+                    "description": "1=incident 2=request",
+                    "type": "integer"
+                },
+                "urgency": {
+                    "type": "integer"
+                },
+                "watcher_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -21137,6 +22362,41 @@ const docTemplate = `{
                 },
                 "warning": {
                     "type": "string"
+                }
+            }
+        },
+        "api.createTicketSeadRequest": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "entity_id": {
+                    "type": "integer"
+                },
+                "impact": {
+                    "type": "integer"
+                },
+                "location_id": {
+                    "type": "integer"
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "request_type_id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "integer"
+                },
+                "urgency": {
+                    "type": "integer"
                 }
             }
         },
@@ -24252,6 +25512,41 @@ const docTemplate = `{
                 }
             }
         },
+        "api.ticketUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "integer"
+                },
+                "impact": {
+                    "type": "integer"
+                },
+                "location_id": {
+                    "type": "integer"
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "sla_id_tto": {
+                    "type": "integer"
+                },
+                "sla_id_ttr": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "integer"
+                },
+                "urgency": {
+                    "type": "integer"
+                }
+            }
+        },
         "api.toolSyncServiceRequest": {
             "type": "object",
             "properties": {
@@ -24823,9 +26118,44 @@ const docTemplate = `{
                 }
             }
         },
+        "glpi.TicketActor": {
+            "type": "object",
+            "properties": {
+                "actor_id": {
+                    "description": "users_id or groups_id",
+                    "type": "integer"
+                },
+                "id": {
+                    "description": "Ticket_User / Group_Ticket row id (for removal)",
+                    "type": "integer"
+                },
+                "is_group": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "description": "ActorRequester / ActorObserver / ActorAssign",
+                    "type": "integer"
+                }
+            }
+        },
         "glpi.TicketDetail": {
             "type": "object",
             "properties": {
+                "actors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/glpi.TicketActor"
+                    }
+                },
+                "documents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/glpi.TicketDocument"
+                    }
+                },
                 "event_counts": {
                     "type": "object",
                     "additionalProperties": {
@@ -24845,15 +26175,39 @@ const docTemplate = `{
                     "type": "object",
                     "additionalProperties": {}
                 },
+                "satisfaction": {
+                    "$ref": "#/definitions/glpi.TicketSatisfaction"
+                },
                 "ticket": {
                     "type": "object",
                     "additionalProperties": {}
+                },
+                "validations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/glpi.TicketValidation"
+                    }
                 },
                 "warnings": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "glpi.TicketDocument": {
+            "type": "object",
+            "properties": {
+                "doc_id": {
+                    "type": "integer"
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "Document_Item row id (for removal)",
+                    "type": "integer"
                 }
             }
         },
@@ -24889,6 +26243,120 @@ const docTemplate = `{
                 },
                 "user_name": {
                     "type": "string"
+                }
+            }
+        },
+        "glpi.TicketSatisfaction": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "type": "string"
+                },
+                "date_answered": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "satisfaction": {
+                    "type": "integer"
+                },
+                "tickets_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "glpi.TicketValidation": {
+            "type": "object",
+            "properties": {
+                "comment_submission": {
+                    "type": "string"
+                },
+                "comment_validation": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "submission_date": {
+                    "type": "string"
+                },
+                "tickets_id": {
+                    "type": "integer"
+                },
+                "users_id": {
+                    "description": "who requested the validation",
+                    "type": "integer"
+                },
+                "users_id_validate": {
+                    "type": "integer"
+                },
+                "validation_date": {
+                    "type": "string"
+                }
+            }
+        },
+        "glpiv2.Ref": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "glpiv2.Ticket": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "$ref": "#/definitions/glpiv2.Ref"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                },
+                "date_creation": {
+                    "type": "string"
+                },
+                "date_mod": {
+                    "type": "string"
+                },
+                "entity": {
+                    "$ref": "#/definitions/glpiv2.Ref"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "impact": {
+                    "type": "integer"
+                },
+                "location": {
+                    "$ref": "#/definitions/glpiv2.Ref"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "request_type": {
+                    "$ref": "#/definitions/glpiv2.Ref"
+                },
+                "status": {
+                    "$ref": "#/definitions/glpiv2.Ref"
+                },
+                "type": {
+                    "type": "integer"
+                },
+                "urgency": {
+                    "type": "integer"
                 }
             }
         },
