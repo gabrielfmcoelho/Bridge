@@ -155,6 +155,7 @@ var integrationGroups = map[string][]string{
 		"osbackup_prefix",
 		"osbackup_include",
 		"osbackup_exclude",
+		"osbackup_retention_days",
 	},
 	"glpi": {
 		"glpi_enabled",
@@ -1057,7 +1058,7 @@ func (h *integrationSettingsHandlers) registerRoutes(rr routeRegistrar) {
 // handleTestMinio godoc
 //
 //	@Summary		Test the MinIO integration
-//	@Description	Admin. Checks the saved MinIO settings: the credentials work and the bucket exists. Always 200: {"success": false, "error"} or {"success": true, "bucket"}.
+//	@Description	Admin. Checks the saved MinIO settings (the credentials work, the bucket exists) and applies the backup retention as Bridge's lifecycle rule on the bucket, keeping its other rules. Always 200: {"success": false, "error"} or {"success": true, "bucket", "retention_days", "lifecycle_error"?}.
 //	@Tags			integration-settings
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}
@@ -1082,5 +1083,11 @@ func (h *integrationSettingsHandlers) handleTestMinio(w http.ResponseWriter, r *
 		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
 		return
 	}
-	jsonOK(w, map[string]any{"success": true, "bucket": s.Bucket})
+	out := map[string]any{"success": true, "bucket": s.Bucket, "retention_days": s.RetentionDays}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	if err := c.EnsureLifecycle(ctx); err != nil {
+		out["lifecycle_error"] = err.Error() // e.g. the key may not manage lifecycle: backups still work
+	}
+	jsonOK(w, out)
 }

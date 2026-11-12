@@ -260,9 +260,10 @@ func TestOSUpdateRuns_Backup(t *testing.T) {
 		t.Fatalf("check ignores backup = %d %v", code, out)
 	}
 
-	// MinIO set up (nothing is contacted: links are signed offline).
+	// MinIO set up on a port that refuses: links are signed offline, and the
+	// lifecycle rule a backup run re-applies fails fast and is only logged.
 	settings := store.NewAppSettingsRepo(d.SQL)
-	for k, v := range map[string]string{"minio_enabled": "true", "minio_endpoint": "10.0.122.76:9000", "minio_access_key": "ak", "minio_bucket": "ops"} {
+	for k, v := range map[string]string{"minio_enabled": "true", "minio_endpoint": "127.0.0.1:1", "minio_access_key": "ak", "minio_bucket": "ops"} {
 		settings.Set(ctx, k, v)
 	}
 	if err := store.NewAppSecretRepo(d.SQL).Store(ctx, d.Encryptor, "minio_secret_key", "sk"); err != nil {
@@ -284,7 +285,7 @@ func TestOSUpdateRuns_Backup(t *testing.T) {
 	}
 	link := fmt.Sprintf("/api/ssh/os-updates/runs/%d/hosts/%d/backup", id, hostID)
 	code, out := call("GET", link, "")
-	if code != http.StatusOK || !strings.Contains(fmt.Sprint(out["url"]), "10.0.122.76:9000/ops/bridge/os-backups/vm1/") || out["expires_in"] != float64(3600) {
+	if code != http.StatusOK || !strings.Contains(fmt.Sprint(out["url"]), "127.0.0.1:1/ops/bridge/os-backups/vm1/") || out["expires_in"] != float64(3600) {
 		t.Fatalf("link = %d %v", code, out)
 	}
 	// Marked deleted (as after a manual delete): no more link.

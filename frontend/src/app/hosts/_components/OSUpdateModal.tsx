@@ -93,7 +93,8 @@ export default function OSUpdateModal({ groups, hostIds, onClose, onStarted }: {
               <Toggle checked={backup} onChange={setBackup} ariaLabel={t("host.osUpdate.backup")} />
             </FormField>
             {backup && (
-              <FormField label={t("host.osUpdate.keepBackup")} hint={t("host.osUpdate.keepBackupHint")}>
+              <FormField label={t("host.osUpdate.keepBackup")} hint={`${t("host.osUpdate.keepBackupHint")} ${config?.retention_days
+                ? t("host.osUpdate.retention", { days: String(config.retention_days) }) : t("host.osUpdate.retentionOff")}`}>
                 <Toggle checked={keepBackup} onChange={setKeepBackup} ariaLabel={t("host.osUpdate.keepBackup")} />
               </FormField>
             )}
