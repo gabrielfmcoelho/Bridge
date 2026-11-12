@@ -24,6 +24,7 @@ const (
 	OSUpdatePackages = "packages" // every upgrade inside the current release
 	OSUpdateSecurity = "security" // security upgrades only
 	OSUpdateRelease  = "release"  // next release (osReleaseScript)
+	OSUpdateRestore  = "restore"  // a kept backup back onto its host (osrestore.go)
 )
 
 // osUpdateDir holds each run's script, log and exit code on the host.
@@ -186,7 +187,10 @@ func OSUpdateInnerScript(kind string) (string, error) {
 	return "", fmt.Errorf("unknown OS update kind %q", kind)
 }
 
-// osUpdateFile is the run's path prefix on the host (.sh, .log, .exit).
+// osUpdateFile is the run's path prefix on the host (.sh, .log, .exit). The
+// script is root-only (a restore's carries a download link to the backup);
+// the log and exit code are world-readable so polling needs no sudo, and
+// never contain the link.
 func osUpdateFile(runID int64) string {
 	return fmt.Sprintf("%s/run-%d", osUpdateDir, runID)
 }
@@ -198,7 +202,7 @@ func osUpdateLauncher(runID int64, inner string) string {
 	b64 := base64.StdEncoding.EncodeToString([]byte(inner))
 	return fmt.Sprintf(`umask 022
 mkdir -p %[1]s && chmod 755 %[1]s || exit 1
-echo %[3]s | base64 -d > %[2]s.sh || exit 1
+(umask 077; echo %[3]s | base64 -d > %[2]s.sh) || exit 1
 rm -f %[2]s.log %[2]s.exit
 RUN="sh %[2]s.sh > %[2]s.log 2>&1; echo \$? > %[2]s.exit"
 if command -v setsid >/dev/null 2>&1; then

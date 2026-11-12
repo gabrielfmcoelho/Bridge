@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -210,7 +211,11 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 		}
 		res.BackupKey, res.BackupSize, res.BackupStatus = key, &size, models.OSBackupDone
 	}
-	err = sshtest.StartOSUpdate(client, priv, run.ID, run.Kind)
+	if run.Kind == sshtest.OSUpdateRestore {
+		err = h.startRestore(ctx, client, priv, run)
+	} else {
+		err = sshtest.StartOSUpdate(client, priv, run.ID, run.Kind)
+	}
 	client.Close()
 	if err != nil {
 		res.Reason = "start: " + err.Error()
@@ -219,7 +224,7 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 
 	// Poll on fresh connections until the exit file shows up.
 	limit := osUpdateHostTimeout
-	if run.Kind == sshtest.OSUpdateRelease {
+	if run.Kind == sshtest.OSUpdateRelease || run.Kind == sshtest.OSUpdateRestore {
 		limit = osReleaseTimeout
 	}
 	deadline := time.Now().Add(limit)
@@ -310,6 +315,42 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 	return res
 }
 
+// osRestoreLinkTTL is how long the host's download link of a restore works:
+// the whole download has to start within it.
+const osRestoreLinkTTL = 6 * time.Hour
+
+// startRestore launches the restore of run's source backup on the host,
+// detached; the host downloads it straight from MinIO.
+func (h *sshHandlers) startRestore(ctx context.Context, client *ssh.Client, priv sshtest.Privilege, run models.OSUpdateRun) error {
+	if run.SourceRunID == nil || run.SourceHostID == nil {
+		return errors.New("restore without a source backup")
+	}
+	src, err := store.NewOSUpdateRepo(h.db.SQL).GetResult(ctx, *run.SourceRunID, *run.SourceHostID)
+	if err != nil {
+		return err
+	}
+	if src == nil || src.BackupStatus != models.OSBackupDone {
+		return errors.New("the source backup is no longer kept")
+	}
+	members, err := sshtest.RestoreMembers(run.RestorePaths)
+	if err != nil {
+		return err
+	}
+	c, _, err := h.minio()
+	if err != nil {
+		return err
+	}
+	link, err := c.FetchURL(ctx, src.BackupKey, osRestoreLinkTTL)
+	if err != nil {
+		return err
+	}
+	script, err := sshtest.RestoreScript(run.ID, run.RestoreMode, src.BackupKey, link, members)
+	if err != nil {
+		return err
+	}
+	return sshtest.StartDetached(client, priv, run.ID, script)
+}
+
 // osBackupTimeout bounds one host's backup (a few hundred GB at LAN speed).
 var osBackupTimeout = 3 * time.Hour
 
@@ -334,6 +375,10 @@ func (h *sshHandlers) backupHost(ctx context.Context, run models.OSUpdateRun, ho
 	if err != nil {
 		return "", 0, err
 	}
+	include := s.Include
+	if run.Kind == sshtest.OSUpdateRestore {
+		include = run.RestorePaths // the undo of a restore in place: just what it overwrites
+	}
 	ext := sshtest.BackupExt(client)
 	contentType := "application/gzip"
 	if ext == "tar.zst" {
@@ -346,7 +391,7 @@ func (h *sshHandlers) backupHost(ctx context.Context, run models.OSUpdateRun, ho
 		func(r io.Reader) (int64, error) {
 			return c.Put(ctx, key, r, contentType)
 		},
-		func(w io.Writer) error { return sshtest.StreamBackup(ctx, client, priv, s.Include, s.Exclude, w) },
+		func(w io.Writer) error { return sshtest.StreamBackup(ctx, client, priv, include, s.Exclude, w) },
 	)
 	if err != nil {
 		c.Delete(context.WithoutCancel(ctx), key) // a partial upload may have completed
@@ -702,4 +747,84 @@ func (h *sshHandlers) handleOSBackupDelete(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	jsonOK(w, map[string]string{"status": "deleted"})
+}
+
+type osRestoreRequest struct {
+	RunID  int64    `json:"run_id"`  // the run whose backup to restore
+	HostID int64    `json:"host_id"` // its host: the restore goes back there
+	Mode   string   `json:"mode"`    // staging | paths
+	Paths  []string `json:"paths"`   // absolute; required for paths
+}
+
+// handleStartOSRestore godoc
+//
+//	@Summary		Restore a kept backup onto its host
+//	@Description	Admin. Starts a restore run of the backup kept by run_id for host_id, back on that host, in the background. mode staging extracts into /var/lib/bridge-restore/run-<id> (root-only) and changes nothing else; paths may narrow it. mode paths extracts the given absolute paths over /, after backing exactly those paths up to MinIO (kept: the undo). Restoring all of / in place is refused. The host downloads the backup itself from MinIO through a six-hour link, then is rescanned. Answers 202 with the run. 404 when the backup isn't kept or the host isn't visible.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		osRestoreRequest	true	"Restore"
+//	@Success		202		{object}	models.OSUpdateRun
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/os-updates/restores [post]
+func (h *sshHandlers) handleStartOSRestore(w http.ResponseWriter, r *http.Request) {
+	var req osRestoreRequest
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+	if req.Mode != sshtest.RestoreStaging && req.Mode != sshtest.RestorePaths {
+		jsonError(w, http.StatusBadRequest, "mode must be staging or paths")
+		return
+	}
+	var paths []string
+	for _, p := range req.Paths {
+		if p = strings.TrimSpace(p); p != "" {
+			paths = append(paths, p)
+		}
+	}
+	if req.Mode == sshtest.RestorePaths && len(paths) == 0 {
+		jsonError(w, http.StatusBadRequest, "a restore in place needs at least one path")
+		return
+	}
+	if _, err := sshtest.RestoreMembers(paths); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	src, err := store.NewOSUpdateRepo(h.db.SQL).GetResult(r.Context(), req.RunID, req.HostID)
+	if err != nil {
+		jsonServerError(w, r, "failed to load the backup", err)
+		return
+	}
+	if src == nil || src.BackupStatus != models.OSBackupDone {
+		jsonError(w, http.StatusNotFound, "no backup kept for this host in this run")
+		return
+	}
+	if host, err := store.NewHostRepo(h.db.SQL).GetByID(r.Context(), req.HostID); err != nil || host == nil {
+		jsonError(w, http.StatusNotFound, "host not found")
+		return
+	}
+	if _, _, err := h.minio(); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	run := models.OSUpdateRun{Kind: sshtest.OSUpdateRestore, Concurrency: 1, RestoreMode: req.Mode, RestorePaths: paths,
+		SourceRunID: &req.RunID, SourceHostID: &req.HostID,
+		// In place, what gets overwritten is backed up first and kept: the undo.
+		Backup: req.Mode == sshtest.RestorePaths, KeepBackup: req.Mode == sshtest.RestorePaths}
+	if u := auth.UserFromContext(r.Context()); u != nil {
+		run.RequestedBy = &u.ID
+	}
+	repo := store.NewOSUpdateRepo(h.db.SQL)
+	if err := repo.CreateRun(r.Context(), &run, []int64{req.HostID}); err != nil {
+		jsonServerError(w, r, "failed to create the run", err)
+		return
+	}
+	osUpdates.start(h.db.SQL, run, h.runner())
+	got, err := repo.GetRun(r.Context(), run.ID)
+	if err != nil || got == nil {
+		got = &run
+	}
+	httpx.WriteJSON(w, http.StatusAccepted, got)
 }

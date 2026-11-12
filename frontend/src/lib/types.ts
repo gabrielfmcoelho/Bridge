@@ -1491,13 +1491,18 @@ export type OSUpdateResultStatus = "pending" | "running" | "success" | "failed" 
 /** One check / upgrade over a set of hosts (GET /api/ssh/os-updates/runs). */
 export interface OSUpdateRun {
   id: number;
-  kind: OSUpdateKind;
+  kind: OSUpdateKind | "restore";
   reboot: boolean;
   concurrency: number;
   status: "running" | "done" | "cancelled" | "interrupted";
   /** Each host backed up to MinIO first; kept after a success too. */
   backup: boolean;
   keep_backup: boolean;
+  /** Restores: review folder or paths in place, and which backup. */
+  restore_mode?: "staging" | "paths";
+  restore_paths?: string[];
+  source_run_id?: number;
+  source_host_id?: number;
   requested_name?: string;
   created_at: string;
   finished_at?: string;

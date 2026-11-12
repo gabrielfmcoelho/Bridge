@@ -752,6 +752,9 @@ export const osUpdateAPI = {
   /** A one-hour link straight to MinIO that downloads a kept backup. */
   backupLink: (runId: number, hostId: number) =>
     api.get<{ url: string; key: string; size?: number; expires_in: number }>(`/api/ssh/os-updates/runs/${runId}/hosts/${hostId}/backup`),
+  /** Restores a kept backup onto its host (a run of kind "restore"). */
+  restore: (body: { run_id: number; host_id: number; mode: "staging" | "paths"; paths: string[] }) =>
+    api.post<import("./types").OSUpdateRun>("/api/ssh/os-updates/restores", body),
   deleteBackup: (runId: number, hostId: number) => api.delete(`/api/ssh/os-updates/runs/${runId}/hosts/${hostId}/backup`),
 };
 

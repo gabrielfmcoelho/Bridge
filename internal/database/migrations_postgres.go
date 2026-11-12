@@ -2193,4 +2193,13 @@ var migrationsPostgres = []string{
 	ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS backup_status TEXT NOT NULL DEFAULT '';
 	ALTER TABLE os_update_results DROP CONSTRAINT IF EXISTS os_update_results_backup_status_check;
 	ALTER TABLE os_update_results ADD CONSTRAINT os_update_results_backup_status_check CHECK (backup_status IN ('','done','failed','deleted'));`,
+
+	// Version 126: restores are runs too (kind 'restore'): which kept backup
+	// (source run + host), into a review folder or over the chosen paths.
+	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
+	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore'));
+	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS restore_mode TEXT NOT NULL DEFAULT '';
+	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS restore_paths TEXT NOT NULL DEFAULT '';
+	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS source_run_id BIGINT;
+	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS source_host_id BIGINT;`,
 }

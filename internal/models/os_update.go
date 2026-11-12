@@ -29,13 +29,18 @@ const (
 // OSUpdateRun is one check / upgrade over a set of hosts (os_update_runs).
 // Counts are per result status, filled by the list and get queries.
 type OSUpdateRun struct {
-	ID            int64            `json:"id"`
-	Kind          string           `json:"kind"`
-	Reboot        bool             `json:"reboot"`
-	Concurrency   int              `json:"concurrency"`
-	Target        string           `json:"target,omitempty"`
-	Backup        bool             `json:"backup"`      // back each host up to MinIO first
-	KeepBackup    bool             `json:"keep_backup"` // keep it after a success too
+	ID          int64  `json:"id"`
+	Kind        string `json:"kind"`
+	Reboot      bool   `json:"reboot"`
+	Concurrency int    `json:"concurrency"`
+	Target      string `json:"target,omitempty"`
+	Backup      bool   `json:"backup"`      // back each host up to MinIO first
+	KeepBackup  bool   `json:"keep_backup"` // keep it after a success too
+	// Restores: the kept backup (source run and host) and where it goes.
+	RestoreMode   string           `json:"restore_mode,omitempty"`  // staging | paths
+	RestorePaths  []string         `json:"restore_paths,omitempty"` // absolute paths
+	SourceRunID   *int64           `json:"source_run_id,omitempty"`
+	SourceHostID  *int64           `json:"source_host_id,omitempty"`
 	Status        string           `json:"status"`
 	RequestedBy   *int64           `json:"requested_by,omitempty"`
 	RequestedName string           `json:"requested_name,omitempty"`
