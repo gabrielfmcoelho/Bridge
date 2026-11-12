@@ -1485,7 +1485,7 @@ export interface HostOS {
   reboot_required?: boolean;
 }
 
-export type OSUpdateKind = "check" | "packages" | "security" | "release";
+export type OSUpdateKind = "check" | "packages" | "security" | "release" | "backup";
 export type OSUpdateResultStatus = "pending" | "running" | "success" | "failed" | "skipped";
 
 /** One check / upgrade over a set of hosts (GET /api/ssh/os-updates/runs). */
@@ -1498,6 +1498,9 @@ export interface OSUpdateRun {
   /** Each host backed up to MinIO first; kept after a success too. */
   backup: boolean;
   keep_backup: boolean;
+  /** This run's own backup paths (none = each host's profile, else the defaults). */
+  backup_include?: string[];
+  backup_exclude?: string[];
   /** Restores: review folder or paths in place, and which backup. */
   restore_mode?: "staging" | "paths";
   restore_paths?: string[];
@@ -1534,6 +1537,25 @@ export interface OSUpdateResult {
   backup_key?: string;
   backup_size?: number;
   backup_status?: "done" | "failed" | "deleted";
+  /** The paths the backup took (run → host profile → defaults). */
+  backup_include?: string[];
+  backup_exclude?: string[];
+  /** Backup lists only: the run's kind, and when retention removes it. */
+  run_kind?: OSUpdateRun["kind"];
+  expires_at?: string;
+}
+
+export interface BackupPaths {
+  include: string[] | null;
+  exclude: string[] | null;
+}
+
+/** GET /api/hosts/{slug}/backup-profile: the host's own paths (null =
+ *  inherited), the defaults, and what a backup of the host takes. */
+export interface BackupProfileView {
+  profile: BackupPaths & { host_id: number; updated_name?: string; updated_at?: string };
+  defaults: { prefix: string; include: string[]; exclude: string[]; retention_days: number };
+  effective: { include: string[]; exclude: string[] };
 }
 
 export interface DependencyGroup {

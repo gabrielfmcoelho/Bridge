@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import EmptyState from "@/components/ui/EmptyState";
 import StatusAlert from "@/components/ui/StatusAlert";
 import Badge from "@/components/ui/Badge";
@@ -11,14 +11,13 @@ import Icon from "@/components/ui/Icon";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { tableClasses } from "@/components/ui/Table";
 import { useLocale } from "@/contexts/LocaleContext";
-import { useConfirm } from "@/contexts/ConfirmContext";
-import { useFlag } from "@/contexts/FlagContext";
 import { osUpdateAPI, vulnAPI } from "@/lib/api";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import type { Host } from "@/lib/types";
 import { hostIdsByOS, osFamilies, osKey, sortOSGroups } from "./osView";
 import { osLabel, osName } from "./hostInsights";
-import OSUpdateModal from "./OSUpdateModal";
+import OSUpdateModal, { type UpdateTarget } from "./OSUpdateModal";
+import OSBadges, { useLatestBackups } from "./OSBadges";
 import OSUpdateRuns, { pendingText } from "./OSUpdateRuns";
 
 const params = { kind: "os", scope: "host", per_page: "200" };
@@ -30,41 +29,21 @@ const params = { kind: "os", scope: "host", per_page: "200" };
 export default function HostsOSView({ hosts, isAdmin }: { hosts: Host[]; isAdmin: boolean }) {
   const { t } = useLocale();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [showUpdate, setShowUpdate] = useState(false);
+  const [update, setUpdate] = useState<{ target: UpdateTarget; preset?: "release" } | null>(null);
   const [openRun, setOpenRun] = useState<number | null>(null);
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["vulnerabilities", "dependency-groups", params],
     queryFn: () => vulnAPI.dependencyGroups(params),
   });
   const { data: latest = [] } = useQuery({ queryKey: ["os-updates", "latest"], queryFn: osUpdateAPI.latest, enabled: isAdmin });
-  const { data: updateConfig } = useQuery({ queryKey: ["os-updates", "config"], queryFn: osUpdateAPI.config, enabled: isAdmin });
+  const backups = useLatestBackups(isAdmin);
   const groups = sortOSGroups(data?.data ?? []);
   const families = osFamilies(groups);
   const idsByOS = useMemo(() => hostIdsByOS(hosts), [hosts]);
   const hostById = useMemo(() => new Map(hosts.map((h) => [h.id, h])), [hosts]);
   const latestByHost = useMemo(() => new Map(latest.map((x) => [x.host_id, x])), [latest]);
-  const confirm = useConfirm();
-  const flag = useFlag();
-  const queryClient = useQueryClient();
-  const release = useMutation({
-    mutationFn: (h: Host) => osUpdateAPI.start({ kind: "release", host_ids: [h.id], reboot: true, concurrency: 1 }),
-    onSuccess: (run) => {
-      queryClient.invalidateQueries({ queryKey: ["os-updates"] });
-      setOpenRun(run.id);
-    },
-    onError: (err) => flag({ appearance: "error", title: t("host.osRelease.failed"), description: (err as Error).message }),
-  });
-  // One host at a time, typed name: a release upgrade can leave a VM unbootable.
-  const startRelease = async (h: Host) => {
-    const ok = await confirm({
-      title: t("host.osRelease.confirmTitle", { host: h.nickname, os: osLabel(h) }),
-      message: `${t("host.osRelease.confirmMessage")} ${updateConfig?.backup_available ? t("host.osRelease.withBackup") : t("host.osRelease.noBackup")}`,
-      confirmLabel: t("host.osRelease.start"),
-      danger: true,
-      requireText: h.nickname,
-    });
-    if (ok) release.mutate(h);
-  };
+  const startRelease = (h: Host) =>
+    setUpdate({ target: { by: "hosts", hosts: [{ id: h.id, nickname: h.nickname, slug: h.oficial_slug, os: osLabel(h) }] }, preset: "release" });
 
   if (isLoading) return <SkeletonTable rows={8} />;
   if (isError) return <StatusAlert variant="error">{(error as Error)?.message}</StatusAlert>;
@@ -81,7 +60,7 @@ export default function HostsOSView({ hosts, isAdmin }: { hosts: Host[]; isAdmin
           </span>
         ))}
         {isAdmin && (
-          <Button size="sm" className="ml-auto" onClick={() => setShowUpdate(true)}>
+          <Button size="sm" className="ml-auto" onClick={() => setUpdate({ target: { by: "groups", groups, hostIds: idsByOS } })}>
             <Icon path={ICON_PATHS.refresh} className="w-3.5 h-3.5" />{t("host.osUpdate.open")}
           </Button>
         )}
@@ -134,9 +113,9 @@ export default function HostsOSView({ hosts, isAdmin }: { hosts: Host[]; isAdmin
                                     {t("host.osUpdate.pendingShort", { text: pendingText(last, t) })}
                                   </span>
                                 )}
-                                {h.os?.reboot_required && <span className="text-[var(--warning)]">{t("host.rebootPending")}</span>}
+                                <OSBadges os={{ reboot_required: h.os?.reboot_required }} backup={backups.get(id)} />
                                 {isAdmin && (
-                                  <button type="button" onClick={() => startRelease(h)} disabled={release.isPending}
+                                  <button type="button" onClick={() => startRelease(h)}
                                     className="text-[var(--text-muted)] hover:text-[var(--danger)] underline-offset-2 hover:underline">
                                     {t("host.osRelease.action")}
                                   </button>
@@ -155,9 +134,9 @@ export default function HostsOSView({ hosts, isAdmin }: { hosts: Host[]; isAdmin
         </table>
       </div>
       {isAdmin && <OSUpdateRuns openId={openRun} onOpen={setOpenRun} />}
-      {showUpdate && (
-        <OSUpdateModal groups={groups} hostIds={idsByOS} onClose={() => setShowUpdate(false)}
-          onStarted={(run) => { setShowUpdate(false); setOpenRun(run.id); }} />
+      {update && (
+        <OSUpdateModal target={update.target} preset={update.preset} onClose={() => setUpdate(null)}
+          onStarted={(run) => { setUpdate(null); setOpenRun(run.id); }} />
       )}
     </div>
   );
