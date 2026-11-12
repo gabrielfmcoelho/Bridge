@@ -25,6 +25,7 @@ const (
 	OSUpdateSecurity = "security" // security upgrades only
 	OSUpdateRelease  = "release"  // next release (osReleaseScript)
 	OSUpdateRestore  = "restore"  // a kept backup back onto its host (osrestore.go)
+	OSUpdateBackup   = "backup"   // back up to MinIO only (Bridge side; no script on the host)
 )
 
 // osUpdateDir holds each run's script, log and exit code on the host.

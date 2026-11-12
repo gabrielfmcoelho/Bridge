@@ -56,6 +56,36 @@ func TestBackupScript_Archives(t *testing.T) {
 	if strings.Contains(got, "big.bin") {
 		t.Errorf("excluded path archived:\n%s", got)
 	}
+
+	// An exclude wins over an include beneath it: excluding docker's root
+	// drops its volumes even when they are listed. To keep the volumes, the
+	// exclude must name the other subdirectories instead (what the UI
+	// suggests, frontend/src/lib/backupPreview.ts).
+	docker := filepath.Join(root, "var/lib/docker")
+	for _, rel := range []string{"volumes/v1/_data/db", "overlay2/l/layer"} {
+		os.MkdirAll(filepath.Dir(filepath.Join(docker, rel)), 0o755)
+		os.WriteFile(filepath.Join(docker, rel), []byte("x"), 0o644)
+	}
+	archive := func(include, exclude []string) string {
+		t.Helper()
+		var out bytes.Buffer
+		cmd := exec.Command("sh", "-c", backupScript(include, exclude))
+		cmd.Stdout = &out
+		if err := cmd.Run(); err != nil {
+			t.Fatal(err)
+		}
+		list := exec.Command("sh", "-c", unz+" | tar -tf -")
+		list.Stdin = &out
+		names, _ := list.Output()
+		return string(names)
+	}
+	if got := archive([]string{root, filepath.Join(docker, "volumes")}, []string{docker}); strings.Contains(got, "volumes/v1") {
+		t.Errorf("an include under an exclude was archived:\n%s", got)
+	}
+	got = archive([]string{root}, []string{filepath.Join(docker, "overlay2")})
+	if !strings.Contains(got, "volumes/v1/_data/db") || strings.Contains(got, "overlay2/l/layer") {
+		t.Errorf("volumes without the layers:\n%s", got)
+	}
 }
 
 func TestBackupResult(t *testing.T) {
