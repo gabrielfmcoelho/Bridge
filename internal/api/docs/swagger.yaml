@@ -702,6 +702,14 @@ definitions:
     properties:
       completename:
         type: string
+      disabled:
+        description: |-
+          Selectable mirrors GLPI's own tree dropdown: group/header nodes (e.g. an
+          ITILCategory that only exists to hold children) come back from GLPI's
+          select2 payload as disabled — GLPI itself refuses to attach a ticket to
+          one, so a catalogue entry scraped with that flag must stay non-pickable
+          here too, or the submission dies later with a bare ERROR_GLPI_ADD.
+        type: boolean
       id:
         type: integer
       name:
@@ -931,6 +939,10 @@ definitions:
       alert_id:
         description: optional — links via alert_chamado_links
         type: integer
+      assign_group_id:
+        type: integer
+      assign_user_id:
+        type: integer
       category_id:
         type: integer
       description:
@@ -940,13 +952,38 @@ definitions:
       host_slug:
         description: optional — persists as host_chamado
         type: string
+      impact:
+        type: integer
       link_computer:
         description: if true + host_slug, find & link GLPI Computer
         type: boolean
+      location_id:
+        type: integer
+      priority:
+        type: integer
       profile_id:
+        type: integer
+      request_type_id:
+        type: integer
+      requester_ids:
+        items:
+          type: integer
+        type: array
+      sla_id_tto:
+        type: integer
+      sla_id_ttr:
         type: integer
       title:
         type: string
+      type:
+        description: 1=incident 2=request
+        type: integer
+      urgency:
+        type: integer
+      watcher_ids:
+        items:
+          type: integer
+        type: array
     type: object
   api.createTicketResponse:
     properties:
@@ -960,6 +997,29 @@ definitions:
         type: string
       warning:
         type: string
+    type: object
+  api.createTicketSeadRequest:
+    properties:
+      category_id:
+        type: integer
+      description:
+        type: string
+      entity_id:
+        type: integer
+      impact:
+        type: integer
+      location_id:
+        type: integer
+      priority:
+        type: integer
+      request_type_id:
+        type: integer
+      title:
+        type: string
+      type:
+        type: integer
+      urgency:
+        type: integer
     type: object
   api.databaseRequest:
     properties:
@@ -3067,6 +3127,29 @@ definitions:
       trace_id:
         type: string
     type: object
+  api.ticketUpdateRequest:
+    properties:
+      category_id:
+        type: integer
+      impact:
+        type: integer
+      location_id:
+        type: integer
+      priority:
+        type: integer
+      sla_id_tto:
+        type: integer
+      sla_id_ttr:
+        type: integer
+      status:
+        type: integer
+      title:
+        type: string
+      type:
+        type: integer
+      urgency:
+        type: integer
+    type: object
   api.toolSyncServiceRequest:
     properties:
       dns_id:
@@ -3447,8 +3530,32 @@ definitions:
       url:
         type: string
     type: object
+  glpi.TicketActor:
+    properties:
+      actor_id:
+        description: users_id or groups_id
+        type: integer
+      id:
+        description: Ticket_User / Group_Ticket row id (for removal)
+        type: integer
+      is_group:
+        type: boolean
+      name:
+        type: string
+      role:
+        description: ActorRequester / ActorObserver / ActorAssign
+        type: integer
+    type: object
   glpi.TicketDetail:
     properties:
+      actors:
+        items:
+          $ref: '#/definitions/glpi.TicketActor'
+        type: array
+      documents:
+        items:
+          $ref: '#/definitions/glpi.TicketDocument'
+        type: array
       event_counts:
         additionalProperties:
           type: integer
@@ -3462,13 +3569,29 @@ definitions:
       requester:
         additionalProperties: {}
         type: object
+      satisfaction:
+        $ref: '#/definitions/glpi.TicketSatisfaction'
       ticket:
         additionalProperties: {}
         type: object
+      validations:
+        items:
+          $ref: '#/definitions/glpi.TicketValidation'
+        type: array
       warnings:
         items:
           type: string
         type: array
+    type: object
+  glpi.TicketDocument:
+    properties:
+      doc_id:
+        type: integer
+      filename:
+        type: string
+      id:
+        description: Document_Item row id (for removal)
+        type: integer
     type: object
   glpi.TicketEvent:
     properties:
@@ -3493,6 +3616,81 @@ definitions:
         type: integer
       user_name:
         type: string
+    type: object
+  glpi.TicketSatisfaction:
+    properties:
+      comment:
+        type: string
+      date_answered:
+        type: string
+      id:
+        type: integer
+      satisfaction:
+        type: integer
+      tickets_id:
+        type: integer
+    type: object
+  glpi.TicketValidation:
+    properties:
+      comment_submission:
+        type: string
+      comment_validation:
+        type: string
+      id:
+        type: integer
+      status:
+        type: integer
+      submission_date:
+        type: string
+      tickets_id:
+        type: integer
+      users_id:
+        description: who requested the validation
+        type: integer
+      users_id_validate:
+        type: integer
+      validation_date:
+        type: string
+    type: object
+  glpiv2.Ref:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  glpiv2.Ticket:
+    properties:
+      category:
+        $ref: '#/definitions/glpiv2.Ref'
+      content:
+        type: string
+      date:
+        type: string
+      date_creation:
+        type: string
+      date_mod:
+        type: string
+      entity:
+        $ref: '#/definitions/glpiv2.Ref'
+      id:
+        type: integer
+      impact:
+        type: integer
+      location:
+        $ref: '#/definitions/glpiv2.Ref'
+      name:
+        type: string
+      priority:
+        type: integer
+      request_type:
+        $ref: '#/definitions/glpiv2.Ref'
+      status:
+        $ref: '#/definitions/glpiv2.Ref'
+      type:
+        type: integer
+      urgency:
+        type: integer
     type: object
   httpx.ErrorResponse:
     properties:
@@ -10914,6 +11112,296 @@ paths:
       summary: Save the caller's GitLab token
       tags:
       - gitlab
+  /api/glpi-sead/administration/{itemtype}/search:
+    get:
+      parameters:
+      - description: GLPI itemtype
+        enum:
+        - User
+        - Entity
+        - Group
+        in: path
+        name: itemtype
+        required: true
+        type: string
+      - description: Substring filter
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Search GLPI SEAD/NTGD users/entities/groups
+      tags:
+      - glpi-sead
+  /api/glpi-sead/dropdowns/{itemtype}/search:
+    get:
+      parameters:
+      - description: GLPI itemtype
+        enum:
+        - ITILCategory
+        - Location
+        - RequestType
+        - TaskCategory
+        in: path
+        name: itemtype
+        required: true
+        type: string
+      - description: Substring filter
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Search a GLPI SEAD/NTGD dropdown
+      tags:
+      - glpi-sead
+  /api/glpi-sead/status:
+    get:
+      description: 'Any role. {enabled: bool}.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: GLPI SEAD/NTGD integration status
+      tags:
+      - glpi-sead
+  /api/glpi-sead/tickets:
+    get:
+      description: Any role. q filters by ticket name substring (RSQL `name=like=`).
+        503 when not configured; 502 when GLPI rejects the call.
+      parameters:
+      - description: Substring filter on ticket name
+        in: query
+        name: q
+        type: string
+      - description: Pagination offset (default 0)
+        in: query
+        name: start
+        type: integer
+      - description: Page size (default 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: List GLPI SEAD/NTGD tickets
+      tags:
+      - glpi-sead
+    post:
+      consumes:
+      - application/json
+      description: Editor+.
+      parameters:
+      - description: Ticket
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.createTicketSeadRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Create a GLPI SEAD/NTGD ticket
+      tags:
+      - glpi-sead
+  /api/glpi-sead/tickets/{id}:
+    get:
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/glpiv2.Ticket'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Get a GLPI SEAD/NTGD ticket
+      tags:
+      - glpi-sead
+  /api/glpi-sead/tickets/{id}/followups:
+    post:
+      consumes:
+      - application/json
+      description: Editor+.
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Followup
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            content:
+              type: string
+            is_private:
+              type: boolean
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Add a followup to a GLPI SEAD/NTGD ticket
+      tags:
+      - glpi-sead
+  /api/glpi-sead/tickets/{id}/team:
+    get:
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: GLPI SEAD/NTGD ticket requesters/observers/assignees
+      tags:
+      - glpi-sead
+  /api/glpi-sead/tickets/{id}/timeline:
+    get:
+      description: Raw timeline rows (followups/tasks/solutions/documents/validations)
+        — each row carries its own `itemtype` field.
+      parameters:
+      - description: Ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: GLPI SEAD/NTGD ticket timeline
+      tags:
+      - glpi-sead
   /api/glpi/documents/{id}:
     get:
       description: Any role. Streams the document through Bridge, forwarding the upstream
@@ -11392,6 +11880,162 @@ paths:
       summary: Get a GLPI ticket
       tags:
       - glpi
+    put:
+      consumes:
+      - application/json
+      description: Editor+. Partial update — omitted fields keep their GLPI value.
+        503 when the GLPI integration is disabled or unconfigured; 502 when GLPI rejects
+        the session or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: Fields to change
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.ticketUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Update a GLPI ticket
+      tags:
+      - glpi
+  /api/glpi/tickets/{id}/actors:
+    post:
+      consumes:
+      - application/json
+      description: Editor+. Exactly one of user_id/group_id must be set; role is 1=requester
+        2=observer 3=assign (groups can't be requesters). 503 when the GLPI integration
+        is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: Actor
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            group_id:
+              type: integer
+            role:
+              type: integer
+            user_id:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Add an actor to a GLPI ticket
+      tags:
+      - glpi
+  /api/glpi/tickets/{id}/actors/{actorId}:
+    delete:
+      description: Editor+. actorId is the Ticket_User/Group_Ticket row id (TicketActor.id
+        from the details response), not the user/group id. 503 when the GLPI integration
+        is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Ticket_User/Group_Ticket row ID
+        in: path
+        name: actorId
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: true if the row is a Group_Ticket rather than a Ticket_User
+        in: query
+        name: is_group
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Remove an actor from a GLPI ticket
+      tags:
+      - glpi
   /api/glpi/tickets/{id}/details:
     get:
       description: Any role. The ticket plus followups, tasks and solutions merged
@@ -11433,6 +12077,365 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: GLPI ticket with its timeline
+      tags:
+      - glpi
+  /api/glpi/tickets/{id}/documents:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Editor+. Forwards the file (max 50 MiB) to GLPI as a Document and
+        links it to the ticket. 503 when the GLPI integration is disabled or unconfigured;
+        502 when GLPI rejects the session or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Attach a file to a GLPI ticket
+      tags:
+      - glpi
+  /api/glpi/tickets/{id}/followups:
+    post:
+      consumes:
+      - application/json
+      description: Editor+. 503 when the GLPI integration is disabled or unconfigured;
+        502 when GLPI rejects the session or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: Followup
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            content:
+              type: string
+            is_private:
+              type: boolean
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Add a followup to a GLPI ticket
+      tags:
+      - glpi
+  /api/glpi/tickets/{id}/satisfaction:
+    put:
+      consumes:
+      - application/json
+      description: Any role (the requester, typically). satisfaction_id comes from
+        the ticket details response. rating is 1-5. 503 when the GLPI integration
+        is disabled or unconfigured; 502 when GLPI rejects the session or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: Answer
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            comment:
+              type: string
+            rating:
+              type: integer
+            satisfaction_id:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Answer a GLPI ticket satisfaction survey
+      tags:
+      - glpi
+  /api/glpi/tickets/{id}/solution:
+    post:
+      consumes:
+      - application/json
+      description: Editor+. 503 when the GLPI integration is disabled or unconfigured;
+        502 when GLPI rejects the session or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: Solution
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            content:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Propose a solution for a GLPI ticket
+      tags:
+      - glpi
+  /api/glpi/tickets/{id}/tasks:
+    post:
+      consumes:
+      - application/json
+      description: Editor+. 503 when the GLPI integration is disabled or unconfigured;
+        502 when GLPI rejects the session or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: Task
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            actiontime:
+              type: integer
+            content:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Add a task to a GLPI ticket
+      tags:
+      - glpi
+  /api/glpi/tickets/{id}/validations:
+    post:
+      consumes:
+      - application/json
+      description: Editor+. 503 when the GLPI integration is disabled or unconfigured;
+        502 when GLPI rejects the session or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: Validation request
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            approver_id:
+              type: integer
+            comment:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Request a validation on a GLPI ticket
+      tags:
+      - glpi
+  /api/glpi/tickets/{id}/validations/{validationId}:
+    put:
+      consumes:
+      - application/json
+      description: Editor+. status is 2 (accepted) or 3 (refused). 503 when the GLPI
+        integration is disabled or unconfigured; 502 when GLPI rejects the session
+        or the call.
+      parameters:
+      - description: GLPI ticket ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: TicketValidation ID
+        in: path
+        name: validationId
+        required: true
+        type: integer
+      - description: GLPI token profile ID whose session is used
+        in: query
+        name: profile_id
+        required: true
+        type: integer
+      - description: Answer
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            comment:
+              type: string
+            status:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Answer a GLPI ticket validation
       tags:
       - glpi
   /api/glpi/users/search:
@@ -18593,7 +19596,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Editor+. mode "generate" makes a new key, "existing" reuses existing_key_path.
+      description: Editor+. mode "generate" makes a new key; "existing" installs the
+        host's vault key (the linked shared key, else its own), or existing_key_path
+        when given.
       parameters:
       - description: Host slug
         in: path

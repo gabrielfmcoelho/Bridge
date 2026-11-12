@@ -3,6 +3,7 @@ package sshsetup
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/pem"
 	"fmt"
 	"regexp"
 	"strings"
@@ -45,5 +46,6 @@ func GenerateKeyPair(host string) (privPEM []byte, pubKeyLine string, err error)
 	_ = pubKey // pubKey used indirectly via signer
 	pubKeyLine = pubKeyStr + " " + base
 
-	return privBlock.Bytes, pubKeyLine, nil
+	// PEM text: ssh.ParsePrivateKey (every login) reads only that, not the block's raw bytes.
+	return pem.EncodeToMemory(privBlock), pubKeyLine, nil
 }

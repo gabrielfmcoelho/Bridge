@@ -14,6 +14,7 @@ type Request struct {
 	Host            string // SSH config Host alias
 	Mode            string // "generate" or "existing"
 	ExistingKeyPath string // Path to existing private key (when Mode="existing")
+	Key             []byte // existing private key PEM (the host's vault key); wins over ExistingKeyPath
 }
 
 // Result holds the outcome of an SSH key setup operation.
@@ -38,6 +39,20 @@ func expandTilde(path string) (string, error) {
 // Execute orchestrates the SSH key setup: optionally generates a keypair,
 // then copies the public key to the remote host via the provided SSH client.
 func Execute(client *ssh.Client, req Request) (*Result, error) {
+	result, err := resolveKey(req)
+	if err != nil {
+		return nil, err
+	}
+	if err := CopyPublicKey(client, result.PubKeyLine); err != nil {
+		return nil, fmt.Errorf("copy public key: %w", err)
+	}
+	return result, nil
+}
+
+// resolveKey is the key a setup installs: a new pair, the given PEM (its
+// public half derived from it, so what's installed is what logs in), or a
+// key pair on disk.
+func resolveKey(req Request) (*Result, error) {
 	var result Result
 
 	switch req.Mode {
@@ -51,6 +66,18 @@ func Execute(client *ssh.Client, req Request) (*Result, error) {
 		result.Generated = true
 
 	case "existing":
+		if len(req.Key) > 0 {
+			signer, err := ssh.ParsePrivateKey(req.Key)
+			if err != nil {
+				return nil, fmt.Errorf("the host's key can't be used to log in: %w", err)
+			}
+			result.PrivKeyPEM = req.Key
+			result.PubKeyLine = strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signer.PublicKey())))
+			return &result, nil
+		}
+		if req.ExistingKeyPath == "" {
+			return nil, fmt.Errorf("no existing key: link a key to the host or generate one")
+		}
 		privPath, err := expandTilde(req.ExistingKeyPath)
 		if err != nil {
 			return nil, err
@@ -70,10 +97,5 @@ func Execute(client *ssh.Client, req Request) (*Result, error) {
 	default:
 		return nil, fmt.Errorf("invalid mode: %q (must be \"generate\" or \"existing\")", req.Mode)
 	}
-
-	if err := CopyPublicKey(client, result.PubKeyLine); err != nil {
-		return nil, fmt.Errorf("copy public key: %w", err)
-	}
-
 	return &result, nil
 }

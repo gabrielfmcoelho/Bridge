@@ -87,14 +87,14 @@ func (h *glpiv2Handlers) handleListTickets(w http.ResponseWriter, r *http.Reques
 //
 //	GET /api/glpi-sead/tickets/{id}
 //
-//	@Summary		Get a GLPI SEAD/NTGD ticket
-//	@Tags			glpi-sead
-//	@Produce		json
-//	@Param			id	path		int	true	"Ticket ID"
-//	@Success		200	{object}	glpiv2.Ticket
-//	@Failure		502	{object}	httpx.ErrorResponse
-//	@Failure		503	{object}	httpx.ErrorResponse
-//	@Router			/api/glpi-sead/tickets/{id} [get]
+//	@Summary	Get a GLPI SEAD/NTGD ticket
+//	@Tags		glpi-sead
+//	@Produce	json
+//	@Param		id	path		int	true	"Ticket ID"
+//	@Success	200	{object}	glpiv2.Ticket
+//	@Failure	502	{object}	httpx.ErrorResponse
+//	@Failure	503	{object}	httpx.ErrorResponse
+//	@Router		/api/glpi-sead/tickets/{id} [get]
 func (h *glpiv2Handlers) handleGetTicket(w http.ResponseWriter, r *http.Request) {
 	client := h.requireClient(w)
 	if client == nil {
@@ -152,14 +152,14 @@ func (h *glpiv2Handlers) handleGetTicketTimeline(w http.ResponseWriter, r *http.
 //
 //	GET /api/glpi-sead/tickets/{id}/team
 //
-//	@Summary		GLPI SEAD/NTGD ticket requesters/observers/assignees
-//	@Tags			glpi-sead
-//	@Produce		json
-//	@Param			id	path		int	true	"Ticket ID"
-//	@Success		200	{object}	map[string]interface{}
-//	@Failure		502	{object}	httpx.ErrorResponse
-//	@Failure		503	{object}	httpx.ErrorResponse
-//	@Router			/api/glpi-sead/tickets/{id}/team [get]
+//	@Summary	GLPI SEAD/NTGD ticket requesters/observers/assignees
+//	@Tags		glpi-sead
+//	@Produce	json
+//	@Param		id	path		int	true	"Ticket ID"
+//	@Success	200	{object}	map[string]interface{}
+//	@Failure	502	{object}	httpx.ErrorResponse
+//	@Failure	503	{object}	httpx.ErrorResponse
+//	@Router		/api/glpi-sead/tickets/{id}/team [get]
 func (h *glpiv2Handlers) handleGetTicketTeam(w http.ResponseWriter, r *http.Request) {
 	client := h.requireClient(w)
 	if client == nil {
@@ -339,16 +339,16 @@ func seadAllowedAdministrationItemtype(t string) bool {
 //
 //	GET /api/glpi-sead/dropdowns/{itemtype}/search?q=<substring>
 //
-//	@Summary		Search a GLPI SEAD/NTGD dropdown
-//	@Tags			glpi-sead
-//	@Produce		json
-//	@Param			itemtype	path		string	true	"GLPI itemtype"	Enums(ITILCategory, Location, RequestType, TaskCategory)
-//	@Param			q			query		string	false	"Substring filter"
-//	@Success		200			{object}	map[string]interface{}
-//	@Failure		400			{object}	httpx.ErrorResponse
-//	@Failure		502			{object}	httpx.ErrorResponse
-//	@Failure		503			{object}	httpx.ErrorResponse
-//	@Router			/api/glpi-sead/dropdowns/{itemtype}/search [get]
+//	@Summary	Search a GLPI SEAD/NTGD dropdown
+//	@Tags		glpi-sead
+//	@Produce	json
+//	@Param		itemtype	path		string	true	"GLPI itemtype"	Enums(ITILCategory, Location, RequestType, TaskCategory)
+//	@Param		q			query		string	false	"Substring filter"
+//	@Success	200			{object}	map[string]interface{}
+//	@Failure	400			{object}	httpx.ErrorResponse
+//	@Failure	502			{object}	httpx.ErrorResponse
+//	@Failure	503			{object}	httpx.ErrorResponse
+//	@Router		/api/glpi-sead/dropdowns/{itemtype}/search [get]
 func (h *glpiv2Handlers) handleSearchDropdown(w http.ResponseWriter, r *http.Request) {
 	itemtype := r.PathValue("itemtype")
 	if !seadAllowedDropdownItemtype(itemtype) {
@@ -373,16 +373,16 @@ func (h *glpiv2Handlers) handleSearchDropdown(w http.ResponseWriter, r *http.Req
 //
 //	GET /api/glpi-sead/administration/{itemtype}/search?q=<substring>
 //
-//	@Summary		Search GLPI SEAD/NTGD users/entities/groups
-//	@Tags			glpi-sead
-//	@Produce		json
-//	@Param			itemtype	path		string	true	"GLPI itemtype"	Enums(User, Entity, Group)
-//	@Param			q			query		string	false	"Substring filter"
-//	@Success		200			{object}	map[string]interface{}
-//	@Failure		400			{object}	httpx.ErrorResponse
-//	@Failure		502			{object}	httpx.ErrorResponse
-//	@Failure		503			{object}	httpx.ErrorResponse
-//	@Router			/api/glpi-sead/administration/{itemtype}/search [get]
+//	@Summary	Search GLPI SEAD/NTGD users/entities/groups
+//	@Tags		glpi-sead
+//	@Produce	json
+//	@Param		itemtype	path		string	true	"GLPI itemtype"	Enums(User, Entity, Group)
+//	@Param		q			query		string	false	"Substring filter"
+//	@Success	200			{object}	map[string]interface{}
+//	@Failure	400			{object}	httpx.ErrorResponse
+//	@Failure	502			{object}	httpx.ErrorResponse
+//	@Failure	503			{object}	httpx.ErrorResponse
+//	@Router		/api/glpi-sead/administration/{itemtype}/search [get]
 func (h *glpiv2Handlers) handleSearchAdministration(w http.ResponseWriter, r *http.Request) {
 	itemtype := r.PathValue("itemtype")
 	if !seadAllowedAdministrationItemtype(itemtype) {
