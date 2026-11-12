@@ -748,7 +748,7 @@ export const osUpdateAPI = {
   /** Per host, the newest run that counted pending upgrades. */
   latest: () => api.get<import("./types").OSUpdateResult[]>("/api/ssh/os-updates/latest"),
   /** Whether hosts can be backed up to MinIO first, and what a backup takes. */
-  config: () => api.get<{ backup_available: boolean; backup_include: string[]; backup_exclude: string[] }>("/api/ssh/os-updates/config"),
+  config: () => api.get<{ backup_available: boolean; backup_include: string[]; backup_exclude: string[]; retention_days: number }>("/api/ssh/os-updates/config"),
   /** A one-hour link straight to MinIO that downloads a kept backup. */
   backupLink: (runId: number, hostId: number) =>
     api.get<{ url: string; key: string; size?: number; expires_in: number }>(`/api/ssh/os-updates/runs/${runId}/hosts/${hostId}/backup`),
@@ -1461,7 +1461,7 @@ export const integrationsAPI = {
       name?: string;
       org_id?: number;
     }>("/api/settings/integrations/test/grafana", data ?? {}),
-  testMinio: () => api.post<{ success: boolean; error?: string; bucket?: string }>("/api/settings/integrations/test/minio", {}),
+  testMinio: () => api.post<{ success: boolean; error?: string; bucket?: string; retention_days?: number; lifecycle_error?: string }>("/api/settings/integrations/test/minio", {}),
   testOutline: (data?: { base_url?: string; token?: string }) =>
     api.post<{
       success: boolean;

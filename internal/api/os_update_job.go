@@ -252,20 +252,22 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 	if run.Kind != sshtest.OSUpdateCheck {
 		res.Upgradable, res.SecurityUpgradable = rep.Remaining, rep.RemainingSecurity
 	}
+	// A failed update still rescans: apt may have changed half the packages.
+	// A skip changed nothing, so it doesn't.
 	switch {
 	case exitCode != 0:
 		res.Reason = rep.Error
 		if res.Reason == "" {
 			res.Reason = "exit " + strconv.Itoa(exitCode)
 		}
-		return res
 	case rep.Skip != "":
 		res.Status, res.Reason = models.OSResultSkipped, rep.Skip
 		return res
+	default:
+		res.Status = models.OSResultSuccess
 	}
-	res.Status = models.OSResultSuccess
 
-	if run.Reboot && rep.RebootRequired && run.Kind != sshtest.OSUpdateCheck {
+	if res.Status == models.OSResultSuccess && run.Reboot && rep.RebootRequired && run.Kind != sshtest.OSUpdateCheck {
 		if c, err := dial(); err != nil {
 			res.Reason = "reboot: SSH connect: " + err.Error()
 		} else {
@@ -280,8 +282,8 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 		}
 	}
 
-	// Rescan, so the OS map, dependencies and EOL show the new state; after a
-	// reboot, wait for SSH to come back first.
+	// Rescan (after a success or a failure), so the OS map, dependencies and
+	// EOL show the host as it is now; after a reboot, wait for SSH first.
 	client = waitForSSH(dial, res.Rebooted)
 	if client == nil {
 		res.Reason = joinReason(res.Reason, "the host did not answer SSH after the update")
@@ -296,7 +298,7 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 	h.recordScan(ctx, host, info, map[string]any{})
 	res.OSAfter, res.RebootRequired = info.OS, info.RebootRequired
 	// Updated, and the host answered and rescanned: the backup has done its job.
-	if res.BackupStatus == models.OSBackupDone && !run.KeepBackup {
+	if res.Status == models.OSResultSuccess && res.BackupStatus == models.OSBackupDone && !run.KeepBackup {
 		if c, _, err := h.minio(); err != nil {
 			res.Reason = joinReason(res.Reason, "backup kept: "+err.Error())
 		} else if err := c.Delete(ctx, res.BackupKey); err != nil {
@@ -496,6 +498,17 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 	if u := auth.UserFromContext(r.Context()); u != nil {
 		run.RequestedBy = &u.ID
 	}
+	if run.Backup {
+		// Re-apply the retention (the setting may have changed); best effort:
+		// a key that can't manage lifecycle still backs up.
+		if c, _, err := h.minio(); err == nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			if err := c.EnsureLifecycle(ctx); err != nil {
+				log.Printf("[osupdate] backup lifecycle rule: %v", err)
+			}
+			cancel()
+		}
+	}
 	repo := store.NewOSUpdateRepo(h.db.SQL)
 	if err := repo.CreateRun(r.Context(), &run, req.HostIDs); err != nil {
 		jsonServerError(w, r, "failed to create the run", err)
@@ -607,7 +620,7 @@ func (h *sshHandlers) handleLatestOSUpdates(w http.ResponseWriter, r *http.Reque
 //	@Router			/api/ssh/os-updates/config [get]
 func (h *sshHandlers) handleOSUpdateConfig(w http.ResponseWriter, r *http.Request) {
 	_, s, err := h.minio()
-	jsonOK(w, map[string]any{"backup_available": err == nil, "backup_include": s.Include, "backup_exclude": s.Exclude})
+	jsonOK(w, map[string]any{"backup_available": err == nil, "backup_include": s.Include, "backup_exclude": s.Exclude, "retention_days": s.RetentionDays})
 }
 
 // osBackupFromPath loads {id}/{host_id}'s result when it has a backup in

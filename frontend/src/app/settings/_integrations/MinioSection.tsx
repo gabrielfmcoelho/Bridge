@@ -43,6 +43,8 @@ export default function MinioSection() {
         <Input label={t("settings.integrations.minio.prefix")} value={f.form.osbackup_prefix ?? ""}
           onChange={(e) => f.set("osbackup_prefix", e.target.value)} placeholder="bridge/os-backups" />
       </div>
+      <Input label={t("settings.integrations.minio.retention")} type="number" min={0} value={f.form.osbackup_retention_days ?? ""}
+        onChange={(e) => f.set("osbackup_retention_days", e.target.value)} placeholder="30" hint={t("settings.integrations.minio.retentionHint")} />
       <Textarea label={t("settings.integrations.minio.include")} rows={2} value={f.form.osbackup_include ?? ""}
         onChange={(e) => f.set("osbackup_include", e.target.value)} placeholder="/" hint={t("settings.integrations.minio.includeHint")} />
       <Textarea label={t("settings.integrations.minio.exclude")} rows={3} value={f.form.osbackup_exclude ?? ""}
@@ -52,7 +54,10 @@ export default function MinioSection() {
         run={async () => {
           const res = await integrationsAPI.testMinio();
           if (!res.success) return { success: false, message: failedLine(t, res.error) };
-          return { success: true, message: t("settings.integrations.minio.bucketOk", { bucket: res.bucket ?? "" }) };
+          const ok = t("settings.integrations.minio.bucketOk", { bucket: res.bucket ?? "" });
+          // The bucket works; the lifecycle rule is a separate permission.
+          if (res.lifecycle_error) return { success: false, message: `${ok} · ${t("settings.integrations.minio.lifecycleFailed", { error: res.lifecycle_error })}` };
+          return { success: true, message: `${ok} · ${res.retention_days ? t("settings.integrations.minio.lifecycleOk", { days: String(res.retention_days) }) : t("settings.integrations.minio.lifecycleOff")}` };
         }}
       />
     </IntegrationCard>

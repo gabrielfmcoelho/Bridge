@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/minio/minio-go/v7/pkg/lifecycle"
 )
 
 func TestHostPortAndReady(t *testing.T) {
@@ -53,5 +55,32 @@ func TestDownloadURLAndKey(t *testing.T) {
 	}
 	if _, err := New(Settings{Endpoint: "e:9000", PublicURL: "::bad", AccessKey: "a", SecretKey: "s"}); err == nil {
 		t.Fatal("a bad public URL must error")
+	}
+}
+
+// Bridge's rule is added, updated in place or removed; the bucket's other
+// rules (the datalake's) are never touched.
+func TestWithBackupRule(t *testing.T) {
+	theirs := lifecycle.Rule{ID: "datalake-tmp", Status: "Enabled", RuleFilter: lifecycle.Filter{Prefix: "tmp/"}, Expiration: lifecycle.Expiration{Days: 7}}
+
+	rules := withBackupRule([]lifecycle.Rule{theirs}, "/bridge/os-backups/", 30)
+	if len(rules) != 2 || rules[0].ID != "datalake-tmp" || rules[0].Expiration.Days != 7 {
+		t.Fatalf("their rule changed: %+v", rules)
+	}
+	mine := rules[1]
+	if mine.ID != lifecycleRuleID || mine.Status != "Enabled" || mine.RuleFilter.Prefix != "bridge/os-backups/" ||
+		mine.Expiration.Days != 30 || mine.AbortIncompleteMultipartUpload.DaysAfterInitiation != 1 {
+		t.Fatalf("bridge rule = %+v", mine)
+	}
+
+	// A new retention replaces Bridge's rule, never duplicates it.
+	rules = withBackupRule(rules, "bridge/os-backups", 7)
+	if len(rules) != 2 || rules[1].Expiration.Days != 7 {
+		t.Fatalf("updated = %+v", rules)
+	}
+	// 0 = keep forever: Bridge's rule goes, theirs stays.
+	rules = withBackupRule(rules, "bridge/os-backups", 0)
+	if len(rules) != 1 || rules[0].ID != "datalake-tmp" {
+		t.Fatalf("removed = %+v", rules)
 	}
 }

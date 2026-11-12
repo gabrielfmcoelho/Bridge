@@ -684,6 +684,8 @@
       "failed": "Não foi possível iniciar a troca de versão"
     },
     "osUpdate": {
+      "retention": "Backups mantidos expiram depois de {days} dias.",
+      "retentionOff": "Backups mantidos nunca expiram: apague-os aqui.",
       "backup": "Fazer backup no MinIO antes",
       "backupHint": "Envia {paths} (sem os caminhos excluídos e os sistemas de arquivos virtuais e de rede) para o MinIO antes de mexer no host. Se o backup falhar, o host não é atualizado.",
       "keepBackup": "Manter o backup depois do sucesso",
@@ -1789,6 +1791,11 @@
     },
     "integrations": {
       "minio": {
+        "retention": "Manter backups por (dias)",
+        "retentionHint": "Uma regra de ciclo de vida no prefixo apaga backups mais antigos que isso; 0 mantém até serem apagados à mão. Aplicada ao testar e quando começa uma execução com backup; as outras regras do bucket são mantidas.",
+        "lifecycleOk": "backups expiram depois de {days} dias",
+        "lifecycleOff": "backups nunca expiram",
+        "lifecycleFailed": "regra de ciclo de vida não aplicada: {error}",
         "hint": "Onde as execuções de atualização guardam o backup dos hosts antes de mexer neles; hosts que falharam mantêm o seu, para baixar pela execução.",
         "ariaEnable": "Ativar backups no MinIO",
         "endpoint": "Endpoint (host:porta que o Bridge alcança)",

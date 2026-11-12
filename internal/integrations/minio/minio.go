@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	mc "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/minio/minio-go/v7/pkg/lifecycle"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
@@ -24,6 +26,8 @@ const (
 	DefaultInclude = "/"
 	DefaultExclude = "/tmp /var/tmp /var/cache /var/lib/docker /var/lib/containerd /swapfile /swap.img /var/lib/bridge-osupdate /lost+found"
 	DefaultPrefix  = "bridge/os-backups"
+	// DefaultRetentionDays: kept backups expire after this many days.
+	DefaultRetentionDays = 30
 )
 
 // Settings is the minio_* group (app_settings; the secret key encrypted).
@@ -38,6 +42,9 @@ type Settings struct {
 	Prefix    string
 	Include   []string // paths backed up (osbackup_include)
 	Exclude   []string // paths left out (osbackup_exclude)
+	// RetentionDays: backups under Prefix expire after this many days (a
+	// bucket lifecycle rule); 0 keeps them until deleted by hand.
+	RetentionDays int
 }
 
 // LoadSettings reads the minio_* and osbackup_* settings.
@@ -63,6 +70,10 @@ func LoadSettings(db *sql.DB, enc *database.Encryptor) (Settings, error) {
 	}
 	if get("osbackup_exclude") == "" {
 		s.Exclude = strings.Fields(DefaultExclude)
+	}
+	s.RetentionDays = DefaultRetentionDays
+	if n, err := strconv.Atoi(get("osbackup_retention_days")); err == nil && n >= 0 {
+		s.RetentionDays = n
 	}
 	secret, _, err := store.NewAppSecretRepo(db).Reveal(context.Background(), enc, "minio_secret_key")
 	if err != nil {
@@ -162,4 +173,44 @@ func (c *Client) DownloadURL(ctx context.Context, key string, ttl time.Duration)
 		return "", err
 	}
 	return u.String(), nil
+}
+
+// lifecycleRuleID names Bridge's rule among the bucket's (the datalake's
+// bucket may have rules of its own).
+const lifecycleRuleID = "bridge-os-backups"
+
+// withBackupRule returns rules with Bridge's rule set to expire objects under
+// prefix after days (and drop multipart uploads a cut backup left behind
+// after a day); days 0 removes it. Every other rule is kept as is.
+func withBackupRule(rules []lifecycle.Rule, prefix string, days int) []lifecycle.Rule {
+	out := make([]lifecycle.Rule, 0, len(rules)+1)
+	for _, r := range rules {
+		if r.ID != lifecycleRuleID {
+			out = append(out, r)
+		}
+	}
+	if days > 0 {
+		out = append(out, lifecycle.Rule{
+			ID:                             lifecycleRuleID,
+			Status:                         "Enabled",
+			RuleFilter:                     lifecycle.Filter{Prefix: strings.Trim(prefix, "/") + "/"},
+			Expiration:                     lifecycle.Expiration{Days: lifecycle.ExpirationDays(days)},
+			AbortIncompleteMultipartUpload: lifecycle.AbortIncompleteMultipartUpload{DaysAfterInitiation: 1},
+		})
+	}
+	return out
+}
+
+// EnsureLifecycle puts the settings' retention on the bucket as Bridge's
+// lifecycle rule, leaving the bucket's other rules alone. Idempotent.
+func (c *Client) EnsureLifecycle(ctx context.Context) error {
+	cfg, err := c.c.GetBucketLifecycle(ctx, c.s.Bucket)
+	if err != nil {
+		if mc.ToErrorResponse(err).Code != "NoSuchLifecycleConfiguration" {
+			return err
+		}
+		cfg = lifecycle.NewConfiguration()
+	}
+	cfg.Rules = withBackupRule(cfg.Rules, c.s.Prefix, c.s.RetentionDays)
+	return c.c.SetBucketLifecycle(ctx, c.s.Bucket, cfg)
 }
