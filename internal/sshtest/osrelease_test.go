@@ -51,6 +51,10 @@ func (h *releaseHost) run() (OSUpdateReport, string, error) {
 	if err != nil {
 		h.t.Fatal(err)
 	}
+	return h.runScript(script)
+}
+
+func (h *releaseHost) runScript(script string) (OSUpdateReport, string, error) {
 	cmd := exec.Command(filepath.Join(h.path, "sh"), "-c", script)
 	cmd.Env = []string{"PATH=" + h.path, "BRIDGE_ROOT=" + h.root, "LOG=" + filepath.Join(h.root, "calls")}
 	out, err := cmd.CombinedOutput()
@@ -152,7 +156,7 @@ func TestReleaseScript_Ubuntu(t *testing.T) {
 
 // Every refusal skips without touching anything and without a reboot.
 func TestReleaseScript_Skips(t *testing.T) {
-	pending := `case "$1" in list) printf 'curl/jammy-updates 1 amd64 [upgradable from: 0]\n' ;; esac`
+	pending := `case "$*" in *-s*) printf 'Inst curl [0] (1 jammy-updates [amd64])\n' ;; esac`
 	cases := []struct {
 		name, osRelease, free, want string
 		stubs                       map[string]string
@@ -162,7 +166,7 @@ func TestReleaseScript_Skips(t *testing.T) {
 		{"odd year", "ID=ubuntu\nVERSION_ID=\"23.04\"\n", "9000000", "only LTS", nil, false},
 		{"no upgrader", "ID=ubuntu\nVERSION_ID=\"22.04\"\n", "9000000", "not installed", nil, false},
 		{"no newer LTS", "ID=ubuntu\nVERSION_ID=\"24.04\"\n", "9000000", "no newer LTS", map[string]string{"apt-get": "exit 0", "apt": "exit 0", "do-release-upgrade": "exit 1"}, false},
-		{"pending packages", bookworm, "9000000", "run a package update first", map[string]string{"apt-get": "exit 0", "apt": pending}, false},
+		{"pending packages", bookworm, "9000000", "1 packages waiting", map[string]string{"apt-get": pending}, false},
 		{"low disk", bookworm, "1000", "5 GB", nil, false},
 		{"reboot pending", bookworm, "9000000", "reboot is pending", nil, true},
 		{"unknown debian", "ID=debian\nVERSION_ID=\"13\"\nVERSION_CODENAME=trixie\n", "9000000", "no supported next release", nil, false},
@@ -180,5 +184,49 @@ func TestReleaseScript_Skips(t *testing.T) {
 				t.Fatalf("err=%v report=%+v\n%s", err, r, out)
 			}
 		})
+	}
+}
+
+// The check-only pass changes nothing and ends with @@ready. A package that
+// "apt list" still shows but an update wouldn't install (Ubuntu's phased
+// updates) doesn't count as waiting.
+func TestReleasePrecheck(t *testing.T) {
+	const sources = "deb mirror bookworm main\n"
+	listed := `case "$1" in list) printf 'curl/jammy-updates 1 amd64 [upgradable from: 0]\n' ;; esac`
+	h := newReleaseHost(t, bookworm, "9000000", map[string]string{"apt-get": aptGetStub(""), "apt": listed})
+	h.write("etc/apt/sources.list", sources)
+	r, out, err := h.runScript(ReleasePrecheck(false))
+	if err != nil || !r.Ready || r.Skip != "" || r.RebootRequired {
+		t.Fatalf("precheck: %v %+v\n%s", err, r, out)
+	}
+	if h.read("etc/apt/sources.list") != sources || h.read("etc/apt.bridge-backup-bookworm/sources.list") != "" {
+		t.Fatal("the check changed the host")
+	}
+	if calls := h.read("calls"); strings.Contains(calls, "--without-new-pkgs") || strings.Contains(calls, "full-upgrade") {
+		t.Fatalf("calls = %q", calls)
+	}
+
+	// Waiting packages still refuse, before anything is backed up.
+	pending := `echo "apt-get $*" >> "$LOG"; case "$*" in *-s*) printf 'Inst curl [0] (1 x [amd64])\n' ;; esac`
+	h = newReleaseHost(t, bookworm, "9000000", map[string]string{"apt-get": pending})
+	if r, out, _ := h.runScript(ReleasePrecheck(false)); r.Ready || !strings.Contains(r.Skip, "packages waiting") {
+		t.Fatalf("pending: %+v\n%s", r, out)
+	}
+
+	// Updating first: waiting packages and a pending reboot are the update's
+	// job, so the check doesn't even refresh the lists.
+	h = newReleaseHost(t, bookworm, "9000000", map[string]string{"apt-get": pending})
+	h.write("var/run/reboot-required", "")
+	if r, out, err := h.runScript(ReleasePrecheck(true)); err != nil || !r.Ready || r.Skip != "" {
+		t.Fatalf("update first: %v %+v\n%s", err, r, out)
+	}
+	if calls := h.read("calls"); calls != "" {
+		t.Fatalf("update first called apt-get: %q", calls)
+	}
+
+	// The other refusals stay.
+	h = newReleaseHost(t, "ID=debian\nVERSION_ID=\"13\"\nVERSION_CODENAME=trixie\n", "9000000", nil)
+	if r, _, _ := h.runScript(ReleasePrecheck(true)); r.Ready || !strings.Contains(r.Skip, "no supported next release") {
+		t.Fatalf("trixie: %+v", r)
 	}
 }

@@ -36,6 +36,9 @@ type OSUpdateRun struct {
 	Target      string `json:"target,omitempty"`
 	Backup      bool   `json:"backup"`      // back each host up to MinIO first
 	KeepBackup  bool   `json:"keep_backup"` // keep it after a success too
+	// UpdateFirst: a release that updates the packages (and reboots if that
+	// needs it) before changing the version.
+	UpdateFirst bool `json:"update_first,omitempty"`
 	// The run's one-off backup paths (empty = each host's profile, else the defaults).
 	BackupInclude []string `json:"backup_include,omitempty"`
 	BackupExclude []string `json:"backup_exclude,omitempty"`

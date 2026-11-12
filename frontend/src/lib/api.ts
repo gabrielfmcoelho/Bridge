@@ -740,7 +740,7 @@ export const orchestratorsAPI = {
 // SSH
 // OS update runs (admin): background check / package / security upgrades.
 export const osUpdateAPI = {
-  start: (body: { kind: import("./types").OSUpdateKind; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean;
+  start: (body: { kind: import("./types").OSUpdateKind; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean; update_first?: boolean;
     backup_include?: string[]; backup_exclude?: string[] }) =>
     api.post<import("./types").OSUpdateRun>("/api/ssh/os-updates/runs", body),
   /** Newest first; with hostId, only the runs that include that host. */

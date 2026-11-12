@@ -1498,6 +1498,8 @@ export interface OSUpdateRun {
   /** Each host backed up to MinIO first; kept after a success too. */
   backup: boolean;
   keep_backup: boolean;
+  /** A release that updated the packages first, in the same run. */
+  update_first?: boolean;
   /** This run's own backup paths (none = each host's profile, else the defaults). */
   backup_include?: string[];
   backup_exclude?: string[];

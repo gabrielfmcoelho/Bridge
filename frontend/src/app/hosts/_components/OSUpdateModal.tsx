@@ -6,6 +6,7 @@ import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import RadioGroup from "@/components/ui/RadioGroup";
 import CheckboxList from "@/components/ui/CheckboxList";
 import Toggle from "@/components/ui/Toggle";
+import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import FormField from "@/components/ui/FormField";
 import FormFooter from "@/components/ui/FormFooter";
@@ -15,7 +16,8 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useFlag } from "@/contexts/FlagContext";
 import { osUpdateAPI, type VMInfoType } from "@/lib/api";
-import { parsePaths } from "@/lib/backupPreview";
+import { formatBytes, parsePaths } from "@/lib/backupPreview";
+import { getTimeAgo } from "@/lib/utils";
 import type { DependencyGroup, OSUpdateKind, OSUpdateRun } from "@/lib/types";
 import { osKey } from "./osView";
 import BackupPathsEditor from "./BackupPathsEditor";
@@ -39,7 +41,7 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
   onClose: () => void;
   onStarted: (run: OSUpdateRun) => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const confirm = useConfirm();
   const flag = useFlag();
   const queryClient = useQueryClient();
@@ -59,8 +61,20 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
   const backupAvailable = !!config?.backup_available;
   const [backup, setBackup] = useState(true);
   const [keepBackup, setKeepBackup] = useState(false);
-  // A release always backs up when it can; backup-only is nothing but that.
-  const withBackup = kind !== "check" && backupAvailable && (release || backupOnly || backup);
+  // A release on one host: the latest check says whether packages are still
+  // pending (update them first, in the same run, unless it found none), and a
+  // kept full backup (not a restore's undo) may stand in for a new one.
+  const { data: latest = [] } = useQuery({ queryKey: ["os-updates", "latest"], queryFn: osUpdateAPI.latest, enabled: release });
+  const pending = single ? latest.find((x) => x.host_id === single.id)?.upgradable : undefined;
+  const [updateFirstSet, setUpdateFirst] = useState<boolean | null>(null);
+  const updateFirst = release && (updateFirstSet ?? pending !== 0);
+  const { data: kept = [] } = useQuery({ queryKey: ["os-updates", "backups", single?.id], queryFn: () => osUpdateAPI.backups(single!.id),
+    enabled: release && !!single && backupAvailable });
+  const lastBackup = release ? kept.find((x) => x.run_kind !== "restore") : undefined;
+  const lastBackupArgs = lastBackup && { run: String(lastBackup.run_id), when: lastBackup.finished_at ? getTimeAgo(lastBackup.finished_at, locale) : "–",
+    size: formatBytes(lastBackup.backup_size ?? 0) };
+  // Backup-only is nothing but a backup; a release skips its own only with one kept.
+  const withBackup = kind !== "check" && backupAvailable && (backupOnly || backup || (release && !lastBackup));
   // One host: its own paths can be overridden for this run.
   const { data: profile } = useQuery({ queryKey: ["backup-profile", single?.slug], queryFn: () => osUpdateAPI.backupProfile(single!.slug), enabled: !!single && withBackup });
   const [paths, setPaths] = useState({ include: "", exclude: "" });
@@ -72,7 +86,7 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
   const start = useMutation({
     mutationFn: () => osUpdateAPI.start({
       kind, host_ids: targets, reboot: release || (!backupOnly && kind !== "check" && reboot), concurrency: release ? 1 : Math.min(conc || 1, targets.length || 1),
-      backup: withBackup, keep_backup: withBackup && (backupOnly || keepBackup),
+      backup: withBackup, keep_backup: withBackup && (backupOnly || keepBackup), ...(release ? { update_first: updateFirst } : {}),
       ...(withBackup && single ? { backup_include: parsePaths(paths.include), backup_exclude: parsePaths(paths.exclude) } : {}),
     }),
     onSuccess: (run) => {
@@ -87,7 +101,8 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
       // One host, typed name: a release upgrade can leave a VM unbootable.
       const ok = await confirm({
         title: t("host.osRelease.confirmTitle", { host: single.nickname, os: single.os || "?" }),
-        message: `${t("host.osRelease.confirmMessage")} ${withBackup ? t("host.osRelease.withBackup") : t("host.osRelease.noBackup")}`,
+        message: [t("host.osRelease.confirmMessage"), t(updateFirst ? "host.osRelease.confirmUpdateFirst" : "host.osRelease.confirmNoUpdate"),
+          withBackup ? t("host.osRelease.withBackup") : lastBackupArgs ? t("host.osRelease.usesBackup", lastBackupArgs) : t("host.osRelease.noBackup")].join(" "),
         confirmLabel: t("host.osRelease.start"), danger: true, requireText: single.nickname,
       });
       if (!ok) return;
@@ -123,7 +138,20 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
           </FormField>
         )}
 
-        {release && <StatusAlert variant="warning">{t("host.osRelease.modalHint")}</StatusAlert>}
+        {release && (
+          <>
+            <StatusAlert variant="warning">{t("host.osRelease.modalHint")}</StatusAlert>
+            <FormField label={t("host.osRelease.updateFirst")} hint={t("host.osRelease.updateFirstHint")}>
+              <Toggle checked={updateFirst} onChange={setUpdateFirst} ariaLabel={t("host.osRelease.updateFirst")} />
+            </FormField>
+            {!updateFirst && !!pending && (
+              <StatusAlert variant="warning">
+                <span className="block mb-2">{t("host.osRelease.pendingWarn", { count: String(pending) })}</span>
+                <Button size="sm" variant="secondary" onClick={() => setKind("packages")}>{t("host.osRelease.onlyUpdate")}</Button>
+              </StatusAlert>
+            )}
+          </>
+        )}
         {kind !== "check" && !backupOnly && !release && (
           <FormField label={t("host.osUpdate.reboot")} hint={t("host.osUpdate.rebootHint")}>
             <Toggle checked={reboot} onChange={setReboot} ariaLabel={t("host.osUpdate.reboot")} />
@@ -132,9 +160,10 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
 
         {kind !== "check" && (backupAvailable ? (
           <>
-            {!release && !backupOnly && (
-              <FormField label={t("host.osUpdate.backup")} hint={t("host.osUpdate.backupHintProfile")}>
-                <Toggle checked={backup} onChange={setBackup} ariaLabel={t("host.osUpdate.backup")} />
+            {!backupOnly && (!release || lastBackupArgs) && (
+              <FormField label={t(release ? "host.osRelease.newBackup" : "host.osUpdate.backup")}
+                hint={lastBackupArgs ? t("host.osRelease.newBackupHint", lastBackupArgs) : t("host.osUpdate.backupHintProfile")}>
+                <Toggle checked={backup} onChange={setBackup} ariaLabel={t(release ? "host.osRelease.newBackup" : "host.osUpdate.backup")} />
               </FormField>
             )}
             {withBackup && !backupOnly && (

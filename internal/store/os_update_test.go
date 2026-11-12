@@ -133,6 +133,15 @@ func TestOSUpdateRepo_Lifecycle(t *testing.T) {
 	if all, _ := repo.KeptBackups(ctx, 0); len(all) != 1 || all[0].HostID != hosts[1] {
 		t.Fatalf("latest kept = %+v", all)
 	}
+
+	// A chained release remembers that it updates the packages first.
+	rrun := &models.OSUpdateRun{Kind: "release", Concurrency: 1, Reboot: true, UpdateFirst: true}
+	if err := repo.CreateRun(ctx, rrun, hosts[:1]); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := repo.GetRun(ctx, rrun.ID); got == nil || !got.UpdateFirst {
+		t.Fatalf("release run = %+v", got)
+	}
 	if none, _ := repo.KeptBackups(ctx, hosts[0]); len(none) != 0 {
 		t.Fatalf("a deleted backup is not kept: %+v", none)
 	}
