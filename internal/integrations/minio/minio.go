@@ -214,3 +214,13 @@ func (c *Client) EnsureLifecycle(ctx context.Context) error {
 	cfg.Rules = withBackupRule(cfg.Rules, c.s.Prefix, c.s.RetentionDays)
 	return c.c.SetBucketLifecycle(ctx, c.s.Bucket, cfg)
 }
+
+// FetchURL is a link to key, valid for ttl, signed for the endpoint Bridge
+// uses (the hosts reach MinIO there too): what a restore downloads from.
+func (c *Client) FetchURL(ctx context.Context, key string, ttl time.Duration) (string, error) {
+	u, err := c.c.PresignedGetObject(ctx, c.s.Bucket, key, ttl, nil)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
+}

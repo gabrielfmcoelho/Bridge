@@ -476,6 +476,23 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     mockOSRuns.unshift(run);
     return json(run, 202);
   }
+  if (p === "ssh/os-updates/restores" && method === "POST") {
+    const body = await readJSON<{ run_id: number; host_id: number; mode: "staging" | "paths"; paths: string[] }>(request);
+    const src = mockOSRuns.find((r) => r.id === body.run_id)?.results?.find((x) => x.host_id === body.host_id);
+    if (!src || src.backup_status !== "done") return json({ error: "no backup kept for this host in this run" }, 404);
+    const id = mockOSRuns.length + 1;
+    const now = new Date().toISOString();
+    const inPlace = body.mode === "paths";
+    const result: OSUpdateResult = { ...src, run_id: id, status: "success", reason: undefined, upgradable: undefined, security_upgradable: undefined, upgraded: undefined,
+      rebooted: false, reboot_required: false, output: `@@restored_to ${inPlace ? "/" : `/var/lib/bridge-restore/run-${id}`}\n`, started_at: now, finished_at: now,
+      ...(inPlace ? { backup_key: `bridge/os-backups/${src.host_slug}/run${id}.tar.zst`, backup_size: 52_000_000, backup_status: "done" as const }
+        : { backup_key: undefined, backup_size: undefined, backup_status: undefined }) };
+    const run: OSUpdateRun = { id, kind: "restore", reboot: false, concurrency: 1, status: "done", requested_name: "Mock", backup: inPlace, keep_backup: inPlace,
+      restore_mode: body.mode, restore_paths: body.paths, source_run_id: body.run_id, source_host_id: body.host_id,
+      created_at: now, finished_at: now, counts: { success: 1 }, results: [result] };
+    mockOSRuns.unshift(run);
+    return json(run, 202);
+  }
   if (p === "ssh/os-updates/config" && method === "GET") return json({ backup_available: true, backup_include: ["/"], backup_exclude: ["/tmp", "/var/cache", "/var/lib/docker"], retention_days: 30 });
   const backupPath = p.match(/^ssh\/os-updates\/runs\/(\d+)\/hosts\/(\d+)\/backup$/);
   if (backupPath) {

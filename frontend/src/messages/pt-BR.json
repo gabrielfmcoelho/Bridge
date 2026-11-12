@@ -648,6 +648,35 @@
     "idleHint": "Uma VM ociosa não tem serviços de aplicação implantados pelo usuário e nenhum container Docker. Passe o mouse sobre a chip de cada card para ver as regras."
   },
   "host": {
+    "osRestore": {
+      "open": "Restaurar…",
+      "title": "Restaurar o backup de {host}",
+      "start": "Restaurar",
+      "mode": "Onde",
+      "modeStaging": "Numa pasta para revisão (não altera mais nada)",
+      "modePaths": "Caminhos escolhidos, no lugar",
+      "modeHint": {
+        "staging": "Extraído em /var/lib/bridge-restore/run-<id> no host, legível só pelo root. Compare ou copie o que precisar à mão.",
+        "paths": "Os caminhos escolhidos são guardados antes no MinIO (mantido: essa cópia desfaz a restauração) e depois substituídos pela versão do backup. Arquivos que o backup não tem ficam como estão."
+      },
+      "paths": "Caminhos a restaurar",
+      "pathsOptional": "Caminhos a restaurar (opcional: vazio = tudo)",
+      "pathsHint": "Caminhos absolutos, separados por espaço ou linha.",
+      "absolute": "Use caminhos absolutos (começando com /).",
+      "noRoot": "Restaurar todo o / no lugar não é suportado: escolha caminhos ou use a pasta de revisão.",
+      "pathsRequired": "Escolha pelo menos um caminho.",
+      "warning": "Serviços em execução continuam usando o que já carregaram: reinicie-os (ou o host) depois de restaurar os arquivos deles.",
+      "confirmTitle": "Substituir estes caminhos em {host}?",
+      "confirmMessage": "{paths} serão substituídos pela versão do backup. Antes, são guardados no MinIO.",
+      "modeShort": {
+        "staging": "pasta de revisão",
+        "paths": "no lugar"
+      },
+      "summary": {
+        "staging": "Restauração do backup da execução #{run} na pasta de revisão (caminhos: {paths}).",
+        "paths": "Restauração do backup da execução #{run} sobre {paths}. O backup desta execução é o que esses caminhos tinham antes: restaure-o para desfazer."
+      }
+    },
     "title": "Hosts",
     "idle": "VM ociosa",
     "idleTooltipPrefix": "Sinalizado como ocioso:",
@@ -735,6 +764,7 @@
       "hosts": "Hosts",
       "when": "Quando",
       "kindShort": {
+        "restore": "Restauração",
         "check": "Verificação",
         "packages": "Pacotes",
         "security": "Segurança",
