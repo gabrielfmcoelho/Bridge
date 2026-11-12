@@ -122,6 +122,7 @@ export function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () 
           {t("host.backup.runPaths", { include: (run.backup_include ?? []).join(" ") || t("host.backup.inherited"), exclude: (run.backup_exclude ?? []).join(" ") || t("host.backup.inherited") })}
         </p>
       )}
+      {run?.update_first && <p className="text-xs text-[var(--text-secondary)] mb-3">{t("host.osRelease.runUpdateFirst")}</p>}
       {run?.kind === "restore" && (
         <p className="text-xs text-[var(--text-secondary)] mb-3">
           {t(`host.osRestore.summary.${run.restore_mode ?? "staging"}`, { paths: (run.restore_paths ?? []).join(" ") || "/", run: String(run.source_run_id ?? "") })}

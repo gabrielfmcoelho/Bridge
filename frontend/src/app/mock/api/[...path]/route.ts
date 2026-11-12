@@ -481,8 +481,8 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   // ponytail: module memory, not reset by __reset.
   if (p === "ssh/os-updates/runs" && method === "POST") {
     const body = await readJSON<{ kind: OSUpdateRun["kind"]; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean;
-      backup_include?: string[]; backup_exclude?: string[] }>(request);
-    const backup = body.kind === "release" || body.kind === "backup" || (body.kind !== "check" && !!body.backup);
+      backup_include?: string[]; backup_exclude?: string[]; update_first?: boolean }>(request);
+    const backup = body.kind === "backup" || (body.kind !== "check" && !!body.backup);
     if (body.kind === "backup") { body.keep_backup = true; body.reboot = false; }
     const id = mockOSRuns.length + 1;
     const now = new Date().toISOString();
@@ -502,7 +502,7 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
           backup_include: body.backup_include?.length ? body.backup_include : eff.include, backup_exclude: body.backup_exclude?.length ? body.backup_exclude : eff.exclude } : {}) };
     });
     const run: OSUpdateRun = { id, kind: body.kind, reboot: body.reboot, concurrency: body.concurrency, status: "done", requested_name: "Mock",
-      backup, keep_backup: backup && !!body.keep_backup,
+      backup, keep_backup: backup && !!body.keep_backup, update_first: body.kind === "release" && !!body.update_first,
       backup_include: body.backup_include?.length ? body.backup_include : undefined, backup_exclude: body.backup_exclude?.length ? body.backup_exclude : undefined,
       created_at: now, finished_at: now, counts: { success: results.length }, results };
     mockOSRuns.unshift(run);

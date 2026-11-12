@@ -2220,4 +2220,8 @@ var migrationsPostgres = []string{
 	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS backup_exclude TEXT;
 	ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS backup_include TEXT NOT NULL DEFAULT '';
 	ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS backup_exclude TEXT NOT NULL DEFAULT '';`,
+
+	// Version 128: a release run may update the host's packages first, in
+	// the same run (update, reboot if needed, then the release).
+	`ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS update_first BOOLEAN NOT NULL DEFAULT FALSE;`,
 }

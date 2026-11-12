@@ -273,9 +273,13 @@ func TestOSUpdateRuns_Backup(t *testing.T) {
 	if _, cfg := call("GET", "/api/ssh/os-updates/config", ""); cfg["backup_available"] != true {
 		t.Fatalf("config with MinIO = %v", cfg)
 	}
-	code, run := call("POST", "/api/ssh/os-updates/runs", `{"kind":"release","backup":false,"host_ids":`+hosts+`}`)
+	// A release with no backup to go back to can't skip its own.
+	if code, out := call("POST", "/api/ssh/os-updates/runs", `{"kind":"release","backup":false,"host_ids":`+hosts+`}`); code != http.StatusBadRequest {
+		t.Fatalf("release without any backup = %d %v", code, out)
+	}
+	code, run := call("POST", "/api/ssh/os-updates/runs", `{"kind":"release","backup":true,"host_ids":`+hosts+`}`)
 	if code != http.StatusAccepted || run["backup"] != true {
-		t.Fatalf("release forces backup = %d %v", code, run)
+		t.Fatalf("release with backup = %d %v", code, run)
 	}
 	id := int64(run["id"].(float64))
 	for range 100 {
@@ -485,6 +489,10 @@ func TestHostBackups_Handlers(t *testing.T) {
 		settings.Set(ctx, k, v)
 	}
 	store.NewAppSecretRepo(d.SQL).Store(ctx, d.Encryptor, "minio_secret_key", "sk")
+	// No kept backup yet: a version change must take one.
+	if code, raw := call("POST", "/api/ssh/os-updates/runs", `{"kind":"release","backup":false,"host_ids":`+hosts+`}`); code != http.StatusBadRequest || !strings.Contains(raw, "no kept backup") {
+		t.Fatalf("release without any backup = %d %s", code, raw)
+	}
 	if code, _ := call("POST", "/api/ssh/os-updates/runs", `{"kind":"backup","backup_include":["etc"],"host_ids":`+hosts+`}`); code != http.StatusBadRequest {
 		t.Fatalf("relative override = %d", code)
 	}
@@ -525,6 +533,29 @@ func TestHostBackups_Handlers(t *testing.T) {
 	}
 	if _, raw = call("GET", "/api/ssh/os-updates/runs?host_id=9999", ""); strings.TrimSpace(raw) != "[]" {
 		t.Fatalf("other host runs = %s", raw)
+	}
+
+	// With a kept backup, a version change may go without a new one, and
+	// update the packages first. update_first is a release's only.
+	code, raw = call("POST", "/api/ssh/os-updates/runs", `{"kind":"release","backup":false,"update_first":true,"host_ids":`+hosts+`}`)
+	var rel models.OSUpdateRun
+	if json.Unmarshal([]byte(raw), &rel); code != http.StatusAccepted || rel.Backup || !rel.UpdateFirst || !rel.Reboot {
+		t.Fatalf("release on the kept backup = %d %s", code, raw)
+	}
+	if got := <-ran; !got.UpdateFirst || got.Backup {
+		t.Fatalf("runner got %+v", got)
+	}
+	code, raw = call("POST", "/api/ssh/os-updates/runs", `{"kind":"packages","update_first":true,"host_ids":`+hosts+`}`)
+	rel = models.OSUpdateRun{}
+	if json.Unmarshal([]byte(raw), &rel); code != http.StatusAccepted || rel.UpdateFirst {
+		t.Fatalf("packages with update_first = %d %s", code, raw)
+	}
+	<-ran
+	for range 100 {
+		if x, _ := store.NewOSUpdateRepo(d.SQL).GetResult(ctx, rel.ID, hostID); x != nil && x.FinishedAt != nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 
 	// The connection's group holds no feature settings, and the reverse.

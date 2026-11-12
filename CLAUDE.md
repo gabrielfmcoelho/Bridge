@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v127**. Use idempotent idioms:
+per element, currently at **v128**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -251,7 +251,15 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   Ubuntu LTS → LTS, Debian N → N+1 (codename rewritten in the apt sources,
   `/etc/apt` backed up and restored only if the new lists can't be fetched),
   Alpine 3.x → 3.x+1; RHEL family is skipped. It skips, changing nothing,
-  with a reboot pending, < 5 GB on `/` or packages still waiting. Its tests
+  with a reboot pending, < 5 GB on `/` or packages still waiting (what
+  `apt-get -s upgrade --with-new-pkgs` would install — Ubuntu's phased updates
+  stay in `apt list --upgradable` after an update). Those checks run first,
+  as their own detached pass (`ReleasePrecheck`, `@@ready` right before the
+  first change), so a refusal never costs a backup. `update_first` (v128)
+  chains a package update and, when it asks, a reboot before the release in
+  the same run. With MinIO set up a release backs up unless the request says
+  `backup: false` **and** the host has a kept backup that isn't a restore's
+  undo (`lastFullBackup`, checked in MinIO); otherwise 400. Its tests
   run it on a fake root through `BRIDGE_ROOT`.
   Host backups — who owns what: the **MinIO integration** (`internal/integrations/minio`,
   settings group `minio`) is the connection only (endpoint, public URL, keys,
