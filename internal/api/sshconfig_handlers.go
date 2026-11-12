@@ -593,7 +593,7 @@ type sshSetupKeyRequest struct {
 // handleSetupKey sets up an SSH key for a host.
 //
 //	@Summary		Install an SSH key on a host
-//	@Description	Editor+. mode "generate" makes a new key, "existing" reuses existing_key_path.
+//	@Description	Editor+. mode "generate" makes a new key; "existing" installs the host's vault key (the linked shared key, else its own), or existing_key_path when given.
 //	@Tags			ssh
 //	@Accept			json
 //	@Produce		json
@@ -640,11 +640,24 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existingKeyPath := req.ExistingKeyPath
-	// If using "existing" mode and no explicit path was given, use the host's
-	// current key_path (already set by linkSSHKey when the key was linked).
-	if req.Mode == "existing" && existingKeyPath == "" && host.KeyPath != "" {
-		existingKeyPath = host.KeyPath
+	setupReq := sshsetup.Request{
+		Host:            host.OficialSlug,
+		Mode:            req.Mode,
+		ExistingKeyPath: req.ExistingKeyPath,
+	}
+	// "existing" with no path installs the host's vault key: the shared key
+	// just linked to it (key_secret_id), else its own. Keys never live on disk.
+	if req.Mode == "existing" && req.ExistingKeyPath == "" {
+		key, ok, err := vault.HostGetSSHKey(r.Context(), h.db, host.ID)
+		if err != nil {
+			jsonServerError(w, r, "failed to read the host's key", err)
+			return
+		}
+		if !ok || key.PrivateKeyPEM == "" {
+			jsonError(w, http.StatusBadRequest, "this host has no key in the vault: link one or generate one")
+			return
+		}
+		setupReq.Key = []byte(key.PrivateKeyPEM)
 	}
 
 	// Dial with password auth for the initial key copy
@@ -654,12 +667,6 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer client.Close()
-
-	setupReq := sshsetup.Request{
-		Host:            host.OficialSlug,
-		Mode:            req.Mode,
-		ExistingKeyPath: existingKeyPath,
-	}
 
 	result, err := sshsetup.Execute(client, setupReq)
 	if err != nil {
@@ -676,9 +683,13 @@ func (h *sshHandlers) handleSetupKey(w http.ResponseWriter, r *http.Request) {
 	// use the host's linked key only. key_path is empty — keys live only
 	// in the unified vault, never on the filesystem.
 	_ = store.NewHostRepo(h.db.SQL).UpdateKeyMeta(r.Context(), host.ID, true, "", "yes")
-	if vErr := vault.HostSetSSHKey(r.Context(), h.db, host.ID, actorID(r),
-		vault.HostSSHKey{PrivateKeyPEM: string(result.PrivKeyPEM), PublicKey: result.PubKeyLine}); vErr != nil {
-		log.Printf("[ssh] setup-key vault write slug=%s: %v", host.OficialSlug, vErr)
+	// A vault key is already stored; writing it as the host's own would also
+	// drop the host's link to a shared key.
+	if setupReq.Key == nil {
+		if vErr := vault.HostSetSSHKey(r.Context(), h.db, host.ID, actorID(r),
+			vault.HostSSHKey{PrivateKeyPEM: string(result.PrivKeyPEM), PublicKey: result.PubKeyLine}); vErr != nil {
+			log.Printf("[ssh] setup-key vault write slug=%s: %v", host.OficialSlug, vErr)
+		}
 	}
 
 	jsonOK(w, map[string]any{
