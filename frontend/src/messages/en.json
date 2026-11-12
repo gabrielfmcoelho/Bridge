@@ -761,12 +761,22 @@
       "eolCount": "{count} past end of life"
     },
     "osRelease": {
+      "runUpdateFirst": "Packages updated first, in this run.",
+      "confirmNoUpdate": "Pending packages or a pending reboot make it skip, before anything changes.",
+      "confirmUpdateFirst": "It first updates every package and reboots if that needs it.",
+      "usesBackup": "No new backup: backup #{run} ({when}) is the way back.",
+      "newBackupHint": "Off: backup #{run} ({when}, {size}) is the way back.",
+      "newBackup": "New backup first",
+      "onlyUpdate": "Just update the packages",
+      "pendingWarn": "The last check found {count} pending packages: the version change will be skipped until they are installed.",
+      "updateFirstHint": "Same run: updates every package, reboots if that needs it, then changes the version. Off: pending packages or a pending reboot make the change skip.",
+      "updateFirst": "Update packages first",
       "modalHint": "Take a VM snapshot first: a failed release upgrade can leave it unbootable. One host at a time, rebooted at the end. Supported: Ubuntu LTS → next LTS, Debian N → N+1, Alpine 3.x → 3.x+1.",
       "withBackup": "The host is backed up to MinIO first and the backup is kept if the upgrade fails.",
       "noBackup": "No backup is taken: MinIO is not configured.",
       "action": "change version",
       "confirmTitle": "Upgrade {host} ({os}) to its next release?",
-      "confirmMessage": "Take a snapshot of the VM first: a failed release upgrade can leave it unbootable. Supported: Ubuntu LTS → next LTS, Debian N → N+1, Alpine 3.x → 3.x+1. The host must have no pending package updates, no pending reboot and 5 GB free on /. It is rebooted at the end and can take up to 3 hours.",
+      "confirmMessage": "Take a snapshot of the VM first: a failed release upgrade can leave it unbootable. Supported: Ubuntu LTS → next LTS, Debian N → N+1, Alpine 3.x → 3.x+1. It needs 5 GB free on /, is rebooted at the end and can take up to 3 hours.",
       "start": "Upgrade release"
     },
     "osUpdate": {
@@ -803,7 +813,7 @@
       "kind": "Type",
       "kindHint": {
         "backup": "Only sends the host's files to MinIO, changing nothing on it. The backup is kept until the retention ends.",
-        "release": "Takes the host to the next release of its system (up to 3 h) and reboots it. Always backs up first when MinIO is set up.",
+        "release": "Takes the host to the next release of its system (up to 3 h) and reboots it. Its checks run before anything else; with MinIO set up it backs up first, unless the host already has a kept backup and you turn that off.",
         "check": "Refreshes the package lists and counts what can be upgraded. Changes nothing.",
         "security": "Installs only the security upgrades (apt: *-security suites; dnf/yum: security advisories). Alpine has no separate channel.",
         "packages": "Installs every upgrade within the current release (apt upgrade, dnf/yum upgrade, apk upgrade). Never changes the release."

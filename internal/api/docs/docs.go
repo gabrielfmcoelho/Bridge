@@ -16911,7 +16911,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.",
+                "description": "Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h; its checks run before the backup, update_first updates the packages (and reboots if needed) first in the same run, and with MinIO set up it backs up unless backup is false and the host already has a kept backup; backup: back up only, and keep it — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.",
                 "consumes": [
                     "application/json"
                 ],
@@ -23224,6 +23224,10 @@ const docTemplate = `{
                 },
                 "reboot": {
                     "type": "boolean"
+                },
+                "update_first": {
+                    "description": "Release only: update the packages first, rebooting if that needs it.",
+                    "type": "boolean"
                 }
             }
         },
@@ -26834,6 +26838,10 @@ const docTemplate = `{
                 },
                 "target": {
                     "type": "string"
+                },
+                "update_first": {
+                    "description": "UpdateFirst: a release that updates the packages (and reboots if that\nneeds it) before changing the version.",
+                    "type": "boolean"
                 }
             }
         },

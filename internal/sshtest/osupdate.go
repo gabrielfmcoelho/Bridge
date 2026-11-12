@@ -113,7 +113,13 @@ exit 0
 // (repositories bumped, apk upgrade --available). It skips, changing
 // nothing, when a reboot is pending, / has under 5 GB free, packages are
 // still waiting for a package update, or the path isn't supported (RHEL
-// family: Leapp/ELevate). Debian / Alpine sources are backed up first and
+// family: Leapp/ELevate). "Packages waiting" counts what a package update
+// would install (apt-get -s), not "apt list --upgradable": Ubuntu's phased
+// updates stay listed after an update, and would block the release forever.
+// With BRIDGE_PRECHECK it runs the checks only and ends with "@@ready" right
+// before its first change; BRIDGE_UPDATE_FIRST leaves out the two checks a
+// package update and its reboot settle (pending packages, pending reboot).
+// Debian / Alpine sources are backed up first and
 // restored when the new release's lists can't be fetched; once the upgrade
 // itself has started nothing is rolled back (a half-restored system is
 // worse). It always ends with "@@reboot yes": the release finishes on boot.
@@ -124,13 +130,15 @@ say() { echo "@@$*"; }
 APTOPTS='-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
 osr() ( . "$R/etc/os-release" 2>/dev/null; echo "$ID $VERSION_ID" )
 . "$R/etc/os-release" 2>/dev/null || { say skip "no /etc/os-release"; exit 0; }
+ready() { if [ -n "${BRIDGE_PRECHECK:-}" ]; then say ready; exit 0; fi; }
 say release_from "$(osr)"
-if [ -f "$R/var/run/reboot-required" ]; then say skip "a reboot is pending: reboot the host first"; exit 0; fi
+if [ -z "${BRIDGE_UPDATE_FIRST:-}" ] && [ -f "$R/var/run/reboot-required" ]; then say skip "a reboot is pending: reboot the host first"; exit 0; fi
 FREE=$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}')
 if [ "${FREE:-0}" -lt 5242880 ]; then say skip "less than 5 GB free on /"; exit 0; fi
 apt_pending() {
+  [ -n "${BRIDGE_UPDATE_FIRST:-}" ] && return 0
   apt-get update -q || { say error apt-get update failed; exit 1; }
-  N=$(apt list --upgradable 2>/dev/null | grep -c '\[upgradable')
+  N=$(apt-get -s -q upgrade --with-new-pkgs 2>/dev/null | grep -c '^Inst ')
   if [ "$N" -gt 0 ]; then say skip "$N packages waiting: run a package update first"; exit 0; fi
 }
 case "$ID" in
@@ -141,6 +149,7 @@ ubuntu)
   apt_pending
   [ -f "$R/etc/update-manager/release-upgrades" ] && sed -i 's/^Prompt=.*/Prompt=lts/' "$R/etc/update-manager/release-upgrades"
   do-release-upgrade -c >/dev/null 2>&1 || { say skip "no newer LTS release is available yet"; exit 0; }
+  ready
   do-release-upgrade -f DistUpgradeViewNonInteractive || { say error do-release-upgrade failed; exit 1; } ;;
 debian)
   case "$VERSION_CODENAME" in
@@ -148,6 +157,7 @@ debian)
   *) say skip "no supported next release for Debian ${VERSION_CODENAME:-$VERSION_ID}"; exit 0 ;;
   esac
   apt_pending
+  ready
   B="$R/etc/apt.bridge-backup-$VERSION_CODENAME"
   rm -rf "$B" && cp -a "$R/etc/apt" "$B" || { say error could not back up /etc/apt; exit 1; }
   say backup "$B"
@@ -161,6 +171,7 @@ alpine)
   CUR=$(echo "$VERSION_ID" | cut -d. -f1,2); MIN=${CUR#*.}; NEXT="${CUR%%.*}.$((MIN + 1))"
   REPOS="$R/etc/apk/repositories"
   grep -q "/v$CUR/" "$REPOS" 2>/dev/null || { say skip "the repositories don't pin v$CUR (edge?)"; exit 0; }
+  ready
   cp "$REPOS" "$REPOS.bridge-backup" || { say error could not back up the repositories; exit 1; }
   say backup "$REPOS.bridge-backup"
   sed -i "s#/v$CUR/#/v$NEXT/#g" "$REPOS"
@@ -186,6 +197,18 @@ func OSUpdateInnerScript(kind string) (string, error) {
 		return osReleaseScript, nil
 	}
 	return "", fmt.Errorf("unknown OS update kind %q", kind)
+}
+
+// ReleasePrecheck is the release script in check-only mode: it changes
+// nothing (but Ubuntu's Prompt=lts, which the release sets anyway) and ends
+// with "@@ready" or "@@skip". updateFirst: a package update and its reboot
+// come before the release, so pending packages and reboots don't count.
+func ReleasePrecheck(updateFirst bool) string {
+	pre := "BRIDGE_PRECHECK=1\n"
+	if updateFirst {
+		pre += "BRIDGE_UPDATE_FIRST=1\n"
+	}
+	return pre + osReleaseScript
 }
 
 // osUpdateFile is the run's path prefix on the host (.sh, .log, .exit). The
@@ -298,6 +321,7 @@ type OSUpdateReport struct {
 	RebootRequired    bool
 	Skip              string
 	Error             string
+	Ready             bool // a release check passed (ReleasePrecheck)
 }
 
 // ParseOSUpdateLog reads the "@@key value" markers of a run's log; the last
@@ -335,6 +359,8 @@ func ParseOSUpdateLog(logText string) OSUpdateReport {
 			r.Skip = val
 		case "error":
 			r.Error = val
+		case "ready":
+			r.Ready = true
 		}
 	}
 	return r

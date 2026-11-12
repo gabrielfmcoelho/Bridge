@@ -200,6 +200,31 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 		res.Reason = "SSH connect: " + err.Error()
 		return res
 	}
+	// A release runs its own checks first: a refusal ends the run before the
+	// backup and the package update, not after them.
+	if run.Kind == sshtest.OSUpdateRelease {
+		err = sshtest.StartDetached(client, priv, run.ID, sshtest.ReleasePrecheck(run.UpdateFirst))
+		client.Close()
+		code, tail := 0, ""
+		if err == nil {
+			code, tail, err = pollOSRun(dial, run.ID, osUpdateHostTimeout)
+		}
+		rep := sshtest.ParseOSUpdateLog(tail)
+		switch {
+		case rep.Skip != "":
+			return models.OSUpdateResult{Status: models.OSResultSkipped, Reason: rep.Skip, Output: tail}
+		case err != nil:
+			res.Reason, res.Output = "release check: "+err.Error(), tail
+			return res
+		case code != 0 || !rep.Ready:
+			res.Reason, res.Output = "release check: "+exitReason(rep, code), tail
+			return res
+		}
+		if client, err = dial(); err != nil {
+			res.Reason = "SSH connect: " + err.Error()
+			return res
+		}
+	}
 	// The backup comes first: no backup, no update.
 	if run.Backup && run.Kind != sshtest.OSUpdateCheck {
 		key, size, paths, err := h.backupHost(ctx, run, host, client, priv)
@@ -221,6 +246,49 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 		res.Status = models.OSResultSuccess
 		return res
 	}
+	// A chained release updates the packages first, and reboots when that
+	// needs it, so the release's own checks pass. If the update fails the
+	// release never starts (the host is still rescanned: apt may have changed
+	// half the packages).
+	chained := run.Kind == sshtest.OSUpdateRelease && run.UpdateFirst
+	var pre sshtest.OSUpdateReport
+	var preOut string
+	if chained {
+		err = sshtest.StartOSUpdate(client, priv, run.ID, sshtest.OSUpdatePackages)
+		client.Close()
+		if err != nil {
+			res.Reason = "package update: start: " + err.Error()
+			return res
+		}
+		var code int
+		code, preOut, err = pollOSRun(dial, run.ID, osUpdateHostTimeout)
+		pre = sshtest.ParseOSUpdateLog(preOut)
+		res.Output, res.PkgManager, res.Upgraded = preOut, pre.PkgManager, upgradedCount(sshtest.OSUpdatePackages, pre)
+		if err != nil {
+			res.Reason = "package update: " + err.Error()
+			return res
+		}
+		if code != 0 || pre.Skip != "" {
+			why := pre.Skip
+			if why == "" {
+				why = exitReason(pre, code)
+			}
+			res.Reason = "package update failed, the release did not start: " + why
+			return h.rescanHost(ctx, run, host, dial, priv, res)
+		}
+		if pre.RebootRequired {
+			if err := rebootHost(dial, priv); err != nil {
+				res.Reason = "reboot after the package update: " + err.Error()
+				return h.rescanHost(ctx, run, host, dial, priv, res)
+			}
+			res.Rebooted = true
+		}
+		if client = waitForSSH(dial, res.Rebooted); client == nil {
+			res.Reason = "the host did not answer SSH after the package update"
+			return res
+		}
+	}
+
 	if run.Kind == sshtest.OSUpdateRestore {
 		err = h.startRestore(ctx, client, priv, run)
 	} else {
@@ -229,83 +297,74 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 	client.Close()
 	if err != nil {
 		res.Reason = "start: " + err.Error()
+		if chained {
+			return h.rescanHost(ctx, run, host, dial, priv, res)
+		}
 		return res
 	}
 
-	// Poll on fresh connections until the exit file shows up.
 	limit := osUpdateHostTimeout
 	if run.Kind == sshtest.OSUpdateRelease || run.Kind == sshtest.OSUpdateRestore {
 		limit = osReleaseTimeout
 	}
-	deadline := time.Now().Add(limit)
-	var exitCode int
-	var logTail string
-	for done := false; !done; {
-		if time.Now().After(deadline) {
-			res.Reason, res.Output = fmt.Sprintf("no result after %s: the update may still be running on the host", limit), logTail
-			return res
-		}
-		time.Sleep(osUpdatePoll)
-		c, err := dial()
-		if err != nil {
-			continue // transient: the deadline decides
-		}
-		var pollErr error
-		done, exitCode, logTail, pollErr = sshtest.PollOSUpdate(c, run.ID)
-		c.Close()
-		if pollErr != nil && !done {
-			res.Reason = pollErr.Error()
-			return res
-		}
+	exitCode, logTail, err := pollOSRun(dial, run.ID, limit)
+	res.Output = logTail
+	if chained {
+		res.Output = preOut + "\n" + logTail
+	}
+	if err != nil {
+		res.Reason = err.Error()
+		return res
 	}
 
 	rep := sshtest.ParseOSUpdateLog(logTail)
-	res.Output, res.PkgManager, res.RebootRequired = logTail, rep.PkgManager, rep.RebootRequired
+	res.PkgManager, res.RebootRequired = rep.PkgManager, rep.RebootRequired
 	// Upgradable / security are what's still pending once the run is over:
 	// the "pending updates" column shows the latest of them.
 	res.Upgradable, res.SecurityUpgradable, res.Upgraded = rep.Upgradable, rep.Security, upgradedCount(run.Kind, rep)
 	if run.Kind != sshtest.OSUpdateCheck {
 		res.Upgradable, res.SecurityUpgradable = rep.Remaining, rep.RemainingSecurity
 	}
+	if chained {
+		// What the run installed is the package update's: a release counts nothing.
+		res.PkgManager, res.Upgraded = pre.PkgManager, upgradedCount(sshtest.OSUpdatePackages, pre)
+	}
 	// A failed update still rescans: apt may have changed half the packages.
-	// A skip changed nothing, so it doesn't.
+	// A skip changed nothing, so it doesn't (unless a chained update ran).
 	switch {
 	case exitCode != 0:
-		res.Reason = rep.Error
-		if res.Reason == "" {
-			res.Reason = "exit " + strconv.Itoa(exitCode)
-		}
+		res.Reason = exitReason(rep, exitCode)
 	case rep.Skip != "":
 		res.Status, res.Reason = models.OSResultSkipped, rep.Skip
-		return res
+		if !chained {
+			return res
+		}
 	default:
 		res.Status = models.OSResultSuccess
 	}
 
 	if res.Status == models.OSResultSuccess && run.Reboot && rep.RebootRequired && run.Kind != sshtest.OSUpdateCheck {
-		if c, err := dial(); err != nil {
-			res.Reason = "reboot: SSH connect: " + err.Error()
+		if err := rebootHost(dial, priv); err != nil {
+			res.Reason = "reboot: " + err.Error()
 		} else {
-			err := sshtest.Reboot(c, priv)
-			c.Close()
-			if err != nil {
-				res.Reason = "reboot: " + err.Error()
-			} else {
-				res.Rebooted = true
-				time.Sleep(osUpdateRebootWait)
-			}
+			res.Rebooted = true
 		}
 	}
+	return h.rescanHost(ctx, run, host, dial, priv, res)
+}
 
-	// Rescan (after a success or a failure), so the OS map, dependencies and
-	// EOL show the host as it is now; after a reboot, wait for SSH first.
-	client = waitForSSH(dial, res.Rebooted)
+// rescanHost rescans the host (after a reboot, once SSH answers again) so the
+// OS map, dependencies and EOL show it as it is now, then deletes a success's
+// backup unless the run keeps it.
+func (h *sshHandlers) rescanHost(ctx context.Context, run models.OSUpdateRun, host *models.Host, dial func() (*ssh.Client, error),
+	priv sshtest.Privilege, res models.OSUpdateResult) models.OSUpdateResult {
+	client := waitForSSH(dial, res.Rebooted)
 	if client == nil {
 		res.Reason = joinReason(res.Reason, "the host did not answer SSH after the update")
 		return res
 	}
 	defer client.Close()
-	info, err := sshtest.TestCapture(client, authn.Password())
+	info, err := sshtest.TestCapture(client, priv.Password)
 	if err != nil {
 		res.Reason = joinReason(res.Reason, "rescan: "+err.Error())
 		return res
@@ -323,6 +382,57 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 		}
 	}
 	return res
+}
+
+// pollOSRun waits for the run's detached script on the host, on a fresh
+// session each poll, and returns its exit code and log tail.
+func pollOSRun(dial func() (*ssh.Client, error), runID int64, limit time.Duration) (int, string, error) {
+	deadline := time.Now().Add(limit)
+	logTail := ""
+	for {
+		if time.Now().After(deadline) {
+			return 0, logTail, fmt.Errorf("no result after %s: the update may still be running on the host", limit)
+		}
+		time.Sleep(osUpdatePoll)
+		c, err := dial()
+		if err != nil {
+			continue // transient: the deadline decides
+		}
+		done, code, tail, err := sshtest.PollOSUpdate(c, runID)
+		c.Close()
+		if err != nil && !done {
+			return 0, logTail, err
+		}
+		if logTail = tail; done {
+			return code, logTail, nil
+		}
+	}
+}
+
+// rebootHost schedules the reboot and waits out the shutdown.
+func rebootHost(dial func() (*ssh.Client, error), priv sshtest.Privilege) error {
+	c, err := dial()
+	if err != nil {
+		return fmt.Errorf("SSH connect: %w", err)
+	}
+	err = sshtest.Reboot(c, priv)
+	c.Close()
+	if err != nil {
+		return err
+	}
+	time.Sleep(osUpdateRebootWait)
+	return nil
+}
+
+// exitReason is why a script failed: its error marker, else its exit code.
+func exitReason(rep sshtest.OSUpdateReport, code int) string {
+	switch {
+	case rep.Error != "":
+		return rep.Error
+	case code == 0:
+		return "the script ended without a result"
+	}
+	return "exit " + strconv.Itoa(code)
 }
 
 // osRestoreLinkTTL is how long the host's download link of a restore works:
@@ -505,6 +615,8 @@ type osUpdateRunRequest struct {
 	// This run's backup paths, absolute; empty = each host's profile, else the defaults.
 	BackupInclude []string `json:"backup_include"`
 	BackupExclude []string `json:"backup_exclude"`
+	// Release only: update the packages first, rebooting if that needs it.
+	UpdateFirst bool `json:"update_first"`
 }
 
 var osUpdateKinds = map[string]bool{sshtest.OSUpdateCheck: true, sshtest.OSUpdatePackages: true, sshtest.OSUpdateSecurity: true,
@@ -513,7 +625,7 @@ var osUpdateKinds = map[string]bool{sshtest.OSUpdateCheck: true, sshtest.OSUpdat
 // handleStartOSUpdate godoc
 //
 //	@Summary		Start an OS update run
-//	@Description	Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.
+//	@Description	Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h; its checks run before the backup, update_first updates the packages (and reboots if needed) first in the same run, and with MinIO set up it backs up unless backup is false and the host already has a kept backup; backup: back up only, and keep it — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.
 //	@Tags			ssh
 //	@Accept			json
 //	@Produce		json
@@ -550,16 +662,15 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 		}
 		req.Concurrency, req.Reboot = 1, true
 	}
-	// A check changes nothing: no backup. A release upgrade always takes one
-	// when MinIO is set up. A backup run only backs up, and keeps it.
+	req.UpdateFirst = req.UpdateFirst && req.Kind == sshtest.OSUpdateRelease
+	// A check changes nothing: no backup. A backup run only backs up, and
+	// keeps it. A release without a new backup is checked below.
 	_, _, minioErr := h.minio()
-	switch {
-	case req.Kind == sshtest.OSUpdateCheck:
+	switch req.Kind {
+	case sshtest.OSUpdateCheck:
 		req.Backup, req.KeepBackup = false, false
-	case req.Kind == sshtest.OSUpdateBackup:
+	case sshtest.OSUpdateBackup:
 		req.Backup, req.KeepBackup, req.Reboot = true, true, false
-	case req.Kind == sshtest.OSUpdateRelease && minioErr == nil:
-		req.Backup = true
 	}
 	if req.Backup && minioErr != nil {
 		jsonError(w, http.StatusBadRequest, minioErr.Error())
@@ -586,8 +697,15 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 			return
 		}
 	}
+	// A release can leave a VM unbootable: with MinIO set up it skips its own
+	// backup only when the host already has one to go back to.
+	if req.Kind == sshtest.OSUpdateRelease && !req.Backup && minioErr == nil && h.lastFullBackup(r.Context(), req.HostIDs[0]) == nil {
+		jsonError(w, http.StatusBadRequest, "this host has no kept backup: a version change backs it up first")
+		return
+	}
 	run := models.OSUpdateRun{Kind: req.Kind, Reboot: req.Reboot && req.Kind != sshtest.OSUpdateCheck, Concurrency: req.Concurrency,
-		Backup: req.Backup, KeepBackup: req.Backup && req.KeepBackup, BackupInclude: req.BackupInclude, BackupExclude: req.BackupExclude}
+		Backup: req.Backup, KeepBackup: req.Backup && req.KeepBackup, BackupInclude: req.BackupInclude, BackupExclude: req.BackupExclude,
+		UpdateFirst: req.UpdateFirst}
 	if u := auth.UserFromContext(r.Context()); u != nil {
 		run.RequestedBy = &u.ID
 	}
@@ -908,13 +1026,25 @@ func (h *sshHandlers) handleListOSBackups(w http.ResponseWriter, r *http.Request
 			return
 		}
 	}
-	repo := store.NewOSUpdateRepo(h.db.SQL)
-	rows, err := repo.KeptBackups(r.Context(), hostID)
+	out, err := h.keptBackups(r.Context(), hostID)
 	if err != nil {
 		jsonServerError(w, r, "failed to list the backups", err)
 		return
 	}
-	d := service.LoadBackupDefaults(r.Context(), h.db.SQL)
+	jsonOK(w, out)
+}
+
+// keptBackups lists the kept backups with their expiry: the newest of each
+// host (hostID 0, expired ones dropped by age), or one host's, each checked
+// in MinIO — the lifecycle rule deletes without telling Bridge; a gone one
+// is marked deleted. MinIO unreachable: what Bridge knows.
+func (h *sshHandlers) keptBackups(ctx context.Context, hostID int64) ([]models.OSUpdateResult, error) {
+	repo := store.NewOSUpdateRepo(h.db.SQL)
+	rows, err := repo.KeptBackups(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+	d := service.LoadBackupDefaults(ctx, h.db.SQL)
 	c, _, minioErr := h.minio()
 	now := time.Now()
 	out := make([]models.OSUpdateResult, 0, len(rows))
@@ -928,20 +1058,33 @@ func (h *sshHandlers) handleListOSBackups(w http.ResponseWriter, r *http.Request
 			}
 			continue
 		}
-		// One host: ask MinIO (the lifecycle rule deletes without telling
-		// Bridge). MinIO unreachable: show what Bridge knows.
 		if minioErr == nil && i < osBackupStatCap {
-			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-			ok, err := c.Exists(ctx, x.BackupKey)
+			sctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			ok, err := c.Exists(sctx, x.BackupKey)
 			cancel()
 			if err == nil && !ok {
-				repo.SetBackupStatus(r.Context(), x.RunID, x.HostID, models.OSBackupDeleted)
+				repo.SetBackupStatus(ctx, x.RunID, x.HostID, models.OSBackupDeleted)
 				continue
 			}
 		}
 		out = append(out, x)
 	}
-	jsonOK(w, out)
+	return out, nil
+}
+
+// lastFullBackup is the host's newest kept backup a version change can go
+// back to: not a restore's undo, which holds only the restored paths.
+func (h *sshHandlers) lastFullBackup(ctx context.Context, hostID int64) *models.OSUpdateResult {
+	kept, err := h.keptBackups(ctx, hostID)
+	if err != nil {
+		return nil
+	}
+	for _, x := range kept {
+		if x.RunKind != sshtest.OSUpdateRestore {
+			return &x
+		}
+	}
+	return nil
 }
 
 // backupProfileView is a host's backup profile with what it resolves to.
