@@ -29,7 +29,7 @@ and contacts. Access is scoped by a hierarchical org-unit tree called
 | Frontend build | `cd frontend && npm run build` |
 | Frontend dev | `cd frontend && npm run dev` |
 | Frontend dev, no Go backend | `cd frontend && npm run dev:mock` — sets `NEXT_PUBLIC_USE_MOCK_API=1`, which repoints `API_BASE` at the in-app mock (`src/app/mock/api/[...path]/route.ts` + `src/mocks/`). **Required for `/catalog` and `/requests`**: those routes have no Go backend yet, so plain `npm run dev` proxies them to Go and gets 404. `POST /mock/api/__user {role, entidade_slug}` switches persona, `POST /mock/api/__reset` re-seeds. |
-| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases,shareBundles,breadcrumbs,constants,vulns,sshCustomOps,webDns}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts`, `src/app/atlas/{apis,databases}/_components/{api,database}Insights.test.ts`, `src/app/_home/homeModel.test.ts`, `src/components/ai/chatModel.test.ts` (insight modules stay runtime-import free so Node can run them) |
+| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases,shareBundles,breadcrumbs,constants,vulns,sshCustomOps,webDns,backupPreview}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts`, `src/app/atlas/{apis,databases}/_components/{api,database}Insights.test.ts`, `src/app/_home/homeModel.test.ts`, `src/components/ai/chatModel.test.ts` (insight modules stay runtime-import free so Node can run them) |
 
 ## Architecture
 
@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v126**. Use idempotent idioms:
+per element, currently at **v127**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -253,21 +253,42 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   Alpine 3.x → 3.x+1; RHEL family is skipped. It skips, changing nothing,
   with a reboot pending, < 5 GB on `/` or packages still waiting. Its tests
   run it on a fake root through `BRIDGE_ROOT`.
-  Backups before updating (v125, `backup` / `keep_backup` on the run): the
-  host's files (`osbackup_include`, default `/`, minus `osbackup_exclude` and
-  every pseudo / container / network mount from `/proc/mounts`) leave the VM
-  as one `tar | zstd` stream on the SSH session's stdout (`sshtest.StreamBackup`)
-  and go straight into MinIO (`internal/integrations/minio`, settings group
-  `minio`, multipart 64 MiB parts) — nothing is written on the host and no
-  credentials go to it. No backup → no update. After a success whose rescan
-  answered, the object is deleted unless `keep_backup`; a failed host keeps
-  it, downloadable through a one-hour presigned link straight to MinIO
-  (`minio_public_url` when browsers can't reach the endpoint). Release runs
-  always back up when MinIO is set up. MinIO images now need a login, so the
-  tests sign links offline and stream into a fake instead of a container.
-  Retention: `osbackup_retention_days` (default 30) is Bridge's own bucket
-  lifecycle rule `bridge-os-backups` on the prefix — read the bucket's
-  configuration, swap only that rule (the datalake's bucket has its own).
+  Host backups — who owns what: the **MinIO integration** (`internal/integrations/minio`,
+  settings group `minio`) is the connection only (endpoint, public URL, keys,
+  bucket; its test changes nothing). The **host backups feature**
+  (`service.BackupDefaults`, group `osbackup`, Settings › Hosts) owns the
+  prefix, retention and default paths. A host's **profile**
+  (`host_backup_profiles`, v127, `GET/PUT /api/hosts/{slug}/backup-profile`)
+  overrides the paths; a **run** may override them once (`backup_include` /
+  `backup_exclude`). Each list resolves on its own: run → host → defaults
+  (`service.EffectivePaths`); an empty list inherits; each result records the
+  paths it took. A host's files (minus every pseudo / container / network
+  mount from `/proc/mounts`) leave the VM as one `tar | zstd` stream on the
+  SSH session's stdout (`sshtest.StreamBackup`) straight into MinIO (multipart
+  64 MiB parts) — nothing is written on the host and no credentials go to it.
+  An exclude wins over an include beneath it (keeping docker volumes means
+  excluding docker's other subdirectories, not the root). No backup → no
+  update. After a success whose rescan answered, the object is deleted unless
+  `keep_backup`; a failed host keeps it, downloadable through a one-hour
+  presigned link (`minio_public_url` when browsers can't reach the endpoint).
+  Release runs always back up when MinIO is set up; kind `backup` only backs
+  up and always keeps. Retention: `osbackup_retention_days` (default 30) is
+  Bridge's own lifecycle rule `bridge-os-backups` on the prefix, applied from
+  Settings › Hosts and on every backup run — read the bucket's configuration,
+  swap only that rule (the datalake's bucket has its own). The rule deletes
+  without telling Bridge: `GET …/os-updates/backups?host_id=` checks each kept
+  backup in MinIO and marks the gone ones `deleted`; the fleet list
+  (`…/backups`, no host) drops them by age. MinIO images now need a login, so
+  the tests sign links offline and stream into a fake instead of a container.
+  UI: every entry point opens the same modals — the host's admin
+  **Manutenção** tab (OS, pending updates, backup profile, kept backups, its
+  runs), the hosts list's bulk menu (Atualizar SO… / Fazer backup… over the
+  listed hosts), the OS tab (by distro version) and Vulnerabilidades (a
+  distro package with OSV CVEs → security update; an EOL OS → release).
+  `OSUpdateModal` takes hosts or distro groups; `OSBadges` is the one look of
+  EOL / reboot / backup. The backup preview (`lib/backupPreview.ts`) reads the
+  latest scan: filesystems, a database running on the host (its data dir),
+  docker volumes, files ≥ 1 GiB.
   Restores (v126) are runs of kind `restore` (`POST …/os-updates/restores`,
   `sshtest/osrestore.go`): a kept backup goes back onto its host, into
   `/var/lib/bridge-restore/run-<id>` (root-only) or over the chosen paths —

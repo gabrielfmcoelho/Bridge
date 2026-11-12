@@ -7597,6 +7597,92 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/hosts/{slug}/backup-profile": {
+            "get": {
+                "description": "Admin. The host's own backup paths (an empty list inherits the default), the defaults (Settings › Host backups) and the paths a backup of the host takes. 404 when the host isn't visible.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "A host's backup profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Host slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.backupProfileView"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Admin. Partial: an omitted list keeps its value, [] goes back to the default, otherwise absolute paths (spaces or lines). Returns the profile view. 400 on a relative path, 404 when the host isn't visible.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Update a host's backup profile",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Host slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Profile",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.backupProfileRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.backupProfileView"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/hosts/{slug}/chamados": {
             "get": {
                 "description": "Any role. Invisible hosts answer 404.",
@@ -13492,7 +13578,7 @@ const docTemplate = `{
         },
         "/api/settings/integrations": {
             "get": {
-                "description": "Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, glpi, smtp, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
+                "description": "Admin. Every integration group (ldap, gitlab, keycloak, keycloak_apis, llm, coolify, grafana, signoz, outline, proxmox, minio, osbackup, glpi, smtp, general) mapped to its key/value settings. Secret keys are never returned: they read \"••••••••\" when set, \"\" otherwise.",
                 "produces": [
                     "application/json"
                 ],
@@ -14016,6 +14102,27 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/settings/integrations/osbackup/retention": {
+            "post": {
+                "description": "Admin. Puts the saved retention (osbackup_retention_days under osbackup_prefix) on the MinIO bucket as Bridge's lifecycle rule, keeping the bucket's other rules; 0 removes Bridge's rule. Always 200: {\"success\": false, \"error\"} or {\"success\": true, \"retention_days\", \"prefix\"}.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "integration-settings"
+                ],
+                "summary": "Apply the host backups' retention",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/settings/integrations/test/gestor": {
             "post": {
                 "description": "Admin. Always 200: {\"success\": true} or {\"success\": false, \"error\": \"...\"}.",
@@ -14227,6 +14334,27 @@ const docTemplate = `{
                         "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/settings/integrations/test/minio": {
+            "post": {
+                "description": "Admin. Checks the saved MinIO connection: the credentials work and the bucket exists. Changes nothing. Always 200: {\"success\": false, \"error\"} or {\"success\": true, \"bucket\"}.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "integration-settings"
+                ],
+                "summary": "Test the MinIO integration",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -16618,6 +16746,364 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/os-updates/backups": {
+            "get": {
+                "description": "Admin. With host_id: that host's backups still kept in MinIO, newest first. Each is checked in MinIO (up to 20): one the bucket's lifecycle rule already removed is marked deleted and left out. Without host_id: each host's newest kept backup, for the indicators; those older than the retention are left out by age, without asking MinIO. Each has run_kind, the paths it took and expires_at (none when backups are kept until deleted). 404 when the host isn't visible.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Kept host backups",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "One host's backups",
+                        "name": "host_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.OSUpdateResult"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/os-updates/config": {
+            "get": {
+                "description": "Admin. Whether hosts can be backed up to MinIO before an update (the integration is on and complete), and the paths a backup takes.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "OS update options available",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/os-updates/latest": {
+            "get": {
+                "description": "Admin. Per host, the newest successful run that counted upgrades (any kind): upgradable and security counts, when, and the reboot flag. Without output.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Each host's latest update counts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.OSUpdateResult"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/os-updates/restores": {
+            "post": {
+                "description": "Admin. Starts a restore run of the backup kept by run_id for host_id, back on that host, in the background. mode staging extracts into /var/lib/bridge-restore/run-\u003cid\u003e (root-only) and changes nothing else; paths may narrow it. mode paths extracts the given absolute paths over /, after backing exactly those paths up to MinIO (kept: the undo). Restoring all of / in place is refused. The host downloads the backup itself from MinIO through a six-hour link, then is rescanned. Answers 202 with the run. 404 when the backup isn't kept or the host isn't visible.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Restore a kept backup onto its host",
+                "parameters": [
+                    {
+                        "description": "Restore",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.osRestoreRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/models.OSUpdateRun"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/os-updates/runs": {
+            "get": {
+                "description": "Admin. The 50 newest runs, newest first, with how many hosts are in each status; host_id keeps only the runs that include that host.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "List OS update runs",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Only runs of this host",
+                        "name": "host_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.OSUpdateRun"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Start an OS update run",
+                "parameters": [
+                    {
+                        "description": "Run",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.osUpdateRunRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/models.OSUpdateRun"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/os-updates/runs/{id}": {
+            "get": {
+                "description": "Admin. The run with every host's result: status, reason, package manager, OS before and after, upgradable / security / upgraded counts, reboot, and the tail of the host's log.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Get an OS update run",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Run ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OSUpdateRun"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/os-updates/runs/{id}/cancel": {
+            "post": {
+                "description": "Admin. Hosts not started yet are skipped; hosts already updating finish (an upgrade is never killed halfway). Returns the run.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Cancel an OS update run",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Run ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OSUpdateRun"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/os-updates/runs/{id}/hosts/{host_id}/backup": {
+            "get": {
+                "description": "Admin. A link straight to MinIO, valid for one hour, that saves the backup (tar.zst / tar.gz) on the caller's computer. 404 when the result has no backup kept.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Download link of a host's backup",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Run ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Host ID",
+                        "name": "host_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Admin. Removes the backup from MinIO and marks it deleted. 404 when the result has no backup kept.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Delete a host's backup",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Run ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Host ID",
+                        "name": "host_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -20191,6 +20677,37 @@ const docTemplate = `{
                 }
             }
         },
+        "api.backupProfileRequest": {
+            "type": "object",
+            "properties": {
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "include": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.backupProfileView": {
+            "type": "object",
+            "properties": {
+                "defaults": {
+                    "$ref": "#/definitions/service.BackupDefaults"
+                },
+                "effective": {
+                    "$ref": "#/definitions/service.BackupPaths"
+                },
+                "profile": {
+                    "$ref": "#/definitions/models.HostBackupProfile"
+                }
+            }
+        },
         "api.bundleRevealResponse": {
             "type": "object",
             "properties": {
@@ -22642,6 +23159,71 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/api.linkWithHealth"
                     }
+                }
+            }
+        },
+        "api.osRestoreRequest": {
+            "type": "object",
+            "properties": {
+                "host_id": {
+                    "description": "its host: the restore goes back there",
+                    "type": "integer"
+                },
+                "mode": {
+                    "description": "staging | paths",
+                    "type": "string"
+                },
+                "paths": {
+                    "description": "absolute; required for paths",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "run_id": {
+                    "description": "the run whose backup to restore",
+                    "type": "integer"
+                }
+            }
+        },
+        "api.osUpdateRunRequest": {
+            "type": "object",
+            "properties": {
+                "backup": {
+                    "description": "back each host up to MinIO first",
+                    "type": "boolean"
+                },
+                "backup_exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "backup_include": {
+                    "description": "This run's backup paths, absolute; empty = each host's profile, else the defaults.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "concurrency": {
+                    "type": "integer"
+                },
+                "host_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "keep_backup": {
+                    "description": "keep the backup after a success",
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "reboot": {
+                    "type": "boolean"
                 }
             }
         },
@@ -25906,6 +26488,35 @@ const docTemplate = `{
                 }
             }
         },
+        "models.HostBackupProfile": {
+            "type": "object",
+            "properties": {
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "include": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "integer"
+                },
+                "updated_name": {
+                    "type": "string"
+                }
+            }
+        },
         "models.HostChamado": {
             "type": "object",
             "properties": {
@@ -26051,6 +26662,177 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.OSUpdateResult": {
+            "type": "object",
+            "properties": {
+                "backup_exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "backup_include": {
+                    "description": "The paths the backup actually took (after run → host → defaults).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "backup_key": {
+                    "type": "string"
+                },
+                "backup_size": {
+                    "type": "integer"
+                },
+                "backup_status": {
+                    "description": "done | failed | deleted",
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "host_nickname": {
+                    "type": "string"
+                },
+                "host_slug": {
+                    "type": "string"
+                },
+                "os_after": {
+                    "type": "string"
+                },
+                "os_before": {
+                    "type": "string"
+                },
+                "output": {
+                    "type": "string"
+                },
+                "pkg_manager": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "reboot_required": {
+                    "type": "boolean"
+                },
+                "rebooted": {
+                    "type": "boolean"
+                },
+                "run_id": {
+                    "type": "integer"
+                },
+                "run_kind": {
+                    "description": "filled by the backup lists",
+                    "type": "string"
+                },
+                "security_upgradable": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "upgradable": {
+                    "type": "integer"
+                },
+                "upgraded": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.OSUpdateRun": {
+            "type": "object",
+            "properties": {
+                "backup": {
+                    "description": "back each host up to MinIO first",
+                    "type": "boolean"
+                },
+                "backup_exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "backup_include": {
+                    "description": "The run's one-off backup paths (empty = each host's profile, else the defaults).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "concurrency": {
+                    "type": "integer"
+                },
+                "counts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "keep_backup": {
+                    "description": "keep it after a success too",
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "reboot": {
+                    "type": "boolean"
+                },
+                "requested_by": {
+                    "type": "integer"
+                },
+                "requested_name": {
+                    "type": "string"
+                },
+                "restore_mode": {
+                    "description": "Restores: the kept backup (source run and host) and where it goes.",
+                    "type": "string"
+                },
+                "restore_paths": {
+                    "description": "absolute paths",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.OSUpdateResult"
+                    }
+                },
+                "source_host_id": {
+                    "type": "integer"
+                },
+                "source_run_id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "target": {
                     "type": "string"
                 }
             }
@@ -27213,6 +27995,47 @@ const docTemplate = `{
                 }
             }
         },
+        "service.BackupDefaults": {
+            "type": "object",
+            "properties": {
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "include": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "prefix": {
+                    "type": "string"
+                },
+                "retention_days": {
+                    "description": "RetentionDays: backups under Prefix expire after this many days (a\nbucket lifecycle rule); 0 keeps them until deleted by hand.",
+                    "type": "integer"
+                }
+            }
+        },
+        "service.BackupPaths": {
+            "type": "object",
+            "properties": {
+                "exclude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "include": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "service.CertScanSummary": {
             "type": "object",
             "properties": {
@@ -27605,6 +28428,9 @@ const docTemplate = `{
                 "oficial_slug": {
                     "type": "string"
                 },
+                "os": {
+                    "$ref": "#/definitions/service.HostOS"
+                },
                 "parent_host_id": {
                     "description": "Proxmox node the guest runs on",
                     "type": "integer"
@@ -27685,6 +28511,32 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.HostOS": {
+            "type": "object",
+            "properties": {
+                "arch": {
+                    "type": "string"
+                },
+                "eol": {
+                    "type": "boolean"
+                },
+                "eol_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "pretty": {
+                    "type": "string"
+                },
+                "reboot_required": {
+                    "type": "boolean"
+                },
+                "version": {
                     "type": "string"
                 }
             }

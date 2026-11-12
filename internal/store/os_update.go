@@ -23,10 +23,11 @@ func (r *OSUpdateRepo) CreateRun(ctx context.Context, run *models.OSUpdateRun, h
 	}
 	defer tx.Rollback()
 	if err := tx.QueryRowContext(ctx, `INSERT INTO os_update_runs (kind, reboot, concurrency, target, requested_by, backup, keep_backup,
-		restore_mode, restore_paths, source_run_id, source_host_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, status, created_at`,
+		restore_mode, restore_paths, source_run_id, source_host_id, backup_include, backup_exclude)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, status, created_at`,
 		run.Kind, run.Reboot, run.Concurrency, run.Target, run.RequestedBy, run.Backup, run.KeepBackup,
-		run.RestoreMode, strings.Join(run.RestorePaths, "\n"), run.SourceRunID, run.SourceHostID).Scan(&run.ID, &run.Status, &run.CreatedAt); err != nil {
+		run.RestoreMode, strings.Join(run.RestorePaths, "\n"), run.SourceRunID, run.SourceHostID,
+		joinPaths(run.BackupInclude), joinPaths(run.BackupExclude)).Scan(&run.ID, &run.Status, &run.CreatedAt); err != nil {
 		return err
 	}
 	for _, id := range hostIDs {
@@ -38,27 +39,47 @@ func (r *OSUpdateRepo) CreateRun(ctx context.Context, run *models.OSUpdateRun, h
 }
 
 const osRunCols = `r.id, r.kind, r.reboot, r.concurrency, r.target, r.status, r.requested_by, COALESCE(u.display_name, ''), r.backup, r.keep_backup,
-	r.restore_mode, r.restore_paths, r.source_run_id, r.source_host_id,
+	r.restore_mode, r.restore_paths, r.source_run_id, r.source_host_id, COALESCE(r.backup_include, ''), COALESCE(r.backup_exclude, ''),
 	r.created_at, r.finished_at,
 	(SELECT COALESCE(json_object_agg(s.status, s.n), '{}')::text FROM
 		(SELECT status, COUNT(*) AS n FROM os_update_results WHERE run_id = r.id GROUP BY status) s)
 	FROM os_update_runs r LEFT JOIN users u ON u.id = r.requested_by`
 
 func scanOSRun(sc interface{ Scan(...any) error }, run *models.OSUpdateRun) error {
-	var counts, paths string
+	var counts, paths, include, exclude string
 	if err := sc.Scan(&run.ID, &run.Kind, &run.Reboot, &run.Concurrency, &run.Target, &run.Status, &run.RequestedBy,
-		&run.RequestedName, &run.Backup, &run.KeepBackup, &run.RestoreMode, &paths, &run.SourceRunID, &run.SourceHostID, &run.CreatedAt, &run.FinishedAt, &counts); err != nil {
+		&run.RequestedName, &run.Backup, &run.KeepBackup, &run.RestoreMode, &paths, &run.SourceRunID, &run.SourceHostID,
+		&include, &exclude, &run.CreatedAt, &run.FinishedAt, &counts); err != nil {
 		return err
 	}
+	run.BackupInclude, run.BackupExclude = splitPaths(include), splitPaths(exclude)
 	if paths != "" {
 		run.RestorePaths = strings.Split(paths, "\n")
 	}
 	return json.Unmarshal([]byte(counts), &run.Counts)
 }
 
-// ListRuns returns the newest runs first, with their per-status counts.
-func (r *OSUpdateRepo) ListRuns(ctx context.Context, limit int) ([]models.OSUpdateRun, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+osRunCols+` ORDER BY r.id DESC LIMIT ?`, limit)
+// joinPaths stores a path list as lines; an empty list is NULL (inherit).
+func joinPaths(p []string) any {
+	if len(p) == 0 {
+		return nil
+	}
+	return strings.Join(p, "\n")
+}
+
+func splitPaths(s string) []string {
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, "\n")
+}
+
+// ListRuns returns the newest runs first, with their per-status counts; with
+// hostID > 0 only the runs that include that host.
+func (r *OSUpdateRepo) ListRuns(ctx context.Context, limit int, hostID int64) ([]models.OSUpdateRun, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+osRunCols+`
+		WHERE ? = 0 OR EXISTS (SELECT 1 FROM os_update_results x WHERE x.run_id = r.id AND x.host_id = ?)
+		ORDER BY r.id DESC LIMIT ?`, hostID, hostID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -97,15 +118,23 @@ func (r *OSUpdateRepo) GetRun(ctx context.Context, id int64) (*models.OSUpdateRu
 	return run, rows.Err()
 }
 
-const osResultCols = `x.run_id, x.host_id, h.nickname, h.oficial_slug, x.status, x.reason, x.pkg_manager, x.os_before, x.os_after,
+const osResultFields = `x.run_id, x.host_id, h.nickname, h.oficial_slug, x.status, x.reason, x.pkg_manager, x.os_before, x.os_after,
 	x.upgradable, x.security_upgradable, x.upgraded, x.reboot_required, x.rebooted, x.output, x.started_at, x.finished_at,
-	x.backup_key, x.backup_size, x.backup_status
-	FROM os_update_results x JOIN hosts h ON h.id = x.host_id`
+	x.backup_key, x.backup_size, x.backup_status, x.backup_include, x.backup_exclude`
 
-func scanOSResult(sc interface{ Scan(...any) error }, x *models.OSUpdateResult) error {
-	return sc.Scan(&x.RunID, &x.HostID, &x.HostNickname, &x.HostSlug, &x.Status, &x.Reason, &x.PkgManager, &x.OSBefore, &x.OSAfter,
+const osResultCols = osResultFields + ` FROM os_update_results x JOIN hosts h ON h.id = x.host_id`
+
+// scanOSResult scans osResultFields, then extra.
+func scanOSResult(sc interface{ Scan(...any) error }, x *models.OSUpdateResult, extra ...any) error {
+	var include, exclude string
+	dest := append([]any{&x.RunID, &x.HostID, &x.HostNickname, &x.HostSlug, &x.Status, &x.Reason, &x.PkgManager, &x.OSBefore, &x.OSAfter,
 		&x.Upgradable, &x.SecurityUpgradable, &x.Upgraded, &x.RebootRequired, &x.Rebooted, &x.Output, &x.StartedAt, &x.FinishedAt,
-		&x.BackupKey, &x.BackupSize, &x.BackupStatus)
+		&x.BackupKey, &x.BackupSize, &x.BackupStatus, &include, &exclude}, extra...)
+	if err := sc.Scan(dest...); err != nil {
+		return err
+	}
+	x.BackupInclude, x.BackupExclude = splitPaths(include), splitPaths(exclude)
+	return nil
 }
 
 // PendingHosts returns the run's hosts still pending, in id order.
@@ -142,10 +171,10 @@ func (r *OSUpdateRepo) StartResult(ctx context.Context, runID, hostID int64, osB
 func (r *OSUpdateRepo) FinishResult(ctx context.Context, x *models.OSUpdateResult) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE os_update_results SET status = ?, reason = ?, pkg_manager = ?, os_after = ?,
 		upgradable = ?, security_upgradable = ?, upgraded = ?, reboot_required = ?, rebooted = ?, output = ?, finished_at = now(),
-		backup_key = ?, backup_size = ?, backup_status = ?
+		backup_key = ?, backup_size = ?, backup_status = ?, backup_include = ?, backup_exclude = ?
 		WHERE run_id = ? AND host_id = ?`,
 		x.Status, x.Reason, x.PkgManager, x.OSAfter, x.Upgradable, x.SecurityUpgradable, x.Upgraded, x.RebootRequired, x.Rebooted, x.Output,
-		x.BackupKey, x.BackupSize, x.BackupStatus, x.RunID, x.HostID)
+		x.BackupKey, x.BackupSize, x.BackupStatus, strings.Join(x.BackupInclude, "\n"), strings.Join(x.BackupExclude, "\n"), x.RunID, x.HostID)
 	return err
 }
 
@@ -219,4 +248,31 @@ func (r *OSUpdateRepo) GetResult(ctx context.Context, runID, hostID int64) (*mod
 func (r *OSUpdateRepo) SetBackupStatus(ctx context.Context, runID, hostID int64, status string) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE os_update_results SET backup_status = ? WHERE run_id = ? AND host_id = ?`, status, runID, hostID)
 	return err
+}
+
+// KeptBackups returns the backups still kept in MinIO (as far as Bridge
+// knows), newest first: one host's with hostID > 0, else the newest per host.
+// Without output; RunKind says what took them.
+func (r *OSUpdateRepo) KeptBackups(ctx context.Context, hostID int64) ([]models.OSUpdateResult, error) {
+	from := ` FROM os_update_results x JOIN hosts h ON h.id = x.host_id JOIN os_update_runs rr ON rr.id = x.run_id
+		WHERE x.backup_status = 'done' AND h.deleted_at IS NULL`
+	q, args := `SELECT `+osResultFields+`, rr.kind`+from+` AND x.host_id = ? ORDER BY x.finished_at DESC`, []any{hostID}
+	if hostID == 0 {
+		q, args = `SELECT DISTINCT ON (x.host_id) `+osResultFields+`, rr.kind`+from+` ORDER BY x.host_id, x.finished_at DESC`, nil
+	}
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []models.OSUpdateResult{}
+	for rows.Next() {
+		var x models.OSUpdateResult
+		if err := scanOSResult(rows, &x, &x.RunKind); err != nil {
+			return nil, err
+		}
+		x.Output = ""
+		out = append(out, x)
+	}
+	return out, rows.Err()
 }

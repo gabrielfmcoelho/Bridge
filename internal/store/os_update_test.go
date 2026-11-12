@@ -81,7 +81,7 @@ func TestOSUpdateRepo_Lifecycle(t *testing.T) {
 	if err != nil || len(latest) != 1 || latest[0].HostID != hosts[0] || *latest[0].SecurityUpgradable != 1 || latest[0].Output != "" {
 		t.Fatalf("latest = %+v %v", latest, err)
 	}
-	runs, err := repo.ListRuns(ctx, 10)
+	runs, err := repo.ListRuns(ctx, 10, 0)
 	if err != nil || len(runs) != 1 || runs[0].Counts["failed"] != 1 {
 		t.Fatalf("runs = %+v %v", runs, err)
 	}
@@ -110,5 +110,66 @@ func TestOSUpdateRepo_Lifecycle(t *testing.T) {
 	}
 	if none, err := repo.GetResult(ctx, brun.ID, hosts[2]); none != nil || err != nil {
 		t.Fatalf("no result = %v %v", none, err)
+	}
+
+	// A backup-only run with the run's own paths; its result keeps the
+	// effective ones. Kept backups: per host, and the newest of each host.
+	krun := &models.OSUpdateRun{Kind: "backup", Concurrency: 1, Backup: true, KeepBackup: true, BackupInclude: []string{"/etc", "/opt"}}
+	if err := repo.CreateRun(ctx, krun, hosts[1:2]); err != nil {
+		t.Fatal(err)
+	}
+	repo.StartResult(ctx, krun.ID, hosts[1], "")
+	repo.FinishResult(ctx, &models.OSUpdateResult{RunID: krun.ID, HostID: hosts[1], Status: models.OSResultSuccess,
+		BackupKey: "k", BackupSize: &size, BackupStatus: models.OSBackupDone,
+		BackupInclude: []string{"/etc", "/opt"}, BackupExclude: []string{"/tmp"}})
+	if got, _ := repo.GetRun(ctx, krun.ID); strings.Join(got.BackupInclude, " ") != "/etc /opt" || got.BackupExclude != nil ||
+		strings.Join(got.Results[0].BackupExclude, " ") != "/tmp" {
+		t.Fatalf("backup run = %+v / %+v", got, got.Results[0])
+	}
+	kept, err := repo.KeptBackups(ctx, hosts[1])
+	if err != nil || len(kept) != 1 || kept[0].RunKind != "backup" || kept[0].BackupKey != "k" {
+		t.Fatalf("kept = %+v %v", kept, err)
+	}
+	if all, _ := repo.KeptBackups(ctx, 0); len(all) != 1 || all[0].HostID != hosts[1] {
+		t.Fatalf("latest kept = %+v", all)
+	}
+	if none, _ := repo.KeptBackups(ctx, hosts[0]); len(none) != 0 {
+		t.Fatalf("a deleted backup is not kept: %+v", none)
+	}
+	if runs, _ := repo.ListRuns(ctx, 10, hosts[1]); len(runs) != 2 || runs[0].ID != krun.ID {
+		t.Fatalf("host runs = %+v", runs)
+	}
+}
+
+// A host without a profile inherits everything; an empty list goes back to
+// inheriting; the host's deletion takes its profile.
+func TestHostBackupProfileRepo(t *testing.T) {
+	ctx := context.Background()
+	d := openDB(t)
+	var host int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('db-1', 'db-1') RETURNING id`).Scan(&host); err != nil {
+		t.Fatal(err)
+	}
+	repo := store.NewHostBackupProfileRepo(d.SQL)
+	p, err := repo.Get(ctx, host)
+	if err != nil || p.Include != nil || p.Exclude != nil || p.UpdatedAt != nil {
+		t.Fatalf("none = %+v %v", p, err)
+	}
+	if err := repo.Upsert(ctx, &models.HostBackupProfile{HostID: host, Exclude: []string{"/tmp", "/var/lib/postgresql"}}); err != nil {
+		t.Fatal(err)
+	}
+	p, _ = repo.Get(ctx, host)
+	if p.Include != nil || strings.Join(p.Exclude, " ") != "/tmp /var/lib/postgresql" || p.UpdatedAt == nil {
+		t.Fatalf("saved = %+v", p)
+	}
+	repo.Upsert(ctx, &models.HostBackupProfile{HostID: host, Include: []string{"/etc"}})
+	if p, _ = repo.Get(ctx, host); strings.Join(p.Include, " ") != "/etc" || p.Exclude != nil {
+		t.Fatalf("replaced = %+v", p)
+	}
+	d.SQL.Exec(`DELETE FROM hosts WHERE id = $1`, host)
+	var n int
+	d.SQL.QueryRow(`SELECT COUNT(*) FROM host_backup_profiles`).Scan(&n)
+	if n != 0 {
+		t.Fatal("the profile goes with its host")
 	}
 }

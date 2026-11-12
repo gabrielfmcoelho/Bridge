@@ -202,14 +202,24 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 	}
 	// The backup comes first: no backup, no update.
 	if run.Backup && run.Kind != sshtest.OSUpdateCheck {
-		key, size, err := h.backupHost(ctx, run, host, client, priv)
+		key, size, paths, err := h.backupHost(ctx, run, host, client, priv)
+		res.BackupInclude, res.BackupExclude = paths.Include, paths.Exclude
 		if err != nil {
 			client.Close()
 			res.BackupStatus = models.OSBackupFailed
 			res.Reason = "backup failed, nothing was updated: " + err.Error()
+			if run.Kind == sshtest.OSUpdateBackup {
+				res.Reason = "backup failed: " + err.Error()
+			}
 			return res
 		}
 		res.BackupKey, res.BackupSize, res.BackupStatus = key, &size, models.OSBackupDone
+	}
+	// A backup-only run is done here: nothing changed on the host.
+	if run.Kind == sshtest.OSUpdateBackup {
+		client.Close()
+		res.Status = models.OSResultSuccess
+		return res
 	}
 	if run.Kind == sshtest.OSUpdateRestore {
 		err = h.startRestore(ctx, client, priv, run)
@@ -354,8 +364,9 @@ func (h *sshHandlers) startRestore(ctx context.Context, client *ssh.Client, priv
 // osBackupTimeout bounds one host's backup (a few hundred GB at LAN speed).
 var osBackupTimeout = 3 * time.Hour
 
-// minio returns a client on the configured MinIO and its settings, or an
-// error when it isn't set up.
+// minio returns a client on the configured MinIO connection and its
+// settings, or an error when it isn't set up. What backups take and keep is
+// the feature's: service.LoadBackupDefaults.
 func (h *sshHandlers) minio() (*minioclient.Client, minioclient.Settings, error) {
 	s, err := minioclient.LoadSettings(h.db.SQL, h.db.Encryptor)
 	if err != nil {
@@ -368,36 +379,54 @@ func (h *sshHandlers) minio() (*minioclient.Client, minioclient.Settings, error)
 	return c, s, err
 }
 
-// backupHost streams the host's files to MinIO and returns the object key
-// and size. A failed backup leaves no object behind.
-func (h *sshHandlers) backupHost(ctx context.Context, run models.OSUpdateRun, host *models.Host, client *ssh.Client, priv sshtest.Privilege) (string, int64, error) {
-	c, s, err := h.minio()
+// backupPaths is what a backup of host in run takes: the run's override,
+// else the host's profile, else the defaults (each list on its own).
+func (h *sshHandlers) backupPaths(ctx context.Context, run models.OSUpdateRun, hostID int64, d service.BackupDefaults) (service.BackupPaths, error) {
+	p, err := store.NewHostBackupProfileRepo(h.db.SQL).Get(ctx, hostID)
 	if err != nil {
-		return "", 0, err
+		return service.BackupPaths{}, err
 	}
-	include := s.Include
+	paths := service.EffectivePaths(d, service.BackupPaths{Include: p.Include, Exclude: p.Exclude},
+		service.BackupPaths{Include: run.BackupInclude, Exclude: run.BackupExclude})
 	if run.Kind == sshtest.OSUpdateRestore {
-		include = run.RestorePaths // the undo of a restore in place: just what it overwrites
+		paths.Include = run.RestorePaths // the undo of a restore in place: just what it overwrites
+	}
+	return paths, nil
+}
+
+// backupHost streams the host's files to MinIO and returns the object key,
+// its size and the paths it took. A failed backup leaves no object behind.
+func (h *sshHandlers) backupHost(ctx context.Context, run models.OSUpdateRun, host *models.Host, client *ssh.Client, priv sshtest.Privilege) (string, int64, service.BackupPaths, error) {
+	d := service.LoadBackupDefaults(ctx, h.db.SQL)
+	paths, err := h.backupPaths(ctx, run, host.ID, d)
+	if err != nil {
+		return "", 0, paths, err
+	}
+	c, _, err := h.minio()
+	if err != nil {
+		return "", 0, paths, err
 	}
 	ext := sshtest.BackupExt(client)
 	contentType := "application/gzip"
 	if ext == "tar.zst" {
 		contentType = "application/zstd"
 	}
-	key := c.BackupKey(host.OficialSlug, run.ID, ext, time.Now())
+	key := d.BackupKey(host.OficialSlug, run.ID, ext, time.Now())
 	ctx, cancel := context.WithTimeout(ctx, osBackupTimeout)
 	defer cancel()
 	size, err := streamTo(
 		func(r io.Reader) (int64, error) {
 			return c.Put(ctx, key, r, contentType)
 		},
-		func(w io.Writer) error { return sshtest.StreamBackup(ctx, client, priv, include, s.Exclude, w) },
+		func(w io.Writer) error {
+			return sshtest.StreamBackup(ctx, client, priv, paths.Include, paths.Exclude, w)
+		},
 	)
 	if err != nil {
 		c.Delete(context.WithoutCancel(ctx), key) // a partial upload may have completed
-		return "", 0, err
+		return "", 0, paths, err
 	}
-	return key, size, nil
+	return key, size, paths, nil
 }
 
 // streamTo pipes what produce writes into consume, concurrently: the archive
@@ -473,9 +502,13 @@ type osUpdateRunRequest struct {
 	Concurrency int     `json:"concurrency"`
 	Backup      bool    `json:"backup"`      // back each host up to MinIO first
 	KeepBackup  bool    `json:"keep_backup"` // keep the backup after a success
+	// This run's backup paths, absolute; empty = each host's profile, else the defaults.
+	BackupInclude []string `json:"backup_include"`
+	BackupExclude []string `json:"backup_exclude"`
 }
 
-var osUpdateKinds = map[string]bool{sshtest.OSUpdateCheck: true, sshtest.OSUpdatePackages: true, sshtest.OSUpdateSecurity: true, sshtest.OSUpdateRelease: true}
+var osUpdateKinds = map[string]bool{sshtest.OSUpdateCheck: true, sshtest.OSUpdatePackages: true, sshtest.OSUpdateSecurity: true,
+	sshtest.OSUpdateRelease: true, sshtest.OSUpdateBackup: true}
 
 // handleStartOSUpdate godoc
 //
@@ -496,9 +529,18 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if !osUpdateKinds[req.Kind] {
-		jsonError(w, http.StatusBadRequest, "kind must be check, packages, security or release")
+		jsonError(w, http.StatusBadRequest, "kind must be check, packages, security, release or backup")
 		return
 	}
+	include, err := service.CleanPaths(req.BackupInclude)
+	if err == nil {
+		req.BackupExclude, err = service.CleanPaths(req.BackupExclude)
+	}
+	if err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	req.BackupInclude = include
 	// A release upgrade can leave a host unbootable: one host per run, and it
 	// always reboots (the release finishes on boot).
 	if req.Kind == sshtest.OSUpdateRelease {
@@ -509,16 +551,22 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 		req.Concurrency, req.Reboot = 1, true
 	}
 	// A check changes nothing: no backup. A release upgrade always takes one
-	// when MinIO is set up.
+	// when MinIO is set up. A backup run only backs up, and keeps it.
 	_, _, minioErr := h.minio()
 	switch {
 	case req.Kind == sshtest.OSUpdateCheck:
 		req.Backup, req.KeepBackup = false, false
+	case req.Kind == sshtest.OSUpdateBackup:
+		req.Backup, req.KeepBackup, req.Reboot = true, true, false
 	case req.Kind == sshtest.OSUpdateRelease && minioErr == nil:
 		req.Backup = true
-	case req.Backup && minioErr != nil:
+	}
+	if req.Backup && minioErr != nil {
 		jsonError(w, http.StatusBadRequest, minioErr.Error())
 		return
+	}
+	if !req.Backup {
+		req.BackupInclude, req.BackupExclude = nil, nil
 	}
 	if len(req.HostIDs) == 0 || len(req.HostIDs) > osUpdateMaxHosts {
 		jsonError(w, http.StatusBadRequest, fmt.Sprintf("host_ids must have 1 to %d hosts", osUpdateMaxHosts))
@@ -539,7 +587,7 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 		}
 	}
 	run := models.OSUpdateRun{Kind: req.Kind, Reboot: req.Reboot && req.Kind != sshtest.OSUpdateCheck, Concurrency: req.Concurrency,
-		Backup: req.Backup, KeepBackup: req.Backup && req.KeepBackup}
+		Backup: req.Backup, KeepBackup: req.Backup && req.KeepBackup, BackupInclude: req.BackupInclude, BackupExclude: req.BackupExclude}
 	if u := auth.UserFromContext(r.Context()); u != nil {
 		run.RequestedBy = &u.ID
 	}
@@ -548,7 +596,8 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 		// a key that can't manage lifecycle still backs up.
 		if c, _, err := h.minio(); err == nil {
 			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-			if err := c.EnsureLifecycle(ctx); err != nil {
+			d := service.LoadBackupDefaults(ctx, h.db.SQL)
+			if err := c.EnsureRule(ctx, service.BackupRuleID, d.Prefix, d.RetentionDays); err != nil {
 				log.Printf("[osupdate] backup lifecycle rule: %v", err)
 			}
 			cancel()
@@ -570,13 +619,14 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 // handleListOSUpdates godoc
 //
 //	@Summary		List OS update runs
-//	@Description	Admin. The 50 newest runs, newest first, with how many hosts are in each status.
+//	@Description	Admin. The 50 newest runs, newest first, with how many hosts are in each status; host_id keeps only the runs that include that host.
 //	@Tags			ssh
 //	@Produce		json
-//	@Success		200	{array}	models.OSUpdateRun
+//	@Param			host_id	query	int	false	"Only runs of this host"
+//	@Success		200		{array}	models.OSUpdateRun
 //	@Router			/api/ssh/os-updates/runs [get]
 func (h *sshHandlers) handleListOSUpdates(w http.ResponseWriter, r *http.Request) {
-	runs, err := store.NewOSUpdateRepo(h.db.SQL).ListRuns(r.Context(), 50)
+	runs, err := store.NewOSUpdateRepo(h.db.SQL).ListRuns(r.Context(), 50, hostIDParam(r))
 	if err != nil {
 		jsonServerError(w, r, "failed to list runs", err)
 		return
@@ -664,8 +714,10 @@ func (h *sshHandlers) handleLatestOSUpdates(w http.ResponseWriter, r *http.Reque
 //	@Success		200	{object}	map[string]interface{}
 //	@Router			/api/ssh/os-updates/config [get]
 func (h *sshHandlers) handleOSUpdateConfig(w http.ResponseWriter, r *http.Request) {
-	_, s, err := h.minio()
-	jsonOK(w, map[string]any{"backup_available": err == nil, "backup_include": s.Include, "backup_exclude": s.Exclude, "retention_days": s.RetentionDays})
+	_, _, err := h.minio()
+	d := service.LoadBackupDefaults(r.Context(), h.db.SQL)
+	jsonOK(w, map[string]any{"backup_available": err == nil, "backup_include": d.Include, "backup_exclude": d.Exclude,
+		"retention_days": d.RetentionDays, "backup_prefix": d.Prefix})
 }
 
 // osBackupFromPath loads {id}/{host_id}'s result when it has a backup in
@@ -827,4 +879,172 @@ func (h *sshHandlers) handleStartOSRestore(w http.ResponseWriter, r *http.Reques
 		got = &run
 	}
 	httpx.WriteJSON(w, http.StatusAccepted, got)
+}
+
+// hostIDParam is the ?host_id= filter (0 when absent or invalid).
+func hostIDParam(r *http.Request) int64 {
+	id, _ := strconv.ParseInt(r.URL.Query().Get("host_id"), 10, 64)
+	return max(id, 0)
+}
+
+// osBackupStatCap bounds the MinIO lookups one list makes.
+const osBackupStatCap = 20
+
+// handleListOSBackups godoc
+//
+//	@Summary		Kept host backups
+//	@Description	Admin. With host_id: that host's backups still kept in MinIO, newest first. Each is checked in MinIO (up to 20): one the bucket's lifecycle rule already removed is marked deleted and left out. Without host_id: each host's newest kept backup, for the indicators; those older than the retention are left out by age, without asking MinIO. Each has run_kind, the paths it took and expires_at (none when backups are kept until deleted). 404 when the host isn't visible.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			host_id	query		int	false	"One host's backups"
+//	@Success		200		{array}		models.OSUpdateResult
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/os-updates/backups [get]
+func (h *sshHandlers) handleListOSBackups(w http.ResponseWriter, r *http.Request) {
+	hostID := hostIDParam(r)
+	if hostID > 0 {
+		if host, err := store.NewHostRepo(h.db.SQL).GetByID(r.Context(), hostID); err != nil || host == nil {
+			jsonError(w, http.StatusNotFound, "host not found")
+			return
+		}
+	}
+	repo := store.NewOSUpdateRepo(h.db.SQL)
+	rows, err := repo.KeptBackups(r.Context(), hostID)
+	if err != nil {
+		jsonServerError(w, r, "failed to list the backups", err)
+		return
+	}
+	d := service.LoadBackupDefaults(r.Context(), h.db.SQL)
+	c, _, minioErr := h.minio()
+	now := time.Now()
+	out := make([]models.OSUpdateResult, 0, len(rows))
+	for i, x := range rows {
+		if x.FinishedAt != nil {
+			x.ExpiresAt = d.ExpiresAt(*x.FinishedAt)
+		}
+		if hostID == 0 {
+			if x.ExpiresAt == nil || x.ExpiresAt.After(now) {
+				out = append(out, x)
+			}
+			continue
+		}
+		// One host: ask MinIO (the lifecycle rule deletes without telling
+		// Bridge). MinIO unreachable: show what Bridge knows.
+		if minioErr == nil && i < osBackupStatCap {
+			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+			ok, err := c.Exists(ctx, x.BackupKey)
+			cancel()
+			if err == nil && !ok {
+				repo.SetBackupStatus(r.Context(), x.RunID, x.HostID, models.OSBackupDeleted)
+				continue
+			}
+		}
+		out = append(out, x)
+	}
+	jsonOK(w, out)
+}
+
+// backupProfileView is a host's backup profile with what it resolves to.
+type backupProfileView struct {
+	Profile   *models.HostBackupProfile `json:"profile"`
+	Defaults  service.BackupDefaults    `json:"defaults"`
+	Effective service.BackupPaths       `json:"effective"`
+}
+
+func (h *sshHandlers) backupProfileView(ctx context.Context, hostID int64) (*backupProfileView, error) {
+	p, err := store.NewHostBackupProfileRepo(h.db.SQL).Get(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+	d := service.LoadBackupDefaults(ctx, h.db.SQL)
+	return &backupProfileView{Profile: p, Defaults: d,
+		Effective: service.EffectivePaths(d, service.BackupPaths{Include: p.Include, Exclude: p.Exclude}, service.BackupPaths{})}, nil
+}
+
+// handleGetBackupProfile godoc
+//
+//	@Summary		A host's backup profile
+//	@Description	Admin. The host's own backup paths (an empty list inherits the default), the defaults (Settings › Host backups) and the paths a backup of the host takes. 404 when the host isn't visible.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	backupProfileView
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/backup-profile [get]
+func (h *sshHandlers) handleGetBackupProfile(w http.ResponseWriter, r *http.Request) {
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	v, err := h.backupProfileView(r.Context(), host.ID)
+	if err != nil {
+		jsonServerError(w, r, "failed to load the backup profile", err)
+		return
+	}
+	jsonOK(w, v)
+}
+
+// backupProfileRequest is a partial update: an omitted (or null) list is
+// kept; [] goes back to the default; absolute paths otherwise.
+type backupProfileRequest struct {
+	Include *[]string `json:"include"`
+	Exclude *[]string `json:"exclude"`
+}
+
+// handleUpdateBackupProfile godoc
+//
+//	@Summary		Update a host's backup profile
+//	@Description	Admin. Partial: an omitted list keeps its value, [] goes back to the default, otherwise absolute paths (spaces or lines). Returns the profile view. 400 on a relative path, 404 when the host isn't visible.
+//	@Tags			ssh
+//	@Accept			json
+//	@Produce		json
+//	@Param			slug	path		string					true	"Host slug"
+//	@Param			body	body		backupProfileRequest	true	"Profile"
+//	@Success		200		{object}	backupProfileView
+//	@Failure		400		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/backup-profile [put]
+func (h *sshHandlers) handleUpdateBackupProfile(w http.ResponseWriter, r *http.Request) {
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	var req backupProfileRequest
+	if err := decodeJSON(r, &req); err != nil {
+		jsonBadRequest(w, r, "invalid request body", err)
+		return
+	}
+	repo := store.NewHostBackupProfileRepo(h.db.SQL)
+	p, err := repo.Get(r.Context(), host.ID)
+	if err != nil {
+		jsonServerError(w, r, "failed to load the backup profile", err)
+		return
+	}
+	for _, f := range []struct {
+		in  *[]string
+		out *[]string
+	}{{req.Include, &p.Include}, {req.Exclude, &p.Exclude}} {
+		if f.in == nil {
+			continue
+		}
+		clean, err := service.CleanPaths(*f.in)
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		*f.out = clean
+	}
+	if u := auth.UserFromContext(r.Context()); u != nil {
+		p.UpdatedBy = &u.ID
+	}
+	if err := repo.Upsert(r.Context(), p); err != nil {
+		jsonServerError(w, r, "failed to save the backup profile", err)
+		return
+	}
+	v, err := h.backupProfileView(r.Context(), host.ID)
+	if err != nil {
+		jsonServerError(w, r, "failed to load the backup profile", err)
+		return
+	}
+	jsonOK(w, v)
 }

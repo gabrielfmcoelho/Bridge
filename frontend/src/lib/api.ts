@@ -740,15 +740,23 @@ export const orchestratorsAPI = {
 // SSH
 // OS update runs (admin): background check / package / security upgrades.
 export const osUpdateAPI = {
-  start: (body: { kind: import("./types").OSUpdateKind; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean }) =>
+  start: (body: { kind: import("./types").OSUpdateKind; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean;
+    backup_include?: string[]; backup_exclude?: string[] }) =>
     api.post<import("./types").OSUpdateRun>("/api/ssh/os-updates/runs", body),
-  runs: () => api.get<import("./types").OSUpdateRun[]>("/api/ssh/os-updates/runs"),
+  /** Newest first; with hostId, only the runs that include that host. */
+  runs: (hostId?: number) => api.get<import("./types").OSUpdateRun[]>(`/api/ssh/os-updates/runs${hostId ? `?host_id=${hostId}` : ""}`),
   run: (id: number) => api.get<import("./types").OSUpdateRun>(`/api/ssh/os-updates/runs/${id}`),
   cancel: (id: number) => api.post<import("./types").OSUpdateRun>(`/api/ssh/os-updates/runs/${id}/cancel`),
   /** Per host, the newest run that counted pending upgrades. */
   latest: () => api.get<import("./types").OSUpdateResult[]>("/api/ssh/os-updates/latest"),
   /** Whether hosts can be backed up to MinIO first, and what a backup takes. */
-  config: () => api.get<{ backup_available: boolean; backup_include: string[]; backup_exclude: string[]; retention_days: number }>("/api/ssh/os-updates/config"),
+  config: () => api.get<{ backup_available: boolean; backup_include: string[]; backup_exclude: string[]; retention_days: number; backup_prefix: string }>("/api/ssh/os-updates/config"),
+  /** Kept backups: one host's (checked in MinIO), or each host's newest. */
+  backups: (hostId?: number) => api.get<import("./types").OSUpdateResult[]>(`/api/ssh/os-updates/backups${hostId ? `?host_id=${hostId}` : ""}`),
+  backupProfile: (slug: string) => api.get<import("./types").BackupProfileView>(`/api/hosts/${slug}/backup-profile`),
+  /** Partial: an omitted list is kept, [] goes back to the default. */
+  saveBackupProfile: (slug: string, body: { include?: string[]; exclude?: string[] }) =>
+    api.put<import("./types").BackupProfileView>(`/api/hosts/${slug}/backup-profile`, body),
   /** A one-hour link straight to MinIO that downloads a kept backup. */
   backupLink: (runId: number, hostId: number) =>
     api.get<{ url: string; key: string; size?: number; expires_in: number }>(`/api/ssh/os-updates/runs/${runId}/hosts/${hostId}/backup`),
@@ -1464,7 +1472,9 @@ export const integrationsAPI = {
       name?: string;
       org_id?: number;
     }>("/api/settings/integrations/test/grafana", data ?? {}),
-  testMinio: () => api.post<{ success: boolean; error?: string; bucket?: string; retention_days?: number; lifecycle_error?: string }>("/api/settings/integrations/test/minio", {}),
+  testMinio: () => api.post<{ success: boolean; error?: string; bucket?: string }>("/api/settings/integrations/test/minio", {}),
+  /** Puts the host backups' retention on the bucket (Bridge's lifecycle rule). */
+  applyBackupRetention: () => api.post<{ success: boolean; error?: string; retention_days?: number; prefix?: string }>("/api/settings/integrations/osbackup/retention", {}),
   testOutline: (data?: { base_url?: string; token?: string }) =>
     api.post<{
       success: boolean;

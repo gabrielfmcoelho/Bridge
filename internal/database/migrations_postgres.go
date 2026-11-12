@@ -2202,4 +2202,22 @@ var migrationsPostgres = []string{
 	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS restore_paths TEXT NOT NULL DEFAULT '';
 	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS source_run_id BIGINT;
 	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS source_host_id BIGINT;`,
+
+	// Version 127: host backups as a feature. A host's backup profile
+	// overrides the default paths (NULL = inherit); a run may override them
+	// once (backup_include / backup_exclude, NULL = none) and each result
+	// records the paths it actually took. Kind 'backup' backs up only.
+	`CREATE TABLE IF NOT EXISTS host_backup_profiles (
+		host_id    BIGINT PRIMARY KEY REFERENCES hosts(id) ON DELETE CASCADE,
+		include    TEXT,
+		exclude    TEXT,
+		updated_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	);
+	ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
+	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup'));
+	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS backup_include TEXT;
+	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS backup_exclude TEXT;
+	ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS backup_include TEXT NOT NULL DEFAULT '';
+	ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS backup_exclude TEXT NOT NULL DEFAULT '';`,
 }

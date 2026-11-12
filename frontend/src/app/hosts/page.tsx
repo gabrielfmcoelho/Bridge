@@ -37,12 +37,17 @@ import BatchDockerLogsModal from "./_components/BatchDockerLogsModal";
 import BatchSudoNopasswdModal from "./_components/BatchSudoNopasswdModal";
 import BatchSetupKeyModal from "./_components/BatchSetupKeyModal";
 import HostsTableView from "./_components/HostsTableView";
+import OSUpdateModal from "./_components/OSUpdateModal";
+import { RunDrawer } from "./_components/OSUpdateRuns";
+import OSRestoreModal from "./_components/OSRestoreModal";
+import { useLatestBackups } from "./_components/OSBadges";
+import { osLabel } from "./_components/hostInsights";
 import GroupByMenu from "@/components/inventory/GroupByMenu";
 import Icon from "@/components/ui/Icon";
 import DropdownMenu, { DropdownMenuGroup, DropdownMenuItem } from "@/components/ui/DropdownMenu";
 import { useRelationGroups } from "@/hooks/useRelationGroups";
 import type { GroupEntity } from "@/lib/grouping";
-import type { Host, HostFilters, HostSortConfig } from "@/lib/types";
+import type { Host, HostFilters, HostSortConfig, OSUpdateResult } from "@/lib/types";
 
 type ScanStatus = "pending" | "scanning" | "success" | "failed" | "skipped";
 type ScanProgress = Record<string, { status: ScanStatus; error?: string; attempt?: number }>;
@@ -117,6 +122,10 @@ export default function HostsPage() {
   const [showDockerLogsModal, setShowDockerLogsModal] = useState(false);
   const [showSudoModal, setShowSudoModal] = useState(false);
   const [showSetupKeyModal, setShowSetupKeyModal] = useState(false);
+  // Maintenance over the listed hosts: OS update or backup-only (admin).
+  const [maintenance, setMaintenance] = useState<"security" | "backup" | null>(null);
+  const [openRun, setOpenRun] = useState<number | null>(null);
+  const [restoring, setRestoring] = useState<OSUpdateResult | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<ScanProgress>({});
   const [scanConcurrency, setScanConcurrency] = useLocalStorage("hosts.scanConcurrency", 10);
@@ -202,6 +211,7 @@ export default function HostsPage() {
   const tableTotal = tableQuery.data?.meta.total ?? 0;
 
   const canEdit = user?.role === "admin" || user?.role === "editor";
+  const backups = useLatestBackups(user?.role === "admin");
   useOpenOnParam("new", () => setShowForm(true), canEdit);
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const scannableHosts = useMemo(() => hosts.filter(h => h.has_key || h.has_password), [hosts]);
@@ -451,6 +461,10 @@ export default function HostsPage() {
       { label: t("host.batchSudo"), icon: ICON_PATHS.terminal, color: "var(--warning)", onClick: () => setShowSudoModal(true) },
       { label: t("host.batchKey"), icon: ICON_PATHS.key, color: "var(--success)", onClick: () => setShowSetupKeyModal(true) },
     ] : []),
+    ...(user?.role === "admin" && hosts.length > 0 ? [
+      { label: t("host.bulkOSUpdate"), icon: ICON_PATHS.refresh, color: "var(--warning)", onClick: () => setMaintenance("security"), group: "maintenance" },
+      { label: t("host.bulkBackup"), icon: ICON_PATHS.exportDoc, color: "var(--success)", onClick: () => setMaintenance("backup"), group: "maintenance" },
+    ] : []),
     ...(user?.role === "admin" ? [
       { label: t("host.syncProxmox"), icon: ICON_PATHS.refresh, color: "var(--info)", onClick: () => proxmoxSync.mutate(), disabled: proxmoxSync.isPending, group: "sync" },
       { label: t("host.syncCoolify"), icon: ICON_PATHS.refresh, color: "var(--accent)", onClick: () => coolifySync.mutate(), disabled: coolifySync.isPending, group: "sync" },
@@ -502,10 +516,10 @@ export default function HostsPage() {
                 )}
                 {bulkActions.length > 0 && (
                   <DropdownMenu trigger={<ToolbarActionButton icon={ICON_PATHS.bolt} label={t("host.bulkActions")} hideLabel="md" />}>
-                    {(["ops", "sync"] as const).map((g) => {
+                    {(["ops", "maintenance", "sync"] as const).map((g) => {
                       const items = bulkActions.filter((a) => ("group" in a ? a.group : "ops") === g);
                       return items.length > 0 && (
-                        <DropdownMenuGroup key={g} title={t(g === "ops" ? "host.bulkGroupOps" : "host.bulkGroupSync")}>
+                        <DropdownMenuGroup key={g} title={t({ ops: "host.bulkGroupOps", maintenance: "host.bulkGroupMaintenance", sync: "host.bulkGroupSync" }[g])}>
                           {items.map((a) => (
                             <DropdownMenuItem
                               key={a.label}
@@ -549,7 +563,7 @@ export default function HostsPage() {
                 emptyDescription={search || activeFilterCount ? t("host.emptyStateFilter") : t("host.emptyStateAdd")}
                 emptyAction={canEdit && !search && !activeFilterCount ? <Button size="sm" onClick={() => setShowForm(true)}>+ {t("host.addHost")}</Button> : undefined}
                 renderCard={(host) => <HostCard host={host} />}
-                renderTable={(items) => <HostsTableView hosts={items} total={groupBy ? undefined : tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} canEdit={canEdit} t={t} />}
+                renderTable={(items) => <HostsTableView hosts={items} total={groupBy ? undefined : tableTotal} tablePage={tablePage} onPageChange={setTablePage} sort={sort} onSortChange={setSort} canEdit={canEdit} backups={backups} t={t} />}
                 visibleCount={visibleCount}
                 loadMoreRef={loadMoreRef}
                 onLoadMore={() => setVisibleCount((c) => c + 24)}
@@ -607,6 +621,16 @@ export default function HostsPage() {
       <ResponsiveModal open={showSetupKeyModal} onClose={() => setShowSetupKeyModal(false)} title={t("host.batchKey")}>
         <BatchSetupKeyModal hosts={hosts} onClose={() => setShowSetupKeyModal(false)} t={t} />
       </ResponsiveModal>
+
+      {maintenance && (
+        <OSUpdateModal preset={maintenance} onClose={() => setMaintenance(null)}
+          target={{ by: "hosts", hosts: hosts.map((h) => ({ id: h.id, nickname: h.nickname, slug: h.oficial_slug, os: osLabel(h) })) }}
+          onStarted={(run) => { setMaintenance(null); setOpenRun(run.id); }} />
+      )}
+      {/* The run started here (the history lives in the OS tab and on each host). */}
+      {openRun !== null && <RunDrawer id={openRun} onClose={() => setOpenRun(null)} onRestore={(x) => { setOpenRun(null); setRestoring(x); }} />}
+      {restoring && <OSRestoreModal backup={restoring} onClose={() => setRestoring(null)}
+        onStarted={(r) => { setRestoring(null); setOpenRun(r.id); }} />}
 
       <FilterDrawer open={showFilters} onClose={() => setShowFilters(false)} filters={filters} onFiltersChange={setFilters}
         sort={sort} onSortChange={setSort} search={search} onSearchChange={setSearch} />

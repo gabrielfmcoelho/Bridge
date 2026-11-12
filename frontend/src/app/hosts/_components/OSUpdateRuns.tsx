@@ -11,25 +11,25 @@ import StatusAlert from "@/components/ui/StatusAlert";
 import { tableClasses } from "@/components/ui/Table";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useFlag } from "@/contexts/FlagContext";
-import { useConfirm } from "@/contexts/ConfirmContext";
 import { osUpdateAPI } from "@/lib/api";
 import { getTimeAgo } from "@/lib/utils";
 import type { OSUpdateResult, OSUpdateRun } from "@/lib/types";
 import OSRestoreModal from "./OSRestoreModal";
+import BackupActions from "./BackupActions";
 
 const RUN_TONE: Record<OSUpdateRun["status"], LozengeAppearance> = { running: "inprogress", done: "success", cancelled: "default", interrupted: "moved" };
 const RESULT_TONE: Record<OSUpdateResult["status"], LozengeAppearance> = { pending: "default", running: "inprogress", success: "success", failed: "removed", skipped: "moved" };
 
-/** The OS tab's run history; a row opens the run's per-host results. Polls
- *  while a run is going and says when one ends. */
-export default function OSUpdateRuns({ openId, onOpen }: { openId: number | null; onOpen: (id: number | null) => void }) {
+/** Run history (the fleet's, or one host's with hostId); a row opens the
+ *  run's per-host results. Polls while a run is going and says when one ends. */
+export default function OSUpdateRuns({ openId, onOpen, hostId }: { openId: number | null; onOpen: (id: number | null) => void; hostId?: number }) {
   const { t, locale } = useLocale();
   const [restoring, setRestoring] = useState<OSUpdateResult | null>(null);
   const flag = useFlag();
   const queryClient = useQueryClient();
   const { data: runs = [], isError, error } = useQuery({
-    queryKey: ["os-updates", "runs"],
-    queryFn: osUpdateAPI.runs,
+    queryKey: ["os-updates", "runs", hostId ?? 0],
+    queryFn: () => osUpdateAPI.runs(hostId),
     refetchInterval: (q) => (q.state.data?.some((r) => r.status === "running") ? 5000 : false),
   });
 
@@ -43,6 +43,7 @@ export default function OSUpdateRuns({ openId, onOpen }: { openId: number | null
         queryClient.invalidateQueries({ queryKey: ["hosts"] });
         queryClient.invalidateQueries({ queryKey: ["vulnerabilities", "dependency-groups"] });
         queryClient.invalidateQueries({ queryKey: ["os-updates", "latest"] });
+        queryClient.invalidateQueries({ queryKey: ["os-updates", "backups"] });
       }
     }
   }, [runs, flag, t, queryClient]);
@@ -94,7 +95,8 @@ function countsText(r: OSUpdateRun, t: (k: string, v?: Record<string, string>) =
     .join(" · ");
 }
 
-function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () => void; onRestore: (x: OSUpdateResult) => void }) {
+/** One run's per-host results (polls while it runs). */
+export function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () => void; onRestore: (x: OSUpdateResult) => void }) {
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const [openHost, setOpenHost] = useState<number | null>(null);
@@ -107,22 +109,6 @@ function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () => void
     mutationFn: () => osUpdateAPI.cancel(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["os-updates"] }),
   });
-  const flag = useFlag();
-  const confirm = useConfirm();
-  // The link goes straight to MinIO (no Bridge proxy in the way of a big file).
-  const download = useMutation({
-    mutationFn: (x: OSUpdateResult) => osUpdateAPI.backupLink(id, x.host_id),
-    onSuccess: (link) => { window.location.href = link.url; },
-    onError: (err) => flag({ appearance: "error", title: t("host.osUpdate.backupLinkFailed"), description: (err as Error).message }),
-  });
-  const removeBackup = useMutation({
-    mutationFn: (x: OSUpdateResult) => osUpdateAPI.deleteBackup(id, x.host_id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["os-updates", "run", id] }),
-    onError: (err) => flag({ appearance: "error", title: t("host.osUpdate.backupDeleteFailed"), description: (err as Error).message }),
-  });
-  const askRemove = async (x: OSUpdateResult) => {
-    if (await confirm({ title: t("host.osUpdate.backupDeleteTitle", { host: x.host_nickname }), confirmLabel: t("common.delete"), danger: true })) removeBackup.mutate(x);
-  };
 
   return (
     <Drawer open onClose={onClose} wide title={t("host.osUpdate.runTitle", { id: String(id) })}
@@ -131,6 +117,11 @@ function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () => void
       ) : undefined}>
       {isError && <StatusAlert variant="error">{(error as Error)?.message}</StatusAlert>}
       {run?.status === "running" && <p className="text-xs text-[var(--text-muted)] mb-3">{t("host.osUpdate.cancelHint")}</p>}
+      {run?.backup && (run.backup_include || run.backup_exclude) && (
+        <p className="text-xs text-[var(--text-secondary)] mb-3">
+          {t("host.backup.runPaths", { include: (run.backup_include ?? []).join(" ") || t("host.backup.inherited"), exclude: (run.backup_exclude ?? []).join(" ") || t("host.backup.inherited") })}
+        </p>
+      )}
       {run?.kind === "restore" && (
         <p className="text-xs text-[var(--text-secondary)] mb-3">
           {t(`host.osRestore.summary.${run.restore_mode ?? "staging"}`, { paths: (run.restore_paths ?? []).join(" ") || "/", run: String(run.source_run_id ?? "") })}
@@ -170,14 +161,7 @@ function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () => void
                     </td>
                     {run.backup && (
                       <td className={`${tableClasses.td} text-xs`} onClick={(e) => e.stopPropagation()}>
-                        {x.backup_status === "done" ? (
-                          <span className="flex flex-wrap items-center gap-1.5 min-w-[9rem]">
-                            <span className="tabular-nums text-[var(--text-secondary)]">{x.backup_size != null ? gib(x.backup_size) : ""}</span>
-                            <Button size="sm" variant="secondary" onClick={() => download.mutate(x)} disabled={download.isPending}>{t("host.osUpdate.backupDownload")}</Button>
-                            <Button size="sm" variant="secondary" onClick={() => onRestore(x)}>{t("host.osRestore.open")}</Button>
-                            <Button size="sm" variant="ghost" onClick={() => askRemove(x)} disabled={removeBackup.isPending}>{t("common.delete")}</Button>
-                          </span>
-                        ) : x.backup_status ? (
+                        {x.backup_status === "done" ? <BackupActions backup={x} onRestore={onRestore} /> : x.backup_status ? (
                           <span className={x.backup_status === "failed" ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}>{t(`host.osUpdate.backupStatus.${x.backup_status}`)}</span>
                         ) : <span className="text-[var(--text-muted)]">–</span>}
                       </td>
@@ -205,6 +189,3 @@ export function pendingText(x: Pick<OSUpdateResult, "upgradable" | "security_upg
   if (x.upgradable == null) return "–";
   return x.security_upgradable ? `${x.upgradable} (${t("host.osUpdate.securityShort", { count: String(x.security_upgradable) })})` : String(x.upgradable);
 }
-
-/** 3400000000 → "3.2 GiB". */
-const gib = (n: number) => (n >= 1 << 30 ? `${(n / (1 << 30)).toFixed(1)} GiB` : `${Math.max(1, Math.round(n / (1 << 20)))} MiB`);

@@ -14,9 +14,12 @@ import SectionHeading from "@/components/ui/SectionHeading";
 import { SkeletonTable } from "@/components/ui/Skeleton";
 import { tableClasses } from "@/components/ui/Table";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useAuth } from "@/contexts/AuthContext";
+import Button from "@/components/ui/Button";
+import OSUpdateModal, { type UpdateHost } from "@/app/hosts/_components/OSUpdateModal";
 import { vulnAPI } from "@/lib/api";
 import { VULN_SEVERITY_BADGE } from "@/lib/alert-colors";
-import type { Dependency, DependencyInstance } from "@/lib/types";
+import type { Dependency, DependencyGroup, DependencyInstance, OSUpdateKind } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -45,6 +48,10 @@ export default function DependencyList({ search, kind, flag, onOpenFinding, host
   const page = paged.key === key ? paged.page : 1;
   const [openId, setOpenId] = useState<number | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  // Remediation: the same update modal as the hosts pages.
+  const [update, setUpdate] = useState<{ hosts: UpdateHost[]; preset: OSUpdateKind } | null>(null);
 
   const params: Record<string, string> = { page: String(page), per_page: String(PER_PAGE), kind: KINDS[kind] };
   if (search) params.search = search;
@@ -121,6 +128,16 @@ export default function DependencyList({ search, kind, flag, onOpenFinding, host
                           <td className={`${tableClasses.td} font-mono text-xs text-[var(--text-muted)]`}>{g.evaluated > 0 ? inst.cve_count : ""}</td>
                         </tr>
                       ))}
+                      {open && isAdmin && fixableHosts(g).length > 0 && (
+                        <tr className={tableClasses.row}>
+                          <td className={tableClasses.td} colSpan={2} />
+                          <td className={tableClasses.td} colSpan={4}>
+                            <Button size="sm" variant="secondary" onClick={() => setUpdate({ hosts: fixableHosts(g), preset: "security" })}>
+                              {t("vuln.deps.updateHosts", { count: String(fixableHosts(g).length) })}
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
                       {open && g.installs > g.instances.length && (
                         <tr className={tableClasses.row}>
                           <td className={tableClasses.td} colSpan={2} />
@@ -139,9 +156,22 @@ export default function DependencyList({ search, kind, flag, onOpenFinding, host
             onChange={(p) => setPaged({ key, page: p })} />
         </div>
       )}
-      <DependencyDrawer id={openId} onClose={() => setOpenId(null)} onOpenFinding={onOpenFinding} />
+      <DependencyDrawer id={openId} onClose={() => setOpenId(null)} onOpenFinding={onOpenFinding}
+        onUpdate={isAdmin ? (hosts, preset) => { setOpenId(null); setUpdate({ hosts, preset }); } : undefined} />
+      {update && <OSUpdateModal target={{ by: "hosts", hosts: update.hosts }} preset={update.preset}
+        onClose={() => setUpdate(null)} onStarted={() => setUpdate(null)} />}
     </>
   );
+}
+
+/** The hosts a distro security update may fix this version on: its
+ *  installations on the host itself (containers are rebuilt, never upgraded)
+ *  when its CVEs come from the distro's advisories (OSV). */
+function fixableHosts(g: DependencyGroup): UpdateHost[] {
+  if (g.lookup !== "osv" || g.cve_count === 0) return [];
+  const seen = new Map<number, UpdateHost>();
+  for (const i of g.instances) if (!i.container && i.cve_count > 0) seen.set(i.host_id, { id: i.host_id, nickname: i.host_nickname, slug: i.host_slug });
+  return [...seen.values()];
 }
 
 /** "vm-app · web (nginx:1.25)" — the host, and the container when there is one. */
@@ -182,11 +212,22 @@ function CveCell({ kind, lookup, versionSource, evaluated, cves, severity }: {
   );
 }
 
-function DependencyDrawer({ id, onClose, onOpenFinding }: { id: number | null; onClose: () => void; onOpenFinding: (id: number) => void }) {
+function DependencyDrawer({ id, onClose, onOpenFinding, onUpdate }: {
+  id: number | null; onClose: () => void; onOpenFinding: (id: number) => void;
+  /** Admins: start a remediation run on this installation's host. */
+  onUpdate?: (hosts: UpdateHost[], preset: OSUpdateKind) => void;
+}) {
   const { t, formatDate } = useLocale();
   const { data: d } = useQuery({ queryKey: ["vulnerabilities", "dependency", id], queryFn: () => vulnAPI.dependency(id!), enabled: id != null });
+  // On the host itself only: a container is rebuilt, never upgraded.
+  const host = d && !d.container ? [{ id: d.host_id, nickname: d.host_nickname, slug: d.host_slug }] : [];
+  const action = !onUpdate || !d || host.length === 0 ? null
+    : d.kind === "os" && d.eol ? { preset: "release" as const, label: t("host.osRelease.start") }
+    : d.lookup === "osv" && d.cve_count > 0 ? { preset: "security" as const, label: t("vuln.deps.updateSecurity") }
+    : null;
   return (
-    <Drawer open={id != null} onClose={onClose} wide title={d ? `${d.name} ${d.version}` : ""}>
+    <Drawer open={id != null} onClose={onClose} wide title={d ? `${d.name} ${d.version}` : ""}
+      headerAction={action ? <Button size="sm" onClick={() => onUpdate!(host, action.preset)}>{action.label}</Button> : undefined}>
       {d && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">

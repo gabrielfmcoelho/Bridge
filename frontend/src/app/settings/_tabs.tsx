@@ -12,6 +12,7 @@ import AppearanceTab from "./AppearanceTab";
 import ImportTab from "./ImportTab";
 import BackupTab from "./BackupTab";
 import SSHCustomOpsTab from "./SSHCustomOpsTab";
+import HostBackupsTab from "./HostBackupsTab";
 import ApiTokensPanel from "@/components/tokens/ApiTokensPanel";
 
 /** One Settings section: its URL (/settings/<key>), its label and side-nav
@@ -36,6 +37,7 @@ export const SETTINGS_TABS: SettingsTab[] = [
   // ponytail: role gate until the catalog.manage permission ships.
   { key: "offerings", label: "settings.offerings.title", group: "settings.groups.catalog", minRole: "editor", Component: OfferingsTab },
   { key: "ssh-operations", label: "settings.sshOps.title", group: "settings.groups.hosts", minRole: "admin", Component: SSHCustomOpsTab },
+  { key: "host-backups", label: "settings.hostBackups.title", group: "settings.groups.hosts", minRole: "admin", Component: HostBackupsTab },
   { key: "integrations", label: "settings.integrationsTabLabel", group: "settings.groups.integrations", minRole: "admin", Component: IntegrationsTab },
   { key: "gitlab-repos", label: "settings.gitlabRepos.tabLabel", group: "settings.groups.integrations", minRole: "admin", Component: GitLabReposTab },
   { key: "import", label: "settings.import", group: "settings.groups.data", minRole: "admin", Component: ImportTab },

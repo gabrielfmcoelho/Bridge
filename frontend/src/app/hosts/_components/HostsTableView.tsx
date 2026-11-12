@@ -1,7 +1,7 @@
 import SortableTable from "@/components/ui/SortableTable";
 import Pagination from "@/components/ui/Pagination";
 import Tag from "@/components/ui/Tag";
-import Lozenge from "@/components/ui/Lozenge";
+import OSBadges from "./OSBadges";
 import { osLabel } from "./hostInsights";
 import ScanIndicator from "./ScanIndicator";
 import SituacaoCell from "./SituacaoCell";
@@ -10,7 +10,7 @@ import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { QuickLookOutlet } from "./HostQuickLook";
 import { openQuickLook } from "./quickLookStore";
-import type { Host, HostSortConfig } from "@/lib/types";
+import type { Host, HostSortConfig, OSUpdateResult } from "@/lib/types";
 import { pct } from "@/lib/sentinel";
 
 // Server-driven table (inventory pagination reference). `hosts` is ONE server
@@ -28,6 +28,7 @@ export default function HostsTableView({
   sort,
   onSortChange,
   canEdit,
+  backups,
   t,
 }: {
   hosts: Host[];
@@ -38,6 +39,8 @@ export default function HostsTableView({
   sort: HostSortConfig;
   onSortChange: (s: HostSortConfig) => void;
   canEdit: boolean;
+  /** Each host's newest kept backup (admins). */
+  backups?: Map<number, OSUpdateResult>;
   t: (key: string) => string;
 }) {
   return (
@@ -78,8 +81,7 @@ export default function HostsTableView({
               </td>
               <td className="px-4 py-2.5 whitespace-nowrap" title={host.os?.pretty}>
                 <span className="text-[var(--text-secondary)]">{osLabel(host) || "–"}</span>
-                {host.os?.eol && <Lozenge appearance="removed" className="ml-1.5">{t("host.osEol")}</Lozenge>}
-                {host.os?.reboot_required && <Lozenge appearance="moved" className="ml-1.5">{t("host.rebootPending")}</Lozenge>}
+                <span className="ml-1.5"><OSBadges os={host.os} backup={backups?.get(host.id)} /></span>
               </td>
               <td className="px-4 py-2.5 text-center"><ScanIndicator hasScan={host.has_scan} lastScanAt={host.last_scan_at} /></td>
               <td className="px-4 py-2.5 text-right tabular-nums whitespace-nowrap text-[var(--text-secondary)]" title={host.sentinel && host.sentinel.state !== "ok" ? t(`sentinel.reason.${host.sentinel.state}`) : undefined}>
