@@ -476,7 +476,7 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     mockOSRuns.unshift(run);
     return json(run, 202);
   }
-  if (p === "ssh/os-updates/config" && method === "GET") return json({ backup_available: true, backup_include: ["/"], backup_exclude: ["/tmp", "/var/cache", "/var/lib/docker"] });
+  if (p === "ssh/os-updates/config" && method === "GET") return json({ backup_available: true, backup_include: ["/"], backup_exclude: ["/tmp", "/var/cache", "/var/lib/docker"], retention_days: 30 });
   const backupPath = p.match(/^ssh\/os-updates\/runs\/(\d+)\/hosts\/(\d+)\/backup$/);
   if (backupPath) {
     const x = mockOSRuns.find((r) => r.id === Number(backupPath[1]))?.results?.find((r) => r.host_id === Number(backupPath[2]));

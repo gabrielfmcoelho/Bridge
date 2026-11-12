@@ -684,6 +684,8 @@
       "failed": "Could not start the release upgrade"
     },
     "osUpdate": {
+      "retention": "Kept backups expire after {days} days.",
+      "retentionOff": "Kept backups never expire: delete them here.",
       "backup": "Back up to MinIO first",
       "backupHint": "Streams {paths} (minus the excluded paths and pseudo/network filesystems) to MinIO before touching the host. If the backup fails, the host is not updated.",
       "keepBackup": "Keep the backup after a success",
@@ -1789,6 +1791,11 @@
     },
     "integrations": {
       "minio": {
+        "retention": "Keep backups for (days)",
+        "retentionHint": "A lifecycle rule on the prefix deletes backups older than this; 0 keeps them until deleted by hand. Applied when you test and when a run with backup starts; the bucket's other rules are kept.",
+        "lifecycleOk": "backups expire after {days} days",
+        "lifecycleOff": "backups never expire",
+        "lifecycleFailed": "lifecycle rule not applied: {error}",
         "hint": "Where OS update runs back hosts up before touching them; failed hosts keep theirs, downloadable from the run.",
         "ariaEnable": "Enable MinIO backups",
         "endpoint": "Endpoint (host:port Bridge reaches)",
