@@ -14,7 +14,7 @@ export interface TestResult {
  * "Test connection" and its result. `run` calls the section's test endpoint
  * and turns the response into one line; a thrown error is shown as a failure.
  */
-export default function TestConnectionButton({ run, disabled }: { run: () => Promise<TestResult>; disabled?: boolean }) {
+export default function TestConnectionButton({ run, disabled, label }: { run: () => Promise<TestResult>; disabled?: boolean; label?: string }) {
   const { t } = useLocale();
   const test = useMutation({ mutationFn: run });
   const result: TestResult | null = test.isError
@@ -24,7 +24,7 @@ export default function TestConnectionButton({ run, disabled }: { run: () => Pro
   return (
     <div className="space-y-3">
       <Button type="button" variant="secondary" onClick={() => test.mutate()} loading={test.isPending} disabled={disabled}>
-        {t("settings.integrations.testConnection")}
+        {label ?? t("settings.integrations.testConnection")}
       </Button>
       {result && !test.isPending && (
         <StatusAlert variant={result.success ? "success" : "error"}>{result.message}</StatusAlert>

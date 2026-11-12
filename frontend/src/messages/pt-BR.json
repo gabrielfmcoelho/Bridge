@@ -648,6 +648,63 @@
     "idleHint": "Uma VM ociosa não tem serviços de aplicação implantados pelo usuário e nenhum container Docker. Passe o mouse sobre a chip de cada card para ver as regras."
   },
   "host": {
+    "maintenance": {
+      "tab": "Manutenção",
+      "system": "Sistema",
+      "check": "Verificar atualizações",
+      "update": "Atualizar…",
+      "kernel": "Núcleo (kernel)",
+      "neverChecked": "Nunca verificado",
+      "backup": "Backup",
+      "kept": "Backups mantidos",
+      "noKept": "Nenhum backup deste host está mantido no MinIO.",
+      "expires": "Expira em",
+      "keptForever": "até ser excluído"
+    },
+    "backup": {
+      "apply": "Aplicar",
+      "configure": "Configurar…",
+      "configureTitle": "Backup de {host}",
+      "custom": "Próprio do host",
+      "usesDefaults": "Usa os padrões",
+      "eachProfile": "Cada host usa os caminhos do seu perfil de backup (ou os padrões).",
+      "estimate": "Até {size} de dados nos sistemas de arquivos incluídos, antes da compressão.",
+      "lastSize": "Último backup: {size}.",
+      "excludeWins": "Uma exclusão vale também para o que estiver incluído abaixo dela.",
+      "failed": "Não foi possível iniciar o backup",
+      "inherited": "herdados",
+      "inherits": {
+        "defaults": "Vazio = os padrões (Configurações › Hosts › Backups de hosts).",
+        "host": "Vazio = o perfil de backup do host."
+      },
+      "noScan": "O host ainda não tem scan: rode um para ver a prévia do que o backup leva.",
+      "preview": "O que o backup leva (pelo último scan)",
+      "profile": "Perfil",
+      "run": "Fazer backup agora",
+      "runPaths": "Caminhos desta execução: inclui {include}; exclui {exclude}.",
+      "saveAndRun": "Salvar e fazer backup",
+      "saved": "Perfil de backup salvo",
+      "started": "Backup de {host} iniciado",
+      "fs": {
+        "included": "incluído",
+        "partial": "em parte",
+        "excluded": "excluído",
+        "network": "rede (nunca)",
+        "outside": "fora"
+      },
+      "suggest": {
+        "database": "{subject} roda no próprio host: copiar os dados com o banco ligado pode dar uma cópia inconsistente. Exclua {paths} e faça um dump do banco.",
+        "docker": "{subject} container(s) e o Docker excluído inteiro: os volumes ficam de fora. Para levá-los, exclua só {paths}.",
+        "bigfile": "{subject} tem {size}. Excluir do backup?"
+      }
+    },
+    "bulkGroupMaintenance": "Manutenção",
+    "bulkBackup": "Fazer backup…",
+    "bulkOSUpdate": "Atualizar SO…",
+    "noBackup": "sem backup",
+    "backupKept": "Mantido até ser excluído",
+    "backupExpires": "Mantido até {date}",
+    "backupBadge": "backup · {age}",
     "osRestore": {
       "open": "Restaurar…",
       "title": "Restaurar o backup de {host}",
@@ -704,19 +761,28 @@
       "eolCount": "{count} sem suporte"
     },
     "osRelease": {
+      "modalHint": "Faça um snapshot da VM antes: uma troca de versão que falhe pode deixá-la sem dar boot. Um host por vez, reiniciado no fim. Suportado: Ubuntu LTS → próxima LTS, Debian N → N+1, Alpine 3.x → 3.x+1.",
       "withBackup": "O host recebe um backup no MinIO antes, mantido se a troca falhar.",
       "noBackup": "Nenhum backup é feito: o MinIO não está configurado.",
       "action": "trocar versão",
       "confirmTitle": "Levar {host} ({os}) para a próxima versão?",
       "confirmMessage": "Faça um snapshot da VM antes: uma troca de versão que falhe pode deixá-la sem dar boot. Suportado: Ubuntu LTS → próxima LTS, Debian N → N+1, Alpine 3.x → 3.x+1. O host não pode ter atualizações de pacotes pendentes nem reinício pendente, e precisa de 5 GB livres em /. Ele é reiniciado no fim e pode levar até 3 horas.",
-      "start": "Trocar versão",
-      "failed": "Não foi possível iniciar a troca de versão"
+      "start": "Trocar versão"
     },
     "osUpdate": {
+      "kindOption": {
+        "check": "Verificar atualizações",
+        "security": "Atualizações de segurança",
+        "packages": "Todas as atualizações de pacotes",
+        "release": "Trocar para a próxima versão",
+        "backup": "Só backup"
+      },
+      "titleHost": "Atualizar {host}",
+      "hostsCount": "{count} hosts selecionados",
+      "backupHintProfile": "Envia os caminhos do perfil de backup de cada host para o MinIO antes de mexer nele. Se o backup falhar, o host não é atualizado.",
       "retention": "Backups mantidos expiram depois de {days} dias.",
       "retentionOff": "Backups mantidos nunca expiram: apague-os aqui.",
       "backup": "Fazer backup no MinIO antes",
-      "backupHint": "Envia {paths} (sem os caminhos excluídos e os sistemas de arquivos virtuais e de rede) para o MinIO antes de mexer no host. Se o backup falhar, o host não é atualizado.",
       "keepBackup": "Manter o backup depois do sucesso",
       "keepBackupHint": "Por padrão o backup é apagado quando a atualização deu certo e o host voltou a responder. Hosts que falharam sempre mantêm o seu.",
       "backupUnavailable": "O backup antes de atualizar precisa do MinIO: Configurações › Integrações › MinIO.",
@@ -735,10 +801,9 @@
       "title": "Atualizar sistemas operacionais",
       "start": "Iniciar",
       "kind": "Tipo",
-      "kindCheck": "Verificar atualizações",
-      "kindSecurity": "Atualizações de segurança",
-      "kindPackages": "Todas as atualizações de pacotes",
       "kindHint": {
+        "backup": "Só envia os arquivos do host para o MinIO, sem mudar nada nele. O backup fica mantido até o fim da retenção.",
+        "release": "Leva o host para a próxima versão do sistema (até 3 h) e o reinicia. Sempre faz backup antes quando o MinIO está configurado.",
         "check": "Atualiza as listas de pacotes e conta o que pode ser atualizado. Não altera nada.",
         "security": "Instala só as atualizações de segurança (apt: suítes *-security; dnf/yum: avisos de segurança). Alpine não tem canal separado.",
         "packages": "Instala todas as atualizações da versão atual (apt upgrade, dnf/yum upgrade, apk upgrade). Nunca muda a versão do sistema."
@@ -764,6 +829,7 @@
       "hosts": "Hosts",
       "when": "Quando",
       "kindShort": {
+        "backup": "Só backup",
         "restore": "Restauração",
         "check": "Verificação",
         "packages": "Pacotes",
@@ -1728,6 +1794,15 @@
     "cleared": "Limpo"
   },
   "settings": {
+    "hostBackups": {
+      "title": "Backups de hosts",
+      "hint": "Padrões dos backups feitos antes das atualizações e pelo \"Fazer backup agora\". O perfil de cada host pode trocar os caminhos, e uma execução pode trocá-los só daquela vez. A conexão é a da integração MinIO.",
+      "minioOff": "A integração MinIO está desligada, e sem ela não há backup. Configure-a em Integrações › MinIO.",
+      "prefixHint": "Pasta no bucket onde ficam os backups. Se mudar, a retenção passa a valer só para a pasta nova.",
+      "includeHint": "Separados por espaço ou linha. Padrão: /",
+      "applyRetention": "Aplicar retenção no bucket",
+      "retentionStage": "Regra de retenção"
+    },
     "title": "Configurações",
     "enums": "Opções Configuráveis",
     "users": "Gerenciamento de Usuários",
@@ -1825,7 +1900,6 @@
         "retentionHint": "Uma regra de ciclo de vida no prefixo apaga backups mais antigos que isso; 0 mantém até serem apagados à mão. Aplicada ao testar e quando começa uma execução com backup; as outras regras do bucket são mantidas.",
         "lifecycleOk": "backups expiram depois de {days} dias",
         "lifecycleOff": "backups nunca expiram",
-        "lifecycleFailed": "regra de ciclo de vida não aplicada: {error}",
         "hint": "Onde as execuções de atualização guardam o backup dos hosts antes de mexer neles; hosts que falharam mantêm o seu, para baixar pela execução.",
         "ariaEnable": "Ativar backups no MinIO",
         "endpoint": "Endpoint (host:porta que o Bridge alcança)",
@@ -1837,7 +1911,6 @@
         "bucket": "Bucket",
         "prefix": "Prefixo do caminho",
         "include": "Caminhos do backup",
-        "includeHint": "Separados por espaço ou linha. Padrão: /",
         "exclude": "Caminhos fora do backup",
         "excludeHint": "Sistemas de arquivos virtuais, de containers e de rede sempre ficam de fora. Exclua as pastas de dados de bancos em uso: copiadas com o banco rodando podem ficar inconsistentes.",
         "bucketOk": "Bucket {bucket} acessível"
@@ -4291,6 +4364,9 @@
       "meta": "Gerado {ago} · {model}"
     },
     "deps": {
+      "updateSecurity": "Atualizar (segurança)…",
+      "updateHosts": "Atualizar {count} host(s) afetado(s)…",
+      "fixableCallout": "{count} pacotes da distro neste host têm CVEs com aviso da própria distro: uma atualização de segurança costuma corrigi-los.",
       "searchPlaceholder": "Buscar componente, versão, container ou host…",
       "emptyHint": "As versões aparecem depois do scan de um host (SSH › Testar com captura).",
       "component": "Componente",

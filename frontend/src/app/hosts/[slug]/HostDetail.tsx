@@ -30,8 +30,10 @@ import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
 import HostDependencies from "./_components/HostDependencies";
+import HostMaintenance from "./_components/HostMaintenance";
+import OSBadges, { useLatestBackups } from "../_components/OSBadges";
 
-type TabKey = "overview" | "operations" | "alerts" | "vulns" | "topology" | "metrics" | "requests" | "sentinel";
+type TabKey = "overview" | "operations" | "maintenance" | "alerts" | "vulns" | "topology" | "metrics" | "requests" | "sentinel";
 
 export default function HostDetail({ slug }: { slug: string }) {
   const { t, locale } = useLocale();
@@ -66,11 +68,13 @@ export default function HostDetail({ slug }: { slug: string }) {
     queryKey: ["hosts"],
     queryFn: () => hostsAPI.list(),
   });
+  // The list row carries what the detail doesn't: alerts and the OS summary.
+  const listHost = useMemo(() => hostsList.find((h) => h.oficial_slug === slug), [hostsList, slug]);
   const hostAlerts = useMemo(() => {
     if (!data) return [];
-    const match = hostsList.find((h) => h.oficial_slug === slug);
-    return match?.alerts || data.host.alerts || [];
-  }, [hostsList, data, slug]);
+    return listHost?.alerts || data.host.alerts || [];
+  }, [listHost, data]);
+  const backups = useLatestBackups(isAdmin);
 
   const { data: hostIssues = [] } = useQuery({
     queryKey: ["issues", "host", data?.host?.id],
@@ -118,6 +122,7 @@ export default function HostDetail({ slug }: { slug: string }) {
   const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
     { key: "overview", label: t("host.tabOverview"), icon: tabIcons.overview },
     ...(canEdit ? [{ key: "operations" as TabKey, label: t("host.tabOperations"), icon: tabIcons.operations }] : []),
+    ...(isAdmin ? [{ key: "maintenance" as TabKey, label: t("host.maintenance.tab"), icon: ICON_PATHS.refresh }] : []),
     { key: "alerts" as TabKey, label: t("host.tabTracking"), icon: tabIcons.alerts, badge: issuesTabBadge || undefined },
     { key: "vulns" as TabKey, label: t("vuln.tab"), icon: ICON_PATHS.shieldAlert, badge: openVulns || undefined },
     { key: "topology", label: t("host.tabTopology"), icon: tabIcons.topology },
@@ -145,7 +150,12 @@ export default function HostDetail({ slug }: { slug: string }) {
             title={data.host.nickname}
             subtitle={data.host.oficial_slug}
             subtitleFont="mono"
-            status={<SituacaoText situacao={data.host.situacao} />}
+            status={
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <SituacaoText situacao={data.host.situacao} />
+                <OSBadges os={listHost?.os} backup={backups.get(data.host.id)} />
+              </span>
+            }
             indicators={
               <>
                 <CardIndicator icon={ICON_PATHS.alert} count={alertCount} color="warning" title={t("host.alertsTitle", { count: String(alertCount) })} />
@@ -223,6 +233,10 @@ export default function HostDetail({ slug }: { slug: string }) {
             </div>
           )}
 
+          {activeTab === "maintenance" && isAdmin && (
+            <HostMaintenance host={{ ...data.host, os: listHost?.os }} scanData={data.last_scan?.data} />
+          )}
+
           {/* ═══ ISSUES TAB ═══ */}
           {activeTab === "alerts" && (
             <IssuesTab
@@ -243,7 +257,7 @@ export default function HostDetail({ slug }: { slug: string }) {
           {activeTab === "vulns" && (
             <div className="space-y-6">
               <EntityVulnsTab entityType="host" entityId={data.host.id} />
-              <HostDependencies hostId={data.host.id} />
+              <HostDependencies hostId={data.host.id} host={{ id: data.host.id, nickname: data.host.nickname, slug: data.host.oficial_slug }} />
             </div>
           )}
 

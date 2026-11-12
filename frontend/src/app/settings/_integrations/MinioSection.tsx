@@ -3,18 +3,14 @@
 import { useLocale } from "@/contexts/LocaleContext";
 import { integrationsAPI } from "@/lib/api";
 import Input from "@/components/ui/Input";
-import Textarea from "@/components/ui/Textarea";
 import NativeSelect from "@/components/ui/NativeSelect";
 import IntegrationCard from "./IntegrationCard";
 import SecretInputWithClear from "./SecretInputWithClear";
 import TestConnectionButton, { failedLine } from "./TestConnectionButton";
 import { useIntegrationForm } from "./useIntegrationForm";
 
-// Defaults shown as placeholders; the server applies the same ones when the
-// fields are empty (internal/integrations/minio).
-const DEFAULT_EXCLUDE = "/tmp /var/tmp /var/cache /var/lib/docker /var/lib/containerd /swapfile /swap.img /var/lib/bridge-osupdate /lost+found";
-
-/** MinIO (S3): where OS update runs back hosts up before touching them. */
+/** MinIO (S3): the connection only. What each feature keeps there is the
+ *  feature's (host backups: Settings › Hosts › Backups de hosts). */
 export default function MinioSection() {
   const { t } = useLocale();
   const f = useIntegrationForm("minio");
@@ -37,27 +33,14 @@ export default function MinioSection() {
       <Input label={t("settings.integrations.minio.accessKey")} value={f.form.minio_access_key ?? ""}
         onChange={(e) => f.set("minio_access_key", e.target.value)} autoComplete="off" />
       <SecretInputWithClear form={f} name="minio_secret_key" label={t("settings.integrations.minio.secretKey")} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Input label={t("settings.integrations.minio.bucket")} value={f.form.minio_bucket ?? ""}
-          onChange={(e) => f.set("minio_bucket", e.target.value)} placeholder="ops" />
-        <Input label={t("settings.integrations.minio.prefix")} value={f.form.osbackup_prefix ?? ""}
-          onChange={(e) => f.set("osbackup_prefix", e.target.value)} placeholder="bridge/os-backups" />
-      </div>
-      <Input label={t("settings.integrations.minio.retention")} type="number" min={0} value={f.form.osbackup_retention_days ?? ""}
-        onChange={(e) => f.set("osbackup_retention_days", e.target.value)} placeholder="30" hint={t("settings.integrations.minio.retentionHint")} />
-      <Textarea label={t("settings.integrations.minio.include")} rows={2} value={f.form.osbackup_include ?? ""}
-        onChange={(e) => f.set("osbackup_include", e.target.value)} placeholder="/" hint={t("settings.integrations.minio.includeHint")} />
-      <Textarea label={t("settings.integrations.minio.exclude")} rows={3} value={f.form.osbackup_exclude ?? ""}
-        onChange={(e) => f.set("osbackup_exclude", e.target.value)} placeholder={DEFAULT_EXCLUDE} hint={t("settings.integrations.minio.excludeHint")} />
+      <Input label={t("settings.integrations.minio.bucket")} value={f.form.minio_bucket ?? ""}
+        onChange={(e) => f.set("minio_bucket", e.target.value)} placeholder="ops" />
       {/* Tests the saved settings: save first. */}
       <TestConnectionButton
         run={async () => {
           const res = await integrationsAPI.testMinio();
           if (!res.success) return { success: false, message: failedLine(t, res.error) };
-          const ok = t("settings.integrations.minio.bucketOk", { bucket: res.bucket ?? "" });
-          // The bucket works; the lifecycle rule is a separate permission.
-          if (res.lifecycle_error) return { success: false, message: `${ok} · ${t("settings.integrations.minio.lifecycleFailed", { error: res.lifecycle_error })}` };
-          return { success: true, message: `${ok} · ${res.retention_days ? t("settings.integrations.minio.lifecycleOk", { days: String(res.retention_days) }) : t("settings.integrations.minio.lifecycleOff")}` };
+          return { success: true, message: t("settings.integrations.minio.bucketOk", { bucket: res.bucket ?? "" }) };
         }}
       />
     </IntegrationCard>

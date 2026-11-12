@@ -648,6 +648,63 @@
     "idleHint": "An idle VM has no user-deployed application services and no Docker containers. Hover the chip on each card for the rule trail."
   },
   "host": {
+    "maintenance": {
+      "tab": "Maintenance",
+      "system": "System",
+      "check": "Check for updates",
+      "update": "Update…",
+      "kernel": "Kernel",
+      "neverChecked": "Never checked",
+      "backup": "Backup",
+      "kept": "Kept backups",
+      "noKept": "No backup of this host is kept in MinIO.",
+      "expires": "Expires",
+      "keptForever": "until deleted"
+    },
+    "backup": {
+      "apply": "Apply",
+      "configure": "Configure…",
+      "configureTitle": "{host} backup",
+      "custom": "The host's own",
+      "usesDefaults": "Uses the defaults",
+      "eachProfile": "Each host uses its backup profile's paths (or the defaults).",
+      "estimate": "Up to {size} of data on the included filesystems, before compression.",
+      "lastSize": "Last backup: {size}.",
+      "excludeWins": "An exclude also covers anything included beneath it.",
+      "failed": "Could not start the backup",
+      "inherited": "inherited",
+      "inherits": {
+        "defaults": "Empty = the defaults (Settings › Hosts › Host backups).",
+        "host": "Empty = the host's backup profile."
+      },
+      "noScan": "This host has no scan yet: run one to preview what the backup takes.",
+      "preview": "What the backup takes (from the latest scan)",
+      "profile": "Profile",
+      "run": "Back up now",
+      "runPaths": "This run's paths: include {include}; exclude {exclude}.",
+      "saveAndRun": "Save and back up",
+      "saved": "Backup profile saved",
+      "started": "Backup of {host} started",
+      "fs": {
+        "included": "included",
+        "partial": "partly",
+        "excluded": "excluded",
+        "network": "network (never)",
+        "outside": "outside"
+      },
+      "suggest": {
+        "database": "{subject} runs on the host itself: copying its data while it runs can give an inconsistent copy. Exclude {paths} and dump the database instead.",
+        "docker": "{subject} container(s) and all of Docker excluded: the volumes are left out. To take them, exclude only {paths}.",
+        "bigfile": "{subject} is {size}. Leave it out of the backup?"
+      }
+    },
+    "bulkGroupMaintenance": "Maintenance",
+    "bulkBackup": "Back up…",
+    "bulkOSUpdate": "Update OS…",
+    "noBackup": "no backup",
+    "backupKept": "Kept until deleted",
+    "backupExpires": "Kept until {date}",
+    "backupBadge": "backup {age}",
     "osRestore": {
       "open": "Restore…",
       "title": "Restore the backup of {host}",
@@ -704,19 +761,28 @@
       "eolCount": "{count} past end of life"
     },
     "osRelease": {
+      "modalHint": "Take a VM snapshot first: a failed release upgrade can leave it unbootable. One host at a time, rebooted at the end. Supported: Ubuntu LTS → next LTS, Debian N → N+1, Alpine 3.x → 3.x+1.",
       "withBackup": "The host is backed up to MinIO first and the backup is kept if the upgrade fails.",
       "noBackup": "No backup is taken: MinIO is not configured.",
       "action": "change version",
       "confirmTitle": "Upgrade {host} ({os}) to its next release?",
       "confirmMessage": "Take a snapshot of the VM first: a failed release upgrade can leave it unbootable. Supported: Ubuntu LTS → next LTS, Debian N → N+1, Alpine 3.x → 3.x+1. The host must have no pending package updates, no pending reboot and 5 GB free on /. It is rebooted at the end and can take up to 3 hours.",
-      "start": "Upgrade release",
-      "failed": "Could not start the release upgrade"
+      "start": "Upgrade release"
     },
     "osUpdate": {
+      "kindOption": {
+        "check": "Check for updates",
+        "security": "Security updates",
+        "packages": "All package updates",
+        "release": "Upgrade to the next release",
+        "backup": "Backup only"
+      },
+      "titleHost": "Update {host}",
+      "hostsCount": "{count} hosts selected",
+      "backupHintProfile": "Sends each host's backup profile paths to MinIO before touching it. If the backup fails, the host isn't updated.",
       "retention": "Kept backups expire after {days} days.",
       "retentionOff": "Kept backups never expire: delete them here.",
       "backup": "Back up to MinIO first",
-      "backupHint": "Streams {paths} (minus the excluded paths and pseudo/network filesystems) to MinIO before touching the host. If the backup fails, the host is not updated.",
       "keepBackup": "Keep the backup after a success",
       "keepBackupHint": "By default the backup is deleted once the update succeeded and the host answered again. Failed hosts always keep theirs.",
       "backupUnavailable": "Backups before updating need MinIO: Settings › Integrations › MinIO.",
@@ -735,10 +801,9 @@
       "title": "Update operating systems",
       "start": "Start",
       "kind": "Type",
-      "kindCheck": "Check for updates",
-      "kindSecurity": "Security updates",
-      "kindPackages": "All package updates",
       "kindHint": {
+        "backup": "Only sends the host's files to MinIO, changing nothing on it. The backup is kept until the retention ends.",
+        "release": "Takes the host to the next release of its system (up to 3 h) and reboots it. Always backs up first when MinIO is set up.",
         "check": "Refreshes the package lists and counts what can be upgraded. Changes nothing.",
         "security": "Installs only the security upgrades (apt: *-security suites; dnf/yum: security advisories). Alpine has no separate channel.",
         "packages": "Installs every upgrade within the current release (apt upgrade, dnf/yum upgrade, apk upgrade). Never changes the release."
@@ -764,6 +829,7 @@
       "hosts": "Hosts",
       "when": "When",
       "kindShort": {
+        "backup": "Backup only",
         "restore": "Restore",
         "check": "Check",
         "packages": "Packages",
@@ -1728,6 +1794,15 @@
     "cleared": "Cleared"
   },
   "settings": {
+    "hostBackups": {
+      "title": "Host backups",
+      "hint": "Defaults of the backups taken before updates and by \"Back up now\". Each host's profile can change the paths, and a run can change them just that once. The connection is the MinIO integration's.",
+      "minioOff": "The MinIO integration is off, and without it there are no backups. Set it up in Integrations › MinIO.",
+      "prefixHint": "Folder in the bucket where backups go. Changing it makes the retention apply to the new folder only.",
+      "includeHint": "Separated by spaces or lines. Default: /",
+      "applyRetention": "Apply retention to the bucket",
+      "retentionStage": "Retention rule"
+    },
     "title": "Settings",
     "enums": "Configurable Options",
     "users": "User Management",
@@ -1825,7 +1900,6 @@
         "retentionHint": "A lifecycle rule on the prefix deletes backups older than this; 0 keeps them until deleted by hand. Applied when you test and when a run with backup starts; the bucket's other rules are kept.",
         "lifecycleOk": "backups expire after {days} days",
         "lifecycleOff": "backups never expire",
-        "lifecycleFailed": "lifecycle rule not applied: {error}",
         "hint": "Where OS update runs back hosts up before touching them; failed hosts keep theirs, downloadable from the run.",
         "ariaEnable": "Enable MinIO backups",
         "endpoint": "Endpoint (host:port Bridge reaches)",
@@ -1837,7 +1911,6 @@
         "bucket": "Bucket",
         "prefix": "Path prefix",
         "include": "Paths to back up",
-        "includeHint": "Separated by spaces or lines. Default: /",
         "exclude": "Paths to leave out",
         "excludeHint": "Pseudo, container and network filesystems are always left out. Exclude live database data folders: copied while running they may be inconsistent.",
         "bucketOk": "Bucket {bucket} reachable"
@@ -4291,6 +4364,9 @@
       "meta": "Generated {ago} · {model}"
     },
     "deps": {
+      "updateSecurity": "Update (security)…",
+      "updateHosts": "Update {count} affected host(s)…",
+      "fixableCallout": "{count} distro packages on this host have CVEs from the distro's own advisories: a security update usually fixes them.",
       "searchPlaceholder": "Search component, version, container or host…",
       "emptyHint": "Versions appear after a host scan (SSH › Test with capture).",
       "component": "Component",

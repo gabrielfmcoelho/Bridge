@@ -29,7 +29,7 @@ and contacts. Access is scoped by a hierarchical org-unit tree called
 | Frontend build | `cd frontend && npm run build` |
 | Frontend dev | `cd frontend && npm run dev` |
 | Frontend dev, no Go backend | `cd frontend && npm run dev:mock` — sets `NEXT_PUBLIC_USE_MOCK_API=1`, which repoints `API_BASE` at the in-app mock (`src/app/mock/api/[...path]/route.ts` + `src/mocks/`). **Required for `/catalog` and `/requests`**: those routes have no Go backend yet, so plain `npm run dev` proxies them to Go and gets 404. `POST /mock/api/__user {role, entidade_slug}` switches persona, `POST /mock/api/__reset` re-seeds. |
-| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases,shareBundles,breadcrumbs,constants,vulns,sshCustomOps,webDns}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts`, `src/app/atlas/{apis,databases}/_components/{api,database}Insights.test.ts`, `src/app/_home/homeModel.test.ts`, `src/components/ai/chatModel.test.ts` (insight modules stay runtime-import free so Node can run them) |
+| Frontend unit tests | No runner is installed. Run each `*.test.ts` file individually with Node's built-in runner (Node 24 strips TS natively), e.g. `node --test src/lib/entidades.test.ts`. Files: `src/lib/{entidades,requests,aiDraft,offeringSchema,releases,shareBundles,breadcrumbs,constants,vulns,sshCustomOps,webDns,backupPreview}.test.ts`, `src/mocks/scope.test.ts`, `src/app/{hosts,dns,services}/_components/{host,dns,service}Insights.test.ts`, `src/app/atlas/{apis,databases}/_components/{api,database}Insights.test.ts`, `src/app/_home/homeModel.test.ts`, `src/components/ai/chatModel.test.ts` (insight modules stay runtime-import free so Node can run them) |
 
 ## Architecture
 
@@ -280,6 +280,15 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   backup in MinIO and marks the gone ones `deleted`; the fleet list
   (`…/backups`, no host) drops them by age. MinIO images now need a login, so
   the tests sign links offline and stream into a fake instead of a container.
+  UI: every entry point opens the same modals — the host's admin
+  **Manutenção** tab (OS, pending updates, backup profile, kept backups, its
+  runs), the hosts list's bulk menu (Atualizar SO… / Fazer backup… over the
+  listed hosts), the OS tab (by distro version) and Vulnerabilidades (a
+  distro package with OSV CVEs → security update; an EOL OS → release).
+  `OSUpdateModal` takes hosts or distro groups; `OSBadges` is the one look of
+  EOL / reboot / backup. The backup preview (`lib/backupPreview.ts`) reads the
+  latest scan: filesystems, a database running on the host (its data dir),
+  docker volumes, files ≥ 1 GiB.
   Restores (v126) are runs of kind `restore` (`POST …/os-updates/restores`,
   `sshtest/osrestore.go`): a kept backup goes back onto its host, into
   `/var/lib/bridge-restore/run-<id>` (root-only) or over the chosen paths —
