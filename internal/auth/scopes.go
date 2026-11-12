@@ -44,6 +44,7 @@ var domainRules = map[string]string{
 	"/api/assets":          "inventory",
 	"/api/vulnerabilities": "inventory",
 	"/api/glpi":            "integrations",
+	"/api/glpi-sead":       "integrations",
 	"/api/coolify":         "integrations",
 	"/api/gestor":          "integrations",
 	"/api/gitlab":          "integrations",

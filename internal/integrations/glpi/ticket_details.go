@@ -24,12 +24,16 @@ type TicketEvent struct {
 // TicketDetail is a ticket plus its merged timeline, ready to serialize. The
 // JSON shape matches what GET /api/glpi/tickets/{id}/details has always returned.
 type TicketDetail struct {
-	Ticket      map[string]any `json:"ticket"`
-	GLPIBaseURL string         `json:"glpi_base_url"`
-	Requester   map[string]any `json:"requester"`
-	Events      []TicketEvent  `json:"events"`
-	EventCounts map[string]int `json:"event_counts"`
-	Warnings    []string       `json:"warnings,omitempty"`
+	Ticket       map[string]any      `json:"ticket"`
+	GLPIBaseURL  string              `json:"glpi_base_url"`
+	Requester    map[string]any      `json:"requester"`
+	Actors       []TicketActor       `json:"actors"`
+	Documents    []TicketDocument    `json:"documents"`
+	Validations  []TicketValidation  `json:"validations"`
+	Satisfaction *TicketSatisfaction `json:"satisfaction,omitempty"`
+	Events       []TicketEvent       `json:"events"`
+	EventCounts  map[string]int      `json:"event_counts"`
+	Warnings     []string            `json:"warnings,omitempty"`
 }
 
 // TicketDetails fetches a ticket and its followups, tasks and solutions, resolves
@@ -46,16 +50,20 @@ func (c *Client) TicketDetails(ctx context.Context, sessionToken string, ticketI
 	// Fan out the three related collections in parallel. Each failure degrades
 	// gracefully to an empty slice + warning so the ticket body still renders.
 	var (
-		followups []Followup
-		tasks     []Task
-		solutions []Solution
-		warnings  []string
-		wg        sync.WaitGroup
-		mu        sync.Mutex
+		followups    []Followup
+		tasks        []Task
+		solutions    []Solution
+		actors       []TicketActor
+		documents    []TicketDocument
+		validations  []TicketValidation
+		satisfaction *TicketSatisfaction
+		warnings     []string
+		wg           sync.WaitGroup
+		mu           sync.Mutex
 	)
 	addWarn := func(s string) { mu.Lock(); warnings = append(warnings, s); mu.Unlock() }
 
-	wg.Add(3)
+	wg.Add(7)
 	go func() {
 		defer wg.Done()
 		f, err := c.GetTicketFollowups(ctx, sessionToken, ticketID)
@@ -82,6 +90,42 @@ func (c *Client) TicketDetails(ctx context.Context, sessionToken string, ticketI
 			return
 		}
 		solutions = sols
+	}()
+	go func() {
+		defer wg.Done()
+		a, err := c.ListTicketActors(ctx, sessionToken, ticketID)
+		if err != nil {
+			addWarn("actors: " + FriendlyError(err))
+			return
+		}
+		actors = a
+	}()
+	go func() {
+		defer wg.Done()
+		d, err := c.ListTicketDocuments(ctx, sessionToken, ticketID)
+		if err != nil {
+			addWarn("documents: " + FriendlyError(err))
+			return
+		}
+		documents = d
+	}()
+	go func() {
+		defer wg.Done()
+		v, err := c.ListTicketValidations(ctx, sessionToken, ticketID)
+		if err != nil {
+			addWarn("validations: " + FriendlyError(err))
+			return
+		}
+		validations = v
+	}()
+	go func() {
+		defer wg.Done()
+		s, err := c.GetTicketSatisfaction(ctx, sessionToken, ticketID)
+		if err != nil {
+			addWarn("satisfaction: " + FriendlyError(err))
+			return
+		}
+		satisfaction = s
 	}()
 	wg.Wait()
 
@@ -170,13 +214,26 @@ func (c *Client) TicketDetails(ctx context.Context, sessionToken string, ticketI
 		return a < b
 	})
 
+	if actors == nil {
+		actors = []TicketActor{}
+	}
+	if documents == nil {
+		documents = []TicketDocument{}
+	}
+	if validations == nil {
+		validations = []TicketValidation{}
+	}
 	return &TicketDetail{
-		Ticket:      c.TicketView(t),
-		GLPIBaseURL: c.WebBaseURL(),
-		Requester:   map[string]any{"id": t.UsersIDRequester, "name": users[t.UsersIDRequester]},
-		Events:      events,
-		EventCounts: map[string]int{"followup": len(followups), "task": len(tasks), "solution": len(solutions)},
-		Warnings:    warnings,
+		Ticket:       c.TicketView(t),
+		GLPIBaseURL:  c.WebBaseURL(),
+		Requester:    map[string]any{"id": t.UsersIDRequester, "name": users[t.UsersIDRequester]},
+		Actors:       actors,
+		Documents:    documents,
+		Validations:  validations,
+		Satisfaction: satisfaction,
+		Events:       events,
+		EventCounts:  map[string]int{"followup": len(followups), "task": len(tasks), "solution": len(solutions)},
+		Warnings:     warnings,
 	}, nil
 }
 

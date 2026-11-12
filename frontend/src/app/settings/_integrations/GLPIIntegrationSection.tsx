@@ -70,6 +70,13 @@ function GlpiProfileList({ profiles }: { profiles: GlpiTokenProfile[] }) {
   const [error, setError] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<number, { ok: boolean; message: string }>>({});
 
+  const [editingID, setEditingID] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editToken, setEditToken] = useState("");
+  const [editEntity, setEditEntity] = useState("0");
+  const [editError, setEditError] = useState<string | null>(null);
+
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["glpi-profiles"] });
 
   const createMutation = useMutation({
@@ -90,6 +97,31 @@ function GlpiProfileList({ profiles }: { profiles: GlpiTokenProfile[] }) {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => glpiAPI.deleteProfile(id),
     onSuccess: invalidate,
+  });
+
+  const startEdit = (p: GlpiTokenProfile) => {
+    setEditingID(p.id);
+    setEditName(p.name);
+    setEditDesc(p.description ?? "");
+    setEditToken("");
+    setEditEntity(String(p.default_entity_id ?? 0));
+    setEditError(null);
+  };
+
+  const updateMutation = useMutation({
+    mutationFn: (id: number) => glpiAPI.updateProfile(id, {
+      name: editName.trim(),
+      description: editDesc.trim(),
+      // Empty = keep the stored token (matches the backend's partial-update convention).
+      user_token: editToken.trim() || undefined,
+      default_entity_id: parseInt(editEntity || "0", 10),
+    }),
+    onSuccess: () => {
+      setEditingID(null);
+      setEditError(null);
+      invalidate();
+    },
+    onError: (err: Error) => setEditError(err.message),
   });
 
   const testMutation = useMutation({
@@ -115,44 +147,73 @@ function GlpiProfileList({ profiles }: { profiles: GlpiTokenProfile[] }) {
 
       {profiles.map((p) => (
         <div key={p.id} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] px-3 py-2">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-[var(--text-primary)]">{p.name}</p>
-              {p.description && <p className="text-xs text-[var(--text-muted)]">{p.description}</p>}
-              <p className="text-2xs text-[var(--text-muted)] mt-0.5">
-                {t("settings.integrations.glpi.tokenStatusLine", {
-                  status: p.has_token ? t("settings.integrations.glpi.tokenStored") : t("settings.integrations.glpi.noTokenStored"),
-                  id: String(p.default_entity_id),
-                })}
-              </p>
+          {editingID === p.id ? (
+            <div className="space-y-3">
+              <Input label={t("common.name")} value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <Input label={t("settings.integrations.glpi.profileDescLabel")} value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+              <Input
+                label={t("settings.integrations.glpi.userTokenLabel")}
+                type="password"
+                value={editToken}
+                onChange={(e) => setEditToken(e.target.value)}
+                placeholder={t("settings.integrations.glpi.editTokenPlaceholder")}
+              />
+              <Input label={t("settings.integrations.glpi.entityIdLabel")} type="number" value={editEntity} onChange={(e) => setEditEntity(e.target.value)} />
+              {editError && <FormError message={editError} />}
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={() => updateMutation.mutate(p.id)} loading={updateMutation.isPending} disabled={!editName.trim()}>
+                  {t("common.save")}
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingID(null); setEditError(null); }}>
+                  {t("common.cancel")}
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={testMutation.isPending}
-                onClick={() => testMutation.mutate(p.id)}
-              >
-                {t("settings.integrations.glpi.testButton")}
-              </Button>
-              <Button
-                type="button"
-                variant="danger"
-                size="sm"
-                onClick={async () => {
-                  if (!(await confirm({ title: t("confirm.deleteTitle", { name: `"${p.name}"` }), message: t("settings.integrations.glpi.confirmDeleteProfile", { name: p.name }), danger: true, confirmLabel: t("common.delete") }))) return;
-                  deleteMutation.mutate(p.id);
-                }}
-              >
-                {t("common.delete")}
-              </Button>
-            </div>
-          </div>
-          {testResults[p.id] && (
-            <p className={`text-xs mt-1 ${testResults[p.id].ok ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-              {testResults[p.id].message}
-            </p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{p.name}</p>
+                  {p.description && <p className="text-xs text-[var(--text-muted)]">{p.description}</p>}
+                  <p className="text-2xs text-[var(--text-muted)] mt-0.5">
+                    {t("settings.integrations.glpi.tokenStatusLine", {
+                      status: p.has_token ? t("settings.integrations.glpi.tokenStored") : t("settings.integrations.glpi.noTokenStored"),
+                      id: String(p.default_entity_id),
+                    })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => startEdit(p)}>
+                    {t("common.edit")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={testMutation.isPending}
+                    onClick={() => testMutation.mutate(p.id)}
+                  >
+                    {t("settings.integrations.glpi.testButton")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    onClick={async () => {
+                      if (!(await confirm({ title: t("confirm.deleteTitle", { name: `"${p.name}"` }), message: t("settings.integrations.glpi.confirmDeleteProfile", { name: p.name }), danger: true, confirmLabel: t("common.delete") }))) return;
+                      deleteMutation.mutate(p.id);
+                    }}
+                  >
+                    {t("common.delete")}
+                  </Button>
+                </div>
+              </div>
+              {testResults[p.id] && (
+                <p className={`text-xs mt-1 ${testResults[p.id].ok ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
+                  {testResults[p.id].message}
+                </p>
+              )}
+            </>
           )}
         </div>
       ))}

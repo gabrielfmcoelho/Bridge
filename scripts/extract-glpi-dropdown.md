@@ -33,13 +33,20 @@ Destination in sshcm: **Settings → Integrations → GLPI → Catálogo de drop
        .map(o => ({
          id: parseInt(o.value || o.dataset.id || '', 10),
          name: (o.textContent || '').trim(),
+         disabled: o.disabled || o.getAttribute('aria-disabled') === 'true'
+           || o.classList.contains('select2-results__option--disabled') || undefined,
        }))
        .filter(o => Number.isFinite(o.id) && o.id > 0 && o.name),
      null, 2
    ));
    ```
 
-   `copy(...)` drops the JSON into your clipboard.
+   `copy(...)` drops the JSON into your clipboard. The `disabled` flag matters
+   for tree itemtypes (`ITILCategory`, `Location`): GLPI disables group/header
+   nodes in its own dropdown (a category that only organizes children, never
+   assigned to a ticket directly) — sshcm carries that flag through so the
+   picker shows the same node as non-selectable instead of letting a user pick
+   it and hit `ERROR_GLPI_ADD` on submit.
 
 4. In sshcm, open the catalogue editor for that itemtype and paste into the
    textarea. Save.
@@ -60,7 +67,9 @@ copy(JSON.stringify(
       const full = (o.textContent || '').trim();
       // Last segment after " > " is the leaf; whole thing is the completename.
       const leaf = full.includes(' > ') ? full.split(' > ').pop() : full;
-      return { id, name: leaf, completename: full };
+      const disabled = o.disabled || o.getAttribute('aria-disabled') === 'true'
+        || o.classList.contains('select2-results__option--disabled') || undefined;
+      return { id, name: leaf, completename: full, disabled };
     })
     .filter(o => Number.isFinite(o.id) && o.id > 0 && o.name),
   null, 2
