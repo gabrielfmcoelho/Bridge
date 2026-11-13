@@ -689,3 +689,57 @@ func TestRunScanSecretsBackfillSavesEachBatch(t *testing.T) {
 		t.Fatalf("flag = %q, want %d", v, all[2].ID)
 	}
 }
+
+// A value the vault refuses for a moment (a DB error) is not lost: the row
+// keeps it as it was (already plaintext there), later rows are still
+// redacted, and the saved mark stays before the failed row, so the next start
+// retries it — the log says from where.
+func TestBackfillRetriesARefusedRow(t *testing.T) {
+	d, hid, _ := newScanSecretsFixture(t)
+	ctx := context.Background()
+	repo := store.NewHostScanRepo(d.SQL)
+	for _, cmd := range []string{"/usr/local/bin/foo --token=abc123", "/usr/local/bin/bar --token=s3cr3t", "/usr/local/bin/baz --token=xyz789"} {
+		b, _ := json.Marshal(sshtest.VMInfo{ProcessDetails: []sshtest.ProcessDetail{{Command: cmd}}})
+		if err := repo.Create(ctx, hid, string(b)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := d.SQL.Exec(`CREATE FUNCTION fail_scan_bar() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'vault down'; END $$;
+		CREATE TRIGGER fail_scan_bar BEFORE INSERT ON secrets FOR EACH ROW WHEN (NEW.group_label = 'scan-bar') EXECUTE FUNCTION fail_scan_bar();`); err != nil {
+		t.Fatal(err)
+	}
+	var logged bytes.Buffer
+	log.SetOutput(&logged)
+	defer log.SetOutput(os.Stderr)
+	RunScanSecretsBackfill(ctx, d)
+
+	all, _ := repo.ListAfter(ctx, 0, 10)
+	if len(all) != 3 || strings.Contains(all[0].Data, "abc123") || strings.Contains(all[2].Data, "xyz789") {
+		t.Fatalf("rows around the refused one not redacted: %+v", all)
+	}
+	if !strings.Contains(all[1].Data, "s3cr3t") || strings.Contains(all[1].Data, "{{secret") {
+		t.Fatalf("refused row was rewritten (its value lost): %s", all[1].Data)
+	}
+	settings := store.NewAppSettingsRepo(d.SQL)
+	if v := settings.Value(ctx, scanSecretsBackfillFlag); v != fmt.Sprint(all[0].ID) {
+		t.Fatalf("flag = %q, want %d (before the refused row)", v, all[0].ID)
+	}
+	if out := logged.String(); !strings.Contains(out, fmt.Sprintf("the next start resumes after scan %d", all[0].ID)) || strings.Contains(out, "s3cr3t") {
+		t.Fatalf("log = %q", out)
+	}
+
+	if _, err := d.SQL.Exec(`DROP TRIGGER fail_scan_bar ON secrets`); err != nil {
+		t.Fatal(err)
+	}
+	RunScanSecretsBackfill(ctx, d)
+	all, _ = repo.ListAfter(ctx, 0, 10)
+	if strings.Contains(all[1].Data, "s3cr3t") || !strings.Contains(all[1].Data, "{{secret:") {
+		t.Fatalf("refused row not retried: %s", all[1].Data)
+	}
+	if rows := scanSecretRows(t, d); rows["scan-bar/TOKEN"] == 0 || len(rows) != 3 {
+		t.Fatalf("vault rows = %v", rows)
+	}
+	if v := settings.Value(ctx, scanSecretsBackfillFlag); v != fmt.Sprint(all[2].ID) {
+		t.Fatalf("flag = %q, want %d", v, all[2].ID)
+	}
+}

@@ -452,15 +452,18 @@ var scanBackfillBatch = 200
 // scans) is never read: a redacted line can re-parse to a "value". batchDone,
 // when set, gets the last id and the counts so far after each batch. rows is
 // the scans rewritten, secrets the secrets found in them, last the id of the
-// last scan gone through (afterID when none).
+// last scan gone through (afterID when none). A row with a value the vault
+// refused is left as it was (its value would be lost blanked) and the walk
+// goes on, but last stays before it, so the next run retries it.
 func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64, batchDone func(last int64, rows, secrets int)) (rows, secrets int, last int64, err error) {
 	ctx = store.WithSystemScope(ctx)
 	repo := store.NewHostScanRepo(db.SQL)
 	var firstErr error
 	failed := 0
 	last = afterID
+	cursor := afterID
 	for {
-		batch, err := repo.ListAfter(ctx, last, scanBackfillBatch)
+		batch, err := repo.ListAfter(ctx, cursor, scanBackfillBatch)
 		if err != nil {
 			return rows, secrets, last, err
 		}
@@ -473,10 +476,12 @@ func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64, ba
 			if errors.Is(recErr, errScanNotRewritten) {
 				return rows, secrets, last, recErr
 			}
+			cursor = s.ID
 			if recErr != nil {
 				if failed++; firstErr == nil {
 					firstErr = recErr
 				}
+				continue
 			}
 			if data != "" {
 				if err := repo.UpdateData(ctx, s.ID, data); err != nil {
@@ -484,14 +489,16 @@ func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64, ba
 				}
 				rows++
 			}
-			last = s.ID
+			if failed == 0 {
+				last = s.ID
+			}
 		}
 		if batchDone != nil {
 			batchDone(last, rows, secrets)
 		}
 	}
 	if failed > 0 {
-		return rows, secrets, last, fmt.Errorf("%d scan(s) with a secret the vault didn't take (blanked): %w", failed, firstErr)
+		return rows, secrets, last, fmt.Errorf("%d scan(s) with a secret the vault didn't take, left as they were: %w", failed, firstErr)
 	}
 	return rows, secrets, last, nil
 }
@@ -573,8 +580,8 @@ func replaceStrings(v any, repl map[string]string) any {
 // through (the flag scan_secrets_backfill_v1 holds that id), so a start also
 // redacts the plaintext rows an older binary wrote after the previous walk (a
 // rolling deploy). The id is saved after every batch, so a start killed
-// mid-walk resumes after its last batch; a failure is retried at the next
-// start. Logs counts only.
+// mid-walk resumes after its last batch; a scan the vault refused a value of
+// is retried at the next start. Logs counts and scan ids only.
 func RunScanSecretsBackfill(ctx context.Context, db *database.DB) {
 	settings := store.NewAppSettingsRepo(db.SQL)
 	after, _ := strconv.ParseInt(settings.Value(ctx, scanSecretsBackfillFlag), 10, 64)
@@ -595,7 +602,8 @@ func RunScanSecretsBackfill(ctx context.Context, db *database.DB) {
 	})
 	save(last) // stopped mid-batch: the scans before the failed one are done
 	if err != nil {
-		log.Printf("[scan] secrets backfill incomplete, resumed at the next start: %d scan(s) rewritten, %d secret(s) found: %v", rows, secrets, err)
+		// saved, not last: the promise is what the flag holds.
+		log.Printf("[scan] secrets backfill incomplete, the next start resumes after scan %d: %d scan(s) rewritten, %d secret(s) found: %v", saved, rows, secrets, err)
 		return
 	}
 	if rows > 0 {
