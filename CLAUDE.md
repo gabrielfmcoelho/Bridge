@@ -332,8 +332,9 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   through `newSession`, never `client.NewSession` — sshd's default `MaxSessions
   10` refuses the 11th concurrent session with an `OpenChannelError`
   (Prohibited), and Go's client then failed silently, so probes just vanished;
-  `newSession` retries that refusal. Every script batch starts with `scanPath`
-  (`/usr/sbin`, `/sbin` appended): a non-interactive CentOS 7 PATH has no
+  `newSession` retries that refusal. New probes open through `newSession` and
+  start their script with `scanPath` (`/usr/sbin`, `/sbin` appended; some older
+  scripts inline the same export): a non-interactive CentOS 7 PATH has no
   `ss`, which left `ports` null on every CentOS host. Process details
   (`procdetails.go`) run as root when Bridge has the password; the systemd
   unit comes from `/proc/<pid>/cgroup`, readable without root (`unit`,
@@ -346,7 +347,7 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   Tomcat and GlassFish are matched by **main class**, not by process name, and
   yield one service per instance, keyed `<catalog>@<instance>` (the systemd
   unit, else the install dir) — two JBoss on one host stay two services.
-  `HostPorts` come from the PID's own ports with the HTTP port first, so a
+  `HostPorts` come from the PID's own ports with the likely HTTP port (80xx) first, so a
   proxy target resolves to the right instance; deployed `.war`/`.ear` (plus
   exploded dirs on Tomcat and WildFly) go in `apps`. `service.RecordWebDNS`
   also links a record whose `proxy_pass` points at **another VM**: to that host
@@ -360,7 +361,9 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   so the identity is stable) and is replaced in the scan by `{{secret:<id>}}`
   (`{{secret}}` when it can't be registered) **inside `recordScan`, before the
   scan is stored or returned** — a raw value never reaches `host_scans` or the
-  response. A trashed identity is never recreated. Revealing a
+  response, an error or a log line: the only way out of the vault is the
+  audited reveal (`GET /api/secrets/{id}/reveal`, which writes a
+  `secret_audit_log` row). A trashed identity is never recreated. Revealing a
   `scan-*` host secret needs `hosts.secrets.reveal` (v130, seeded for editors);
   only admins move a host secret into or out of a `scan-` group. At startup
   `service.RunScanSecretsBackfill` (`cmd/web.go`) redacts old `host_scans`
