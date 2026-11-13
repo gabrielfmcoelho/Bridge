@@ -376,15 +376,16 @@ func (r *SecretRepo) GetMetadata(ctx context.Context, actor ActorContext, id int
 func (r *SecretRepo) Reveal(ctx context.Context, actor ActorContext, id int64) (string, error) {
 	var (
 		typeStr, scopeStr, visStr string
+		group                     sql.NullString
 		s                         models.Secret
 	)
 	vis, vargs := secretVisibleSQL(ctx, "secrets")
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, type, scope, visibility, parent_id, owner_user_id, name,
+		`SELECT id, type, scope, visibility, parent_id, owner_user_id, name, group_label,
 		        payload_ciphertext, payload_nonce, key_version, created_by
 		 FROM secrets WHERE id = ? AND deleted_at IS NULL AND `+vis, append([]any{id}, vargs...)...,
 	).Scan(&s.ID, &typeStr, &scopeStr, &visStr, &s.ParentID, &s.OwnerUserID,
-		&s.Name, &s.PayloadCiphertext, &s.PayloadNonce, &s.KeyVersion, &s.CreatedBy)
+		&s.Name, &group, &s.PayloadCiphertext, &s.PayloadNonce, &s.KeyVersion, &s.CreatedBy)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrSecretNotFound
 	}
@@ -399,7 +400,7 @@ func (r *SecretRepo) Reveal(ctx context.Context, actor ActorContext, id int64) (
 	if !dec.canSeeMetadata {
 		return "", ErrSecretNotFound
 	}
-	if !dec.canReveal || !revealPermitted(ctx, r.db, actor, s.Scope) {
+	if !dec.canReveal || !revealPermitted(ctx, r.db, actor, s.Scope, group.String) {
 		return "", ErrSecretForbidden
 	}
 
