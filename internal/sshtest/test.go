@@ -2016,7 +2016,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		agentNames[a.Name] = true
 	}
 	info.ServiceInventory = captureServices(hostInv, info.ParsedContainers, agentNames, agentPortClaims)
-	info.ServiceInventory = append(info.ServiceInventory, captureAppServers(client, sudoPassword, procDetails)...)
+	info.ServiceInventory = append(info.ServiceInventory, captureAppServers(client, sudoPassword, procDetails, hostInv.ContainerPIDs)...)
 
 	// Back-fill PortOwners with agent and service attribution. `ss -tlnp`
 	// only emits a process column when the scanning user can see the

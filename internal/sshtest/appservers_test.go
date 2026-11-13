@@ -15,7 +15,7 @@ func TestDetectAppServers(t *testing.T) {
 		{PID: "3", Command: "java -Dcatalina.base=/srv/tomcat9 -classpath /srv/tomcat9/bin/bootstrap.jar org.apache.catalina.startup.Bootstrap start", Ports: "8080"},
 		{PID: "4", Command: "java -jar app.jar"},
 	}
-	got := detectAppServers(procs)
+	got := detectAppServers(procs, nil)
 	if len(got) != 3 {
 		t.Fatalf("len = %d, want 3: %+v", len(got), got)
 	}
@@ -31,6 +31,19 @@ func TestDetectAppServers(t *testing.T) {
 	}
 	if got[2].Name != "tomcat" || got[2].Instance != "/srv/tomcat9" {
 		t.Errorf("tomcat = %+v", got[2])
+	}
+}
+
+// ps on the host lists container processes too: a Tomcat in a container is
+// the container's service, never a host one.
+func TestDetectAppServersSkipsContainerPIDs(t *testing.T) {
+	tomcat := "java -Dcatalina.base=/usr/local/tomcat -classpath /usr/local/tomcat/bin/bootstrap.jar org.apache.catalina.startup.Bootstrap start"
+	procs := []ProcessDetail{{PID: "200", Command: tomcat, Ports: "8080"}, {PID: "300", Command: tomcat, Ports: "8080"}}
+	if got := detectAppServers(procs, map[int]string{200: "abc", 300: ""}); len(got) != 0 {
+		t.Fatalf("container tomcats became host services: %+v", got)
+	}
+	if got := detectAppServers(procs, map[int]string{300: "abc"}); len(got) != 1 || got[0].PID != 200 {
+		t.Fatalf("host tomcat = %+v", got)
 	}
 }
 
