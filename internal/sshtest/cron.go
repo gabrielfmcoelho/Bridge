@@ -183,7 +183,8 @@ func parseCronDaemon(name, active, enabled string) (installed, isActive, isEnabl
 
 // cronCommandBinary returns the absolute path a cron command starts with,
 // after leading VAR=value assignments, or "" when it starts with anything else
-// (a relative path, a shell builtin, a bare name found through PATH).
+// (a relative path, a shell builtin, a bare name found through PATH) or holds
+// a shell or cron expansion ($, a backtick, %): not a literal path.
 func cronCommandBinary(cmd string) string {
 	for _, tok := range strings.Fields(cmd) {
 		if eq := strings.Index(tok, "="); eq > 0 && isCronEnvKey(tok[:eq]) {
@@ -192,7 +193,7 @@ func cronCommandBinary(cmd string) string {
 		if i := strings.IndexAny(tok, "<>;|&"); i >= 0 {
 			tok = tok[:i]
 		}
-		if strings.HasPrefix(tok, "/") {
+		if strings.HasPrefix(tok, "/") && !strings.ContainsAny(tok, "$`%") {
 			return tok
 		}
 		return ""
@@ -210,22 +211,22 @@ func markMissingBinaries(jobs []CronJob, missing map[string]bool) {
 }
 
 // findMissingBinaries asks the host which of the jobs' binaries are not
-// executable. Read-only; root when a password is stored, so a binary under a
-// directory the SSH user cannot traverse is not reported missing.
+// executable. Read-only; root when a password is stored, else see
+// missingBinariesScript.
 func findMissingBinaries(client *ssh.Client, sudoPassword string, jobs []CronJob) map[string]bool {
 	seen := map[string]bool{}
-	var quoted []string
+	var paths []string
 	for _, j := range jobs {
 		if b := cronCommandBinary(j.Command); b != "" && !seen[b] {
 			seen[b] = true
-			quoted = append(quoted, shQuote(b))
+			paths = append(paths, b)
 		}
 	}
 	missing := map[string]bool{}
-	if len(quoted) == 0 {
+	if len(paths) == 0 {
 		return missing
 	}
-	script := scanPath + `; for p in ` + strings.Join(quoted, " ") + `; do [ -x "$p" ] || echo "$p"; done`
+	script := missingBinariesScript(paths)
 	var out string
 	if sudoPassword != "" {
 		out, _ = runSudoCmd(client, sudoPassword, script)
@@ -238,6 +239,22 @@ func findMissingBinaries(client *ssh.Client, sudoPassword string, jobs []CronJob
 		}
 	}
 	return missing
+}
+
+// missingBinariesScript prints each of paths that is not executable. Without
+// root it can't tell (a job runs as root or its own user), so a path counts
+// only when it doesn't exist and its nearest existing directory is traversable
+// by the scan user: a 0700 home or a root-only script is not "missing".
+func missingBinariesScript(paths []string) string {
+	quoted := make([]string, len(paths))
+	for i, p := range paths {
+		quoted[i] = shQuote(p)
+	}
+	return scanPath + `; r=; [ "$(id -u)" = 0 ] && r=1; for p in ` + strings.Join(quoted, " ") + `; do ` +
+		`[ -x "$p" ] && continue; ` +
+		`if [ -z "$r" ]; then [ -e "$p" ] && continue; d=${p%/*}; ` +
+		`while [ -n "$d" ] && [ ! -d "$d" ]; do d=${d%/*}; done; [ -x "${d:-/}" ] || continue; fi; ` +
+		`echo "$p"; done`
 }
 
 // splitOnBlankLines splits a multi-line string on runs of blank lines.
