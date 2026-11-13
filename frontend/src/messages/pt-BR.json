@@ -648,6 +648,22 @@
     "idleHint": "Uma VM ociosa não tem serviços de aplicação implantados pelo usuário e nenhum container Docker. Passe o mouse sobre a chip de cada card para ver as regras."
   },
   "host": {
+    "secrets": {
+      "tab": "Segredos",
+      "title": "Segredos encontrados no scan",
+      "hint": "Valores achados nas linhas de comando deste host. O scan guarda só uma referência; o valor fica no cofre.",
+      "empty": "Nenhum segredo encontrado no scan deste host.",
+      "inScan": "No último scan",
+      "gone": "Não visto mais",
+      "updated": "Alterado {when}",
+      "reveal": "Revelar",
+      "hide": "Ocultar",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "loadError": "Não foi possível carregar os segredos",
+      "revealError": "Não foi possível revelar o segredo",
+      "chip": "Segredo guardado no cofre"
+    },
     "maintenance": {
       "tab": "Manutenção",
       "system": "Sistema",

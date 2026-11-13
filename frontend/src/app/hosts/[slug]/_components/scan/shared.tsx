@@ -1,6 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { useLocale } from "@/contexts/LocaleContext";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -64,4 +66,36 @@ export function Detail({ label, children, mono = true }: { label: string; childr
 /** Colour for a CPU/RAM percentage: danger ≥ 80, warning ≥ 50. */
 export function pctColor(pct: number): string {
   return pct >= 80 ? "text-[var(--danger)]" : pct >= 50 ? "text-[var(--warning)]" : "text-[var(--text-secondary)]";
+}
+
+const SECRET_TOKEN = /^\{\{secret(?::\d+)?\}\}$/;
+
+/**
+ * A scan command as text, with each `{{secret:<id>}}` / `{{secret}}` token drawn
+ * as a lock chip linking to the host's Segredos tab. Never anything but the chip
+ * for a token; text without tokens comes out unchanged.
+ */
+export function SecretText({ text, hostSlug }: { text: string; hostSlug: string }) {
+  const { t } = useLocale();
+  if (!text.includes("{{secret")) return <>{text}</>;
+  const parts = text.split(/(\{\{secret(?::\d+)?\}\})/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        SECRET_TOKEN.test(p) ? (
+          <Link
+            key={i}
+            href={`/hosts/${hostSlug}?tab=secrets`}
+            title={t("host.secrets.chip")}
+            className="inline-flex items-center gap-1 px-1.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] hover:bg-[var(--warning)]/20 align-baseline"
+          >
+            <Icon path={ICON_PATHS.lock} className="w-3 h-3" />
+            <span>{t("host.secrets.tab")}</span>
+          </Link>
+        ) : (
+          p
+        ),
+      )}
+    </>
+  );
 }

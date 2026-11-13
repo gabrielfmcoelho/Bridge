@@ -648,6 +648,22 @@
     "idleHint": "An idle VM has no user-deployed application services and no Docker containers. Hover the chip on each card for the rule trail."
   },
   "host": {
+    "secrets": {
+      "tab": "Secrets",
+      "title": "Secrets found in the scan",
+      "hint": "Values found in command lines of this host. The scan keeps only a reference; the value lives in the vault.",
+      "empty": "No secrets found in the scan of this host.",
+      "inScan": "In latest scan",
+      "gone": "No longer seen",
+      "updated": "Changed {when}",
+      "reveal": "Reveal",
+      "hide": "Hide",
+      "copy": "Copy",
+      "copied": "Copied",
+      "loadError": "Could not load the secrets",
+      "revealError": "Could not reveal the secret",
+      "chip": "Secret stored in the vault"
+    },
     "maintenance": {
       "tab": "Maintenance",
       "system": "System",

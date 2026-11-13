@@ -23,22 +23,24 @@ export type ScanGroup = (typeof SCAN_GROUPS)[number];
  * `anchorPrefix`, so the jump bar can reach each group) and by the
  * Operations console after a scan.
  */
-export default function VMInfoDisplay({ info, locale, anchorPrefix, dnsRecords }: {
+export default function VMInfoDisplay({ info, locale, anchorPrefix, dnsRecords, hostSlug }: {
   info: VMInfoType; locale: string; anchorPrefix?: string;
+  /** The host the scan belongs to: secret chips link to its Segredos tab. */
+  hostSlug: string;
   /** The host's linked DNS records: web-server names show linked / not linked. */
   dnsRecords?: { id: number; domain: string }[];
 }) {
   const { t } = useLocale();
   const groups: Record<ScanGroup, ReactNode> = {
-    resources: <ScanResources info={info} t={t} />,
+    resources: <ScanResources info={info} t={t} hostSlug={hostSlug} />,
     system: <ScanSystem info={info} locale={locale} t={t} />,
     users: <ScanUsers info={info} locale={locale} t={t} />,
-    processes: <ScanProcesses info={info} t={t} />,
+    processes: <ScanProcesses info={info} t={t} hostSlug={hostSlug} />,
     containers: <ScanContainers info={info} t={t} />,
     services: <ScanServices info={info} t={t} />,
     webservers: <ScanWebServers info={info} t={t} dnsRecords={dnsRecords} />,
     git: <ScanGitRemotes info={info} t={t} />,
-    packages: <ScanPackages info={info} t={t} />,
+    packages: <ScanPackages info={info} t={t} hostSlug={hostSlug} />,
     security: <ScanSecurity info={info} t={t} />,
   };
   return (

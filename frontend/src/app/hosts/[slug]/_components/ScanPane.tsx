@@ -87,7 +87,7 @@ export default function ScanPane({ slug, host, lastScan, canEdit, dnsRecords }: 
       ) : (
         <>
           <JumpBar t={t} />
-          <VMInfoDisplay info={parsed.info} locale={locale} anchorPrefix={ANCHOR} dnsRecords={dnsRecords} />
+          <VMInfoDisplay info={parsed.info} locale={locale} anchorPrefix={ANCHOR} dnsRecords={dnsRecords} hostSlug={slug} />
         </>
       )}
     </section>
