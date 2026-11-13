@@ -93,7 +93,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v131**. Use idempotent idioms:
+per element, currently at **v132**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -216,10 +216,11 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   word exactly `pull` or `clone` (`TestGitInnerScriptRuns` plants both). Each
   container frame ends with its `docker exec` status (`@@exit N`, taken off
   by `splitCtrFrames`): a walk that never started counts as done only for
-  126/127 (no shell in the image). It must stay well inside the browser's
-  120 s scan request or the whole scan is lost:
+  126/127 (no shell in the image). In the synchronous scan it must stay well
+  inside the browser's 120 s scan request or the whole scan is lost:
   host walk 20 s, containers started within 30 s (8 s each), unprivileged
-  deadline 60 s. `git_remotes` is `null` when the probe didn't run, `[]` when
+  deadline 60 s; a background scan (`CaptureJob`, below) gets 180 s, 300 s and
+  9 min. `git_remotes` is `null` when the probe didn't run, `[]` when
   it found none; `git_remotes_partial` marks a list that may be short (find
   exit > 1, cap, a container skipped, cut, paused or restarting, or the
   unprivileged fallback after a failed root run).
@@ -394,6 +395,29 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   re-read. UI: the host tab **Segredos** (`?tab=secrets`, editors) lists them,
   with reveal only for `hosts.secrets.reveal`, and scan views render the
   tokens as lock chips linking to it (a plain chip for viewers).
+- Background scans (`internal/api/scan_job.go`, v132): a scan run is an
+  `os_update_runs` row of kind `scan` on the OS update runner — `ListRuns`
+  and every OS-update view leave scans out. `POST /api/ssh/scans`
+  `{host_ids, concurrency?, method?}` (editor, 202, default concurrency 10),
+  `GET /api/ssh/scans[?active=1&host_id=]`, `GET …/{id}`, `POST …/{id}/cancel`;
+  a run is seen and cancelled only by its requester and admins (404 otherwise).
+  `scanHostRunner` dials like `handleTestConnection` (`scanMethod`, then
+  `service.DialHost` and its pinned key; a dropped connection is retried, a
+  refused login or changed key never), captures with `sshtest.CaptureJob`,
+  reloads the host (an edit made during the scan's minutes survives), then
+  `noteTest` (shared with the synchronous scan) and `recordScan`; a result's
+  `output` is recordScan's summary as JSON. Past `scanHostTimeout` (20 min) the
+  client is closed and **nothing is recorded**: a closed client makes every
+  probe come back empty, which would mark the host's services offline.
+  `TestCapture(client, pw, mode)`: `CaptureSync` keeps the budgets of the
+  browser's 120 s request (`POST /api/ssh/test/{slug}`, still behind SSH
+  operations' tests); `CaptureJob` (scan runs, OS-update rescans) raises the
+  per-command deadline, the git walk, the containers' start budget and the
+  unprivileged git deadline (`budgets`, `test.go`), never the output caps. The
+  per-command budget is looked up by client (`budgetOf`), so `runCmd` callers
+  take no mode. UI: the hosts list's batch scan and the host's scan button
+  start runs and poll them (`useScanRun`); a reopened page picks up the
+  caller's active run.
 - Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
   names are read in bulk; wiki titles come from Outline at most once a day per
   page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title

@@ -2672,6 +2672,19 @@ definitions:
       ttl_seconds:
         type: integer
     type: object
+  api.scanRunRequest:
+    properties:
+      concurrency:
+        description: 1–10, default 10
+        type: integer
+      host_ids:
+        items:
+          type: integer
+        type: array
+      method:
+        description: '"password" or "key" for every host; empty = each host''s own.'
+        type: string
+    type: object
   api.secretConsolidationApplyRequest:
     properties:
       keys:
@@ -4988,6 +5001,9 @@ definitions:
     type: object
   models.OSUpdateRun:
     properties:
+      auth_method:
+        description: 'Scans: the SSH method to use, "" = each host''s own.'
+        type: string
       backup:
         description: back each host up to MinIO first
         type: boolean
@@ -19672,6 +19688,115 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: Preview the generated SSH config
+      tags:
+      - ssh
+  /api/ssh/scans:
+    get:
+      description: 'Editor+. The caller''s 50 newest scan runs (an admin''s: everyone''s),
+        newest first, with how many hosts are in each status; active=1 keeps the running
+        ones, host_id the ones that include that host.'
+      parameters:
+      - description: '1: only running runs'
+        in: query
+        name: active
+        type: integer
+      - description: Only runs of this host
+        in: query
+        name: host_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.OSUpdateRun'
+            type: array
+      summary: List background scans
+      tags:
+      - ssh
+    post:
+      consumes:
+      - application/json
+      description: Editor+. Scans host_ids on the server, concurrency at a time (1–10,
+        default 10), each like POST /api/ssh/test/{slug} with capture (the host's
+        auth method — or method for every host —, its pinned host key, the same bookkeeping)
+        but with longer probe budgets, retrying a dropped connection. The run outlives
+        the request and the browser tab; poll GET …/scans/{id}. Answers 202 with the
+        run. 404 when a host isn't visible.
+      parameters:
+      - description: Hosts
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.scanRunRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/models.OSUpdateRun'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Start a background scan
+      tags:
+      - ssh
+  /api/ssh/scans/{id}:
+    get:
+      description: 'Editor+. The run with every host''s result: status, reason, OS,
+        and as output a JSON summary of what the scan recorded. 404 unless the caller
+        started it or is an admin.'
+      parameters:
+      - description: Run ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.OSUpdateRun'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Get a background scan
+      tags:
+      - ssh
+  /api/ssh/scans/{id}/cancel:
+    post:
+      description: Editor+. Hosts not started yet are skipped; hosts being scanned
+        finish. Returns the run. 404 unless the caller started it or is an admin.
+      parameters:
+      - description: Run ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.OSUpdateRun'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Cancel a background scan
       tags:
       - ssh
   /api/ssh/server-info:
