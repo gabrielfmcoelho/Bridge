@@ -46,12 +46,12 @@ func ByTo(pairs []LinkPair) map[int64][]int64 {
 
 // GraphRepo reads the graph's edges in one query per link table, instead of
 // one query per entity (the per-id HostIDs/DNSIDs helpers made /api/graph
-// issue ~1k round-trips). Rows are unscoped: callers only use ids of assets
-// they already listed through VisibleExpr, so a link to an invisible asset is
-// never followed (graph edges need both ends in the scoped node maps; list
-// enrichment keys by the listed row's own id). Links from soft-deleted
-// services/projects are dropped where a count reads them (DNS list), matching
-// ServiceRepo.CountsByHost.
+// issue ~1k round-trips). Rows are unscoped, so a caller drops invisible ends
+// itself: graph edges need both ends in the scoped node maps, and list
+// enrichment, keyed by the listed row's own id, filters the other end with
+// VisibleSet + KeepVisible (a shared row links the other side's assets).
+// Links from soft-deleted services/projects are dropped where a count reads
+// them (DNS list), matching ServiceRepo.CountsByHost.
 type GraphRepo struct{ db *sql.DB }
 
 func NewGraphRepo(db *sql.DB) *GraphRepo { return &GraphRepo{db: db} }

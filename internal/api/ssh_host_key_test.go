@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"golang.org/x/crypto/ssh"
@@ -28,10 +29,14 @@ import (
 
 // fakeSSHD is an in-process SSH server whose host key a test can swap. It
 // takes the password "pw" and answers every command with exit 0, no output.
+// conns counts the connections it accepted; onExec, when set, runs before
+// each command is answered (a test may block it, or change the database).
 type fakeSSHD struct {
 	host, port string
 	mu         sync.Mutex
 	key        ssh.Signer
+	conns      atomic.Int32
+	onExec     func()
 }
 
 func newFakeSSHD(t *testing.T, key ssh.Signer) *fakeSSHD {
@@ -49,6 +54,7 @@ func newFakeSSHD(t *testing.T, key ssh.Signer) *fakeSSHD {
 			if err != nil {
 				return
 			}
+			s.conns.Add(1)
 			go s.serve(c)
 		}
 	}()
@@ -86,6 +92,9 @@ func (s *fakeSSHD) serve(c net.Conn) {
 			for req := range chReqs {
 				req.Reply(true, nil)
 				if req.Type == "exec" || req.Type == "shell" {
+					if s.onExec != nil {
+						s.onExec()
+					}
 					ch.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{0}))
 					ch.Close()
 				}

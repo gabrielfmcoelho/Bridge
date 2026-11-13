@@ -291,40 +291,16 @@ func (r *DNSRepo) InTrash(ctx context.Context, domain string) (bool, error) {
 	return exists, err
 }
 
-// SetHostLinks replaces all host links for a DNS record (one tx).
+// SetHostLinks replaces a DNS record's host links among the hosts the caller
+// can see (one tx); links to hosts it can't see are kept.
 func (r *DNSRepo) SetHostLinks(ctx context.Context, dnsID int64, hostIDs []int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM dns_host_links WHERE dns_id = ?`, dnsID); err != nil {
-		return err
-	}
-	for _, hid := range hostIDs {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO dns_host_links (dns_id, host_id) VALUES (?, ?)`, dnsID, hid); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+	return replaceVisibleLinks(ctx, r.db, `dns_host_links`, `dns_id`, dnsID, `host_id`, `hosts`, AssetHost, hostIDs)
 }
 
-// SetLinksForHost replaces all DNS links for a host (one tx).
+// SetLinksForHost replaces a host's DNS links among the records the caller
+// can see (one tx); links to records it can't see are kept.
 func (r *DNSRepo) SetLinksForHost(ctx context.Context, hostID int64, dnsIDs []int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM dns_host_links WHERE host_id = ?`, hostID); err != nil {
-		return err
-	}
-	for _, did := range dnsIDs {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO dns_host_links (dns_id, host_id) VALUES (?, ?)`, did, hostID); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+	return replaceVisibleLinks(ctx, r.db, `dns_host_links`, `host_id`, hostID, `dns_id`, `dns_records`, AssetDNS, dnsIDs)
 }
 
 // AddHostLink links a host to a DNS record without touching its other links.
@@ -350,41 +326,35 @@ func (r *DNSRepo) IDByDomain(ctx context.Context, domain string) (id int64, foun
 	return id, err == nil, trashed, err
 }
 
-// SetServiceLinks replaces all service links for a DNS record (one tx).
+// SetServiceLinks replaces a DNS record's service links among the services
+// the caller can see (one tx); links to services it can't see are kept.
 func (r *DNSRepo) SetServiceLinks(ctx context.Context, dnsID int64, serviceIDs []int64) error {
-	return replaceLinks(ctx, r.db, `service_dns_links`, `dns_id`, `service_id`, dnsID, serviceIDs)
+	return replaceVisibleLinks(ctx, r.db, `service_dns_links`, `dns_id`, dnsID, `service_id`, `services`, AssetService, serviceIDs)
 }
 
-// ServiceIDs returns all service ids linked to a DNS record.
+// ServiceIDs returns the ids of the services linked to a DNS record that the
+// caller can see: a record shared across entidades must not reveal the other
+// side's services, not even as ids or a count.
 func (r *DNSRepo) ServiceIDs(ctx context.Context, dnsID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT service_id FROM service_dns_links WHERE dns_id = ? ORDER BY service_id`, dnsID)
-	if err != nil {
-		return nil, err
-	}
-	return scanInt64s(rows)
+	return visibleLinkIDs(ctx, r.db, `service_dns_links`, `dns_id`, dnsID, `service_id`, `services`, AssetService)
 }
 
-// SetProjectLinks replaces all direct project links for a DNS record (one tx).
+// SetProjectLinks replaces a DNS record's direct project links among the
+// projects the caller can see (one tx); the others are kept.
 func (r *DNSRepo) SetProjectLinks(ctx context.Context, dnsID int64, projectIDs []int64) error {
-	return replaceLinks(ctx, r.db, `project_dns_links`, `dns_id`, `project_id`, dnsID, projectIDs)
+	return replaceVisibleLinks(ctx, r.db, `project_dns_links`, `dns_id`, dnsID, `project_id`, `projects`, AssetProject, projectIDs)
 }
 
-// ProjectIDs returns all project ids directly linked to a DNS record.
+// ProjectIDs returns the ids of the projects directly linked to a DNS record
+// that the caller can see.
 func (r *DNSRepo) ProjectIDs(ctx context.Context, dnsID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT project_id FROM project_dns_links WHERE dns_id = ? ORDER BY project_id`, dnsID)
-	if err != nil {
-		return nil, err
-	}
-	return scanInt64s(rows)
+	return visibleLinkIDs(ctx, r.db, `project_dns_links`, `dns_id`, dnsID, `project_id`, `projects`, AssetProject)
 }
 
-// HostIDs returns all host ids linked to a DNS record.
+// HostIDs returns the ids of the hosts linked to a DNS record that the caller
+// can see.
 func (r *DNSRepo) HostIDs(ctx context.Context, dnsID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT host_id FROM dns_host_links WHERE dns_id = ?`, dnsID)
-	if err != nil {
-		return nil, err
-	}
-	return scanInt64s(rows)
+	return visibleLinkIDs(ctx, r.db, `dns_host_links`, `dns_id`, dnsID, `host_id`, `hosts`, AssetHost)
 }
 
 // RecordsByHost returns all DNS records linked to a host, ordered by domain.
@@ -417,9 +387,10 @@ func (r *DNSRepo) Count(ctx context.Context) (int, error) {
 	return n, err
 }
 
-// CountsByHost returns host_id → number of linked DNS records.
+// CountsByHost returns host_id → number of linked DNS records the caller can see.
 func (r *DNSRepo) CountsByHost(ctx context.Context) (map[int64]int, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT l.host_id, COUNT(*) FROM dns_host_links l JOIN dns_records ON dns_records.id = l.dns_id AND `+dnsLive+` GROUP BY l.host_id`)
+	vis, vargs := VisibleExpr(ctx, AssetDNS, "dns_records.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT l.host_id, COUNT(*) FROM dns_host_links l JOIN dns_records ON dns_records.id = l.dns_id AND `+dnsLive+` WHERE `+vis+` GROUP BY l.host_id`, vargs...)
 	if err != nil {
 		return nil, err
 	}

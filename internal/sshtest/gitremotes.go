@@ -32,9 +32,10 @@ type GitRemote struct {
 	PullKind string `json:"pull_kind,omitempty"` // clone, pull or fetch
 }
 
-// The whole probe must finish well inside the browser's 120 s scan request
-// (DEFAULT_REQUEST_TIMEOUT_MS), or the scan itself is lost: host walk ≤ 20 s
-// (in gitInnerScript), containers started within 30 s, each ≤ 8 s.
+// The synchronous scan's probe must finish well inside the browser's 120 s
+// scan request (DEFAULT_REQUEST_TIMEOUT_MS), or the scan itself is lost: host
+// walk ≤ 20 s, containers started within 30 s, each ≤ 8 s. A background scan
+// raises the walk and the start budget (budgets, CaptureJob).
 const (
 	maxGitContainers = 30
 	gitOutputCap     = 131072
@@ -66,7 +67,7 @@ const (
 // hold the author and the clone URL).
 // Every file is read only after [ -f ]: opening a FIFO there would block the walk.
 // ponytail: refs/heads only; a HEAD on a tag or a nested symref reads as unknown.
-const gitWalkScript = `T=""; TI=""; command -v timeout >/dev/null 2>&1 && timeout 1 true 2>/dev/null && T="timeout 20" && TI="timeout 5"
+const gitWalkScript = `T=""; TI=""; command -v timeout >/dev/null 2>&1 && timeout 1 true 2>/dev/null && T="timeout {WALK}" && TI="timeout 5"
 R="$GITPROBE_ROOTS"
 [ -n "$R" ] || R="/ $(awk '$3 ~ /^(ext[234]|xfs|btrfs|zfs|f2fs)$/ && $2 != "/" {print $2}' /proc/mounts 2>/dev/null | sort -u | tr '\n' ' ')"
 X=""; DR=$($TI docker info --format '{{.DockerRootDir}}' 2>/dev/null); case "$DR" in /?*) X="-o -path $DR";; esac
@@ -96,36 +97,43 @@ printf '%s\n' "$L" | head -n 101 | { n=0; while IFS= read -r g; do
 done; [ "$rc" -gt 1 ] || echo @@gitend; }
 `
 
-// gitInnerScript runs on the host and inside each container: @@git opens the
-// run, then the walk. On the host with SUDO=1 and a sudo that needs no
-// password, the whole walk runs in one privileged shell — two entries in the
-// auth log per scan, not two per checkout.
-var gitInnerScript = `export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
+// gitInner runs on the host and inside each container: @@git opens the
+// run, then the walk (walk seconds at most). On the host with SUDO=1 and a
+// sudo that needs no password, the whole walk runs in one privileged shell —
+// two entries in the auth log per scan, not two per checkout.
+func gitInner(walk int) string {
+	w := strings.ReplaceAll(gitWalkScript, "{WALK}", strconv.Itoa(walk))
+	return `export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
 echo @@git
 if [ -n "$SUDO" ] && sudo -n true 2>/dev/null; then
-  printf %s ` + base64.StdEncoding.EncodeToString([]byte(gitWalkScript)) + ` | base64 -d | sudo -n sh
+  printf %s ` + base64.StdEncoding.EncodeToString([]byte(w)) + ` | base64 -d | sudo -n sh
 else
-` + gitWalkScript + `fi
+` + w + `fi
 `
+}
+
+// gitInnerScript is the synchronous scan's (tests run it as is).
+var gitInnerScript = gitInner(budgets[CaptureSync].gitWalk)
 
 // gitProbeScript is the whole remote script: host, then every running
-// container (up to maxGitContainers, started within gitCtrBudget). One SSH session.
-func gitProbeScript(asRoot bool) string {
-	return hostAndContainersScript(gitInnerScript, maxGitContainers, gitOutputCap, gitCtrTimeout, gitCtrBudget, asRoot)
+// container (up to maxGitContainers, started within b.gitCtrs). One SSH session.
+func gitProbeScript(asRoot bool, b budget) string {
+	return hostAndContainersScript(gitInner(b.gitWalk), maxGitContainers, gitOutputCap, gitCtrTimeout, b.gitCtrs, asRoot)
 }
 
 // collectGitRemotes runs the probe — as root with the stored password when
 // there is one (other users' homes are 0700), else unprivileged with sudo -n.
 // nil: the probe didn't run. complete=false: some part stopped early.
 func collectGitRemotes(client *ssh.Client, sudoPassword string) (remotes []GitRemote, complete bool) {
+	b := budgetOf(client)
 	if sudoPassword != "" {
-		out, err := runSudoCmd(client, sudoPassword, gitProbeScript(true))
+		out, err := runSudoCmd(client, sudoPassword, gitProbeScript(true, b))
 		if remotes, complete = parseGitProbe(out); remotes != nil {
 			return remotes, complete
 		}
 		log.Printf("[sshscan] git remotes as root failed, falling back to unprivileged: %v", err)
 	}
-	raw, _ := runCmdWithDeadline(client, encodedScript(gitProbeScript(false), "sh"), gitProbeTimeout)
+	raw, _ := runCmdWithDeadline(client, encodedScript(gitProbeScript(false, b), "sh"), b.gitProbe)
 	return fallbackGitResult(raw, sudoPassword != "")
 }
 

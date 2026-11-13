@@ -381,6 +381,10 @@ type ProcessDetail struct {
 	Venv    string `json:"venv,omitempty"`
 	Ports   string `json:"ports,omitempty"`
 	Unit    string `json:"unit,omitempty"` // systemd service from the cgroup
+	// InContainer: the cgroup puts the process in a container. Read in the
+	// process-details run itself, so as root when it is (a hidepid host hides
+	// other users' cgroups from the unprivileged sweep).
+	InContainer bool `json:"-"`
 }
 
 // Test runs a simple "echo OK" over SSH to verify connectivity.
@@ -406,7 +410,11 @@ func Test(client *ssh.Client) error {
 // error return with the panic value + stack snippet, so the HTTP handler
 // can surface a real message instead of letting net/http close the
 // connection mid-response (which the proxy logs as "socket hang up").
-func TestCapture(client *ssh.Client, sudoPassword string) (info *VMInfo, retErr error) {
+//
+// mode picks the time budgets: CaptureSync fits the browser's 120 s request,
+// CaptureJob (a background run) gives the probes more time.
+func TestCapture(client *ssh.Client, sudoPassword string, mode CaptureMode) (info *VMInfo, retErr error) {
+	defer enterMode(client, mode)()
 	defer func() {
 		if rv := recover(); rv != nil {
 			log.Printf("[sshscan] panic during capture: %v\n%s", rv, debug.Stack())
@@ -427,6 +435,51 @@ func FixDevNull(client *ssh.Client) (string, error) {
 // under a second; anything above this is almost certainly a hang
 // (df on a stuck NFS mount, curl waiting on dead DNS, etc).
 const sshCmdTimeout = 30 * time.Second
+
+// CaptureMode picks a capture's time budgets.
+type CaptureMode int
+
+const (
+	// CaptureSync fits the synchronous scan, inside the browser's 120 s request.
+	CaptureSync CaptureMode = iota
+	// CaptureJob is a background scan: the deadlines that exist only for
+	// that request are raised. Caps on output size stay.
+	CaptureJob
+)
+
+// budget is what a capture may spend: each plain command (runCmd), the
+// unprivileged git probe's whole session, its host walk and the time within
+// which a container's walk may still start (seconds).
+type budget struct {
+	cmd, gitProbe    time.Duration
+	gitWalk, gitCtrs int
+}
+
+var budgets = map[CaptureMode]budget{
+	CaptureSync: {cmd: sshCmdTimeout, gitProbe: gitProbeTimeout, gitWalk: 20, gitCtrs: gitCtrBudget},
+	CaptureJob:  {cmd: 2 * time.Minute, gitProbe: 9 * time.Minute, gitWalk: 180, gitCtrs: 300},
+}
+
+// jobClients are the clients a CaptureJob capture is running on. The budget
+// is looked up by client so the ~40 runCmd callers keep their signature.
+var jobClients sync.Map
+
+// enterMode puts client on mode's budget until the returned func is called.
+func enterMode(client *ssh.Client, mode CaptureMode) func() {
+	if mode != CaptureJob {
+		return func() {}
+	}
+	jobClients.Store(client, true)
+	return func() { jobClients.Delete(client) }
+}
+
+// budgetOf is client's budget: the job one inside a CaptureJob capture.
+func budgetOf(client *ssh.Client) budget {
+	if _, ok := jobClients.Load(client); ok {
+		return budgets[CaptureJob]
+	}
+	return budgets[CaptureSync]
+}
 
 // runCmdWithDeadline executes cmd in a fresh session with a hard deadline.
 // On timeout it closes the session (which makes the underlying
@@ -469,7 +522,7 @@ func runCmdWithDeadline(client *ssh.Client, cmd string, timeout time.Duration) (
 }
 
 func runCmd(client *ssh.Client, cmd string) string {
-	out, err := runCmdWithDeadline(client, cmd, sshCmdTimeout)
+	out, err := runCmdWithDeadline(client, cmd, budgetOf(client).cmd)
 	if err != nil {
 		return ""
 	}
@@ -477,7 +530,7 @@ func runCmd(client *ssh.Client, cmd string) string {
 }
 
 func runCmdWithWarnings(client *ssh.Client, cmd string, warnings map[string]bool) string {
-	out, err := runCmdWithDeadline(client, cmd, sshCmdTimeout)
+	out, err := runCmdWithDeadline(client, cmd, budgetOf(client).cmd)
 	if err != nil {
 		return ""
 	}
@@ -485,7 +538,7 @@ func runCmdWithWarnings(client *ssh.Client, cmd string, warnings map[string]bool
 }
 
 func runCmdRaw(client *ssh.Client, cmd string) (string, error) {
-	out, execErr := runCmdWithDeadline(client, cmd, sshCmdTimeout)
+	out, execErr := runCmdWithDeadline(client, cmd, budgetOf(client).cmd)
 	cleaned := strings.TrimSpace(cleanCommandOutput(out, nil))
 	if execErr != nil {
 		if cleaned == "" {

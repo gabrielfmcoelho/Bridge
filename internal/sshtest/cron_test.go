@@ -38,6 +38,17 @@ func TestCronCommandBinary(t *testing.T) {
 		"/opt/backup-$(date +%F).sh": "",
 		"/opt/app/`hostname`.sh":     "",
 		"/opt/run.sh%input":          "",
+		// Glob patterns are not one path.
+		"/opt/backup/*.sh": "",
+		"/opt/run?.sh":     "",
+		"/opt/[ab].sh":     "",
+		// A quoted path keeps its spaces.
+		`"/opt/my app/run.sh" --x`:          "/opt/my app/run.sh",
+		`'/opt/my app/run.sh'>/dev/null`:    "/opt/my app/run.sh",
+		`PGPASSWORD=x "/opt/my app/b.sh" y`: "/opt/my app/b.sh",
+		`"/opt/unterminated x`:              "",
+		`"/opt/my app"/run.sh`:              "",
+		`A="/x" "/opt/b c/d.sh"`:            "/opt/b c/d.sh",
 	}
 	for in, want := range cases {
 		if got := cronCommandBinary(in); got != want {
@@ -84,7 +95,7 @@ func TestMissingBinariesScriptRuns(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 
-	paths := []string{"open/run.sh", "open/noexec.sh", "open/gone.sh", "open/it's gone.sh", "nodir/sub/gone.sh", "locked/run.sh", "locked/gone.sh", "locked/sub/gone.sh"}
+	paths := []string{"open/run.sh", "open/noexec.sh", "open/gone.sh", "open/it's gone.sh", "nodir/sub/gone.sh", "locked/run.sh", "locked/gone.sh", "locked/sub/gone.sh", `open/back\cslash.sh`}
 	for i := range paths {
 		paths[i] = filepath.Join(root, paths[i])
 	}
@@ -92,7 +103,8 @@ func TestMissingBinariesScriptRuns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("script: %v\n%s", err, out)
 	}
-	want := []string{paths[2], paths[3], paths[4]}
+	// dash's echo stops at "\c": the path is printed with printf, whole.
+	want := []string{paths[2], paths[3], paths[4], paths[8]}
 	if got := strings.Split(strings.TrimSpace(string(out)), "\n"); !reflect.DeepEqual(got, want) {
 		t.Fatalf("reported %q, want %q", got, want)
 	}

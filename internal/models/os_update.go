@@ -22,6 +22,10 @@ const (
 	OSResultSkipped = "skipped"
 )
 
+// RunKindScan is a background host scan: it shares the run tables with the
+// OS updates, never their views.
+const RunKindScan = "scan"
+
 // Backup statuses of a result.
 const (
 	OSBackupDone    = "done"
@@ -46,10 +50,12 @@ type OSUpdateRun struct {
 	BackupInclude []string `json:"backup_include,omitempty"`
 	BackupExclude []string `json:"backup_exclude,omitempty"`
 	// Restores: the kept backup (source run and host) and where it goes.
-	RestoreMode   string           `json:"restore_mode,omitempty"`  // staging | paths
-	RestorePaths  []string         `json:"restore_paths,omitempty"` // absolute paths
-	SourceRunID   *int64           `json:"source_run_id,omitempty"`
-	SourceHostID  *int64           `json:"source_host_id,omitempty"`
+	RestoreMode  string   `json:"restore_mode,omitempty"`  // staging | paths
+	RestorePaths []string `json:"restore_paths,omitempty"` // absolute paths
+	SourceRunID  *int64   `json:"source_run_id,omitempty"`
+	SourceHostID *int64   `json:"source_host_id,omitempty"`
+	// Scans: the SSH method to use, "" = each host's own.
+	AuthMethod    string           `json:"auth_method,omitempty"`
 	Status        string           `json:"status"`
 	RequestedBy   *int64           `json:"requested_by,omitempty"`
 	RequestedName string           `json:"requested_name,omitempty"`

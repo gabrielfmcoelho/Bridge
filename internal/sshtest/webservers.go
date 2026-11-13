@@ -283,7 +283,8 @@ var (
 	reProxyPass   = nginxDirective("proxy_pass")
 	reFastCGIPass = nginxDirective("fastcgi_pass")
 	reRoot        = nginxDirective("root")
-	reLocation    = regexp.MustCompile(`^location\s+(?:[=~^*]+\s+)?(\S+)\s*\{`)
+	// The "{" may open on the next line; a path holding "{" ({3}) keeps it.
+	reLocation    = regexp.MustCompile(`^location\s+(?:[=~^*]+\s+)?(?:(\S+)\s*\{|(\S+)$)`)
 	reUpstream    = regexp.MustCompile(`^upstream\s+(\S+)\s*\{`)
 	reUpstreamSrv = regexp.MustCompile(`^server\s+([^;\s]+)`)
 )
@@ -344,7 +345,7 @@ func parseNginxSites(cfg string) []WebSite {
 
 		if cur != nil {
 			if m := reLocation.FindStringSubmatch(line); m != nil {
-				locs = append(locs, openLoc{m[1], depth})
+				locs = append(locs, openLoc{m[1] + m[2], depth})
 			}
 			top := depth == serverDepth+1 || (depth == serverDepth && strings.Contains(line, "{"))
 			switch {

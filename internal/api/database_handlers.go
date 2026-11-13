@@ -201,9 +201,12 @@ func (h *databaseHandlers) attachDetail(ctx context.Context, d *models.Database)
 // checkRefs rejects references the caller can't see (404, like the asset
 // itself would answer) and a free endpoint set by a non-admin: host is where
 // Bridge will connect to, so only admins may point it anywhere; editors use
-// the endpoint derived from the instance.
-func (h *databaseHandlers) checkRefs(w http.ResponseWriter, r *http.Request, d *models.Database, prevHost string, serviceIDs, projectIDs []int64) bool {
-	if d.InstanceServiceID != nil {
+// the endpoint derived from the instance. prev is the row before this request
+// (zero on create): an instance or tunnel host it already held isn't
+// re-checked, so a scoped editor can save a database on another entidade's
+// instance.
+func (h *databaseHandlers) checkRefs(w http.ResponseWriter, r *http.Request, d *models.Database, prev models.Database, serviceIDs, projectIDs []int64) bool {
+	if changedRef(d.InstanceServiceID, prev.InstanceServiceID) {
 		serviceIDs = append(append([]int64{}, serviceIDs...), *d.InstanceServiceID)
 	}
 	for _, id := range serviceIDs {
@@ -218,19 +221,24 @@ func (h *databaseHandlers) checkRefs(w http.ResponseWriter, r *http.Request, d *
 			return false
 		}
 	}
-	if d.TunnelHostID != nil {
+	if changedRef(d.TunnelHostID, prev.TunnelHostID) {
 		if hst, err := store.NewHostRepo(h.db.SQL).GetByID(r.Context(), *d.TunnelHostID); err != nil || hst == nil {
 			jsonError(w, http.StatusNotFound, fmt.Sprintf("host %d not found", *d.TunnelHostID))
 			return false
 		}
 	}
-	if d.Host != prevHost && d.Host != "" {
+	if d.Host != prev.Host && d.Host != "" {
 		if actor, _ := actorFrom(r); actor.Role != "admin" {
 			jsonError(w, http.StatusForbidden, "only admins may set a database's host")
 			return false
 		}
 	}
 	return true
+}
+
+// changedRef reports whether cur points somewhere prev didn't.
+func changedRef(cur, prev *int64) bool {
+	return cur != nil && (prev == nil || *cur != *prev)
 }
 
 func idsOrNil(p *[]int64) []int64 {
@@ -277,7 +285,7 @@ func (h *databaseHandlers) handleCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	consumers, projects := idsOrNil(req.ConsumerServiceIDs), idsOrNil(req.ProjectIDs)
-	if !h.checkRefs(w, r, d, "", consumers, projects) {
+	if !h.checkRefs(w, r, d, models.Database{}, consumers, projects) {
 		return
 	}
 	g, ok := resolveGrants(w, r, req.AssetGrantsInput, nil)
@@ -354,14 +362,14 @@ func (h *databaseHandlers) handleUpdate(w http.ResponseWriter, r *http.Request) 
 		jsonError(w, http.StatusNotFound, "database not found")
 		return
 	}
-	prevHost := d.Host
+	prev := *d
 	req.merge(d)
 	if err := d.Validate(); err != nil {
 		jsonBadRequest(w, r, err.Error(), err)
 		return
 	}
 	consumers, projects := idsOrNil(req.ConsumerServiceIDs), idsOrNil(req.ProjectIDs)
-	if !h.checkRefs(w, r, d, prevHost, consumers, projects) {
+	if !h.checkRefs(w, r, d, prev, consumers, projects) {
 		return
 	}
 	if err := repo.Update(r.Context(), d); err != nil {

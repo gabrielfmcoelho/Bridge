@@ -109,6 +109,12 @@ func (s *ServiceService) List(ctx context.Context, f models.ServiceFilter) ([]Se
 		return nil, err
 	}
 	hostIDs, dnsIDs, depIDs := store.ByFrom(links.ServiceHost), store.ByFrom(links.ServiceDNS), store.ByFrom(links.ServiceDepends)
+	// A service shared across entidades links the other side's assets too:
+	// their ids must not reach this caller.
+	vis, err := store.VisibleSets(ctx, s.db, store.AssetHost, store.AssetDNS, store.AssetService)
+	if err != nil {
+		return nil, err
+	}
 	issueCounts, err := models.GetIssueCountsByEntity(s.db, "service")
 	if err != nil {
 		return nil, err
@@ -122,9 +128,9 @@ func (s *ServiceService) List(ctx context.Context, f models.ServiceFilter) ([]Se
 		out[i] = ServiceListItem{
 			Service:             svc,
 			Tags:                tagMap[svc.ID],
-			HostIDs:             hostIDs[svc.ID],
-			DNSIDs:              dnsIDs[svc.ID],
-			DependsOnIDs:        depIDs[svc.ID],
+			HostIDs:             store.KeepVisible(hostIDs[svc.ID], vis[0]),
+			DNSIDs:              store.KeepVisible(dnsIDs[svc.ID], vis[1]),
+			DependsOnIDs:        store.KeepVisible(depIDs[svc.ID], vis[2]),
 			MainResponsavelName: mainNames[svc.ID],
 			IssuesCount:         issueCounts[svc.ID],
 		}

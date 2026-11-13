@@ -23,11 +23,11 @@ func (r *OSUpdateRepo) CreateRun(ctx context.Context, run *models.OSUpdateRun, h
 	}
 	defer tx.Rollback()
 	if err := tx.QueryRowContext(ctx, `INSERT INTO os_update_runs (kind, reboot, concurrency, target, requested_by, backup, keep_backup,
-		restore_mode, restore_paths, source_run_id, source_host_id, backup_include, backup_exclude, update_first)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, status, created_at`,
+		restore_mode, restore_paths, source_run_id, source_host_id, backup_include, backup_exclude, update_first, auth_method)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, status, created_at`,
 		run.Kind, run.Reboot, run.Concurrency, run.Target, run.RequestedBy, run.Backup, run.KeepBackup,
 		run.RestoreMode, strings.Join(run.RestorePaths, "\n"), run.SourceRunID, run.SourceHostID,
-		joinPaths(run.BackupInclude), joinPaths(run.BackupExclude), run.UpdateFirst).Scan(&run.ID, &run.Status, &run.CreatedAt); err != nil {
+		joinPaths(run.BackupInclude), joinPaths(run.BackupExclude), run.UpdateFirst, run.AuthMethod).Scan(&run.ID, &run.Status, &run.CreatedAt); err != nil {
 		return err
 	}
 	for _, id := range hostIDs {
@@ -40,7 +40,7 @@ func (r *OSUpdateRepo) CreateRun(ctx context.Context, run *models.OSUpdateRun, h
 
 const osRunCols = `r.id, r.kind, r.reboot, r.concurrency, r.target, r.status, r.requested_by, COALESCE(u.display_name, ''), r.backup, r.keep_backup,
 	r.restore_mode, r.restore_paths, r.source_run_id, r.source_host_id, COALESCE(r.backup_include, ''), COALESCE(r.backup_exclude, ''),
-	r.update_first, r.created_at, r.finished_at,
+	r.update_first, r.auth_method, r.created_at, r.finished_at,
 	(SELECT COALESCE(json_object_agg(s.status, s.n), '{}')::text FROM
 		(SELECT status, COUNT(*) AS n FROM os_update_results WHERE run_id = r.id GROUP BY status) s)
 	FROM os_update_runs r LEFT JOIN users u ON u.id = r.requested_by`
@@ -49,7 +49,7 @@ func scanOSRun(sc interface{ Scan(...any) error }, run *models.OSUpdateRun) erro
 	var counts, paths, include, exclude string
 	if err := sc.Scan(&run.ID, &run.Kind, &run.Reboot, &run.Concurrency, &run.Target, &run.Status, &run.RequestedBy,
 		&run.RequestedName, &run.Backup, &run.KeepBackup, &run.RestoreMode, &paths, &run.SourceRunID, &run.SourceHostID,
-		&include, &exclude, &run.UpdateFirst, &run.CreatedAt, &run.FinishedAt, &counts); err != nil {
+		&include, &exclude, &run.UpdateFirst, &run.AuthMethod, &run.CreatedAt, &run.FinishedAt, &counts); err != nil {
 		return err
 	}
 	run.BackupInclude, run.BackupExclude = splitPaths(include), splitPaths(exclude)
@@ -74,12 +74,34 @@ func splitPaths(s string) []string {
 	return strings.Split(s, "\n")
 }
 
-// ListRuns returns the newest runs first, with their per-status counts; with
-// hostID > 0 only the runs that include that host.
+// ListRuns returns the newest OS update runs first (never scans), with
+// their per-status counts; with hostID > 0 only the runs that include that host.
 func (r *OSUpdateRepo) ListRuns(ctx context.Context, limit int, hostID int64) ([]models.OSUpdateRun, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+osRunCols+`
-		WHERE ? = 0 OR EXISTS (SELECT 1 FROM os_update_results x WHERE x.run_id = r.id AND x.host_id = ?)
+	return r.listRuns(ctx, `SELECT `+osRunCols+` WHERE r.kind <> 'scan'
+		AND (? = 0 OR EXISTS (SELECT 1 FROM os_update_results x WHERE x.run_id = r.id AND x.host_id = ?))
 		ORDER BY r.id DESC LIMIT ?`, hostID, hostID, limit)
+}
+
+// ScanRunFilter narrows ListScanRuns; zero values don't filter (Limit 0 = 50).
+type ScanRunFilter struct {
+	RequestedBy, HostID int64
+	Active              bool // still running
+	Limit               int
+}
+
+// ListScanRuns returns the scan runs newest first, with their counts.
+func (r *OSUpdateRepo) ListScanRuns(ctx context.Context, f ScanRunFilter) ([]models.OSUpdateRun, error) {
+	if f.Limit <= 0 {
+		f.Limit = 50
+	}
+	return r.listRuns(ctx, `SELECT `+osRunCols+` WHERE r.kind = 'scan'
+		AND (? = 0 OR r.requested_by = ?) AND (NOT ? OR r.status = 'running')
+		AND (? = 0 OR EXISTS (SELECT 1 FROM os_update_results x WHERE x.run_id = r.id AND x.host_id = ?))
+		ORDER BY r.id DESC LIMIT ?`, f.RequestedBy, f.RequestedBy, f.Active, f.HostID, f.HostID, f.Limit)
+}
+
+func (r *OSUpdateRepo) listRuns(ctx context.Context, q string, args ...any) ([]models.OSUpdateRun, error) {
+	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -205,13 +227,14 @@ func (r *OSUpdateRepo) FinishRun(ctx context.Context, runID int64, status string
 }
 
 // MarkInterrupted closes the runs a restart cut short: their running hosts
-// failed (the update may still be going on the host), pending ones skipped.
+// failed (an update may still be going on the host; a scan just stopped),
+// pending ones skipped.
 func (r *OSUpdateRepo) MarkInterrupted(ctx context.Context) error {
 	_, err := r.db.ExecContext(ctx, `
-		WITH cut AS (UPDATE os_update_runs SET status = 'interrupted', finished_at = now() WHERE status = 'running' RETURNING id)
+		WITH cut AS (UPDATE os_update_runs SET status = 'interrupted', finished_at = now() WHERE status = 'running' RETURNING id, kind)
 		UPDATE os_update_results x SET
 			status = CASE x.status WHEN 'running' THEN 'failed' ELSE 'skipped' END,
-			reason = CASE x.status WHEN 'running' THEN 'interrupted by a Bridge restart: the update may still be running on the host'
+			reason = CASE WHEN x.status = 'running' AND cut.kind <> 'scan' THEN 'interrupted by a Bridge restart: the update may still be running on the host'
 				ELSE 'interrupted by a Bridge restart' END,
 			finished_at = now()
 		FROM cut WHERE x.run_id = cut.id AND x.status IN ('pending','running')`)

@@ -156,3 +156,50 @@ func CanSee(ctx context.Context, q Queryer, assetType AssetType, id int64) (bool
 	err := q.QueryRowContext(ctx, `SELECT `+vis, args...).Scan(&ok)
 	return ok, err
 }
+
+// VisibleSet returns the ids of assetType the caller can see, or nil when it
+// sees everything (admin / system scope). For enriching a page of rows from
+// the unscoped GraphRepo.Links, whose other ends may be invisible.
+func VisibleSet(ctx context.Context, q Queryer, assetType AssetType) (map[int64]bool, error) {
+	if _, skip := unscoped(ctx); skip {
+		return nil, nil
+	}
+	table := assetRegistry[assetType].Table
+	vis, args := VisibleExpr(ctx, assetType, table+".id")
+	rows, err := q.QueryContext(ctx, `SELECT id FROM `+table+` WHERE `+vis, args...)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := scanInt64s(rows)
+	set := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		set[id] = true
+	}
+	return set, err
+}
+
+// VisibleSets is VisibleSet for each asset type, in order.
+func VisibleSets(ctx context.Context, q Queryer, types ...AssetType) ([]map[int64]bool, error) {
+	sets := make([]map[int64]bool, len(types))
+	for i, a := range types {
+		var err error
+		if sets[i], err = VisibleSet(ctx, q, a); err != nil {
+			return nil, err
+		}
+	}
+	return sets, nil
+}
+
+// KeepVisible filters ids to those in set; a nil set (sees everything) keeps all.
+func KeepVisible(ids []int64, set map[int64]bool) []int64 {
+	if set == nil {
+		return ids
+	}
+	var out []int64
+	for _, id := range ids {
+		if set[id] {
+			out = append(out, id)
+		}
+	}
+	return out
+}

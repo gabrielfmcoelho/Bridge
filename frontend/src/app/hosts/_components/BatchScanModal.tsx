@@ -1,16 +1,16 @@
 import Button from "@/components/ui/Button";
-import type { Host } from "@/lib/types";
+import type { Host, OSUpdateRun } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import StatusDot from "@/components/ui/StatusDot";
 
+/** Batch scan: pick the hosts, start one server-side run, follow it. The run
+ * outlives the modal and the tab; reopened, the page hands its run back. */
 export default function BatchScanModal({
-  scanning,
-  scanProgress,
+  run,
+  starting,
+  stopping,
   scannableHosts,
-  scannedCount,
-  successCount,
-  failedCount,
   concurrency,
   onConcurrencyChange,
   scope,
@@ -29,12 +29,11 @@ export default function BatchScanModal({
   onViewFailed,
   t,
 }: {
-  scanning: boolean;
-  scanProgress: Record<string, { status: "pending" | "scanning" | "success" | "failed" | "skipped"; error?: string; attempt?: number }>;
+  /** The run being shown: running, or the last one this page started. */
+  run?: OSUpdateRun;
+  starting: boolean;
+  stopping: boolean;
   scannableHosts: Host[];
-  scannedCount: number;
-  successCount: number;
-  failedCount: number;
   concurrency: number;
   onConcurrencyChange: (value: number) => void;
   scope: "all" | "failed" | "success" | "untested";
@@ -51,21 +50,27 @@ export default function BatchScanModal({
   onStop: () => void;
   onClose: () => void;
   onViewFailed: () => void;
-  t: (key: string) => string;
+  t: (key: string, vars?: Record<string, string>) => string;
 }) {
-  const scanFinished = !scanning && scannedCount > 0;
+  const scanning = run?.status === "running";
+  const busy = scanning || starting;
+  const results = run?.results ?? [];
+  const finished = results.filter((x) => x.status !== "pending" && x.status !== "running").length;
+  const successCount = run?.counts.success ?? 0;
+  const failedCount = run?.counts.failed ?? 0;
   return (
     <div className="space-y-4">
       <p className="text-sm text-[var(--text-secondary)]">
-        {t("host.scanAllDescription")} ({scannableHosts.length} {t("host.title").toLowerCase()})
+        {t("host.scanAllDescription")} ({scanning ? results.length : scannableHosts.length} {t("host.title").toLowerCase()})
       </p>
+      <p className="text-xs text-[var(--text-muted)]">{t("host.scanServerNote")}</p>
 
       <div className="flex items-center gap-2">
         <span className="text-xs text-[var(--text-muted)] whitespace-nowrap">{t("host.scanScope")}:</span>
         <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--border-subtle)] overflow-hidden">
           <button
             type="button"
-            disabled={scanning}
+            disabled={busy}
             onClick={() => onScopeChange("all")}
             className={`px-3 py-1.5 text-xs transition-colors ${scope === "all" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-50 disabled:cursor-not-allowed`}
           >
@@ -73,7 +78,7 @@ export default function BatchScanModal({
           </button>
           <button
             type="button"
-            disabled={scanning || failedHostsCount === 0}
+            disabled={busy || failedHostsCount === 0}
             onClick={() => onScopeChange("failed")}
             className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${scope === "failed" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
           >
@@ -81,7 +86,7 @@ export default function BatchScanModal({
           </button>
           <button
             type="button"
-            disabled={scanning || successHostsCount === 0}
+            disabled={busy || successHostsCount === 0}
             onClick={() => onScopeChange("success")}
             className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${scope === "success" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
           >
@@ -89,7 +94,7 @@ export default function BatchScanModal({
           </button>
           <button
             type="button"
-            disabled={scanning || untestedHostsCount === 0}
+            disabled={busy || untestedHostsCount === 0}
             onClick={() => onScopeChange("untested")}
             className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${scope === "untested" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
           >
@@ -108,7 +113,7 @@ export default function BatchScanModal({
         <div className="inline-flex rounded-[var(--radius-md)] border border-[var(--border-subtle)] overflow-hidden">
           <button
             type="button"
-            disabled={scanning}
+            disabled={busy}
             onClick={() => onAuthMethodChange("auto")}
             className={`px-3 py-1.5 text-xs transition-colors ${authMethod === "auto" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-50 disabled:cursor-not-allowed`}
             title={t("host.scanAuthMethodAutoTooltip")}
@@ -117,7 +122,7 @@ export default function BatchScanModal({
           </button>
           <button
             type="button"
-            disabled={scanning || passwordCapableCount === 0}
+            disabled={busy || passwordCapableCount === 0}
             onClick={() => onAuthMethodChange("password")}
             className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${authMethod === "password" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
           >
@@ -125,7 +130,7 @@ export default function BatchScanModal({
           </button>
           <button
             type="button"
-            disabled={scanning || keyCapableCount === 0}
+            disabled={busy || keyCapableCount === 0}
             onClick={() => onAuthMethodChange("key")}
             className={`px-3 py-1.5 text-xs transition-colors border-l border-[var(--border-subtle)] ${authMethod === "key" ? "bg-[var(--accent-muted)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"} disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)]`}
           >
@@ -142,10 +147,10 @@ export default function BatchScanModal({
           id="scan-concurrency"
           type="range"
           min={1}
-          max={20}
+          max={10}
           step={1}
           value={concurrency}
-          disabled={scanning}
+          disabled={busy}
           onChange={(e) => onConcurrencyChange(Number(e.target.value))}
           className="flex-1 accent-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         />
@@ -154,66 +159,60 @@ export default function BatchScanModal({
         </span>
       </div>
 
-      {scanning && (
+      {run && (
         <div>
           <div className="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1.5">
-            <span>{t("host.scanProgress")}</span>
-            <span className="font-mono">{scannedCount}/{scannableHosts.length}</span>
+            <span>{scanning ? t("host.scanProgress") : t(`host.osUpdate.runStatus.${run.status}`)}</span>
+            <span className="font-mono">{finished}/{results.length}</span>
           </div>
           <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div
               className="h-full rounded-full bg-[var(--accent)] transition duration-300"
-              style={{ width: `${scannableHosts.length ? (scannedCount / scannableHosts.length) * 100 : 0}%` }}
+              style={{ width: `${results.length ? (finished / results.length) * 100 : 0}%` }}
             />
           </div>
           {(successCount > 0 || failedCount > 0) && (
             <div className="flex gap-3 mt-1.5 text-xs">
-              <span className="text-[var(--success)]">{successCount} OK</span>
-              {failedCount > 0 && <span className="text-[var(--danger)]">{failedCount} failed</span>}
+              <span className="text-[var(--success)]">{t("host.scanCountOk", { n: String(successCount) })}</span>
+              {failedCount > 0 && <span className="text-[var(--danger)]">{t("host.scanCountFailed", { n: String(failedCount) })}</span>}
             </div>
           )}
         </div>
       )}
 
-      {Object.keys(scanProgress).length > 0 && (
+      {results.length > 0 && (
         <div className="max-h-64 overflow-y-auto space-y-1 border border-[var(--border-subtle)] rounded-[var(--radius-md)] p-2">
-          {scannableHosts.map(host => {
-            const s = scanProgress[host.oficial_slug];
-            if (!s) return null;
-            return (
-              <div key={host.oficial_slug} className="flex items-center gap-2 py-1.5 px-2 rounded text-xs">
-                {s.status === "pending" && <StatusDot color="muted" />}
-                {s.status === "scanning" && <StatusDot color="accent" className="animate-pulse" />}
-                {s.status === "success" && <StatusDot className="bg-[var(--success)]" />}
-                {s.status === "failed" && <StatusDot className="bg-[var(--danger)]" />}
-                {s.status === "skipped" && <StatusDot className="bg-[var(--text-faint)]" />}
-                <span className="text-[var(--text-primary)] font-medium font-mono">{host.nickname}</span>
-                {s.status === "scanning" && <span className="text-[var(--accent)] ml-auto">{t("host.scanning")}{s.attempt && s.attempt > 1 ? ` (${s.attempt}/3)` : ""}</span>}
-                {s.status === "success" && <span className="text-[var(--success)] ml-auto">OK</span>}
-                {s.status === "skipped" && <span className="text-[var(--text-muted)] ml-auto">{t("host.scanSkipped")}</span>}
-                {s.error && <span className="text-[var(--danger)] ml-auto truncate max-w-[200px]" title={s.error}>{s.error}</span>}
-              </div>
-            );
-          })}
+          {results.map((x) => (
+            <div key={x.host_id} className="flex items-center gap-2 py-1.5 px-2 rounded text-xs">
+              {x.status === "pending" && <StatusDot color="muted" />}
+              {x.status === "running" && <StatusDot color="accent" className="animate-pulse" />}
+              {x.status === "success" && <StatusDot className="bg-[var(--success)]" />}
+              {x.status === "failed" && <StatusDot className="bg-[var(--danger)]" />}
+              {x.status === "skipped" && <StatusDot className="bg-[var(--text-faint)]" />}
+              <span className="text-[var(--text-primary)] font-medium font-mono">{x.host_nickname}</span>
+              {x.status === "running" && <span className="text-[var(--accent)] ml-auto">{t("host.scanning")}</span>}
+              {x.status === "success" && <span className="text-[var(--success)] ml-auto">OK</span>}
+              {x.status === "skipped" && <span className="text-[var(--text-muted)] ml-auto truncate max-w-[200px]" title={x.reason}>{t("host.scanSkipped")}</span>}
+              {x.status === "failed" && <span className="text-[var(--danger)] ml-auto truncate max-w-[200px]" title={x.reason}>{x.reason}</span>}
+            </div>
+          ))}
         </div>
       )}
 
       <div className="flex gap-2 justify-end">
+        {!scanning && run && failedCount > 0 && (
+          <Button variant="secondary" size="sm" onClick={onViewFailed}>
+            {t("host.viewFailed")} ({failedCount})
+          </Button>
+        )}
+        <Button variant="secondary" size="sm" onClick={onClose}>{t("common.close")}</Button>
         {scanning ? (
-          <Button variant="danger" size="sm" onClick={onStop}>{t("host.stopScan")}</Button>
+          <Button variant="danger" size="sm" onClick={onStop} loading={stopping}>{t("host.stopScan")}</Button>
         ) : (
-          <>
-            {scanFinished && failedCount > 0 && (
-              <Button variant="secondary" size="sm" onClick={onViewFailed}>
-                {t("host.viewFailed")} ({failedCount})
-              </Button>
-            )}
-            <Button variant="secondary" size="sm" onClick={onClose}>{t("common.cancel")}</Button>
-            <Button size="sm" onClick={onStart}>
-              <Icon path={ICON_PATHS.scan} className="w-3.5 h-3.5 mr-1" />
-              {scannedCount > 0 ? t("host.rescan") : t("host.startScan")}
-            </Button>
-          </>
+          <Button size="sm" onClick={onStart} loading={starting} disabled={scannableHosts.length === 0}>
+            <Icon path={ICON_PATHS.scan} className="w-3.5 h-3.5 mr-1" />
+            {run ? t("host.rescan") : t("host.startScan")}
+          </Button>
         )}
       </div>
     </div>

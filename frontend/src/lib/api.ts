@@ -788,6 +788,18 @@ export const osUpdateAPI = {
   deleteBackup: (runId: number, hostId: number) => api.delete(`/api/ssh/os-updates/runs/${runId}/hosts/${hostId}/backup`),
 };
 
+// Background scans (editor): one run over a set of hosts, on the server, so
+// it outlives the tab. Each result's output is the scan's summary (JSON).
+export const scanAPI = {
+  start: (body: { host_ids: number[]; concurrency?: number; method?: "password" | "key" }) =>
+    api.post<import("./types").OSUpdateRun>("/api/ssh/scans", body),
+  /** The caller's runs (an admin's: everyone's), newest first. */
+  list: (q: { active?: boolean; hostId?: number } = {}) =>
+    api.get<import("./types").OSUpdateRun[]>(`/api/ssh/scans?active=${q.active ? 1 : 0}&host_id=${q.hostId ?? 0}`),
+  run: (id: number) => api.get<import("./types").OSUpdateRun>(`/api/ssh/scans/${id}`),
+  cancel: (id: number) => api.post<import("./types").OSUpdateRun>(`/api/ssh/scans/${id}/cancel`),
+};
+
 export const sshAPI = {
   previewConfig: () => api.get<{ content: string }>("/api/ssh/preview-config"),
   generateConfig: () => api.post<{ status: string; host_count: number; path: string }>("/api/ssh/generate-config"),

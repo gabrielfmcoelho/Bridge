@@ -2244,4 +2244,10 @@ var migrationsPostgres = []string{
 	// it (service.HostKeyCheck). NULL = not pinned yet.
 	`ALTER TABLE hosts ADD COLUMN IF NOT EXISTS ssh_host_key TEXT;
 	ALTER TABLE hosts ADD COLUMN IF NOT EXISTS ssh_host_key_at TIMESTAMPTZ;`,
+
+	// Version 132: host scans are background runs too (kind 'scan'), with
+	// the SSH method the caller picked ('' = each host's own).
+	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
+	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan'));
+	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS auth_method TEXT NOT NULL DEFAULT '';`,
 }

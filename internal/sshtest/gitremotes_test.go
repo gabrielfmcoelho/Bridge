@@ -89,7 +89,7 @@ func TestParseGitProbeFailedPartialEmpty(t *testing.T) {
 func TestGitProbeScript(t *testing.T) {
 	b64 := base64.StdEncoding.EncodeToString([]byte(gitInnerScript))
 	for _, asRoot := range []bool{false, true} {
-		s := gitProbeScript(asRoot)
+		s := gitProbeScript(asRoot, budgets[CaptureSync])
 		if out, err := exec.Command("sh", "-n", "-c", s).CombinedOutput(); err != nil {
 			t.Fatalf("root=%v sh -n: %v %s", asRoot, err, out)
 		}
@@ -309,7 +309,7 @@ func TestGitProbeContainerBudget(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			cmd := exec.Command("sh", "-c", gitProbeScript(true))
+			cmd := exec.Command("sh", "-c", gitProbeScript(true, budgets[CaptureSync]))
 			cmd.Env = append(os.Environ(), "GITPROBE_ROOTS="+t.TempDir(), "DATE_STATE="+filepath.Join(t.TempDir(), "s"),
 				"PATH="+bin+":"+os.Getenv("PATH"))
 			out, err := cmd.CombinedOutput()
@@ -395,7 +395,7 @@ func TestGitProbeContainerExecStatus(t *testing.T) {
 ps) echo '0123456789ab ok img:1'; echo '0123456789ac other img:2';;
 exec) [ "$3" = 0123456789ab ] && exec sh; ` + c.second + `;;
 esac`})
-			cmd := exec.Command("sh", "-c", gitProbeScript(true))
+			cmd := exec.Command("sh", "-c", gitProbeScript(true, budgets[CaptureSync]))
 			cmd.Env = append(os.Environ(), "GITPROBE_ROOTS="+t.TempDir(), path)
 			out, err := cmd.CombinedOutput()
 			if err != nil {
