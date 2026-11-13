@@ -242,7 +242,7 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 	result := map[string]any{}
 
 	if req.Capture {
-		vmInfo, testErr := sshtest.TestCapture(client, auth.Password())
+		vmInfo, testErr := sshtest.TestCapture(client, auth.Password(), sshtest.CaptureSync)
 		if testErr != nil {
 			host.ConnectionsFailed++
 			setTestStatus("failed")

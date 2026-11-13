@@ -381,7 +381,7 @@ func (h *sshHandlers) rescanHost(ctx context.Context, run models.OSUpdateRun, ho
 		return res
 	}
 	defer client.Close()
-	info, err := sshtest.TestCapture(client, priv.Password)
+	info, err := sshtest.TestCapture(client, priv.Password, sshtest.CaptureJob)
 	if err != nil {
 		res.Reason = joinReason(res.Reason, "rescan: "+err.Error())
 		return res
@@ -419,7 +419,7 @@ type runReport struct {
 func (h *sshHandlers) startReport(ctx context.Context, run models.OSUpdateRun, host *models.Host, client *ssh.Client, priv sshtest.Privilege) *runReport {
 	rr := &runReport{release: run.Kind == sshtest.OSUpdateRelease}
 	if rr.release {
-		if info, err := sshtest.TestCapture(client, priv.Password); err != nil {
+		if info, err := sshtest.TestCapture(client, priv.Password, sshtest.CaptureJob); err != nil {
 			log.Printf("[osupdate] run %d host %d: scan before the release: %v", run.ID, host.ID, err)
 		} else {
 			h.recordScan(ctx, host, info, map[string]any{})
