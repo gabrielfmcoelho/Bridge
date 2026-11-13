@@ -2871,6 +2871,7 @@
       "unlinked": "Not linked: it does not resolve in DNS, its record is in the trash, or the server is stopped",
       "ignored": "Not a DNS name (default server, localhost, IP, wildcard or regex)",
       "proxy": "Proxies to",
+      "locations": "Locations",
       "root": "Document root",
       "source": "File",
       "usedBy": "Used by",

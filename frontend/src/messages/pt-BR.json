@@ -2871,6 +2871,7 @@
       "unlinked": "Não vinculado: não resolve no DNS, o registro está na lixeira ou o servidor está parado",
       "ignored": "Não é um nome DNS (servidor padrão, localhost, IP, curinga ou regex)",
       "proxy": "Encaminha para",
+      "locations": "Rotas",
       "root": "Raiz dos arquivos",
       "source": "Arquivo",
       "usedBy": "Usado por",

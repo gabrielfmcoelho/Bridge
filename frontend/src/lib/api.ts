@@ -208,6 +208,8 @@ export type WebSite = {
   root?: string;
   proxy?: string[];
   fastcgi?: string[];
+  /** nginx: each location with its own targets (proxy/fastcgi stay the union). */
+  locations?: { path: string; proxy?: string[]; fastcgi?: string[] }[];
   /** Apache: config file:line. */
   source?: string;
 };

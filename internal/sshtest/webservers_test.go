@@ -52,9 +52,14 @@ func TestParseNginxSites(t *testing.T) {
 	want := []WebSite{
 		{Names: []string{"_"}, Listen: []int{80}, Root: "/var/www/html"},
 		{Names: []string{"portal.sead.pi.gov.br", "www.portal.sead.pi.gov.br"}, Listen: []int{443}, TLS: true,
-			Proxy: []string{"127.0.0.1:8080", "127.0.0.1:8081", "http://127.0.0.1:3000/"}},
+			Proxy: []string{"127.0.0.1:8080", "127.0.0.1:8081", "http://127.0.0.1:3000/"},
+			Locations: []WebLocation{
+				{Path: "/", Proxy: []string{"127.0.0.1:8080", "127.0.0.1:8081"}},
+				{Path: "/api/", Proxy: []string{"http://127.0.0.1:3000/"}},
+			}},
 		{Names: []string{"gestor.sead.pi.gov.br", `~^(?<sub>.+)\.example\.com$`}, Listen: []int{80},
-			Root: "/banco/www/gestor", FastCGI: []string{"unix:/run/php/php8.1-fpm.sock"}},
+			Root: "/banco/www/gestor", FastCGI: []string{"unix:/run/php/php8.1-fpm.sock"},
+			Locations: []WebLocation{{Path: `\.php$`, FastCGI: []string{"unix:/run/php/php8.1-fpm.sock"}}}},
 	}
 	for i := range want {
 		if !reflect.DeepEqual(sites[i], want[i]) {
@@ -185,5 +190,60 @@ func TestWebProbeScript(t *testing.T) {
 		if retries == asRoot {
 			t.Fatalf("root=%v: sudo -n retries present = %v", asRoot, retries)
 		}
+	}
+}
+
+func TestParseNginxLocations(t *testing.T) {
+	cfg := `http {
+  upstream sgc {
+    ip_hash;
+    server 10.0.122.11:8080;
+    server 10.0.122.11:8180;
+  }
+  server {
+    listen 80;
+    server_name siga.example;
+    location /trace { return 404; }
+    location ^~ /sgc { proxy_pass http://sgc; }
+    location /prometheus {
+      proxy_pass http://10.0.122.16:9090;
+    }
+    location ~ /(auth|actuator) { proxy_pass http://10.0.122.16:9090; }
+    location / { rewrite ^/$ /sgc/ redirect; }
+  }
+}`
+	sites := parseNginxSites(cfg)
+	if len(sites) != 1 {
+		t.Fatalf("sites = %d", len(sites))
+	}
+	want := []WebLocation{
+		{Path: "/sgc", Proxy: []string{"10.0.122.11:8080", "10.0.122.11:8180"}},
+		{Path: "/prometheus", Proxy: []string{"http://10.0.122.16:9090"}},
+		{Path: "/(auth|actuator)", Proxy: []string{"http://10.0.122.16:9090"}},
+	}
+	if !reflect.DeepEqual(sites[0].Locations, want) {
+		t.Errorf("locations = %+v, want %+v", sites[0].Locations, want)
+	}
+	if !reflect.DeepEqual(sites[0].Proxy, []string{"10.0.122.11:8080", "10.0.122.11:8180", "http://10.0.122.16:9090"}) {
+		t.Errorf("proxy = %v", sites[0].Proxy)
+	}
+}
+
+func TestParseNginxLocationsNested(t *testing.T) {
+	cfg := `server {
+  listen 80;
+  location /a {
+    location /a/b { proxy_pass http://x:1; }
+    if ($x) { proxy_pass http://y:2; }
+  }
+  location @fb { proxy_pass http://z:3; }
+}`
+	sites := parseNginxSites(cfg)
+	want := []WebLocation{
+		{Path: "/a/b", Proxy: []string{"http://x:1"}},
+		{Path: "/a", Proxy: []string{"http://y:2"}},
+	}
+	if len(sites) != 1 || !reflect.DeepEqual(sites[0].Locations, want) {
+		t.Errorf("sites = %+v, want locations %+v", sites, want)
 	}
 }
