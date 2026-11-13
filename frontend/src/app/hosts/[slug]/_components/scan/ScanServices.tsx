@@ -83,7 +83,7 @@ function Inventory({ ns, title, entries, groupOf, order, icons, t }: {
                 {tOr(t, `scan.${ns}.${groupKey}.${g}`, g)} <span className="opacity-60">({list.length})</span>
               </span>
               <div className="divide-y divide-[var(--border-subtle)]/60">
-                {list.map((e) => <InventoryRow key={e.name} ns={ns} e={e} t={t} />)}
+                {list.map((e) => <InventoryRow key={`${e.name}@${e.instance ?? ""}`} ns={ns} e={e} t={t} />)}
               </div>
             </div>
           );
@@ -101,6 +101,7 @@ function InventoryRow({ ns, e, t }: { ns: Ns; e: Entry; t: T }) {
         {tOr(t, `scan.${ns}.state.${e.state ?? "unknown"}`, e.state ?? "–")}
       </span>
       <span className="font-medium text-[var(--text-primary)]">{e.label}</span>
+      {e.instance && <span className="text-2xs text-[var(--text-muted)] font-mono" title={e.instance}>{e.instance.replace(/\.service$/, "").split("/").pop()}</span>}
       {e.vendor && <span className="text-2xs text-[var(--text-faint)]">{e.vendor}</span>}
       {e.version && (
         <span className="text-2xs text-[var(--text-muted)] font-mono" title={e.package ? `${e.package} ${e.version}` : e.version}>v{e.version}</span>
@@ -114,6 +115,11 @@ function InventoryRow({ ns, e, t }: { ns: Ns; e: Entry; t: T }) {
       )}
       {e.ports && e.ports.length > 0 && (
         <span className="text-2xs text-[var(--text-muted)] font-mono" title={t(`scan.${ns}.portsTooltip`)}>:{e.ports.join(", :")}</span>
+      )}
+      {e.apps && e.apps.length > 0 && (
+        <span className="basis-full pl-[5.5rem] text-2xs text-[var(--text-muted)]">
+          {t("scan.services.apps")}: <span className="font-mono">{e.apps.join(", ")}</span>
+        </span>
       )}
       <span className="ml-auto flex items-center gap-1.5 flex-wrap">
         {(e.sources ?? []).map((src) => (

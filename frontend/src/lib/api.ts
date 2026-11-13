@@ -72,6 +72,8 @@ export type Agent = {
   state?: string;            // active|inactive|failed|running|stopped
   enabled?: boolean;
   unit?: string;
+  instance?: string;         // app-server instance: unit or install dir
+  apps?: string[];           // applications deployed on it
   pid?: number;
   version?: string;
   package?: string;

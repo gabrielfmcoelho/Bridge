@@ -2753,6 +2753,7 @@
       "enabledAtBoot": "boot",
       "enabledAtBootTooltip": "Serviço habilitado para iniciar automaticamente no boot",
       "portsTooltip": "Portas TCP em escuta atribuídas a este serviço",
+      "apps": "Aplicações",
       "hostInstance": "no host",
       "hostInstanceTooltip": "Executando no próprio host, fora de qualquer contêiner. Uma linha com este selo e também um selo de imagem tem uma instância nativa e outra em contêiner.",
       "kind": {

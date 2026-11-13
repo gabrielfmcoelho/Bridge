@@ -308,6 +308,8 @@ type DiscoveredService struct {
 	State          string   `json:"state,omitempty"`   // active|inactive|failed|running|stopped
 	Enabled        bool     `json:"enabled,omitempty"` // boot persistence
 	Unit           string   `json:"unit,omitempty"`
+	Instance       string   `json:"instance,omitempty"` // app-server instance: unit or install dir
+	Apps           []string `json:"apps,omitempty"`     // applications deployed on it
 	PID            int      `json:"pid,omitempty"`
 	Version        string   `json:"version,omitempty"` // package version when known
 	Package        string   `json:"package,omitempty"`
@@ -2014,6 +2016,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		agentNames[a.Name] = true
 	}
 	info.ServiceInventory = captureServices(hostInv, info.ParsedContainers, agentNames, agentPortClaims)
+	info.ServiceInventory = append(info.ServiceInventory, captureAppServers(client, sudoPassword, procDetails)...)
 
 	// Back-fill PortOwners with agent and service attribution. `ss -tlnp`
 	// only emits a process column when the scanning user can see the
