@@ -202,7 +202,7 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 		return res
 	}
 	priv := sshtest.Privilege{User: host.User, Password: authn.Password()}
-	dial := func() (*ssh.Client, error) { return sshtest.Dial(host.Hostname, host.Port, host.User, authn) }
+	dial := func() (*ssh.Client, error) { return service.DialHost(ctx, h.db, host, host.User, authn) }
 
 	client, err := dial()
 	if err != nil {

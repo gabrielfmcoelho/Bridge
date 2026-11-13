@@ -15,7 +15,6 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/integrations/sentinel"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
-	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -183,7 +182,7 @@ func (s *SentinelService) dialSSH(ctx context.Context, host *models.Host) (*sent
 	if err != nil {
 		return nil, unavailable(SentinelReasonError, err.Error())
 	}
-	client, err := sshtest.Dial(host.Hostname, host.Port, host.User, auth)
+	client, err := DialHost(ctx, s.db, host, host.User, auth)
 	if err != nil {
 		return nil, unavailable(SentinelReasonSSHFailed, err.Error())
 	}

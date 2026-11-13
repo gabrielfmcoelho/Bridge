@@ -2932,6 +2932,17 @@ definitions:
           $ref: '#/definitions/vault.BundleWikiItem'
         type: array
     type: object
+  api.sharedHostKey:
+    properties:
+      fingerprint:
+        type: string
+      hosts:
+        items:
+          $ref: '#/definitions/store.SSHHostKeyHolder'
+        type: array
+      key_type:
+        type: string
+    type: object
   api.sshCreateRemoteUserRequest:
     properties:
       force:
@@ -6689,6 +6700,15 @@ definitions:
         type: string
       b_id:
         type: integer
+    type: object
+  store.SSHHostKeyHolder:
+    properties:
+      id:
+        type: integer
+      nickname:
+        type: string
+      oficial_slug:
+        type: string
     type: object
   store.UnassignedRow:
     properties:
@@ -13600,6 +13620,44 @@ paths:
       summary: Sync one host's Sentinel snapshots
       tags:
       - sentinel
+  /api/hosts/{slug}/ssh-host-key/reset:
+    post:
+      description: Admin. Drops the pinned key; the next successful login pins the
+        key the host shows then. Written to the host's operation log.
+      parameters:
+      - description: Host slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: Re-trust a host's SSH host key
+      tags:
+      - ssh
   /api/hosts/trash:
     get:
       description: Any role.
@@ -19081,6 +19139,34 @@ paths:
           schema:
             $ref: '#/definitions/httpx.ErrorResponse'
       summary: SSH config block for one host
+      tags:
+      - ssh
+  /api/ssh/host-keys/duplicates:
+    get:
+      description: Admin. One entry per pinned key held by more than one live host,
+        with those hosts.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.sharedHostKey'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpx.ErrorResponse'
+      summary: SSH host keys shared by several hosts
       tags:
       - ssh
   /api/ssh/keys:

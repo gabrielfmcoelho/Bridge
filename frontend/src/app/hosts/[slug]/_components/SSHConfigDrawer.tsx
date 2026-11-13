@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { sshAPI } from "@/lib/api";
 import { useCopy } from "@/hooks/useCopy";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
+import { useFlag } from "@/contexts/FlagContext";
+import SectionHeading from "@/components/ui/SectionHeading";
 import Drawer from "@/components/ui/Drawer";
 import Button from "@/components/ui/Button";
 import type { Host } from "@/lib/types";
@@ -17,7 +21,11 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
   slug: string;
   host: Host;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const { user } = useAuth();
+  const confirm = useConfirm();
+  const flag = useFlag();
+  const queryClient = useQueryClient();
   const [includeKey, setIncludeKey] = useState(!!host.has_key);
   const { copied, copy } = useCopy();
 
@@ -28,6 +36,20 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
   });
 
   const config = data?.config || "";
+  const pin = data?.host_key;
+
+  const reset = useMutation({
+    mutationFn: () => sshAPI.resetHostKey(slug),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ssh-config", slug] });
+      queryClient.invalidateQueries({ queryKey: ["ssh-host-keys-shared"] });
+      flag({ appearance: "success", title: t("host.hostKey.resetDone") });
+    },
+    onError: (err) => flag({ appearance: "error", title: t("host.hostKey.resetFailed"), description: (err as Error).message }),
+  });
+  const handleReset = async () => {
+    if (await confirm({ title: t("host.hostKey.resetTitle"), message: t("host.hostKey.resetMessage"), danger: true, confirmLabel: t("host.hostKey.reset") })) reset.mutate();
+  };
 
   const handleCopy = () => { if (config) copy(config); };
 
@@ -92,6 +114,28 @@ export default function SSHConfigDrawer({ open, onClose, slug, host }: {
         <p className="text-2xs text-[var(--text-faint)] leading-relaxed">
           {t("host.sshConfigHint")}
         </p>
+
+        {/* Pinned host key: Bridge refuses the host when it shows another one. */}
+        <div className="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
+          <SectionHeading
+            icon={ICON_PATHS.lock}
+            actions={pin && user?.role === "admin" ? (
+              <Button size="sm" variant="secondary" onClick={handleReset} loading={reset.isPending}>{t("host.hostKey.reset")}</Button>
+            ) : undefined}
+          >
+            {t("host.hostKey.title")}
+          </SectionHeading>
+          {pin ? (
+            <>
+              <p className="font-mono text-xs text-[var(--text-primary)] break-all">{pin.key_type} {pin.fingerprint}</p>
+              {pin.pinned_at && (
+                <p className="text-2xs text-[var(--text-faint)]">{t("host.hostKey.pinnedAt", { date: new Date(pin.pinned_at).toLocaleString(locale) })}</p>
+              )}
+            </>
+          ) : (
+            <p className="text-2xs text-[var(--text-faint)] leading-relaxed">{t("host.hostKey.unpinned")}</p>
+          )}
+        </div>
       </div>
     </Drawer>
   );
