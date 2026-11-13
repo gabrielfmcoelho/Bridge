@@ -2708,6 +2708,7 @@
       "nextRun": "Próxima execução",
       "lastRun": "Última execução",
       "disabled": "desabilitado",
+      "missingBinary": "binário não encontrado",
       "timerUnit": "Unidade timer",
       "jobSingular": "tarefa",
       "jobPlural": "tarefas"

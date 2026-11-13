@@ -81,6 +81,7 @@ function CronGroup({ title, jobs, t }: { title: string; jobs: CronJob[]; t: T })
               <span className="w-28 shrink-0 font-mono text-[var(--text-secondary)] truncate" title={j.kind === "timer" ? t("scan.cron.timerUnit") : t("scan.cron.schedule")}>{j.schedule || "–"}</span>
               {j.user && <span className="shrink-0 font-mono text-[var(--info)]" title={t("scan.cron.runAs")}>{j.user}</span>}
               <span className="flex-1 min-w-0 truncate font-mono text-[var(--text-primary)]" title={j.command}>{j.command || "–"}</span>
+              {j.missing_binary && <Badge color="danger">{t("scan.cron.missingBinary")}</Badge>}
               {j.disabled && <Badge>{t("scan.cron.disabled")}</Badge>}
               {j.next_run && <span className="shrink-0 text-2xs text-[var(--text-muted)]" title={t("scan.cron.nextRun")}>→ {j.next_run}</span>}
               <span className="shrink-0 text-2xs text-[var(--text-faint)] font-mono" title={j.source}>{source}</span>

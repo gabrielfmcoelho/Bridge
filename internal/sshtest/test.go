@@ -272,6 +272,8 @@ type CronJob struct {
 	NextRun  string `json:"next_run,omitempty"`
 	LastRun  string `json:"last_run,omitempty"`
 	Disabled bool   `json:"disabled,omitempty"`
+	// MissingBinary: the command's absolute binary path is not executable on the host.
+	MissingBinary bool `json:"missing_binary,omitempty"`
 }
 
 // CronInfo bundles cron daemon state and every scheduled task on the host

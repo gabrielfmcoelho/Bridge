@@ -2708,6 +2708,7 @@
       "nextRun": "Next run",
       "lastRun": "Last run",
       "disabled": "disabled",
+      "missingBinary": "binary not found",
       "timerUnit": "Timer unit",
       "jobSingular": "task",
       "jobPlural": "tasks"

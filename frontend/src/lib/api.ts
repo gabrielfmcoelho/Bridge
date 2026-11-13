@@ -53,6 +53,7 @@ export type CronJob = {
   next_run?: string;
   last_run?: string;
   disabled?: boolean;
+  missing_binary?: boolean;
 };
 
 export type CronInfo = {
