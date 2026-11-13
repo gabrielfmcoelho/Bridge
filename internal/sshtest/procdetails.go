@@ -10,12 +10,27 @@ const procSep = "\x1f"
 
 // processDetailsScript prints one line per matching process (read-only):
 // PID US USER US CPU US MEM US CWD US EXE US PCOMM US CGROUP-LINE US PORTS US CMD,
-// with US = 0x1f and the command last so a "|" inside it survives.
+// with US = 0x1f and the command last so a "|" inside it survives. App-server
+// JVMs (a main class detectAppServers knows) are listed first, up to 30, then
+// up to 20 other runtimes: a host with many workers before its JBoss in PID
+// order still reports the JBoss.
 func processDetailsScript() string {
+	const (
+		sel = `$11 ~ /(python|node|java|ruby|php|gunicorn|uvicorn|celery|pm2)/ && $11 !~ /(^|\/)(grep|ps|awk)$/`
+		row = `{printf "%s %s %s %s", $2, $1, $3, $4; for(i=11;i<=NF;i++) printf " %s", $i; print ""}`
+	)
+	var classes []string
+	for _, spec := range serviceCatalog {
+		for _, c := range spec.MainClasses {
+			classes = append(classes, strings.ReplaceAll(c, ".", `\.`))
+		}
+	}
+	app := "(" + strings.Join(classes, "|") + ")"
 	return strings.Join([]string{
 		scanPath,
 		`ss_out=$(ss -tlnp 2>/dev/null)`,
-		`ps aux 2>/dev/null | awk '$11 ~ /(python|node|java|ruby|php|gunicorn|uvicorn|celery|pm2)/ && $11 !~ /(^|\/)(grep|ps|awk)$/ {printf "%s %s %s %s", $2, $1, $3, $4; for(i=11;i<=NF;i++) printf " %s", $i; print ""}' | head -20 | while read -r pid user cpu mem cmd; do
+		`{ ps aux 2>/dev/null | awk '` + sel + ` && $0 ~ /` + app + `/ ` + row + `' | head -30
+  ps aux 2>/dev/null | awk '` + sel + ` && $0 !~ /` + app + `/ ` + row + `' | head -20; } | while read -r pid user cpu mem cmd; do
 	cwd=$(readlink /proc/$pid/cwd 2>/dev/null)
 	exe=$(readlink /proc/$pid/exe 2>/dev/null)
 	ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null)
