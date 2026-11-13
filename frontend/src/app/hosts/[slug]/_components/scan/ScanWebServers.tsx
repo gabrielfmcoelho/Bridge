@@ -80,7 +80,7 @@ function SiteRow({ site, linked, muted, t }: { site: WebSite; linked: Map<string
       <Detail key="l" label={t("scan.web.locations")}>
         <span className="flex flex-col gap-0.5">
           {site.locations.map((l) => (
-            <span key={l.path} className="font-mono">
+            <span key={l.path} className="font-mono break-all">
               {l.path} → {[...(l.proxy ?? []), ...(l.fastcgi ?? [])].join(", ")}
             </span>
           ))}

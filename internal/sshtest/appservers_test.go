@@ -108,6 +108,24 @@ func TestParseAppsListing(t *testing.T) {
 	}
 }
 
+// ROOT.war is an application (deployed at "/"), except JBoss AS <= 6's own
+// exploded welcome app; a Tomcat war and its exploded directory are one app.
+func TestParseAppsListingRootAndExploded(t *testing.T) {
+	raw := "@@dir jboss /opt/a/server/default/deploy\nROOT.war/\nsgc.war\n" +
+		"@@dir jboss /opt/b/server/default/deploy\nROOT.war\n" +
+		"@@dir wildfly /opt/wf/standalone/deployments\nROOT.war\napi.war\n" +
+		"@@dir tomcat /srv/t/webapps\nROOT/\nfoo/\nfoo.war\nbar/\n"
+	want := map[string][]string{
+		"/opt/a/server/default/deploy":   {"sgc.war"},
+		"/opt/b/server/default/deploy":   {"ROOT.war"},
+		"/opt/wf/standalone/deployments": {"ROOT.war", "api.war"},
+		"/srv/t/webapps":                 {"foo.war", "bar"},
+	}
+	if got := parseAppsListing(raw); !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func TestHttpPortFirst(t *testing.T) {
 	cases := []struct{ in, want []int }{
 		{[]int{1090, 8009, 8080, 8083}, []int{8080, 1090, 8009, 8083}},

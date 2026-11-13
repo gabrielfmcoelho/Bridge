@@ -247,3 +247,16 @@ func TestParseNginxLocationsNested(t *testing.T) {
 		t.Errorf("sites = %+v, want locations %+v", sites, want)
 	}
 }
+
+// A location whose "{" opens on the next line (Allman style) is still a block.
+func TestParseNginxLocationBraceOnNextLine(t *testing.T) {
+	cfg := "server {\n  listen 80;\n  location /api\n  {\n    proxy_pass http://10.0.0.5:8080;\n  }\n  location ~ \\.php$\n  {\n    fastcgi_pass unix:/run/php.sock;\n  }\n}"
+	sites := parseNginxSites(cfg)
+	want := []WebLocation{
+		{Path: "/api", Proxy: []string{"http://10.0.0.5:8080"}},
+		{Path: `\.php$`, FastCGI: []string{"unix:/run/php.sock"}},
+	}
+	if len(sites) != 1 || !reflect.DeepEqual(sites[0].Locations, want) {
+		t.Errorf("sites = %+v, want locations %+v", sites, want)
+	}
+}
