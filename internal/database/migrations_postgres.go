@@ -2229,4 +2229,13 @@ var migrationsPostgres = []string{
 	// of the scan before it, dpkg's errors, what the scans before and after
 	// differ by and its sites before and after (service.ReleaseReport).
 	`ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS report JSONB;`,
+
+	// Version 130: secrets the scan found on a host (host env_var rows, group
+	// 'scan-…') are revealed only with hosts.secrets.reveal — editors here,
+	// admins always — not by every viewer of the host.
+	`INSERT INTO permissions (code, description, category) VALUES
+		('hosts.secrets.reveal', 'Reveal secrets the scan found on a host', 'hosts')
+	ON CONFLICT DO NOTHING;
+	INSERT INTO role_permissions (role, permission) VALUES ('editor', 'hosts.secrets.reveal')
+	ON CONFLICT DO NOTHING;`,
 }

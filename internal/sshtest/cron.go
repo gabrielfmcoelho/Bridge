@@ -23,16 +23,17 @@ import (
 func captureCronInfo(client *ssh.Client, sudoPassword string) *CronInfo {
 	const delim = "---CRON---"
 	cmd := strings.Join([]string{
-		// 0: daemon active state
-		`(systemctl is-active cron 2>/dev/null || systemctl is-active crond 2>/dev/null) | head -n1`,
-		`echo '` + delim + `'`,
-		// 1: daemon enabled-at-boot state
-		`(systemctl is-enabled cron 2>/dev/null || systemctl is-enabled crond 2>/dev/null) | head -n1`,
-		`echo '` + delim + `'`,
-		// 2: daemon name (cron or crond) so the UI can show which one
+		// 0: daemon name (cron or crond) so the UI can show which one
 		`if systemctl cat cron --no-pager >/dev/null 2>&1; then echo cron; ` +
 			`elif systemctl cat crond --no-pager >/dev/null 2>&1; then echo crond; ` +
 			`else echo; fi`,
+		`echo '` + delim + `'`,
+		// 1/2: active and enabled-at-boot state of that daemon only: `is-active cron`
+		// on a crond host prints "unknown" and would hide the real state.
+		`N=$(if systemctl cat cron --no-pager >/dev/null 2>&1; then echo cron; elif systemctl cat crond --no-pager >/dev/null 2>&1; then echo crond; fi); ` +
+			`[ -n "$N" ] && systemctl is-active "$N" 2>/dev/null | head -n1`,
+		`echo '` + delim + `'`,
+		`[ -n "$N" ] && systemctl is-enabled "$N" 2>/dev/null | head -n1`,
 		`echo '` + delim + `'`,
 		// 3: /etc/crontab (system-wide, has user field)
 		`cat /etc/crontab 2>/dev/null || sudo -n cat /etc/crontab 2>/dev/null`,
@@ -71,14 +72,8 @@ func captureCronInfo(client *ssh.Client, sudoPassword string) *CronInfo {
 	sections := splitSections(raw, delim, 10)
 
 	info := &CronInfo{}
-	info.DaemonActive = strings.EqualFold(strings.TrimSpace(sections[0]), "active")
-	enabledOut := strings.TrimSpace(sections[1])
-	info.DaemonEnabled = strings.EqualFold(enabledOut, "enabled") ||
-		strings.EqualFold(enabledOut, "enabled-runtime") ||
-		strings.EqualFold(enabledOut, "alias") ||
-		strings.EqualFold(enabledOut, "static")
-	info.DaemonName = strings.TrimSpace(sections[2])
-	info.DaemonInstalled = info.DaemonName != "" || info.DaemonActive
+	info.DaemonName = strings.TrimSpace(sections[0])
+	info.DaemonInstalled, info.DaemonActive, info.DaemonEnabled = parseCronDaemon(info.DaemonName, sections[1], sections[2])
 
 	// /etc/crontab
 	for _, line := range strings.Split(sections[3], "\n") {
@@ -170,7 +165,96 @@ func captureCronInfo(client *ssh.Client, sudoPassword string) *CronInfo {
 		}
 	}
 
+	markMissingBinaries(info.Jobs, findMissingBinaries(client, sudoPassword, info.Jobs))
 	return info
+}
+
+// parseCronDaemon turns the daemon name and its systemctl is-active/is-enabled
+// output into the three flags. No name means no cron daemon is installed.
+func parseCronDaemon(name, active, enabled string) (installed, isActive, isEnabled bool) {
+	name, active, enabled = strings.TrimSpace(name), strings.TrimSpace(active), strings.TrimSpace(enabled)
+	isActive = strings.EqualFold(active, "active")
+	switch strings.ToLower(enabled) {
+	case "enabled", "enabled-runtime", "alias", "static":
+		isEnabled = true
+	}
+	return name != "" || isActive, isActive, isEnabled
+}
+
+// cronCommandBinary returns the absolute path a cron command starts with,
+// after leading VAR=value assignments, or "" when it starts with anything else
+// (a relative path, a shell builtin, a bare name found through PATH) or holds
+// a shell or cron expansion ($, a backtick, %): not a literal path.
+func cronCommandBinary(cmd string) string {
+	for _, tok := range strings.Fields(cmd) {
+		if eq := strings.Index(tok, "="); eq > 0 && isCronEnvKey(tok[:eq]) {
+			continue
+		}
+		if i := strings.IndexAny(tok, "<>;|&"); i >= 0 {
+			tok = tok[:i]
+		}
+		if strings.HasPrefix(tok, "/") && !strings.ContainsAny(tok, "$`%") {
+			return tok
+		}
+		return ""
+	}
+	return ""
+}
+
+// markMissingBinaries flags the jobs whose command binary is in missing.
+func markMissingBinaries(jobs []CronJob, missing map[string]bool) {
+	for i := range jobs {
+		if b := cronCommandBinary(jobs[i].Command); b != "" && missing[b] {
+			jobs[i].MissingBinary = true
+		}
+	}
+}
+
+// findMissingBinaries asks the host which of the jobs' binaries are not
+// executable. Read-only; root when a password is stored, else see
+// missingBinariesScript.
+func findMissingBinaries(client *ssh.Client, sudoPassword string, jobs []CronJob) map[string]bool {
+	seen := map[string]bool{}
+	var paths []string
+	for _, j := range jobs {
+		if b := cronCommandBinary(j.Command); b != "" && !seen[b] {
+			seen[b] = true
+			paths = append(paths, b)
+		}
+	}
+	missing := map[string]bool{}
+	if len(paths) == 0 {
+		return missing
+	}
+	script := missingBinariesScript(paths)
+	var out string
+	if sudoPassword != "" {
+		out, _ = runSudoCmd(client, sudoPassword, script)
+	} else {
+		out = runCmd(client, script)
+	}
+	for _, l := range strings.Split(out, "\n") {
+		if l = strings.TrimSpace(l); l != "" && seen[l] {
+			missing[l] = true
+		}
+	}
+	return missing
+}
+
+// missingBinariesScript prints each of paths that is not executable. Without
+// root it can't tell (a job runs as root or its own user), so a path counts
+// only when it doesn't exist and its nearest existing directory is traversable
+// by the scan user: a 0700 home or a root-only script is not "missing".
+func missingBinariesScript(paths []string) string {
+	quoted := make([]string, len(paths))
+	for i, p := range paths {
+		quoted[i] = shQuote(p)
+	}
+	return scanPath + `; r=; [ "$(id -u)" = 0 ] && r=1; for p in ` + strings.Join(quoted, " ") + `; do ` +
+		`[ -x "$p" ] && continue; ` +
+		`if [ -z "$r" ]; then [ -e "$p" ] && continue; d=${p%/*}; ` +
+		`while [ -n "$d" ] && [ ! -d "$d" ]; do d=${d%/*}; done; [ -x "${d:-/}" ] || continue; fi; ` +
+		`echo "$p"; done`
 }
 
 // splitOnBlankLines splits a multi-line string on runs of blank lines.

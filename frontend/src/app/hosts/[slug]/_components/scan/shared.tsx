@@ -1,6 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { useLocale } from "@/contexts/LocaleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -64,4 +67,44 @@ export function Detail({ label, children, mono = true }: { label: string; childr
 /** Colour for a CPU/RAM percentage: danger ≥ 80, warning ≥ 50. */
 export function pctColor(pct: number): string {
   return pct >= 80 ? "text-[var(--danger)]" : pct >= 50 ? "text-[var(--warning)]" : "text-[var(--text-secondary)]";
+}
+
+const SECRET_TOKEN = /^\{\{secret(?::\d+)?\}\}$/;
+
+/**
+ * A scan command as text, with each `{{secret:<id>}}` / `{{secret}}` token drawn
+ * as a lock chip linking to the host's Segredos tab (a plain chip for viewers,
+ * who can't open that tab). Never anything but the chip for a token; text
+ * without tokens comes out unchanged.
+ */
+export function SecretText({ text, hostSlug }: { text: string; hostSlug: string }) {
+  const { t } = useLocale();
+  const { user } = useAuth();
+  const canEdit = user?.role === "admin" || user?.role === "editor";
+  if (!text.includes("{{secret")) return <>{text}</>;
+  const parts = text.split(/(\{\{secret(?::\d+)?\}\})/g);
+  const chip = "inline-flex items-center gap-1 px-1.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] align-baseline";
+  const body = (
+    <>
+      <Icon path={ICON_PATHS.lock} className="w-3 h-3" />
+      <span>{t("host.secrets.tab")}</span>
+    </>
+  );
+  return (
+    <>
+      {parts.map((p, i) =>
+        !SECRET_TOKEN.test(p) ? (
+          p
+        ) : canEdit ? (
+          <Link key={i} href={`/hosts/${hostSlug}?tab=secrets`} title={t("host.secrets.chip")} className={`${chip} hover:bg-[var(--warning)]/20`}>
+            {body}
+          </Link>
+        ) : (
+          <span key={i} title={t("host.secrets.chip")} className={chip}>
+            {body}
+          </span>
+        ),
+      )}
+    </>
+  );
 }

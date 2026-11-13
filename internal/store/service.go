@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -549,9 +550,15 @@ func hostServiceRows(services []sshtest.DiscoveredService) []discoveredRow {
 		if s.Unit != "" {
 			desc = "Auto-discovered from systemd unit " + s.Unit
 		}
+		key, nick := s.Name, s.Label
+		if s.Instance != "" {
+			key = s.Name + "@" + s.Instance
+			short := strings.TrimSuffix(s.Instance, ".service")
+			nick = s.Label + " · " + path.Base(short)
+		}
 		rows = append(rows, discoveredRow{
-			kind: "host", key: s.Name,
-			nickname:    s.Label,
+			kind: "host", key: key,
+			nickname:    nick,
 			description: desc,
 			serviceType: sshtest.ServiceTypeForCatalog(s.Name), serviceSubtype: s.Label, serviceKind: s.Kind,
 			version: s.Version,

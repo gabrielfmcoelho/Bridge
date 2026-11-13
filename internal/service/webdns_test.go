@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"encoding/json"
 	"context"
 	"errors"
 	"reflect"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/dbtest"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
@@ -189,5 +191,126 @@ func TestRecordWebDNS(t *testing.T) {
 	}
 	if sum.Created != 0 || sum.Linked != 0 || sum.ServiceLinks != 0 || strings.Join(looked, ",") != "ghost.x.gov.br" {
 		t.Fatalf("second run = %+v, looked %v", sum, looked)
+	}
+}
+
+// remoteSetup creates proxy host P (10.0.0.10) and a record for siace.example,
+// and returns what RecordWebDNS(P) needs.
+func remoteSetup(t *testing.T) (*database.DB, *models.Host, sshtest.VMInfo, int64) {
+	t.Helper()
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { d.Close() })
+	ctx := context.Background()
+	p := &models.Host{Nickname: "proxy", OficialSlug: "proxy", Hostname: "10.0.0.10", Situacao: "active"}
+	if err := store.NewHostRepo(d.SQL).Create(ctx, p); err != nil {
+		t.Fatal(err)
+	}
+	rec := models.DNSRecord{Domain: "siace.example", Situacao: "active"}
+	if err := store.NewDNSRepo(d.SQL).Create(ctx, &rec); err != nil {
+		t.Fatal(err)
+	}
+	info := sshtest.VMInfo{WebServers: []sshtest.WebServer{{Kind: "nginx", Sites: []sshtest.WebSite{
+		{Names: []string{"siace.example"}, Listen: []int{80}, Proxy: []string{"10.0.0.11:8180"}},
+	}}}}
+	return d, p, info, rec.ID
+}
+
+func remoteLinks(t *testing.T, d *database.DB, recID int64) (hosts, svcs []int64) {
+	t.Helper()
+	for _, q := range []struct {
+		sql string
+		out *[]int64
+	}{
+		{`SELECT host_id FROM dns_host_links WHERE dns_id = ? ORDER BY 1`, &hosts},
+		{`SELECT service_id FROM service_dns_links WHERE dns_id = ? ORDER BY 1`, &svcs},
+	} {
+		rows, err := d.SQL.Query(q.sql, recID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			var id int64
+			rows.Scan(&id)
+			*q.out = append(*q.out, id)
+		}
+		rows.Close()
+	}
+	return
+}
+
+func addUpstream(t *testing.T, d *database.DB, withScan bool) (*models.Host, int64) {
+	t.Helper()
+	ctx := context.Background()
+	u := &models.Host{Nickname: "up", OficialSlug: "up", Hostname: "10.0.0.11", Situacao: "active"}
+	if err := store.NewHostRepo(d.SQL).Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	if !withScan {
+		return u, 0
+	}
+	inv := []sshtest.DiscoveredService{{Name: "jboss", Label: "JBoss", Kind: "app", Instance: "compras2.service",
+		HostRunning: true, Ports: []int{8180, 1190}, HostPorts: []int{8180, 1190}}}
+	b, _ := json.Marshal(sshtest.VMInfo{ServiceInventory: inv})
+	if err := store.NewHostScanRepo(d.SQL).Create(ctx, u.ID, string(b)); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.NewServiceRepo(d.SQL).ReconcileDiscovered(ctx, u.ID, store.DiscoveredInventory{Services: inv}); err != nil {
+		t.Fatal(err)
+	}
+	svcs, _ := store.NewServiceRepo(d.SQL).ListDiscoveredByHost(store.WithSystemScope(ctx), u.ID)
+	for _, s := range svcs {
+		if s.DiscoveryKey == "jboss@compras2.service" {
+			return u, s.ID
+		}
+	}
+	t.Fatalf("service not reconciled: %+v", svcs)
+	return u, 0
+}
+
+func TestRecordWebDNSRemoteUpstream(t *testing.T) {
+	d, p, info, rec := remoteSetup(t)
+	u, svc := addUpstream(t, d, true)
+	ctx := context.Background()
+	if _, err := service.RecordWebDNS(ctx, d.SQL, p, info, nil); err != nil {
+		t.Fatal(err)
+	}
+	hosts, svcs := remoteLinks(t, d, rec)
+	if !reflect.DeepEqual(hosts, []int64{p.ID, u.ID}) || !reflect.DeepEqual(svcs, []int64{svc}) {
+		t.Fatalf("hosts=%v svcs=%v, want [%d %d] [%d]", hosts, svcs, p.ID, u.ID, svc)
+	}
+	sum, err := service.RecordWebDNS(ctx, d.SQL, p, info, nil)
+	if err != nil || sum.Linked != 0 || sum.ServiceLinks != 0 {
+		t.Fatalf("second run %+v %v, want nothing added", sum, err)
+	}
+}
+
+func TestRecordWebDNSRemoteHostOnly(t *testing.T) {
+	d, p, info, rec := remoteSetup(t)
+	u, _ := addUpstream(t, d, false)
+	if _, err := service.RecordWebDNS(context.Background(), d.SQL, p, info, nil); err != nil {
+		t.Fatal(err)
+	}
+	hosts, svcs := remoteLinks(t, d, rec)
+	if !reflect.DeepEqual(hosts, []int64{p.ID, u.ID}) || len(svcs) != 0 {
+		t.Fatalf("hosts=%v svcs=%v", hosts, svcs)
+	}
+}
+
+func TestRecordWebDNSRemoteAmbiguous(t *testing.T) {
+	d, p, info, rec := remoteSetup(t)
+	addUpstream(t, d, false)
+	dup := &models.Host{Nickname: "up2", OficialSlug: "up2", Hostname: "10.0.0.11", Situacao: "active"}
+	if err := store.NewHostRepo(d.SQL).Create(context.Background(), dup); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.RecordWebDNS(context.Background(), d.SQL, p, info, nil); err != nil {
+		t.Fatal(err)
+	}
+	hosts, _ := remoteLinks(t, d, rec)
+	if !reflect.DeepEqual(hosts, []int64{p.ID}) {
+		t.Fatalf("hosts=%v, want only the proxy", hosts)
 	}
 }
