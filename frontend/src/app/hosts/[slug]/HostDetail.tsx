@@ -44,9 +44,20 @@ export default function HostDetail({ slug }: { slug: string }) {
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isAdmin = user?.role === "admin";
 
-  // ?tab=secrets (the scan chips) opens that tab; a tab the role can't see falls back to overview.
+  // ?tab=secrets (the scan chips) opens that tab, on a fresh load (user may still be loading)
+  // and on a same-page click; the param is dropped once used so a later chip click re-triggers.
   const tabParam = useSearchParams().get("tab");
-  const [activeTab, setActiveTab] = useState<TabKey>(tabParam === "secrets" && canEdit ? "secrets" : "overview");
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const wantSecrets = tabParam === "secrets" && canEdit;
+  const [openedFor, setOpenedFor] = useState(false);
+  if (wantSecrets !== openedFor) {
+    setOpenedFor(wantSecrets);
+    if (wantSecrets) setActiveTab("secrets");
+  }
+  const selectTab = (k: TabKey) => {
+    setActiveTab(k);
+    if (tabParam) router.replace(`/hosts/${slug}`, { scroll: false });
+  };
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [formFooter, setFormFooter] = useState<ReactNode>(null);
   const [formSubHeader, setFormSubHeader] = useState<ReactNode>(null);
@@ -188,7 +199,7 @@ export default function HostDetail({ slug }: { slug: string }) {
               idBase: "host",
               label: data.host.nickname,
               active: activeTab,
-              onChange: (k) => setActiveTab(k as TabKey),
+              onChange: (k) => selectTab(k as TabKey),
               items: tabs,
               panelClassName: "space-y-5",
             }}
