@@ -9638,6 +9638,62 @@
                 }
             }
         },
+        "/api/hosts/{slug}/ssh-host-key/reset": {
+            "post": {
+                "description": "Admin. Drops the pinned key; the next successful login pins the key the host shows then. Written to the host's operation log.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Re-trust a host's SSH host key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Host slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/import": {
             "post": {
                 "description": "Admin. {\"type\": \"hosts\"|\"dns\", \"data\": [...]} dispatched to /api/import/hosts or /api/import/dns, with the same rules.",
@@ -17612,6 +17668,47 @@
                 }
             }
         },
+        "/api/ssh/host-keys/duplicates": {
+            "get": {
+                "description": "Admin. One entry per pinned key held by more than one live host, with those hosts.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "SSH host keys shared by several hosts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.sharedHostKey"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/ssh/keys": {
             "get": {
                 "description": "Any role.",
@@ -25205,6 +25302,23 @@
                 }
             }
         },
+        "api.sharedHostKey": {
+            "type": "object",
+            "properties": {
+                "fingerprint": {
+                    "type": "string"
+                },
+                "hosts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/store.SSHHostKeyHolder"
+                    }
+                },
+                "key_type": {
+                    "type": "string"
+                }
+            }
+        },
         "api.sshCreateRemoteUserRequest": {
             "type": "object",
             "properties": {
@@ -30706,6 +30820,20 @@
                 },
                 "b_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "store.SSHHostKeyHolder": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "oficial_slug": {
+                    "type": "string"
                 }
             }
         },

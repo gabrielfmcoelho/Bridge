@@ -2238,4 +2238,10 @@ var migrationsPostgres = []string{
 	ON CONFLICT DO NOTHING;
 	INSERT INTO role_permissions (role, permission) VALUES ('editor', 'hosts.secrets.reveal')
 	ON CONFLICT DO NOTHING;`,
+
+	// Version 131: each host's pinned SSH host key (authorized_keys format),
+	// captured on the first successful login and checked on every dial after
+	// it (service.HostKeyCheck). NULL = not pinned yet.
+	`ALTER TABLE hosts ADD COLUMN IF NOT EXISTS ssh_host_key TEXT;
+	ALTER TABLE hosts ADD COLUMN IF NOT EXISTS ssh_host_key_at TIMESTAMPTZ;`,
 }
