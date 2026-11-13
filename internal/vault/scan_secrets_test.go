@@ -3,6 +3,8 @@ package vault_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -188,5 +190,69 @@ func TestRenameScanSecretGroupNeedsAdmin(t *testing.T) {
 	}
 	if g := group(id); g != "x" {
 		t.Fatalf("group after refused move in = %q", g)
+	}
+}
+
+// Bridge never recreates what a user trashed: a scan finding a trashed
+// identity again writes nothing until the row is restored.
+func TestUpsertScanSecretTrashedNotRecreated(t *testing.T) {
+	d, hid, uid := newHostSecretFixture(t)
+	ctx := context.Background()
+	repo := vault.NewSecretRepo(d)
+	admin := vault.ActorContext{UserID: uid, Role: "admin"}
+
+	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", "TOKEN", "abc123", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SoftDelete(ctx, admin, id); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", "TOKEN", "xyz789", "")
+	if !errors.Is(err, vault.ErrScanSecretTrashed) || got != 0 {
+		t.Fatalf("trashed identity: id=%d err=%v, want ErrScanSecretTrashed", got, err)
+	}
+	var n int
+	_ = d.SQL.QueryRow(`SELECT COUNT(*) FROM secrets WHERE name = 'TOKEN'`).Scan(&n)
+	if n != 1 {
+		t.Fatalf("%d rows, want only the trashed one", n)
+	}
+
+	if err := repo.Restore(ctx, admin, id); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", "TOKEN", "xyz789", ""); err != nil || got != id {
+		t.Fatalf("after restore: id=%d (want %d) err=%v", got, id, err)
+	}
+}
+
+// Two scans of the same host finding a new secret at once: the second insert
+// hits the unique index and carries on as an update of the first one's row.
+func TestUpsertScanSecretConcurrentFirstInsert(t *testing.T) {
+	d, hid, uid := newHostSecretFixture(t)
+	ctx := context.Background()
+	for i := 0; i < 20; i++ {
+		name := fmt.Sprintf("TOKEN_%d", i)
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		ids, errs := make([]int64, 2), make([]error, 2)
+		for g := range ids {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				ids[g], errs[g] = vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", name, "abc123", "")
+			}()
+		}
+		close(start)
+		wg.Wait()
+		if errs[0] != nil || errs[1] != nil || ids[0] == 0 || ids[0] != ids[1] {
+			t.Fatalf("%s: ids=%v errs=%v", name, ids, errs)
+		}
+	}
+	var n int
+	_ = d.SQL.QueryRow(`SELECT COUNT(*) FROM secrets WHERE group_label = 'scan-x'`).Scan(&n)
+	if n != 20 {
+		t.Fatalf("%d rows, want 20", n)
 	}
 }

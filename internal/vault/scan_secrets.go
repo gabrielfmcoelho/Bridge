@@ -11,6 +11,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
 // scan_secrets.go — secrets a host scan finds on the VM (a Redis password
@@ -25,11 +26,16 @@ const (
 	PermHostSecretsReveal = "hosts.secrets.reveal"
 )
 
+// ErrScanSecretTrashed: the identity exists only in the trash. Bridge never
+// recreates what a user trashed, so nothing is written.
+var ErrScanSecretTrashed = errors.New("scan secret is in the trash")
+
 // UpsertScanSecret stores value as the host's (groupLabel, name) scan secret
 // and returns its id. The same value and description write nothing; a change
 // updates the row in place, audited. actorUserID <= 0 falls back to the system
-// actor. Name and group are checked before anything is written; no error
-// carries the value.
+// actor. An identity found only in the trash is never recreated
+// (ErrScanSecretTrashed). Name and group are checked before anything is
+// written; no error carries the value.
 func UpsertScanSecret(ctx context.Context, db *database.DB, hostID, actorUserID int64, groupLabel, name, value, description string) (int64, error) {
 	if err := models.ValidateEnvVarName(name); err != nil {
 		return 0, err
@@ -58,6 +64,19 @@ func UpsertScanSecret(ctx context.Context, db *database.DB, hostID, actorUserID 
 	if err != nil {
 		return 0, err
 	}
+	id, err := upsertScanSecretTx(ctx, db, hostID, actorUserID, groupLabel, name, plain, derived.valueFP, description)
+	// A scan of the same host inserted this identity between our lookup and our
+	// insert, so the unique index refused ours: its row exists now, and one more
+	// pass takes it as an update.
+	if store.IsUniqueViolation(err) {
+		id, err = upsertScanSecretTx(ctx, db, hostID, actorUserID, groupLabel, name, plain, derived.valueFP, description)
+	}
+	return id, err
+}
+
+// upsertScanSecretTx is one transaction of UpsertScanSecret: look up the live
+// row, refuse a trashed identity, then insert or update.
+func upsertScanSecretTx(ctx context.Context, db *database.DB, hostID, actorUserID int64, groupLabel, name, plain string, valueFP []byte, description string) (int64, error) {
 	desc := sql.NullString{String: description, Valid: description != ""}
 	actor := ActorContext{UserID: actorUserID, Role: "admin"}
 
@@ -79,13 +98,25 @@ func UpsertScanSecret(ctx context.Context, db *database.DB, hostID, actorUserID 
 		hostID, name, groupLabel,
 	).Scan(&id, &fp, &oldDesc); {
 	case errors.Is(err, sql.ErrNoRows):
+		var trashed bool
+		if err := tx.QueryRowContext(ctx,
+			`SELECT EXISTS (SELECT 1 FROM secrets
+			  WHERE type = 'env_var' AND scope = 'host' AND parent_id = ? AND name = ? AND group_label = ?
+			    AND visibility = 'shared' AND deleted_at IS NOT NULL)`,
+			hostID, name, groupLabel,
+		).Scan(&trashed); err != nil {
+			return 0, fmt.Errorf("scan secret trash lookup: %w", err)
+		}
+		if trashed {
+			return 0, ErrScanSecretTrashed
+		}
 	case err != nil:
 		return 0, fmt.Errorf("scan secret lookup: %w", err)
 	}
 
 	var changed []string
 	if id != 0 {
-		if !bytes.Equal(fp, derived.valueFP) {
+		if !bytes.Equal(fp, valueFP) {
 			changed = append(changed, "payload")
 		}
 		if oldDesc.String != description {
