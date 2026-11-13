@@ -15,7 +15,7 @@ func processDetailsScript() string {
 	return strings.Join([]string{
 		scanPath,
 		`ss_out=$(ss -tlnp 2>/dev/null)`,
-		`ps aux 2>/dev/null | awk '$11 ~ /(python|node|java|ruby|php|gunicorn|uvicorn|celery|pm2)/ && $11 !~ /grep|ps|awk/ {printf "%s %s %s %s", $2, $1, $3, $4; for(i=11;i<=NF;i++) printf " %s", $i; print ""}' | head -20 | while read -r pid user cpu mem cmd; do
+		`ps aux 2>/dev/null | awk '$11 ~ /(python|node|java|ruby|php|gunicorn|uvicorn|celery|pm2)/ && $11 !~ /(^|\/)(grep|ps|awk)$/ {printf "%s %s %s %s", $2, $1, $3, $4; for(i=11;i<=NF;i++) printf " %s", $i; print ""}' | head -20 | while read -r pid user cpu mem cmd; do
 	cwd=$(readlink /proc/$pid/cwd 2>/dev/null)
 	exe=$(readlink /proc/$pid/exe 2>/dev/null)
 	ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null)
@@ -44,9 +44,11 @@ func unitFromCgroup(cgroup string) string {
 	if i := strings.LastIndex(line, ":"); i >= 0 {
 		line = line[i+1:]
 	}
-	unit := line[strings.LastIndex(line, "/")+1:]
-	if !strings.HasSuffix(unit, ".service") {
-		return ""
+	unit := ""
+	for _, c := range strings.Split(line, "/") {
+		if strings.HasSuffix(c, ".service") {
+			unit = c
+		}
 	}
 	return unit
 }

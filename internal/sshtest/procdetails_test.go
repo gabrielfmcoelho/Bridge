@@ -8,6 +8,7 @@ func TestUnitFromCgroup(t *testing.T) {
 		{"v2", "0::/system.slice/nginx.service", "nginx.service"},
 		{"session scope", "0::/user.slice/user-1008.slice/session-7.scope", ""},
 		{"docker scope", "0::/system.slice/docker-ab12.scope", ""},
+		{"sub-cgroup", "0::/system.slice/foo.service/sub", "foo.service"},
 		{"v1 multi-line", "4:cpu,cpuacct:/system.slice/other.service\n3:memory:/system.slice/other.service\n1:name=systemd:/system.slice/compras1.service\n", "compras1.service"},
 	}
 	for _, c := range cases {
