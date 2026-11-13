@@ -254,6 +254,12 @@ func (r *SecretRepo) Update(ctx context.Context, actor ActorContext, id int64, p
 		if v.GroupLabel != nil {
 			cur = *v.GroupLabel
 		}
+		// The scan- prefix gates reveal (revealPermitted): only an admin moves a
+		// host secret across it, or an editor could expose it to every viewer.
+		if v.Scope == models.SecretScopeHost && actor.Role != "admin" &&
+			strings.HasPrefix(cur, ScanSecretGroupPrefix) != strings.HasPrefix(*patch.GroupLabel, ScanSecretGroupPrefix) {
+			return ErrSecretForbidden
+		}
 		if cur != *patch.GroupLabel {
 			sets = append(sets, "group_label = ?")
 			args = append(args, *patch.GroupLabel)

@@ -143,3 +143,50 @@ func TestRevealScanSecretNeedsPermission(t *testing.T) {
 		t.Fatalf("viewer reveal of host password = %q, %v", got, err)
 	}
 }
+
+// The reveal gate is keyed on the group label, so only an admin may move a host
+// secret into or out of a scan- group; an editor renaming it would expose it.
+func TestRenameScanSecretGroupNeedsAdmin(t *testing.T) {
+	d, hid, uid := newHostSecretFixture(t)
+	ctx := context.Background()
+	repo := vault.NewSecretRepo(d)
+	admin := vault.ActorContext{UserID: uid, Role: "admin"}
+	var eid int64
+	if err := d.SQL.QueryRow(`INSERT INTO users (username, password_hash, role) VALUES ('eddie','x','editor') RETURNING id`).Scan(&eid); err != nil {
+		t.Fatal(err)
+	}
+	editor := vault.ActorContext{UserID: eid, Role: "editor"}
+	group := func(id int64) string {
+		var g string
+		_ = d.SQL.QueryRow(`SELECT group_label FROM secrets WHERE id = ?`, id).Scan(&g)
+		return g
+	}
+	str := func(s string) *string { return &s }
+
+	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", "CACHE_SERVER_PASSWORD", "abc123", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Update(ctx, editor, id, vault.SecretPatch{GroupLabel: str("x")}); !errors.Is(err, vault.ErrSecretForbidden) {
+		t.Fatalf("editor scan-x → x: err = %v, want forbidden", err)
+	}
+	if g := group(id); g != "scan-x" {
+		t.Fatalf("group after refused rename = %q", g)
+	}
+	// Other fields stay editable by the editor.
+	if err := repo.Update(ctx, editor, id, vault.SecretPatch{Description: str("found in /opt/compras1")}); err != nil {
+		t.Fatalf("editor description: %v", err)
+	}
+	if err := repo.Update(ctx, admin, id, vault.SecretPatch{GroupLabel: str("x")}); err != nil {
+		t.Fatalf("admin scan-x → x: %v", err)
+	}
+	if g := group(id); g != "x" {
+		t.Fatalf("group after admin rename = %q", g)
+	}
+	if err := repo.Update(ctx, editor, id, vault.SecretPatch{GroupLabel: str("scan-y")}); !errors.Is(err, vault.ErrSecretForbidden) {
+		t.Fatalf("editor x → scan-y: err = %v, want forbidden", err)
+	}
+	if g := group(id); g != "x" {
+		t.Fatalf("group after refused move in = %q", g)
+	}
+}
