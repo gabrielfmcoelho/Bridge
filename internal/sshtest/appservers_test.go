@@ -64,8 +64,12 @@ func TestAppDeployDirs(t *testing.T) {
 }
 
 func TestParseAppsListing(t *testing.T) {
-	raw := "@@dir /opt/compras1/server/default/deploy\nsgc.war\nsigacomum.ear\njbossweb.sar\njmx-console.war\nadmin-console.war\nROOT.war\nmail-service.xml\nx.rar\nsigatr-api-1.jar\n"
-	want := map[string][]string{"/opt/compras1/server/default/deploy": {"sgc.war", "sigacomum.ear"}}
+	raw := "@@dir jboss /opt/compras1/server/default/deploy\nmanagement/\nmessaging/\nsecurity/\nsgc.war\nsigacomum.ear/\nfoo.properties\njbossweb.sar/\njmx-console.war/\nmail-service.xml\nx.rar\nsigatr-api-1.jar\n" +
+		"@@dir tomcat /srv/t/webapps\nmyapp/\nlegacy.war\ndocs/\nROOT/\nnotes.txt\n"
+	want := map[string][]string{
+		"/opt/compras1/server/default/deploy": {"sgc.war", "sigacomum.ear"},
+		"/srv/t/webapps":                      {"myapp", "legacy.war"},
+	}
 	if got := parseAppsListing(raw); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v", got)
 	}

@@ -111,29 +111,30 @@ var appServerArtefacts = map[string]bool{
 	"docs": true, "examples": true, "manager": true, "host-manager": true, "ROOT": true,
 }
 
-// parseAppsListing reads the "@@dir <path>" framed ls output into the
-// deployed applications per directory, dropping the server's own artefacts.
+// parseAppsListing reads the "@@dir <catalog> <path>" framed `ls -1p` output
+// into the deployed applications per directory. Allow-list: JBoss <= 6 deploys
+// only *.war / *.ear (file or exploded directory); Tomcat, WildFly and GlassFish
+// also deploy extension-less directories (trailing "/"). The server's own stock
+// entries are dropped.
 func parseAppsListing(raw string) map[string][]string {
 	out := map[string][]string{}
-	dir := ""
+	dir, catalog := "", ""
 	for _, l := range splitLines(raw) {
 		l = strings.TrimSpace(l)
-		if d, ok := strings.CutPrefix(l, "@@dir "); ok {
-			dir = d
+		if f, ok := strings.CutPrefix(l, "@@dir "); ok {
+			catalog, dir, _ = strings.Cut(f, " ")
 			continue
 		}
-		if dir == "" || l == "" || strings.HasPrefix(l, ".") || appServerArtefacts[l] {
+		if dir == "" || l == "" || strings.HasPrefix(l, ".") {
 			continue
 		}
-		skip := false
-		for _, suf := range []string{".sar", ".xml", ".rar", ".jar", ".deployed", ".failed", ".undeployed", ".isdeploying", ".dodeploy"} {
-			if strings.HasSuffix(l, suf) {
-				skip = true
-				break
-			}
+		name, isDir := strings.CutSuffix(l, "/")
+		if appServerArtefacts[name] {
+			continue
 		}
-		if !skip {
-			out[dir] = append(out[dir], l)
+		pkg := strings.HasSuffix(name, ".war") || strings.HasSuffix(name, ".ear")
+		if pkg || (isDir && catalog != "jboss") {
+			out[dir] = append(out[dir], name)
 		}
 	}
 	return out
@@ -172,24 +173,27 @@ func captureAppServers(client *ssh.Client, sudoPassword string, procs []ProcessD
 		return nil
 	}
 	dirsOf := make([][]string, len(svcs))
-	var all []string
+	var all []string // "<catalog> <dir>" frames
 	for i, s := range svcs {
 		for _, p := range procs {
 			if strconv.Itoa(s.PID) != p.PID {
 				continue
 			}
 			dirsOf[i] = appDeployDirs(s.Name, appHome(p.Command), p.Command)
-			all = append(all, dirsOf[i]...)
+			for _, d := range dirsOf[i] {
+				all = append(all, s.Name+" "+d)
+			}
 		}
 	}
 	if len(all) == 0 {
 		return svcs
 	}
 	quoted := make([]string, len(all))
-	for i, d := range all {
-		quoted[i] = shQuote(d)
+	for i, f := range all {
+		cat, d, _ := strings.Cut(f, " ")
+		quoted[i] = shQuote(cat) + " " + shQuote(d)
 	}
-	script := scanPath + "\n" + `for d in ` + strings.Join(quoted, " ") + `; do echo "@@dir $d"; ls -1 "$d" 2>/dev/null; done`
+	script := scanPath + "\n" + `set -- ` + strings.Join(quoted, " ") + `; while [ $# -ge 2 ]; do echo "@@dir $1 $2"; ls -1p "$2" 2>/dev/null; shift 2; done`
 	raw := ""
 	if sudoPassword != "" {
 		if out, err := runSudoCmd(client, sudoPassword, script); err == nil {
