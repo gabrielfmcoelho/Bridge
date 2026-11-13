@@ -174,6 +174,8 @@ export type VMInfoType = {
   volume_groups?: VolumeGroup[];
   /** Mount of the fullest local filesystem — the one disk_percent is about. */
   disk_fullest?: string;
+  /** What a release would trip over, with its warnings. null = probe didn't run. */
+  release_risks?: import("./types").ReleaseRisks | null;
 };
 
 export type Filesystem = {
@@ -740,7 +742,7 @@ export const orchestratorsAPI = {
 // SSH
 // OS update runs (admin): background check / package / security upgrades.
 export const osUpdateAPI = {
-  start: (body: { kind: import("./types").OSUpdateKind; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean; update_first?: boolean;
+  start: (body: { kind: import("./types").OSUpdateKind; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean; update_first?: boolean; allow_no_backup?: boolean;
     backup_include?: string[]; backup_exclude?: string[] }) =>
     api.post<import("./types").OSUpdateRun>("/api/ssh/os-updates/runs", body),
   /** Newest first; with hostId, only the runs that include that host. */

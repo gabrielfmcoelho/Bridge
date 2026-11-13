@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ResponsiveModal from "@/components/ui/ResponsiveModal";
 import RadioGroup from "@/components/ui/RadioGroup";
@@ -15,12 +15,13 @@ import StatusAlert from "@/components/ui/StatusAlert";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useFlag } from "@/contexts/FlagContext";
-import { osUpdateAPI, type VMInfoType } from "@/lib/api";
+import { hostsAPI, osUpdateAPI, type VMInfoType } from "@/lib/api";
 import { formatBytes, parsePaths } from "@/lib/backupPreview";
 import { getTimeAgo } from "@/lib/utils";
 import type { DependencyGroup, OSUpdateKind, OSUpdateRun } from "@/lib/types";
 import { osKey } from "./osView";
 import BackupPathsEditor from "./BackupPathsEditor";
+import ReleaseWarnings from "./ReleaseWarnings";
 
 /** A host an update can target. */
 export interface UpdateHost { id: number; nickname: string; slug: string; os?: string }
@@ -73,8 +74,17 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
   const lastBackup = release ? kept.find((x) => x.run_kind !== "restore") : undefined;
   const lastBackupArgs = lastBackup && { run: String(lastBackup.run_id), when: lastBackup.finished_at ? getTimeAgo(lastBackup.finished_at, locale) : "–",
     size: formatBytes(lastBackup.backup_size ?? 0) };
-  // Backup-only is nothing but a backup; a release skips its own only with one kept.
-  const withBackup = kind !== "check" && backupAvailable && (backupOnly || backup || (release && !lastBackup));
+  // Backup-only is nothing but a backup. A release without a new one falls
+  // back on the kept one, or — said out loud — on nothing at all.
+  const withBackup = kind !== "check" && backupAvailable && (backupOnly || backup);
+  const noBackupAtAll = release && backupAvailable && !backup && !lastBackup;
+  // A release on one host: what its latest scan says the release trips over
+  // (the same query as the host's page, so usually cached).
+  const { data: hostDetail } = useQuery({ queryKey: ["host", single?.slug], queryFn: () => hostsAPI.get(single!.slug), enabled: release && !!single });
+  const lastScan = hostDetail?.last_scan;
+  const risks = useMemo<VMInfoType["release_risks"]>(() => {
+    try { return lastScan ? (JSON.parse(lastScan.data) as Partial<VMInfoType>).release_risks : undefined; } catch { return undefined; }
+  }, [lastScan]);
   // One host: its own paths can be overridden for this run.
   const { data: profile } = useQuery({ queryKey: ["backup-profile", single?.slug], queryFn: () => osUpdateAPI.backupProfile(single!.slug), enabled: !!single && withBackup });
   const [paths, setPaths] = useState({ include: "", exclude: "" });
@@ -86,7 +96,7 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
   const start = useMutation({
     mutationFn: () => osUpdateAPI.start({
       kind, host_ids: targets, reboot: release || (!backupOnly && kind !== "check" && reboot), concurrency: release ? 1 : Math.min(conc || 1, targets.length || 1),
-      backup: withBackup, keep_backup: withBackup && (backupOnly || keepBackup), ...(release ? { update_first: updateFirst } : {}),
+      backup: withBackup, keep_backup: withBackup && (backupOnly || keepBackup), ...(release ? { update_first: updateFirst, allow_no_backup: noBackupAtAll } : {}),
       ...(withBackup && single ? { backup_include: parsePaths(paths.include), backup_exclude: parsePaths(paths.exclude) } : {}),
     }),
     onSuccess: (run) => {
@@ -102,7 +112,8 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
       const ok = await confirm({
         title: t("host.osRelease.confirmTitle", { host: single.nickname, os: single.os || "?" }),
         message: [t("host.osRelease.confirmMessage"), t(updateFirst ? "host.osRelease.confirmUpdateFirst" : "host.osRelease.confirmNoUpdate"),
-          withBackup ? t("host.osRelease.withBackup") : lastBackupArgs ? t("host.osRelease.usesBackup", lastBackupArgs) : t("host.osRelease.noBackup")].join(" "),
+          withBackup ? t("host.osRelease.withBackup") : lastBackupArgs ? t("host.osRelease.usesBackup", lastBackupArgs)
+            : noBackupAtAll ? t("host.osRelease.withoutBackup") : t("host.osRelease.noBackup")].join(" "),
         confirmLabel: t("host.osRelease.start"), danger: true, requireText: single.nickname,
       });
       if (!ok) return;
@@ -141,6 +152,7 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
         {release && (
           <>
             <StatusAlert variant="warning">{t("host.osRelease.modalHint")}</StatusAlert>
+            {hostDetail && <ReleaseWarnings risks={risks} scannedAt={lastScan?.scanned_at} />}
             <FormField label={t("host.osRelease.updateFirst")} hint={t("host.osRelease.updateFirstHint")}>
               <Toggle checked={updateFirst} onChange={setUpdateFirst} ariaLabel={t("host.osRelease.updateFirst")} />
             </FormField>
@@ -160,12 +172,13 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
 
         {kind !== "check" && (backupAvailable ? (
           <>
-            {!backupOnly && (!release || lastBackupArgs) && (
+            {!backupOnly && (
               <FormField label={t(release ? "host.osRelease.newBackup" : "host.osUpdate.backup")}
-                hint={lastBackupArgs ? t("host.osRelease.newBackupHint", lastBackupArgs) : t("host.osUpdate.backupHintProfile")}>
+                hint={lastBackupArgs ? t("host.osRelease.newBackupHint", lastBackupArgs) : release ? t("host.osRelease.noKeptBackupHint") : t("host.osUpdate.backupHintProfile")}>
                 <Toggle checked={backup} onChange={setBackup} ariaLabel={t(release ? "host.osRelease.newBackup" : "host.osUpdate.backup")} />
               </FormField>
             )}
+            {noBackupAtAll && <StatusAlert variant="error">{t("host.osRelease.noBackupWarn")}</StatusAlert>}
             {withBackup && !backupOnly && (
               <FormField label={t("host.osUpdate.keepBackup")} hint={`${t("host.osUpdate.keepBackupHint")} ${config?.retention_days
                 ? t("host.osUpdate.retention", { days: String(config.retention_days) }) : t("host.osUpdate.retentionOff")}`}>

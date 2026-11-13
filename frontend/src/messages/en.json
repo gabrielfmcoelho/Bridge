@@ -761,6 +761,23 @@
       "eolCount": "{count} past end of life"
     },
     "osRelease": {
+      "withoutBackup": "No backup at all: if the release breaks the host, there is nothing to go back to.",
+      "noKeptBackupHint": "Off: this host has no kept backup, so the release runs with none at all.",
+      "noBackupWarn": "No backup, and none kept: if the release breaks this host there is nothing to go back to. Take a VM snapshot first.",
+      "risk": {
+        "title": "Latest scan ({when}) found:",
+        "none": "Latest scan ({when}): nothing a release is known to trip over.",
+        "notChecked": "The latest scan doesn't check release risks yet: rescan the host.",
+        "hint": "Warnings only: the release scans again right before it starts, and they never stop it.",
+        "dpkg_broken": "Packages dpkg left half configured ({count})",
+        "foreign_packages": "Packages from another release, a PPA or no source at all ({count})",
+        "disabled_sources": "Disabled or leftover package sources ({count})",
+        "modified_conffiles": "Config files changed locally ({count}): the release keeps them and leaves the package's version beside them",
+        "pending_dist_files": "Config files waiting for review, *.dpkg-dist / *.ucf-dist ({count})",
+        "failed_units": "Failed units ({count})",
+        "php_handler_missing": "PHP handlers pointing at a PHP that isn't installed ({count}): those sites are down",
+        "vhost_port_unlistened": "Apache sites on a port Apache doesn't listen on ({count}): never served"
+      },
       "runUpdateFirst": "Packages updated first, in this run.",
       "confirmNoUpdate": "Pending packages or a pending reboot make it skip, before anything changes.",
       "confirmUpdateFirst": "It first updates every package and reboots if that needs it.",
@@ -780,6 +797,24 @@
       "start": "Upgrade release"
     },
     "osUpdate": {
+      "report": {
+        "issues": "{count} to check",
+        "dpkgErrors": "dpkg could not configure ({count})",
+        "dpkgBroken": "Packages dpkg left half configured ({count})",
+        "newFailedUnits": "Units failing now ({count})",
+        "stoppedServices": "Services running before, not after ({count})",
+        "lostPhpHandlers": "PHP handlers whose PHP is gone ({count})",
+        "newDistFiles": "New config files to review ({count})",
+        "newForeignPackages": "New packages from another release ({count})",
+        "nothingWorse": "Nothing got worse: no new failed units, stopped services or broken sites.",
+        "sites": "Sites checked ({count})",
+        "site": "Site",
+        "before": "Before",
+        "after": "After",
+        "noAnswer": "no answer",
+        "phpError": "PHP error on the page: {error}",
+        "warningsBefore": "Warnings in the scan before the release"
+      },
       "kindOption": {
         "check": "Check for updates",
         "security": "Security updates",
@@ -813,7 +848,7 @@
       "kind": "Type",
       "kindHint": {
         "backup": "Only sends the host's files to MinIO, changing nothing on it. The backup is kept until the retention ends.",
-        "release": "Takes the host to the next release of its system (up to 3 h) and reboots it. Its checks run before anything else; with MinIO set up it backs up first, unless the host already has a kept backup and you turn that off.",
+        "release": "Takes the host to the next release of its system (up to 3 h) and reboots it. A fresh scan and its checks run before anything else; with MinIO set up it backs up first unless you turn that off (with no kept backup, it then runs with none at all).",
         "check": "Refreshes the package lists and counts what can be upgraded. Changes nothing.",
         "security": "Installs only the security upgrades (apt: *-security suites; dnf/yum: security advisories). Alpine has no separate channel.",
         "packages": "Installs every upgrade within the current release (apt upgrade, dnf/yum upgrade, apk upgrade). Never changes the release."

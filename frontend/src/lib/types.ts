@@ -1545,6 +1545,70 @@ export interface OSUpdateResult {
   /** Backup lists only: the run's kind, and when retention removes it. */
   run_kind?: OSUpdateRun["kind"];
   expires_at?: string;
+  /** What the run did beyond the packages; none for check and backup runs. */
+  report?: ReleaseReport;
+}
+
+/** One thing to look at before a release; the UI words it from code. */
+export interface RiskWarning {
+  code: "dpkg_broken" | "foreign_packages" | "disabled_sources" | "modified_conffiles" | "pending_dist_files"
+    | "failed_units" | "php_handler_missing" | "vhost_port_unlistened";
+  count: number;
+  /** The first few items. */
+  detail?: string;
+}
+
+/** An Apache line that hands PHP to a FastCGI wrapper or a php-fpm socket. */
+export interface PHPHandler {
+  source: string;
+  dir?: string;
+  kind: "fcgi" | "fpm";
+  target: string;
+  /** fcgi: the binary the wrapper execs. */
+  runs?: string;
+  version?: string;
+  state: "ok" | "missing" | "unknown";
+}
+
+/** What a release would trip over, from the scan (releaserisk.go). Names,
+ *  paths and ports only. */
+export interface ReleaseRisks {
+  foreign_count: number;
+  foreign_packages?: string[];
+  disabled_sources?: string[];
+  modified_conffiles?: string[];
+  pending_dist_files?: string[];
+  failed_units?: string[];
+  dpkg_broken?: string[];
+  apache_listen?: number[];
+  php_handlers?: PHPHandler[];
+  warnings?: RiskWarning[];
+}
+
+/** A site's "/" before and after a run (0: no answer). */
+export interface SiteCheck {
+  name: string;
+  before: number;
+  after: number;
+  /** PHP error text the page shows after the run. */
+  error?: string;
+  /** Answered before and not after, or a new PHP error. */
+  broken?: boolean;
+}
+
+/** One host's report of a run (os_update_results.report). */
+export interface ReleaseReport {
+  /** Release only: the warnings of the scan taken right before it. */
+  warnings_before?: RiskWarning[];
+  /** "pkg: message". */
+  dpkg_errors?: string[];
+  dpkg_broken?: string[];
+  new_failed_units?: string[];
+  stopped_services?: string[];
+  new_dist_files?: string[];
+  lost_php_handlers?: string[];
+  new_foreign_packages?: string[];
+  sites?: SiteCheck[];
 }
 
 export interface BackupPaths {

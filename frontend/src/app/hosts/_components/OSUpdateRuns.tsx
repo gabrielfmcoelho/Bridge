@@ -16,6 +16,7 @@ import { getTimeAgo } from "@/lib/utils";
 import type { OSUpdateResult, OSUpdateRun } from "@/lib/types";
 import OSRestoreModal from "./OSRestoreModal";
 import BackupActions from "./BackupActions";
+import RunReport, { reportIssues } from "./RunReport";
 
 const RUN_TONE: Record<OSUpdateRun["status"], LozengeAppearance> = { running: "inprogress", done: "success", cancelled: "default", interrupted: "moved" };
 const RESULT_TONE: Record<OSUpdateResult["status"], LozengeAppearance> = { pending: "default", running: "inprogress", success: "success", failed: "removed", skipped: "moved" };
@@ -145,12 +146,14 @@ export function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () 
             <tbody>
               {(run.results ?? []).map((x) => (
                 <Fragment key={x.host_id}>
-                  <tr className={`${tableClasses.row} ${x.output ? "cursor-pointer" : ""}`} onClick={() => x.output && setOpenHost(openHost === x.host_id ? null : x.host_id)}>
+                  <tr className={`${tableClasses.row} ${x.output || x.report ? "cursor-pointer" : ""}`}
+                    onClick={() => (x.output || x.report) && setOpenHost(openHost === x.host_id ? null : x.host_id)}>
                     <td className={tableClasses.td}>
                       <Link href={`/hosts/${x.host_slug}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-[var(--accent)] hover:underline">{x.host_nickname}</Link>
                     </td>
                     <td className={tableClasses.td}>
                       <Lozenge appearance={RESULT_TONE[x.status]}>{t(`host.osUpdate.resultStatus.${x.status}`)}</Lozenge>
+                      {reportIssues(x.report) > 0 && <Lozenge appearance="removed" className="ml-1.5">{t("host.osUpdate.report.issues", { count: String(reportIssues(x.report)) })}</Lozenge>}
                       {x.reason && <div className="text-xs text-[var(--text-muted)] mt-1 max-w-xs">{x.reason}</div>}
                     </td>
                     <td className={`${tableClasses.td} text-xs tabular-nums`}>{pendingText(x, t)}</td>
@@ -171,7 +174,8 @@ export function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () 
                   {openHost === x.host_id && (
                     <tr className={tableClasses.row}>
                       <td className={tableClasses.td} colSpan={run.backup ? 6 : 5}>
-                        <pre className="text-xs font-mono whitespace-pre-wrap max-h-80 overflow-auto bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-3">{x.output}</pre>
+                        {x.report && <RunReport report={x.report} />}
+                        {x.output && <pre className="text-xs font-mono whitespace-pre-wrap max-h-80 overflow-auto bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-3">{x.output}</pre>}
                       </td>
                     </tr>
                   )}

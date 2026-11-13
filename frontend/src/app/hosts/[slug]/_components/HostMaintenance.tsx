@@ -20,11 +20,12 @@ import OSUpdateRuns, { pendingText } from "../../_components/OSUpdateRuns";
 import OSRestoreModal from "../../_components/OSRestoreModal";
 import HostBackupModal from "../../_components/HostBackupModal";
 import BackupActions from "../../_components/BackupActions";
+import ReleaseWarnings from "../../_components/ReleaseWarnings";
 
 /** The host's "Manutenção" tab (admin): its OS and pending updates, how it is
  *  backed up, the backups kept, and every update / backup / restore run on it.
  *  Every action opens the same modals as the hosts list and the OS tab. */
-export default function HostMaintenance({ host, scanData }: { host: Host; scanData?: string }) {
+export default function HostMaintenance({ host, scanData, scannedAt }: { host: Host; scanData?: string; scannedAt?: string }) {
   const { t, locale } = useLocale();
   const flag = useFlag();
   const queryClient = useQueryClient();
@@ -72,6 +73,7 @@ export default function HostMaintenance({ host, scanData }: { host: Host; scanDa
           <Field label={t("host.osUpdate.pending")} value={last ? `${pendingText(last, t)} · ${getTimeAgo(last.finished_at ?? "", locale)}` : t("host.maintenance.neverChecked")} />
           <div><OSBadges os={host.os} /></div>
         </div>
+        {scan && <div className="mt-4"><ReleaseWarnings risks={scan.release_risks} scannedAt={scannedAt} /></div>}
       </SectionCard>
 
       <SectionCard as="h3" title={t("host.maintenance.backup")}
