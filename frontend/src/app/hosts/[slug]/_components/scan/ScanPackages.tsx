@@ -4,21 +4,21 @@ import SectionCard from "@/components/ui/SectionCard";
 import StatusDot from "@/components/ui/StatusDot";
 import Badge from "@/components/ui/Badge";
 import type { VMInfoType, CronInfo, CronJob } from "@/lib/api";
-import { SubBlock, type T } from "./shared";
+import { SubBlock, SecretText, type T } from "./shared";
 
 /** Installed packages and scheduled jobs (cron, anacron, systemd timers). */
-export default function ScanPackages({ info, t }: { info: VMInfoType; t: T }) {
+export default function ScanPackages({ info, t, hostSlug }: { info: VMInfoType; t: T; hostSlug: string }) {
   const packages = info.installed_packages ?? [];
   const legacyCron = !info.cron ? info.cron_jobs ?? [] : [];
   const empty = packages.length === 0 && !info.cron && legacyCron.length === 0;
 
   return (
     <SectionCard as="h3" title={t("scan.pane.group.packages")} empty={empty ? t("scan.pane.empty.packages") : undefined}>
-      {info.cron && <Cron cron={info.cron} t={t} />}
+      {info.cron && <Cron cron={info.cron} t={t} hostSlug={hostSlug} />}
       {/* Scans persisted before the structured collector carry a raw blob. */}
       {legacyCron.length > 0 && (
         <SubBlock title={t("scan.cronJobs")}>
-          <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all font-mono">{legacyCron.join("\n")}</pre>
+          <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all font-mono"><SecretText text={legacyCron.join("\n")} hostSlug={hostSlug} /></pre>
         </SubBlock>
       )}
       {packages.length > 0 && (
@@ -40,7 +40,7 @@ export default function ScanPackages({ info, t }: { info: VMInfoType; t: T }) {
 // "System" = anything package-manager / sysadmin-owned (/etc/crontab,
 // /etc/cron.d, drop-in dirs, anacron, timers); "user" = per-user crontabs —
 // what the OS schedules vs what somebody added by hand.
-function Cron({ cron, t }: { cron: CronInfo; t: T }) {
+function Cron({ cron, t, hostSlug }: { cron: CronInfo; t: T; hostSlug: string }) {
   const jobs = cron.jobs ?? [];
   const system = jobs.filter((j) => !j.source.startsWith("user:"));
   const user = jobs.filter((j) => j.source.startsWith("user:"));
@@ -61,15 +61,15 @@ function Cron({ cron, t }: { cron: CronInfo; t: T }) {
         <p className="text-xs text-[var(--text-muted)]">{t("scan.cron.noJobs")}</p>
       ) : (
         <div className="space-y-3">
-          {system.length > 0 && <CronGroup title={t("scan.cron.systemJobs")} jobs={system} t={t} />}
-          {user.length > 0 && <CronGroup title={t("scan.cron.userJobs")} jobs={user} t={t} />}
+          {system.length > 0 && <CronGroup title={t("scan.cron.systemJobs")} jobs={system} t={t} hostSlug={hostSlug} />}
+          {user.length > 0 && <CronGroup title={t("scan.cron.userJobs")} jobs={user} t={t} hostSlug={hostSlug} />}
         </div>
       )}
     </SubBlock>
   );
 }
 
-function CronGroup({ title, jobs, t }: { title: string; jobs: CronJob[]; t: T }) {
+function CronGroup({ title, jobs, t, hostSlug }: { title: string; jobs: CronJob[]; t: T; hostSlug: string }) {
   return (
     <div>
       <span className="text-2xs font-semibold text-[var(--text-faint)] block mb-1">{title} <span className="opacity-60">({jobs.length})</span></span>
@@ -80,7 +80,8 @@ function CronGroup({ title, jobs, t }: { title: string; jobs: CronJob[]; t: T })
             <div key={i} className={`flex flex-wrap items-center gap-2 py-1.5 text-xs ${j.disabled ? "opacity-50" : ""}`}>
               <span className="w-28 shrink-0 font-mono text-[var(--text-secondary)] truncate" title={j.kind === "timer" ? t("scan.cron.timerUnit") : t("scan.cron.schedule")}>{j.schedule || "–"}</span>
               {j.user && <span className="shrink-0 font-mono text-[var(--info)]" title={t("scan.cron.runAs")}>{j.user}</span>}
-              <span className="flex-1 min-w-0 truncate font-mono text-[var(--text-primary)]" title={j.command}>{j.command || "–"}</span>
+              <span className="flex-1 min-w-0 truncate font-mono text-[var(--text-primary)]" title={j.command}>{j.command ? <SecretText text={j.command} hostSlug={hostSlug} /> : "–"}</span>
+              {j.missing_binary && <Badge color="danger">{t("scan.cron.missingBinary")}</Badge>}
               {j.disabled && <Badge>{t("scan.cron.disabled")}</Badge>}
               {j.next_run && <span className="shrink-0 text-2xs text-[var(--text-muted)]" title={t("scan.cron.nextRun")}>→ {j.next_run}</span>}
               <span className="shrink-0 text-2xs text-[var(--text-faint)] font-mono" title={j.source}>{source}</span>

@@ -64,7 +64,7 @@ var tarExitRe = regexp.MustCompile(`@@tar_exit (\d+)`)
 // root. It returns when the archive is complete, ctx ends (the session is
 // closed) or the write side fails.
 func StreamBackup(ctx context.Context, client *ssh.Client, p Privilege, include, exclude []string, w io.Writer) error {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return err
 	}

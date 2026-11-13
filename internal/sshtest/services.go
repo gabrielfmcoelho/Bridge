@@ -29,6 +29,9 @@ type serviceSpec struct {
 	// claimed first by agentCatalog; service entries that overlap with
 	// already-claimed ports won't double-attribute.
 	SignaturePorts []int
+	// MainClasses are Java main classes / jar names that identify an app-server
+	// process; each instance becomes its own service (see appservers.go).
+	MainClasses []string
 }
 
 // serviceCatalog enumerates well-known application services. The catalog
@@ -181,6 +184,10 @@ var serviceCatalog = []serviceSpec{
 		Packages: []string{"activemq"}},
 
 	// ── Application runtimes / process managers ──
+	{Name: "jboss", Label: "JBoss AS", Vendor: "Red Hat", Kind: "runtime", MainClasses: []string{"org.jboss.Main"}},
+	{Name: "wildfly", Label: "WildFly / JBoss EAP", Vendor: "Red Hat", Kind: "runtime", MainClasses: []string{"org.jboss.modules.Main", "jboss-modules.jar"}},
+	{Name: "tomcat", Label: "Apache Tomcat", Vendor: "Apache", Kind: "runtime", MainClasses: []string{"org.apache.catalina.startup.Bootstrap"}},
+	{Name: "glassfish", Label: "GlassFish", Vendor: "Eclipse", Kind: "runtime", MainClasses: []string{"com.sun.enterprise.glassfish.bootstrap.ASMain"}},
 	{Name: "supervisord", Label: "Supervisor", Vendor: "Supervisor", Kind: "runtime",
 		Units: []string{"supervisor", "supervisord"}, Binaries: []string{"supervisord"},
 		Packages: []string{"supervisor"}},

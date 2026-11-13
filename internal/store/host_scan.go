@@ -34,6 +34,33 @@ func (r *HostScanRepo) Create(ctx context.Context, hostID int64, data string) er
 	return err
 }
 
+// ListAfter returns up to limit scans with id > afterID, in id order (a
+// keyset walk over every host's scans, for one-off rewrites).
+func (r *HostScanRepo) ListAfter(ctx context.Context, afterID int64, limit int) ([]models.HostScan, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, host_id, data, scanned_at FROM host_scans WHERE id > ? ORDER BY id LIMIT ?`, afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.HostScan
+	for rows.Next() {
+		var s models.HostScan
+		if err := rows.Scan(&s.ID, &s.HostID, &s.Data, &s.ScannedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// UpdateData rewrites one scan's JSON in place; scanned_at and the derived
+// metric columns stay as they were.
+func (r *HostScanRepo) UpdateData(ctx context.Context, id int64, data string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE host_scans SET data = ? WHERE id = ?`, data, id)
+	return err
+}
+
 // GetLatest returns the most recent scan for a host, or (nil, nil) if none.
 func (r *HostScanRepo) GetLatest(ctx context.Context, hostID int64) (*models.HostScan, error) {
 	s := &models.HostScan{}
