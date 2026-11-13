@@ -42,6 +42,8 @@ func TestFindSecrets(t *testing.T) {
 		{`PGPASSWORD='pw' pg_dump`, []kv{{"PGPASSWORD", "pw"}}},
 		{`DB_PASSWORD="two words" ./run.sh`, []kv{{"DB_PASSWORD", "two words"}}},
 		{"app --password --token abc", []kv{{"token", "abc"}}},
+		// A value starting inside another and ending past it: one span covers both.
+		{`x PASSWORD="a --token=b"c d`, []kv{{"PASSWORD", `a --token=b"c`}}},
 		{"mysql -P3306 -p -h db", nil},
 		{"tar -pczf x.tgz /srv", nil},
 		{"app -Dhttp.port=8080 --user admin", nil},

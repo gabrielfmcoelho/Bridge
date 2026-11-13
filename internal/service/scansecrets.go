@@ -88,8 +88,12 @@ func FindSecrets(cmd string) []FoundSecret {
 	sort.SliceStable(found, func(i, j int) bool { return found[i].Start < found[j].Start })
 	out, end := found[:0], 0
 	for _, f := range found {
-		if f.Start >= end {
+		switch {
+		case f.Start >= end:
 			out, end = append(out, f), f.End
+		case f.End > end: // starts inside the previous value and ends past it: one span covers both
+			p := &out[len(out)-1]
+			p.End, p.Value, end = f.End, cmd[p.Start:f.End], f.End
 		}
 	}
 	return out
