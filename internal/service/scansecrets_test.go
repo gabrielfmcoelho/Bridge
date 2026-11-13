@@ -34,10 +34,26 @@ func TestFindSecrets(t *testing.T) {
 		{"app --password=s3cr3t", []kv{{"password", "s3cr3t"}}},
 		{"app --db-password s3cr3t --db-host x", []kv{{"db-password", "s3cr3t"}}},
 		{"PGPASSWORD=pw /usr/bin/pg_dump x", []kv{{"PGPASSWORD", "pw"}}},
-		{"curl https://bob:pa55@git.example/x", []kv{{"url-bob-git.example", "pa55"}}},
+		// A URL secret is named after its host only: the user part may itself be the credential.
+		{"curl https://bob:pa55@git.example/x", []kv{{"url-git.example", "pa55"}}},
+		// A token used as the URL's user, bare or with GitHub's placeholder password.
+		{"git clone https://ghp_0123456789abcdefABCDEF0123456789abcd@github.com/o/r", []kv{{"url-github.com", "ghp_0123456789abcdefABCDEF0123456789abcd"}}},
+		{"git clone https://glpat-AbCd123@gitlab.example/o/r.git", []kv{{"url-gitlab.example", "glpat-AbCd123"}}},
+		{"curl https://0123456789abcdef0123456789abcdef:x-oauth-basic@api.github.com/x", []kv{{"url-api.github.com", "0123456789abcdef0123456789abcdef"}}},
+		{"curl https://0123456789abcdef0123456789abcdef:hunter2@h/x", []kv{{"url-h", "0123456789abcdef0123456789abcdef"}, {"url-h", "hunter2"}}},
+		// A login name is not a secret.
+		{"git clone ssh://git@gitlab.example/o/r", nil},
+		{"curl https://admin@intranet/x", nil},
+		// curl -u user:password: the password, never the user.
+		{"curl -s -u admin:S3cret https://x", []kv{{"curl-password", "S3cret"}}},
+		{"curl --user admin:S3cret https://x", []kv{{"curl-password", "S3cret"}}},
+		{"/usr/bin/curl --user=admin:S3cret https://x", []kv{{"curl-password", "S3cret"}}},
+		{"curl -uadmin:S3cret https://x", []kv{{"curl-password", "S3cret"}}},
+		{"curl -u admin https://x", nil},
+		{"app -u admin:x", nil},
 		{"mysqldump -uroot -pS3cret db", []kv{{"mysql-password", "S3cret"}}},
 		// Go and Python split userinfo at the last "@": the whole password is the value.
-		{"psql postgres://app:P@ssw0rd@db:5432/x", []kv{{"url-app-db", "P@ssw0rd"}}},
+		{"psql postgres://app:P@ssw0rd@db:5432/x", []kv{{"url-db", "P@ssw0rd"}}},
 		{"java -Dpassword=${DB_PASS}", nil},
 		{"app --token=$TOKEN", nil},
 		{`PGPASSWORD="$PGPASS" pg_dump`, nil},
@@ -99,7 +115,7 @@ func TestEnvVarName(t *testing.T) {
 		"cacheServerPassword":              "CACHE_SERVER_PASSWORD",
 		"javax.net.ssl.trustStorePassword": "JAVAX_NET_SSL_TRUST_STORE_PASSWORD",
 		"db-password":                      "DB_PASSWORD",
-		"url-bob-git.example":              "URL_BOB_GIT_EXAMPLE",
+		"url-git.example":                  "URL_GIT_EXAMPLE",
 		"PGPASSWORD":                       "PGPASSWORD",
 		"url--10.0.0.5":                    "URL_10_0_0_5",
 		"2fa-token":                        "_2FA_TOKEN",
@@ -190,6 +206,26 @@ func planted() *sshtest.VMInfo {
 			{Source: "system", Kind: "cron", Schedule: "0 2 * * *", User: "root", Command: "PGPASSWORD=pw /usr/bin/pg_dump x"},
 		}},
 		CronJobs: []string{"0 2 * * * PGPASSWORD=pw /usr/bin/pg_dump x", "DB_PASSWORD=s3cr3t"},
+	}
+}
+
+// A resource_top line cut inside a token used as the URL's user (no "@"
+// left) is blanked from the "//" on; a cut host name is not a secret.
+func TestRecordScanSecrets_CutURLToken(t *testing.T) {
+	d, hid, uid := newScanSecretsFixture(t)
+	info := &sshtest.VMInfo{ResourceTop: &sshtest.ResourceUsageSnapshot{TopCPU: []sshtest.ResourceProcess{
+		{PID: 1, Command: "git clone https://ghp_0123456789abcd…"},
+		{PID: 2, Command: "curl -s http://sistemas.pi.gov.b…"},
+	}}}
+	if _, err := RecordScanSecrets(context.Background(), d, hid, uid, info); err != nil {
+		t.Fatal(err)
+	}
+	top := info.ResourceTop.TopCPU
+	if got := top[0].Command; got != "git clone https://{{secret}}…" {
+		t.Errorf("cut inside a URL token = %q", got)
+	}
+	if got := top[1].Command; got != "curl -s http://sistemas.pi.gov.b…" {
+		t.Errorf("cut inside a host name = %q", got)
 	}
 }
 

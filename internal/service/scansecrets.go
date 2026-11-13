@@ -42,11 +42,16 @@ var (
 	assignRe = regexp.MustCompile(keyStart + `(?:-D|--?)?([A-Za-z_][A-Za-z0-9_.\-]*)=`)
 	// --<name> followed by whitespace and a value that is not itself a flag.
 	flagArgRe = regexp.MustCompile(keyStart + `--([A-Za-z_][A-Za-z0-9_.\-]*)`)
-	// scheme://user:pass@host — userinfo ends at the last "@", as Go's and
-	// Python's URL parsers read it.
-	urlUserRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://([^\s:/@]*):([^\s/]+)@([^\s/:?#@]+)`)
-	// A resource_top line cut inside a URL's password: no "@" is left.
-	cutURLRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://[^\s:/@]*:([^\s@/]+)…$`)
+	// scheme://user[:pass]@host — userinfo ends at the last "@", as Go's and
+	// Python's URL parsers read it. A user already redacted is one token.
+	urlUserRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://(\{\{secret(?::\d+)?\}\}|[^\s:/@?#]*)(?::([^\s/]*))?@([^\s/:?#@]+)`)
+	// A URL's user that is a credential, not a login (https://<token>@host):
+	// a known token prefix, or 20+ characters of a token's alphabet.
+	tokenUserRe = regexp.MustCompile(`^(gh[pousr]_|github_pat_|glpat-|gldt-|xox[abp]-)|^[A-Za-z0-9_\-]{20,}$`)
+	// A resource_top line cut inside a URL's userinfo: no "@" is left. With no
+	// ":" the cut part is a user or a host, blanked unless it reads as a host.
+	cutURLRe  = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://(?:([^\s:/@]*):)?([^\s@/]+)…$`)
+	cutHostRe = regexp.MustCompile(`^[a-z0-9-]+(\.[a-z0-9-]*)+$`)
 	// Not values: a reference ($NAME, ${NAME}) or a redaction token.
 	notValueRe    = regexp.MustCompile(`^(\$(\{[A-Za-z_]\w*\}|[A-Za-z_]\w*)|\{\{secret(:\d+)?\}\})$`)
 	wordRe        = regexp.MustCompile(`\S+`)
@@ -100,15 +105,39 @@ func FindSecrets(cmd string) []FoundSecret {
 		}
 	}
 	for _, m := range urlUserRe.FindAllStringSubmatchIndex(cmd, -1) {
-		add("url-"+cmd[m[2]:m[3]]+"-"+cmd[m[6]:m[7]], m[4], m[5])
+		// Named after the host alone: the user part may be the credential.
+		key := "url-" + cmd[m[6]:m[7]]
+		if tokenUserRe.MatchString(cmd[m[2]:m[3]]) {
+			add(key, m[2], m[3])
+		}
+		if m[4] >= 0 && cmd[m[4]:m[5]] != "x-oauth-basic" { // GitHub's <token>:x-oauth-basic
+			add(key, m[4], m[5])
+		}
 	}
-	mysql := false
-	for _, w := range wordRe.FindAllStringIndex(cmd, -1) {
+	// curl -u / --user user:password: the part after the first ":".
+	curlUser := func(s, e int) {
+		if j := strings.IndexByte(cmd[s:e], ':'); j >= 0 {
+			add("curl-password", s+j+1, e)
+		}
+	}
+	mysql, curl := false, false
+	words := wordRe.FindAllStringIndex(cmd, -1)
+	for i, w := range words {
 		word := cmd[w[0]:w[1]]
-		if mysqlClients[path.Base(strings.Trim(word, `"'`))] {
+		prog := path.Base(strings.Trim(word, `"'`))
+		switch {
+		case mysqlClients[prog]:
 			mysql = true
-		} else if mysql && strings.HasPrefix(word, "-p") {
+		case prog == "curl":
+			curl = true
+		case mysql && strings.HasPrefix(word, "-p"):
 			add("mysql-password", w[0]+2, w[1])
+		case curl && (word == "-u" || word == "--user") && i+1 < len(words):
+			curlUser(words[i+1][0], words[i+1][1])
+		case curl && strings.HasPrefix(word, "--user="):
+			curlUser(w[0]+len("--user="), w[1])
+		case curl && strings.HasPrefix(word, "-u"):
+			curlUser(w[0]+2, w[1])
 		}
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].Start < found[j].Start })
@@ -331,8 +360,9 @@ func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID
 	}
 	for _, c := range redactOnly {
 		*c = redactSpans(*c, FindSecrets(*c), func(f FoundSecret) string { return lookup(byValue, f.Value) })
-		if m := cutURLRe.FindStringSubmatchIndex(*c); m != nil && (*c)[m[2]:m[3]] != blankToken {
-			*c = (*c)[:m[2]] + blankToken + (*c)[m[3]:]
+		if m := cutURLRe.FindStringSubmatchIndex(*c); m != nil && (*c)[m[4]:m[5]] != blankToken &&
+			(m[2] >= 0 || !cutHostRe.MatchString((*c)[m[4]:m[5]])) {
+			*c = (*c)[:m[4]] + blankToken + (*c)[m[5]:]
 		}
 	}
 	info.SecretsRedacted = true
