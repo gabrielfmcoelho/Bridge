@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -164,4 +166,75 @@ func upsertScanSecretTx(ctx context.Context, db *database.DB, hostID, actorUserI
 		return 0, err
 	}
 	return id, nil
+}
+
+// ScanSecretNames reads the host's scan secrets in groupLabel named base or
+// base_<n> (n >= 2), live or trashed: names and value fingerprints only, never
+// a payload. held maps each of values to the lowest-numbered name holding it;
+// names lists that family once each, in suffix order.
+func ScanSecretNames(ctx context.Context, db *database.DB, hostID int64, groupLabel, base string, values []string) (held map[string]string, names []string, err error) {
+	byFP := map[string]string{}
+	for _, v := range values {
+		payload, err := json.Marshal(map[string]string{"value": v})
+		if err != nil {
+			return nil, nil, err
+		}
+		d, err := deriveCols(db.Encryptor, models.SecretTypeEnvVar, string(payload))
+		if err != nil {
+			return nil, nil, err
+		}
+		byFP[string(d.valueFP)] = v
+	}
+	rows, err := db.SQL.QueryContext(ctx,
+		`SELECT name, value_fingerprint FROM secrets
+		  WHERE type = 'env_var' AND scope = 'host' AND parent_id = ? AND group_label = ? AND visibility = 'shared'`,
+		hostID, groupLabel)
+	if err != nil {
+		return nil, nil, fmt.Errorf("scan secret names: %w", err)
+	}
+	defer rows.Close()
+	type row struct {
+		n    int
+		name string
+		fp   []byte
+	}
+	var family []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.name, &r.fp); err != nil {
+			return nil, nil, err
+		}
+		if r.n = familySuffix(r.name, base); r.n > 0 {
+			family = append(family, r)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+	sort.SliceStable(family, func(i, j int) bool { return family[i].n < family[j].n })
+	held = map[string]string{}
+	for _, r := range family {
+		if len(names) == 0 || names[len(names)-1] != r.name {
+			names = append(names, r.name)
+		}
+		if v, ok := byFP[string(r.fp)]; ok && held[v] == "" {
+			held[v] = r.name
+		}
+	}
+	return held, names, nil
+}
+
+// familySuffix is 1 for base, n for base_<n> (n >= 2, no leading zero), else 0.
+func familySuffix(name, base string) int {
+	if name == base {
+		return 1
+	}
+	rest, ok := strings.CutPrefix(name, base+"_")
+	if !ok {
+		return 0
+	}
+	if n, err := strconv.Atoi(rest); err == nil && n >= 2 && strconv.Itoa(n) == rest {
+		return n
+	}
+	return 0
 }

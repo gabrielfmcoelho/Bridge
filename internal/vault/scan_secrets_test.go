@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -254,5 +255,46 @@ func TestUpsertScanSecretConcurrentFirstInsert(t *testing.T) {
 	_ = d.SQL.QueryRow(`SELECT COUNT(*) FROM secrets WHERE group_label = 'scan-x'`).Scan(&n)
 	if n != 20 {
 		t.Fatalf("%d rows, want 20", n)
+	}
+}
+
+// ScanSecretNames reads names and value fingerprints only: which of the
+// candidate values a name of the family (base, base_<n>, live or trashed)
+// already holds, and the family's names in suffix order.
+func TestScanSecretNames(t *testing.T) {
+	d, hid, uid := newHostSecretFixture(t)
+	ctx := context.Background()
+	repo := vault.NewSecretRepo(d)
+	admin := vault.ActorContext{UserID: uid, Role: "admin"}
+	put := func(name, value string) int64 {
+		t.Helper()
+		id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-manage-py", name, value, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	put("PASSWORD_10", "ten")
+	put("PASSWORD", "one")
+	trashed := put("PASSWORD_2", "two")
+	put("PASSWORD_X", "x")    // not of the family
+	put("PASSWORD_2_3", "y")  // not of the family either
+	put("DB_PASSWORD", "two") // another family
+	if _, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-other", "PASSWORD", "one", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SoftDelete(ctx, admin, trashed); err != nil {
+		t.Fatal(err)
+	}
+
+	held, names, err := vault.ScanSecretNames(ctx, d, hid, "scan-manage-py", "PASSWORD", []string{"two", "three", "ten"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := map[string]string{"two": "PASSWORD_2", "ten": "PASSWORD_10"}; !reflect.DeepEqual(held, want) {
+		t.Errorf("held = %v, want %v", held, want)
+	}
+	if want := []string{"PASSWORD", "PASSWORD_2", "PASSWORD_10"}; !reflect.DeepEqual(names, want) {
+		t.Errorf("names = %v, want %v", names, want)
 	}
 }
