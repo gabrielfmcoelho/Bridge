@@ -120,20 +120,27 @@ func (r *DatabaseRepo) List(ctx context.Context, f models.DatabaseFilter) ([]mod
 			args = append(args, eq.v)
 		}
 	}
+	// Link filters go only through assets the caller can see: an id it can't
+	// see matches nothing, as if it didn't exist, and a project never reaches
+	// a database through another entidade's service.
+	services, sargs := liveVisibleIDs(ctx, `services`, AssetService)
 	if f.InstanceServiceID != 0 {
-		q += " AND d.instance_service_id = ?"
-		args = append(args, f.InstanceServiceID)
+		q += " AND d.instance_service_id = ? AND d.instance_service_id IN (" + services + ")"
+		args = append(append(args, f.InstanceServiceID), sargs...)
 	}
 	if f.ConsumerServiceID != 0 {
-		q += " AND d.id IN (SELECT database_id FROM database_consumer_links WHERE service_id = ?)"
-		args = append(args, f.ConsumerServiceID)
+		q += " AND d.id IN (SELECT database_id FROM database_consumer_links WHERE service_id = ? AND service_id IN (" + services + "))"
+		args = append(append(args, f.ConsumerServiceID), sargs...)
 	}
 	if f.ProjectID != 0 {
-		q += ` AND (d.id IN (SELECT database_id FROM database_project_links WHERE project_id = ?)
-			OR d.instance_service_id IN (SELECT id FROM services WHERE project_id = ? AND deleted_at IS NULL)
+		projects, pargs := liveVisibleIDs(ctx, `projects`, AssetProject)
+		q += ` AND ? IN (` + projects + `) AND (d.id IN (SELECT database_id FROM database_project_links WHERE project_id = ?)
+			OR d.instance_service_id IN (SELECT s.id FROM services s WHERE s.project_id = ? AND s.id IN (` + services + `))
 			OR d.id IN (SELECT l.database_id FROM database_consumer_links l JOIN services s ON s.id = l.service_id
-				WHERE s.project_id = ? AND s.deleted_at IS NULL))`
-		args = append(args, f.ProjectID, f.ProjectID, f.ProjectID)
+				WHERE s.project_id = ? AND s.id IN (` + services + `)))`
+		args = append(append(args, f.ProjectID), pargs...)
+		args = append(append(args, f.ProjectID, f.ProjectID), sargs...)
+		args = append(append(args, f.ProjectID), sargs...)
 	}
 	q += " ORDER BY d.name, d.id"
 	return r.query(ctx, q, args...)
@@ -187,18 +194,23 @@ func (r *DatabaseRepo) enrich(ctx context.Context, dbs []models.Database) ([]mod
 	for i := range dbs {
 		byID[dbs[i].ID] = &dbs[i]
 	}
+	// Only the links SetLinks manages: live and visible to the caller (a
+	// shared database links the other side's assets too).
+	services, sargs := liveVisibleIDs(ctx, `services`, AssetService)
+	projects, pargs := liveVisibleIDs(ctx, `projects`, AssetProject)
 	for _, q := range []struct {
-		sql string
-		set func(d *models.Database, other int64)
+		sql   string
+		vargs []any
+		set   func(d *models.Database, other int64)
 	}{
-		{`SELECT l.database_id, l.service_id FROM database_consumer_links l JOIN services s ON s.id = l.service_id
-			WHERE s.deleted_at IS NULL AND l.database_id IN (` + ph + `) ORDER BY l.service_id`,
+		{`SELECT l.database_id, l.service_id FROM database_consumer_links l
+			WHERE l.service_id IN (` + services + `) AND l.database_id IN (` + ph + `) ORDER BY l.service_id`, sargs,
 			func(d *models.Database, o int64) { d.ConsumerServiceIDs = append(d.ConsumerServiceIDs, o) }},
-		{`SELECT l.database_id, l.project_id FROM database_project_links l JOIN projects p ON p.id = l.project_id
-			WHERE p.deleted_at IS NULL AND l.database_id IN (` + ph + `) ORDER BY l.project_id`,
+		{`SELECT l.database_id, l.project_id FROM database_project_links l
+			WHERE l.project_id IN (` + projects + `) AND l.database_id IN (` + ph + `) ORDER BY l.project_id`, pargs,
 			func(d *models.Database, o int64) { d.ProjectIDs = append(d.ProjectIDs, o) }},
 	} {
-		rows, err := r.db.QueryContext(ctx, q.sql, ids...)
+		rows, err := r.db.QueryContext(ctx, q.sql, append(append([]any{}, q.vargs...), ids...)...)
 		if err != nil {
 			return nil, err
 		}
@@ -326,16 +338,17 @@ func (r *DatabaseRepo) Instances(ctx context.Context) ([]models.DatabaseInstance
 	return out, crows.Err()
 }
 
-// SetLinks replaces a database's consumer services and projects. A nil slice
-// leaves that side untouched; an empty one clears it.
+// SetLinks replaces a database's consumer services and projects, but only
+// among those the caller can see: links to the other side's assets are kept.
+// A nil slice leaves that side untouched; an empty one clears the caller's.
 func (r *DatabaseRepo) SetLinks(ctx context.Context, id int64, consumerIDs, projectIDs []int64) error {
 	if consumerIDs != nil {
-		if err := replaceLinks(ctx, r.db, `database_consumer_links`, `database_id`, `service_id`, id, dedupeIDs(consumerIDs)); err != nil {
+		if err := replaceVisibleLinks(ctx, r.db, `database_consumer_links`, `database_id`, id, `service_id`, `services`, AssetService, dedupeIDs(consumerIDs)); err != nil {
 			return err
 		}
 	}
 	if projectIDs != nil {
-		if err := replaceLinks(ctx, r.db, `database_project_links`, `database_id`, `project_id`, id, dedupeIDs(projectIDs)); err != nil {
+		if err := replaceVisibleLinks(ctx, r.db, `database_project_links`, `database_id`, id, `project_id`, `projects`, AssetProject, dedupeIDs(projectIDs)); err != nil {
 			return err
 		}
 	}

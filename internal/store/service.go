@@ -422,25 +422,6 @@ func (r *ServiceRepo) DependentIDs(ctx context.Context, serviceID int64) ([]int6
 	return visibleLinkIDs(ctx, r.db, `service_dependencies`, `depends_on_id`, serviceID, `service_id`, `services`, AssetService)
 }
 
-// replaceLinks deletes all rows in a two-column junction matching keyCol=keyID,
-// then inserts (keyID, v) for each v in vals — atomically.
-func replaceLinks(ctx context.Context, db *sql.DB, table, keyCol, valCol string, keyID int64, vals []int64) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE `+keyCol+` = ?`, keyID); err != nil {
-		return err
-	}
-	for _, v := range vals {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO `+table+` (`+keyCol+`, `+valCol+`) VALUES (?, ?)`, keyID, v); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
-}
-
 // DiscoveredInventory is one scan's view of what runs on a host, as far as
 // service reconciliation cares.
 //

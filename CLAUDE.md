@@ -76,7 +76,9 @@ are `(asset_type, asset_id, entidade_id, relation)` with
    migration, using the existing `DROP CONSTRAINT` / `ADD CONSTRAINT` idiom.
 3. Filter every read with `store.VisibleExpr` / `VisibleExprDyn`. Link
    reads too: per id through `visibleLinkIDs`, lists built on
-   `GraphRepo.Links` (unscoped) through `store.VisibleSet` + `KeepVisible`.
+   `GraphRepo.Links` (unscoped) through `store.VisibleSet` + `KeepVisible`,
+   a repo's own batch link query with `l.<col> IN (liveVisibleIDs(...))`
+   (`APICatalogRepo.LinksBulk`, `DatabaseRepo.enrich`).
 4. Gate every write through `store.ResolveGrants`
    (`internal/store/asset_entidade.go`). Link setters go through
    `replaceVisibleLinks`, never DELETE-all + insert: a scoped save would

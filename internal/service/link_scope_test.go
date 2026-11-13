@@ -226,3 +226,131 @@ func TestHostService_LinkedIDsRespectScope(t *testing.T) {
 		t.Fatalf("after SGA save, unscoped dns=%v services=%v projects=%v; want SGP's %d/%d/%d kept", full.DNSRecords, full.Services, full.Projects, dnsB, svcB, projB)
 	}
 }
+
+// A catalogued API shared by SGA and SGP is served by, consumed by and part
+// of assets of both. SGA's detail and list row show only its own ids, and an
+// SGA save keeps SGP's links, which its pickers never showed.
+func TestAPICatalogRepo_LinkedIDsRespectScope(t *testing.T) {
+	bg := context.Background()
+	_, d := newServiceService(t)
+	f := newScopeFixture(t, d.SQL)
+	user := f.id(`INSERT INTO users (username, password_hash, role) VALUES ('scope-api', 'x', 'admin') RETURNING id`)
+	api := f.id(`INSERT INTO api_catalog (scope, name, source_type, spec_json, owner_user_id, created_by)
+		VALUES ('avulso', 'shared', 'url', '{}', ?, ?) RETURNING id`, user, user)
+	f.grant(store.AssetAPICatalog, api, f.sga, f.sgp)
+	svcA, svcB := f.service("serve-a", nil, f.sga), f.service("serve-b", nil, f.sgp)
+	conA, conB := f.service("call-a", nil, f.sga), f.service("call-b", nil, f.sgp)
+	projA, projB := f.project("pa", f.sga), f.project("pb", f.sgp)
+	repo := store.NewAPICatalogRepo(d.SQL)
+	f.must(repo.SetLinks(bg, api, []int64{svcA, svcB}, []int64{projA, projB}, []int64{conA, conB}))
+
+	asSGA := f.as(f.sga)
+	det, err := repo.Get(asSGA, api)
+	if err != nil || det == nil {
+		t.Fatalf("Get = %v, %v", det, err)
+	}
+	want := [][]int64{{svcA}, {conA}, {projA}}
+	if got := [][]int64{det.ServiceIDs, det.ConsumerServiceIDs, det.ProjectIDs}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SGA detail services/consumers/projects = %v; want only SGA's %v", got, want)
+	}
+	list, err := repo.List(asSGA, models.APICatalogFilter{})
+	if err != nil || len(list) != 1 {
+		t.Fatalf("List = %+v, %v", list, err)
+	}
+	if got := [][]int64{list[0].ServiceIDs, list[0].ConsumerServiceIDs, list[0].ProjectIDs}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SGA list row services/consumers/projects = %v; want only SGA's %v", got, want)
+	}
+
+	f.must(repo.SetLinks(asSGA, api, []int64{}, []int64{}, []int64{}))
+	full, _ := repo.Get(bg, api)
+	if got, want := [][]int64{full.ServiceIDs, full.ConsumerServiceIDs, full.ProjectIDs}, [][]int64{{svcB}, {conB}, {projB}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("after SGA save, unscoped services/consumers/projects = %v; want SGP's %v kept", got, want)
+	}
+}
+
+// A catalogued database shared by SGA and SGP is consumed by services and
+// part of projects of both: same contract as the API above.
+func TestDatabaseRepo_LinkedIDsRespectScope(t *testing.T) {
+	bg := context.Background()
+	_, d := newServiceService(t)
+	f := newScopeFixture(t, d.SQL)
+	db := f.id(`INSERT INTO databases (name, engine) VALUES ('shared', 'postgres') RETURNING id`)
+	f.grant(store.AssetDatabase, db, f.sga, f.sgp)
+	conA, conB := f.service("call-a", nil, f.sga), f.service("call-b", nil, f.sgp)
+	projA, projB := f.project("pa", f.sga), f.project("pb", f.sgp)
+	repo := store.NewDatabaseRepo(d.SQL)
+	f.must(repo.SetLinks(bg, db, []int64{conA, conB}, []int64{projA, projB}))
+
+	asSGA := f.as(f.sga)
+	det, err := repo.Get(asSGA, db)
+	if err != nil || det == nil {
+		t.Fatalf("Get = %v, %v", det, err)
+	}
+	want := [][]int64{{conA}, {projA}}
+	if got := [][]int64{det.ConsumerServiceIDs, det.ProjectIDs}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SGA detail consumers/projects = %v; want only SGA's %v", got, want)
+	}
+	list, err := repo.List(asSGA, models.DatabaseFilter{})
+	if err != nil || len(list) != 1 {
+		t.Fatalf("List = %+v, %v", list, err)
+	}
+	if got := [][]int64{list[0].ConsumerServiceIDs, list[0].ProjectIDs}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SGA list row consumers/projects = %v; want only SGA's %v", got, want)
+	}
+
+	f.must(repo.SetLinks(asSGA, db, []int64{}, []int64{}))
+	full, _ := repo.Get(bg, db)
+	if got, want := [][]int64{full.ConsumerServiceIDs, full.ProjectIDs}, [][]int64{{conB}, {projB}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("after SGA save, unscoped consumers/projects = %v; want SGP's %v kept", got, want)
+	}
+}
+
+// Filtering the API or database list by a service or project SGA can't see
+// matches nothing, as if the id didn't exist, and a shared project's list
+// never reaches an API or database only through SGP's service. SGP, which
+// sees them, gets the row from every filter.
+func TestAtlasListFilters_RespectScope(t *testing.T) {
+	bg := context.Background()
+	_, d := newServiceService(t)
+	f := newScopeFixture(t, d.SQL)
+	shared := f.id(`INSERT INTO projects (name) VALUES ('shared') RETURNING id`)
+	f.grant(store.AssetProject, shared, f.sga, f.sgp)
+	projB, svcB := f.project("pb", f.sgp), f.service("sb", &shared, f.sgp)
+	user := f.id(`INSERT INTO users (username, password_hash, role) VALUES ('scope-filter', 'x', 'admin') RETURNING id`)
+	api := f.id(`INSERT INTO api_catalog (scope, name, source_type, spec_json, owner_user_id, created_by)
+		VALUES ('avulso', 'shared', 'url', '{}', ?, ?) RETURNING id`, user, user)
+	db := f.id(`INSERT INTO databases (name, engine, instance_service_id) VALUES ('shared', 'postgres', ?) RETURNING id`, svcB)
+	f.grant(store.AssetAPICatalog, api, f.sga, f.sgp)
+	f.grant(store.AssetDatabase, db, f.sga, f.sgp)
+	apis, dbs := store.NewAPICatalogRepo(d.SQL), store.NewDatabaseRepo(d.SQL)
+	f.must(
+		apis.SetLinks(bg, api, []int64{svcB}, []int64{projB}, nil),
+		dbs.SetLinks(bg, db, []int64{svcB}, []int64{projB}),
+	)
+
+	apiList := func(flt models.APICatalogFilter) func(context.Context) (int, error) {
+		return func(ctx context.Context) (int, error) { l, err := apis.List(ctx, flt); return len(l), err }
+	}
+	dbList := func(flt models.DatabaseFilter) func(context.Context) (int, error) {
+		return func(ctx context.Context) (int, error) { l, err := dbs.List(ctx, flt); return len(l), err }
+	}
+	for _, c := range []struct {
+		name string
+		list func(context.Context) (int, error)
+	}{
+		{"apis ?service_id=sb", apiList(models.APICatalogFilter{ServiceID: svcB})},
+		{"apis ?project_id=pb", apiList(models.APICatalogFilter{ProjectID: projB})},
+		{"apis ?project_id=shared (through sb)", apiList(models.APICatalogFilter{ProjectID: shared})},
+		{"databases ?consumer_service_id=sb", dbList(models.DatabaseFilter{ConsumerServiceID: svcB})},
+		{"databases ?instance_service_id=sb", dbList(models.DatabaseFilter{InstanceServiceID: svcB})},
+		{"databases ?project_id=pb", dbList(models.DatabaseFilter{ProjectID: projB})},
+		{"databases ?project_id=shared (through sb)", dbList(models.DatabaseFilter{ProjectID: shared})},
+	} {
+		if n, err := c.list(f.as(f.sgp)); err != nil || n != 1 {
+			t.Errorf("%s as SGP = %d, %v; want 1", c.name, n, err)
+		}
+		if n, err := c.list(f.as(f.sga)); err != nil || n != 0 {
+			t.Errorf("%s as SGA = %d, %v; want 0", c.name, n, err)
+		}
+	}
+}
