@@ -16,8 +16,8 @@ func processDetailsScript() string {
 		scanPath,
 		`ss_out=$(ss -tlnp 2>/dev/null)`,
 		`ps aux 2>/dev/null | awk '$11 ~ /(python|node|java|ruby|php|gunicorn|uvicorn|celery|pm2)/ && $11 !~ /grep|ps|awk/ {printf "%s %s %s %s", $2, $1, $3, $4; for(i=11;i<=NF;i++) printf " %s", $i; print ""}' | head -20 | while read -r pid user cpu mem cmd; do
-	cwd=$(readlink -f /proc/$pid/cwd 2>/dev/null)
-	exe=$(readlink -f /proc/$pid/exe 2>/dev/null)
+	cwd=$(readlink /proc/$pid/cwd 2>/dev/null)
+	exe=$(readlink /proc/$pid/exe 2>/dev/null)
 	ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null)
 	pcomm=$(cat /proc/$ppid/comm 2>/dev/null)
 	cg=$(grep -E 'name=systemd|^0::' /proc/$pid/cgroup 2>/dev/null | head -1)
