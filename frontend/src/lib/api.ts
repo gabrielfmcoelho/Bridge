@@ -370,6 +370,7 @@ export type ProcessDetail = {
   started_via: string;
   venv?: string;
   ports?: string;
+  unit?: string;
 };
 
 // Default per-request timeout. Generous enough for long SSH scans

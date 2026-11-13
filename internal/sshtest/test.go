@@ -363,6 +363,7 @@ type ProcessDetail struct {
 	StartedVia string `json:"started_via"` // systemd, cron, manual, unknown
 	Venv    string `json:"venv,omitempty"`
 	Ports   string `json:"ports,omitempty"`
+	Unit    string `json:"unit,omitempty"` // systemd service from the cgroup
 }
 
 // Test runs a simple "echo OK" over SSH to verify connectivity.
@@ -1115,100 +1116,6 @@ func CleanupNginx(client *ssh.Client, password string, purge bool) (result *Ngin
 	return status, nil
 }
 
-func captureProcessDetails(client *ssh.Client) []ProcessDetail {
-	// Single SSH command that collects everything for all matching processes.
-	// Output format per process: PID|USER|%CPU|%MEM|CMD||CWD|EXE|PPID_COMM|PORTS
-	// Processes separated by newlines, "||" separates ps fields from /proc fields.
-	raw := runCmd(client, `ps aux 2>/dev/null | awk '$11 ~ /(python|node|java|ruby|php|gunicorn|uvicorn|celery|pm2)/ && $11 !~ /grep|ps|awk/ {printf "%s|%s|%s|%s|", $2, $1, $3, $4; for(i=11;i<=NF;i++) printf "%s ", $i; print ""}' | head -20`)
-	if raw == "" {
-		return nil
-	}
-
-	// Collect PIDs
-	var pids []string
-	var psLines []string
-	for _, line := range splitLines(raw) {
-		parts := strings.SplitN(line, "|", 5)
-		if len(parts) >= 5 && strings.TrimSpace(parts[4]) != "" {
-			pids = append(pids, parts[0])
-			psLines = append(psLines, line)
-		}
-	}
-	if len(pids) == 0 {
-		return nil
-	}
-
-	// Single batch command to get cwd, exe, parent comm, and ports for all PIDs
-	batchScript := `for pid in ` + strings.Join(pids, " ") + `; do
-		cwd=$(readlink -f /proc/$pid/cwd 2>/dev/null)
-		exe=$(readlink -f /proc/$pid/exe 2>/dev/null)
-		ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null)
-		pcomm=$(cat /proc/$ppid/comm 2>/dev/null)
-		ports=$(ss -tlnp 2>/dev/null | grep "pid=$pid," | awk '{split($4,a,":"); print a[length(a)]}' | sort -nu | tr '\n' ',' | sed 's/,$//')
-		echo "$pid||$cwd||$exe||$pcomm||$ports"
-	done`
-	batchRaw := runCmd(client, batchScript)
-
-	// Parse batch results into a map by PID
-	procInfo := map[string][4]string{} // cwd, exe, parentComm, ports
-	for _, line := range splitLines(batchRaw) {
-		parts := strings.Split(line, "||")
-		if len(parts) >= 5 {
-			procInfo[parts[0]] = [4]string{parts[1], parts[2], parts[3], parts[4]}
-		}
-	}
-
-	var details []ProcessDetail
-	for i, line := range psLines {
-		parts := strings.SplitN(line, "|", 5)
-		pid := pids[i]
-		cmd := strings.TrimSpace(parts[4])
-		info := procInfo[pid]
-		cwd, exe, parentComm, ports := info[0], info[1], info[2], info[3]
-
-		// Detect venv from exe path
-		venv := ""
-		for _, marker := range []string{"/venv/", "/.venv/", "/virtualenv/", "/env/"} {
-			if idx := strings.Index(exe, marker); idx >= 0 {
-				venv = exe[:idx+len(marker)-1]
-				break
-			}
-		}
-
-		// Classify start method from parent process
-		startedVia := "unknown"
-		switch parentComm {
-		case "systemd", "init":
-			startedVia = "systemd"
-		case "cron", "crond", "anacron":
-			startedVia = "cron"
-		case "sshd", "bash", "sh", "zsh", "tmux: server", "screen":
-			startedVia = "manual"
-		case "supervisord":
-			startedVia = "supervisor"
-		case "containerd-shim", "docker":
-			startedVia = "docker"
-		default:
-			if parentComm != "" {
-				startedVia = "parent:" + parentComm
-			}
-		}
-
-		details = append(details, ProcessDetail{
-			PID:        pid,
-			User:       parts[1],
-			CPU:        parts[2] + "%",
-			MEM:        parts[3] + "%",
-			Command:    cmd,
-			CWD:        cwd,
-			StartedVia: startedVia,
-			Venv:       venv,
-			Ports:      ports,
-		})
-	}
-	return details
-}
-
 // RemoteKeyInfo holds information about an SSH key found on the remote host.
 type RemoteKeyInfo struct {
 	Name        string `json:"name"`
@@ -1772,7 +1679,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	go func() {
 		defer wg.Done()
 		s := time.Now()
-		procDetails = captureProcessDetails(client)
+		procDetails = captureProcessDetails(client, sudoPassword)
 		timeSession("[par] process-details", s)
 	}()
 	go func() {
