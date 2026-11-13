@@ -134,6 +134,24 @@ func TestRevealScanSecretNeedsPermission(t *testing.T) {
 	if got, err := repo.Reveal(ctx, editor, id); err != nil || got != `{"value":"abc123"}` {
 		t.Fatalf("editor reveal = %q, %v", got, err)
 	}
+	bundle := func(a vault.ActorContext) error {
+		_, _, err := repo.CreateBundle(ctx, a, []vault.BundleItemInput{{Type: vault.BundleItemSecret, RefID: id}},
+			vault.CreateBundleOpts{Title: "x", TTL: time.Hour})
+		return err
+	}
+	if err := bundle(editor); err != nil {
+		t.Fatalf("editor bundle: %v", err)
+	}
+	// Revoked from editors (Settings › Permissions): reveal and bundling both refused.
+	if _, err := d.SQL.Exec(`DELETE FROM role_permissions WHERE role = 'editor' AND permission = ?`, vault.PermHostSecretsReveal); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.Reveal(ctx, editor, id); !errors.Is(err, vault.ErrSecretForbidden) {
+		t.Fatalf("editor reveal after revoke: err = %v, want forbidden", err)
+	}
+	if err := bundle(editor); !errors.Is(err, vault.ErrSecretForbidden) {
+		t.Fatalf("editor bundle after revoke: err = %v, want forbidden", err)
+	}
 
 	// The host's SSH password keeps today's rule: any viewer of the host.
 	if err := vault.HostSetPassword(ctx, d, hid, uid, "s3cret"); err != nil {
