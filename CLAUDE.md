@@ -340,11 +340,13 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   unit comes from `/proc/<pid>/cgroup`, readable without root (`unit`,
   `started_via = systemd`). Cron asks for the daemon name first (RHEL
   `crond`), then is-active/is-enabled for that unit only; a job whose
-  absolute binary doesn't exist gets `missing_binary` (a real `/ust/bin/certbot`).
+  absolute binary doesn't exist gets `missing_binary` (a real `/ust/bin/certbot`;
+  without root only where the scan user can traverse, never a `$`/`%` path).
   nginx sites keep `locations` (path → targets, upstreams expanded);
   `proxy` stays the flattened union for the old readers.
 - Java app servers (`appservers.go`, `services.go`): JBoss AS, WildFly/EAP,
-  Tomcat and GlassFish are matched by **main class**, not by process name, and
+  Tomcat and GlassFish are matched by **main class**, not by process name (host
+  processes only: a container PID belongs to its container), and
   yield one service per instance, keyed `<catalog>@<instance>` (the systemd
   unit, else the install dir) — two JBoss on one host stay two services.
   `HostPorts` come from the PID's own ports with the likely HTTP port (80xx) first, so a
@@ -361,15 +363,19 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   so the identity is stable) and is replaced in the scan by `{{secret:<id>}}`
   (`{{secret}}` when it can't be registered) **inside `recordScan`, before the
   scan is stored or returned** — a raw value never reaches `host_scans` or the
-  response, an error or a log line: the only way out of the vault is the
+  response, an error or a log line: a value leaves the vault only through the
   audited reveal (`GET /api/secrets/{id}/reveal`, which writes a
-  `secret_audit_log` row). A trashed identity is never recreated. Revealing a
+  `secret_audit_log` row) or a share-bundle redemption (`revealRaw`, gated by
+  the same permission when the bundle is created, logged in
+  `share_bundle_access_log`). A trashed identity is never recreated. Revealing a
   `scan-*` host secret needs `hosts.secrets.reveal` (v130, seeded for editors);
   only admins move a host secret into or out of a `scan-` group. At startup
   `service.RunScanSecretsBackfill` (`cmd/web.go`) redacts old `host_scans`
-  rows, synchronously, resuming after a stored high-water id. UI: the host
-  tab **Segredos** (`?tab=secrets`) lists them with reveal, and scan views
-  render the tokens as lock chips linking to it.
+  rows, synchronously, resuming after a high-water id saved every batch; a
+  scan `RecordScanSecrets` wrote carries `secrets_redacted` and is never
+  re-read. UI: the host tab **Segredos** (`?tab=secrets`, editors) lists them,
+  with reveal only for `hosts.secrets.reveal`, and scan views render the
+  tokens as lock chips linking to it (a plain chip for viewers).
 - Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
   names are read in bulk; wiki titles come from Outline at most once a day per
   page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title
