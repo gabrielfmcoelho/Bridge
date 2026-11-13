@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
@@ -539,6 +540,63 @@ func (r *HostRepo) UpdateKeyMeta(ctx context.Context, id int64, hasKey bool, key
 		hasKey, keyPath, identitiesOnly, id,
 	)
 	return err
+}
+
+// SSHHostKey returns host id's pinned SSH host key (an authorized_keys
+// line) and when it was pinned: "" and nil when there is no pin.
+func (r *HostRepo) SSHHostKey(ctx context.Context, id int64) (key string, at *time.Time, err error) {
+	err = r.db.QueryRowContext(ctx, `SELECT COALESCE(ssh_host_key, ''), ssh_host_key_at FROM hosts WHERE id = ?`, id).Scan(&key, &at)
+	return key, at, err
+}
+
+// PinSSHHostKey pins key on host id unless a key is pinned already, and
+// returns the pin that holds afterwards: the first of two racing logins wins.
+func (r *HostRepo) PinSSHHostKey(ctx context.Context, id int64, key string) (pinned string, err error) {
+	err = r.db.QueryRowContext(ctx, `UPDATE hosts SET
+			ssh_host_key_at = CASE WHEN ssh_host_key IS NULL THEN CURRENT_TIMESTAMP ELSE ssh_host_key_at END,
+			ssh_host_key = COALESCE(ssh_host_key, ?)
+		WHERE id = ? RETURNING ssh_host_key`, key, id).Scan(&pinned)
+	return pinned, err
+}
+
+// ResetSSHHostKey drops host id's pin: its next successful login pins again.
+func (r *HostRepo) ResetSSHHostKey(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE hosts SET ssh_host_key = NULL, ssh_host_key_at = NULL WHERE id = ?`, id)
+	return err
+}
+
+// SSHHostKeyHolder is a live host holding a pinned key.
+type SSHHostKeyHolder struct {
+	Key      string `json:"-"`
+	ID       int64  `json:"id"`
+	Slug     string `json:"oficial_slug"`
+	Nickname string `json:"nickname"`
+}
+
+// SharedSSHHostKeys lists the visible live hosts whose pinned key another
+// of them holds too (VMs cloned from one template), ordered by key, slug.
+func (r *HostRepo) SharedSSHHostKeys(ctx context.Context) ([]SSHHostKeyHolder, error) {
+	vis, vargs := VisibleExpr(ctx, AssetHost, "hosts.id")
+	rows, err := r.db.QueryContext(ctx, `WITH pinned AS (
+			SELECT id, oficial_slug, nickname, ssh_host_key FROM hosts
+			WHERE deleted_at IS NULL AND ssh_host_key IS NOT NULL AND `+vis+`
+		)
+		SELECT ssh_host_key, id, oficial_slug, nickname FROM pinned
+		WHERE ssh_host_key IN (SELECT ssh_host_key FROM pinned GROUP BY ssh_host_key HAVING COUNT(*) > 1)
+		ORDER BY ssh_host_key, oficial_slug`, vargs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SSHHostKeyHolder
+	for rows.Next() {
+		var h SSHHostKeyHolder
+		if err := rows.Scan(&h.Key, &h.ID, &h.Slug, &h.Nickname); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
 }
 
 // scanStringCountMap reads (string, count) rows into a map.

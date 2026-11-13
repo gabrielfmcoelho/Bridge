@@ -2229,4 +2229,10 @@ var migrationsPostgres = []string{
 	// of the scan before it, dpkg's errors, what the scans before and after
 	// differ by and its sites before and after (service.ReleaseReport).
 	`ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS report JSONB;`,
+
+	// Version 130: each host's pinned SSH host key (authorized_keys format),
+	// captured on the first successful login and checked on every dial after
+	// it (service.HostKeyCheck). NULL = not pinned yet.
+	`ALTER TABLE hosts ADD COLUMN IF NOT EXISTS ssh_host_key TEXT;
+	ALTER TABLE hosts ADD COLUMN IF NOT EXISTS ssh_host_key_at TIMESTAMPTZ;`,
 }

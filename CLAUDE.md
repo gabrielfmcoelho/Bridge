@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v129**. Use idempotent idioms:
+per element, currently at **v130**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -134,6 +134,18 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   fields in the request struct, `nil` = keep), `""`/`[]` clears. `PUT
   /api/api-catalog/{id}` follows this; new update handlers must too — a plain
   `string` field silently blanks the column when a caller omits it.
+- SSH host keys (v130, `internal/service/host_key.go`): every dial goes
+  through `service.DialHost`, never `sshtest.Dial` directly. The first
+  successful login pins the key the host showed (`hosts.ssh_host_key`, an
+  authorized_keys line; a failed login pins nothing); later dials offer that
+  key's algorithms first and refuse any other key with "host key changed
+  (expected SHA256:…, got SHA256:…)", which the test path saves as a failed
+  test. `HostRepo.Update` never writes the pin, so a stale host can't undo
+  one. An admin re-trusts a host with `POST /api/hosts/{slug}/ssh-host-key/reset`
+  (SSH config drawer, operation log `host-key-reset`); `GET
+  /api/ssh/host-keys/duplicates` lists keys pinned on several hosts (VMs
+  cloned from one template), warned about in Settings › SSH operations.
+  Pins fill in on each host's next connection: rollout locks no one out.
 - Atlas API keys (`internal/api/api_key_handlers.go`, Keycloak integration in
   `internal/integrations/kcadmin`): the scope prefix `bridge` is reserved for
   Bridge's own entry; a key's secret is returned **once** (also stored in the

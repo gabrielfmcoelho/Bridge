@@ -40,8 +40,17 @@ func KeyAuth(keyPEM []byte, sudoPassword string) Auth {
 	return Auth{method: "key", keyPEM: keyPEM, password: sudoPassword}
 }
 
-// Dial opens an SSH connection using the provided auth method.
-func Dial(hostname, port, user string, auth Auth) (*ssh.Client, error) {
+// HostKey is how Dial checks the server's SSH host key.
+type HostKey struct {
+	Check ssh.HostKeyCallback
+	// Algorithms offered for the host key (the pinned key's, so the server
+	// shows that key); nil = x/crypto's default order.
+	Algorithms []string
+}
+
+// Dial opens an SSH connection using the provided auth method, checking the
+// server's host key with hostKey (service.HostKeyCheck builds it).
+func Dial(hostname, port, user string, auth Auth, hostKey HostKey) (*ssh.Client, error) {
 	if port == "" {
 		port = "22"
 	}
@@ -64,8 +73,9 @@ func Dial(hostname, port, user string, auth Auth) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User:            user,
 		Auth:            methods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
+		HostKeyCallback:   hostKey.Check,
+		HostKeyAlgorithms: hostKey.Algorithms,
+		Timeout:           10 * time.Second,
 	}
 	return ssh.Dial("tcp", net.JoinHostPort(hostname, port), config)
 }
