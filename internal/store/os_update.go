@@ -120,20 +120,24 @@ func (r *OSUpdateRepo) GetRun(ctx context.Context, id int64) (*models.OSUpdateRu
 
 const osResultFields = `x.run_id, x.host_id, h.nickname, h.oficial_slug, x.status, x.reason, x.pkg_manager, x.os_before, x.os_after,
 	x.upgradable, x.security_upgradable, x.upgraded, x.reboot_required, x.rebooted, x.output, x.started_at, x.finished_at,
-	x.backup_key, x.backup_size, x.backup_status, x.backup_include, x.backup_exclude`
+	x.backup_key, x.backup_size, x.backup_status, x.backup_include, x.backup_exclude, x.report`
 
 const osResultCols = osResultFields + ` FROM os_update_results x JOIN hosts h ON h.id = x.host_id`
 
 // scanOSResult scans osResultFields, then extra.
 func scanOSResult(sc interface{ Scan(...any) error }, x *models.OSUpdateResult, extra ...any) error {
 	var include, exclude string
+	var report []byte
 	dest := append([]any{&x.RunID, &x.HostID, &x.HostNickname, &x.HostSlug, &x.Status, &x.Reason, &x.PkgManager, &x.OSBefore, &x.OSAfter,
 		&x.Upgradable, &x.SecurityUpgradable, &x.Upgraded, &x.RebootRequired, &x.Rebooted, &x.Output, &x.StartedAt, &x.FinishedAt,
-		&x.BackupKey, &x.BackupSize, &x.BackupStatus, &include, &exclude}, extra...)
+		&x.BackupKey, &x.BackupSize, &x.BackupStatus, &include, &exclude, &report}, extra...)
 	if err := sc.Scan(dest...); err != nil {
 		return err
 	}
 	x.BackupInclude, x.BackupExclude = splitPaths(include), splitPaths(exclude)
+	if len(report) > 0 {
+		x.Report = report
+	}
 	return nil
 }
 
@@ -169,12 +173,16 @@ func (r *OSUpdateRepo) StartResult(ctx context.Context, runID, hostID int64, osB
 
 // FinishResult writes a host's outcome.
 func (r *OSUpdateRepo) FinishResult(ctx context.Context, x *models.OSUpdateResult) error {
+	var report any // NULL when the run has none
+	if len(x.Report) > 0 {
+		report = string(x.Report)
+	}
 	_, err := r.db.ExecContext(ctx, `UPDATE os_update_results SET status = ?, reason = ?, pkg_manager = ?, os_after = ?,
 		upgradable = ?, security_upgradable = ?, upgraded = ?, reboot_required = ?, rebooted = ?, output = ?, finished_at = now(),
-		backup_key = ?, backup_size = ?, backup_status = ?, backup_include = ?, backup_exclude = ?
+		backup_key = ?, backup_size = ?, backup_status = ?, backup_include = ?, backup_exclude = ?, report = ?::jsonb
 		WHERE run_id = ? AND host_id = ?`,
 		x.Status, x.Reason, x.PkgManager, x.OSAfter, x.Upgradable, x.SecurityUpgradable, x.Upgraded, x.RebootRequired, x.Rebooted, x.Output,
-		x.BackupKey, x.BackupSize, x.BackupStatus, strings.Join(x.BackupInclude, "\n"), strings.Join(x.BackupExclude, "\n"), x.RunID, x.HostID)
+		x.BackupKey, x.BackupSize, x.BackupStatus, strings.Join(x.BackupInclude, "\n"), strings.Join(x.BackupExclude, "\n"), report, x.RunID, x.HostID)
 	return err
 }
 
@@ -228,7 +236,7 @@ func (r *OSUpdateRepo) LatestByHost(ctx context.Context) ([]models.OSUpdateResul
 		if err := scanOSResult(rows, &x); err != nil {
 			return nil, err
 		}
-		x.Output = "" // the column only needs the counts
+		x.Output, x.Report = "", nil // the column only needs the counts
 		out = append(out, x)
 	}
 	return out, rows.Err()
@@ -271,7 +279,7 @@ func (r *OSUpdateRepo) KeptBackups(ctx context.Context, hostID int64) ([]models.
 		if err := scanOSResult(rows, &x, &x.RunKind); err != nil {
 			return nil, err
 		}
-		x.Output = ""
+		x.Output, x.Report = "", nil
 		out = append(out, x)
 	}
 	return out, rows.Err()

@@ -558,6 +558,31 @@ func TestHostBackups_Handlers(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 
+	// A host with no kept backup: a version change without a new one is
+	// refused, unless the caller says to go without any backup.
+	var bare int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug, hostname, ssh_user) VALUES ('db2', 'db2', '10.0.0.3', 'root') RETURNING id`).Scan(&bare); err != nil {
+		t.Fatal(err)
+	}
+	bareHosts := fmt.Sprintf("[%d]", bare)
+	if code, raw := call("POST", "/api/ssh/os-updates/runs", `{"kind":"release","backup":false,"host_ids":`+bareHosts+`}`); code != http.StatusBadRequest || !strings.Contains(raw, "no kept backup") {
+		t.Fatalf("release without any backup = %d %s", code, raw)
+	}
+	code, raw = call("POST", "/api/ssh/os-updates/runs", `{"kind":"release","backup":false,"allow_no_backup":true,"host_ids":`+bareHosts+`}`)
+	rel = models.OSUpdateRun{}
+	if json.Unmarshal([]byte(raw), &rel); code != http.StatusAccepted || rel.Backup || rel.KeepBackup || !rel.Reboot {
+		t.Fatalf("release without a backup, allowed = %d %s", code, raw)
+	}
+	if got := <-ran; got.Backup || got.Kind != sshtest.OSUpdateRelease {
+		t.Fatalf("runner got %+v", got)
+	}
+	for range 100 {
+		if x, _ := store.NewOSUpdateRepo(d.SQL).GetResult(ctx, rel.ID, bare); x != nil && x.FinishedAt != nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
 	// The connection's group holds no feature settings, and the reverse.
 	for _, k := range integrationGroups["minio"] {
 		if strings.HasPrefix(k, "osbackup_") {
@@ -566,5 +591,23 @@ func TestHostBackups_Handlers(t *testing.T) {
 	}
 	if len(integrationGroups["osbackup"]) != 4 {
 		t.Fatalf("osbackup group = %v", integrationGroups["osbackup"])
+	}
+}
+
+// A failed run's reason names what dpkg failed on.
+func TestExitReason(t *testing.T) {
+	rep := sshtest.ParseOSUpdateLog("@@error do-release-upgrade failed\n@@dpkg_broken proftpd-core\n" +
+		"@@dpkg_error proftpd-core: installed proftpd-core package post-installation script subprocess returned error exit status 1\n" +
+		"@@dpkg_error proftpd-mod-crypto: dependency problems - leaving unconfigured\n")
+	want := "do-release-upgrade failed; dpkg could not configure: proftpd-core (installed proftpd-core package post-installation script " +
+		"subprocess returned error exit status 1); proftpd-mod-crypto (dependency problems - leaving unconfigured)"
+	if got := exitReason(rep, 1); got != want {
+		t.Fatalf("got %q", got)
+	}
+	if got := exitReason(sshtest.ParseOSUpdateLog("@@dpkg_broken proftpd-core\n@@dpkg_broken fail2ban\n"), 100); got != "exit 100; dpkg left half configured: proftpd-core, fail2ban" {
+		t.Fatalf("broken only = %q", got)
+	}
+	if got := exitReason(sshtest.OSUpdateReport{}, 0); got != "the script ended without a result" {
+		t.Fatalf("no result = %q", got)
 	}
 }

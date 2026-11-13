@@ -234,7 +234,7 @@ export default function HostDetail({ slug }: { slug: string }) {
           )}
 
           {activeTab === "maintenance" && isAdmin && (
-            <HostMaintenance host={{ ...data.host, os: listHost?.os }} scanData={data.last_scan?.data} />
+            <HostMaintenance host={{ ...data.host, os: listHost?.os }} scanData={data.last_scan?.data} scannedAt={data.last_scan?.scanned_at} />
           )}
 
           {/* ═══ ISSUES TAB ═══ */}

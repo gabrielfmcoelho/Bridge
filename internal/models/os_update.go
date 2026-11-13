@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // OS update run statuses.
 const (
@@ -77,12 +80,15 @@ type OSUpdateResult struct {
 	BackupSize         *int64 `json:"backup_size,omitempty"`
 	BackupStatus       string `json:"backup_status,omitempty"` // done | failed | deleted
 	// The paths the backup actually took (after run → host → defaults).
-	BackupInclude []string   `json:"backup_include,omitempty"`
-	BackupExclude []string   `json:"backup_exclude,omitempty"`
-	RunKind       string     `json:"run_kind,omitempty"` // filled by the backup lists
-	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
-	StartedAt     *time.Time `json:"started_at,omitempty"`
-	FinishedAt    *time.Time `json:"finished_at,omitempty"`
+	BackupInclude []string `json:"backup_include,omitempty"`
+	BackupExclude []string `json:"backup_exclude,omitempty"`
+	RunKind       string   `json:"run_kind,omitempty"` // filled by the backup lists
+	// Report: what the run did beyond the packages (service.ReleaseReport),
+	// as stored; none for check and backup runs.
+	Report     json.RawMessage `json:"report,omitempty" swaggertype:"object"`
+	ExpiresAt  *time.Time      `json:"expires_at,omitempty"`
+	StartedAt  *time.Time      `json:"started_at,omitempty"`
+	FinishedAt *time.Time      `json:"finished_at,omitempty"`
 }
 
 // HostBackupProfile is a host's own backup paths (host_backup_profiles);

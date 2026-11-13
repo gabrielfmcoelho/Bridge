@@ -14,7 +14,7 @@ import { canTransition } from "@/lib/requests";
 import { extractJSON, coerceToSchema, coercePriority } from "@/lib/aiDraft";
 import type {
   Offering, ServiceRequest, RequestEvent, RequestStatus, CatalogHit, AssetGrantsInput,
-  Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool, Database, OSUpdateRun, OSUpdateResult,
+  Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool, Database, OSUpdateRun, OSUpdateResult, ReleaseReport, RiskWarning,
 } from "@/lib/types";
 import {
   db, resetDB, currentUser, switchUser, requestVisible, abilitiesForRequest,
@@ -33,6 +33,29 @@ const mockProfiles = new Map<number, { include?: string[]; exclude?: string[] }>
 const MOCK_BACKUP_DEFAULTS = { prefix: "bridge/os-backups", include: ["/"], exclude: ["/tmp", "/var/cache", "/var/lib/docker"], retention_days: 30 };
 // A scan with what the backup preview reads: filesystems, a host database,
 // containers and a big file.
+// SAPASP-CONCURSO before its release: what the scan's release probe found.
+const MOCK_RISK_WARNINGS: RiskWarning[] = [
+  { code: "foreign_packages", count: 2, detail: "libssl1.1 1.1.1f-1ubuntu2.20, php8.2-cli 8.2.6-1+ubuntu18.04.1+deb.sury.org+1" },
+  { code: "modified_conffiles", count: 1, detail: "/etc/proftpd/proftpd.conf" },
+  { code: "php_handler_missing", count: 1, detail: "/home/sasc/fcgi-bin/php7.2.fcgi → /usr/bin/php-cgi7.2" },
+  { code: "vhost_port_unlistened", count: 1, detail: "sasc.example.gov.br:444" },
+];
+// What the mock release (which fails like run #8 did) leaves behind.
+const mockReport = (release: boolean): ReleaseReport => ({
+  ...(release ? {
+    warnings_before: MOCK_RISK_WARNINGS,
+    dpkg_errors: ["proftpd-core: installed proftpd-core package post-installation script subprocess returned error exit status 1"],
+    new_failed_units: ["fail2ban.service", "logrotate.service"],
+    stopped_services: ["fail2ban.service"],
+    new_dist_files: ["/etc/proftpd/modules.conf.ucf-dist", "/etc/proftpd/proftpd.conf.ucf-dist"],
+    lost_php_handlers: ["/home/sasc/fcgi-bin/php7.2.fcgi → /usr/bin/php-cgi7.2"],
+  } : {}),
+  sites: [
+    { name: "portal.example.gov.br", before: 200, after: 200 },
+    { name: "sasc.example.gov.br", before: 302, after: release ? 200 : 302, ...(release ? { error: "Deprecated", broken: true } : {}) },
+    ...(release ? [{ name: "concurso.example.gov.br", before: 200, after: 0, broken: true }] : []),
+  ],
+});
 const mockScan = (h: { nickname: string; os?: { pretty?: string; arch?: string } }) => JSON.stringify({
   os: h.os?.pretty ?? "", kernel: "6.8.0-45-generic", arch: h.os?.arch ?? "x86_64",
   filesystems: [
@@ -43,6 +66,11 @@ const mockScan = (h: { nickname: string; os?: { pretty?: string; arch?: string }
   service_inventory: [{ name: "postgresql", label: "PostgreSQL", kind: "database", host_running: true }],
   parsed_containers: [{ id: "a1", name: "web", image: "nginx:1.25", status: "Up 3 days", ports: "80/tcp" }],
   resource_top: { top_disk: [{ path: "/data/dumps/full.sql", size_bytes: 3_221_225_472 }] },
+  release_risks: { foreign_count: 2, foreign_packages: ["libssl1.1 1.1.1f-1ubuntu2.20", "php8.2-cli 8.2.6-1+ubuntu18.04.1+deb.sury.org+1"],
+    modified_conffiles: ["/etc/proftpd/proftpd.conf"], apache_listen: [80, 443],
+    php_handlers: [{ source: "/etc/apache2/sites-enabled/sasc.conf:5", dir: "/home/sasc/public_html", kind: "fcgi",
+      target: "/home/sasc/fcgi-bin/php7.2.fcgi", runs: "/usr/bin/php-cgi7.2", version: "7.2", state: "missing" }],
+    warnings: MOCK_RISK_WARNINGS },
 });
 const profileView = (hostId: number) => {
   const p = mockProfiles.get(hostId) ?? {};
@@ -481,7 +509,7 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   // ponytail: module memory, not reset by __reset.
   if (p === "ssh/os-updates/runs" && method === "POST") {
     const body = await readJSON<{ kind: OSUpdateRun["kind"]; host_ids: number[]; reboot: boolean; concurrency: number; backup?: boolean; keep_backup?: boolean;
-      backup_include?: string[]; backup_exclude?: string[]; update_first?: boolean }>(request);
+      backup_include?: string[]; backup_exclude?: string[]; update_first?: boolean; allow_no_backup?: boolean }>(request);
     const backup = body.kind === "backup" || (body.kind !== "check" && !!body.backup);
     if (body.kind === "backup") { body.keep_backup = true; body.reboot = false; }
     const id = mockOSRuns.length + 1;
@@ -495,7 +523,11 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
         backup_include: body.backup_include?.length ? body.backup_include : profileView(hid).effective.include,
         backup_exclude: body.backup_exclude?.length ? body.backup_exclude : profileView(hid).effective.exclude };
       const eff = profileView(hid).effective;
-      return { run_id: id, host_id: hid, host_nickname: h.nickname, host_slug: h.oficial_slug, status: "success", pkg_manager: "apt",
+      const release = body.kind === "release";
+      return { run_id: id, host_id: hid, host_nickname: h.nickname, host_slug: h.oficial_slug, pkg_manager: "apt",
+        ...(release ? { status: "failed" as const, reason: "do-release-upgrade failed; dpkg could not configure: proftpd-core (installed proftpd-core package post-installation script subprocess returned error exit status 1)" }
+          : { status: "success" as const }),
+        ...(check ? {} : { report: mockReport(release) }),
         os_before: h.os?.pretty, os_after: h.os?.pretty, upgradable: check ? 3 : 0, security_upgradable: check ? 1 : 0, upgraded: check ? undefined : 3,
         reboot_required: !check && !body.reboot, rebooted: !check && body.reboot, output: "@@pm apt\n@@upgradable 3\n@@security 1\n", started_at: now, finished_at: now,
         ...(backup ? { backup_key: `bridge/os-backups/${h.oficial_slug}/run${id}.tar.zst`, backup_size: 3_400_000_000, backup_status: body.keep_backup ? "done" as const : "deleted" as const,
@@ -504,7 +536,7 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     const run: OSUpdateRun = { id, kind: body.kind, reboot: body.reboot, concurrency: body.concurrency, status: "done", requested_name: "Mock",
       backup, keep_backup: backup && !!body.keep_backup, update_first: body.kind === "release" && !!body.update_first,
       backup_include: body.backup_include?.length ? body.backup_include : undefined, backup_exclude: body.backup_exclude?.length ? body.backup_exclude : undefined,
-      created_at: now, finished_at: now, counts: { success: results.length }, results };
+      created_at: now, finished_at: now, counts: body.kind === "release" ? { failed: results.length } : { success: results.length }, results };
     mockOSRuns.unshift(run);
     return json(run, 202);
   }
