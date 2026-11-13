@@ -354,16 +354,18 @@ func (r *ProjectRepo) Counts(ctx context.Context) (ProjectCounts, error) {
 // (project_host_links); hosts reached through the project's services are
 // separate and unaffected.
 func (r *ProjectRepo) SetDirectHosts(ctx context.Context, projectID int64, hostIDs []int64) error {
-	return r.replaceVisibleLinks(ctx, `project_host_links`, `host_id`, `hosts`, AssetHost, projectID, hostIDs)
+	return replaceVisibleLinks(ctx, r.db, `project_host_links`, `project_id`, projectID, `host_id`, `hosts`, AssetHost, hostIDs)
 }
 
 // SetDirectDNS replaces the DNS records linked straight to a project
 // (project_dns_links).
 func (r *ProjectRepo) SetDirectDNS(ctx context.Context, projectID int64, dnsIDs []int64) error {
-	return r.replaceVisibleLinks(ctx, `project_dns_links`, `dns_id`, `dns_records`, AssetDNS, projectID, dnsIDs)
+	return replaceVisibleLinks(ctx, r.db, `project_dns_links`, `project_id`, projectID, `dns_id`, `dns_records`, AssetDNS, dnsIDs)
 }
 
-func (r *ProjectRepo) replaceVisibleLinks(ctx context.Context, table, col, assetTable string, asset AssetType, projectID int64, ids []int64) error {
+// replaceVisibleLinks makes ids the assets linked to keyID in table, but only
+// among assets the caller can see: invisible links are kept, never added.
+func replaceVisibleLinks(ctx context.Context, db *sql.DB, table, keyCol string, keyID int64, col, assetTable string, asset AssetType, ids []int64) error {
 	if ids == nil {
 		ids = []int64{}
 	}
@@ -371,19 +373,19 @@ func (r *ProjectRepo) replaceVisibleLinks(ctx context.Context, table, col, asset
 	// Live assets only: links to trashed ones are kept for their restore.
 	vis = assetTable + ".deleted_at IS NULL AND " + vis
 	visible := `SELECT id FROM ` + assetTable + ` WHERE ` + vis
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx,
-		`DELETE FROM `+table+` WHERE project_id = ? AND `+col+` IN (`+visible+`) AND NOT (`+col+` = ANY(?))`,
-		append(append([]any{projectID}, vargs...), ids)...); err != nil {
+		`DELETE FROM `+table+` WHERE `+keyCol+` = ? AND `+col+` IN (`+visible+`) AND NOT (`+col+` = ANY(?))`,
+		append(append([]any{keyID}, vargs...), ids)...); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO `+table+` (project_id, `+col+`) SELECT ?, id FROM `+assetTable+` WHERE id = ANY(?) AND `+vis+` ON CONFLICT DO NOTHING`,
-		append([]any{projectID, ids}, vargs...)...); err != nil {
+		`INSERT INTO `+table+` (`+keyCol+`, `+col+`) SELECT ?, id FROM `+assetTable+` WHERE id = ANY(?) AND `+vis+` ON CONFLICT DO NOTHING`,
+		append([]any{keyID, ids}, vargs...)...); err != nil {
 		return err
 	}
 	return tx.Commit()

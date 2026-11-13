@@ -111,6 +111,14 @@ func (s *DNSService) List(ctx context.Context, f models.DNSFilter) ([]DNSListIte
 		return nil, err
 	}
 	hostIDs, svcIDs, projIDs := store.ByFrom(links.DNSHost), store.ByTo(links.ServiceDNS), store.ByTo(links.ProjectDNS)
+	// A record shared across entidades links the other side's assets too:
+	// neither their ids nor their count may reach this caller.
+	var vis [3]map[int64]bool
+	for i, a := range []store.AssetType{store.AssetHost, store.AssetService, store.AssetProject} {
+		if vis[i], err = store.VisibleSet(ctx, s.db, a); err != nil {
+			return nil, err
+		}
+	}
 	issueCounts, err := models.GetIssueCountsByEntity(s.db, "dns")
 	if err != nil {
 		return nil, err
@@ -120,9 +128,9 @@ func (s *DNSService) List(ctx context.Context, f models.DNSFilter) ([]DNSListIte
 		out[i] = DNSListItem{
 			DNSRecord:           rec,
 			Tags:                tagMap[rec.ID],
-			HostIDs:             hostIDs[rec.ID],
-			ServicesCount:       len(svcIDs[rec.ID]),
-			ProjectsCount:       len(projIDs[rec.ID]),
+			HostIDs:             store.KeepVisible(hostIDs[rec.ID], vis[0]),
+			ServicesCount:       len(store.KeepVisible(svcIDs[rec.ID], vis[1])),
+			ProjectsCount:       len(store.KeepVisible(projIDs[rec.ID], vis[2])),
 			IssuesCount:         issueCounts[rec.ID],
 			MainResponsavelName: mainNames[rec.ID],
 			MainEntidade:        entidades[rec.ID],
