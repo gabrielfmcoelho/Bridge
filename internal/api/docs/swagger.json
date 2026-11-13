@@ -18082,7 +18082,7 @@
                 }
             },
             "post": {
-                "description": "Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h; its checks run before the backup, update_first updates the packages (and reboots if needed) first in the same run, and with MinIO set up it backs up unless backup is false and the host already has a kept backup; backup: back up only, and keep it — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.",
+                "description": "Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h; its checks run before the backup, update_first updates the packages (and reboots if needed) first in the same run, and with MinIO set up it backs up unless backup is false and either the host already has a kept backup or allow_no_backup is true (no backup at all); the scan right before it (recorded like any scan) gives the result's report its warnings_before, which never block. Every kind but check and backup stores a report per host: dpkg's errors, what the scans before and after differ by, and the host's sites (its DNS names' /) before and after; backup: back up only, and keep it — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.",
                 "consumes": [
                     "application/json"
                 ],
@@ -24442,6 +24442,10 @@
         "api.osUpdateRunRequest": {
             "type": "object",
             "properties": {
+                "allow_no_backup": {
+                    "description": "Release only: go without a backup even when the host has none kept —\nthe caller accepts there is nothing to go back to.",
+                    "type": "boolean"
+                },
                 "backup": {
                     "description": "back each host up to MinIO first",
                     "type": "boolean"
@@ -28192,6 +28196,10 @@
                 },
                 "rebooted": {
                     "type": "boolean"
+                },
+                "report": {
+                    "description": "Report: what the run did beyond the packages (service.ReleaseReport),\nas stored; none for check and backup runs.",
+                    "type": "object"
                 },
                 "run_id": {
                     "type": "integer"

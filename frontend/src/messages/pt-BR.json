@@ -761,6 +761,23 @@
       "eolCount": "{count} sem suporte"
     },
     "osRelease": {
+      "withoutBackup": "Nenhum backup: se a troca de versão quebrar o host, não há para onde voltar.",
+      "noKeptBackupHint": "Desligado: este host não tem backup guardado, então a troca de versão roda sem nenhum.",
+      "noBackupWarn": "Sem backup e sem nenhum guardado: se a troca de versão quebrar este host, não há para onde voltar. Tire um snapshot da VM antes.",
+      "risk": {
+        "title": "Último scan ({when}) encontrou:",
+        "none": "Último scan ({when}): nada em que uma troca de versão costuma tropeçar.",
+        "notChecked": "O último scan ainda não verifica os riscos da troca de versão: escaneie o host de novo.",
+        "hint": "São só avisos: a troca de versão escaneia de novo logo antes de começar, e eles nunca a impedem.",
+        "dpkg_broken": "Pacotes deixados meio configurados pelo dpkg ({count})",
+        "foreign_packages": "Pacotes de outra versão, de um PPA ou sem origem nenhuma ({count})",
+        "disabled_sources": "Fontes de pacotes desativadas ou esquecidas ({count})",
+        "modified_conffiles": "Arquivos de configuração alterados localmente ({count}): a troca os mantém e deixa a versão do pacote ao lado",
+        "pending_dist_files": "Arquivos de configuração aguardando revisão, *.dpkg-dist / *.ucf-dist ({count})",
+        "failed_units": "Units com falha ({count})",
+        "php_handler_missing": "Handlers de PHP apontando para um PHP que não está instalado ({count}): esses sites estão fora do ar",
+        "vhost_port_unlistened": "Sites do Apache numa porta em que o Apache não escuta ({count}): nunca são servidos"
+      },
       "runUpdateFirst": "Pacotes atualizados antes, nesta execução.",
       "confirmNoUpdate": "Pacotes ou reinício pendentes fazem a troca ser pulada, antes de qualquer mudança.",
       "confirmUpdateFirst": "Antes, atualiza todos os pacotes e reinicia se precisar.",
@@ -780,6 +797,24 @@
       "start": "Trocar versão"
     },
     "osUpdate": {
+      "report": {
+        "issues": "{count} a verificar",
+        "dpkgErrors": "O dpkg não conseguiu configurar ({count})",
+        "dpkgBroken": "Pacotes deixados meio configurados pelo dpkg ({count})",
+        "newFailedUnits": "Units falhando agora ({count})",
+        "stoppedServices": "Serviços rodando antes e não depois ({count})",
+        "lostPhpHandlers": "Handlers de PHP cujo PHP sumiu ({count})",
+        "newDistFiles": "Novos arquivos de configuração a revisar ({count})",
+        "newForeignPackages": "Novos pacotes de outra versão ({count})",
+        "nothingWorse": "Nada piorou: nenhuma unit nova com falha, nenhum serviço parado, nenhum site quebrado.",
+        "sites": "Sites verificados ({count})",
+        "site": "Site",
+        "before": "Antes",
+        "after": "Depois",
+        "noAnswer": "sem resposta",
+        "phpError": "erro de PHP na página: {error}",
+        "warningsBefore": "Avisos do scan anterior à troca de versão"
+      },
       "kindOption": {
         "check": "Verificar atualizações",
         "security": "Atualizações de segurança",
@@ -813,7 +848,7 @@
       "kind": "Tipo",
       "kindHint": {
         "backup": "Só envia os arquivos do host para o MinIO, sem mudar nada nele. O backup fica mantido até o fim da retenção.",
-        "release": "Leva o host para a próxima versão do sistema (até 3 h) e o reinicia. As verificações rodam antes de tudo; com o MinIO configurado faz backup antes, a menos que o host já tenha um backup mantido e você desligue isso.",
+        "release": "Leva o host para a próxima versão do sistema (até 3 h) e o reinicia. Um scan novo e as verificações rodam antes de tudo; com o MinIO configurado faz backup antes, a menos que você desligue isso (sem backup mantido, roda então sem nenhum).",
         "check": "Atualiza as listas de pacotes e conta o que pode ser atualizado. Não altera nada.",
         "security": "Instala só as atualizações de segurança (apt: suítes *-security; dnf/yum: avisos de segurança). Alpine não tem canal separado.",
         "packages": "Instala todas as atualizações da versão atual (apt upgrade, dnf/yum upgrade, apk upgrade). Nunca muda a versão do sistema."

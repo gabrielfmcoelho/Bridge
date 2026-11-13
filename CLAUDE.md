@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v128**. Use idempotent idioms:
+per element, currently at **v129**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -258,9 +258,32 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   first change), so a refusal never costs a backup. `update_first` (v128)
   chains a package update and, when it asks, a reboot before the release in
   the same run. With MinIO set up a release backs up unless the request says
-  `backup: false` **and** the host has a kept backup that isn't a restore's
-  undo (`lastFullBackup`, checked in MinIO); otherwise 400. Its tests
+  `backup: false` **and** either the host has a kept backup that isn't a
+  restore's undo (`lastFullBackup`, checked in MinIO) or `allow_no_backup`
+  is true (no backup at all, said out loud in the modal); otherwise 400. Its tests
   run it on a fake root through `BRIDGE_ROOT`.
+  Release risks (`internal/sshtest/releaserisk.go`, `VMInfo.ReleaseRisks`,
+  `null` when the probe didn't run): what SAPASP-CONCURSO's 20.04 → 22.04
+  tripped over. It lists:
+  - packages from a PPA / another release / no source (`[installed,local]`);
+  - disabled or leftover sources, and locally modified conffiles (md5 of
+    `dpkg-query ${Conffiles}`, not `dpkg --verify`, which hashes everything);
+  - pending `*.dpkg-dist`/`*.ucf-dist`, failed units, `dpkg --audit`;
+  - Apache `Listen` ports and each FCGIWrapper / `proxy:unix` PHP handler,
+    with whether the binary its wrapper execs (or the socket) exists.
+  Only names, paths and ports leave the VM. Warnings are derived at capture
+  (with `web_servers`: a vhost on a port Apache doesn't `Listen` on is never
+  served) and only rendered by the UI. They never block: a release first
+  takes a fresh scan (`TestCapture` + `recordScan`) and keeps its warnings in
+  the result's report. Every failure path of both update scripts goes through
+  `fail` → `diagnose`, which prints `@@dpkg_broken` and `@@dpkg_error pkg: msg`
+  from the part of `term.log` / the dist-upgrade logs written during the run;
+  `exitReason` names them. Every kind but check and backup stores
+  `os_update_results.report` (v129, `service.ReleaseReport`): dpkg's errors,
+  `CompareScans(before, after)` (stopped services, new failed units, new
+  `*.dist`, lost PHP handlers, new foreign packages) and the host's DNS names'
+  `/` before and after (`ProbeSites`, body read for PHP error text, never
+  stored). shortcut: only `/` of each name.
   Host backups — who owns what: the **MinIO integration** (`internal/integrations/minio`,
   settings group `minio`) is the connection only (endpoint, public URL, keys,
   bucket; its test changes nothing). The **host backups feature**
@@ -279,8 +302,8 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   update. After a success whose rescan answered, the object is deleted unless
   `keep_backup`; a failed host keeps it, downloadable through a one-hour
   presigned link (`minio_public_url` when browsers can't reach the endpoint).
-  Release runs always back up when MinIO is set up; kind `backup` only backs
-  up and always keeps. Retention: `osbackup_retention_days` (default 30) is
+  Release runs back up when MinIO is set up unless told not to (above); kind
+  `backup` only backs up and always keeps. Retention: `osbackup_retention_days` (default 30) is
   Bridge's own lifecycle rule `bridge-os-backups` on the prefix, applied from
   Settings › Hosts and on every backup run — read the bucket's configuration,
   swap only that rule (the datalake's bucket has its own). The rule deletes
