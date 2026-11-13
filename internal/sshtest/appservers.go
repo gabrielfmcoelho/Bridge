@@ -2,6 +2,7 @@ package sshtest
 
 import (
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,12 +12,16 @@ import (
 
 // detectAppServers turns every Java process running a known app-server main
 // class into one service per instance (unit, else the install directory).
-// A process in a container (containerPIDs, from its cgroup) is skipped: ps
-// lists it on the host too, but it belongs to the container's own service.
+// A process in a container (its own cgroup line, or containerPIDs) is
+// skipped: ps lists it on the host too, but it belongs to the container's own
+// service.
 func detectAppServers(procs []ProcessDetail, containerPIDs map[int]string) []DiscoveredService {
 	var out []DiscoveredService
 	seen := map[string]bool{}
 	for _, p := range procs {
+		if p.InContainer {
+			continue
+		}
 		if pid, err := strconv.Atoi(p.PID); err == nil {
 			if _, inContainer := containerPIDs[pid]; inContainer {
 				continue
@@ -114,7 +119,7 @@ func appDeployDirs(catalog, home, cmd string) []string {
 }
 
 var appServerArtefacts = map[string]bool{
-	"jmx-console.war": true, "admin-console.war": true, "ROOT.war": true,
+	"jmx-console.war": true, "admin-console.war": true,
 	"docs": true, "examples": true, "manager": true, "host-manager": true, "ROOT": true,
 }
 
@@ -122,7 +127,8 @@ var appServerArtefacts = map[string]bool{
 // into the deployed applications per directory. Allow-list: JBoss <= 6 deploys
 // only *.war / *.ear (file or exploded directory); Tomcat, WildFly and GlassFish
 // also deploy extension-less directories (trailing "/"). The server's own stock
-// entries are dropped.
+// entries are dropped; ROOT.war is an app (the "/" context) except JBoss AS's
+// own exploded welcome app. A war Tomcat unpacked next to itself is one app.
 func parseAppsListing(raw string) map[string][]string {
 	out := map[string][]string{}
 	dir, catalog := "", ""
@@ -136,13 +142,20 @@ func parseAppsListing(raw string) map[string][]string {
 			continue
 		}
 		name, isDir := strings.CutSuffix(l, "/")
-		if appServerArtefacts[name] {
+		if appServerArtefacts[name] || name == "ROOT.war" && isDir && catalog == "jboss" {
 			continue
 		}
 		pkg := strings.HasSuffix(name, ".war") || strings.HasSuffix(name, ".ear")
 		if pkg || (isDir && catalog != "jboss") {
 			out[dir] = append(out[dir], name)
 		}
+	}
+	for dir, names := range out {
+		wars := map[string]bool{}
+		for _, n := range names {
+			wars[n] = strings.HasSuffix(n, ".war")
+		}
+		out[dir] = slices.DeleteFunc(names, func(n string) bool { return wars[n+".war"] })
 	}
 	return out
 }

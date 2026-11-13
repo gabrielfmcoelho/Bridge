@@ -184,19 +184,35 @@ func parseCronDaemon(name, active, enabled string) (installed, isActive, isEnabl
 // cronCommandBinary returns the absolute path a cron command starts with,
 // after leading VAR=value assignments, or "" when it starts with anything else
 // (a relative path, a shell builtin, a bare name found through PATH) or holds
-// a shell or cron expansion ($, a backtick, %): not a literal path.
+// a shell or cron expansion ($, a backtick, %) or a glob (*, ?, [): not one
+// literal path. A quoted path keeps its spaces.
 func cronCommandBinary(cmd string) string {
+	literal := func(p string) string {
+		if strings.HasPrefix(p, "/") && !strings.ContainsAny(p, "$`%*?[") {
+			return p
+		}
+		return ""
+	}
+	off := 0
 	for _, tok := range strings.Fields(cmd) {
+		start := off + strings.Index(cmd[off:], tok)
+		off = start + len(tok)
 		if eq := strings.Index(tok, "="); eq > 0 && isCronEnvKey(tok[:eq]) {
 			continue
+		}
+		if q := tok[0]; q == '"' || q == '\'' {
+			rest := cmd[start+1:]
+			end := strings.IndexByte(rest, q)
+			// Unterminated, or glued to more text ("/opt/a"/b): not one literal path.
+			if end < 0 || end+1 < len(rest) && !strings.ContainsRune(" \t<>;|&", rune(rest[end+1])) {
+				return ""
+			}
+			return literal(rest[:end])
 		}
 		if i := strings.IndexAny(tok, "<>;|&"); i >= 0 {
 			tok = tok[:i]
 		}
-		if strings.HasPrefix(tok, "/") && !strings.ContainsAny(tok, "$`%") {
-			return tok
-		}
-		return ""
+		return literal(tok)
 	}
 	return ""
 }
@@ -254,7 +270,7 @@ func missingBinariesScript(paths []string) string {
 		`[ -x "$p" ] && continue; ` +
 		`if [ -z "$r" ]; then [ -e "$p" ] && continue; d=${p%/*}; ` +
 		`while [ -n "$d" ] && [ ! -d "$d" ]; do d=${d%/*}; done; [ -x "${d:-/}" ] || continue; fi; ` +
-		`echo "$p"; done`
+		`printf '%s\n' "$p"; done` // not echo: dash's stops at a "\c" in the path
 }
 
 // splitOnBlankLines splits a multi-line string on runs of blank lines.

@@ -42,11 +42,16 @@ var (
 	assignRe = regexp.MustCompile(keyStart + `(?:-D|--?)?([A-Za-z_][A-Za-z0-9_.\-]*)=`)
 	// --<name> followed by whitespace and a value that is not itself a flag.
 	flagArgRe = regexp.MustCompile(keyStart + `--([A-Za-z_][A-Za-z0-9_.\-]*)`)
-	// scheme://user:pass@host — userinfo ends at the last "@", as Go's and
-	// Python's URL parsers read it.
-	urlUserRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://([^\s:/@]*):([^\s/]+)@([^\s/:?#@]+)`)
-	// A resource_top line cut inside a URL's password: no "@" is left.
-	cutURLRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://[^\s:/@]*:([^\s@/]+)…$`)
+	// scheme://user[:pass]@host — userinfo ends at the last "@", as Go's and
+	// Python's URL parsers read it. A user already redacted is one token.
+	urlUserRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://(\{\{secret(?::\d+)?\}\}|[^\s:/@?#]*)(?::([^\s/]*))?@([^\s/:?#@]+)`)
+	// A URL's user that is a credential, not a login (https://<token>@host):
+	// a known token prefix, or 20+ characters of a token's alphabet.
+	tokenUserRe = regexp.MustCompile(`^(gh[pousr]_|github_pat_|glpat-|gldt-|xox[abp]-)|^[A-Za-z0-9_\-]{20,}$`)
+	// A resource_top line cut inside a URL's userinfo: no "@" is left. With no
+	// ":" the cut part is a user or a host, blanked unless it reads as a host.
+	cutURLRe  = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://(?:([^\s:/@]*):)?([^\s@/]+)…$`)
+	cutHostRe = regexp.MustCompile(`^[a-z0-9-]+(\.[a-z0-9-]*)+$`)
 	// Not values: a reference ($NAME, ${NAME}) or a redaction token.
 	notValueRe    = regexp.MustCompile(`^(\$(\{[A-Za-z_]\w*\}|[A-Za-z_]\w*)|\{\{secret(:\d+)?\}\})$`)
 	wordRe        = regexp.MustCompile(`\S+`)
@@ -100,15 +105,39 @@ func FindSecrets(cmd string) []FoundSecret {
 		}
 	}
 	for _, m := range urlUserRe.FindAllStringSubmatchIndex(cmd, -1) {
-		add("url-"+cmd[m[2]:m[3]]+"-"+cmd[m[6]:m[7]], m[4], m[5])
+		// Named after the host alone: the user part may be the credential.
+		key := "url-" + cmd[m[6]:m[7]]
+		if tokenUserRe.MatchString(cmd[m[2]:m[3]]) {
+			add(key, m[2], m[3])
+		}
+		if m[4] >= 0 && cmd[m[4]:m[5]] != "x-oauth-basic" { // GitHub's <token>:x-oauth-basic
+			add(key, m[4], m[5])
+		}
 	}
-	mysql := false
-	for _, w := range wordRe.FindAllStringIndex(cmd, -1) {
+	// curl -u / --user user:password: the part after the first ":".
+	curlUser := func(s, e int) {
+		if j := strings.IndexByte(cmd[s:e], ':'); j >= 0 {
+			add("curl-password", s+j+1, e)
+		}
+	}
+	mysql, curl := false, false
+	words := wordRe.FindAllStringIndex(cmd, -1)
+	for i, w := range words {
 		word := cmd[w[0]:w[1]]
-		if mysqlClients[path.Base(strings.Trim(word, `"'`))] {
+		prog := path.Base(strings.Trim(word, `"'`))
+		switch {
+		case mysqlClients[prog]:
 			mysql = true
-		} else if mysql && strings.HasPrefix(word, "-p") {
+		case prog == "curl":
+			curl = true
+		case mysql && strings.HasPrefix(word, "-p"):
 			add("mysql-password", w[0]+2, w[1])
+		case curl && (word == "-u" || word == "--user") && i+1 < len(words):
+			curlUser(words[i+1][0], words[i+1][1])
+		case curl && strings.HasPrefix(word, "--user="):
+			curlUser(w[0]+len("--user="), w[1])
+		case curl && strings.HasPrefix(word, "-u"):
+			curlUser(w[0]+2, w[1])
 		}
 	}
 	sort.SliceStable(found, func(i, j int) bool { return found[i].Start < found[j].Start })
@@ -331,8 +360,9 @@ func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID
 	}
 	for _, c := range redactOnly {
 		*c = redactSpans(*c, FindSecrets(*c), func(f FoundSecret) string { return lookup(byValue, f.Value) })
-		if m := cutURLRe.FindStringSubmatchIndex(*c); m != nil && (*c)[m[2]:m[3]] != blankToken {
-			*c = (*c)[:m[2]] + blankToken + (*c)[m[3]:]
+		if m := cutURLRe.FindStringSubmatchIndex(*c); m != nil && (*c)[m[4]:m[5]] != blankToken &&
+			(m[2] >= 0 || !cutHostRe.MatchString((*c)[m[4]:m[5]])) {
+			*c = (*c)[:m[4]] + blankToken + (*c)[m[5]:]
 		}
 	}
 	info.SecretsRedacted = true
@@ -422,15 +452,18 @@ var scanBackfillBatch = 200
 // scans) is never read: a redacted line can re-parse to a "value". batchDone,
 // when set, gets the last id and the counts so far after each batch. rows is
 // the scans rewritten, secrets the secrets found in them, last the id of the
-// last scan gone through (afterID when none).
+// last scan gone through (afterID when none). A row with a value the vault
+// refused is left as it was (its value would be lost blanked) and the walk
+// goes on, but last stays before it, so the next run retries it.
 func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64, batchDone func(last int64, rows, secrets int)) (rows, secrets int, last int64, err error) {
 	ctx = store.WithSystemScope(ctx)
 	repo := store.NewHostScanRepo(db.SQL)
 	var firstErr error
 	failed := 0
 	last = afterID
+	cursor := afterID
 	for {
-		batch, err := repo.ListAfter(ctx, last, scanBackfillBatch)
+		batch, err := repo.ListAfter(ctx, cursor, scanBackfillBatch)
 		if err != nil {
 			return rows, secrets, last, err
 		}
@@ -443,10 +476,12 @@ func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64, ba
 			if errors.Is(recErr, errScanNotRewritten) {
 				return rows, secrets, last, recErr
 			}
+			cursor = s.ID
 			if recErr != nil {
 				if failed++; firstErr == nil {
 					firstErr = recErr
 				}
+				continue
 			}
 			if data != "" {
 				if err := repo.UpdateData(ctx, s.ID, data); err != nil {
@@ -454,14 +489,16 @@ func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64, ba
 				}
 				rows++
 			}
-			last = s.ID
+			if failed == 0 {
+				last = s.ID
+			}
 		}
 		if batchDone != nil {
 			batchDone(last, rows, secrets)
 		}
 	}
 	if failed > 0 {
-		return rows, secrets, last, fmt.Errorf("%d scan(s) with a secret the vault didn't take (blanked): %w", failed, firstErr)
+		return rows, secrets, last, fmt.Errorf("%d scan(s) with a secret the vault didn't take, left as they were: %w", failed, firstErr)
 	}
 	return rows, secrets, last, nil
 }
@@ -543,8 +580,8 @@ func replaceStrings(v any, repl map[string]string) any {
 // through (the flag scan_secrets_backfill_v1 holds that id), so a start also
 // redacts the plaintext rows an older binary wrote after the previous walk (a
 // rolling deploy). The id is saved after every batch, so a start killed
-// mid-walk resumes after its last batch; a failure is retried at the next
-// start. Logs counts only.
+// mid-walk resumes after its last batch; a scan the vault refused a value of
+// is retried at the next start. Logs counts and scan ids only.
 func RunScanSecretsBackfill(ctx context.Context, db *database.DB) {
 	settings := store.NewAppSettingsRepo(db.SQL)
 	after, _ := strconv.ParseInt(settings.Value(ctx, scanSecretsBackfillFlag), 10, 64)
@@ -565,7 +602,8 @@ func RunScanSecretsBackfill(ctx context.Context, db *database.DB) {
 	})
 	save(last) // stopped mid-batch: the scans before the failed one are done
 	if err != nil {
-		log.Printf("[scan] secrets backfill incomplete, resumed at the next start: %d scan(s) rewritten, %d secret(s) found: %v", rows, secrets, err)
+		// saved, not last: the promise is what the flag holds.
+		log.Printf("[scan] secrets backfill incomplete, the next start resumes after scan %d: %d scan(s) rewritten, %d secret(s) found: %v", saved, rows, secrets, err)
 		return
 	}
 	if rows > 0 {

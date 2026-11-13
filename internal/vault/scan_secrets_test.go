@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -132,6 +133,24 @@ func TestRevealScanSecretNeedsPermission(t *testing.T) {
 	}
 	if got, err := repo.Reveal(ctx, editor, id); err != nil || got != `{"value":"abc123"}` {
 		t.Fatalf("editor reveal = %q, %v", got, err)
+	}
+	bundle := func(a vault.ActorContext) error {
+		_, _, err := repo.CreateBundle(ctx, a, []vault.BundleItemInput{{Type: vault.BundleItemSecret, RefID: id}},
+			vault.CreateBundleOpts{Title: "x", TTL: time.Hour})
+		return err
+	}
+	if err := bundle(editor); err != nil {
+		t.Fatalf("editor bundle: %v", err)
+	}
+	// Revoked from editors (Settings › Permissions): reveal and bundling both refused.
+	if _, err := d.SQL.Exec(`DELETE FROM role_permissions WHERE role = 'editor' AND permission = ?`, vault.PermHostSecretsReveal); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.Reveal(ctx, editor, id); !errors.Is(err, vault.ErrSecretForbidden) {
+		t.Fatalf("editor reveal after revoke: err = %v, want forbidden", err)
+	}
+	if err := bundle(editor); !errors.Is(err, vault.ErrSecretForbidden) {
+		t.Fatalf("editor bundle after revoke: err = %v, want forbidden", err)
 	}
 
 	// The host's SSH password keeps today's rule: any viewer of the host.
@@ -296,5 +315,35 @@ func TestScanSecretNames(t *testing.T) {
 	}
 	if want := []string{"PASSWORD", "PASSWORD_2", "PASSWORD_10"}; !reflect.DeepEqual(names, want) {
 		t.Errorf("names = %v, want %v", names, want)
+	}
+}
+
+// A bulk env-var write onto a scan secret's row restamps its fingerprint: the
+// next scan finding the old value again writes it back instead of taking the
+// stale fingerprint for "unchanged". A row the bulk write inserts is stamped too.
+func TestBulkEnvVarsStampFingerprint(t *testing.T) {
+	d, hid, uid := newHostSecretFixture(t)
+	ctx := context.Background()
+	repo := vault.NewSecretRepo(d)
+	admin := vault.ActorContext{UserID: uid, Role: "admin"}
+	desc := "--token · foo · /usr/local/bin/foo"
+	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-foo", "TOKEN", "abc123", desc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := []vault.EnvVarTarget{{Scope: models.SecretScopeHost, ParentID: &hid}}
+	if _, err := repo.BulkUpsertEnvVarsMulti(ctx, admin, target, models.SecretVisibilityShared, "scan-foo",
+		[]vault.EnvVarUpsert{{Name: "TOKEN", Value: "edited", Description: &desc}, {Name: "OTHER", Value: "v"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-foo", "TOKEN", "abc123", desc); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := repo.Reveal(ctx, admin, id); err != nil || got != `{"value":"abc123"}` {
+		t.Fatalf("after the scan saw abc123 again: reveal = %q, %v", got, err)
+	}
+	var unstamped int
+	if err := d.SQL.QueryRow(`SELECT COUNT(*) FROM secrets WHERE value_fingerprint IS NULL AND deleted_at IS NULL`).Scan(&unstamped); err != nil || unstamped != 0 {
+		t.Fatalf("rows without a fingerprint = %d, %v", unstamped, err)
 	}
 }
