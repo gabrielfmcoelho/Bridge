@@ -367,7 +367,7 @@ type ProcessDetail struct {
 
 // Test runs a simple "echo OK" over SSH to verify connectivity.
 func Test(client *ssh.Client) error {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
@@ -417,7 +417,7 @@ const sshCmdTimeout = 30 * time.Second
 // captured output (possibly partial on timeout) and an error if the
 // session failed or the deadline fired.
 func runCmdWithDeadline(client *ssh.Client, cmd string, timeout time.Duration) (string, error) {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return "", fmt.Errorf("new session: %w", err)
 	}
@@ -490,7 +490,7 @@ func RunPrivilegedScript(client *ssh.Client, password, script string) (string, e
 // base64 transport as RunPrivilegedScript. No deadline: the caller bounds it
 // (closing the client ends the session).
 func RunScript(client *ssh.Client, script string) (string, error) {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return "", err
 	}
@@ -521,7 +521,7 @@ func runSudoCmd(client *ssh.Client, password, cmd string) (string, error) {
 	if password == "" {
 		return "", fmt.Errorf("sudo password not available")
 	}
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return "", err
 	}
@@ -1515,13 +1515,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		// Session 3: logins + services + service-details + listening
 		// ports. last -500 gives per-user grouping enough headroom even
 		// for hosts where one busy account dominates.
-		`last -500 -w 2>/dev/null | head -500`,
-		`echo '` + delim2 + `'`,
-		`ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|docker|containerd|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{print $11}' | sort -u | head -15`,
-		`echo '` + delim2 + `'`,
-		`ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{printf "%s  CPU:%.1f%%  MEM:%.1f%%  RSS:%sMB\n", $11, $3, $4, int($6/1024)}' | head -15`,
-		`echo '` + delim2 + `'`,
-		`ss -tlnp 2>/dev/null | awk 'NR>1{split($4,a,":"); port=a[length(a)]; proc=$7; gsub(/.*users:\(\("/,"",proc); gsub(/".*/,"",proc); if(port+0>0) print port " " proc}' | sort -n -u | head -20`,
+		loginsServicesPortsScript(delim2),
 		`echo '` + delimSession + `'`,
 
 		// Session 0 part 2: CPU sample after all the work above. The
@@ -1596,7 +1590,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		return ""
 	}
 	info.LastLogins = splitLines(section(0))
-	info.Services = splitLines(section(1))
+	info.Services = cleanServiceBinaries(splitLines(section(1)))
 	info.ServiceDetails = splitLines(section(2))
 	info.Ports = splitLines(section(3))
 
