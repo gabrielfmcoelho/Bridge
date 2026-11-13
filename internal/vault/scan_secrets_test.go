@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 )
 
@@ -296,5 +297,35 @@ func TestScanSecretNames(t *testing.T) {
 	}
 	if want := []string{"PASSWORD", "PASSWORD_2", "PASSWORD_10"}; !reflect.DeepEqual(names, want) {
 		t.Errorf("names = %v, want %v", names, want)
+	}
+}
+
+// A bulk env-var write onto a scan secret's row restamps its fingerprint: the
+// next scan finding the old value again writes it back instead of taking the
+// stale fingerprint for "unchanged". A row the bulk write inserts is stamped too.
+func TestBulkEnvVarsStampFingerprint(t *testing.T) {
+	d, hid, uid := newHostSecretFixture(t)
+	ctx := context.Background()
+	repo := vault.NewSecretRepo(d)
+	admin := vault.ActorContext{UserID: uid, Role: "admin"}
+	desc := "--token · foo · /usr/local/bin/foo"
+	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-foo", "TOKEN", "abc123", desc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := []vault.EnvVarTarget{{Scope: models.SecretScopeHost, ParentID: &hid}}
+	if _, err := repo.BulkUpsertEnvVarsMulti(ctx, admin, target, models.SecretVisibilityShared, "scan-foo",
+		[]vault.EnvVarUpsert{{Name: "TOKEN", Value: "edited", Description: &desc}, {Name: "OTHER", Value: "v"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-foo", "TOKEN", "abc123", desc); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := repo.Reveal(ctx, admin, id); err != nil || got != `{"value":"abc123"}` {
+		t.Fatalf("after the scan saw abc123 again: reveal = %q, %v", got, err)
+	}
+	var unstamped int
+	if err := d.SQL.QueryRow(`SELECT COUNT(*) FROM secrets WHERE value_fingerprint IS NULL AND deleted_at IS NULL`).Scan(&unstamped); err != nil || unstamped != 0 {
+		t.Fatalf("rows without a fingerprint = %d, %v", unstamped, err)
 	}
 }

@@ -265,6 +265,10 @@ func (r *SecretRepo) upsertEnvVarRow(
 		); err != nil {
 			return false, fmt.Errorf("update env_var %q: %w", v.Name, err)
 		}
+		// A stale fingerprint would make a scan's no-op check skip a real change.
+		if err := stampDerived(ctx, tx, r.enc, existingID, models.SecretTypeEnvVar, string(payload)); err != nil {
+			return false, err
+		}
 		meta, _ := json.Marshal(map[string][]string{"changed_fields": {"payload", "description"}})
 		if err := writeAuditTx(tx, existingID, models.SecretAuditActionUpdate, actor, nil, meta); err != nil {
 			return false, fmt.Errorf("audit update %q: %w", v.Name, err)
@@ -284,6 +288,9 @@ func (r *SecretRepo) upsertEnvVarRow(
 		)
 		if err != nil {
 			return false, fmt.Errorf("insert env_var %q: %w", v.Name, err)
+		}
+		if err := stampDerived(ctx, tx, r.enc, id, models.SecretTypeEnvVar, string(payload)); err != nil {
+			return false, err
 		}
 		if err := writeAuditTx(tx, id, models.SecretAuditActionCreate, actor, nil, nil); err != nil {
 			return false, fmt.Errorf("audit insert %q: %w", v.Name, err)
