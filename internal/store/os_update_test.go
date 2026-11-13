@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -60,7 +61,7 @@ func TestOSUpdateRepo_Lifecycle(t *testing.T) {
 	if got.Counts["success"] != 1 || got.Counts["running"] != 1 || got.Counts["skipped"] != 1 || len(got.Results) != 3 {
 		t.Fatalf("counts = %v results = %d", got.Counts, len(got.Results))
 	}
-	if r := got.Results[0]; r.HostNickname != "vm-a" || *r.Upgradable != 3 || r.OSBefore != "ubuntu 22.04" || r.FinishedAt == nil {
+	if r := got.Results[0]; r.HostNickname != "vm-a" || *r.Upgradable != 3 || r.OSBefore != "ubuntu 22.04" || r.FinishedAt == nil || r.Report != nil {
 		t.Fatalf("vm-a = %+v", r)
 	}
 
@@ -89,7 +90,7 @@ func TestOSUpdateRepo_Lifecycle(t *testing.T) {
 		t.Fatalf("missing = %v %v", missing, err)
 	}
 
-	// Backup fields round-trip; a backup can later be marked deleted.
+	// Backup fields and the report round-trip; a backup can later be marked deleted.
 	brun := &models.OSUpdateRun{Kind: "packages", Concurrency: 1, Backup: true, KeepBackup: true}
 	if err := repo.CreateRun(ctx, brun, hosts[:1]); err != nil {
 		t.Fatal(err)
@@ -97,12 +98,19 @@ func TestOSUpdateRepo_Lifecycle(t *testing.T) {
 	repo.StartResult(ctx, brun.ID, hosts[0], "")
 	size := int64(1 << 30)
 	if err := repo.FinishResult(ctx, &models.OSUpdateResult{RunID: brun.ID, HostID: hosts[0], Status: models.OSResultSuccess,
-		BackupKey: "bridge/os-backups/vm-a/x.tar.zst", BackupSize: &size, BackupStatus: models.OSBackupDone}); err != nil {
+		BackupKey: "bridge/os-backups/vm-a/x.tar.zst", BackupSize: &size, BackupStatus: models.OSBackupDone,
+		Report: json.RawMessage(`{"new_failed_units":["fail2ban.service"]}`)}); err != nil {
 		t.Fatal(err)
 	}
 	x, err := repo.GetResult(ctx, brun.ID, hosts[0])
 	if err != nil || x == nil || x.BackupKey != "bridge/os-backups/vm-a/x.tar.zst" || *x.BackupSize != size || x.BackupStatus != models.OSBackupDone {
 		t.Fatalf("result = %+v %v", x, err)
+	}
+	var report struct {
+		NewFailedUnits []string `json:"new_failed_units"`
+	}
+	if err := json.Unmarshal(x.Report, &report); err != nil || strings.Join(report.NewFailedUnits, " ") != "fail2ban.service" {
+		t.Fatalf("report = %s %v", x.Report, err)
 	}
 	repo.SetBackupStatus(ctx, brun.ID, hosts[0], models.OSBackupDeleted)
 	if got, _ := repo.GetRun(ctx, brun.ID); !got.Backup || !got.KeepBackup || got.Results[0].BackupStatus != models.OSBackupDeleted {
@@ -127,7 +135,7 @@ func TestOSUpdateRepo_Lifecycle(t *testing.T) {
 		t.Fatalf("backup run = %+v / %+v", got, got.Results[0])
 	}
 	kept, err := repo.KeptBackups(ctx, hosts[1])
-	if err != nil || len(kept) != 1 || kept[0].RunKind != "backup" || kept[0].BackupKey != "k" {
+	if err != nil || len(kept) != 1 || kept[0].RunKind != "backup" || kept[0].BackupKey != "k" || kept[0].Report != nil {
 		t.Fatalf("kept = %+v %v", kept, err)
 	}
 	if all, _ := repo.KeptBackups(ctx, 0); len(all) != 1 || all[0].HostID != hosts[1] {

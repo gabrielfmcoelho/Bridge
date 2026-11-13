@@ -3,6 +3,7 @@ package sshtest
 import (
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,45 @@ const (
 // osUpdateDir holds each run's script, log and exit code on the host.
 const osUpdateDir = "/var/lib/bridge-osupdate"
 
+// osScriptCommon opens both update scripts: say, and fail = say error,
+// diagnose, exit 1. diagnose tells why dpkg is stuck:
+//
+//	@@dpkg_broken <pkg>          what dpkg --audit names
+//	@@dpkg_error <pkg>: <msg>    the packages dpkg failed on in this run
+//
+// The errors come from the part of term.log and the dist-upgrade logs
+// written since the script started (the first non-empty line after
+// "error processing package X", or main.log's "got an error from dpkg"),
+// the last 10 packages, printable ASCII, 200 characters each.
+// BRIDGE_ROOT prefixes the files they read and write (tests only).
+const osScriptCommon = `R="${BRIDGE_ROOT:-}"
+say() { echo "@@$*"; }
+DLOGS="/var/log/apt/term.log /var/log/dist-upgrade/apt-term.log /var/log/dist-upgrade/main.log"
+DMARK=$(for f in $DLOGS; do if [ -f "$R$f" ]; then echo "$f $(wc -c < "$R$f")"; else echo "$f 0"; fi; done)
+diagnose() {
+  command -v dpkg >/dev/null 2>&1 && dpkg --audit 2>/dev/null | awk '/^ [a-z0-9]/ {print "@@dpkg_broken " $1}' | head -n 20
+  echo "$DMARK" | while read -r f n; do
+    [ -f "$R$f" ] || continue
+    [ "$(wc -c < "$R$f")" -lt "$n" ] && n=0
+    tail -c +$((n + 1)) "$R$f"
+  done | awk -v q="'" '
+    function note(p, m) {
+      gsub(/[^ -~]/, "", m); sub(/^ +/, "", m)
+      if (p !~ /^[a-z0-9][a-z0-9+.:-]*$/ || m == "") return 0
+      if (!(p in msg)) order[++k] = p
+      msg[p] = substr(m, 1, 200); return 1
+    }
+    want { if (note(p, $0)) want = 0; next }
+    /got an error from dpkg for pkg: / { if (split($0, a, q) >= 4) note(a[2], a[4]); next }
+    /error processing / {
+      p = $0; sub(/.*error processing (package |archive )?/, "", p); sub(/ \(--.*/, "", p); sub(/.*\//, "", p); sub(/_.*/, "", p)
+      if (p ~ /^[a-z0-9][a-z0-9+.:-]*$/) want = 1
+    }
+    END { for (i = (k > 10 ? k - 9 : 1); i <= k; i++) print "@@dpkg_error " order[i] ": " msg[order[i]] }'
+}
+fail() { say error "$*"; diagnose; exit 1; }
+`
+
 // osUpdateScript is the root script for one kind. Markers:
 //
 //	@@pm apt|dnf|yum|apk              package manager found
@@ -39,12 +79,12 @@ const osUpdateDir = "/var/lib/bridge-osupdate"
 //	@@reboot yes                      a reboot is pending
 //	@@skip <reason>                   nothing was done, on purpose
 //	@@error <reason>                  it failed (exit code non-zero too)
+//	@@dpkg_broken / @@dpkg_error      why dpkg is stuck (osScriptCommon)
 //
 // Security counts on apt are the upgradable packages from a *-security
 // suite; on dnf/yum, the packages named by a security advisory.
 const osUpdateScript = `MODE='%s'
-export DEBIAN_FRONTEND=noninteractive
-say() { echo "@@$*"; }
+` + osScriptCommon + `export DEBIAN_FRONTEND=noninteractive
 reboot_flag() {
   if [ -f /var/run/reboot-required ]; then say reboot yes
   elif command -v needs-restarting >/dev/null 2>&1; then needs-restarting -r >/dev/null 2>&1; [ $? -eq 1 ] && say reboot yes
@@ -55,18 +95,18 @@ APTOPTS='-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-con
 apt_up() { apt list --upgradable 2>/dev/null | grep '\[upgradable'; }
 if command -v apt-get >/dev/null 2>&1; then
   say pm apt
-  apt-get update -q || { say error apt-get update failed; exit 1; }
+  apt-get update -q || fail apt-get update failed
   say upgradable "$(apt_up | grep -c .)"
   say security "$(apt_up | grep -c -- '-security')"
   case "$MODE" in
   packages)
-    apt-get $APTOPTS upgrade --with-new-pkgs || { say error apt-get upgrade failed; exit 1; }
+    apt-get $APTOPTS upgrade --with-new-pkgs || fail apt-get upgrade failed
     say remaining "$(apt_up | grep -c .)"
     say remaining_security "$(apt_up | grep -c -- '-security')" ;;
   security)
     PKGS=$(apt_up | grep -- '-security' | cut -d/ -f1)
     if [ -n "$PKGS" ]; then
-      apt-get $APTOPTS install --only-upgrade $PKGS || { say error apt-get install --only-upgrade failed; exit 1; }
+      apt-get $APTOPTS install --only-upgrade $PKGS || fail apt-get install --only-upgrade failed
     fi
     say remaining "$(apt_up | grep -c .)"
     say remaining_security "$(apt_up | grep -c -- '-security')" ;;
@@ -76,26 +116,26 @@ elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then
   say pm $PM
   up() { $PM -q check-update 2>/dev/null | awk 'NF==3 && $1 ~ /\./ && $2 ~ /[0-9]/' | wc -l; }
   sec() { $PM -q updateinfo list --security 2>/dev/null | awk 'NF>=3 {print $3}' | sort -u | wc -l; }
-  $PM -q makecache >/dev/null 2>&1 || { say error $PM makecache failed; exit 1; }
+  $PM -q makecache >/dev/null 2>&1 || fail $PM makecache failed
   say upgradable "$(up)"
   say security "$(sec)"
   case "$MODE" in
   packages)
-    $PM -y upgrade || { say error $PM upgrade failed; exit 1; }
+    $PM -y upgrade || fail $PM upgrade failed
     say remaining "$(up)"
     say remaining_security "$(sec)" ;;
   security)
-    $PM -y upgrade --security || { say error $PM upgrade --security failed; exit 1; }
+    $PM -y upgrade --security || fail $PM upgrade --security failed
     say remaining "$(up)"
     say remaining_security "$(sec)" ;;
   esac
 elif command -v apk >/dev/null 2>&1; then
   say pm apk
-  apk update -q || { say error apk update failed; exit 1; }
+  apk update -q || fail apk update failed
   say upgradable "$(apk version -l '<' 2>/dev/null | grep -c '<')"
   case "$MODE" in
   packages)
-    apk upgrade -q || { say error apk upgrade failed; exit 1; }
+    apk upgrade -q || fail apk upgrade failed
     say remaining "$(apk version -l '<' 2>/dev/null | grep -c '<')" ;;
   security)
     say skip "Alpine has no separate security channel: use a package update" ;;
@@ -124,9 +164,7 @@ exit 0
 // itself has started nothing is rolled back (a half-restored system is
 // worse). It always ends with "@@reboot yes": the release finishes on boot.
 // BRIDGE_ROOT prefixes the files it reads and writes (tests only).
-const osReleaseScript = `R="${BRIDGE_ROOT:-}"
-export DEBIAN_FRONTEND=noninteractive
-say() { echo "@@$*"; }
+const osReleaseScript = osScriptCommon + `export DEBIAN_FRONTEND=noninteractive
 APTOPTS='-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold'
 osr() ( . "$R/etc/os-release" 2>/dev/null; echo "$ID $VERSION_ID" )
 . "$R/etc/os-release" 2>/dev/null || { say skip "no /etc/os-release"; exit 0; }
@@ -137,7 +175,7 @@ FREE=$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}')
 if [ "${FREE:-0}" -lt 5242880 ]; then say skip "less than 5 GB free on /"; exit 0; fi
 apt_pending() {
   [ -n "${BRIDGE_UPDATE_FIRST:-}" ] && return 0
-  apt-get update -q || { say error apt-get update failed; exit 1; }
+  apt-get update -q || fail apt-get update failed
   N=$(apt-get -s -q upgrade --with-new-pkgs 2>/dev/null | grep -c '^Inst ')
   if [ "$N" -gt 0 ]; then say skip "$N packages waiting: run a package update first"; exit 0; fi
 }
@@ -150,7 +188,7 @@ ubuntu)
   [ -f "$R/etc/update-manager/release-upgrades" ] && sed -i 's/^Prompt=.*/Prompt=lts/' "$R/etc/update-manager/release-upgrades"
   do-release-upgrade -c >/dev/null 2>&1 || { say skip "no newer LTS release is available yet"; exit 0; }
   ready
-  do-release-upgrade -f DistUpgradeViewNonInteractive || { say error do-release-upgrade failed; exit 1; } ;;
+  do-release-upgrade -f DistUpgradeViewNonInteractive || fail do-release-upgrade failed ;;
 debian)
   case "$VERSION_CODENAME" in
   buster) NEXT=bullseye ;; bullseye) NEXT=bookworm ;; bookworm) NEXT=trixie ;;
@@ -159,24 +197,24 @@ debian)
   apt_pending
   ready
   B="$R/etc/apt.bridge-backup-$VERSION_CODENAME"
-  rm -rf "$B" && cp -a "$R/etc/apt" "$B" || { say error could not back up /etc/apt; exit 1; }
+  rm -rf "$B" && cp -a "$R/etc/apt" "$B" || fail could not back up /etc/apt
   say backup "$B"
   for f in "$R/etc/apt/sources.list" "$R"/etc/apt/sources.list.d/*.list "$R"/etc/apt/sources.list.d/*.sources; do
     [ -f "$f" ] && sed -i -e "s/\b$VERSION_CODENAME\b/$NEXT/g" -e "s#$NEXT/updates#$NEXT-security#g" "$f"
   done
-  apt-get update -q || { rm -rf "$R/etc/apt" && cp -a "$B" "$R/etc/apt"; say error "apt-get update failed on $NEXT: sources restored"; exit 1; }
-  apt-get $APTOPTS upgrade --without-new-pkgs || { say error "apt-get upgrade failed halfway to $NEXT: fix it on the host (backup in $B)"; exit 1; }
-  apt-get $APTOPTS full-upgrade || { say error "apt-get full-upgrade failed halfway to $NEXT: fix it on the host (backup in $B)"; exit 1; } ;;
+  apt-get update -q || { rm -rf "$R/etc/apt" && cp -a "$B" "$R/etc/apt"; fail "apt-get update failed on $NEXT: sources restored"; }
+  apt-get $APTOPTS upgrade --without-new-pkgs || fail "apt-get upgrade failed halfway to $NEXT: fix it on the host (backup in $B)"
+  apt-get $APTOPTS full-upgrade || fail "apt-get full-upgrade failed halfway to $NEXT: fix it on the host (backup in $B)" ;;
 alpine)
   CUR=$(echo "$VERSION_ID" | cut -d. -f1,2); MIN=${CUR#*.}; NEXT="${CUR%%.*}.$((MIN + 1))"
   REPOS="$R/etc/apk/repositories"
   grep -q "/v$CUR/" "$REPOS" 2>/dev/null || { say skip "the repositories don't pin v$CUR (edge?)"; exit 0; }
   ready
-  cp "$REPOS" "$REPOS.bridge-backup" || { say error could not back up the repositories; exit 1; }
+  cp "$REPOS" "$REPOS.bridge-backup" || fail could not back up the repositories
   say backup "$REPOS.bridge-backup"
   sed -i "s#/v$CUR/#/v$NEXT/#g" "$REPOS"
-  apk update -q || { cp "$REPOS.bridge-backup" "$REPOS"; say error "apk update failed on v$NEXT (not released yet?): repositories restored"; exit 1; }
-  apk upgrade --available -q || { say error "apk upgrade failed halfway to v$NEXT: fix it on the host"; exit 1; } ;;
+  apk update -q || { cp "$REPOS.bridge-backup" "$REPOS"; fail "apk update failed on v$NEXT (not released yet?): repositories restored"; }
+  apk upgrade --available -q || fail "apk upgrade failed halfway to v$NEXT: fix it on the host" ;;
 rhel|rocky|almalinux|centos|ol|fedora)
   say skip "major upgrades of the RHEL family (Leapp / ELevate) are not supported"; exit 0 ;;
 *)
@@ -322,6 +360,10 @@ type OSUpdateReport struct {
 	Skip              string
 	Error             string
 	Ready             bool // a release check passed (ReleasePrecheck)
+	// Why dpkg is stuck, from diagnose: "pkg: first message line", and what
+	// dpkg --audit names. Each once, in log order.
+	DpkgErrors []string
+	DpkgBroken []string
 }
 
 // ParseOSUpdateLog reads the "@@key value" markers of a run's log; the last
@@ -361,9 +403,20 @@ func ParseOSUpdateLog(logText string) OSUpdateReport {
 			r.Error = val
 		case "ready":
 			r.Ready = true
+		case "dpkg_error":
+			r.DpkgErrors = appendNew(r.DpkgErrors, val)
+		case "dpkg_broken":
+			r.DpkgBroken = appendNew(r.DpkgBroken, val)
 		}
 	}
 	return r
+}
+
+func appendNew(list []string, v string) []string {
+	if v == "" || slices.Contains(list, v) {
+		return list
+	}
+	return append(list, v)
 }
 
 // Reboot schedules a reboot in one minute (so this session ends cleanly).

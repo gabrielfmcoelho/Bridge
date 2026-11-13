@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/tls"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -59,16 +60,24 @@ func resolve(ctx context.Context, host string) (kind, target string) {
 }
 
 func httpStatus(ctx context.Context, url string) int {
+	code, _ := httpProbe(ctx, url, 0)
+	return code
+}
+
+// httpProbe is one request with observeClient (no redirect followed): the
+// status, and up to limit bytes of the body. 0 when nothing answered.
+func httpProbe(ctx context.Context, url string, limit int64) (int, string) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return 0
+		return 0, ""
 	}
 	resp, err := observeClient.Do(req)
 	if err != nil {
-		return 0
+		return 0, ""
 	}
-	resp.Body.Close()
-	return resp.StatusCode
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, limit))
+	return resp.StatusCode, string(body)
 }
 
 // obsStatus sums up the two ports the way the ETIPI inventory does: the best

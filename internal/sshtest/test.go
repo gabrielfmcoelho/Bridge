@@ -137,6 +137,9 @@ type VMInfo struct {
 	// GitRemotesPartial: a part stopped early, so the list may miss repos.
 	GitRemotes        []GitRemote `json:"git_remotes"`
 	GitRemotesPartial bool        `json:"git_remotes_partial,omitempty"`
+	// ReleaseRisks: what a release upgrade would trip over, with its
+	// warnings (releaserisk.go). nil = the probe didn't run.
+	ReleaseRisks *ReleaseRisks `json:"release_risks"`
 	// Dependencies is the host's and each container's OS, runtimes and
 	// packages (deps.go). Kept out of the stored scan JSON: the scan handler
 	// writes it to dependency_inventory; container package lists would
@@ -1690,6 +1693,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		cronInfo       *CronInfo
 		sshPolicy      *SSHAuthPolicy
 		storageRaw     string
+		releaseRaw     string
 		nginxConfig    string
 		webServers     []WebServer
 		gitRemotes     []GitRemote
@@ -1728,6 +1732,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		s = time.Now()
 		storageRaw = collectStorage(client, sudoPassword)
 		timeSession("[par] session 7d storage", s)
+		// Release risks, chained after storage (same reason).
+		s = time.Now()
+		releaseRaw = collectReleaseRisks(client, sudoPassword)
+		timeSession("[par] session 7e release-risks", s)
 	}()
 	go func() {
 		defer wg.Done()
@@ -2049,6 +2057,9 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	markStoppedHostServers(webServers, info.SystemdServices)
 	info.WebServers = webServers
 	info.GitRemotes, info.GitRemotesPartial = gitRemotes, gitRemotes != nil && !gitComplete
+	if info.ReleaseRisks = parseReleaseRisks(releaseRaw); info.ReleaseRisks != nil {
+		info.ReleaseRisks.Warnings = deriveReleaseWarnings(info)
+	}
 
 	// Build a map of docker host port → container for fast lookup.
 	dockerHostPorts := dockerHostPortMap(info.ParsedContainers)

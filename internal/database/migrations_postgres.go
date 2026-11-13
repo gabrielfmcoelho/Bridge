@@ -2224,4 +2224,9 @@ var migrationsPostgres = []string{
 	// Version 128: a release run may update the host's packages first, in
 	// the same run (update, reboot if needed, then the release).
 	`ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS update_first BOOLEAN NOT NULL DEFAULT FALSE;`,
+
+	// Version 129: each host's report of an update run: the release warnings
+	// of the scan before it, dpkg's errors, what the scans before and after
+	// differ by and its sites before and after (service.ReleaseReport).
+	`ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS report JSONB;`,
 }

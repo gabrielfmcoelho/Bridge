@@ -15,7 +15,7 @@ import (
 func fakeHost(t *testing.T, stubs map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
-	for _, tool := range []string{"sh", "grep", "cut", "awk", "wc", "sort", "cat", "touch", "cp", "rm", "sed", "tar", "gzip", "mkdir", "chmod"} {
+	for _, tool := range []string{"sh", "grep", "cut", "awk", "wc", "sort", "cat", "touch", "cp", "rm", "sed", "tar", "gzip", "mkdir", "chmod", "head", "tail"} {
 		p, err := exec.LookPath(tool)
 		if err != nil {
 			t.Skipf("%s not available", tool)

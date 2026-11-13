@@ -230,3 +230,63 @@ func TestReleasePrecheck(t *testing.T) {
 		t.Fatalf("trixie: %+v", r)
 	}
 }
+
+// proftpd's postinst failing halfway through do-release-upgrade: the error
+// names the packages and dpkg's message, from this run's part of the logs
+// only (an older failure already in term.log is not this run's).
+func TestReleaseScript_DiagnosesDpkg(t *testing.T) {
+	const aptTerm = `Setting up proftpd-core (1.3.7c+dfsg-1build1) ...
+Job for proftpd.service failed because the control process exited with error code.
+invoke-rc.d: initscript proftpd, action "start" failed.
+dpkg: error processing package proftpd-core (--configure):
+ installed proftpd-core package post-installation script subprocess returned error exit status 1
+dpkg: dependency problems prevent configuration of proftpd-mod-crypto:
+ proftpd-mod-crypto depends on proftpd-core (= 1.3.7c+dfsg-1build1); however:
+  Package proftpd-core is not configured yet.
+
+dpkg: error processing package proftpd-mod-crypto (--configure):
+ dependency problems - leaving unconfigured
+`
+	const mainLog = `2026-11-01 10:00:00,123 ERROR got an error from dpkg for pkg: 'proftpd-core': 'installed proftpd-core package post-installation script subprocess returned error exit status 1'
+`
+	h := newReleaseHost(t, "ID=ubuntu\nVERSION_ID=\"20.04\"\nVERSION_CODENAME=focal\n", "9000000", map[string]string{
+		"apt-get": aptGetStub(""), "apt": "exit 0",
+		"do-release-upgrade": `[ "$1" = -c ] && exit 0
+cat >> "$BRIDGE_ROOT/var/log/dist-upgrade/apt-term.log" <<'LOG'
+` + aptTerm + `LOG
+cat >> "$BRIDGE_ROOT/var/log/dist-upgrade/main.log" <<'LOG'
+` + mainLog + `LOG
+exit 1`,
+		"dpkg": `[ "$1" = --audit ] && printf 'The following packages are only half configured, probably due to problems\nconfiguring them the first time:\n proftpd-core         Versatile, security-focused FTP server\n proftpd-mod-crypto   ProFTPD module mod_tls\n'`,
+	})
+	h.write("var/log/apt/term.log", "dpkg: error processing package oldpkg (--configure):\n subprocess returned error exit status 1\n")
+	h.write("var/log/dist-upgrade/.keep", "")
+	r, out, err := h.run()
+	if err == nil || r.Error != "do-release-upgrade failed" {
+		t.Fatalf("err=%v report=%+v\n%s", err, r, out)
+	}
+	want := []string{
+		"proftpd-core: installed proftpd-core package post-installation script subprocess returned error exit status 1",
+		"proftpd-mod-crypto: dependency problems - leaving unconfigured",
+	}
+	if strings.Join(r.DpkgErrors, "|") != strings.Join(want, "|") || strings.Join(r.DpkgBroken, " ") != "proftpd-core proftpd-mod-crypto" {
+		t.Fatalf("errors=%q broken=%q\n%s", r.DpkgErrors, r.DpkgBroken, out)
+	}
+
+	// A package update failing the same way: same markers, from term.log.
+	path := fakeHost(t, map[string]string{
+		"apt": "exit 0",
+		"apt-get": `case "$*" in *update*) exit 0 ;; esac
+printf 'dpkg: error processing package fail2ban (--configure):\n installed fail2ban package post-installation script subprocess returned error exit status 1\n' >> "$BRIDGE_ROOT/var/log/apt/term.log"
+exit 100`,
+	})
+	script, _ := OSUpdateInnerScript(OSUpdatePackages)
+	cmd := exec.Command(filepath.Join(path, "sh"), "-c", script)
+	cmd.Env = []string{"PATH=" + path, "BRIDGE_ROOT=" + h.root}
+	out2, err := cmd.CombinedOutput()
+	r = ParseOSUpdateLog(string(out2))
+	if err == nil || r.Error != "apt-get upgrade failed" || strings.Join(r.DpkgErrors, "|") !=
+		"fail2ban: installed fail2ban package post-installation script subprocess returned error exit status 1" {
+		t.Fatalf("packages: err=%v report=%+v\n%s", err, r, out2)
+	}
+}
