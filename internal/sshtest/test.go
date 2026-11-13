@@ -381,6 +381,10 @@ type ProcessDetail struct {
 	Venv    string `json:"venv,omitempty"`
 	Ports   string `json:"ports,omitempty"`
 	Unit    string `json:"unit,omitempty"` // systemd service from the cgroup
+	// InContainer: the cgroup puts the process in a container. Read in the
+	// process-details run itself, so as root when it is (a hidepid host hides
+	// other users' cgroups from the unprivileged sweep).
+	InContainer bool `json:"-"`
 }
 
 // Test runs a simple "echo OK" over SSH to verify connectivity.

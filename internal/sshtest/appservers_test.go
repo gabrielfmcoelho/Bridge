@@ -47,6 +47,26 @@ func TestDetectAppServersSkipsContainerPIDs(t *testing.T) {
 	}
 }
 
+// On a hidepid host the unprivileged cgroup sweep can't see another user's
+// processes, while process details run as root: the cgroup line each process
+// detail carries (read with the same privilege) marks a container's JVM too.
+func TestDetectAppServersSkipsContainerByOwnCgroup(t *testing.T) {
+	const s = "\x1f"
+	tomcat := "java -Dcatalina.base=/usr/local/tomcat -classpath /usr/local/tomcat/bin/bootstrap.jar org.apache.catalina.startup.Bootstrap start"
+	line := func(pid, cgroup, base string) string {
+		return pid + s + "tomcat" + s + "1.0" + s + "2.0" + s + "/" + s + "/usr/bin/java" + s + "containerd-shim" + s + cgroup + s + "8080" + s +
+			strings.ReplaceAll(tomcat, "/usr/local/tomcat", base) + "\n"
+	}
+	procs := parseProcessDetails(
+		line("200", "0::/system.slice/docker-0123456789abcdef0123456789abcdef.scope", "/usr/local/tomcat") +
+			line("300", "1:name=systemd:/lxc/web01", "/srv/lxc-tomcat") +
+			line("400", "0::/system.slice/tomcat9.service", "/srv/tomcat9"))
+	got := detectAppServers(procs, map[int]string{}) // the sweep saw none of them
+	if len(got) != 1 || got[0].PID != 400 {
+		t.Fatalf("host app servers = %+v, want only pid 400", got)
+	}
+}
+
 func TestAppHome(t *testing.T) {
 	cases := []struct{ cmd, want string }{
 		{jbossCmd, "/opt/compras1"},

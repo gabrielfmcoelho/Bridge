@@ -77,6 +77,7 @@ func parseProcessDetails(raw string) []ProcessDetail {
 		}
 		exe, parentComm := f[5], f[6]
 		unit := unitFromCgroup(f[7])
+		_, inContainer := cgroupContainer(f[7])
 
 		venv := ""
 		for _, marker := range []string{"/venv/", "/.venv/", "/virtualenv/", "/env/"} {
@@ -110,7 +111,7 @@ func parseProcessDetails(raw string) []ProcessDetail {
 		details = append(details, ProcessDetail{
 			PID: f[0], User: f[1], CPU: f[2] + "%", MEM: f[3] + "%",
 			Command: strings.TrimSpace(f[9]), CWD: f[4], StartedVia: startedVia,
-			Venv: venv, Ports: f[8], Unit: unit,
+			Venv: venv, Ports: f[8], Unit: unit, InContainer: inContainer,
 		})
 	}
 	return details

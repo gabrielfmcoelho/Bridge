@@ -11,12 +11,16 @@ import (
 
 // detectAppServers turns every Java process running a known app-server main
 // class into one service per instance (unit, else the install directory).
-// A process in a container (containerPIDs, from its cgroup) is skipped: ps
-// lists it on the host too, but it belongs to the container's own service.
+// A process in a container (its own cgroup line, or containerPIDs) is
+// skipped: ps lists it on the host too, but it belongs to the container's own
+// service.
 func detectAppServers(procs []ProcessDetail, containerPIDs map[int]string) []DiscoveredService {
 	var out []DiscoveredService
 	seen := map[string]bool{}
 	for _, p := range procs {
+		if p.InContainer {
+			continue
+		}
 		if pid, err := strconv.Atoi(p.PID); err == nil {
 			if _, inContainer := containerPIDs[pid]; inContainer {
 				continue
