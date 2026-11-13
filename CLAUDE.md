@@ -74,9 +74,13 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 2. Widen the `asset_type` CHECK constraint on `asset_entidades`
    (`internal/database/migrations_postgres.go`, ~line 1314) with a new
    migration, using the existing `DROP CONSTRAINT` / `ADD CONSTRAINT` idiom.
-3. Filter every read with `store.VisibleExpr` / `VisibleExprDyn`.
+3. Filter every read with `store.VisibleExpr` / `VisibleExprDyn`. Link
+   reads too: per id through `visibleLinkIDs`, lists built on
+   `GraphRepo.Links` (unscoped) through `store.VisibleSet` + `KeepVisible`.
 4. Gate every write through `store.ResolveGrants`
-   (`internal/store/asset_entidade.go`).
+   (`internal/store/asset_entidade.go`). Link setters go through
+   `replaceVisibleLinks`, never DELETE-all + insert: a scoped save would
+   drop links to assets the caller's picker never showed.
 5. Return **404, never 403**, when an asset is invisible — existence is not
    leaked.
 6. Embed `<EntidadeScopeFields>` (`frontend/src/components/entidades/`) in

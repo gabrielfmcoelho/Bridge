@@ -178,6 +178,18 @@ func VisibleSet(ctx context.Context, q Queryer, assetType AssetType) (map[int64]
 	return set, err
 }
 
+// VisibleSets is VisibleSet for each asset type, in order.
+func VisibleSets(ctx context.Context, q Queryer, types ...AssetType) ([]map[int64]bool, error) {
+	sets := make([]map[int64]bool, len(types))
+	for i, a := range types {
+		var err error
+		if sets[i], err = VisibleSet(ctx, q, a); err != nil {
+			return nil, err
+		}
+	}
+	return sets, nil
+}
+
 // KeepVisible filters ids to those in set; a nil set (sees everything) keeps all.
 func KeepVisible(ids []int64, set map[int64]bool) []int64 {
 	if set == nil {
