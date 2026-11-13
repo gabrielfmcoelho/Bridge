@@ -119,6 +119,9 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 			own, where = byContainer[ws.Container], "container "+ws.Container
 		}
 		for _, site := range ws.Sites {
+			if site.Disabled {
+				continue // Virtualmin-disabled vhost: serves disabled_by_virtualmin.html, not the app.
+			}
 			targets := pointsTo(site, ws.Container, hostAddrs, portContainer, containers)
 			remHosts, remSvcs, err := remote.resolve(ctx, remoteTargets(site, hostAddrs))
 			if err != nil {
