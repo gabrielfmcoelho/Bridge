@@ -226,3 +226,81 @@ func TestHostService_LinkedIDsRespectScope(t *testing.T) {
 		t.Fatalf("after SGA save, unscoped dns=%v services=%v projects=%v; want SGP's %d/%d/%d kept", full.DNSRecords, full.Services, full.Projects, dnsB, svcB, projB)
 	}
 }
+
+// A catalogued API shared by SGA and SGP is served by, consumed by and part
+// of assets of both. SGA's detail and list row show only its own ids, and an
+// SGA save keeps SGP's links, which its pickers never showed.
+func TestAPICatalogRepo_LinkedIDsRespectScope(t *testing.T) {
+	bg := context.Background()
+	_, d := newServiceService(t)
+	f := newScopeFixture(t, d.SQL)
+	user := f.id(`INSERT INTO users (username, password_hash, role) VALUES ('scope-api', 'x', 'admin') RETURNING id`)
+	api := f.id(`INSERT INTO api_catalog (scope, name, source_type, spec_json, owner_user_id, created_by)
+		VALUES ('avulso', 'shared', 'url', '{}', ?, ?) RETURNING id`, user, user)
+	f.grant(store.AssetAPICatalog, api, f.sga, f.sgp)
+	svcA, svcB := f.service("serve-a", nil, f.sga), f.service("serve-b", nil, f.sgp)
+	conA, conB := f.service("call-a", nil, f.sga), f.service("call-b", nil, f.sgp)
+	projA, projB := f.project("pa", f.sga), f.project("pb", f.sgp)
+	repo := store.NewAPICatalogRepo(d.SQL)
+	f.must(repo.SetLinks(bg, api, []int64{svcA, svcB}, []int64{projA, projB}, []int64{conA, conB}))
+
+	asSGA := f.as(f.sga)
+	det, err := repo.Get(asSGA, api)
+	if err != nil || det == nil {
+		t.Fatalf("Get = %v, %v", det, err)
+	}
+	want := [][]int64{{svcA}, {conA}, {projA}}
+	if got := [][]int64{det.ServiceIDs, det.ConsumerServiceIDs, det.ProjectIDs}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SGA detail services/consumers/projects = %v; want only SGA's %v", got, want)
+	}
+	list, err := repo.List(asSGA, models.APICatalogFilter{})
+	if err != nil || len(list) != 1 {
+		t.Fatalf("List = %+v, %v", list, err)
+	}
+	if got := [][]int64{list[0].ServiceIDs, list[0].ConsumerServiceIDs, list[0].ProjectIDs}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SGA list row services/consumers/projects = %v; want only SGA's %v", got, want)
+	}
+
+	f.must(repo.SetLinks(asSGA, api, []int64{}, []int64{}, []int64{}))
+	full, _ := repo.Get(bg, api)
+	if got, want := [][]int64{full.ServiceIDs, full.ConsumerServiceIDs, full.ProjectIDs}, [][]int64{{svcB}, {conB}, {projB}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("after SGA save, unscoped services/consumers/projects = %v; want SGP's %v kept", got, want)
+	}
+}
+
+// A catalogued database shared by SGA and SGP is consumed by services and
+// part of projects of both: same contract as the API above.
+func TestDatabaseRepo_LinkedIDsRespectScope(t *testing.T) {
+	bg := context.Background()
+	_, d := newServiceService(t)
+	f := newScopeFixture(t, d.SQL)
+	db := f.id(`INSERT INTO databases (name, engine) VALUES ('shared', 'postgres') RETURNING id`)
+	f.grant(store.AssetDatabase, db, f.sga, f.sgp)
+	conA, conB := f.service("call-a", nil, f.sga), f.service("call-b", nil, f.sgp)
+	projA, projB := f.project("pa", f.sga), f.project("pb", f.sgp)
+	repo := store.NewDatabaseRepo(d.SQL)
+	f.must(repo.SetLinks(bg, db, []int64{conA, conB}, []int64{projA, projB}))
+
+	asSGA := f.as(f.sga)
+	det, err := repo.Get(asSGA, db)
+	if err != nil || det == nil {
+		t.Fatalf("Get = %v, %v", det, err)
+	}
+	want := [][]int64{{conA}, {projA}}
+	if got := [][]int64{det.ConsumerServiceIDs, det.ProjectIDs}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SGA detail consumers/projects = %v; want only SGA's %v", got, want)
+	}
+	list, err := repo.List(asSGA, models.DatabaseFilter{})
+	if err != nil || len(list) != 1 {
+		t.Fatalf("List = %+v, %v", list, err)
+	}
+	if got := [][]int64{list[0].ConsumerServiceIDs, list[0].ProjectIDs}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("SGA list row consumers/projects = %v; want only SGA's %v", got, want)
+	}
+
+	f.must(repo.SetLinks(asSGA, db, []int64{}, []int64{}))
+	full, _ := repo.Get(bg, db)
+	if got, want := [][]int64{full.ConsumerServiceIDs, full.ProjectIDs}, [][]int64{{conB}, {projB}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("after SGA save, unscoped consumers/projects = %v; want SGP's %v kept", got, want)
+	}
+}

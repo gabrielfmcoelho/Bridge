@@ -272,8 +272,9 @@ type APILinks struct {
 	URLs      map[int64][]models.APICatalogURL
 }
 
-// LinksBulk loads the direct links of the given APIs. Links to trashed
-// services or projects are left out.
+// LinksBulk loads the direct links of the given APIs, keeping only the
+// services and projects SetLinks manages: live and visible to the caller (a
+// shared API links the other side's assets too).
 func (r *APICatalogRepo) LinksBulk(ctx context.Context, apiIDs []int64) (APILinks, error) {
 	out := APILinks{Services: map[int64][]int64{}, Consumers: map[int64][]int64{}, Projects: map[int64][]int64{}, URLs: map[int64][]models.APICatalogURL{}}
 	if len(apiIDs) == 0 {
@@ -284,18 +285,21 @@ func (r *APICatalogRepo) LinksBulk(ctx context.Context, apiIDs []int64) (APILink
 	for i, id := range apiIDs {
 		args[i] = id
 	}
+	services, sargs := liveVisibleIDs(ctx, `services`, AssetService)
+	projects, pargs := liveVisibleIDs(ctx, `projects`, AssetProject)
 	for _, q := range []struct {
-		dst map[int64][]int64
-		sql string
+		dst   map[int64][]int64
+		sql   string
+		vargs []any
 	}{
-		{out.Services, `SELECT l.api_id, l.service_id FROM api_service_links l JOIN services s ON s.id = l.service_id
-			WHERE s.deleted_at IS NULL AND l.api_id IN (` + ph + `) ORDER BY l.service_id`},
-		{out.Consumers, `SELECT l.api_id, l.service_id FROM api_consumer_links l JOIN services s ON s.id = l.service_id
-			WHERE s.deleted_at IS NULL AND l.api_id IN (` + ph + `) ORDER BY l.service_id`},
-		{out.Projects, `SELECT l.api_id, l.project_id FROM api_project_links l JOIN projects p ON p.id = l.project_id
-			WHERE p.deleted_at IS NULL AND l.api_id IN (` + ph + `) ORDER BY l.project_id`},
+		{out.Services, `SELECT l.api_id, l.service_id FROM api_service_links l
+			WHERE l.service_id IN (` + services + `) AND l.api_id IN (` + ph + `) ORDER BY l.service_id`, sargs},
+		{out.Consumers, `SELECT l.api_id, l.service_id FROM api_consumer_links l
+			WHERE l.service_id IN (` + services + `) AND l.api_id IN (` + ph + `) ORDER BY l.service_id`, sargs},
+		{out.Projects, `SELECT l.api_id, l.project_id FROM api_project_links l
+			WHERE l.project_id IN (` + projects + `) AND l.api_id IN (` + ph + `) ORDER BY l.project_id`, pargs},
 	} {
-		rows, err := r.db.QueryContext(ctx, q.sql, args...)
+		rows, err := r.db.QueryContext(ctx, q.sql, append(append([]any{}, q.vargs...), args...)...)
 		if err != nil {
 			return out, err
 		}
@@ -352,20 +356,22 @@ func (r *APICatalogRepo) SetURLs(ctx context.Context, apiID int64, urls []models
 }
 
 // SetLinks replaces an API's serving services, project links and consumer
-// services. A nil slice leaves that side untouched; an empty one clears it.
+// services, but only among those the caller can see: links to the other
+// side's assets are kept. A nil slice leaves that side untouched; an empty one
+// clears the caller's.
 func (r *APICatalogRepo) SetLinks(ctx context.Context, apiID int64, serviceIDs, projectIDs, consumerIDs []int64) error {
 	if serviceIDs != nil {
-		if err := replaceLinks(ctx, r.db, `api_service_links`, `api_id`, `service_id`, apiID, dedupeIDs(serviceIDs)); err != nil {
+		if err := replaceVisibleLinks(ctx, r.db, `api_service_links`, `api_id`, apiID, `service_id`, `services`, AssetService, dedupeIDs(serviceIDs)); err != nil {
 			return err
 		}
 	}
 	if consumerIDs != nil {
-		if err := replaceLinks(ctx, r.db, `api_consumer_links`, `api_id`, `service_id`, apiID, dedupeIDs(consumerIDs)); err != nil {
+		if err := replaceVisibleLinks(ctx, r.db, `api_consumer_links`, `api_id`, apiID, `service_id`, `services`, AssetService, dedupeIDs(consumerIDs)); err != nil {
 			return err
 		}
 	}
 	if projectIDs != nil {
-		if err := replaceLinks(ctx, r.db, `api_project_links`, `api_id`, `project_id`, apiID, dedupeIDs(projectIDs)); err != nil {
+		if err := replaceVisibleLinks(ctx, r.db, `api_project_links`, `api_id`, apiID, `project_id`, `projects`, AssetProject, dedupeIDs(projectIDs)); err != nil {
 			return err
 		}
 	}
