@@ -648,6 +648,22 @@
     "idleHint": "Uma VM ociosa não tem serviços de aplicação implantados pelo usuário e nenhum container Docker. Passe o mouse sobre a chip de cada card para ver as regras."
   },
   "host": {
+    "secrets": {
+      "tab": "Segredos",
+      "title": "Segredos encontrados no scan",
+      "hint": "Valores achados nas linhas de comando deste host. O scan guarda só uma referência; o valor fica no cofre.",
+      "empty": "Nenhum segredo encontrado no scan deste host.",
+      "inScan": "No último scan",
+      "gone": "Não visto mais",
+      "updated": "Alterado {when}",
+      "reveal": "Revelar",
+      "hide": "Ocultar",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "loadError": "Não foi possível carregar os segredos",
+      "revealError": "Não foi possível revelar o segredo",
+      "chip": "Segredo guardado no cofre"
+    },
     "maintenance": {
       "tab": "Manutenção",
       "system": "Sistema",
@@ -2723,6 +2739,7 @@
       "nextRun": "Próxima execução",
       "lastRun": "Última execução",
       "disabled": "desabilitado",
+      "missingBinary": "binário não encontrado",
       "timerUnit": "Unidade timer",
       "jobSingular": "tarefa",
       "jobPlural": "tarefas"
@@ -2767,6 +2784,7 @@
       "enabledAtBoot": "boot",
       "enabledAtBootTooltip": "Serviço habilitado para iniciar automaticamente no boot",
       "portsTooltip": "Portas TCP em escuta atribuídas a este serviço",
+      "apps": "Aplicações",
       "hostInstance": "no host",
       "hostInstanceTooltip": "Executando no próprio host, fora de qualquer contêiner. Uma linha com este selo e também um selo de imagem tem uma instância nativa e outra em contêiner.",
       "kind": {
@@ -2885,6 +2903,7 @@
       "unlinked": "Não vinculado: não resolve no DNS, o registro está na lixeira ou o servidor está parado",
       "ignored": "Não é um nome DNS (servidor padrão, localhost, IP, curinga ou regex)",
       "proxy": "Encaminha para",
+      "locations": "Rotas",
       "root": "Raiz dos arquivos",
       "source": "Arquivo",
       "usedBy": "Usado por",

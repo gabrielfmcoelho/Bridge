@@ -148,7 +148,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
                     ))}
                   </div>
                 )}
-                <VMInfoDisplay info={data.vm_info!} locale={locale} />
+                <VMInfoDisplay info={data.vm_info!} locale={locale} hostSlug={slug} />
                 <p className="text-[var(--text-faint)] text-2xs">{t("operation.scanSaved")}</p>
               </div>
             ),

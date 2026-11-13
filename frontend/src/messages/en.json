@@ -648,6 +648,22 @@
     "idleHint": "An idle VM has no user-deployed application services and no Docker containers. Hover the chip on each card for the rule trail."
   },
   "host": {
+    "secrets": {
+      "tab": "Secrets",
+      "title": "Secrets found in the scan",
+      "hint": "Values found in command lines of this host. The scan keeps only a reference; the value lives in the vault.",
+      "empty": "No secrets found in the scan of this host.",
+      "inScan": "In latest scan",
+      "gone": "No longer seen",
+      "updated": "Changed {when}",
+      "reveal": "Reveal",
+      "hide": "Hide",
+      "copy": "Copy",
+      "copied": "Copied",
+      "loadError": "Could not load the secrets",
+      "revealError": "Could not reveal the secret",
+      "chip": "Secret stored in the vault"
+    },
     "maintenance": {
       "tab": "Maintenance",
       "system": "System",
@@ -2723,6 +2739,7 @@
       "nextRun": "Next run",
       "lastRun": "Last run",
       "disabled": "disabled",
+      "missingBinary": "binary not found",
       "timerUnit": "Timer unit",
       "jobSingular": "task",
       "jobPlural": "tasks"
@@ -2767,6 +2784,7 @@
       "enabledAtBoot": "boot",
       "enabledAtBootTooltip": "Service is enabled to start automatically at boot",
       "portsTooltip": "Listening TCP ports attributed to this service",
+      "apps": "Applications",
       "hostInstance": "on host",
       "hostInstanceTooltip": "Running on the host itself, outside any container. A row with both this and an image chip has a native instance and a containerized one.",
       "kind": {
@@ -2885,6 +2903,7 @@
       "unlinked": "Not linked: it does not resolve in DNS, its record is in the trash, or the server is stopped",
       "ignored": "Not a DNS name (default server, localhost, IP, wildcard or regex)",
       "proxy": "Proxies to",
+      "locations": "Locations",
       "root": "Document root",
       "source": "File",
       "usedBy": "Used by",

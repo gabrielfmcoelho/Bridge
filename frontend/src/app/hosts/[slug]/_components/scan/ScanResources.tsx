@@ -1,14 +1,15 @@
 "use client";
 
+import type { ReactNode } from "react";
 import SectionCard from "@/components/ui/SectionCard";
 import Badge from "@/components/ui/Badge";
 import { UsageBar } from "../UsageBar";
 import { pctBarColor } from "@/lib/utils";
 import type { VMInfoType, ResourceUsageSnapshot } from "@/lib/api";
-import { pctColor, type T } from "./shared";
+import { pctColor, SecretText, type T } from "./shared";
 
 /** Usage at scan time (CPU/RAM/disk bars), every partition, plus the top consumers of each. */
-export default function ScanResources({ info, t }: { info: VMInfoType; t: T }) {
+export default function ScanResources({ info, t, hostSlug }: { info: VMInfoType; t: T; hostSlug: string }) {
   // The disk % is the fullest partition's: its bar shows that partition's own
   // used / size (the totals are on the partition list's header).
   const fullest = info.filesystems?.find((fs) => fs.mount === info.disk_fullest && !fs.network);
@@ -35,7 +36,7 @@ export default function ScanResources({ info, t }: { info: VMInfoType; t: T }) {
           without opening another terminal. */}
       {hasTop && (
         <div className={bars.length > 0 ? "mt-4 pt-4 border-t border-[var(--border-subtle)]" : ""}>
-          <ResourceTopPanel snapshot={top!} t={t} />
+          <ResourceTopPanel snapshot={top!} t={t} hostSlug={hostSlug} />
         </div>
       )}
     </SectionCard>
@@ -103,7 +104,7 @@ function StoragePanel({ info, t }: { info: VMInfoType; t: T }) {
   );
 }
 
-function ResourceTopPanel({ snapshot, t }: { snapshot: ResourceUsageSnapshot; t: T }) {
+function ResourceTopPanel({ snapshot, t, hostSlug }: { snapshot: ResourceUsageSnapshot; t: T; hostSlug: string }) {
   const cpu = snapshot.top_cpu ?? [];
   const mem = snapshot.top_mem ?? [];
   const disk = snapshot.top_disk ?? [];
@@ -113,7 +114,7 @@ function ResourceTopPanel({ snapshot, t }: { snapshot: ResourceUsageSnapshot; t:
         <ResourceTopList
           title={t("scan.resourceTop.cpu")}
           items={cpu.map((p) => ({
-            primary: truncateCommand(p.command),
+            primary: <SecretText text={p.command} hostSlug={hostSlug} />,
             secondary: `${p.user}  pid ${p.pid}`,
             value: `${p.cpu_percent.toFixed(1)}%`,
             tooltip: p.command,
@@ -124,7 +125,7 @@ function ResourceTopPanel({ snapshot, t }: { snapshot: ResourceUsageSnapshot; t:
         <ResourceTopList
           title={t("scan.resourceTop.mem")}
           items={mem.map((p) => ({
-            primary: truncateCommand(p.command),
+            primary: <SecretText text={p.command} hostSlug={hostSlug} />,
             secondary: `${p.user}  ${humanizeBytesUI(p.rss_bytes)} (${p.mem_percent.toFixed(1)}%)`,
             value: humanizeBytesUI(p.rss_bytes),
             tooltip: p.command,
@@ -148,7 +149,7 @@ function ResourceTopPanel({ snapshot, t }: { snapshot: ResourceUsageSnapshot; t:
 
 function ResourceTopList({ title, items }: {
   title: string;
-  items: Array<{ primary: string; secondary: string; value: string; tooltip?: string }>;
+  items: Array<{ primary: ReactNode; secondary: string; value: string; tooltip?: string }>;
 }) {
   return (
     <div>
@@ -169,12 +170,7 @@ function ResourceTopList({ title, items }: {
   );
 }
 
-// Long argv strings (Java classpaths, etc) are cut to a 60-char preview so the
-// rows stay aligned; the full string lives in the row's tooltip.
-function truncateCommand(cmd: string): string {
-  if (!cmd) return "";
-  return cmd.length <= 60 ? cmd : cmd.slice(0, 60) + "…";
-}
+
 
 function humanizeBytesUI(n: number): string {
   if (!n || n < 1024) return `${n || 0} B`;

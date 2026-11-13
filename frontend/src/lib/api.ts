@@ -67,6 +67,7 @@ export type CronJob = {
   next_run?: string;
   last_run?: string;
   disabled?: boolean;
+  missing_binary?: boolean;
 };
 
 export type CronInfo = {
@@ -85,6 +86,8 @@ export type Agent = {
   state?: string;            // active|inactive|failed|running|stopped
   enabled?: boolean;
   unit?: string;
+  instance?: string;         // app-server instance: unit or install dir
+  apps?: string[];           // applications deployed on it
   pid?: number;
   version?: string;
   package?: string;
@@ -221,6 +224,8 @@ export type WebSite = {
   root?: string;
   proxy?: string[];
   fastcgi?: string[];
+  /** nginx: each location with its own targets (proxy/fastcgi stay the union). */
+  locations?: { path: string; proxy?: string[]; fastcgi?: string[] }[];
   /** Apache: config file:line. */
   source?: string;
 };
@@ -384,6 +389,7 @@ export type ProcessDetail = {
   started_via: string;
   venv?: string;
   ports?: string;
+  unit?: string;
 };
 
 // Default per-request timeout. Generous enough for long SSH scans

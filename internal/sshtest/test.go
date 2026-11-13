@@ -125,6 +125,9 @@ type VMInfo struct {
 	InstalledPackages []InstalledPackage  `json:"installed_packages,omitempty"`
 	CronJobs          []string           `json:"cron_jobs,omitempty"`
 	Cron              *CronInfo          `json:"cron,omitempty"`
+	// SecretsRedacted: service.RecordScanSecrets ran on this scan, so its
+	// command lines hold only tokens; the startup backfill skips it.
+	SecretsRedacted   bool               `json:"secrets_redacted,omitempty"`
 	Agents            []Agent            `json:"agents,omitempty"`
 	ServiceInventory  []DiscoveredService `json:"service_inventory,omitempty"`
 	ResourceTop       *ResourceUsageSnapshot `json:"resource_top,omitempty"`
@@ -282,6 +285,8 @@ type CronJob struct {
 	NextRun  string `json:"next_run,omitempty"`
 	LastRun  string `json:"last_run,omitempty"`
 	Disabled bool   `json:"disabled,omitempty"`
+	// MissingBinary: the command's absolute binary path is not executable on the host.
+	MissingBinary bool `json:"missing_binary,omitempty"`
 }
 
 // CronInfo bundles cron daemon state and every scheduled task on the host
@@ -316,6 +321,8 @@ type DiscoveredService struct {
 	State          string   `json:"state,omitempty"`   // active|inactive|failed|running|stopped
 	Enabled        bool     `json:"enabled,omitempty"` // boot persistence
 	Unit           string   `json:"unit,omitempty"`
+	Instance       string   `json:"instance,omitempty"` // app-server instance: unit or install dir
+	Apps           []string `json:"apps,omitempty"`     // applications deployed on it
 	PID            int      `json:"pid,omitempty"`
 	Version        string   `json:"version,omitempty"` // package version when known
 	Package        string   `json:"package,omitempty"`
@@ -373,11 +380,12 @@ type ProcessDetail struct {
 	StartedVia string `json:"started_via"` // systemd, cron, manual, unknown
 	Venv    string `json:"venv,omitempty"`
 	Ports   string `json:"ports,omitempty"`
+	Unit    string `json:"unit,omitempty"` // systemd service from the cgroup
 }
 
 // Test runs a simple "echo OK" over SSH to verify connectivity.
 func Test(client *ssh.Client) error {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
@@ -427,7 +435,7 @@ const sshCmdTimeout = 30 * time.Second
 // captured output (possibly partial on timeout) and an error if the
 // session failed or the deadline fired.
 func runCmdWithDeadline(client *ssh.Client, cmd string, timeout time.Duration) (string, error) {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return "", fmt.Errorf("new session: %w", err)
 	}
@@ -500,7 +508,7 @@ func RunPrivilegedScript(client *ssh.Client, password, script string) (string, e
 // base64 transport as RunPrivilegedScript. No deadline: the caller bounds it
 // (closing the client ends the session).
 func RunScript(client *ssh.Client, script string) (string, error) {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return "", err
 	}
@@ -531,7 +539,7 @@ func runSudoCmd(client *ssh.Client, password, cmd string) (string, error) {
 	if password == "" {
 		return "", fmt.Errorf("sudo password not available")
 	}
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return "", err
 	}
@@ -1125,100 +1133,6 @@ func CleanupNginx(client *ssh.Client, password string, purge bool) (result *Ngin
 	return status, nil
 }
 
-func captureProcessDetails(client *ssh.Client) []ProcessDetail {
-	// Single SSH command that collects everything for all matching processes.
-	// Output format per process: PID|USER|%CPU|%MEM|CMD||CWD|EXE|PPID_COMM|PORTS
-	// Processes separated by newlines, "||" separates ps fields from /proc fields.
-	raw := runCmd(client, `ps aux 2>/dev/null | awk '$11 ~ /(python|node|java|ruby|php|gunicorn|uvicorn|celery|pm2)/ && $11 !~ /grep|ps|awk/ {printf "%s|%s|%s|%s|", $2, $1, $3, $4; for(i=11;i<=NF;i++) printf "%s ", $i; print ""}' | head -20`)
-	if raw == "" {
-		return nil
-	}
-
-	// Collect PIDs
-	var pids []string
-	var psLines []string
-	for _, line := range splitLines(raw) {
-		parts := strings.SplitN(line, "|", 5)
-		if len(parts) >= 5 && strings.TrimSpace(parts[4]) != "" {
-			pids = append(pids, parts[0])
-			psLines = append(psLines, line)
-		}
-	}
-	if len(pids) == 0 {
-		return nil
-	}
-
-	// Single batch command to get cwd, exe, parent comm, and ports for all PIDs
-	batchScript := `for pid in ` + strings.Join(pids, " ") + `; do
-		cwd=$(readlink -f /proc/$pid/cwd 2>/dev/null)
-		exe=$(readlink -f /proc/$pid/exe 2>/dev/null)
-		ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null)
-		pcomm=$(cat /proc/$ppid/comm 2>/dev/null)
-		ports=$(ss -tlnp 2>/dev/null | grep "pid=$pid," | awk '{split($4,a,":"); print a[length(a)]}' | sort -nu | tr '\n' ',' | sed 's/,$//')
-		echo "$pid||$cwd||$exe||$pcomm||$ports"
-	done`
-	batchRaw := runCmd(client, batchScript)
-
-	// Parse batch results into a map by PID
-	procInfo := map[string][4]string{} // cwd, exe, parentComm, ports
-	for _, line := range splitLines(batchRaw) {
-		parts := strings.Split(line, "||")
-		if len(parts) >= 5 {
-			procInfo[parts[0]] = [4]string{parts[1], parts[2], parts[3], parts[4]}
-		}
-	}
-
-	var details []ProcessDetail
-	for i, line := range psLines {
-		parts := strings.SplitN(line, "|", 5)
-		pid := pids[i]
-		cmd := strings.TrimSpace(parts[4])
-		info := procInfo[pid]
-		cwd, exe, parentComm, ports := info[0], info[1], info[2], info[3]
-
-		// Detect venv from exe path
-		venv := ""
-		for _, marker := range []string{"/venv/", "/.venv/", "/virtualenv/", "/env/"} {
-			if idx := strings.Index(exe, marker); idx >= 0 {
-				venv = exe[:idx+len(marker)-1]
-				break
-			}
-		}
-
-		// Classify start method from parent process
-		startedVia := "unknown"
-		switch parentComm {
-		case "systemd", "init":
-			startedVia = "systemd"
-		case "cron", "crond", "anacron":
-			startedVia = "cron"
-		case "sshd", "bash", "sh", "zsh", "tmux: server", "screen":
-			startedVia = "manual"
-		case "supervisord":
-			startedVia = "supervisor"
-		case "containerd-shim", "docker":
-			startedVia = "docker"
-		default:
-			if parentComm != "" {
-				startedVia = "parent:" + parentComm
-			}
-		}
-
-		details = append(details, ProcessDetail{
-			PID:        pid,
-			User:       parts[1],
-			CPU:        parts[2] + "%",
-			MEM:        parts[3] + "%",
-			Command:    cmd,
-			CWD:        cwd,
-			StartedVia: startedVia,
-			Venv:       venv,
-			Ports:      ports,
-		})
-	}
-	return details
-}
-
 // RemoteKeyInfo holds information about an SSH key found on the remote host.
 type RemoteKeyInfo struct {
 	Name        string `json:"name"`
@@ -1525,13 +1439,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		// Session 3: logins + services + service-details + listening
 		// ports. last -500 gives per-user grouping enough headroom even
 		// for hosts where one busy account dominates.
-		`last -500 -w 2>/dev/null | head -500`,
-		`echo '` + delim2 + `'`,
-		`ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|docker|containerd|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{print $11}' | sort -u | head -15`,
-		`echo '` + delim2 + `'`,
-		`ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{printf "%s  CPU:%.1f%%  MEM:%.1f%%  RSS:%sMB\n", $11, $3, $4, int($6/1024)}' | head -15`,
-		`echo '` + delim2 + `'`,
-		`ss -tlnp 2>/dev/null | awk 'NR>1{split($4,a,":"); port=a[length(a)]; proc=$7; gsub(/.*users:\(\("/,"",proc); gsub(/".*/,"",proc); if(port+0>0) print port " " proc}' | sort -n -u | head -20`,
+		loginsServicesPortsScript(delim2),
 		`echo '` + delimSession + `'`,
 
 		// Session 0 part 2: CPU sample after all the work above. The
@@ -1606,7 +1514,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		return ""
 	}
 	info.LastLogins = splitLines(section(0))
-	info.Services = splitLines(section(1))
+	info.Services = cleanServiceBinaries(splitLines(section(1)))
 	info.ServiceDetails = splitLines(section(2))
 	info.Ports = splitLines(section(3))
 
@@ -1788,7 +1696,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	go func() {
 		defer wg.Done()
 		s := time.Now()
-		procDetails = captureProcessDetails(client)
+		procDetails = captureProcessDetails(client, sudoPassword)
 		timeSession("[par] process-details", s)
 	}()
 	go func() {
@@ -2121,6 +2029,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		agentNames[a.Name] = true
 	}
 	info.ServiceInventory = captureServices(hostInv, info.ParsedContainers, agentNames, agentPortClaims)
+	info.ServiceInventory = append(info.ServiceInventory, captureAppServers(client, sudoPassword, procDetails, hostInv.ContainerPIDs)...)
 
 	// Back-fill PortOwners with agent and service attribution. `ss -tlnp`
 	// only emits a process column when the scanning user can see the

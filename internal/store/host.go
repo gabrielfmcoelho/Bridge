@@ -104,6 +104,25 @@ func (r *HostRepo) GetBySlug(ctx context.Context, slug string) (*models.Host, er
 	return h, err
 }
 
+// LiveByHostname returns the non-trashed hosts whose hostname equals the
+// given one (case-insensitive), whatever the caller's scope.
+func (r *HostRepo) LiveByHostname(ctx context.Context, hostname string) ([]models.Host, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+hostColumns()+` FROM hosts WHERE LOWER(hostname) = LOWER(?) AND deleted_at IS NULL ORDER BY id`, hostname)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.Host
+	for rows.Next() {
+		var h models.Host
+		if err := rows.Scan(hostScanDest(&h)...); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
 // GetByID returns a host by id, or (nil, nil) if absent.
 func (r *HostRepo) GetByID(ctx context.Context, id int64) (*models.Host, error) {
 	h := &models.Host{}

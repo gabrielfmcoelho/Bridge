@@ -87,7 +87,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v130**. Use idempotent idioms:
+per element, currently at **v131**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -134,7 +134,7 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   fields in the request struct, `nil` = keep), `""`/`[]` clears. `PUT
   /api/api-catalog/{id}` follows this; new update handlers must too — a plain
   `string` field silently blanks the column when a caller omits it.
-- SSH host keys (v130, `internal/service/host_key.go`): every dial goes
+- SSH host keys (v131, `internal/service/host_key.go`): every dial goes
   through `service.DialHost`, never `sshtest.Dial` directly. The first
   successful login pins the key the host showed (`hosts.ssh_host_key`, an
   authorized_keys line; a failed login pins nothing); later dials offer that
@@ -340,6 +340,54 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   presigned link signed for the internal endpoint, fed to `curl -K -` on
   stdin: a link on a command line is readable by every local user in /proc,
   and it must never reach the world-readable log. Run scripts are `600`.
+- Scan on legacy VMs (`internal/sshtest/session.go`): every scan session opens
+  through `newSession`, never `client.NewSession` — sshd's default `MaxSessions
+  10` refuses the 11th concurrent session with an `OpenChannelError`
+  (Prohibited), and Go's client then failed silently, so probes just vanished;
+  `newSession` retries that refusal. New probes open through `newSession` and
+  start their script with `scanPath` (`/usr/sbin`, `/sbin` appended; some older
+  scripts inline the same export): a non-interactive CentOS 7 PATH has no
+  `ss`, which left `ports` null on every CentOS host. Process details
+  (`procdetails.go`) run as root when Bridge has the password; the systemd
+  unit comes from `/proc/<pid>/cgroup`, readable without root (`unit`,
+  `started_via = systemd`). Cron asks for the daemon name first (RHEL
+  `crond`), then is-active/is-enabled for that unit only; a job whose
+  absolute binary doesn't exist gets `missing_binary` (a real `/ust/bin/certbot`;
+  without root only where the scan user can traverse, never a `$`/`%` path).
+  nginx sites keep `locations` (path → targets, upstreams expanded);
+  `proxy` stays the flattened union for the old readers.
+- Java app servers (`appservers.go`, `services.go`): JBoss AS, WildFly/EAP,
+  Tomcat and GlassFish are matched by **main class**, not by process name (host
+  processes only: a container PID belongs to its container), and
+  yield one service per instance, keyed `<catalog>@<instance>` (the systemd
+  unit, else the install dir) — two JBoss on one host stay two services.
+  `HostPorts` come from the PID's own ports with the likely HTTP port (80xx) first, so a
+  proxy target resolves to the right instance; deployed `.war`/`.ear` (plus
+  exploded dirs on Tomcat and WildFly) go in `apps`. `service.RecordWebDNS`
+  also links a record whose `proxy_pass` points at **another VM**: to that host
+  only when exactly one live host has that hostname (ambiguous → none), and to
+  the service whose latest-scan `HostPorts` holds the port. Only adds.
+- Secrets in the scan (`service.RecordScanSecrets`, `internal/service/scansecrets.go`):
+  a command line is where legacy VMs keep their secrets (`-D…`, `--…`,
+  `NAME=…`, URL userinfo, mysql `-p`). Each one goes to the vault
+  (`vault.UpsertScanSecret`: `env_var`, host-scoped shared, `group_label`
+  `scan-<origin>`, upper-snake name, origin taken from the command line alone
+  so the identity is stable) and is replaced in the scan by `{{secret:<id>}}`
+  (`{{secret}}` when it can't be registered) **inside `recordScan`, before the
+  scan is stored or returned** — a raw value never reaches `host_scans` or the
+  response, an error or a log line: a value leaves the vault only through the
+  audited reveal (`GET /api/secrets/{id}/reveal`, which writes a
+  `secret_audit_log` row) or a share-bundle redemption (`revealRaw`, gated by
+  the same permission when the bundle is created, logged in
+  `share_bundle_access_log`). A trashed identity is never recreated. Revealing a
+  `scan-*` host secret needs `hosts.secrets.reveal` (v130, seeded for editors);
+  only admins move a host secret into or out of a `scan-` group. At startup
+  `service.RunScanSecretsBackfill` (`cmd/web.go`) redacts old `host_scans`
+  rows, synchronously, resuming after a high-water id saved every batch; a
+  scan `RecordScanSecrets` wrote carries `secrets_redacted` and is never
+  re-read. UI: the host tab **Segredos** (`?tab=secrets`, editors) lists them,
+  with reveal only for `hosts.secrets.reveal`, and scan views render the
+  tokens as lock chips linking to it (a plain chip for viewers).
 - Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
   names are read in bulk; wiki titles come from Outline at most once a day per
   page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title
