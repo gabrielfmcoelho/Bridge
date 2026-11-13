@@ -34,10 +34,10 @@ type FoundSecret struct {
 
 var (
 	secretKeyRe = regexp.MustCompile(`(?i)(pass(word|wd)?|pwd|secret|token|api[-_]?key|credential)`)
-	// A key starts a word: after a space, a quote (sh -c "…"), "(", ";", "&"
-	// (a query string too) or "|". The patterns stop at the key, the value is
+	// A key starts a word: after a space, a quote (sh -c "…"), "(", ";", "&" or
+	// "?" (a query string), or "|". The patterns stop at the key, the value is
 	// read by hand, so a value never hides the next key.
-	keyStart = `(?:^|[\s"'(;&|])`
+	keyStart = `(?:^|[\s"'(;&?|])`
 	// -D<name>=, --<name>=, -<name>= and NAME=.
 	assignRe = regexp.MustCompile(keyStart + `(?:-D|--?)?([A-Za-z_][A-Za-z0-9_.\-]*)=`)
 	// --<name> followed by whitespace and a value that is not itself a flag.
@@ -115,12 +115,13 @@ func FindSecrets(cmd string) []FoundSecret {
 	out, end := found[:0], 0
 	for _, f := range found {
 		switch {
-		case f.Start >= end:
+		case f.Start > end || len(out) == 0:
 			out, end = append(out, f), f.End
 		case f.End > end:
-			// Starts inside the previous value and ends past it (a quote closed
-			// mid-value): one span covers both, its opening quote too, so no
-			// lone quote is left in front of the token.
+			// Starts inside the previous value, or right where it ends, and ends
+			// past it (a quote closed mid-value): one span covers both, its
+			// opening quote too, so no lone quote or pair of tokens is left to
+			// re-parse as a value.
 			p := &out[len(out)-1]
 			if p.Start > 0 && (cmd[p.Start-1] == '"' || cmd[p.Start-1] == '\'') {
 				p.Start--
@@ -266,10 +267,10 @@ func scanCommandLines(info *sshtest.VMInfo) (sources []cmdSource, redactOnly []*
 
 // RecordScanSecrets stores every secret on info's processes and cron jobs as
 // the host's scan secret, written by actorUserID (≤ 0: the system actor), and
-// replaces each value in info by its token (secretNames picks the names).
-// Every value is redacted whatever happens: one the vault refused or holds in
-// the trash becomes {{secret}}. Returns how many secrets the vault holds for
-// this scan; the error only counts the others.
+// replaces each value in info by its token (secretNames picks the names), then
+// marks info SecretsRedacted. Every value is redacted whatever happens: one the
+// vault refused or holds in the trash becomes {{secret}}. Returns how many
+// secrets the vault holds for this scan; the error only counts the others.
 func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID int64, info *sshtest.VMInfo) (int, error) {
 	sources, redactOnly := scanCommandLines(info)
 	type ident struct{ group, name string }
@@ -334,6 +335,7 @@ func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID
 			*c = (*c)[:m[2]] + blankToken + (*c)[m[3]:]
 		}
 	}
+	info.SecretsRedacted = true
 	if len(errs) > 0 {
 		return n, &scanSecretsError{failed: len(errs), err: errors.Join(errs...)}
 	}
@@ -416,10 +418,12 @@ var scanBackfillBatch = 200
 
 // BackfillScanSecrets registers the secrets of every stored scan after
 // afterID, in id order (a later scan's value wins), and rewrites each row that
-// held one, redacted. Re-runnable: a row already redacted holds no value and
-// is left alone. rows is the scans rewritten, secrets the secrets found in
-// them, last the id of the last scan gone through (afterID when none).
-func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64) (rows, secrets int, last int64, err error) {
+// held one, redacted and marked secrets_redacted. A marked row (this binary's
+// scans) is never read: a redacted line can re-parse to a "value". batchDone,
+// when set, gets the last id and the counts so far after each batch. rows is
+// the scans rewritten, secrets the secrets found in them, last the id of the
+// last scan gone through (afterID when none).
+func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64, batchDone func(last int64, rows, secrets int)) (rows, secrets int, last int64, err error) {
 	ctx = store.WithSystemScope(ctx)
 	repo := store.NewHostScanRepo(db.SQL)
 	var firstErr error
@@ -452,6 +456,9 @@ func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64) (r
 			}
 			last = s.ID
 		}
+		if batchDone != nil {
+			batchDone(last, rows, secrets)
+		}
 	}
 	if failed > 0 {
 		return rows, secrets, last, fmt.Errorf("%d scan(s) with a secret the vault didn't take (blanked): %w", failed, firstErr)
@@ -470,6 +477,9 @@ func redactScanJSON(ctx context.Context, db *database.DB, hostID int64, data str
 		if te := (*json.UnmarshalTypeError)(nil); !errors.As(err, &te) {
 			return "", 0, nil
 		}
+	}
+	if info.SecretsRedacted {
+		return "", 0, nil
 	}
 	sources, redactOnly := scanCommandLines(&info)
 	refs := redactOnly
@@ -495,6 +505,9 @@ func redactScanJSON(ctx context.Context, db *database.DB, hostID int64, data str
 	dec.UseNumber()
 	if err := dec.Decode(&tree); err != nil {
 		return "", n, fmt.Errorf("%w: %w", errScanNotRewritten, errors.Join(recErr, err))
+	}
+	if m, ok := tree.(map[string]any); ok {
+		m["secrets_redacted"] = true
 	}
 	out, err := json.Marshal(replaceStrings(tree, repl))
 	if err != nil {
@@ -529,16 +542,28 @@ func replaceStrings(v any, repl map[string]string) any {
 // RunScanSecretsBackfill runs BackfillScanSecrets after the last scan it went
 // through (the flag scan_secrets_backfill_v1 holds that id), so a start also
 // redacts the plaintext rows an older binary wrote after the previous walk (a
-// rolling deploy). A failure is retried at the next start. Logs counts only.
+// rolling deploy). The id is saved after every batch, so a start killed
+// mid-walk resumes after its last batch; a failure is retried at the next
+// start. Logs counts only.
 func RunScanSecretsBackfill(ctx context.Context, db *database.DB) {
 	settings := store.NewAppSettingsRepo(db.SQL)
 	after, _ := strconv.ParseInt(settings.Value(ctx, scanSecretsBackfillFlag), 10, 64)
-	rows, secrets, last, err := BackfillScanSecrets(ctx, db, after)
-	if last > after {
+	saved := after
+	save := func(last int64) {
+		if last <= saved {
+			return
+		}
 		if err := settings.Set(ctx, scanSecretsBackfillFlag, strconv.FormatInt(last, 10)); err != nil {
 			log.Printf("[scan] secrets backfill: save progress: %v", err)
+			return
 		}
+		saved = last
 	}
+	rows, secrets, last, err := BackfillScanSecrets(ctx, db, after, func(last int64, rows, secrets int) {
+		save(last)
+		log.Printf("[scan] secrets backfill: batch done, %d scan(s) rewritten, %d secret(s) found so far", rows, secrets)
+	})
+	save(last) // stopped mid-batch: the scans before the failed one are done
 	if err != nil {
 		log.Printf("[scan] secrets backfill incomplete, resumed at the next start: %d scan(s) rewritten, %d secret(s) found: %v", rows, secrets, err)
 		return

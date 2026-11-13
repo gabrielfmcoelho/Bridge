@@ -1,10 +1,13 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"os"
 	"reflect"
 	"regexp"
 	"strings"
@@ -52,6 +55,9 @@ func TestFindSecrets(t *testing.T) {
 		{`su - postgres -c 'PGPASSWORD=secret pg_dump db'`, []kv{{"PGPASSWORD", "secret"}}},
 		{"(cd /x;A=1;DB_TOKEN=abc ./run)", []kv{{"DB_TOKEN", "abc"}}},
 		{"curl https://api.example/x?a=1&token=abc", []kv{{"token", "abc"}}},
+		// …and the first parameter of a query string, after "?".
+		{"java -Ddb.url=jdbc:postgresql://db/x?password=p -Dx=1", []kv{{"password", "p"}}},
+		{"curl https://api/x?access_token=abc", []kv{{"access_token", "abc"}}},
 		{`sh -c "--token abc"`, []kv{{"token", "abc"}}},
 		{`0 3 * * * bash -c "app --password=s3cr3t"`, []kv{{"password", "s3cr3t"}}},
 		// A crontab line: the assignment follows the schedule.
@@ -62,6 +68,9 @@ func TestFindSecrets(t *testing.T) {
 		// A value starting inside another and ending past it: one span covers
 		// both, its opening quote too, so no lone quote is left to re-parse.
 		{`x PASSWORD="a --token=b"c d`, []kv{{"PASSWORD", `"a --token=b"c`}}},
+		// Values that touch (one ends where the next starts) are one span too:
+		// tokens side by side would re-parse as a value.
+		{`-Dpassword="https://u:"|--token=@h`, []kv{{"password", `"https://u:"|--token=@h`}}},
 		{"mysql -P3306 -p -h db", nil},
 		{"tar -pczf x.tgz /srv", nil},
 		{"app -Dhttp.port=8080 --user admin", nil},
@@ -207,6 +216,9 @@ func TestRecordScanSecrets(t *testing.T) {
 	n, err := RecordScanSecrets(ctx, d, hid, uid, info)
 	if err != nil || n != 2 {
 		t.Fatalf("RecordScanSecrets = %d, %v; want 2, nil", n, err)
+	}
+	if !info.SecretsRedacted {
+		t.Error("scan not marked secrets_redacted: the backfill would read it again")
 	}
 	rows := scanSecretRows(t, d)
 	cache, pg := rows["scan-opt-compras1/CACHE_SERVER_PASSWORD"], rows["scan-cron-root/PGPASSWORD"]
@@ -458,7 +470,7 @@ func TestBackfillScanSecretsTwice(t *testing.T) {
 		}
 	}
 
-	rows, secrets, last, err := BackfillScanSecrets(ctx, d, 0)
+	rows, secrets, last, err := BackfillScanSecrets(ctx, d, 0, nil)
 	if err != nil || rows != 2 || secrets != 2 {
 		t.Fatalf("backfill = %d rows, %d secrets, %v; want 2, 2, nil", rows, secrets, err)
 	}
@@ -485,7 +497,7 @@ func TestBackfillScanSecretsTwice(t *testing.T) {
 		t.Fatalf("vault rows = %v", vaultRows)
 	}
 
-	rows, secrets, _, err = BackfillScanSecrets(ctx, d, 0)
+	rows, secrets, _, err = BackfillScanSecrets(ctx, d, 0, nil)
 	if err != nil || rows != 0 || secrets != 0 {
 		t.Fatalf("second backfill = %d rows, %d secrets, %v; want 0, 0, nil", rows, secrets, err)
 	}
@@ -553,6 +565,91 @@ func TestRunScanSecretsBackfillResumes(t *testing.T) {
 		t.Fatalf("a row already done was read again: %s", all[0].Data)
 	}
 	if v := settings.Value(ctx, scanSecretsBackfillFlag); v != fmt.Sprint(all[2].ID) {
+		t.Fatalf("flag = %q, want %d", v, all[2].ID)
+	}
+}
+
+// A scan RecordScanSecrets marked is never read again: a redacted line can
+// re-parse to a "value" that would overwrite a kept secret with token text. A
+// row of the old binary has no mark: it is still redacted, and marked.
+func TestBackfillSkipsRedactedScans(t *testing.T) {
+	d, hid, _ := newScanSecretsFixture(t)
+	ctx := context.Background()
+	repo := store.NewHostScanRepo(d.SQL)
+	scan := func(redacted bool, cmd string) string {
+		b, _ := json.Marshal(sshtest.VMInfo{SecretsRedacted: redacted, ProcessDetails: []sshtest.ProcessDetail{{Command: cmd}}})
+		return string(b)
+	}
+	// Plaintext under the mark only to see whether the row is read at all.
+	marked := scan(true, "/usr/local/bin/foo --token=abc123")
+	for _, data := range []string{marked, scan(false, "/usr/local/bin/bar --token=s3cr3t")} {
+		if err := repo.Create(ctx, hid, data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	RunScanSecretsBackfill(ctx, d)
+	all, _ := repo.ListAfter(ctx, 0, 10)
+	if len(all) != 2 || all[0].Data != marked {
+		t.Fatalf("marked row was read: %+v", all)
+	}
+	if strings.Contains(all[1].Data, "s3cr3t") || !strings.Contains(all[1].Data, `"secrets_redacted":true`) {
+		t.Fatalf("old row = %s", all[1].Data)
+	}
+	if rows := scanSecretRows(t, d); len(rows) != 1 || rows["scan-bar/TOKEN"] == 0 {
+		t.Fatalf("vault rows = %v", rows)
+	}
+}
+
+type writerFunc func([]byte) (int, error)
+
+func (f writerFunc) Write(p []byte) (int, error) { return f(p) }
+
+// A start killed mid-walk (a slow first deploy) resumes after the last batch
+// it finished: progress is saved, and its counts logged, batch by batch.
+func TestRunScanSecretsBackfillSavesEachBatch(t *testing.T) {
+	d, hid, _ := newScanSecretsFixture(t)
+	repo := store.NewHostScanRepo(d.SQL)
+	defer func(n int) { scanBackfillBatch = n }(scanBackfillBatch)
+	scanBackfillBatch = 1
+	for _, cmd := range []string{"/usr/local/bin/foo --token=abc123", "/usr/local/bin/bar --token=s3cr3t", "/usr/local/bin/baz --token=x"} {
+		b, _ := json.Marshal(sshtest.VMInfo{ProcessDetails: []sshtest.ProcessDetail{{Command: cmd}}})
+		if err := repo.Create(context.Background(), hid, string(b)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The process dies as soon as the backfill logs anything.
+	ctx, kill := context.WithCancel(context.Background())
+	var logged bytes.Buffer
+	log.SetOutput(writerFunc(func(p []byte) (int, error) {
+		if bytes.Contains(p, []byte("secrets backfill")) {
+			kill()
+		}
+		return logged.Write(p)
+	}))
+	defer log.SetOutput(os.Stderr)
+	RunScanSecretsBackfill(ctx, d)
+
+	all, _ := repo.ListAfter(context.Background(), 0, 10)
+	settings := store.NewAppSettingsRepo(d.SQL)
+	if v := settings.Value(context.Background(), scanSecretsBackfillFlag); len(all) != 3 || v != fmt.Sprint(all[0].ID) {
+		t.Fatalf("flag after the killed start = %q, want %d (the first batch)", v, all[0].ID)
+	}
+	if strings.Contains(all[0].Data, "abc123") || !strings.Contains(all[1].Data, "s3cr3t") {
+		t.Fatalf("killed start: %+v", all)
+	}
+	if out := logged.String(); !strings.Contains(out, "1 scan(s) rewritten") || strings.Contains(out, "abc123") {
+		t.Fatalf("log = %q", out)
+	}
+
+	RunScanSecretsBackfill(context.Background(), d)
+	all, _ = repo.ListAfter(context.Background(), 0, 10)
+	for _, s := range all {
+		if strings.Contains(s.Data, "s3cr3t") || strings.Contains(s.Data, "token=x") {
+			t.Errorf("row %d not redacted after the next start: %s", s.ID, s.Data)
+		}
+	}
+	if v := settings.Value(context.Background(), scanSecretsBackfillFlag); v != fmt.Sprint(all[2].ID) {
 		t.Fatalf("flag = %q, want %d", v, all[2].ID)
 	}
 }

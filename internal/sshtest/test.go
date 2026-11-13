@@ -115,6 +115,9 @@ type VMInfo struct {
 	InstalledPackages []InstalledPackage  `json:"installed_packages,omitempty"`
 	CronJobs          []string           `json:"cron_jobs,omitempty"`
 	Cron              *CronInfo          `json:"cron,omitempty"`
+	// SecretsRedacted: service.RecordScanSecrets ran on this scan, so its
+	// command lines hold only tokens; the startup backfill skips it.
+	SecretsRedacted   bool               `json:"secrets_redacted,omitempty"`
 	Agents            []Agent            `json:"agents,omitempty"`
 	ServiceInventory  []DiscoveredService `json:"service_inventory,omitempty"`
 	ResourceTop       *ResourceUsageSnapshot `json:"resource_top,omitempty"`
