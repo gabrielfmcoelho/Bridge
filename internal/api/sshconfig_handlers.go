@@ -1686,6 +1686,18 @@ func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
 // included), web DNS and git links. Outcomes go into result; none of the
 // later steps fails the scan. Shared by the scan and the OS update runs.
 func (h *sshHandlers) recordScan(ctx context.Context, host *models.Host, vmInfo *sshtest.VMInfo, result map[string]any) {
+	// Secrets on the scanned command lines go to the vault first, written by
+	// whoever ran the scan (a job: the system actor). vmInfo keeps only
+	// {{secret:<id>}} — the stored scan and the response are both built from
+	// it — and a value the vault didn't take is blanked anyway.
+	var actor int64
+	if u := auth.UserFromContext(ctx); u != nil {
+		actor = u.ID
+	}
+	if n, err := service.RecordScanSecrets(ctx, h.db, host.ID, actor, vmInfo); err != nil {
+		result["scan_secrets_error"] = err.Error()
+		log.Printf("[ssh] scan secrets host=%s: %d stored, some blanked without being stored", host.OficialSlug, n)
+	}
 	// The host's CPU / RAM / disk specs follow every scan that measured
 	// them: a resized VM, or a disk total that now counts every partition
 	// (storage.go), would otherwise keep its first value forever.

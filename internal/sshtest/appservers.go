@@ -22,7 +22,7 @@ func detectAppServers(procs []ProcessDetail) []DiscoveredService {
 			}
 			inst := p.Unit
 			if inst == "" {
-				inst = appHome(p.Command)
+				inst = AppHome(p.Command)
 			}
 			if inst == "" || seen[spec.Name+"@"+inst] {
 				break
@@ -58,8 +58,8 @@ func matchesMainClass(spec serviceSpec, fields []string) bool {
 	return false
 }
 
-// appHome finds the install (or instance base) directory in a java command line.
-func appHome(cmd string) string {
+// AppHome finds the install (or instance base) directory in a java command line.
+func AppHome(cmd string) string {
 	fields := strings.Fields(cmd)
 	for _, key := range []string{"-Djboss.home.dir=", "-Dcatalina.base=", "-Dcatalina.home=", "-Dcom.sun.aas.installRoot="} {
 		for _, f := range fields {
@@ -179,7 +179,7 @@ func captureAppServers(client *ssh.Client, sudoPassword string, procs []ProcessD
 			if strconv.Itoa(s.PID) != p.PID {
 				continue
 			}
-			dirsOf[i] = appDeployDirs(s.Name, appHome(p.Command), p.Command)
+			dirsOf[i] = appDeployDirs(s.Name, AppHome(p.Command), p.Command)
 			for _, d := range dirsOf[i] {
 				all = append(all, s.Name+" "+d)
 			}

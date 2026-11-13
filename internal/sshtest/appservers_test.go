@@ -41,8 +41,8 @@ func TestAppHome(t *testing.T) {
 		{"java -Dcatalina.base=/srv/t org.apache.catalina.startup.Bootstrap start", "/srv/t"},
 	}
 	for _, c := range cases {
-		if got := appHome(c.cmd); got != c.want {
-			t.Errorf("appHome(%q) = %q, want %q", c.cmd, got, c.want)
+		if got := AppHome(c.cmd); got != c.want {
+			t.Errorf("AppHome(%q) = %q, want %q", c.cmd, got, c.want)
 		}
 	}
 }
