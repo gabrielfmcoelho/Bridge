@@ -1009,6 +1009,16 @@
     "sshConfigWithKey": "Com Chave",
     "sshConfigWithoutKey": "Sem Chave",
     "sshConfigHint": "Cole este bloco no seu arquivo ~/.ssh/config para acessar rapidamente via: ssh {slug}",
+    "hostKey": {
+      "title": "Chave do host",
+      "reset": "Redefinir",
+      "resetTitle": "Redefinir a chave fixada do host?",
+      "resetMessage": "Faça isso só quando souber por que a chave mudou (VM reinstalada, chaves regeneradas). A próxima conexão bem-sucedida fixa a chave que o host mostrar então.",
+      "resetDone": "Chave do host redefinida: a próxima conexão a fixa de novo",
+      "resetFailed": "Não foi possível redefinir a chave do host",
+      "pinnedAt": "Fixada em {date}. O Bridge recusa este host se ele mostrar outra chave.",
+      "unpinned": "Ainda não fixada: a próxima conexão bem-sucedida fixa a chave que o host mostrar."
+    },
     "noAlerts": "Sem alertas",
     "noAlertsDesc": "Este host não possui alertas ativos.",
     "links": "Vínculos",
@@ -2453,6 +2463,10 @@
       "attachGroupHint": "Todos os repositórios deste grupo e dos subgrupos — atuais e futuros — passam a ser do que você escolher."
     },
     "sshOps": {
+      "sharedKeys": {
+        "title": "Chaves de host SSH repetidas em vários hosts ({count})",
+        "hint": "Estas VMs foram clonadas de um mesmo template e podem se passar umas pelas outras. Em cada uma, regenere as chaves do host (apague /etc/ssh/ssh_host_* e rode ssh-keygen -A) e depois redefina a chave fixada na configuração SSH do host."
+      },
       "title": "Operações SSH",
       "intro": "Scripts de shell que quem edita hosts pode executar pela aba Operações de um host. Escreva {{nome}} onde um valor deve ser pedido na execução.",
       "name": "Nome",
@@ -2588,6 +2602,7 @@
     "createRemoteUserNoEligibleKeys": "Nenhuma chave SSH com chave pública armazenada. Adicione ou gere uma em Chaves SSH primeiro.",
     "createRemoteUserNoPubKey": "A chave selecionada não tem chave pública — escolha outra.",
     "deleteRemoteUser": "Excluir Usuário Remoto",
+    "hostKeyReset": "Chave do host redefinida",
     "deleteRemoteUserDesc": "Remove um usuário não-sistema do host remoto, encerra seus processos em execução e limpa o drop-in NOPASSWD do sudoers.",
     "deleteRemoteUserFormDesc": "Informe o nome do usuário a excluir. Root e outras contas de sistema (UID < 1000) estão bloqueadas. O usuário de login SSH atual também é protegido.",
     "deleteRemoteUserPlaceholder": "Usuário a excluir",

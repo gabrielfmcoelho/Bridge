@@ -1385,6 +1385,7 @@ function opTypeLabel(type_: string, t: (k: string) => string): string {
     case "nginx-cleanup": return t("operation.nginxCleanup");
     case "create-remote-user": return t("operation.createRemoteUser");
     case "delete-remote-user": return t("operation.deleteRemoteUser");
+    case "host-key-reset": return t("operation.hostKeyReset");
     default: return type_;
   }
 }

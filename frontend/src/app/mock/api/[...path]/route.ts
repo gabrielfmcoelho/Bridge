@@ -30,6 +30,12 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const mockOSRuns: OSUpdateRun[] = [];
 // Host backup profiles (host id → own paths; absent list = inherit).
 const mockProfiles = new Map<number, { include?: string[]; exclude?: string[] }>();
+// Pinned SSH host keys by host id: the first two hosts share a cloned template's key.
+const mockHostKeys = new Map<number, { fingerprint: string; key_type: string; pinned_at: string }>([
+  [1, { fingerprint: "SHA256:q0dBV3Kp6T7Yx1o9mN2cZ8uR4eF5sH7jL0aW3vX9bQk", key_type: "ecdsa-sha2-nistp256", pinned_at: "2026-11-10T14:02:00Z" }],
+  [2, { fingerprint: "SHA256:q0dBV3Kp6T7Yx1o9mN2cZ8uR4eF5sH7jL0aW3vX9bQk", key_type: "ecdsa-sha2-nistp256", pinned_at: "2026-11-11T09:30:00Z" }],
+  [3, { fingerprint: "SHA256:Zt4hE1yW8pQ2nB6vK0cM5sJ9xR3aL7uD1fG4oT8iVw0", key_type: "ssh-ed25519", pinned_at: "2026-11-12T18:45:00Z" }],
+]);
 const MOCK_BACKUP_DEFAULTS = { prefix: "bridge/os-backups", include: ["/"], exclude: ["/tmp", "/var/cache", "/var/lib/docker"], retention_days: 30 };
 // A scan with what the backup preview reads: filesystems, a host database,
 // containers and a big file.
@@ -569,6 +575,31 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     for (const x of kept) if (!newest.has(x.host_id)) newest.set(x.host_id, x);
     return json([...newest.values()]);
   }
+  const hostConfigPath = p.match(/^ssh\/host-config\/([^/]+)$/);
+  if (hostConfigPath && method === "GET") {
+    const h = db.hosts.find((x) => x.oficial_slug === hostConfigPath[1]);
+    if (!h) return notFound("host not found");
+    return json({ config: `Host ${h.oficial_slug}\n    HostName ${h.hostname}\n    User ${h.user}\n`, host_key: mockHostKeys.get(h.id) ?? null });
+  }
+  const hostKeyResetPath = p.match(/^hosts\/([^/]+)\/ssh-host-key\/reset$/);
+  if (hostKeyResetPath && method === "POST") {
+    const h = db.hosts.find((x) => x.oficial_slug === hostKeyResetPath[1]);
+    if (!h) return notFound("host not found");
+    mockHostKeys.delete(h.id);
+    return json({ status: "reset" });
+  }
+  if (p === "ssh/host-keys/duplicates" && method === "GET") {
+    const groups = new Map<string, { fingerprint: string; key_type: string; hosts: { id: number; oficial_slug: string; nickname: string }[] }>();
+    for (const h of db.hosts) {
+      const k = mockHostKeys.get(h.id);
+      if (!k) continue;
+      const g = groups.get(k.fingerprint) ?? { fingerprint: k.fingerprint, key_type: k.key_type, hosts: [] };
+      g.hosts.push({ id: h.id, oficial_slug: h.oficial_slug, nickname: h.nickname });
+      groups.set(k.fingerprint, g);
+    }
+    return json([...groups.values()].filter((g) => g.hosts.length > 1));
+  }
+  if (p === "ssh/custom-operations" && method === "GET") return json(paginate([], null, null));
   const profilePath = p.match(/^hosts\/([^/]+)\/backup-profile$/);
   if (profilePath) {
     const h = db.hosts.find((x) => x.oficial_slug === profilePath[1]);

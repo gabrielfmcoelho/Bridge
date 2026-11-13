@@ -1009,6 +1009,16 @@
     "sshConfigWithKey": "With Key",
     "sshConfigWithoutKey": "Without Key",
     "sshConfigHint": "Paste this block into your ~/.ssh/config file to enable quick access via: ssh {slug}",
+    "hostKey": {
+      "title": "Host key",
+      "reset": "Reset",
+      "resetTitle": "Reset the pinned host key?",
+      "resetMessage": "Do this only when you know why the key changed (VM reinstalled, keys regenerated). The next successful connection pins whatever key the host shows then.",
+      "resetDone": "Host key reset: the next connection pins it again",
+      "resetFailed": "Couldn't reset the host key",
+      "pinnedAt": "Pinned on {date}. Bridge refuses this host if it shows another key.",
+      "unpinned": "Not pinned yet: the next successful connection pins the key the host shows."
+    },
     "noAlerts": "No alerts",
     "noAlertsDesc": "This host has no active alerts.",
     "links": "Links",
@@ -2453,6 +2463,10 @@
       "attachGroupHint": "Every repo in this group and its subgroups — now and later — belongs to what you pick."
     },
     "sshOps": {
+      "sharedKeys": {
+        "title": "SSH host keys shared by several hosts ({count})",
+        "hint": "These VMs were cloned from one template and can answer for each other. On each one, regenerate the host keys (remove /etc/ssh/ssh_host_* and run ssh-keygen -A), then reset its pin in the host's SSH config."
+      },
       "title": "SSH operations",
       "intro": "Shell scripts anyone who edits hosts can run from a host's Operações tab. Write {{name}} where a value should be asked for at run time.",
       "name": "Name",
@@ -2588,6 +2602,7 @@
     "createRemoteUserNoEligibleKeys": "No SSH keys with a stored public key. Add or generate one under SSH Keys first.",
     "createRemoteUserNoPubKey": "Selected key has no public key — pick another.",
     "deleteRemoteUser": "Delete Remote User",
+    "hostKeyReset": "Host key reset",
     "deleteRemoteUserDesc": "Remove a non-system user from the remote host, kill their running processes, and clean up their NOPASSWD sudoers drop-in.",
     "deleteRemoteUserFormDesc": "Enter the username to delete. Root and other system accounts (UID < 1000) are blocked. The current SSH login user is also protected.",
     "deleteRemoteUserPlaceholder": "Username to delete",

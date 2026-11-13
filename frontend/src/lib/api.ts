@@ -22,6 +22,20 @@ export type RemoteKeyInfo = {
   source: string;
 };
 
+/** A host's pinned SSH host key: Bridge refuses the host when it shows another. */
+export type SSHHostKeyPin = {
+  fingerprint: string;
+  key_type: string;
+  pinned_at: string | null;
+};
+
+/** One host key pinned on several hosts (VMs cloned from one template). */
+export type SharedSSHHostKey = {
+  fingerprint: string;
+  key_type: string;
+  hosts: { id: number; oficial_slug: string; nickname: string }[];
+};
+
 export type DockerStatusType = {
   installed: boolean;
   docker_version?: string;
@@ -818,7 +832,10 @@ export const sshAPI = {
   listRemoteKeys: (slug: string) =>
     api.post<{ success: boolean; error?: string; keys?: RemoteKeyInfo[] }>(`/api/ssh/list-remote-keys/${slug}`),
   hostConfig: (slug: string, includeKey: boolean) =>
-    api.get<{ config: string }>(`/api/ssh/host-config/${slug}?include_key=${includeKey}`),
+    api.get<{ config: string; host_key: SSHHostKeyPin | null }>(`/api/ssh/host-config/${slug}?include_key=${includeKey}`),
+  // Admin: drop the pinned host key; the next successful login pins again.
+  resetHostKey: (slug: string) => api.post<{ status: string }>(`/api/hosts/${slug}/ssh-host-key/reset`),
+  sharedHostKeys: () => api.get<SharedSSHHostKey[]>("/api/ssh/host-keys/duplicates"),
   dockerSetup: (slug: string, fix: boolean) =>
     api.post<{ success: boolean; error?: string; status?: DockerStatusType }>(`/api/ssh/docker-setup/${slug}`, { fix }),
   nginxCleanup: (slug: string, purge: boolean) =>
