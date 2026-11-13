@@ -141,3 +141,60 @@ func TestDatabaseHandlers_CreatePartialUpdateAndScope(t *testing.T) {
 		t.Fatalf("restore = %d", code)
 	}
 }
+
+// A database SGA can see runs on SGP's instance and tunnels through SGP's
+// host. SGA's editor can still save it: a reference the request leaves as it
+// was isn't re-checked. Pointing one at another asset SGA can't see is 404.
+func TestDatabaseHandlers_ScopedSaveKeepsUnchangedRefs(t *testing.T) {
+	d, err := dbtest.Open(t)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	t.Cleanup(func() { d.Close() })
+	bg := context.Background()
+	sga, sgp := entidadeID(t, d, "sga"), entidadeID(t, d, "sgp")
+	grant := func(a store.AssetType, id, ent int64) {
+		t.Helper()
+		if err := store.NewAssetEntidadeRepo(d.SQL).Replace(bg, d.SQL, a, id, models.AssetGrants{CreatorEntidadeID: &ent}); err != nil {
+			t.Fatalf("grant: %v", err)
+		}
+	}
+	mkSvc := func(nick string) int64 {
+		t.Helper()
+		s := &models.Service{Nickname: nick, ServiceKind: "database"}
+		if err := store.NewServiceRepo(d.SQL).Create(bg, s); err != nil {
+			t.Fatalf("service: %v", err)
+		}
+		grant(store.AssetService, s.ID, sgp)
+		return s.ID
+	}
+	pg, otherPG := mkSvc("pg-sgp"), mkSvc("pg-sgp-2")
+	bastion := &models.Host{Nickname: "bastion", OficialSlug: "bastion", Hostname: "10.0.0.1", User: "root", Situacao: "active"}
+	if err := store.NewHostRepo(d.SQL).Create(bg, bastion); err != nil {
+		t.Fatalf("host: %v", err)
+	}
+	grant(store.AssetHost, bastion.ID, sgp)
+	db := &models.Database{Name: "shared", Engine: "postgres", InstanceServiceID: &pg, ConnectionMode: "ssh_tunnel", TunnelHostID: &bastion.ID}
+	if err := store.NewDatabaseRepo(d.SQL).Create(bg, db); err != nil {
+		t.Fatalf("database: %v", err)
+	}
+	grant(store.AssetDatabase, db.ID, sga)
+
+	scoped := dbHandlerEnv(t, d, "editor", sga)
+	path := fmt.Sprintf("/api/databases/%d", db.ID)
+	if code, got := scoped("PUT", path, `{"description":"main db"}`); code != http.StatusOK {
+		t.Fatalf("scoped partial save = %d %v; want 200", code, got)
+	}
+	// The form sends every field back, refs included.
+	if code, got := scoped("PUT", path, fmt.Sprintf(`{"name":"shared db","instance_service_id":%d,"tunnel_host_id":%d}`, pg, bastion.ID)); code != http.StatusOK {
+		t.Fatalf("scoped save resending refs = %d %v; want 200", code, got)
+	}
+	if code, _ := scoped("PUT", path, fmt.Sprintf(`{"instance_service_id":%d}`, otherPG)); code != http.StatusNotFound {
+		t.Fatalf("scoped move to invisible instance = %d; want 404", code)
+	}
+	got, err := store.NewDatabaseRepo(d.SQL).Get(bg, db.ID)
+	if err != nil || got == nil || got.Name != "shared db" || got.InstanceServiceID == nil || *got.InstanceServiceID != pg ||
+		got.TunnelHostID == nil || *got.TunnelHostID != bastion.ID {
+		t.Fatalf("after scoped saves = %+v, %v; want name 'shared db', instance %d, tunnel host %d", got, err, pg, bastion.ID)
+	}
+}
