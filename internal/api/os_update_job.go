@@ -144,7 +144,8 @@ func (j *osUpdateJob) doHost(ctx context.Context, db *sql.DB, run models.OSUpdat
 	if err := repo.FinishResult(ctx, &res); err != nil {
 		log.Printf("[osupdate] run %d host %d: save result: %v", run.ID, hostID, err)
 	}
-	if run.RequestedBy != nil {
+	// A scan writes its own "test" row (noteTest), like the synchronous scan.
+	if run.RequestedBy != nil && run.Kind != models.RunKindScan {
 		status := map[string]string{models.OSResultSuccess: "success", models.OSResultFailed: "failed"}[res.Status]
 		if status == "" {
 			status = "info"
@@ -771,23 +772,9 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 	if !req.Backup {
 		req.BackupInclude, req.BackupExclude = nil, nil
 	}
-	if len(req.HostIDs) == 0 || len(req.HostIDs) > osUpdateMaxHosts {
-		jsonError(w, http.StatusBadRequest, fmt.Sprintf("host_ids must have 1 to %d hosts", osUpdateMaxHosts))
+	var ok bool
+	if req.Concurrency, ok = h.checkRunHosts(w, r, req.HostIDs, req.Concurrency, 3); !ok {
 		return
-	}
-	if req.Concurrency == 0 {
-		req.Concurrency = 3
-	}
-	if req.Concurrency < 1 || req.Concurrency > osUpdateMaxConcurrency {
-		jsonError(w, http.StatusBadRequest, fmt.Sprintf("concurrency must be 1 to %d", osUpdateMaxConcurrency))
-		return
-	}
-	hosts := store.NewHostRepo(h.db.SQL)
-	for _, id := range req.HostIDs {
-		if host, err := hosts.GetByID(r.Context(), id); err != nil || host == nil {
-			jsonError(w, http.StatusNotFound, fmt.Sprintf("host %d not found", id))
-			return
-		}
 	}
 	// A release can leave a VM unbootable: with MinIO set up it skips its own
 	// backup only when the host already has one to go back to, or when the
@@ -825,6 +812,30 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 		got = &run
 	}
 	httpx.WriteJSON(w, http.StatusAccepted, got)
+}
+
+// checkRunHosts validates a run's hosts and concurrency (0 → def) and returns
+// the concurrency, or writes 400, or 404 for a host the caller can't see.
+func (h *sshHandlers) checkRunHosts(w http.ResponseWriter, r *http.Request, hostIDs []int64, concurrency, def int) (int, bool) {
+	if len(hostIDs) == 0 || len(hostIDs) > osUpdateMaxHosts {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("host_ids must have 1 to %d hosts", osUpdateMaxHosts))
+		return 0, false
+	}
+	if concurrency == 0 {
+		concurrency = def
+	}
+	if concurrency < 1 || concurrency > osUpdateMaxConcurrency {
+		jsonError(w, http.StatusBadRequest, fmt.Sprintf("concurrency must be 1 to %d", osUpdateMaxConcurrency))
+		return 0, false
+	}
+	hosts := store.NewHostRepo(h.db.SQL)
+	for _, id := range hostIDs {
+		if host, err := hosts.GetByID(r.Context(), id); err != nil || host == nil {
+			jsonError(w, http.StatusNotFound, fmt.Sprintf("host %d not found", id))
+			return 0, false
+		}
+	}
+	return concurrency, true
 }
 
 // handleListOSUpdates godoc

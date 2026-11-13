@@ -209,18 +209,13 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	method, auth, ok := h.resolveAuth(w, host, req.Method)
+	method, authn, ok := h.resolveAuth(w, host, req.Method)
 	if !ok {
 		return
 	}
-
-	// Helper to update test status on the host record
-	setTestStatus := func(status string) {
-		if method == "password" {
-			host.PasswordTestStatus = &status
-		} else {
-			host.KeyTestStatus = &status
-		}
+	var userID int64
+	if u := auth.UserFromContext(r.Context()); u != nil {
+		userID = u.ID
 	}
 
 	// Dial inline (don't use h.dial helper) so we can persist
@@ -228,59 +223,31 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 	// returns 502 without touching the DB, which leaves rows stuck as
 	// "untested" forever even though the user clearly attempted a scan.
 	// A changed host key fails here too (service.HostKeyChangedError).
-	client, dialErr := service.DialHost(r.Context(), h.db, host, user, auth)
-	if dialErr != nil {
-		host.ConnectionsFailed++
-		setTestStatus("failed")
-		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-		h.logOperation(r, host.ID, "test", &method, "failed", dialErr.Error())
-		jsonOK(w, map[string]any{"success": false, "error": "SSH connect: " + dialErr.Error()})
+	client, err := service.DialHost(r.Context(), h.db, host, user, authn)
+	if err != nil {
+		h.noteTest(r.Context(), host, method, userID, err)
+		jsonOK(w, map[string]any{"success": false, "error": "SSH connect: " + err.Error()})
 		return
 	}
 	defer client.Close()
 
-	result := map[string]any{}
-
+	var vmInfo *sshtest.VMInfo
 	if req.Capture {
-		vmInfo, testErr := sshtest.TestCapture(client, auth.Password(), sshtest.CaptureSync)
-		if testErr != nil {
-			host.ConnectionsFailed++
-			setTestStatus("failed")
-			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
-			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
-			return
-		}
-		result["success"] = true
-		result["vm_info"] = vmInfo
-		if host.ConnectionsFailed > 0 {
-			host.ConnectionsFailed = 0
-		}
-		setTestStatus("success")
-		// Saved here: recordScan writes the host only when its specs change.
-		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-
-		h.logOperation(r, host.ID, "test", &method, "success", "")
-		h.recordScan(r.Context(), host, vmInfo, result)
+		vmInfo, err = sshtest.TestCapture(client, authn.Password(), sshtest.CaptureSync)
 	} else {
-		testErr := sshtest.Test(client)
-		if testErr != nil {
-			host.ConnectionsFailed++
-			setTestStatus("failed")
-			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
-			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
-			return
-		}
-		result["success"] = true
-		if host.ConnectionsFailed > 0 {
-			host.ConnectionsFailed = 0
-		}
-		setTestStatus("success")
-		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-		h.logOperation(r, host.ID, "test", &method, "success", "")
+		err = sshtest.Test(client)
 	}
-
+	// Saved here: recordScan writes the host only when its specs change.
+	h.noteTest(r.Context(), host, method, userID, err)
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	result := map[string]any{"success": true}
+	if vmInfo != nil {
+		result["vm_info"] = vmInfo
+		h.recordScan(r.Context(), host, vmInfo, result)
+	}
 	jsonOK(w, result)
 }
 
@@ -1653,6 +1620,10 @@ func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/ssh/preview-config", h.handlePreviewConfig)
 	rr.role("editor", "POST /api/ssh/generate-config", h.handleGenerateConfig)
 	rr.role("editor", "POST /api/ssh/test/{slug}", h.handleTestConnection)
+	rr.role("editor", "POST /api/ssh/scans", h.handleStartScan)
+	rr.role("editor", "GET /api/ssh/scans", h.handleListScans)
+	rr.role("editor", "GET /api/ssh/scans/{id}", h.handleGetScan)
+	rr.role("editor", "POST /api/ssh/scans/{id}/cancel", h.handleCancelScan)
 	rr.role("editor", "POST /api/ssh/network-test/{slug}", h.handleNetworkTest)
 	rr.role("editor", "POST /api/ssh/setup-key/{slug}", h.handleSetupKey)
 	rr.role("editor", "POST /api/ssh/fix-dev-null/{slug}", h.handleFixDevNull)
