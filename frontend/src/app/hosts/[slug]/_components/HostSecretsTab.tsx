@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { secretsAPI } from "@/lib/api";
 import type { Secret } from "@/lib/types";
 import { useLocale } from "@/contexts/LocaleContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useFlag } from "@/contexts/FlagContext";
 import { useSecretReveal } from "@/hooks/useSecretReveal";
 import Card from "@/components/ui/Card";
@@ -19,6 +20,8 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 /** Secrets the scan found in this host's command lines (vault, group `scan-*`). */
 export default function HostSecretsTab({ hostId, scanText }: { hostId: number; scanText: string }) {
   const { t } = useLocale();
+  const { user } = useAuth();
+  const canReveal = user?.role === "admin" || !!user?.permissions?.includes("hosts.secrets.reveal");
   const { data, isLoading, error } = useQuery({
     queryKey: ["host-scan-secrets", hostId],
     queryFn: () => secretsAPI.list({ scope: "host", parent_id: hostId, type: "env_var" }),
@@ -37,7 +40,7 @@ export default function HostSecretsTab({ hostId, scanText }: { hostId: number; s
       ) : (
         <div className="space-y-2">
           {secrets.map((s) => (
-            <SecretRow key={s.id} secret={s} inScan={scanText.includes(`{{secret:${s.id}}}`)} />
+            <SecretRow key={s.id} secret={s} inScan={scanText.includes(`{{secret:${s.id}}}`)} canReveal={canReveal} />
           ))}
         </div>
       )}
@@ -45,7 +48,7 @@ export default function HostSecretsTab({ hostId, scanText }: { hostId: number; s
   );
 }
 
-function SecretRow({ secret, inScan }: { secret: Secret; inScan: boolean }) {
+function SecretRow({ secret, inScan, canReveal }: { secret: Secret; inScan: boolean; canReveal: boolean }) {
   const { t, formatDateTime } = useLocale();
   const flag = useFlag();
   const r = useSecretReveal();
@@ -67,14 +70,16 @@ function SecretRow({ secret, inScan }: { secret: Secret; inScan: boolean }) {
           {inScan ? t("host.secrets.inScan") : t("host.secrets.gone")}
         </span>
         <span className="text-2xs text-[var(--text-faint)]">{t("host.secrets.updated", { when: formatDateTime(secret.updated_at) })}</span>
-        <PillButton
-          active={r.revealed}
-          disabled={r.loading}
-          onClick={() => (r.revealed ? r.hide() : r.reveal(secret.id))}
-          lead={<Icon path={ICON_PATHS.lock} className="w-3 h-3" />}
-        >
-          {r.revealed ? t("host.secrets.hide") : t("host.secrets.reveal")}
-        </PillButton>
+        {canReveal && (
+          <PillButton
+            active={r.revealed}
+            disabled={r.loading}
+            onClick={() => (r.revealed ? r.hide() : r.reveal(secret.id))}
+            lead={<Icon path={ICON_PATHS.lock} className="w-3 h-3" />}
+          >
+            {r.revealed ? t("host.secrets.hide") : t("host.secrets.reveal")}
+          </PillButton>
+        )}
       </div>
       {r.revealed && r.value != null && (
         <div className="mt-2 flex items-center gap-2">
