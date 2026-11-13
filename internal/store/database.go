@@ -120,20 +120,27 @@ func (r *DatabaseRepo) List(ctx context.Context, f models.DatabaseFilter) ([]mod
 			args = append(args, eq.v)
 		}
 	}
+	// Link filters go only through assets the caller can see: an id it can't
+	// see matches nothing, as if it didn't exist, and a project never reaches
+	// a database through another entidade's service.
+	services, sargs := liveVisibleIDs(ctx, `services`, AssetService)
 	if f.InstanceServiceID != 0 {
-		q += " AND d.instance_service_id = ?"
-		args = append(args, f.InstanceServiceID)
+		q += " AND d.instance_service_id = ? AND d.instance_service_id IN (" + services + ")"
+		args = append(append(args, f.InstanceServiceID), sargs...)
 	}
 	if f.ConsumerServiceID != 0 {
-		q += " AND d.id IN (SELECT database_id FROM database_consumer_links WHERE service_id = ?)"
-		args = append(args, f.ConsumerServiceID)
+		q += " AND d.id IN (SELECT database_id FROM database_consumer_links WHERE service_id = ? AND service_id IN (" + services + "))"
+		args = append(append(args, f.ConsumerServiceID), sargs...)
 	}
 	if f.ProjectID != 0 {
-		q += ` AND (d.id IN (SELECT database_id FROM database_project_links WHERE project_id = ?)
-			OR d.instance_service_id IN (SELECT id FROM services WHERE project_id = ? AND deleted_at IS NULL)
+		projects, pargs := liveVisibleIDs(ctx, `projects`, AssetProject)
+		q += ` AND ? IN (` + projects + `) AND (d.id IN (SELECT database_id FROM database_project_links WHERE project_id = ?)
+			OR d.instance_service_id IN (SELECT s.id FROM services s WHERE s.project_id = ? AND s.id IN (` + services + `))
 			OR d.id IN (SELECT l.database_id FROM database_consumer_links l JOIN services s ON s.id = l.service_id
-				WHERE s.project_id = ? AND s.deleted_at IS NULL))`
-		args = append(args, f.ProjectID, f.ProjectID, f.ProjectID)
+				WHERE s.project_id = ? AND s.id IN (` + services + `)))`
+		args = append(append(args, f.ProjectID), pargs...)
+		args = append(append(args, f.ProjectID, f.ProjectID), sargs...)
+		args = append(append(args, f.ProjectID), sargs...)
 	}
 	q += " ORDER BY d.name, d.id"
 	return r.query(ctx, q, args...)

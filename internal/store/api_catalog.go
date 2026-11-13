@@ -184,7 +184,7 @@ func (r *APICatalogRepo) List(ctx context.Context, f models.APICatalogFilter) ([
 		FROM api_catalog c WHERE c.deleted_at IS NULL`
 	vis, args := VisibleExpr(ctx, AssetAPICatalog, "c.id")
 	q += " AND " + vis
-	q, args = apiLinkFilter(q, args, f.ServiceID, f.ProjectID)
+	q, args = apiLinkFilter(ctx, q, args, f.ServiceID, f.ProjectID)
 	if f.Query != "" {
 		like := "%" + strings.ToLower(f.Query) + "%"
 		q += " AND (LOWER(c.name) LIKE ? OR LOWER(c.title) LIKE ? OR LOWER(c.description) LIKE ? OR LOWER(c.use_cases) LIKE ?)"
@@ -249,17 +249,22 @@ func normalizeAPILinks(a *models.APICatalog) {
 
 // apiLinkFilter narrows a query over api_catalog c to APIs linked to a
 // service, and/or to a project — directly or through one of its live
-// services (the same indirection the relations use for hosts and DNS).
-func apiLinkFilter(q string, args []any, serviceID, projectID int64) (string, []any) {
+// services (the same indirection the relations use for hosts and DNS). Only
+// through assets the caller can see: filtering by an id it can't see matches
+// nothing, as if it didn't exist, and a project never reaches an API through
+// another entidade's service.
+func apiLinkFilter(ctx context.Context, q string, args []any, serviceID, projectID int64) (string, []any) {
+	services, sargs := liveVisibleIDs(ctx, `services`, AssetService)
 	if serviceID != 0 {
-		q += " AND c.id IN (SELECT api_id FROM api_service_links WHERE service_id = ?)"
-		args = append(args, serviceID)
+		q += " AND c.id IN (SELECT api_id FROM api_service_links WHERE service_id = ? AND service_id IN (" + services + "))"
+		args = append(append(args, serviceID), sargs...)
 	}
 	if projectID != 0 {
-		q += ` AND c.id IN (SELECT api_id FROM api_project_links WHERE project_id = ?
+		projects, pargs := liveVisibleIDs(ctx, `projects`, AssetProject)
+		q += ` AND ? IN (` + projects + `) AND c.id IN (SELECT api_id FROM api_project_links WHERE project_id = ?
 			UNION SELECT l.api_id FROM api_service_links l JOIN services s ON s.id = l.service_id
-			 WHERE s.project_id = ? AND s.deleted_at IS NULL)`
-		args = append(args, projectID, projectID)
+			 WHERE s.project_id = ? AND s.id IN (` + services + `))`
+		args = append(append(append(append(args, projectID), pargs...), projectID, projectID), sargs...)
 	}
 	return q, args
 }
@@ -398,7 +403,7 @@ func (r *APICatalogRepo) SearchOperations(ctx context.Context, query string, ser
 		WHERE c.deleted_at IS NULL`
 	vis, args := VisibleExpr(ctx, AssetAPICatalog, "c.id")
 	q += " AND " + vis
-	q, args = apiLinkFilter(q, args, serviceID, projectID)
+	q, args = apiLinkFilter(ctx, q, args, serviceID, projectID)
 	if query != "" {
 		like := "%" + strings.ToLower(query) + "%"
 		q += ` AND (LOWER(o.method) LIKE ? OR LOWER(o.path) LIKE ? OR LOWER(o.operation_id) LIKE ?
