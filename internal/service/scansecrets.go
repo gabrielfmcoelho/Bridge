@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
@@ -33,13 +34,21 @@ type FoundSecret struct {
 
 var (
 	secretKeyRe = regexp.MustCompile(`(?i)(pass(word|wd)?|pwd|secret|token|api[-_]?key|credential)`)
-	// -D<name>=<v>, --<name>=<v>, -<name>=<v> and NAME=<v>, each its own word
-	// (a crontab line's assignment follows the schedule).
-	assignRe = regexp.MustCompile(`(?:^|\s)(?:-D|--?)?([A-Za-z_][A-Za-z0-9_.\-]*)=(\S*)`)
-	// --<name> <v>, the value not itself a flag.
-	flagArgRe = regexp.MustCompile(`(?:^|\s)--([A-Za-z_][A-Za-z0-9_.\-]*)\s+([^\s-]\S*)`)
-	// scheme://user:pass@host
-	urlUserRe     = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://([^\s:/@]*):([^\s@/]+)@([^\s/:?#@]+)`)
+	// A key starts a word: after a space, a quote (sh -c "…"), "(", ";", "&"
+	// (a query string too) or "|". The patterns stop at the key, the value is
+	// read by hand, so a value never hides the next key.
+	keyStart = `(?:^|[\s"'(;&|])`
+	// -D<name>=, --<name>=, -<name>= and NAME=.
+	assignRe = regexp.MustCompile(keyStart + `(?:-D|--?)?([A-Za-z_][A-Za-z0-9_.\-]*)=`)
+	// --<name> followed by whitespace and a value that is not itself a flag.
+	flagArgRe = regexp.MustCompile(keyStart + `--([A-Za-z_][A-Za-z0-9_.\-]*)`)
+	// scheme://user:pass@host — userinfo ends at the last "@", as Go's and
+	// Python's URL parsers read it.
+	urlUserRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://([^\s:/@]*):([^\s/]+)@([^\s/:?#@]+)`)
+	// A resource_top line cut inside a URL's password: no "@" is left.
+	cutURLRe = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.\-]*://[^\s:/@]*:([^\s@/]+)…$`)
+	// Not values: a reference ($NAME, ${NAME}) or a redaction token.
+	notValueRe    = regexp.MustCompile(`^(\$(\{[A-Za-z_]\w*\}|[A-Za-z_]\w*)|\{\{secret(:\d+)?\}\})$`)
 	wordRe        = regexp.MustCompile(`\S+`)
 	envAssignRe   = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
 	interpreterRe = regexp.MustCompile(`^(python|node|nodejs|php|ruby)[0-9.]*$`)
@@ -48,6 +57,8 @@ var (
 )
 
 var mysqlClients = map[string]bool{"mysql": true, "mysqldump": true, "mysqladmin": true}
+
+const blankToken = "{{secret}}"
 
 // FindSecrets returns the secrets in cmd, in order, spans never overlapping.
 // Empty values, references ($VAR, ${VAR}) and redaction tokens are skipped.
@@ -59,18 +70,33 @@ func FindSecrets(cmd string) []FoundSecret {
 			if j := strings.IndexByte(cmd[s+1:], cmd[s]); j >= 0 {
 				s, e = s+1, s+1+j
 			}
+		} else if q := cmd[max(e-1, 0)]; s < e && (q == '"' || q == '\'') &&
+			strings.Count(cmd[s:e], string(q)) == 1 && strings.Count(cmd[:s], string(q))%2 == 1 {
+			e-- // the quote closing a quoted command: sh -c "app --token=abc"
 		}
-		v := cmd[s:e]
-		if v == "" || v[0] == '$' || strings.HasPrefix(v, "{{secret") {
+		if t := strings.Trim(cmd[s:e], `"'`); t == "" || notValueRe.MatchString(t) {
 			return
 		}
-		found = append(found, FoundSecret{Key: key, Value: v, Start: s, End: e})
+		found = append(found, FoundSecret{Key: key, Value: cmd[s:e], Start: s, End: e})
 	}
-	for _, re := range []*regexp.Regexp{assignRe, flagArgRe} {
-		for _, m := range re.FindAllStringSubmatchIndex(cmd, -1) {
-			if key := cmd[m[2]:m[3]]; secretKeyRe.MatchString(key) {
-				add(key, m[4], m[5])
-			}
+	wordEnd := func(s int) int {
+		if i := strings.IndexAny(cmd[s:], " \t\n\v\f\r"); i >= 0 {
+			return s + i
+		}
+		return len(cmd)
+	}
+	for _, m := range assignRe.FindAllStringSubmatchIndex(cmd, -1) {
+		if key := cmd[m[2]:m[3]]; secretKeyRe.MatchString(key) {
+			add(key, m[1], wordEnd(m[1]))
+		}
+	}
+	for _, m := range flagArgRe.FindAllStringSubmatchIndex(cmd, -1) {
+		s := m[1]
+		for s < len(cmd) && strings.IndexByte(" \t\n\v\f\r", cmd[s]) >= 0 {
+			s++
+		}
+		if key := cmd[m[2]:m[3]]; s > m[1] && s < len(cmd) && cmd[s] != '-' && secretKeyRe.MatchString(key) {
+			add(key, s, wordEnd(s))
 		}
 	}
 	for _, m := range urlUserRe.FindAllStringSubmatchIndex(cmd, -1) {
@@ -91,8 +117,14 @@ func FindSecrets(cmd string) []FoundSecret {
 		switch {
 		case f.Start >= end:
 			out, end = append(out, f), f.End
-		case f.End > end: // starts inside the previous value and ends past it: one span covers both
+		case f.End > end:
+			// Starts inside the previous value and ends past it (a quote closed
+			// mid-value): one span covers both, its opening quote too, so no
+			// lone quote is left in front of the token.
 			p := &out[len(out)-1]
+			if p.Start > 0 && (cmd[p.Start-1] == '"' || cmd[p.Start-1] == '\'') {
+				p.Start--
+			}
 			p.End, p.Value, end = f.End, cmd[p.Start:f.End], f.End
 		}
 	}
@@ -136,7 +168,10 @@ func SecretOrigin(cmd string) string {
 // commandOrigin returns the group (scan-<origin>), where the secret was found
 // (for its description) and the program. Java → the app home, else the jar
 // of -jar; an interpreter → its script; anything else → argv[0]'s basename.
+// Read with every value blanked: a value never names any of them, and a
+// rotated value keeps its identity.
 func commandOrigin(cmd string) (group, where, prog string) {
+	cmd = redactSpans(cmd, FindSecrets(cmd), blank)
 	args := strings.Fields(cmd)
 	for len(args) > 1 && envAssignRe.MatchString(args[0]) {
 		args = args[1:]
@@ -163,7 +198,7 @@ func scriptArg(args []string, java bool) string {
 		switch {
 		case (a == "-jar" || a == "-m") && i+1 < len(args):
 			return args[i+1]
-		case java || strings.HasPrefix(a, "-"):
+		case java || strings.HasPrefix(a, "-") || strings.ContainsAny(a, "={"): // a flag, a setting (php -d k=v), a blanked value
 		default:
 			return a
 		}
@@ -177,6 +212,8 @@ func scanGroup(origin string) string {
 	}
 	return vault.ScanSecretGroupPrefix + "unknown"
 }
+
+func blank(FoundSecret) string { return blankToken }
 
 // redactSpans replaces each found value (sorted, not overlapping, as
 // FindSecrets returns them) with its token; the rest of cmd is untouched.
@@ -229,11 +266,10 @@ func scanCommandLines(info *sshtest.VMInfo) (sources []cmdSource, redactOnly []*
 
 // RecordScanSecrets stores every secret on info's processes and cron jobs as
 // the host's scan secret, written by actorUserID (≤ 0: the system actor), and
-// replaces each value in info by its token. Values sharing a (group, name)
-// are named NAME, NAME_2, … in value order, so a re-scan listing them in
-// another order names them alike. Every value is redacted whatever happens:
-// one the vault refused or holds in the trash becomes {{secret}}. Returns
-// how many secrets the vault holds for this scan.
+// replaces each value in info by its token (secretNames picks the names).
+// Every value is redacted whatever happens: one the vault refused or holds in
+// the trash becomes {{secret}}. Returns how many secrets the vault holds for
+// this scan; the error only counts the others.
 func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID int64, info *sshtest.VMInfo) (int, error) {
 	sources, redactOnly := scanCommandLines(info)
 	type ident struct{ group, name string }
@@ -241,38 +277,42 @@ func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID
 	found := make([][]FoundSecret, len(sources))
 	for i, s := range sources {
 		found[i] = FindSecrets(*s.cmd)
-		for _, f := range found[i] {
+		for k, f := range found[i] {
 			id := ident{s.group, EnvVarName(f.Key)}
 			if values[id] == nil {
 				values[id] = map[string]string{}
 			}
-			desc := spelling(*s.cmd, f) + " · " + s.prog + " · " + s.where
+			// Spelled from the line before it, earlier values blanked.
+			pre := redactSpans((*s.cmd)[:f.Start], found[i][:k], blank)
+			desc := spelling(pre, f.Key) + " · " + s.prog + " · " + s.where
 			if old, ok := values[id][f.Value]; !ok || desc < old {
 				values[id][f.Value] = desc
 			}
 		}
 	}
 
-	const blank = "{{secret}}"
 	tokens := map[string]string{}  // group, name, value → token
 	byValue := map[string]string{} // value → token, for the redact-only lines
 	var errs []error
 	n := 0
 	for id, vals := range values {
-		for k, v := range slices.Sorted(maps.Keys(vals)) {
-			name := id.name
-			if k > 0 {
-				name = fmt.Sprintf("%s_%d", id.name, k+1)
-			}
-			tok := blank
-			switch sid, err := vault.UpsertScanSecret(ctx, db, hostID, actorUserID, id.group, name, v, vals[v]); {
-			case err == nil:
-				tok, n = fmt.Sprintf("{{secret:%d}}", sid), n+1
-			case !errors.Is(err, vault.ErrScanSecretTrashed):
-				errs = append(errs, fmt.Errorf("%s/%s: %w", id.group, name, err))
+		sorted := slices.Sorted(maps.Keys(vals))
+		names, err := secretNames(ctx, db, hostID, id.group, id.name, sorted)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		for _, v := range sorted {
+			tok := blankToken
+			if name, ok := names[v]; ok {
+				switch sid, err := vault.UpsertScanSecret(ctx, db, hostID, actorUserID, id.group, name, v, vals[v]); {
+				case err == nil:
+					tok, n = fmt.Sprintf("{{secret:%d}}", sid), n+1
+				case !errors.Is(err, vault.ErrScanSecretTrashed):
+					errs = append(errs, err)
+				}
 			}
 			tokens[id.group+"\x00"+id.name+"\x00"+v] = tok
-			if byValue[v] == "" || byValue[v] == blank {
+			if byValue[v] == "" || byValue[v] == blankToken {
 				byValue[v] = tok
 			}
 		}
@@ -281,7 +321,7 @@ func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID
 		if t, ok := m[key]; ok {
 			return t
 		}
-		return blank
+		return blankToken
 	}
 	for i, s := range sources {
 		*s.cmd = redactSpans(*s.cmd, found[i], func(f FoundSecret) string {
@@ -290,17 +330,83 @@ func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID
 	}
 	for _, c := range redactOnly {
 		*c = redactSpans(*c, FindSecrets(*c), func(f FoundSecret) string { return lookup(byValue, f.Value) })
+		if m := cutURLRe.FindStringSubmatchIndex(*c); m != nil && (*c)[m[2]:m[3]] != blankToken {
+			*c = (*c)[:m[2]] + blankToken + (*c)[m[3]:]
+		}
 	}
-	return n, errors.Join(errs...)
+	if len(errs) > 0 {
+		return n, &scanSecretsError{failed: len(errs), err: errors.Join(errs...)}
+	}
+	return n, nil
 }
 
-// spelling is the key as the command line wrote it (-DcacheServerPassword).
-func spelling(cmd string, f FoundSecret) string {
-	pre := strings.Fields(strings.TrimRight(cmd[:f.Start], "=:'\" \t"))
-	if len(pre) == 0 {
-		return f.Key
+// scanSecretsError counts what the vault didn't take. Its text names no group
+// or secret (both come from the scanned line); the causes stay reachable
+// through errors.Is / errors.As.
+type scanSecretsError struct {
+	failed int
+	err    error
+}
+
+func (e *scanSecretsError) Error() string {
+	return fmt.Sprintf("%d scan secret write(s) failed; their values are blanked in the scan", e.failed)
+}
+
+func (e *scanSecretsError) Unwrap() error { return e.err }
+
+// secretNames gives each value of a (group, base) its name: the name already
+// holding it (live or trashed — a trashed one stays blank); else a name of
+// that family this scan didn't match, in suffix order, so a rotated value
+// updates its row; else the next free suffix. A value no longer seen keeps
+// its row: a new value never takes a name that still holds a value seen now.
+func secretNames(ctx context.Context, db *database.DB, hostID int64, group, base string, values []string) (map[string]string, error) {
+	held, names, err := vault.ScanSecretNames(ctx, db, hostID, group, base, values)
+	if err != nil {
+		return nil, err
 	}
-	return pre[len(pre)-1]
+	out, used, taken := map[string]string{}, map[string]bool{}, map[string]bool{}
+	for _, v := range values {
+		if name, ok := held[v]; ok && !used[name] {
+			out[v], used[name] = name, true
+		}
+	}
+	free := slices.DeleteFunc(slices.Clone(names), func(name string) bool { return used[name] })
+	for _, name := range names {
+		taken[name] = true
+	}
+	next := 1
+	for _, v := range values {
+		if _, ok := out[v]; ok {
+			continue
+		}
+		if len(free) > 0 {
+			out[v], free = free[0], free[1:]
+			continue
+		}
+		for taken[suffixed(base, next)] {
+			next++
+		}
+		out[v], taken[suffixed(base, next)] = suffixed(base, next), true
+	}
+	return out, nil
+}
+
+// suffixed is base for n = 1, else base_<n>.
+func suffixed(base string, n int) string {
+	if n == 1 {
+		return base
+	}
+	return fmt.Sprintf("%s_%d", base, n)
+}
+
+// spelling is the key as the command line wrote it (-DcacheServerPassword):
+// the last word of the line before the value.
+func spelling(pre, key string) string {
+	words := strings.Fields(strings.TrimRight(pre, "=:'\" \t"))
+	if len(words) == 0 {
+		return key
+	}
+	return words[len(words)-1]
 }
 
 const scanSecretsBackfillFlag = "scan_secrets_backfill_v1"
@@ -308,45 +414,49 @@ const scanSecretsBackfillFlag = "scan_secrets_backfill_v1"
 // scanBackfillBatch is how many host_scans rows the backfill reads at a time.
 var scanBackfillBatch = 200
 
-// BackfillScanSecrets registers the secrets of every stored scan, in id order
-// (a later scan's value wins), and rewrites each row that held one, redacted.
-// Re-runnable: a row already redacted holds no value and is left alone.
-// rows is the scans rewritten, secrets the secrets found in them.
-func BackfillScanSecrets(ctx context.Context, db *database.DB) (rows, secrets int, err error) {
+// BackfillScanSecrets registers the secrets of every stored scan after
+// afterID, in id order (a later scan's value wins), and rewrites each row that
+// held one, redacted. Re-runnable: a row already redacted holds no value and
+// is left alone. rows is the scans rewritten, secrets the secrets found in
+// them, last the id of the last scan gone through (afterID when none).
+func BackfillScanSecrets(ctx context.Context, db *database.DB, afterID int64) (rows, secrets int, last int64, err error) {
 	ctx = store.WithSystemScope(ctx)
 	repo := store.NewHostScanRepo(db.SQL)
 	var firstErr error
 	failed := 0
-	for after := int64(0); ; {
-		batch, err := repo.ListAfter(ctx, after, scanBackfillBatch)
+	last = afterID
+	for {
+		batch, err := repo.ListAfter(ctx, last, scanBackfillBatch)
 		if err != nil {
-			return rows, secrets, err
+			return rows, secrets, last, err
 		}
 		if len(batch) == 0 {
 			break
 		}
 		for _, s := range batch {
-			after = s.ID
 			data, n, recErr := redactScanJSON(ctx, db, s.HostID, s.Data)
 			secrets += n
+			if errors.Is(recErr, errScanNotRewritten) {
+				return rows, secrets, last, recErr
+			}
 			if recErr != nil {
 				if failed++; firstErr == nil {
 					firstErr = recErr
 				}
 			}
-			if data == "" {
-				continue
+			if data != "" {
+				if err := repo.UpdateData(ctx, s.ID, data); err != nil {
+					return rows, secrets, last, err
+				}
+				rows++
 			}
-			if err := repo.UpdateData(ctx, s.ID, data); err != nil {
-				return rows, secrets, err
-			}
-			rows++
+			last = s.ID
 		}
 	}
 	if failed > 0 {
-		return rows, secrets, fmt.Errorf("%d scan(s) with a secret the vault didn't take (blanked), first: %w", failed, firstErr)
+		return rows, secrets, last, fmt.Errorf("%d scan(s) with a secret the vault didn't take (blanked): %w", failed, firstErr)
 	}
-	return rows, secrets, nil
+	return rows, secrets, last, nil
 }
 
 // redactScanJSON registers one stored scan's secrets and returns its JSON
@@ -384,14 +494,18 @@ func redactScanJSON(ctx context.Context, db *database.DB, hostID int64, data str
 	dec := json.NewDecoder(strings.NewReader(data))
 	dec.UseNumber()
 	if err := dec.Decode(&tree); err != nil {
-		return "", n, errors.Join(recErr, err)
+		return "", n, fmt.Errorf("%w: %w", errScanNotRewritten, errors.Join(recErr, err))
 	}
 	out, err := json.Marshal(replaceStrings(tree, repl))
 	if err != nil {
-		return "", n, errors.Join(recErr, err)
+		return "", n, fmt.Errorf("%w: %w", errScanNotRewritten, errors.Join(recErr, err))
 	}
 	return string(out), n, recErr
 }
+
+// errScanNotRewritten: a row holding a value could not be rewritten; the
+// backfill stops before it so the next start tries it again.
+var errScanNotRewritten = errors.New("scan not rewritten")
 
 // replaceStrings swaps every string in a decoded JSON tree that equals a key of repl.
 func replaceStrings(v any, repl map[string]string) any {
@@ -412,21 +526,22 @@ func replaceStrings(v any, repl map[string]string) any {
 	return v
 }
 
-// RunScanSecretsBackfill runs BackfillScanSecrets once (flag
-// scan_secrets_backfill_v1, set only when every row went through). A failure
-// is retried at the next start. Logs counts only.
+// RunScanSecretsBackfill runs BackfillScanSecrets after the last scan it went
+// through (the flag scan_secrets_backfill_v1 holds that id), so a start also
+// redacts the plaintext rows an older binary wrote after the previous walk (a
+// rolling deploy). A failure is retried at the next start. Logs counts only.
 func RunScanSecretsBackfill(ctx context.Context, db *database.DB) {
 	settings := store.NewAppSettingsRepo(db.SQL)
-	if settings.Value(ctx, scanSecretsBackfillFlag) != "" {
-		return
+	after, _ := strconv.ParseInt(settings.Value(ctx, scanSecretsBackfillFlag), 10, 64)
+	rows, secrets, last, err := BackfillScanSecrets(ctx, db, after)
+	if last > after {
+		if err := settings.Set(ctx, scanSecretsBackfillFlag, strconv.FormatInt(last, 10)); err != nil {
+			log.Printf("[scan] secrets backfill: save progress: %v", err)
+		}
 	}
-	rows, secrets, err := BackfillScanSecrets(ctx, db)
 	if err != nil {
-		log.Printf("[scan] secrets backfill incomplete, retried at the next start: %d scan(s) rewritten, %d secret(s) found: %v", rows, secrets, err)
+		log.Printf("[scan] secrets backfill incomplete, resumed at the next start: %d scan(s) rewritten, %d secret(s) found: %v", rows, secrets, err)
 		return
-	}
-	if err := settings.Set(ctx, scanSecretsBackfillFlag, "1"); err != nil {
-		log.Printf("[scan] secrets backfill: set flag: %v", err)
 	}
 	if rows > 0 {
 		log.Printf("[scan] secrets backfill: %d scan(s) rewritten, %d secret(s) found", rows, secrets)

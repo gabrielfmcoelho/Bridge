@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -32,18 +33,35 @@ func TestFindSecrets(t *testing.T) {
 		{"PGPASSWORD=pw /usr/bin/pg_dump x", []kv{{"PGPASSWORD", "pw"}}},
 		{"curl https://bob:pa55@git.example/x", []kv{{"url-bob-git.example", "pa55"}}},
 		{"mysqldump -uroot -pS3cret db", []kv{{"mysql-password", "S3cret"}}},
+		// Go and Python split userinfo at the last "@": the whole password is the value.
+		{"psql postgres://app:P@ssw0rd@db:5432/x", []kv{{"url-app-db", "P@ssw0rd"}}},
 		{"java -Dpassword=${DB_PASS}", nil},
 		{"app --token=$TOKEN", nil},
+		{`PGPASSWORD="$PGPASS" pg_dump`, nil},
 		{"java -DcacheServerPassword=", nil},
+		// In a ps line "$" is literal: only $NAME / ${NAME} are references.
+		{"java -Dpassword=$3cr3t", []kv{{"password", "$3cr3t"}}},
+		{"app --password=$2y$10$abc", []kv{{"password", "$2y$10$abc"}}},
 		// Already redacted: a backfill re-run must not take the token for a value.
 		{"java -DcacheServerPassword={{secret:7}} --token {{secret}}", nil},
+		{`x PASSWORD="{{secret:9}} d`, nil},
+		// …but only a whole token is one.
+		{"java -Dpassword={{secret}}realvalue", []kv{{"password", "{{secret}}realvalue"}}},
+		// Assignments inside a quoted sh -c, a subshell, after ";" or in a query string.
+		{`0 2 * * * bash -c "PGPASSWORD=secret pg_dump db"`, []kv{{"PGPASSWORD", "secret"}}},
+		{`su - postgres -c 'PGPASSWORD=secret pg_dump db'`, []kv{{"PGPASSWORD", "secret"}}},
+		{"(cd /x;A=1;DB_TOKEN=abc ./run)", []kv{{"DB_TOKEN", "abc"}}},
+		{"curl https://api.example/x?a=1&token=abc", []kv{{"token", "abc"}}},
+		{`sh -c "--token abc"`, []kv{{"token", "abc"}}},
+		{`0 3 * * * bash -c "app --password=s3cr3t"`, []kv{{"password", "s3cr3t"}}},
 		// A crontab line: the assignment follows the schedule.
 		{"0 2 * * * PGPASSWORD=pw /usr/bin/pg_dump x", []kv{{"PGPASSWORD", "pw"}}},
 		{`PGPASSWORD='pw' pg_dump`, []kv{{"PGPASSWORD", "pw"}}},
 		{`DB_PASSWORD="two words" ./run.sh`, []kv{{"DB_PASSWORD", "two words"}}},
 		{"app --password --token abc", []kv{{"token", "abc"}}},
-		// A value starting inside another and ending past it: one span covers both.
-		{`x PASSWORD="a --token=b"c d`, []kv{{"PASSWORD", `a --token=b"c`}}},
+		// A value starting inside another and ending past it: one span covers
+		// both, its opening quote too, so no lone quote is left to re-parse.
+		{`x PASSWORD="a --token=b"c d`, []kv{{"PASSWORD", `"a --token=b"c`}}},
 		{"mysql -P3306 -p -h db", nil},
 		{"tar -pczf x.tgz /srv", nil},
 		{"app -Dhttp.port=8080 --user admin", nil},
@@ -58,6 +76,11 @@ func TestFindSecrets(t *testing.T) {
 		}
 		if !reflect.DeepEqual(kvs, c.want) {
 			t.Errorf("FindSecrets(%q) = %v, want %v", c.cmd, kvs, c.want)
+		}
+		// Redacted, the line holds nothing a re-run would take for a value.
+		red := redactSpans(c.cmd, got, func(FoundSecret) string { return "{{secret:9}}" })
+		if again := FindSecrets(red); len(again) != 0 {
+			t.Errorf("FindSecrets(%q) after redaction = %v", red, again)
 		}
 	}
 }
@@ -87,6 +110,10 @@ func TestSecretOrigin(t *testing.T) {
 		"java -Xmx1g -jar /opt/api/api-1.2.jar --token=x":    "scan-api-1-2-jar",
 		"PGPASSWORD=pw /usr/bin/pg_dump x":                   "scan-pg-dump",
 		"/usr/bin/python3.11 -m gunicorn app:app --secret=x": "scan-gunicorn",
+		// A value is never the origin.
+		"node --secret Secr3t server.js":                 "scan-server-js",
+		"php -d mysqli.default_pw=Secr3t /srv/app/x.php": "scan-x-php",
+		`DB_PASSWORD="two words" ./run.sh`:               "scan-run-sh",
 	} {
 		if got := SecretOrigin(cmd); got != want {
 			t.Errorf("SecretOrigin(%q) = %q, want %q", cmd, got, want)
@@ -136,14 +163,18 @@ func scanSecretRows(t *testing.T, d *database.DB) map[string]int64 {
 }
 
 // planted builds the scan: the JBoss process, the same line cut short by
-// resource_top (once after the value, once inside it), a root cron job and
-// the legacy crontab lines.
+// resource_top (once after the value, once inside it), a resource_top line
+// cut inside a URL's password (no "@" left), a root cron job and the legacy
+// crontab lines.
 func planted() *sshtest.VMInfo {
 	i := strings.Index(compras1, "abc123")
 	return &sshtest.VMInfo{
 		ProcessDetails: []sshtest.ProcessDetail{{PID: "1", User: "jboss", Command: compras1, Unit: "compras1.service"}},
 		ResourceTop: &sshtest.ResourceUsageSnapshot{
-			TopCPU: []sshtest.ResourceProcess{{PID: 1, Command: compras1[:i+12] + "…"}},
+			TopCPU: []sshtest.ResourceProcess{
+				{PID: 1, Command: compras1[:i+12] + "…"},
+				{PID: 2, Command: "curl -s https://deploy:SuperSecretPassw…"},
+			},
 			TopMem: []sshtest.ResourceProcess{{PID: 1, Command: compras1[:i+4] + "…"}},
 		},
 		Cron: &sshtest.CronInfo{Jobs: []sshtest.CronJob{
@@ -160,7 +191,7 @@ func assertRedacted(t *testing.T, info *sshtest.VMInfo) string {
 		t.Fatal(err)
 	}
 	out := string(b)
-	for _, v := range []string{"abc123", "abc1", "pw ", "s3cr3t"} {
+	for _, v := range []string{"abc123", "abc1", "pw ", "s3cr3t", "SuperSecret"} {
 		if strings.Contains(out, v) {
 			t.Errorf("scan JSON still holds %q: %s", v, out)
 		}
@@ -206,6 +237,9 @@ func TestRecordScanSecrets(t *testing.T) {
 	if got := info.ResourceTop.TopMem[0].Command; !strings.HasSuffix(got, "-DcacheServerPassword={{secret}}") {
 		t.Errorf("top_mem = %q", got)
 	}
+	if got := info.ResourceTop.TopCPU[1].Command; got != "curl -s https://deploy:{{secret}}…" {
+		t.Errorf("top_cpu cut inside a URL = %q", got)
+	}
 	if got := info.Cron.Jobs[0].Command; got != "PGPASSWORD="+tok(pg)+" /usr/bin/pg_dump x" {
 		t.Errorf("cron job = %q", got)
 	}
@@ -227,7 +261,8 @@ func TestRecordScanSecrets(t *testing.T) {
 }
 
 // Nothing reaches the vault (the database is gone): every value is still
-// blanked before the scan is stored, and the error says which secret failed.
+// blanked before the scan is stored, and the error only counts the secrets
+// (a group or name comes from the scanned line).
 func TestRecordScanSecretsFailureStillBlanks(t *testing.T) {
 	d, hid, uid := newScanSecretsFixture(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -238,8 +273,11 @@ func TestRecordScanSecretsFailureStillBlanks(t *testing.T) {
 	if err == nil || n != 0 {
 		t.Fatalf("RecordScanSecrets = %d, %v; want an error", n, err)
 	}
-	if regexp.MustCompile(`abc123|\bpw\b`).MatchString(err.Error()) {
-		t.Errorf("error carries a value: %v", err)
+	if regexp.MustCompile(`abc123|\bpw\b|scan-|PASSWORD`).MatchString(err.Error()) {
+		t.Errorf("error names a secret: %v", err)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("error %v does not wrap its cause", err)
 	}
 	out := assertRedacted(t, info)
 	if strings.Contains(out, "{{secret:") || !strings.Contains(out, "{{secret}}") {
@@ -281,6 +319,90 @@ func TestScanSecretIdentityCollision(t *testing.T) {
 	if got, want := reversed.ProcessDetails[0].Command, fmt.Sprintf("python3 /b/manage.py --password={{secret:%d}}", two); got != want {
 		t.Fatalf("reversed[0] = %q, want %q", got, want)
 	}
+
+	// The process holding "one" stops: "two" keeps PASSWORD_2 and PASSWORD
+	// keeps "one" — a value no longer seen is kept.
+	onlyB := &sshtest.VMInfo{ProcessDetails: []sshtest.ProcessDetail{b}}
+	if n, err := RecordScanSecrets(ctx, d, hid, uid, onlyB); err != nil || n != 1 {
+		t.Fatalf("scan with only b = %d, %v", n, err)
+	}
+	if got, want := onlyB.ProcessDetails[0].Command, fmt.Sprintf("python3 /b/manage.py --password={{secret:%d}}", two); got != want {
+		t.Fatalf("only b = %q, want %q", got, want)
+	}
+	if got, _ := repo.Reveal(ctx, admin, one); got != `{"value":"one"}` {
+		t.Fatalf("PASSWORD after one disappeared = %s", got)
+	}
+	if got, _ := repo.Reveal(ctx, admin, two); got != `{"value":"two"}` {
+		t.Fatalf("PASSWORD_2 after one disappeared = %s", got)
+	}
+
+	// A single new value (one rotated) updates the first name this scan didn't match.
+	rotated := &sshtest.VMInfo{ProcessDetails: []sshtest.ProcessDetail{{Command: "python3 /a/manage.py --password=three"}, b}}
+	if n, err := RecordScanSecrets(ctx, d, hid, uid, rotated); err != nil || n != 2 {
+		t.Fatalf("rotated scan = %d, %v", n, err)
+	}
+	if got := scanSecretRows(t, d); !reflect.DeepEqual(got, rows) {
+		t.Fatalf("rows after rotation = %v, want %v", got, rows)
+	}
+	if got, _ := repo.Reveal(ctx, admin, one); got != `{"value":"three"}` {
+		t.Fatalf("PASSWORD after rotation = %s", got)
+	}
+	if got, _ := repo.Reveal(ctx, admin, two); got != `{"value":"two"}` {
+		t.Fatalf("PASSWORD_2 after rotation = %s", got)
+	}
+}
+
+// The origin and the description come from the line with its values blanked:
+// a value never names a group, a program or a place, and a rotated value
+// keeps the same identity.
+func TestScanSecretOriginIgnoresValues(t *testing.T) {
+	d, hid, uid := newScanSecretsFixture(t)
+	ctx := context.Background()
+	info := &sshtest.VMInfo{
+		ProcessDetails: []sshtest.ProcessDetail{
+			{Command: "node --secret Secr3t server.js"},
+			{Command: `/usr/bin/app A_PASSWORD="x1 y1"B_TOKEN=z1`},
+		},
+		Cron: &sshtest.CronInfo{Jobs: []sshtest.CronJob{
+			{User: "root", Command: `DB_PASSWORD="two words" ./run.sh`},
+			{User: "root", Command: `PGPASSWORD='p w' pg_dump db`},
+		}},
+	}
+	if _, err := RecordScanSecrets(ctx, d, hid, uid, info); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := d.SQL.Query(`SELECT group_label, name, description FROM secrets ORDER BY group_label, name`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var got []string
+	for rows.Next() {
+		var g, n, desc string
+		if err := rows.Scan(&g, &n, &desc); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, g+"/"+n+" "+desc)
+	}
+	want := []string{
+		`scan-app/A_PASSWORD A_PASSWORD · app · /usr/bin/app`,
+		`scan-app/B_TOKEN A_PASSWORD="{{secret}}"B_TOKEN · app · /usr/bin/app`,
+		`scan-cron-root/DB_PASSWORD DB_PASSWORD · run.sh · cron root`,
+		`scan-cron-root/PGPASSWORD PGPASSWORD · pg_dump · cron root`,
+		`scan-server-js/SECRET --secret · node · server.js`,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("rows =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+
+	// The same lines with other values: same identities, nothing new.
+	rot := &sshtest.VMInfo{ProcessDetails: []sshtest.ProcessDetail{{Command: "node --secret Other1 server.js"}}}
+	if _, err := RecordScanSecrets(ctx, d, hid, uid, rot); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(scanSecretRows(t, d)); n != 5 {
+		t.Fatalf("%d rows after a rotated value, want 5", n)
+	}
 }
 
 // A trashed scan secret is not recreated, and its value is still blanked.
@@ -301,6 +423,15 @@ func TestRecordScanSecretsTrashedStaysBlank(t *testing.T) {
 	}
 	if got := again.ProcessDetails[0].Command; got != "/usr/local/bin/foo --token={{secret}}" {
 		t.Fatalf("command = %q", got)
+	}
+	// Another value under the trashed name is that identity too: not recreated
+	// as TOKEN_2 either.
+	rotated := &sshtest.VMInfo{ProcessDetails: []sshtest.ProcessDetail{{Command: "/usr/local/bin/foo --token=n3w"}}}
+	if n, err := RecordScanSecrets(ctx, d, hid, uid, rotated); err != nil || n != 0 {
+		t.Fatalf("rotated after trash = %d, %v; want 0, nil", n, err)
+	}
+	if got := rotated.ProcessDetails[0].Command; got != "/usr/local/bin/foo --token={{secret}}" {
+		t.Fatalf("rotated command = %q", got)
 	}
 	if rows := scanSecretRows(t, d); len(rows) != 0 {
 		t.Fatalf("live rows = %v", rows)
@@ -327,13 +458,16 @@ func TestBackfillScanSecretsTwice(t *testing.T) {
 		}
 	}
 
-	rows, secrets, err := BackfillScanSecrets(ctx, d)
+	rows, secrets, last, err := BackfillScanSecrets(ctx, d, 0)
 	if err != nil || rows != 2 || secrets != 2 {
 		t.Fatalf("backfill = %d rows, %d secrets, %v; want 2, 2, nil", rows, secrets, err)
 	}
 	scans, err := repo.ListAfter(ctx, 0, 10)
 	if err != nil || len(scans) != 3 {
 		t.Fatalf("scans = %d, %v", len(scans), err)
+	}
+	if last != scans[2].ID {
+		t.Fatalf("last = %d, want %d", last, scans[2].ID)
 	}
 	for _, s := range scans {
 		if strings.Contains(s.Data, "abc123") || strings.Contains(s.Data, "pw ") {
@@ -351,7 +485,7 @@ func TestBackfillScanSecretsTwice(t *testing.T) {
 		t.Fatalf("vault rows = %v", vaultRows)
 	}
 
-	rows, secrets, err = BackfillScanSecrets(ctx, d)
+	rows, secrets, _, err = BackfillScanSecrets(ctx, d, 0)
 	if err != nil || rows != 0 || secrets != 0 {
 		t.Fatalf("second backfill = %d rows, %d secrets, %v; want 0, 0, nil", rows, secrets, err)
 	}
@@ -372,5 +506,53 @@ func TestBackfillScanSecretsTwice(t *testing.T) {
 	RunScanSecretsBackfill(ctx, d)
 	if v := settings.Value(ctx, scanSecretsBackfillFlag); v == "" {
 		t.Fatal("startup hook did not set its flag")
+	}
+}
+
+// The flag holds the last scan the backfill went through, and every start
+// resumes after it: plaintext rows an older binary wrote after a finished walk
+// (a rolling deploy) are redacted at the next start; rows already done are not
+// read again.
+func TestRunScanSecretsBackfillResumes(t *testing.T) {
+	d, hid, _ := newScanSecretsFixture(t)
+	ctx := context.Background()
+	repo := store.NewHostScanRepo(d.SQL)
+	plain := func(cmd string) string {
+		b, _ := json.Marshal(sshtest.VMInfo{ProcessDetails: []sshtest.ProcessDetail{{Command: cmd}}})
+		return string(b)
+	}
+	for _, data := range []string{plain("/usr/local/bin/foo --token=abc123"), `{"cpu":"4"}`} {
+		if err := repo.Create(ctx, hid, data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	RunScanSecretsBackfill(ctx, d)
+	done, _ := repo.ListAfter(ctx, 0, 10)
+	if len(done) != 2 || strings.Contains(done[0].Data, "abc123") {
+		t.Fatalf("first start: %+v", done)
+	}
+	settings := store.NewAppSettingsRepo(d.SQL)
+	if v := settings.Value(ctx, scanSecretsBackfillFlag); v != fmt.Sprint(done[1].ID) {
+		t.Fatalf("flag = %q, want %d", v, done[1].ID)
+	}
+
+	// Plaintext put back in a row already done (to see whether it is read
+	// again), and a new plaintext row from the old binary.
+	if err := repo.UpdateData(ctx, done[0].ID, plain("/usr/local/bin/foo --token=abc123")); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Create(ctx, hid, plain("/usr/local/bin/bar --token=s3cr3t")); err != nil {
+		t.Fatal(err)
+	}
+	RunScanSecretsBackfill(ctx, d)
+	all, _ := repo.ListAfter(ctx, 0, 10)
+	if len(all) != 3 || strings.Contains(all[2].Data, "s3cr3t") || !strings.Contains(all[2].Data, "{{secret:") {
+		t.Fatalf("new row after the second start = %+v", all)
+	}
+	if !strings.Contains(all[0].Data, "abc123") {
+		t.Fatalf("a row already done was read again: %s", all[0].Data)
+	}
+	if v := settings.Value(ctx, scanSecretsBackfillFlag); v != fmt.Sprint(all[2].ID) {
+		t.Fatalf("flag = %q, want %d", v, all[2].ID)
 	}
 }
