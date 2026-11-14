@@ -659,7 +659,8 @@
       "kept": "Backups mantidos",
       "noKept": "Nenhum backup deste host está mantido no MinIO.",
       "expires": "Expira em",
-      "keptForever": "até ser excluído"
+      "keptForever": "até ser excluído",
+      "repair": "Reparar…"
     },
     "backup": {
       "apply": "Aplicar",
@@ -813,14 +814,21 @@
         "after": "Depois",
         "noAnswer": "sem resposta",
         "phpError": "erro de PHP na página: {error}",
-        "warningsBefore": "Avisos do scan anterior à troca de versão"
+        "warningsBefore": "Avisos do scan anterior à troca de versão",
+        "unitRestarts": "Units com falha reiniciadas ({count})",
+        "unitOk": "rodando",
+        "unitFailed": "ainda falhando",
+        "distFiles": "Arquivos de configuração a revisar ({count})",
+        "changedLines": "{count} linhas diferem",
+        "repair": "Reparar este host…"
       },
       "kindOption": {
         "check": "Verificar atualizações",
         "security": "Atualizações de segurança",
         "packages": "Todas as atualizações de pacotes",
         "release": "Trocar para a próxima versão",
-        "backup": "Só backup"
+        "backup": "Só backup",
+        "repair": "Reparar pacotes e serviços"
       },
       "titleHost": "Atualizar {host}",
       "hostsCount": "{count} hosts selecionados",
@@ -851,7 +859,8 @@
         "release": "Leva o host para a próxima versão do sistema (até 3 h) e o reinicia. Um scan novo e as verificações rodam antes de tudo; com o MinIO configurado faz backup antes, a menos que você desligue isso (sem backup mantido, roda então sem nenhum).",
         "check": "Atualiza as listas de pacotes e conta o que pode ser atualizado. Não altera nada.",
         "security": "Instala só as atualizações de segurança (apt: suítes *-security; dnf/yum: avisos de segurança). Alpine não tem canal separado.",
-        "packages": "Instala todas as atualizações da versão atual (apt upgrade, dnf/yum upgrade, apk upgrade). Nunca muda a versão do sistema."
+        "packages": "Instala todas as atualizações da versão atual (apt upgrade, dnf/yum upgrade, apk upgrade). Nunca muda a versão do sistema.",
+        "repair": "Termina o que o dpkg deixou pela metade (dpkg --configure -a e, se as dependências continuarem quebradas, apt-get -f install), mantendo os arquivos de configuração locais. Lista os *.dpkg-dist / *.ucf-dist a revisar com quantas linhas diferem (aplicá-los continua manual), reinicia as units com falha (as user@ esperam um reinício) e diz se é preciso reiniciar. Os passos do dpkg só rodam em Debian / Ubuntu."
       },
       "versions": "Versões ({count} hosts)",
       "reboot": "Reiniciar quando necessário",
@@ -864,7 +873,8 @@
       "confirmWord": "atualizar",
       "confirmTitle": {
         "security": "Instalar atualizações de segurança em {count} hosts?",
-        "packages": "Instalar todas as atualizações de pacotes em {count} hosts?"
+        "packages": "Instalar todas as atualizações de pacotes em {count} hosts?",
+        "repair": "Reparar {host}?"
       },
       "confirmReboot": "Os hosts que precisarem serão reiniciados.",
       "confirmNoReboot": "Nenhum host será reiniciado.",
@@ -879,7 +889,8 @@
         "check": "Verificação",
         "packages": "Pacotes",
         "security": "Segurança",
-        "release": "Troca de versão"
+        "release": "Troca de versão",
+        "repair": "Reparo"
       },
       "withReboot": "com reinício",
       "runStatus": {

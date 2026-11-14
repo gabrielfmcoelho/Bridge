@@ -40,23 +40,42 @@ const MOCK_RISK_WARNINGS: RiskWarning[] = [
   { code: "php_handler_missing", count: 1, detail: "/home/sasc/fcgi-bin/php7.2.fcgi → /usr/bin/php-cgi7.2" },
   { code: "vhost_port_unlistened", count: 1, detail: "sasc.example.gov.br:444" },
 ];
-// What the mock release (which fails like run #8 did) leaves behind.
-const mockReport = (release: boolean): ReleaseReport => ({
-  ...(release ? {
-    warnings_before: MOCK_RISK_WARNINGS,
-    dpkg_errors: ["proftpd-core: installed proftpd-core package post-installation script subprocess returned error exit status 1"],
-    new_failed_units: ["fail2ban.service", "logrotate.service"],
-    stopped_services: ["fail2ban.service"],
-    new_dist_files: ["/etc/proftpd/modules.conf.ucf-dist", "/etc/proftpd/proftpd.conf.ucf-dist"],
-    lost_php_handlers: ["/home/sasc/fcgi-bin/php7.2.fcgi → /usr/bin/php-cgi7.2"],
-  } : {}),
-  sites: [
-    { name: "portal.example.gov.br", before: 200, after: 200 },
-    { name: "sasc.example.gov.br", before: 302, after: release ? 200 : 302, ...(release ? { error: "Deprecated", broken: true } : {}) },
-    ...(release ? [{ name: "concurso.example.gov.br", before: 200, after: 0, broken: true }] : []),
-  ],
-});
-const mockScan = (h: { nickname: string; os?: { pretty?: string; arch?: string } }) => JSON.stringify({
+// What the mock release (which fails like run #8 did) leaves behind, and
+// what the repair after it does.
+const mockReport = (kind: OSUpdateRun["kind"]): ReleaseReport => {
+  const release = kind === "release";
+  return {
+    ...(release ? {
+      warnings_before: MOCK_RISK_WARNINGS,
+      dpkg_errors: ["proftpd-core: installed proftpd-core package post-installation script subprocess returned error exit status 1"],
+      new_failed_units: ["fail2ban.service", "logrotate.service"],
+      stopped_services: ["fail2ban.service"],
+      new_dist_files: ["/etc/proftpd/modules.conf.ucf-dist", "/etc/proftpd/proftpd.conf.ucf-dist"],
+      lost_php_handlers: ["/home/sasc/fcgi-bin/php7.2.fcgi → /usr/bin/php-cgi7.2"],
+    } : {}),
+    sites: [
+      { name: "portal.example.gov.br", before: 200, after: 200 },
+      { name: "sasc.example.gov.br", before: 302, after: release ? 200 : 302, ...(release ? { error: "Deprecated", broken: true } : {}) },
+      ...(release ? [{ name: "concurso.example.gov.br", before: 200, after: 0, broken: true }] : []),
+    ],
+    ...(kind === "repair" ? {
+      unit_restarts: [{ unit: "fail2ban.service", ok: true }, { unit: "logrotate.service", ok: false }],
+      dist_files: [{ path: "/etc/proftpd/modules.conf.ucf-dist", changed: 4 }, { path: "/etc/proftpd/proftpd.conf.ucf-dist", changed: 12 }],
+    } : {}),
+  };
+};
+// A host whose latest release or repair run is a (failed) release: its scan
+// shows what the release left, so the Manutenção tab offers a repair.
+const brokenByRelease = (hostId: number) =>
+  mockOSRuns.find((r) => (r.kind === "release" || r.kind === "repair") && r.results?.some((x) => x.host_id === hostId))?.kind === "release";
+const MOCK_BROKEN = { dpkg_broken: ["proftpd-core"], failed_units: ["fail2ban.service", "logrotate.service", "user@1000.service"],
+  pending_dist_files: ["/etc/proftpd/modules.conf.ucf-dist", "/etc/proftpd/proftpd.conf.ucf-dist"] };
+const MOCK_BROKEN_WARNINGS: RiskWarning[] = [
+  { code: "dpkg_broken", count: 1, detail: "proftpd-core" },
+  { code: "pending_dist_files", count: 2, detail: MOCK_BROKEN.pending_dist_files.join(", ") },
+  { code: "failed_units", count: 3, detail: MOCK_BROKEN.failed_units.join(", ") },
+];
+const mockScan = (h: { id: number; nickname: string; os?: { pretty?: string; arch?: string } }) => JSON.stringify({
   os: h.os?.pretty ?? "", kernel: "6.8.0-45-generic", arch: h.os?.arch ?? "x86_64",
   filesystems: [
     { mount: "/", device: "/dev/sda1", fstype: "ext4", size_bytes: 53_687_091_200, used_bytes: 21_474_836_480, avail_bytes: 32_212_254_720, used_pct: 40 },
@@ -70,7 +89,7 @@ const mockScan = (h: { nickname: string; os?: { pretty?: string; arch?: string }
     modified_conffiles: ["/etc/proftpd/proftpd.conf"], apache_listen: [80, 443],
     php_handlers: [{ source: "/etc/apache2/sites-enabled/sasc.conf:5", dir: "/home/sasc/public_html", kind: "fcgi",
       target: "/home/sasc/fcgi-bin/php7.2.fcgi", runs: "/usr/bin/php-cgi7.2", version: "7.2", state: "missing" }],
-    warnings: MOCK_RISK_WARNINGS },
+    ...(brokenByRelease(h.id) ? { ...MOCK_BROKEN, warnings: [...MOCK_BROKEN_WARNINGS, ...MOCK_RISK_WARNINGS] } : { warnings: MOCK_RISK_WARNINGS }) },
 });
 const profileView = (hostId: number) => {
   const p = mockProfiles.get(hostId) ?? {};
@@ -524,12 +543,16 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
         backup_exclude: body.backup_exclude?.length ? body.backup_exclude : profileView(hid).effective.exclude };
       const eff = profileView(hid).effective;
       const release = body.kind === "release";
+      const repair = body.kind === "repair";
       return { run_id: id, host_id: hid, host_nickname: h.nickname, host_slug: h.oficial_slug, pkg_manager: "apt",
         ...(release ? { status: "failed" as const, reason: "do-release-upgrade failed; dpkg could not configure: proftpd-core (installed proftpd-core package post-installation script subprocess returned error exit status 1)" }
           : { status: "success" as const }),
-        ...(check ? {} : { report: mockReport(release) }),
-        os_before: h.os?.pretty, os_after: h.os?.pretty, upgradable: check ? 3 : 0, security_upgradable: check ? 1 : 0, upgraded: check ? undefined : 3,
-        reboot_required: !check && !body.reboot, rebooted: !check && body.reboot, output: "@@pm apt\n@@upgradable 3\n@@security 1\n", started_at: now, finished_at: now,
+        ...(check ? {} : { report: mockReport(body.kind) }),
+        os_before: h.os?.pretty, os_after: h.os?.pretty,
+        ...(repair ? {} : { upgradable: check ? 3 : 0, security_upgradable: check ? 1 : 0, upgraded: check ? undefined : 3 }),
+        reboot_required: !check && !body.reboot, rebooted: !check && body.reboot, started_at: now, finished_at: now,
+        output: repair ? "@@pm apt\n@@dist_file /etc/proftpd/modules.conf.ucf-dist 4\n@@dist_file /etc/proftpd/proftpd.conf.ucf-dist 12\n@@unit_restart fail2ban.service ok\n@@unit_restart logrotate.service failed\n@@reboot yes\n"
+          : "@@pm apt\n@@upgradable 3\n@@security 1\n",
         ...(backup ? { backup_key: `bridge/os-backups/${h.oficial_slug}/run${id}.tar.zst`, backup_size: 3_400_000_000, backup_status: body.keep_backup ? "done" as const : "deleted" as const,
           backup_include: body.backup_include?.length ? body.backup_include : eff.include, backup_exclude: body.backup_exclude?.length ? body.backup_exclude : eff.exclude } : {}) };
     });

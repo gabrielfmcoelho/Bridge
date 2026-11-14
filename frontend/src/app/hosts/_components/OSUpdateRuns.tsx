@@ -15,8 +15,9 @@ import { osUpdateAPI } from "@/lib/api";
 import { getTimeAgo } from "@/lib/utils";
 import type { OSUpdateResult, OSUpdateRun } from "@/lib/types";
 import OSRestoreModal from "./OSRestoreModal";
+import OSUpdateModal, { type UpdateHost } from "./OSUpdateModal";
 import BackupActions from "./BackupActions";
-import RunReport, { reportIssues } from "./RunReport";
+import RunReport, { needsRepair, reportIssues } from "./RunReport";
 
 const RUN_TONE: Record<OSUpdateRun["status"], LozengeAppearance> = { running: "inprogress", done: "success", cancelled: "default", interrupted: "moved" };
 const RESULT_TONE: Record<OSUpdateResult["status"], LozengeAppearance> = { pending: "default", running: "inprogress", success: "success", failed: "removed", skipped: "moved" };
@@ -26,6 +27,7 @@ const RESULT_TONE: Record<OSUpdateResult["status"], LozengeAppearance> = { pendi
 export default function OSUpdateRuns({ openId, onOpen, hostId }: { openId: number | null; onOpen: (id: number | null) => void; hostId?: number }) {
   const { t, locale } = useLocale();
   const [restoring, setRestoring] = useState<OSUpdateResult | null>(null);
+  const [repairing, setRepairing] = useState<UpdateHost | null>(null);
   const flag = useFlag();
   const queryClient = useQueryClient();
   const { data: runs = [], isError, error } = useQuery({
@@ -42,6 +44,7 @@ export default function OSUpdateRuns({ openId, onOpen, hostId }: { openId: numbe
       else if (wasRunning.current.delete(r.id)) {
         flag({ appearance: r.counts.failed ? "warning" : "success", title: t("host.osUpdate.finished", { id: String(r.id) }), description: countsText(r, t) });
         queryClient.invalidateQueries({ queryKey: ["hosts"] });
+        queryClient.invalidateQueries({ queryKey: ["host"] }); // every run ends with a rescan
         queryClient.invalidateQueries({ queryKey: ["vulnerabilities", "dependency-groups"] });
         queryClient.invalidateQueries({ queryKey: ["os-updates", "latest"] });
         queryClient.invalidateQueries({ queryKey: ["os-updates", "backups"] });
@@ -81,10 +84,12 @@ export default function OSUpdateRuns({ openId, onOpen, hostId }: { openId: numbe
         </table>
       </div>
       {openId !== null && <RunDrawer id={openId} onClose={() => onOpen(null)}
-        onRestore={(x) => { onOpen(null); setRestoring(x); }} />}
+        onRestore={(x) => { onOpen(null); setRestoring(x); }} onRepair={(h) => { onOpen(null); setRepairing(h); }} />}
       {/* Outside the drawer: a modal inside it would sit under it and lose focus to it. */}
       {restoring && <OSRestoreModal backup={restoring} onClose={() => setRestoring(null)}
         onStarted={(r) => { setRestoring(null); onOpen(r.id); }} />}
+      {repairing && <OSUpdateModal target={{ by: "hosts", hosts: [repairing] }} preset="repair" onClose={() => setRepairing(null)}
+        onStarted={(r) => { setRepairing(null); onOpen(r.id); }} />}
     </div>
   );
 }
@@ -96,8 +101,11 @@ function countsText(r: OSUpdateRun, t: (k: string, v?: Record<string, string>) =
     .join(" · ");
 }
 
-/** One run's per-host results (polls while it runs). */
-export function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () => void; onRestore: (x: OSUpdateResult) => void }) {
+/** One run's per-host results (polls while it runs). A host dpkg failed on
+ *  offers a repair run (onRepair). */
+export function RunDrawer({ id, onClose, onRestore, onRepair }: {
+  id: number; onClose: () => void; onRestore: (x: OSUpdateResult) => void; onRepair: (h: UpdateHost) => void;
+}) {
   const { t } = useLocale();
   const queryClient = useQueryClient();
   const [openHost, setOpenHost] = useState<number | null>(null);
@@ -155,6 +163,12 @@ export function RunDrawer({ id, onClose, onRestore }: { id: number; onClose: () 
                       <Lozenge appearance={RESULT_TONE[x.status]}>{t(`host.osUpdate.resultStatus.${x.status}`)}</Lozenge>
                       {reportIssues(x.report) > 0 && <Lozenge appearance="removed" className="ml-1.5">{t("host.osUpdate.report.issues", { count: String(reportIssues(x.report)) })}</Lozenge>}
                       {x.reason && <div className="text-xs text-[var(--text-muted)] mt-1 max-w-xs">{x.reason}</div>}
+                      {needsRepair(x.report) && run.status !== "running" && (
+                        <Button size="sm" variant="secondary" className="mt-1.5" onClick={(e) => {
+                          e.stopPropagation();
+                          onRepair({ id: x.host_id, nickname: x.host_nickname, slug: x.host_slug, os: x.os_after || x.os_before });
+                        }}>{t("host.osUpdate.report.repair")}</Button>
+                      )}
                     </td>
                     <td className={`${tableClasses.td} text-xs tabular-nums`}>{pendingText(x, t)}</td>
                     <td className={`${tableClasses.td} text-xs tabular-nums`}>{x.upgraded ?? "–"}</td>

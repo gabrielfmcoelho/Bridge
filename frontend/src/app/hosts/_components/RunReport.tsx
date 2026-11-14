@@ -26,15 +26,24 @@ function reportLists(r: ReleaseReport): [ListKey, string[]][] {
 /** How many things the report says to look at (the drawer's badge). */
 export function reportIssues(r?: ReleaseReport): number {
   if (!r) return 0;
-  return reportLists(r).reduce((n, [, items]) => n + items.length, 0) + (r.sites ?? []).filter((s) => s.broken).length;
+  return reportLists(r).reduce((n, [, items]) => n + items.length, 0) + (r.sites ?? []).filter((s) => s.broken).length
+    + (r.unit_restarts ?? []).filter((u) => !u.ok).length + (r.dist_files?.length ?? 0);
+}
+
+/** dpkg failed or left packages half configured: what a repair run fixes. */
+export function needsRepair(r?: ReleaseReport): boolean {
+  return !!(r?.dpkg_errors?.length || r?.dpkg_broken?.length);
 }
 
 /** One host's report of a run: the scan's warnings right before it, what
- *  dpkg failed on, what the scans before and after differ by, and its sites. */
+ *  dpkg failed on, what the scans before and after differ by, its sites, and
+ *  a repair's unit restarts and config files to review. */
 export default function RunReport({ report }: { report: ReleaseReport }) {
   const { t } = useLocale();
   const lists = reportLists(report);
   const sites = report.sites ?? [];
+  const restarts = report.unit_restarts ?? [];
+  const dist = report.dist_files ?? [];
   const status = (s: number) => (s ? String(s) : t("host.osUpdate.report.noAnswer"));
   return (
     <div className="space-y-3 mb-3">
@@ -46,6 +55,31 @@ export default function RunReport({ report }: { report: ReleaseReport }) {
           </ul>
         </div>
       ))}
+      {restarts.length > 0 && (
+        <div>
+          <SectionHeading>{t("host.osUpdate.report.unitRestarts", { count: String(restarts.length) })}</SectionHeading>
+          <ul className="mt-1 text-xs space-y-0.5">
+            {restarts.map((u) => (
+              <li key={u.unit}>
+                <span className="font-mono">{u.unit}</span> · <span className={u.ok ? "text-[var(--success)]" : "text-[var(--danger)] font-medium"}>
+                  {t(u.ok ? "host.osUpdate.report.unitOk" : "host.osUpdate.report.unitFailed")}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {dist.length > 0 && (
+        <div>
+          <SectionHeading>{t("host.osUpdate.report.distFiles", { count: String(dist.length) })}</SectionHeading>
+          <ul className="mt-1 text-xs space-y-0.5">
+            {dist.map((f) => (
+              <li key={f.path} className="break-all">
+                <span className="font-mono">{f.path}</span> <span className="text-[var(--text-muted)]">· {t("host.osUpdate.report.changedLines", { count: String(f.changed) })}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {lists.length === 0 && !sites.some((s) => s.broken) && (
         <p className="text-xs text-[var(--success)]">{t("host.osUpdate.report.nothingWorse")}</p>
       )}

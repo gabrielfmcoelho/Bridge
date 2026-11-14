@@ -2229,4 +2229,9 @@ var migrationsPostgres = []string{
 	// of the scan before it, dpkg's errors, what the scans before and after
 	// differ by and its sites before and after (service.ReleaseReport).
 	`ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS report JSONB;`,
+
+	// Version 130: repair runs (kind 'repair'): finish what dpkg left half
+	// done, list the config files to review, restart the failed units.
+	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
+	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','repair'));`,
 }

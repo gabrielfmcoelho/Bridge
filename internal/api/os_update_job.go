@@ -451,6 +451,7 @@ func (rr *runReport) report(ctx context.Context, output string) json.RawMessage 
 	}
 	parsed := sshtest.ParseOSUpdateLog(output)
 	rep.DpkgErrors, rep.DpkgBroken = parsed.DpkgErrors, parsed.DpkgBroken
+	rep.UnitRestarts, rep.DistFiles = parsed.UnitRestarts, parsed.DistFiles
 	if rr.after != nil && len(rr.names) > 0 {
 		rep.Sites = service.CompareSites(rr.sites, service.ProbeSites(ctx, rr.names))
 	}
@@ -712,12 +713,12 @@ type osUpdateRunRequest struct {
 }
 
 var osUpdateKinds = map[string]bool{sshtest.OSUpdateCheck: true, sshtest.OSUpdatePackages: true, sshtest.OSUpdateSecurity: true,
-	sshtest.OSUpdateRelease: true, sshtest.OSUpdateBackup: true}
+	sshtest.OSUpdateRelease: true, sshtest.OSUpdateBackup: true, sshtest.OSUpdateRepair: true}
 
 // handleStartOSUpdate godoc
 //
 //	@Summary		Start an OS update run
-//	@Description	Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h; its checks run before the backup, update_first updates the packages (and reboots if needed) first in the same run, and with MinIO set up it backs up unless backup is false and either the host already has a kept backup or allow_no_backup is true (no backup at all); the scan right before it (recorded like any scan) gives the result's report its warnings_before, which never block. Every kind but check and backup stores a report per host: dpkg's errors, what the scans before and after differ by, and the host's sites (its DNS names' /) before and after; backup: back up only, and keep it — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.
+//	@Description	Admin. Runs kind on host_ids in the background — check: refresh the package lists and count upgrades; packages: every upgrade within the current release; security: security upgrades only; release: the next release (Ubuntu LTS → LTS, Debian N → N+1, Alpine 3.x → 3.x+1), exactly one host, always rebooting, up to 3 h; its checks run before the backup, update_first updates the packages (and reboots if needed) first in the same run, and with MinIO set up it backs up unless backup is false and either the host already has a kept backup or allow_no_backup is true (no backup at all); the scan right before it (recorded like any scan) gives the result's report its warnings_before, which never block. repair: exactly one host, finishes what dpkg left half done (dpkg --configure -a keeping local config files, apt-get -f install when apt-get check fails), lists the *.dpkg-dist / *.ucf-dist files to review with how many lines differ (never their contents), restarts failed units (not user@*) judged by systemctl is-active, and says whether a reboot is needed (pending, or a newer kernel installed); its report adds unit_restarts and dist_files. Every kind but check and backup stores a report per host: dpkg's errors, what the scans before and after differ by, and the host's sites (its DNS names' /) before and after; backup: back up only, and keep it — concurrency hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with the stored password, else passwordless sudo). reboot reboots a host that needs it after a successful upgrade. Every host is rescanned at the end. Answers 202 with the run; poll GET …/runs/{id}. 404 when a host isn't visible.
 //	@Tags			ssh
 //	@Accept			json
 //	@Produce		json
@@ -733,7 +734,7 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if !osUpdateKinds[req.Kind] {
-		jsonError(w, http.StatusBadRequest, "kind must be check, packages, security, release or backup")
+		jsonError(w, http.StatusBadRequest, "kind must be check, packages, security, release, repair or backup")
 		return
 	}
 	include, err := service.CleanPaths(req.BackupInclude)
@@ -746,13 +747,16 @@ func (h *sshHandlers) handleStartOSUpdate(w http.ResponseWriter, r *http.Request
 	}
 	req.BackupInclude = include
 	// A release upgrade can leave a host unbootable: one host per run, and it
-	// always reboots (the release finishes on boot).
-	if req.Kind == sshtest.OSUpdateRelease {
+	// always reboots (the release finishes on boot). A repair works on what
+	// one host's scan shows: one host too, rebooting only when asked.
+	if req.Kind == sshtest.OSUpdateRelease || req.Kind == sshtest.OSUpdateRepair {
 		if len(req.HostIDs) != 1 {
-			jsonError(w, http.StatusBadRequest, "a release upgrade takes exactly one host")
+			jsonError(w, http.StatusBadRequest, fmt.Sprintf("a %s takes exactly one host", map[string]string{
+				sshtest.OSUpdateRelease: "release upgrade", sshtest.OSUpdateRepair: "repair"}[req.Kind]))
 			return
 		}
-		req.Concurrency, req.Reboot = 1, true
+		req.Concurrency = 1
+		req.Reboot = req.Reboot || req.Kind == sshtest.OSUpdateRelease
 	}
 	req.UpdateFirst = req.UpdateFirst && req.Kind == sshtest.OSUpdateRelease
 	// A check changes nothing: no backup. A backup run only backs up, and
