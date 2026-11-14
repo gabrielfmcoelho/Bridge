@@ -2870,7 +2870,9 @@
         "packages": "Packages and schedules",
         "security": "Security",
         "webservers": "Web servers",
-        "git": "Git repositories"
+        "git": "Git repositories",
+        "outbound": "Outbound flows",
+        "patch": "Patch freshness"
       },
       "empty": {
         "resources": "No usage data in this scan.",
@@ -2882,7 +2884,30 @@
         "packages": "No packages or schedules found in the last scan.",
         "security": "No firewall or SSH policy data in this scan.",
         "webservers": "No nginx, Apache or PHP-FPM found.",
-        "git": "No git checkouts found."
+        "git": "No git checkouts found.",
+        "outbound": "No outbound flows found in the last scan.",
+        "patch": "No patch information in the last scan."
+      }
+    },
+    "deep": {
+      "notRun": "Deep facts only run in a background scan, not the quick connection test.",
+      "out": {
+        "summary": "Where this VM sends data: destinations in the scripts cron runs (credentials removed on the host) and its established outbound connections.",
+        "scripts": "Transfers in cron scripts",
+        "connections": "Outbound connections",
+        "external": "external"
+      },
+      "patch": {
+        "lastIndex": "Last index refresh",
+        "lastUpgrade": "Last upgrade",
+        "auto": "Automatic updates",
+        "on": "on",
+        "off": "off",
+        "upgradable": "{count} upgradable",
+        "unknown": "unknown",
+        "stale": "Patching looks broken",
+        "staleHelp": "Automatic updates are on, but the package index hasn't refreshed in over two weeks.",
+        "ok": "Package index is current"
       }
     },
     "git": {

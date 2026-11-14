@@ -159,6 +159,10 @@ type VMInfo struct {
 	// bloat host_scans.
 	Dependencies []DepScope `json:"-"`
 	SSHAuthPolicy     *SSHAuthPolicy     `json:"ssh_auth_policy,omitempty"`
+	// DeepFacts: heavier, non-secret enrichment (outbound flows, patch
+	// freshness; deepfacts.go). Populated only in CaptureJob, nil in
+	// CaptureSync — "the probe didn't run", like GitRemotes.
+	DeepFacts *DeepFacts `json:"deep_facts,omitempty"`
 }
 
 // SSHAuthPolicy summarizes the SSH server's authentication policy as observed
@@ -479,6 +483,13 @@ func budgetOf(client *ssh.Client) budget {
 		return budgets[CaptureJob]
 	}
 	return budgets[CaptureSync]
+}
+
+// inJobMode reports that client is in a CaptureJob capture: the heavy probes
+// that stay nil in the synchronous scan run only when this is true.
+func inJobMode(client *ssh.Client) bool {
+	_, ok := jobClients.Load(client)
+	return ok
 }
 
 // runCmdWithDeadline executes cmd in a fresh session with a hard deadline.
@@ -2030,6 +2041,12 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	info.GitRemotes, info.GitRemotesPartial = gitRemotes, gitRemotes != nil && !gitComplete
 	if info.ReleaseRisks = parseReleaseRisks(releaseRaw); info.ReleaseRisks != nil {
 		info.ReleaseRisks.Warnings = deriveReleaseWarnings(info)
+	}
+
+	// Deep facts (outbound flows, patch freshness) only in a background scan:
+	// they add an extra root session and don't fit the 120 s synchronous test.
+	if inJobMode(client) {
+		info.DeepFacts = collectDeepFacts(client, sudoPassword, info.Cron, info.Ports)
 	}
 
 	// Build a map of docker host port → container for fast lookup.

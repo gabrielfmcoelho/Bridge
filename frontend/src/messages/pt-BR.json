@@ -2870,7 +2870,9 @@
         "packages": "Pacotes e agendamentos",
         "security": "Segurança",
         "webservers": "Servidores web",
-        "git": "Repositórios git"
+        "git": "Repositórios git",
+        "outbound": "Fluxos de saída",
+        "patch": "Atualização de pacotes"
       },
       "empty": {
         "resources": "Sem dados de uso neste scan.",
@@ -2882,7 +2884,30 @@
         "packages": "Nenhum pacote ou agendamento encontrado no último scan.",
         "security": "Sem dados de firewall ou política SSH neste scan.",
         "webservers": "Nenhum nginx, Apache ou PHP-FPM encontrado.",
-        "git": "Nenhum checkout git encontrado."
+        "git": "Nenhum checkout git encontrado.",
+        "outbound": "Nenhum fluxo de saída encontrado no último scan.",
+        "patch": "Sem informações de atualização no último scan."
+      }
+    },
+    "deep": {
+      "notRun": "Os fatos aprofundados só rodam em um scan em segundo plano, não no teste rápido de conexão.",
+      "out": {
+        "summary": "Para onde esta VM envia dados: destinos nos scripts que o cron executa (credenciais removidas no próprio host) e as conexões de saída estabelecidas.",
+        "scripts": "Transferências em scripts do cron",
+        "connections": "Conexões de saída",
+        "external": "externo"
+      },
+      "patch": {
+        "lastIndex": "Último índice atualizado",
+        "lastUpgrade": "Último upgrade",
+        "auto": "Atualizações automáticas",
+        "on": "ligadas",
+        "off": "desligadas",
+        "upgradable": "{count} atualizáveis",
+        "unknown": "desconhecido",
+        "stale": "Atualização aparenta estar quebrada",
+        "staleHelp": "As atualizações automáticas estão ligadas, mas o índice de pacotes não é atualizado há mais de duas semanas.",
+        "ok": "Índice de pacotes atualizado"
       }
     },
     "git": {
