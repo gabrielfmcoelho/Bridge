@@ -2,6 +2,7 @@ package sshtest
 
 import (
 	"encoding/base64"
+	"fmt"
 	"log"
 	"path"
 	"strconv"
@@ -94,27 +95,58 @@ emit() {
   head -c {PERFILE} "$f" 2>/dev/null | base64 | tr -d '\n'; printf '\n'
   printf '@@E %s %s\n' "$rd" "$tr"
 }
-for g in "$R"/etc/mysql/debian.cnf "$R"/root/.my.cnf "$R"/etc/my.cnf.d/*.cnf "$R"/var/log/mysqld.log "$R"/etc/postfix/sasl_passwd "$R"/etc/webmin/virtual-server/domains/* ; do emit "$g"; done
+# erel: Java/Oracle app-server configs under one app root — exact names plus
+# bounded globs (Spring, Tomcat conf, WildFly standalone, WebLogic jdbc/boot,
+# hibernate/jdbc, and deployed WEB-INF apps). emit skips what doesn't exist.
+erel() {
+  d="$1"
+  for rel in application.properties application.yml application.yaml config/application.properties config/application.yml conf/context.xml conf/server.xml conf/tomcat-users.xml standalone/configuration/standalone.xml hibernate.cfg.xml persistence.xml META-INF/persistence.xml jdbc.properties db.properties boot.properties ; do
+    emit "$d/$rel"
+  done
+  for x in "$d"/conf/Catalina/*/*.xml "$d"/standalone/configuration/standalone*.xml "$d"/config/jdbc/*.xml "$d"/application-*.properties "$d"/application-*.yml "$d"/config/application-*.properties "$d"/config/application-*.yml "$d"/servers/*/security/boot.properties "$d"/webapps/*/WEB-INF/classes/hibernate.cfg.xml "$d"/webapps/*/WEB-INF/classes/jdbc.properties "$d"/webapps/*/WEB-INF/classes/db.properties "$d"/webapps/*/WEB-INF/classes/application.properties "$d"/webapps/*/META-INF/persistence.xml ; do
+    emit "$x"
+  done
+}
+# emitjar: a Spring Boot fat jar's config members only (job-mode only — the whole
+# probe is). unzip -p | head -c caps each read; counted against N and TOTAL.
+emitjar() {
+  jar="$1"
+  [ -f "$jar" ] && [ -r "$jar" ] || return 0
+  command -v unzip >/dev/null 2>&1 || return 0
+  for mem in BOOT-INF/classes/application.properties BOOT-INF/classes/application.yml BOOT-INF/classes/application.yaml ; do
+    data=$(unzip -p "$jar" "$mem" 2>/dev/null | head -c {PERFILE} | base64 | tr -d '\n')
+    [ -n "$data" ] || continue
+    TOTAL=$((TOTAL + ${#data} * 3 / 4)); [ "$TOTAL" -gt {TOTAL} ] && exit 0
+    N=$((N+1)); [ "$N" -gt {MAXN} ] && exit 0
+    printf '@@F %s %s %s\n' "$(printf %s "${jar#$R}!/$mem" | base64 | tr -d '\n')" 0 -
+    printf '%s\n' "$data"
+    printf '@@E %s %s\n' 0 0
+  done
+}
+for g in "$R"/etc/mysql/debian.cnf "$R"/root/.my.cnf "$R"/etc/my.cnf.d/*.cnf "$R"/var/log/mysqld.log "$R"/etc/postfix/sasl_passwd "$R"/etc/webmin/virtual-server/domains/* "$R"/etc/tnsnames.ora "$R"/var/opt/oracle/tnsnames.ora "$R"/u01/app/oracle/product/*/network/admin/tnsnames.ora "$R"/u01/app/oracle/product/*/*/network/admin/tnsnames.ora ; do emit "$g"; done
 for k in "$R"/root/.ssh/id_* ; do case "$k" in *.pub) ;; *) emit "$k" ;; esac; done
 OLDIFS=$IFS; IFS='
 '
 for x in $(printf %s {FILES} | base64 -d 2>/dev/null); do [ -n "$x" ] && emit "$R$x"; done
+for j in $(printf %s {JARS} | base64 -d 2>/dev/null); do [ -n "$j" ] && emitjar "$R$j"; done
 for r in $(printf %s {ROOTS} | base64 -d 2>/dev/null); do
   [ -n "$r" ] || continue
   for b in "$r" "$r/.." ; do for rel in .env wp-config.php application/config/database.php ; do emit "$R$b/$rel"; done; done
   for d in "$R$r"/*/ ; do [ -d "$d" ] || continue; dd="${d#$R}"; for rel in .env wp-config.php application/config/database.php ; do emit "$R$dd$rel"; done; done
+  erel "$R$r"
+  for d in "$R$r"/*/ ; do [ -d "$d" ] || continue; erel "${d%/}"; done
 done
 IFS=$OLDIFS
 echo @@CSEND
 `
 
-// credProbeScript bakes roots and files into the template.
-func credProbeScript(roots, files []string) string {
+// credProbeScript bakes roots, files and fat jars into the template.
+func credProbeScript(roots, files, jars []string) string {
 	enc := func(list []string) string {
 		return base64.StdEncoding.EncodeToString([]byte(strings.Join(list, "\n")))
 	}
 	return strings.NewReplacer(
-		"{ROOTS}", enc(roots), "{FILES}", enc(files),
+		"{ROOTS}", enc(roots), "{FILES}", enc(files), "{JARS}", enc(jars),
 		"{PERFILE}", strconv.Itoa(credPerFileCap), "{TOTAL}", strconv.Itoa(credTotalCap),
 		"{MAXN}", strconv.Itoa(credMaxFiles),
 	).Replace(credScriptTmpl)
@@ -124,16 +156,51 @@ func credProbeScript(roots, files []string) string {
 // debian.cnf, /root/.my.cnf, /root/.ssh/id_*). Without a stored password, or
 // outside a job scan, it doesn't run and returns scanned=false — the
 // credential_sources field stays null ("didn't run"), like git_remotes.
-func collectCredSources(client *ssh.Client, sudoPassword string, roots, files []string) ([]credFile, bool) {
+func collectCredSources(client *ssh.Client, sudoPassword string, roots, files, jars []string) ([]credFile, bool) {
 	if sudoPassword == "" || !jobMode(client) {
 		return nil, false
 	}
-	out, err := runSudoCmd(client, sudoPassword, credProbeScript(roots, files))
+	script := credProbeScript(roots, files, jars)
+	out, err := runSudoCmd(client, sudoPassword, script)
+	if !strings.Contains(out, "@@CSBEGIN") {
+		// RHEL / CentOS 6–7 ship `Defaults requiretty`: sudo refuses without a
+		// PTY. Retry the probe on a PTY session (Oracle Linux / CentOS 7 are
+		// exactly the Java/Oracle targets). The first, cheaper attempt covers
+		// every modern host; this fires only when sudo itself refused.
+		out, err = runSudoCmdPTY(client, sudoPassword, script)
+	}
 	if !strings.Contains(out, "@@CSBEGIN") {
 		log.Printf("[sshscan] cred-sources probe produced no output: %v", err)
 		return nil, false
 	}
 	return parseCredProbe(out), true
+}
+
+// runSudoCmdPTY runs a script under sudo on a PTY session, for hosts with
+// `Defaults requiretty`. ECHO off keeps the piped password out of the output;
+// OPOST off stops the PTY translating \n→\r\n and corrupting the base64 frames.
+// Any login banner lands before @@CSBEGIN, which parseCredProbe ignores.
+func runSudoCmdPTY(client *ssh.Client, password, cmd string) (string, error) {
+	session, err := newSession(client)
+	if err != nil {
+		return "", err
+	}
+	defer session.Close()
+	modes := ssh.TerminalModes{ssh.ECHO: 0, ssh.OPOST: 0}
+	if err := session.RequestPty("vt100", 200, 80, modes); err != nil {
+		return "", err
+	}
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		return "", err
+	}
+	go func() {
+		fmt.Fprintln(stdin, password)
+		stdin.Close()
+	}()
+	encoded := base64.StdEncoding.EncodeToString([]byte(cmd))
+	out, err := session.CombinedOutput(fmt.Sprintf("sudo -S -p '' sh -c 'echo %s | base64 -d | sh' 2>&1", encoded))
+	return string(out), err
 }
 
 // parseCredProbe reads the base64 frames into credFiles, duplicate paths
@@ -189,14 +256,14 @@ func validCredPath(p string) bool {
 // private keys cron passes with -i (root_ssh_keys reads them). Kept separate so
 // detectCreds can dispatch each arbitrary-path file to the right detector.
 // Each list is bounded and deduplicated.
-func credProbeInputs(info *VMInfo) (roots, cronScripts, keyFiles []string) {
+func credProbeInputs(info *VMInfo) (roots, cronScripts, keyFiles, jars []string) {
 	add := func(dst *[]string, seen map[string]bool, p string) {
 		if p = strings.TrimSpace(p); strings.HasPrefix(p, "/") && !seen[p] && len(seen) < credMaxInputs {
 			seen[p] = true
 			*dst = append(*dst, p)
 		}
 	}
-	rootSet, cronSet, keySet := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	rootSet, cronSet, keySet, jarSet := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 	// Host web docroots (container roots live on the container fs — skipped).
 	for _, ws := range info.WebServers {
 		if ws.Container != "" {
@@ -206,11 +273,17 @@ func credProbeInputs(info *VMInfo) (roots, cronScripts, keyFiles []string) {
 			add(&roots, rootSet, s.Root)
 		}
 	}
-	// Process cwds and Java app homes.
+	// Process cwds, Java app homes, Spring config-location dirs and fat jars.
 	for _, p := range info.ProcessDetails {
 		add(&roots, rootSet, p.CWD)
 		if home := AppHome(p.Command); home != "" {
 			add(&roots, rootSet, home)
+		}
+		for _, loc := range springConfigRoots(p.Command) {
+			add(&roots, rootSet, loc)
+		}
+		for _, jar := range javaJars(p.Command) {
+			add(&jars, jarSet, jar)
 		}
 	}
 	// The scripts cron calls, and the -i keys in cron command lines.
@@ -224,7 +297,52 @@ func credProbeInputs(info *VMInfo) (roots, cronScripts, keyFiles []string) {
 			}
 		}
 	}
-	return roots, cronScripts, keyFiles
+	return roots, cronScripts, keyFiles, jars
+}
+
+// javaJars returns the absolute `-jar <file>.jar` arguments of a java command
+// line (Spring Boot fat jars). Relative jars are skipped: the probe can't
+// resolve them without the cwd, and systemd services use absolute paths.
+func javaJars(cmd string) []string {
+	f := strings.Fields(cmd)
+	var out []string
+	for i := 0; i+1 < len(f); i++ {
+		if f[i] == "-jar" {
+			if j := strings.Trim(f[i+1], `"'`); strings.HasPrefix(j, "/") && strings.HasSuffix(j, ".jar") {
+				out = append(out, j)
+			}
+		}
+	}
+	return out
+}
+
+// springConfigRoots returns the filesystem directories named by
+// -Dspring.config.location / -Dspring.config.additional-location, so the probe
+// scans them for application.* (erel). A `file:` / `optional:` prefix is
+// stripped; a value that is a file contributes its directory; classpath: and
+// other non-filesystem values are dropped.
+func springConfigRoots(cmd string) []string {
+	var out []string
+	for _, f := range strings.Fields(cmd) {
+		for _, key := range []string{"-Dspring.config.location=", "-Dspring.config.additional-location="} {
+			v := strings.TrimPrefix(f, key)
+			if v == f || v == "" {
+				continue
+			}
+			for _, e := range strings.Split(strings.Trim(v, `"'`), ",") {
+				e = strings.TrimPrefix(strings.TrimPrefix(e, "optional:"), "file:")
+				if !strings.HasPrefix(e, "/") {
+					continue
+				}
+				if strings.HasSuffix(e, "/") {
+					out = append(out, strings.TrimRight(e, "/"))
+				} else {
+					out = append(out, path.Dir(e))
+				}
+			}
+		}
+	}
+	return out
 }
 
 // cronScriptPaths returns the absolute script paths a cron command runs: the

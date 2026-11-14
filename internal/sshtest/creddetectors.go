@@ -61,8 +61,32 @@ func detectCredFile(f credFile, cronScripts, keyFiles map[string]bool) []CredHit
 		return wpConfig(f)
 	case base == "database.php" && strings.HasSuffix(dir, "/application/config"):
 		return ci3Database(f)
+	// ---- Java / Oracle (Phase 2) ----
+	case base == "tnsnames.ora":
+		return oracleTNS(f)
+	case base == "tomcat-users.xml":
+		return tomcatUsers(f)
+	case base == "context.xml", base == "server.xml", strings.Contains(f.Path, "/conf/Catalina/"):
+		return tomcatResource(f)
+	case strings.HasPrefix(base, "standalone") && strings.HasSuffix(base, ".xml") && strings.Contains(f.Path, "/configuration/"):
+		return wildflyDS(f)
+	case base == "boot.properties", strings.Contains(f.Path, "/jdbc/") && strings.HasSuffix(base, ".xml"):
+		return weblogicJDBC(f)
+	case isSpringConfig(base):
+		return springProps(f)
+	case base == "hibernate.cfg.xml", base == "persistence.xml", base == "jdbc.properties", base == "db.properties":
+		return hibernateJDBC(f)
 	}
 	return nil
+}
+
+// isSpringConfig reports a Spring Boot config file name (application.properties
+// / .yml / .yaml, with an optional -{profile} suffix).
+func isSpringConfig(base string) bool {
+	if !strings.HasPrefix(base, "application") {
+		return false
+	}
+	return strings.HasSuffix(base, ".properties") || strings.HasSuffix(base, ".yml") || strings.HasSuffix(base, ".yaml")
 }
 
 // ---- helpers ----
