@@ -153,6 +153,17 @@ type VMInfo struct {
 	// ReleaseRisks: what a release upgrade would trip over, with its
 	// warnings (releaserisk.go). nil = the probe didn't run.
 	ReleaseRisks *ReleaseRisks `json:"release_risks"`
+	// CredHits: config-file credentials captured by the credsources probe
+	// (credsources.go). Transient — each holds plaintext, never serialized;
+	// service.RecordScanSecrets vaults them and builds CredentialSources.
+	CredHits []CredHit `json:"-"`
+	// CredSourcesScanned marks that the credsources probe ran (root, in a job
+	// scan), so an empty CredentialSources means "found none", not "didn't run".
+	CredSourcesScanned bool `json:"-"`
+	// CredentialSources: provenance of the captured config-file credentials —
+	// tokens and field names only, never a value (credsources.go). nil = the
+	// probe didn't run; service.RecordScanSecrets fills the tokens.
+	CredentialSources []CredentialSource `json:"credential_sources"`
 	// Dependencies is the host's and each container's OS, runtimes and
 	// packages (deps.go). Kept out of the stored scan JSON: the scan handler
 	// writes it to dependency_inventory; container package lists would
@@ -485,9 +496,10 @@ func budgetOf(client *ssh.Client) budget {
 	return budgets[CaptureSync]
 }
 
-// inJobMode reports that client is in a CaptureJob capture: the heavy probes
-// that stay nil in the synchronous scan run only when this is true.
-func inJobMode(client *ssh.Client) bool {
+// jobMode reports whether client is inside a CaptureJob capture — the gate for
+// heavy probes (the config-file secret probe) that stay null in the 120 s
+// synchronous scan.
+func jobMode(client *ssh.Client) bool {
 	_, ok := jobClients.Load(client)
 	return ok
 }
@@ -2045,7 +2057,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 
 	// Deep facts (outbound flows, patch freshness) only in a background scan:
 	// they add an extra root session and don't fit the 120 s synchronous test.
-	if inJobMode(client) {
+	if jobMode(client) {
 		info.DeepFacts = collectDeepFacts(client, sudoPassword, info.Cron, info.Ports)
 	}
 
@@ -2176,6 +2188,17 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		info.Warnings = append(info.Warnings, "Docker requires sudo to run. Container data was collected via sudo -n. Consider adding the user to the docker group.")
 	}
 	info.ContainersKnown = !warnFlags["docker_unreadable"]
+
+	// Config-file secrets (credsources.go): root-only, job-mode-only, after the
+	// probes it draws its paths from (web docroots, cron scripts, process cwds).
+	// service.RecordScanSecrets vaults the values and keeps only tokens + field
+	// names in the stored scan; CredHits (plaintext) never serializes.
+	credRoots, cronScripts, keyFiles := credProbeInputs(info)
+	credFiles := append(append([]string{}, cronScripts...), keyFiles...)
+	if cf, scanned := collectCredSources(client, sudoPassword, credRoots, credFiles); scanned {
+		info.CredHits = detectCreds(cf, sliceSet(cronScripts), sliceSet(keyFiles))
+		info.CredSourcesScanned = true
+	}
 	return info, nil
 }
 

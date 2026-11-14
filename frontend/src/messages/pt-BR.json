@@ -662,7 +662,26 @@
       "copied": "Copiado",
       "loadError": "Não foi possível carregar os segredos",
       "revealError": "Não foi possível revelar o segredo",
-      "chip": "Segredo guardado no cofre"
+      "chip": "Segredo guardado no cofre",
+      "sectionCmd": "Linhas de comando",
+      "sectionConfig": "Arquivos de configuração",
+      "configHint": "Logins achados em arquivos de configuração deste host. O scan guarda só os nomes dos campos e uma referência ao cofre.",
+      "configEmpty": "Nenhuma credencial de arquivo de configuração no último scan.",
+      "noRoot": "A captura em arquivos de configuração precisa de root — uma senha SSH guardada.",
+      "adminOnly": "somente admin",
+      "indirect": "referência indireta",
+      "detector": {
+        "ci3_database": "Banco CodeIgniter 3",
+        "dotenv": "Arquivo .env",
+        "wp_config": "Config do WordPress",
+        "mysql_debian_cnf": "Admin MySQL (debian.cnf)",
+        "mysql_root_mycnf": "Admin MySQL (.my.cnf)",
+        "mysql_rpm_temp_root": "Senha root temporária do MySQL",
+        "virtualmin_domain": "Domínio Virtualmin",
+        "postfix_sasl": "Relay SASL do Postfix",
+        "cron_embedded": "Script de cron",
+        "root_ssh_keys": "Chave SSH root"
+      }
     },
     "maintenance": {
       "tab": "Manutenção",
