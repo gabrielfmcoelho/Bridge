@@ -28,6 +28,7 @@ export default function DatabaseCard({ db }: { db: Database }) {
               <Badge color="cyan">{t(`atlas.databases.engine.${db.engine}`)}</Badge>
               <Badge color={ENVIRONMENT_COLOR[db.environment]}>{t(`atlas.databases.environment.${db.environment}`)}</Badge>
               <Badge color={SENSITIVITY_COLOR[db.sensitivity]}>{t(`atlas.databases.sensitivity.${db.sensitivity}`)}</Badge>
+              {db.discovered && <Badge color="gray">{t("atlas.databases.discovered")}</Badge>}
             </span>
           }
           description={plainText(db.description)}

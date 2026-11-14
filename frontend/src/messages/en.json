@@ -421,6 +421,8 @@
       "credential": "Credential",
       "hasCredential": "Credential in the vault",
       "noCredential": "No credential yet",
+      "discovered": "Discovered",
+      "scanLoginOnHost": "Login found on {host} (scan)",
       "backupPolicy": "Backup policy",
       "backupPolicyHint": "How and where it is backed up. Empty on prod is flagged.",
       "backupPolicyPlaceholder": "Daily pg_dump to MinIO",
@@ -440,7 +442,8 @@
       "section": {
         "location": "Location",
         "connection": "Connection",
-        "classification": "Classification"
+        "classification": "Classification",
+        "scanLogins": "Logins found in scans"
       },
       "instances": {
         "title": "Database instances",
