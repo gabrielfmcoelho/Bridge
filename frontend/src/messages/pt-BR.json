@@ -421,6 +421,8 @@
       "credential": "Credencial",
       "hasCredential": "Credencial no cofre",
       "noCredential": "Sem credencial ainda",
+      "discovered": "Descoberto",
+      "scanLoginOnHost": "Login encontrado em {host} (scan)",
       "backupPolicy": "Política de backup",
       "backupPolicyHint": "Como e onde é feito o backup. Vazio em produção é sinalizado.",
       "backupPolicyPlaceholder": "pg_dump diário para o MinIO",
@@ -440,7 +442,8 @@
       "section": {
         "location": "Localização",
         "connection": "Conexão",
-        "classification": "Classificação"
+        "classification": "Classificação",
+        "scanLogins": "Logins encontrados em scans"
       },
       "instances": {
         "title": "Instâncias de banco",
@@ -680,7 +683,14 @@
         "virtualmin_domain": "Domínio Virtualmin",
         "postfix_sasl": "Relay SASL do Postfix",
         "cron_embedded": "Script de cron",
-        "root_ssh_keys": "Chave SSH root"
+        "root_ssh_keys": "Chave SSH root",
+        "spring_props": "Config do Spring Boot",
+        "tomcat_resource": "Resource JDBC do Tomcat",
+        "tomcat_users": "Login do gerenciador Tomcat",
+        "wildfly_ds": "Datasource do WildFly",
+        "weblogic_jdbc": "JDBC do WebLogic",
+        "hibernate_jdbc_props": "Config Hibernate / JDBC",
+        "oracle_tns": "tnsnames do Oracle"
       }
     },
     "maintenance": {

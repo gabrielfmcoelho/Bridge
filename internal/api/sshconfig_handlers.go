@@ -1874,4 +1874,12 @@ func (h *sshHandlers) recordScan(ctx context.Context, host *models.Host, vmInfo 
 			result["git_links"] = sum
 		}
 	}
+	// Atlas database rows from the A5 DB-metadata probe + Phase 1's
+	// credential_sources (RecordScanSecrets filled them above). Only adds a
+	// discovered row per new schema. Never fails the scan.
+	if dbSum, dbErr := service.RecordScanDatabases(ctx, h.db.SQL, host, *vmInfo); dbErr != nil {
+		result["scan_databases_error"] = dbErr.Error()
+	} else {
+		result["scan_databases"] = dbSum
+	}
 }

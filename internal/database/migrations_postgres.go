@@ -2250,4 +2250,8 @@ var migrationsPostgres = []string{
 	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
 	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan'));
 	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS auth_method TEXT NOT NULL DEFAULT '';`,
+	// Version 133: an Atlas database row the scan created from the A5
+	// DB-metadata probe (service.RecordScanDatabases) carries a "descoberto"
+	// badge. Operator-made rows stay false.
+	`ALTER TABLE databases ADD COLUMN IF NOT EXISTS discovered BOOLEAN NOT NULL DEFAULT FALSE;`,
 }

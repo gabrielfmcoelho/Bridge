@@ -421,6 +421,8 @@
       "credential": "Credential",
       "hasCredential": "Credential in the vault",
       "noCredential": "No credential yet",
+      "discovered": "Discovered",
+      "scanLoginOnHost": "Login found on {host} (scan)",
       "backupPolicy": "Backup policy",
       "backupPolicyHint": "How and where it is backed up. Empty on prod is flagged.",
       "backupPolicyPlaceholder": "Daily pg_dump to MinIO",
@@ -440,7 +442,8 @@
       "section": {
         "location": "Location",
         "connection": "Connection",
-        "classification": "Classification"
+        "classification": "Classification",
+        "scanLogins": "Logins found in scans"
       },
       "instances": {
         "title": "Database instances",
@@ -680,7 +683,14 @@
         "virtualmin_domain": "Virtualmin domain",
         "postfix_sasl": "Postfix SASL relay",
         "cron_embedded": "Cron script",
-        "root_ssh_keys": "Root SSH key"
+        "root_ssh_keys": "Root SSH key",
+        "spring_props": "Spring Boot config",
+        "tomcat_resource": "Tomcat JDBC resource",
+        "tomcat_users": "Tomcat manager login",
+        "wildfly_ds": "WildFly datasource",
+        "weblogic_jdbc": "WebLogic JDBC",
+        "hibernate_jdbc_props": "Hibernate / JDBC config",
+        "oracle_tns": "Oracle tnsnames"
       }
     },
     "maintenance": {
