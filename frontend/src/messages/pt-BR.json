@@ -2892,7 +2892,11 @@
         "git": "Repositórios git",
         "outbound": "Fluxos de saída",
         "patch": "Atualização de pacotes",
-        "traffic": "Tráfego dos sites"
+        "traffic": "Tráfego dos sites",
+        "panels": "Painéis de controle",
+        "code": "Código e uploads",
+        "owner": "Pistas de dono",
+        "firewall": "Firewall real"
       },
       "empty": {
         "resources": "Sem dados de uso neste scan.",
@@ -2907,7 +2911,11 @@
         "git": "Nenhum checkout git encontrado.",
         "outbound": "Nenhum fluxo de saída encontrado no último scan.",
         "patch": "Sem informações de atualização no último scan.",
-        "traffic": "Sem tráfego de access-log no último scan."
+        "traffic": "Sem tráfego de access-log no último scan.",
+        "panels": "Nenhum painel de controle no último scan.",
+        "code": "Nenhum docroot web identificado no último scan.",
+        "owner": "Nenhuma pista de dono no último scan.",
+        "firewall": "Nenhum dado de firewall no último scan."
       }
     },
     "deep": {
@@ -2945,6 +2953,51 @@
         "lastSeen": "Última requisição",
         "log": "Log de acesso",
         "partial": "A janela pode estar curta: o log passou do limite de leitura ou tem rotações comprimidas."
+      },
+      "panels": {
+        "summary": "Virtualmin / Webmin: domínios hospedados, usuários do painel e tentativas de login malsucedidas — inclusive quando um domínio foi desativado, segundo os próprios registros do painel.",
+        "installed": "Instalado",
+        "domains": "Domínios",
+        "users": "Usuários do painel",
+        "disabled": "desativado",
+        "disabledAt": "Desativado em {date}",
+        "created": "Criado",
+        "owner": "Dono",
+        "contact": "Contato",
+        "letsencrypt": "Let's Encrypt",
+        "reason": "Motivo",
+        "failed": "Logins malsucedidos",
+        "failedPubPriv": "{public} de IPs públicos · {private} de privados"
+      },
+      "code": {
+        "summary": "O que roda sob cada docroot web — framework e versão, mudança de código mais recente e os diretórios de upload (tamanho, arquivos, mais recente).",
+        "root": "(docroot)",
+        "newest": "Código mais recente",
+        "uploads": "Uploads",
+        "files": "{count} arquivos",
+        "noApps": "Nenhum framework detectado"
+      },
+      "owner": {
+        "summary": "Pistas de quem é dono ou mantém esta VM, cada uma com sua origem. Nenhum endereço de cliente, material de chave SSH ou nome de arquivo sai do host.",
+        "lastLogins": "Últimos logins",
+        "gecos": "Nomes das contas",
+        "sudoers": "Sudo / wheel",
+        "authKeys": "Comentários de chaves SSH",
+        "ftp": "Uploads por FTP",
+        "ftpCount": "{count} uploads"
+      },
+      "firewall": {
+        "summary": "A postura real do firewall: ufw, firewalld/nft e iptables, jails do fail2ban, e quais portas sensíveis estão expostas — e com que alcance. Apenas contagens e classes, nunca um endereço de bind.",
+        "active": "ativo",
+        "inactive": "inativo",
+        "rules": "{count} regras",
+        "iptables": "iptables",
+        "fail2ban": "fail2ban",
+        "banned": "{count} banidos",
+        "adminPorts": "Portas administrativas expostas",
+        "exposureAll": "todas as interfaces",
+        "exposureOneIp": "um único IP",
+        "exposureLoopback": "loopback"
       }
     },
     "git": {
