@@ -103,6 +103,7 @@ func TestRecordWebDNS(t *testing.T) {
 				{Names: []string{"new.x.gov.br", "app.x.gov.br"}, Listen: []int{80}, FastCGI: []string{"php:9000"}},
 			}},
 			{Kind: "apache", Stopped: true, Sites: []sshtest.WebSite{{Names: []string{"stopped.x.gov.br"}}}},
+			{Kind: "apache", Sites: []sshtest.WebSite{{Names: []string{"disabled.x.gov.br"}, Listen: []int{80}, Disabled: true}}},
 			{Kind: "nginx", Container: "broken", Error: "config unreadable", Sites: []sshtest.WebSite{{Names: []string{"broken.x.gov.br"}}}},
 		},
 	}
@@ -152,7 +153,7 @@ func TestRecordWebDNS(t *testing.T) {
 	if grants == 0 {
 		t.Fatal("new record did not inherit the host's entidade")
 	}
-	for _, n := range []string{"ghost.x.gov.br", "stopped.x.gov.br", "broken.x.gov.br", "localhost"} {
+	for _, n := range []string{"ghost.x.gov.br", "stopped.x.gov.br", "disabled.x.gov.br", "broken.x.gov.br", "localhost"} {
 		if idOf(n) != 0 {
 			t.Errorf("%s should not have a record", n)
 		}

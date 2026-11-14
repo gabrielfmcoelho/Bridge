@@ -662,7 +662,26 @@
       "copied": "Copied",
       "loadError": "Could not load the secrets",
       "revealError": "Could not reveal the secret",
-      "chip": "Secret stored in the vault"
+      "chip": "Secret stored in the vault",
+      "sectionCmd": "Command lines",
+      "sectionConfig": "Configuration files",
+      "configHint": "Logins found in config files on this host. The scan stores only field names and a vault reference.",
+      "configEmpty": "No config-file credentials in the latest scan.",
+      "noRoot": "Config-file capture needs root — a stored SSH password.",
+      "adminOnly": "admin only",
+      "indirect": "indirect reference",
+      "detector": {
+        "ci3_database": "CodeIgniter 3 database",
+        "dotenv": ".env file",
+        "wp_config": "WordPress config",
+        "mysql_debian_cnf": "MySQL admin (debian.cnf)",
+        "mysql_root_mycnf": "MySQL admin (.my.cnf)",
+        "mysql_rpm_temp_root": "MySQL temporary root password",
+        "virtualmin_domain": "Virtualmin domain",
+        "postfix_sasl": "Postfix SASL relay",
+        "cron_embedded": "Cron script",
+        "root_ssh_keys": "Root SSH key"
+      }
     },
     "maintenance": {
       "tab": "Maintenance",

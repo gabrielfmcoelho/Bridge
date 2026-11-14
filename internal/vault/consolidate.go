@@ -46,6 +46,7 @@ func PlanHostCredentialConsolidation(ctx context.Context, db *sql.DB) ([]Consoli
 		  JOIN hosts h ON h.id = s.parent_id AND h.deleted_at IS NULL
 		 WHERE s.scope = 'host' AND s.visibility = 'shared' AND s.deleted_at IS NULL
 		   AND s.type IN ('password', 'sshkey') AND s.value_fingerprint IS NOT NULL
+		   AND COALESCE(s.group_label, '') NOT LIKE 'scan-%'
 		 ORDER BY h.nickname, h.id`)
 	if err != nil {
 		return nil, err

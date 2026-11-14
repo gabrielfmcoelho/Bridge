@@ -225,7 +225,7 @@ func collectDeepFacts(client *ssh.Client, sudoPassword string, cron *CronInfo, p
 // cron jobs' binary paths; listen is the host's listening ports (to tell an
 // inbound server connection from an outbound one). nil = the probe didn't run.
 func collectFlowsPatch(client *ssh.Client, sudoPassword string, cron *CronInfo, ports []string) *DeepFacts {
-	scripts := cronScriptPaths(cron)
+	scripts := cronJobBinaries(cron)
 	var raw string
 	if sudoPassword != "" {
 		out, err := runSudoCmd(client, sudoPassword, deepFactsScript(true, scripts))
@@ -244,9 +244,9 @@ func collectFlowsPatch(client *ssh.Client, sudoPassword string, cron *CronInfo, 
 	return parseDeepFacts(raw, listenPortSet(ports))
 }
 
-// cronScriptPaths is the absolute binary of each cron job, deduped and capped —
+// cronJobBinaries is the absolute binary of each cron job, deduped and capped —
 // the scripts whose contents A3 reads for transfer destinations.
-func cronScriptPaths(cron *CronInfo) []string {
+func cronJobBinaries(cron *CronInfo) []string {
 	if cron == nil {
 		return nil
 	}
