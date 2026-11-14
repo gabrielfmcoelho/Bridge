@@ -93,7 +93,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v132**. Use idempotent idioms:
+per element, currently at **v133**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -303,6 +303,17 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   `*.dist`, lost PHP handlers, new foreign packages) and the host's DNS names'
   `/` before and after (`ProbeSites`, body read for PHP error text, never
   stored). shortcut: only `/` of each name.
+  `repair` (v133, `sshtest/osrepair.go`) is one host per run, detached like the
+  others, rebooting only when asked: `dpkg --configure -a` keeping local
+  conffiles (failure → `fail`/`diagnose`, stop), `apt-get -f install` only when
+  `apt-get check` fails, `@@dist_file <path> <n>` per `*.dpkg-dist`/`*.ucf-dist`
+  (changed-line count only, never contents; applying one stays manual),
+  `@@unit_restart <unit> ok|failed` per failed unit but `user@*` (judged by
+  `systemctl is-active`, not the restart's exit code), `@@reboot yes` when one
+  is pending or a newer kernel sits in `/boot`. The report adds
+  `unit_restarts` / `dist_files`. The Manutenção tab offers it when the scan's
+  `release_risks` has `dpkg_broken`, failed units or pending dist files; a run
+  result whose report has dpkg errors links to it.
   Host backups — who owns what: the **MinIO integration** (`internal/integrations/minio`,
   settings group `minio`) is the connection only (endpoint, public URL, keys,
   bucket; its test changes nothing). The **host backups feature**

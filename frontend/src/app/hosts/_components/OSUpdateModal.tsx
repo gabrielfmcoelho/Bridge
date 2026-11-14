@@ -33,7 +33,8 @@ export type UpdateTarget =
   | { by: "hosts"; hosts: UpdateHost[] };
 
 /** The one modal that starts an OS update or backup run, from every entry
- *  point. Release (next version) only on one host; backup-only keeps it. */
+ *  point. Release (next version) and repair only on one host; backup-only
+ *  keeps it. */
 export default function OSUpdateModal({ target, preset = "check", scan, onClose, onStarted }: {
   target: UpdateTarget;
   preset?: OSUpdateKind;
@@ -53,7 +54,7 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
     : target.hosts.map((h) => h.id);
   const single = target.by === "hosts" && target.hosts.length === 1 ? target.hosts[0] : null;
 
-  const [kind, setKind] = useState<OSUpdateKind>(preset === "release" && !single ? "check" : preset);
+  const [kind, setKind] = useState<OSUpdateKind>((preset === "release" || preset === "repair") && !single ? "check" : preset);
   const release = kind === "release";
   const backupOnly = kind === "backup";
   const [reboot, setReboot] = useState(false);
@@ -119,7 +120,7 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
       if (!ok) return;
     } else if (kind !== "check" && !backupOnly) {
       const ok = await confirm({
-        title: t(`host.osUpdate.confirmTitle.${kind}`, { count: String(targets.length) }),
+        title: t(`host.osUpdate.confirmTitle.${kind}`, { count: String(targets.length), host: single?.nickname ?? "" }),
         message: `${reboot ? t("host.osUpdate.confirmReboot") : t("host.osUpdate.confirmNoReboot")} ${withBackup ? t("host.osUpdate.confirmBackup") : t("host.osUpdate.confirmNoBackup")}`,
         confirmLabel: t("host.osUpdate.start"), danger: reboot, requireText: t("host.osUpdate.confirmWord"),
       });
@@ -128,7 +129,7 @@ export default function OSUpdateModal({ target, preset = "check", scan, onClose,
     start.mutate();
   };
 
-  const kinds: OSUpdateKind[] = ["check", "security", "packages", ...(single ? ["release" as const] : []), "backup"];
+  const kinds: OSUpdateKind[] = ["check", "security", "packages", ...(single ? (["release", "repair"] as const) : []), "backup"];
   return (
     <ResponsiveModal open onClose={onClose} title={single ? t("host.osUpdate.titleHost", { host: single.nickname }) : t("host.osUpdate.title")}
       footer={<FormFooter onCancel={onClose} submitLabel={t(backupOnly ? "host.backup.run" : "host.osUpdate.start")} onSubmit={submit}

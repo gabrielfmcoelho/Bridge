@@ -16,7 +16,8 @@ import (
 // - the release warnings of the scan just before the run;
 // - why dpkg failed, when it did;
 // - what the scans before and after differ by (CompareScans);
-// - the host's sites before and after (CompareSites).
+// - the host's sites before and after (CompareSites);
+// - a repair's unit restarts and config files to review.
 // Every kind but check and backup gets one; a release most needs it.
 type ReleaseReport struct {
 	WarningsBefore     []sshtest.RiskWarning `json:"warnings_before,omitempty"`
@@ -28,6 +29,9 @@ type ReleaseReport struct {
 	LostPHPHandlers    []string              `json:"lost_php_handlers,omitempty"` // "target → binary"
 	NewForeignPackages []string              `json:"new_foreign_packages,omitempty"`
 	Sites              []SiteCheck           `json:"sites,omitempty"`
+	// A repair's: the failed units it restarted, the config files to review.
+	UnitRestarts []sshtest.UnitRestart `json:"unit_restarts,omitempty"`
+	DistFiles    []sshtest.DistFile    `json:"dist_files,omitempty"`
 }
 
 // CompareScans is what the scan after a run shows that the one before

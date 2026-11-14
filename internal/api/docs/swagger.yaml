@@ -19525,13 +19525,19 @@ paths:
         up unless backup is false and either the host already has a kept backup or
         allow_no_backup is true (no backup at all); the scan right before it (recorded
         like any scan) gives the result''s report its warnings_before, which never
-        block. Every kind but check and backup stores a report per host: dpkg''s errors,
-        what the scans before and after differ by, and the host''s sites (its DNS
-        names'' /) before and after; backup: back up only, and keep it — concurrency
-        hosts at a time (1–10, default 3), as root (the SSH user if root, sudo with
-        the stored password, else passwordless sudo). reboot reboots a host that needs
-        it after a successful upgrade. Every host is rescanned at the end. Answers
-        202 with the run; poll GET …/runs/{id}. 404 when a host isn''t visible.'
+        block. repair: exactly one host, finishes what dpkg left half done (dpkg --configure
+        -a keeping local config files, apt-get -f install when apt-get check fails),
+        lists the *.dpkg-dist / *.ucf-dist files to review with how many lines differ
+        (never their contents), restarts failed units (not user@*) judged by systemctl
+        is-active, and says whether a reboot is needed (pending, or a newer kernel
+        installed); its report adds unit_restarts and dist_files. Every kind but check
+        and backup stores a report per host: dpkg''s errors, what the scans before
+        and after differ by, and the host''s sites (its DNS names'' /) before and
+        after; backup: back up only, and keep it — concurrency hosts at a time (1–10,
+        default 3), as root (the SSH user if root, sudo with the stored password,
+        else passwordless sudo). reboot reboots a host that needs it after a successful
+        upgrade. Every host is rescanned at the end. Answers 202 with the run; poll
+        GET …/runs/{id}. 404 when a host isn''t visible.'
       parameters:
       - description: Run
         in: body

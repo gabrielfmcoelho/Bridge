@@ -38,7 +38,7 @@ import BatchDockerLogsModal from "./_components/BatchDockerLogsModal";
 import BatchSudoNopasswdModal from "./_components/BatchSudoNopasswdModal";
 import BatchSetupKeyModal from "./_components/BatchSetupKeyModal";
 import HostsTableView from "./_components/HostsTableView";
-import OSUpdateModal from "./_components/OSUpdateModal";
+import OSUpdateModal, { type UpdateHost } from "./_components/OSUpdateModal";
 import { RunDrawer } from "./_components/OSUpdateRuns";
 import OSRestoreModal from "./_components/OSRestoreModal";
 import { useLatestBackups } from "./_components/OSBadges";
@@ -95,6 +95,7 @@ export default function HostsPage() {
   const [maintenance, setMaintenance] = useState<"security" | "backup" | null>(null);
   const [openRun, setOpenRun] = useState<number | null>(null);
   const [restoring, setRestoring] = useState<OSUpdateResult | null>(null);
+  const [repairing, setRepairing] = useState<UpdateHost | null>(null);
   const [scanConcurrency, setScanConcurrency] = useLocalStorage("hosts.scanConcurrency", 10);
   const [scanScope, setScanScope] = useLocalStorage<"all" | "failed" | "success" | "untested">("hosts.scanScope", "all");
   // "auto"     → respect each host's preferred_auth (legacy behaviour)
@@ -517,9 +518,12 @@ export default function HostsPage() {
           onStarted={(run) => { setMaintenance(null); setOpenRun(run.id); }} />
       )}
       {/* The run started here (the history lives in the OS tab and on each host). */}
-      {openRun !== null && <RunDrawer id={openRun} onClose={() => setOpenRun(null)} onRestore={(x) => { setOpenRun(null); setRestoring(x); }} />}
+      {openRun !== null && <RunDrawer id={openRun} onClose={() => setOpenRun(null)} onRestore={(x) => { setOpenRun(null); setRestoring(x); }}
+        onRepair={(h) => { setOpenRun(null); setRepairing(h); }} />}
       {restoring && <OSRestoreModal backup={restoring} onClose={() => setRestoring(null)}
         onStarted={(r) => { setRestoring(null); setOpenRun(r.id); }} />}
+      {repairing && <OSUpdateModal target={{ by: "hosts", hosts: [repairing] }} preset="repair" onClose={() => setRepairing(null)}
+        onStarted={(run) => { setRepairing(null); setOpenRun(run.id); }} />}
 
       <FilterDrawer open={showFilters} onClose={() => setShowFilters(false)} filters={filters} onFiltersChange={setFilters}
         sort={sort} onSortChange={setSort} search={search} onSearchChange={setSearch} />

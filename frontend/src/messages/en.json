@@ -675,7 +675,8 @@
       "kept": "Kept backups",
       "noKept": "No backup of this host is kept in MinIO.",
       "expires": "Expires",
-      "keptForever": "until deleted"
+      "keptForever": "until deleted",
+      "repair": "Repair…"
     },
     "backup": {
       "apply": "Apply",
@@ -829,14 +830,21 @@
         "after": "After",
         "noAnswer": "no answer",
         "phpError": "PHP error on the page: {error}",
-        "warningsBefore": "Warnings in the scan before the release"
+        "warningsBefore": "Warnings in the scan before the release",
+        "unitRestarts": "Failed units restarted ({count})",
+        "unitOk": "running",
+        "unitFailed": "still failing",
+        "distFiles": "Config files to review ({count})",
+        "changedLines": "{count} lines differ",
+        "repair": "Repair this host…"
       },
       "kindOption": {
         "check": "Check for updates",
         "security": "Security updates",
         "packages": "All package updates",
         "release": "Upgrade to the next release",
-        "backup": "Backup only"
+        "backup": "Backup only",
+        "repair": "Repair packages and services"
       },
       "titleHost": "Update {host}",
       "hostsCount": "{count} hosts selected",
@@ -867,7 +875,8 @@
         "release": "Takes the host to the next release of its system (up to 3 h) and reboots it. A fresh scan and its checks run before anything else; with MinIO set up it backs up first unless you turn that off (with no kept backup, it then runs with none at all).",
         "check": "Refreshes the package lists and counts what can be upgraded. Changes nothing.",
         "security": "Installs only the security upgrades (apt: *-security suites; dnf/yum: security advisories). Alpine has no separate channel.",
-        "packages": "Installs every upgrade within the current release (apt upgrade, dnf/yum upgrade, apk upgrade). Never changes the release."
+        "packages": "Installs every upgrade within the current release (apt upgrade, dnf/yum upgrade, apk upgrade). Never changes the release.",
+        "repair": "Finishes what dpkg left half done (dpkg --configure -a, then apt-get -f install if dependencies are still broken), keeping the local config files. Lists the *.dpkg-dist / *.ucf-dist files to review with how many lines differ (applying them stays manual), restarts failed units (user@ ones wait for a reboot) and says whether a reboot is needed. The dpkg steps run on Debian / Ubuntu only."
       },
       "versions": "Versions ({count} hosts)",
       "reboot": "Reboot when needed",
@@ -880,7 +889,8 @@
       "confirmWord": "update",
       "confirmTitle": {
         "security": "Install security updates on {count} hosts?",
-        "packages": "Install all package updates on {count} hosts?"
+        "packages": "Install all package updates on {count} hosts?",
+        "repair": "Repair {host}?"
       },
       "confirmReboot": "Hosts that need it will be rebooted.",
       "confirmNoReboot": "No host will be rebooted.",
@@ -895,7 +905,8 @@
         "check": "Check",
         "packages": "Packages",
         "security": "Security",
-        "release": "Release upgrade"
+        "release": "Release upgrade",
+        "repair": "Repair"
       },
       "withReboot": "with reboot",
       "runStatus": {

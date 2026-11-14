@@ -2250,4 +2250,9 @@ var migrationsPostgres = []string{
 	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
 	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan'));
 	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS auth_method TEXT NOT NULL DEFAULT '';`,
+
+	// Version 133: repair runs (kind 'repair'): finish what dpkg left half
+	// done, list the config files to review, restart the failed units.
+	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
+	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan','repair'));`,
 }

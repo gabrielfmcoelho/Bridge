@@ -11,11 +11,15 @@ import (
 
 // fakeHost is a PATH with only the base tools the script uses plus the given
 // stub commands (name → shell body), so each package manager's branch runs
-// for real without touching the machine's own apt.
+// for real without touching the machine's own apt. A stub replaces the base
+// tool of the same name (never written through its symlink).
 func fakeHost(t *testing.T, stubs map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
-	for _, tool := range []string{"sh", "grep", "cut", "awk", "wc", "sort", "cat", "touch", "cp", "rm", "sed", "tar", "gzip", "mkdir", "chmod", "head", "tail"} {
+	for _, tool := range []string{"sh", "grep", "cut", "awk", "wc", "sort", "cat", "touch", "cp", "rm", "sed", "tar", "gzip", "mkdir", "chmod", "head", "tail", "find", "diff", "timeout"} {
+		if _, stubbed := stubs[tool]; stubbed {
+			continue
+		}
 		p, err := exec.LookPath(tool)
 		if err != nil {
 			t.Skipf("%s not available", tool)
