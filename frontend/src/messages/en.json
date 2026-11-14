@@ -2906,7 +2906,8 @@
         "panels": "Control panels",
         "code": "Code & uploads",
         "owner": "Owner clues",
-        "firewall": "Firewall reality"
+        "firewall": "Firewall reality",
+        "roles": "Server role"
       },
       "empty": {
         "resources": "No usage data in this scan.",
@@ -2925,7 +2926,8 @@
         "panels": "No control panel found in the last scan.",
         "code": "No web docroots fingerprinted in the last scan.",
         "owner": "No owner clues in the last scan.",
-        "firewall": "No firewall data in the last scan."
+        "firewall": "No firewall data in the last scan.",
+        "roles": "No mail or DNS role in the last scan."
       }
     },
     "deep": {
@@ -3008,6 +3010,23 @@
         "exposureAll": "all interfaces",
         "exposureOneIp": "single IP",
         "exposureLoopback": "loopback"
+      },
+      "roles": {
+        "summary": "What this VM actually is: a mail server (Postfix/Dovecot) or a DNS server (BIND). Config domain names and counts only — never a recipient address, a client IP or a mailbox username.",
+        "mail": "Mail server",
+        "dnsAuthoritative": "Authoritative DNS",
+        "dnsResolver": "DNS resolver",
+        "daemons": "Daemons",
+        "destinations": "Accepts mail for",
+        "relayhost": "Relay host",
+        "delivery": "Delivery",
+        "deliveryCounts": "{sent} sent · {bounced} bounced · {deferred} deferred",
+        "logins": "Mailbox logins",
+        "loginCounts": "{imap} IMAP · {pop3} POP3",
+        "zones": "Authoritative zones",
+        "recursion": "Recursion",
+        "recursionOn": "on (resolver)",
+        "recursionOff": "off"
       }
     },
     "git": {

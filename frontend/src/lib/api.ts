@@ -211,6 +211,8 @@ export type DeepFacts = {
   owner?: OwnerClues;
   /** A10 firewall reality. */
   firewall?: Firewall;
+  /** A11 mail/DNS role: what a generic VM actually is. */
+  roles?: HostRoles;
 };
 
 export type OutboundFlows = {
@@ -362,6 +364,32 @@ export type FirewallTool = { active: boolean; rules?: number };
 export type F2bJail = { jail: string; banned?: number };
 /** exposure: all | one-ip | loopback */
 export type AdminPort = { port: number; exposure: string };
+
+/** A11 the VM's stated server role. Each sub-object is absent when its software isn't present. */
+export type HostRoles = {
+  mail?: MailRole;
+  dns?: DNSRole;
+};
+/** Postfix/Dovecot: daemons, accepted domains, relay host, delivery counts (no recipient) and login counts. */
+export type MailRole = {
+  postfix?: boolean;
+  dovecot?: boolean;
+  destinations?: string[];
+  relayhost?: string;
+  sent?: number;
+  bounced?: number;
+  deferred?: number;
+  imap_logins?: number;
+  pop3_logins?: number;
+  per_day?: MailDay[];
+};
+export type MailDay = { day: string; sent?: number; bounced?: number };
+/** BIND: authoritative zones (master/slave) versus a recursive resolver. */
+export type DNSRole = {
+  named?: boolean;
+  authoritative?: string[];
+  recursion?: boolean;
+};
 
 export type Filesystem = {
   mount: string; device: string; fstype: string;
