@@ -24,6 +24,10 @@ import (
 const (
 	// ScanSecretGroupPrefix starts the group_label of every scan-found secret.
 	ScanSecretGroupPrefix = "scan-"
+	// ScanSecretAdminGroupPrefix is the admin-only tier: a captured DB-admin
+	// login, a superuser app login or root's outbound SSH key. It starts with
+	// ScanSecretGroupPrefix, so revealPermitted must test it first.
+	ScanSecretAdminGroupPrefix = "scan-admin-"
 	// PermHostSecretsReveal is the permission that reveals scan-found secrets.
 	PermHostSecretsReveal = "hosts.secrets.reveal"
 )
@@ -33,12 +37,18 @@ const (
 var ErrScanSecretTrashed = errors.New("scan secret is in the trash")
 
 // UpsertScanSecret stores value as the host's (groupLabel, name) scan secret
-// and returns its id. The same value and description write nothing; a change
-// updates the row in place, audited. actorUserID <= 0 falls back to the system
-// actor. An identity found only in the trash is never recreated
-// (ErrScanSecretTrashed). Name and group are checked before anything is
-// written; no error carries the value.
-func UpsertScanSecret(ctx context.Context, db *database.DB, hostID, actorUserID int64, groupLabel, name, value, description string) (int64, error) {
+// of type typ and returns its id. The same value and description write
+// nothing; a change updates the row in place, audited. actorUserID <= 0 falls
+// back to the system actor. An identity found only in the trash is never
+// recreated (ErrScanSecretTrashed). Name and group are checked before anything
+// is written; no error carries the value.
+//
+// typ picks the payload shape: env_var wraps value as {"value": …} (command-
+// line secrets, .env keys); cred, sshkey and app_login take value as the JSON
+// payload the config-file detectors build (so the derived username column
+// fills in). The reveal gate is keyed on the group, not the type, so both
+// tiers (scan- and scan-admin-) cover every type.
+func UpsertScanSecret(ctx context.Context, db *database.DB, hostID, actorUserID int64, typ models.SecretType, groupLabel, name, value, description string) (int64, error) {
 	if err := models.ValidateEnvVarName(name); err != nil {
 		return 0, err
 	}
@@ -52,33 +62,42 @@ func UpsertScanSecret(ctx context.Context, db *database.DB, hostID, actorUserID 
 	if value == "" {
 		return 0, fmt.Errorf("scan secret %s: empty value", name)
 	}
+	var plain string
+	switch typ {
+	case models.SecretTypeEnvVar:
+		payload, err := json.Marshal(map[string]string{"value": value})
+		if err != nil {
+			return 0, err
+		}
+		plain = string(payload)
+	case models.SecretTypeCred, models.SecretTypeSSHKey, models.SecretTypeAppLogin:
+		// The detector already built the JSON payload; store it verbatim.
+		plain = value
+	default:
+		return 0, fmt.Errorf("scan secret %s: unsupported type %q", name, typ)
+	}
 	if actorUserID <= 0 {
 		if actorUserID = resolveSystemActor(ctx, db); actorUserID == 0 {
 			return 0, fmt.Errorf("scan secret write: no users exist to attribute the secret to")
 		}
 	}
-	payload, err := json.Marshal(map[string]string{"value": value})
+	derived, err := deriveCols(db.Encryptor, typ, plain)
 	if err != nil {
 		return 0, err
 	}
-	plain := string(payload)
-	derived, err := deriveCols(db.Encryptor, models.SecretTypeEnvVar, plain)
-	if err != nil {
-		return 0, err
-	}
-	id, err := upsertScanSecretTx(ctx, db, hostID, actorUserID, groupLabel, name, plain, derived.valueFP, description)
+	id, err := upsertScanSecretTx(ctx, db, hostID, actorUserID, typ, groupLabel, name, plain, derived.valueFP, description)
 	// A scan of the same host inserted this identity between our lookup and our
 	// insert, so the unique index refused ours: its row exists now, and one more
 	// pass takes it as an update.
 	if store.IsUniqueViolation(err) {
-		id, err = upsertScanSecretTx(ctx, db, hostID, actorUserID, groupLabel, name, plain, derived.valueFP, description)
+		id, err = upsertScanSecretTx(ctx, db, hostID, actorUserID, typ, groupLabel, name, plain, derived.valueFP, description)
 	}
 	return id, err
 }
 
 // upsertScanSecretTx is one transaction of UpsertScanSecret: look up the live
 // row, refuse a trashed identity, then insert or update.
-func upsertScanSecretTx(ctx context.Context, db *database.DB, hostID, actorUserID int64, groupLabel, name, plain string, valueFP []byte, description string) (int64, error) {
+func upsertScanSecretTx(ctx context.Context, db *database.DB, hostID, actorUserID int64, typ models.SecretType, groupLabel, name, plain string, valueFP []byte, description string) (int64, error) {
 	desc := sql.NullString{String: description, Valid: description != ""}
 	actor := ActorContext{UserID: actorUserID, Role: "admin"}
 
@@ -95,17 +114,17 @@ func upsertScanSecretTx(ctx context.Context, db *database.DB, hostID, actorUserI
 	)
 	switch err := tx.QueryRowContext(ctx,
 		`SELECT id, value_fingerprint, description FROM secrets
-		  WHERE type = 'env_var' AND scope = 'host' AND parent_id = ? AND name = ? AND group_label = ?
+		  WHERE type = ? AND scope = 'host' AND parent_id = ? AND name = ? AND group_label = ?
 		    AND visibility = 'shared' AND deleted_at IS NULL`,
-		hostID, name, groupLabel,
+		string(typ), hostID, name, groupLabel,
 	).Scan(&id, &fp, &oldDesc); {
 	case errors.Is(err, sql.ErrNoRows):
 		var trashed bool
 		if err := tx.QueryRowContext(ctx,
 			`SELECT EXISTS (SELECT 1 FROM secrets
-			  WHERE type = 'env_var' AND scope = 'host' AND parent_id = ? AND name = ? AND group_label = ?
+			  WHERE type = ? AND scope = 'host' AND parent_id = ? AND name = ? AND group_label = ?
 			    AND visibility = 'shared' AND deleted_at IS NOT NULL)`,
-			hostID, name, groupLabel,
+			string(typ), hostID, name, groupLabel,
 		).Scan(&trashed); err != nil {
 			return 0, fmt.Errorf("scan secret trash lookup: %w", err)
 		}
@@ -137,8 +156,8 @@ func upsertScanSecretTx(ctx context.Context, db *database.DB, hostID, actorUserI
 			`INSERT INTO secrets
 			   (type, scope, visibility, parent_id, owner_user_id, name, group_label, description,
 			    payload_ciphertext, payload_nonce, key_version, created_by)
-			 VALUES ('env_var', 'host', 'shared', ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-			hostID, actorUserID, name, groupLabel, desc, ct, nonce, actorUserID,
+			 VALUES (?, 'host', 'shared', ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+			string(typ), hostID, actorUserID, name, groupLabel, desc, ct, nonce, actorUserID,
 		); err != nil {
 			return 0, fmt.Errorf("insert scan secret %s: %w", name, err)
 		}
@@ -159,7 +178,7 @@ func upsertScanSecretTx(ctx context.Context, db *database.DB, hostID, actorUserI
 			return 0, err
 		}
 	}
-	if err := stampDerived(ctx, tx, db.Encryptor, id, models.SecretTypeEnvVar, plain); err != nil {
+	if err := stampDerived(ctx, tx, db.Encryptor, id, typ, plain); err != nil {
 		return 0, err
 	}
 	if err := tx.Commit(); err != nil {

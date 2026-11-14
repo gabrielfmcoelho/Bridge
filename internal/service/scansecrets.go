@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/sshtest"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
@@ -334,7 +335,7 @@ func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID
 		for _, v := range sorted {
 			tok := blankToken
 			if name, ok := names[v]; ok {
-				switch sid, err := vault.UpsertScanSecret(ctx, db, hostID, actorUserID, id.group, name, v, vals[v]); {
+				switch sid, err := vault.UpsertScanSecret(ctx, db, hostID, actorUserID, models.SecretTypeEnvVar, id.group, name, v, vals[v]); {
 				case err == nil:
 					tok, n = fmt.Sprintf("{{secret:%d}}", sid), n+1
 				case !errors.Is(err, vault.ErrScanSecretTrashed):
@@ -365,11 +366,40 @@ func RecordScanSecrets(ctx context.Context, db *database.DB, hostID, actorUserID
 			*c = (*c)[:m[4]] + blankToken + (*c)[m[5]:]
 		}
 	}
+	// Config-file credentials (the credsources probe) go to the vault the same
+	// way, and the scan keeps only tokens + field names (credential_sources).
+	cn, cerrs := recordCredentialSources(ctx, db, hostID, actorUserID, info)
+	n += cn
+	errs = append(errs, cerrs...)
 	info.SecretsRedacted = true
 	if len(errs) > 0 {
 		return n, &scanSecretsError{failed: len(errs), err: errors.Join(errs...)}
 	}
 	return n, nil
+}
+
+// recordCredentialSources stores each config-file credential the credsources
+// probe found (info.CredHits) in the vault and fills info.CredentialSources
+// with tokens and field names only — never a value. A hit with an empty Secret
+// is an indirect reference (getenv/${…}/a constant): recorded for provenance,
+// nothing stored. The plaintext in CredHits is dropped as soon as it's written.
+// Returns how many values the vault holds and the writes it refused.
+func recordCredentialSources(ctx context.Context, db *database.DB, hostID, actorUserID int64, info *sshtest.VMInfo) (int, []error) {
+	if !info.CredSourcesScanned {
+		return 0, nil // the probe didn't run → CredentialSources stays nil ("didn't run")
+	}
+	sources := make([]sshtest.CredentialSource, 0, len(info.CredHits))
+	for _, hit := range info.CredHits {
+		// First commit: sources and field names only. The second commit stores
+		// each value in the vault and fills the token.
+		sources = append(sources, sshtest.CredentialSource{
+			Detector: hit.Detector, Path: hit.Path, Locator: hit.Locator,
+			Kind: hit.Kind, Admin: hit.Admin, Fields: hit.Fields,
+		})
+	}
+	info.CredHits = nil
+	info.CredentialSources = sources
+	return 0, nil
 }
 
 // scanSecretsError counts what the vault didn't take. Its text names no group

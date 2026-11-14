@@ -400,6 +400,21 @@ export interface Secret {
   dup_group?: string;
 }
 
+/**
+ * Provenance of a config-file credential the scan captured (credsources).
+ * Stored in the scan JSON as `credential_sources` — field names and a vault
+ * token only, never a value.
+ */
+export interface CredentialSource {
+  detector: string;
+  path: string;
+  locator?: string;
+  kind?: string;
+  admin?: boolean;
+  fields?: Record<string, string>;
+  token?: string; // {{secret:<id>}}; empty for an indirect reference
+}
+
 /** Identical per-host copies of a password/key the admin can consolidate. */
 export interface ConsolidationGroup {
   key: string;
