@@ -2902,7 +2902,11 @@
         "git": "Git repositories",
         "outbound": "Outbound flows",
         "patch": "Patch freshness",
-        "traffic": "Site traffic"
+        "traffic": "Site traffic",
+        "panels": "Control panels",
+        "code": "Code & uploads",
+        "owner": "Owner clues",
+        "firewall": "Firewall reality"
       },
       "empty": {
         "resources": "No usage data in this scan.",
@@ -2917,7 +2921,11 @@
         "git": "No git checkouts found.",
         "outbound": "No outbound flows found in the last scan.",
         "patch": "No patch information in the last scan.",
-        "traffic": "No access-log traffic in the last scan."
+        "traffic": "No access-log traffic in the last scan.",
+        "panels": "No control panel found in the last scan.",
+        "code": "No web docroots fingerprinted in the last scan.",
+        "owner": "No owner clues in the last scan.",
+        "firewall": "No firewall data in the last scan."
       }
     },
     "deep": {
@@ -2955,6 +2963,51 @@
         "lastSeen": "Last request",
         "log": "Access log",
         "partial": "The window may be short: the log exceeded the read cap or has compressed rotations."
+      },
+      "panels": {
+        "summary": "Virtualmin / Webmin: hosted domains, panel users and failed-login attempts — including when a domain was disabled, from the panel's own records.",
+        "installed": "Installed",
+        "domains": "Domains",
+        "users": "Panel users",
+        "disabled": "disabled",
+        "disabledAt": "Disabled {date}",
+        "created": "Created",
+        "owner": "Owner",
+        "contact": "Contact",
+        "letsencrypt": "Let's Encrypt",
+        "reason": "Reason",
+        "failed": "Failed logins",
+        "failedPubPriv": "{public} from public IPs · {private} from private"
+      },
+      "code": {
+        "summary": "What runs under each web docroot — framework and version, newest code change, and the upload directories (size, files, newest).",
+        "root": "(docroot)",
+        "newest": "Newest code",
+        "uploads": "Uploads",
+        "files": "{count} files",
+        "noApps": "No framework detected"
+      },
+      "owner": {
+        "summary": "Leads to who owns or maintains this VM, each with its source. No client address, SSH key material or filename leaves the host.",
+        "lastLogins": "Last logins",
+        "gecos": "Account names",
+        "sudoers": "Sudo / wheel",
+        "authKeys": "SSH key comments",
+        "ftp": "FTP uploads",
+        "ftpCount": "{count} uploads"
+      },
+      "firewall": {
+        "summary": "The real firewall posture: ufw, firewalld/nft and iptables, fail2ban jails, and which sensitive ports are exposed — and how wide. Only counts and classes, never a bind address.",
+        "active": "active",
+        "inactive": "inactive",
+        "rules": "{count} rules",
+        "iptables": "iptables",
+        "fail2ban": "fail2ban",
+        "banned": "{count} banned",
+        "adminPorts": "Exposed admin ports",
+        "exposureAll": "all interfaces",
+        "exposureOneIp": "single IP",
+        "exposureLoopback": "loopback"
       }
     },
     "git": {

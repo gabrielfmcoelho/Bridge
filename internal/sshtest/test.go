@@ -2063,7 +2063,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	// Deep facts (outbound flows, patch freshness) only in a background scan:
 	// they add an extra root session and don't fit the 120 s synchronous test.
 	if jobMode(client) {
-		info.DeepFacts = collectDeepFacts(client, sudoPassword, info.Cron, info.Ports)
+		info.DeepFacts = collectDeepFacts(client, sudoPassword, info.Cron, info.Ports, info.WebServers)
 		info.DBMeta = collectDBMeta(client, sudoPassword)
 	}
 

@@ -203,6 +203,14 @@ export type DeepFacts = {
   patch?: PatchFreshness;
   /** A2 per-site access/error-log traffic: "is anyone actually using it?" */
   sites?: SiteTraffic[];
+  /** A6 Virtualmin/Webmin control panels. */
+  panels?: ControlPanels;
+  /** A7 per-docroot code fingerprint. */
+  code?: CodeFingerprint[];
+  /** A8 owner clues. */
+  owner?: OwnerClues;
+  /** A10 firewall reality. */
+  firewall?: Firewall;
 };
 
 export type OutboundFlows = {
@@ -286,6 +294,74 @@ export type ErrorSig = {
   category: string;
   count: number;
 };
+
+/** A6 Virtualmin/Webmin: counts and names only, never a password or a client IP. */
+export type ControlPanels = {
+  /** virtualmin | webmin */
+  installed?: string[];
+  domains?: PanelDomain[];
+  users?: string[];
+  failed_logins?: PanelFailedLogins;
+};
+export type PanelDomain = {
+  name: string;
+  owner?: string;
+  created?: number;
+  disabled?: boolean;
+  disabled_time?: number;
+  disabled_reason?: string;
+  contact?: string;
+  letsencrypt?: boolean;
+};
+export type PanelFailedLogins = { private?: number; public?: number };
+
+/** A7 one web docroot's apps, newest code mtime and upload directories. */
+export type CodeFingerprint = {
+  docroot: string;
+  apps?: CodeApp[];
+  newest_mtime?: number;
+  uploads?: UploadDir[];
+};
+export type CodeApp = {
+  /** Relative to the docroot; "" = the docroot itself. */
+  path?: string;
+  /** wordpress|laravel|codeigniter3|codeigniter4|joomla|drupal|moodle|scriptcase */
+  framework: string;
+  version?: string;
+};
+export type UploadDir = {
+  dir: string;
+  size_bytes?: number;
+  newest?: number;
+  files?: number;
+};
+
+/** A8 owner leads — each with its source. No client IP, key material or filename. */
+export type OwnerClues = {
+  last_logins?: OwnerLast[];
+  gecos?: OwnerGecos[];
+  sudoers?: string[];
+  auth_keys?: OwnerAuthKey[];
+  ftp?: OwnerFTP[];
+};
+export type OwnerLast = { user: string; when: number };
+export type OwnerGecos = { user: string; gecos: string };
+export type OwnerAuthKey = { user: string; comment: string };
+export type OwnerFTP = { user: string; month: string; upload: number };
+
+/** A10 firewall reality: ufw AND firewalld/nft, iptables, fail2ban, admin ports. */
+export type Firewall = {
+  ufw?: FirewallTool;
+  firewalld?: FirewallTool;
+  nft?: FirewallTool;
+  iptables_rules?: number;
+  fail2ban?: F2bJail[];
+  admin_ports?: AdminPort[];
+};
+export type FirewallTool = { active: boolean; rules?: number };
+export type F2bJail = { jail: string; banned?: number };
+/** exposure: all | one-ip | loopback */
+export type AdminPort = { port: number; exposure: string };
 
 export type Filesystem = {
   mount: string; device: string; fstype: string;
