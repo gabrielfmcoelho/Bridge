@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -23,11 +24,15 @@ import (
 //     password stripped) and its established outbound TCP peers.
 //   - A4 PatchFreshness: whether patching is broken (no successful index update
 //     in weeks although auto-updates are on) or just outdated.
-// Only names, hosts, ports and dates leave the VM — never a script line, a
-// credential, or a client's address.
+//   - A2 Sites: per web site, is anyone using it — 30-day access-log and recent
+//     error-log aggregates (a live site shows thousands of requests, an
+//     abandoned VM zero).
+// Only names, hosts, ports, dates and counts leave the VM — never a script
+// line, a credential, a client's address, a query string or a User-Agent.
 type DeepFacts struct {
 	Outbound *OutboundFlows  `json:"outbound,omitempty"`
 	Patch    *PatchFreshness `json:"patch,omitempty"`
+	Sites    []SiteTraffic   `json:"sites,omitempty"`
 }
 
 // OutboundFlows is where the VM pushes data off-box.
@@ -66,12 +71,62 @@ type PatchFreshness struct {
 	Stale bool `json:"stale,omitempty"`
 }
 
+// SiteTraffic is 30-day access-log and recent error-log aggregates for one web
+// site — the signal behind "is anyone actually using it?". Discovered from
+// Virtualmin's per-domain logs, Apache CustomLog and nginx access_log.
+// PRIVACY: the probe aggregates on the VM and emits only counts and
+// first-path-segment labels; a client IP, query string, User-Agent or request
+// line never leaves the box.
+type SiteTraffic struct {
+	Site       string      `json:"site"`                  // Virtualmin domain / nginx server_name / log basename
+	Server     string      `json:"server,omitempty"`      // virtualmin | apache | nginx
+	AccessLog  string      `json:"access_log,omitempty"`  // the access-log path aggregated (no content)
+	Requests   int         `json:"requests,omitempty"`    // requests in the window (~30 d)
+	Days       int         `json:"days,omitempty"`        // distinct days seen in the window
+	PerDay     int         `json:"per_day,omitempty"`     // requests / active day (the headline)
+	Status2xx  int         `json:"status_2xx,omitempty"`  //
+	Status3xx  int         `json:"status_3xx,omitempty"`  //
+	Status4xx  int         `json:"status_4xx,omitempty"`  //
+	Status5xx  int         `json:"status_5xx,omitempty"`  //
+	Human      int         `json:"human,omitempty"`       // requests with a browser-like User-Agent
+	Bot        int         `json:"bot,omitempty"`         // the rest (bots, tools, no UA)
+	PrivateIPs int         `json:"private_ips,omitempty"` // requests from an RFC1918 client (count only)
+	PublicIPs  int         `json:"public_ips,omitempty"`  // requests from a public client (count only)
+	LastSeen   int64       `json:"last_seen,omitempty"`   // unix (day) of the newest request seen
+	TopPaths   []PathCount `json:"top_paths,omitempty"`   // first path segment × count (query stripped)
+	Errors     []ErrorSig  `json:"errors,omitempty"`      // error-log signatures (allowlisted categories)
+	// Partial: the access log was larger than the byte cap or has compressed
+	// rotations, so the window may be short.
+	Partial bool `json:"partial,omitempty"`
+}
+
+// PathCount is one first-path-segment and how often it was requested.
+type PathCount struct {
+	Path  string `json:"path"` // first path segment, "/" for root; never a query string
+	Count int    `json:"count"`
+}
+
+// ErrorSig counts error-log lines in one allowlisted category (disk-full,
+// php-error, not-found…). The probe matches each line on the VM and emits only
+// the fixed category label — never the message text.
+type ErrorSig struct {
+	Category string `json:"category"`
+	Count    int    `json:"count"`
+}
+
 const (
 	maxFlowScripts = 20      // cron scripts read per scan
 	maxFlowTargets = 200     // ScriptFlow rows kept
 	maxConns       = 100     // OutboundConn rows kept
 	maxTargetLen   = 512     // a destination longer than this is dropped
 	staleAfter     = 1209600 // 14 days: index older than this with auto-updates on = broken
+
+	maxSites       = 50       // SiteTraffic rows kept
+	maxTopPaths    = 8        // top path segments kept per site
+	maxErrSigs     = 8        // error categories kept per site
+	siteWindowDays = 30       // access-log window
+	accessTailCap  = 67108864 // 64 MiB: newest bytes of each access log read
+	errorTailCap   = 4194304  // 4 MiB: newest bytes of each error log read
 )
 
 // deepFactsScript is one root-capable session emitting A4 (@@pm/@@idx/@@upg/
@@ -151,11 +206,25 @@ fi
 	return sb.String()
 }
 
-// collectDeepFacts runs the probe — root with the stored password (ss -p and
-// some history files are root-only), else unprivileged. scripts are the cron
-// jobs' binary paths; listen is the host's listening ports (to tell an inbound
-// server connection from an outbound one). nil = the probe didn't run.
+// collectDeepFacts runs every deep-facts probe and merges the results: A3/A4
+// (outbound flows + patch freshness) and A2 (per-site traffic). nil = nothing
+// ran. Each probe opens its own root-first/unprivileged session.
 func collectDeepFacts(client *ssh.Client, sudoPassword string, cron *CronInfo, ports []string) *DeepFacts {
+	df := collectFlowsPatch(client, sudoPassword, cron, ports)
+	if sites := collectSiteTraffic(client, sudoPassword); len(sites) > 0 {
+		if df == nil {
+			df = &DeepFacts{}
+		}
+		df.Sites = sites
+	}
+	return df
+}
+
+// collectFlowsPatch runs the A3/A4 probe — root with the stored password (ss -p
+// and some history files are root-only), else unprivileged. scripts are the
+// cron jobs' binary paths; listen is the host's listening ports (to tell an
+// inbound server connection from an outbound one). nil = the probe didn't run.
+func collectFlowsPatch(client *ssh.Client, sudoPassword string, cron *CronInfo, ports []string) *DeepFacts {
 	scripts := cronJobBinaries(cron)
 	var raw string
 	if sudoPassword != "" {
@@ -362,4 +431,290 @@ func parseUnix(s string) int64 {
 		return 0
 	}
 	return n
+}
+
+// ── A2: per-site access/error-log traffic ──
+//
+// The whole aggregation runs on the VM. accessAwk reads a combined-log stream
+// and emits ONLY aggregates: it uses the client IP ($1) solely to bump a
+// private/public counter, strips every query string (sub(/\?.*/,"")) before
+// taking the first path segment, and never prints the request line, referer or
+// User-Agent. errorAwk maps each error line to one of a fixed set of category
+// labels and emits only the label — never the message text. So the sole output
+// crossing the SSH boundary is counts, dates and first-path-segment labels.
+
+// accessAwk aggregates a combined-access-log stream. -v cut=<yyyymmdd> drops
+// lines older than the window. Output: one "@@sa k=v …" line and one "@@sp
+// <count> <segment>" line per first path segment.
+const accessAwk = `BEGIN{m["Jan"]=1;m["Feb"]=2;m["Mar"]=3;m["Apr"]=4;m["May"]=5;m["Jun"]=6;m["Jul"]=7;m["Aug"]=8;m["Sep"]=9;m["Oct"]=10;m["Nov"]=11;m["Dec"]=12}
+{
+  ip=$1
+  d=$4; sub(/^\[/,"",d)
+  split(d,D,/[\/:]/)
+  mo=m[D[2]]
+  if(mo==""||D[3]==""||D[1]=="")next
+  ymd=(D[3]*10000)+(mo*100)+(D[1]+0)
+  if(ymd<cut+0)next
+  total++; day[ymd]=1; if(ymd>last)last=ymd
+  nq=split($0,Q,"\"")
+  st=""; if(nq>=3){split(Q[3],SS," ");st=SS[1]}
+  c=substr(st,1,1)
+  if(c=="2")s2++;else if(c=="3")s3++;else if(c=="4")s4++;else if(c=="5")s5++
+  if(nq>=2){
+    split(Q[2],RQ," ");u=RQ[2]
+    sub(/\?.*/,"",u); sub(/^\//,"",u); sub(/\/.*/,"",u)
+    gsub(/[^A-Za-z0-9._~-]/,"",u); u=substr(u,1,40)
+    if(u=="")u="/"
+    seg[u]++
+  }
+  ua=""; if(nq>=6)ua=tolower(Q[nq-1])
+  if(ua~/mozilla|webkit|gecko|chrome|firefox|safari|opera|edg|msie|trident/)human++;else bot++
+  if(ip~/^10\./||ip~/^192\.168\./||ip~/^127\./||ip~/^172\.(1[6-9]|2[0-9]|3[01])\./||ip~/^169\.254\./||ip~/^::1/||ip~/^fe80/||ip~/^f[cd]/)priv++
+  else if(ip!=""&&ip!="-")pub++
+}
+END{
+  nd=0;for(k in day)nd++
+  printf "@@sa req=%d s2=%d s3=%d s4=%d s5=%d human=%d bot=%d priv=%d pub=%d days=%d last=%d\n",total,s2,s3,s4,s5,human,bot,priv,pub,nd,last
+  for(p in seg)printf "@@sp %d %s\n",seg[p],p
+}`
+
+// errorAwk categorises an error-log stream into a fixed allowlist and emits
+// only "@@se <count> <category>". No message text ever leaves the VM.
+const errorAwk = `{
+  l=tolower($0)
+  if(l~/no space left/)k="disk-full"
+  else if(l~/out of memory|allowed memory size|memory exhausted/)k="php-oom"
+  else if(l~/php (fatal|parse|compile) error|uncaught (error|exception)|call to (a member function|undefined)/)k="php-error"
+  else if(l~/permission denied/)k="permission-denied"
+  else if(l~/does not exist|primary script unknown|no such file|not found/)k="not-found"
+  else if(l~/upstream|connect\(\) failed|failed to connect|connection refused|timed out/)k="upstream-error"
+  else if(l~/ssl|certificate|handshake|\btls\b/)k="tls-error"
+  else if(l~/client denied|forbidden|authenticat|authoriz/)k="access-denied"
+  else if(l~/segmentation fault|segfault|exit signal|child .* exited/)k="worker-crash"
+  else k="other"
+  ec[k]++
+}
+END{for(k in ec)printf "@@se %d %s\n",ec[k],k}`
+
+// siteTrafficScript is one root-capable session: it discovers each web site's
+// access log (Virtualmin per-domain logs, Apache CustomLog, nginx access_log),
+// then streams the newest bytes of each through accessAwk and its error log
+// through errorAwk. cutoff is yyyymmdd; BRIDGE_ROOT prefixes reads (tests).
+// Not root: SUDO=1 retries reads through sudo -n.
+// shortcut: error lines are categorised from the log tail (recent bytes),
+// not strictly the last 7 days; add a per-family date filter if precision is
+// needed. Only host web logs are read, not container logs.
+func siteTrafficScript(asRoot bool, cutoff string) string {
+	head := "SUDO=1\n"
+	if asRoot {
+		head = ""
+	}
+	return head + `export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
+R="${BRIDGE_ROOT:-}"
+CUT="` + cutoff + `"
+ACAP=` + strconv.Itoa(accessTailCap) + `
+ECAP=` + strconv.Itoa(errorTailCap) + `
+S=""; if [ -n "$SUDO" ] && sudo -n true 2>/dev/null; then S="sudo -n"; fi
+TAB=$(printf '\t')
+{
+  for a in "$R"/var/log/virtualmin/*_access_log; do
+    [ -f "$a" ] || continue
+    rel=${a#"$R"}
+    dom=${a##*/}; dom=${dom%_access_log}
+    printf 'virtualmin\t%s\t%s\n' "$dom" "$rel"
+  done
+  for d in "$R/etc/apache2" "$R/etc/httpd"; do
+    [ -d "$d" ] || continue
+    $S grep -rhsoE '^[[:space:]]*CustomLog[[:space:]]+[^|"[:space:]]+' "$d" 2>/dev/null \
+      | sed 's#.*CustomLog[[:space:]]*##; s#[$]{APACHE_LOG_DIR}#/var/log/apache2#g'
+  done | while IFS= read -r p; do
+    case "$p" in ''|*'$'*) continue;; esac
+    lbl=${p##*/}; lbl=${lbl%.log}; lbl=${lbl%_access_log}; lbl=${lbl%-access}; lbl=${lbl%_access}; lbl=${lbl%.access}
+    [ -n "$lbl" ] || lbl=${p##*/}
+    printf 'apache\t%s\t%s\n' "$lbl" "$p"
+  done
+  if command -v nginx >/dev/null 2>&1; then
+    $S nginx -T 2>/dev/null | grep -hoE 'access_log[[:space:]]+[^;[:space:]]+' \
+      | sed 's#access_log[[:space:]]*##' | while IFS= read -r p; do
+      case "$p" in ''|off|*'$'*) continue;; esac
+      lbl=${p##*/}; lbl=${lbl%.log}; lbl=${lbl%.access}; lbl=${lbl%-access}; lbl=${lbl%_access}
+      [ -n "$lbl" ] || lbl=${p##*/}
+      printf 'nginx\t%s\t%s\n' "$lbl" "$p"
+    done
+  fi
+} | awk -F"$TAB" '!seen[$3]++' | while IFS="$TAB" read -r server label acc; do
+  f="$R$acc"
+  [ -f "$f" ] || continue
+  part=0
+  sz=$($S wc -c < "$f" 2>/dev/null); case "$sz" in ''|*[!0-9]*) sz=0;; esac
+  [ "$sz" -gt "$ACAP" ] && part=1
+  for g in "$f.1.gz" "$f.2.gz" "$f.2"; do [ -f "$g" ] && part=1; done
+  lb=$(printf %s "$label" | base64 | tr -d '\n')
+  pb=$(printf %s "$acc" | base64 | tr -d '\n')
+  printf '@@site %s %s %s %d\n' "$server" "$lb" "$pb" "$part"
+  { $S tail -c "$ACAP" "$f" 2>/dev/null; [ -f "$f.1" ] && $S tail -c "$ACAP" "$f.1" 2>/dev/null; } | awk -v cut="$CUT" '` + accessAwk + `'
+  err=$(printf %s "$acc" | sed 's/\(.*\)access/\1error/')
+  ef="$R$err"
+  if [ "$err" != "$acc" ] && [ -f "$ef" ]; then
+    $S tail -c "$ECAP" "$ef" 2>/dev/null | awk '` + errorAwk + `'
+  fi
+done
+echo "@@sites-done"
+`
+}
+
+// collectSiteTraffic runs the A2 probe — root with the stored password (web
+// logs are usually root-only), else unprivileged. Returns one SiteTraffic per
+// discovered access log, or nil when nothing ran or no web logs exist.
+func collectSiteTraffic(client *ssh.Client, sudoPassword string) []SiteTraffic {
+	cutoff := siteCutoff()
+	if sudoPassword != "" {
+		out, err := runSudoCmd(client, sudoPassword, siteTrafficScript(true, cutoff))
+		if strings.Contains(out, "@@sites-done") {
+			return parseSiteTraffic(out)
+		}
+		log.Printf("[sshscan] site traffic as root failed, falling back to unprivileged: %v", err)
+	}
+	raw := runCmd(client, encodedScript(siteTrafficScript(false, cutoff), "sh"))
+	return parseSiteTraffic(raw)
+}
+
+// siteCutoff is the yyyymmdd of the start of the access-log window, from nowUnix
+// (overridable so tests are deterministic).
+func siteCutoff() string {
+	return time.Unix(nowUnix(), 0).UTC().AddDate(0, 0, -siteWindowDays).Format("20060102")
+}
+
+// parseSiteTraffic turns the probe markers into SiteTraffic rows. @@site opens a
+// row; @@sa carries its aggregate counters; @@sp and @@se its path and error
+// tallies. Each row's top paths and error categories are sorted and capped.
+func parseSiteTraffic(raw string) []SiteTraffic {
+	var sites []SiteTraffic
+	var cur *SiteTraffic
+	flush := func() {
+		if cur != nil {
+			finalizeSite(cur)
+			if len(sites) < maxSites {
+				sites = append(sites, *cur)
+			}
+			cur = nil
+		}
+	}
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "@@site "):
+			flush()
+			f := strings.Fields(line[7:])
+			if len(f) < 4 {
+				continue
+			}
+			site, acc := decodeToken(f[1]), decodeToken(f[2])
+			if !printable(site) || !printable(acc) {
+				continue
+			}
+			cur = &SiteTraffic{Server: f[0], Site: site, AccessLog: acc, Partial: f[3] == "1"}
+		case strings.HasPrefix(line, "@@sa "):
+			if cur != nil {
+				parseSiteAgg(line[5:], cur)
+			}
+		case strings.HasPrefix(line, "@@sp "):
+			if cur != nil {
+				if p, n := parseCount(line[5:]); n > 0 && len(cur.TopPaths) < 4*maxTopPaths && validSeg(p) {
+					if p != "/" {
+						p = "/" + p
+					}
+					cur.TopPaths = append(cur.TopPaths, PathCount{Path: p, Count: n})
+				}
+			}
+		case strings.HasPrefix(line, "@@se "):
+			if cur != nil {
+				if cat, n := parseCount(line[5:]); n > 0 && len(cur.Errors) < maxErrSigs && validSeg(cat) {
+					cur.Errors = append(cur.Errors, ErrorSig{Category: cat, Count: n})
+				}
+			}
+		}
+	}
+	flush()
+	if len(sites) == 0 {
+		return nil
+	}
+	return sites
+}
+
+// parseSiteAgg reads the "k=v …" aggregate line into st.
+func parseSiteAgg(s string, st *SiteTraffic) {
+	for _, kv := range strings.Fields(s) {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		n, _ := strconv.Atoi(v)
+		switch k {
+		case "req":
+			st.Requests = n
+		case "s2":
+			st.Status2xx = n
+		case "s3":
+			st.Status3xx = n
+		case "s4":
+			st.Status4xx = n
+		case "s5":
+			st.Status5xx = n
+		case "human":
+			st.Human = n
+		case "bot":
+			st.Bot = n
+		case "priv":
+			st.PrivateIPs = n
+		case "pub":
+			st.PublicIPs = n
+		case "days":
+			st.Days = n
+		case "last":
+			if t, err := time.Parse("20060102", v); err == nil {
+				st.LastSeen = t.Unix()
+			}
+		}
+	}
+}
+
+// finalizeSite derives per-day rate and keeps the busiest path segments and
+// error categories.
+func finalizeSite(st *SiteTraffic) {
+	if st.Days > 0 {
+		st.PerDay = st.Requests / st.Days
+	}
+	sort.SliceStable(st.TopPaths, func(i, j int) bool { return st.TopPaths[i].Count > st.TopPaths[j].Count })
+	if len(st.TopPaths) > maxTopPaths {
+		st.TopPaths = st.TopPaths[:maxTopPaths]
+	}
+	sort.SliceStable(st.Errors, func(i, j int) bool { return st.Errors[i].Count > st.Errors[j].Count })
+	if len(st.Errors) > maxErrSigs {
+		st.Errors = st.Errors[:maxErrSigs]
+	}
+}
+
+// parseCount reads a "<count> <label>" marker body.
+func parseCount(s string) (string, int) {
+	n, label, ok := strings.Cut(strings.TrimSpace(s), " ")
+	if !ok {
+		return "", 0
+	}
+	c, err := strconv.Atoi(n)
+	if err != nil {
+		return "", 0
+	}
+	return strings.TrimSpace(label), c
+}
+
+var segOK = regexp.MustCompile(`^[A-Za-z0-9._~/-]{1,40}$`)
+
+func validSeg(s string) bool { return segOK.MatchString(s) }
+
+func printable(s string) bool {
+	if s == "" || len(s) > maxTargetLen {
+		return false
+	}
+	return !strings.ContainsFunc(s, func(r rune) bool { return unicode.IsControl(r) || r == ' ' })
 }

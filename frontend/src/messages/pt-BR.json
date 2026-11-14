@@ -2891,7 +2891,8 @@
         "webservers": "Servidores web",
         "git": "Repositórios git",
         "outbound": "Fluxos de saída",
-        "patch": "Atualização de pacotes"
+        "patch": "Atualização de pacotes",
+        "traffic": "Tráfego dos sites"
       },
       "empty": {
         "resources": "Sem dados de uso neste scan.",
@@ -2905,7 +2906,8 @@
         "webservers": "Nenhum nginx, Apache ou PHP-FPM encontrado.",
         "git": "Nenhum checkout git encontrado.",
         "outbound": "Nenhum fluxo de saída encontrado no último scan.",
-        "patch": "Sem informações de atualização no último scan."
+        "patch": "Sem informações de atualização no último scan.",
+        "traffic": "Sem tráfego de access-log no último scan."
       }
     },
     "deep": {
@@ -2927,6 +2929,22 @@
         "stale": "Atualização aparenta estar quebrada",
         "staleHelp": "As atualizações automáticas estão ligadas, mas o índice de pacotes não é atualizado há mais de duas semanas.",
         "ok": "Índice de pacotes atualizado"
+      },
+      "traffic": {
+        "summary": "Por site, se alguém está usando — agregados de 30 dias do access-log e categorias recentes do error-log. Apenas contagens e o primeiro segmento do caminho: nenhum IP de cliente, query string ou User-Agent sai do host.",
+        "idle": "sem tráfego",
+        "requests": "{count} req",
+        "perDay": "~{count}/dia",
+        "status": "Status",
+        "who": "Visitantes",
+        "humanBot": "{human} navegador · {bot} bot/ferramenta",
+        "clients": "Clientes",
+        "pubPriv": "{pub} público · {priv} privado",
+        "paths": "Principais seções",
+        "errors": "Erros",
+        "lastSeen": "Última requisição",
+        "log": "Log de acesso",
+        "partial": "A janela pode estar curta: o log passou do limite de leitura ou tem rotações comprimidas."
       }
     },
     "git": {

@@ -2891,7 +2891,8 @@
         "webservers": "Web servers",
         "git": "Git repositories",
         "outbound": "Outbound flows",
-        "patch": "Patch freshness"
+        "patch": "Patch freshness",
+        "traffic": "Site traffic"
       },
       "empty": {
         "resources": "No usage data in this scan.",
@@ -2905,7 +2906,8 @@
         "webservers": "No nginx, Apache or PHP-FPM found.",
         "git": "No git checkouts found.",
         "outbound": "No outbound flows found in the last scan.",
-        "patch": "No patch information in the last scan."
+        "patch": "No patch information in the last scan.",
+        "traffic": "No access-log traffic in the last scan."
       }
     },
     "deep": {
@@ -2927,6 +2929,22 @@
         "stale": "Patching looks broken",
         "staleHelp": "Automatic updates are on, but the package index hasn't refreshed in over two weeks.",
         "ok": "Package index is current"
+      },
+      "traffic": {
+        "summary": "Per web site, is anyone using it — 30-day access-log aggregates and recent error-log categories. Counts and first-path-segment labels only: no client IP, query string or User-Agent leaves the host.",
+        "idle": "no traffic",
+        "requests": "{count} req",
+        "perDay": "~{count}/day",
+        "status": "Status",
+        "who": "Visitors",
+        "humanBot": "{human} browser · {bot} bot/tool",
+        "clients": "Clients",
+        "pubPriv": "{pub} public · {priv} private",
+        "paths": "Top sections",
+        "errors": "Errors",
+        "lastSeen": "Last request",
+        "log": "Access log",
+        "partial": "The window may be short: the log exceeded the read cap or has compressed rotations."
       }
     },
     "git": {

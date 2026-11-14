@@ -201,6 +201,8 @@ export type VMInfoType = {
 export type DeepFacts = {
   outbound?: OutboundFlows;
   patch?: PatchFreshness;
+  /** A2 per-site access/error-log traffic: "is anyone actually using it?" */
+  sites?: SiteTraffic[];
 };
 
 export type OutboundFlows = {
@@ -235,6 +237,54 @@ export type PatchFreshness = {
   upgradable?: number;
   /** Auto-updates on but the index is stale: patching is broken, not just outdated. */
   stale?: boolean;
+};
+
+/**
+ * A2 access/error-log aggregates for one web site. Everything is a count or a
+ * first-path-segment label — no client IP, query string or User-Agent leaves
+ * the VM.
+ */
+export type SiteTraffic = {
+  site: string;
+  /** virtualmin | apache | nginx */
+  server?: string;
+  access_log?: string;
+  /** Requests in the window (~30 d). */
+  requests?: number;
+  /** Distinct days seen in the window. */
+  days?: number;
+  /** Requests / active day — the headline. */
+  per_day?: number;
+  status_2xx?: number;
+  status_3xx?: number;
+  status_4xx?: number;
+  status_5xx?: number;
+  /** Requests with a browser-like User-Agent. */
+  human?: number;
+  /** The rest (bots, tools, no UA). */
+  bot?: number;
+  /** Requests from an RFC1918 client (count only). */
+  private_ips?: number;
+  /** Requests from a public client (count only). */
+  public_ips?: number;
+  /** Unix (day) of the newest request seen. */
+  last_seen?: number;
+  top_paths?: PathCount[];
+  errors?: ErrorSig[];
+  /** The log was larger than the byte cap or has compressed rotations: the window may be short. */
+  partial?: boolean;
+};
+
+export type PathCount = {
+  /** First path segment, "/" for root; never a query string. */
+  path: string;
+  count: number;
+};
+
+export type ErrorSig = {
+  /** Allowlisted category: disk-full, php-error, not-found… */
+  category: string;
+  count: number;
 };
 
 export type Filesystem = {
