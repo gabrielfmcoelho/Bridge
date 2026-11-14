@@ -13,10 +13,11 @@ import ScanWebServers from "./scan/ScanWebServers";
 import ScanGitRemotes from "./scan/ScanGitRemotes";
 import ScanOutbound from "./scan/ScanOutbound";
 import ScanPatch from "./scan/ScanPatch";
+import ScanTraffic from "./scan/ScanTraffic";
 import ScanPackages from "./scan/ScanPackages";
 import ScanSecurity from "./scan/ScanSecurity";
 
-export const SCAN_GROUPS = ["resources", "system", "users", "processes", "containers", "services", "webservers", "git", "outbound", "patch", "packages", "security"] as const;
+export const SCAN_GROUPS = ["resources", "system", "users", "processes", "containers", "services", "webservers", "git", "outbound", "patch", "traffic", "packages", "security"] as const;
 export type ScanGroup = (typeof SCAN_GROUPS)[number];
 
 /**
@@ -44,6 +45,7 @@ export default function VMInfoDisplay({ info, locale, anchorPrefix, dnsRecords, 
     git: <ScanGitRemotes info={info} t={t} />,
     outbound: <ScanOutbound info={info} t={t} />,
     patch: <ScanPatch info={info} t={t} />,
+    traffic: <ScanTraffic info={info} t={t} />,
     packages: <ScanPackages info={info} t={t} hostSlug={hostSlug} />,
     security: <ScanSecurity info={info} t={t} />,
   };

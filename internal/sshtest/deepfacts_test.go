@@ -192,3 +192,165 @@ EOF`,
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+// TestParseSiteTraffic drives the A2 parser with synthetic markers: the
+// aggregate line, several path segments (sorted and capped), error categories,
+// and the last-seen date. It also checks that per-day is derived from the
+// distinct-day count.
+func TestParseSiteTraffic(t *testing.T) {
+	raw := strings.Join([]string{
+		"@@site virtualmin " + b64("concursos.sead.pi.gov.br") + " " + b64("/var/log/virtualmin/concursos.sead.pi.gov.br_access_log") + " 0",
+		"@@sa req=102 s2=70 s3=10 s4=15 s5=7 human=80 bot=22 priv=4 pub=98 days=30 last=20261113",
+		"@@sp 50 arquivos",
+		"@@sp 30 /",
+		"@@sp 12 sasc",
+		"@@se 637 not-found",
+		"@@se 40 php-error",
+		"@@site virtualmin " + b64("app.seadprev.pi.gov.br") + " " + b64("/var/log/virtualmin/app.seadprev.pi.gov.br_access_log") + " 1",
+		"@@sa req=0 s2=0 s3=0 s4=0 s5=0 human=0 bot=0 priv=0 pub=0 days=0 last=0",
+		"@@sites-done",
+	}, "\n")
+
+	sites := parseSiteTraffic(raw)
+	if len(sites) != 2 {
+		t.Fatalf("want 2 sites, got %d: %+v", len(sites), sites)
+	}
+
+	s := sites[0]
+	if s.Site != "concursos.sead.pi.gov.br" || s.Server != "virtualmin" {
+		t.Fatalf("site[0] identity = %+v", s)
+	}
+	if s.Requests != 102 || s.Status2xx != 70 || s.Status5xx != 7 || s.Human != 80 || s.Bot != 22 {
+		t.Fatalf("site[0] aggregates = %+v", s)
+	}
+	if s.Days != 30 || s.PerDay != 3 { // 102 / 30 = 3
+		t.Fatalf("site[0] per-day = %d (days %d)", s.PerDay, s.Days)
+	}
+	if s.LastSeen != time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC).Unix() {
+		t.Fatalf("site[0] last-seen = %d", s.LastSeen)
+	}
+	wantPaths := []PathCount{{Path: "/arquivos", Count: 50}, {Path: "/", Count: 30}, {Path: "/sasc", Count: 12}}
+	if !reflect.DeepEqual(s.TopPaths, wantPaths) {
+		t.Fatalf("site[0] top paths = %+v", s.TopPaths)
+	}
+	wantErrs := []ErrorSig{{Category: "not-found", Count: 637}, {Category: "php-error", Count: 40}}
+	if !reflect.DeepEqual(s.Errors, wantErrs) {
+		t.Fatalf("site[0] errors = %+v", s.Errors)
+	}
+
+	if sites[1].Site != "app.seadprev.pi.gov.br" || sites[1].Requests != 0 || !sites[1].Partial {
+		t.Fatalf("site[1] (the dead site) = %+v", sites[1])
+	}
+}
+
+func TestParseSiteTrafficNotRun(t *testing.T) {
+	if parseSiteTraffic("") != nil {
+		t.Fatal("no markers: want nil")
+	}
+	if parseSiteTraffic("@@sites-done\n") != nil {
+		t.Fatal("no sites: want nil")
+	}
+}
+
+// TestSiteTrafficScriptRuns runs the real A2 script against a fake root holding
+// a Virtualmin access + error log. The access log mixes 2xx/4xx/5xx, browser
+// and bot User-Agents, and private and public client IPs — and every request
+// carries a query string with a fake secret. The error log carries file paths
+// and a client IP. The test asserts the aggregates are right AND — the whole
+// point of this probe — that no client IP, query string, User-Agent or error
+// message ever appears in the probe output or the parsed struct.
+func TestSiteTrafficScriptRuns(t *testing.T) {
+	// Freeze "now" so the 30-day window is deterministic (cutoff 2026-10-15).
+	old := nowUnix
+	nowUnix = func() int64 { return time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC).Unix() }
+	t.Cleanup(func() { nowUnix = old })
+
+	root := t.TempDir()
+	write := func(rel, body string) {
+		t.Helper()
+		p := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Combined log format. Mixed statuses, UAs, IPs; every URL has a query
+	// string with a secret; the last line is outside the 30-day window.
+	access := strings.Join([]string{
+		`203.0.113.45 - - [13/Nov/2026:10:00:00 +0000] "GET /arquivos/edital.pdf?token=SECRET123 HTTP/1.1" 200 1234 "-" "Mozilla/5.0 (Windows NT 10.0) Chrome/120"`,
+		`198.51.100.7 - - [13/Nov/2026:11:00:00 +0000] "GET /?debug=1 HTTP/1.1" 500 10 "-" "curl/7.68.0"`,
+		`10.0.122.5 - - [12/Nov/2026:09:00:00 +0000] "GET /sasc/login?pw=hunter2 HTTP/1.1" 200 55 "-" "Mozilla/5.0 Firefox/120"`,
+		`192.168.1.9 - - [12/Nov/2026:09:30:00 +0000] "POST /wp-admin/admin-ajax.php?action=leak HTTP/1.1" 404 0 "-" "Googlebot/2.1"`,
+		`45.33.22.11 - - [13/Nov/2026:12:00:00 +0000] "GET /arquivos/anexo.pdf HTTP/1.1" 200 20 "-" "Mozilla/5.0 Safari/16"`,
+		`8.8.8.8 - - [01/Jan/2020:00:00:00 +0000] "GET /old?k=v HTTP/1.1" 200 1 "-" "Mozilla/5.0"`,
+		``,
+	}, "\n")
+	write("var/log/virtualmin/example.com_access_log", access)
+	write("var/log/virtualmin/example.com_error_log", strings.Join([]string{
+		`[Fri Nov 13 10:00:00.111 2026] [php:error] [pid 7] [client 203.0.113.45:5678] PHP Fatal error: Uncaught in /home/u/secret_path.php`,
+		`[Fri Nov 13 10:01:00.222 2026] [core:error] [client 198.51.100.7:40] No space left on device: /var/www/html`,
+		``,
+	}, "\n"))
+
+	cmd := exec.Command("sh", "-c", siteTrafficScript(true, siteCutoff()))
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "BRIDGE_ROOT=" + root}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+
+	// The privacy guarantee: none of these may leave the VM.
+	leaks := []string{
+		"203.0.113.45", "198.51.100.7", "10.0.122.5", "192.168.1.9", "45.33.22.11", "8.8.8.8",
+		"SECRET123", "hunter2", "token=", "debug=", "pw=", "action=leak", "?",
+		"Mozilla", "Chrome", "curl", "Googlebot", "Safari",
+		"secret_path", "/home/u", "/var/www/html", "edital", "anexo", "admin-ajax",
+	}
+	sites := parseSiteTraffic(string(out))
+	blob, _ := json.Marshal(sites)
+	for _, s := range leaks {
+		if strings.Contains(string(out), s) {
+			t.Fatalf("%q leaked into probe output:\n%s", s, out)
+		}
+		if strings.Contains(string(blob), s) {
+			t.Fatalf("%q leaked into parsed struct: %s", s, blob)
+		}
+	}
+
+	if len(sites) != 1 {
+		t.Fatalf("want 1 site, got %d:\n%s", len(sites), out)
+	}
+	st := sites[0]
+	if st.Site != "example.com" || st.Server != "virtualmin" {
+		t.Fatalf("identity = %+v\n%s", st, out)
+	}
+	if st.Requests != 5 { // the 2020 line is outside the window
+		t.Errorf("requests = %d want 5\n%s", st.Requests, out)
+	}
+	if st.Status2xx != 3 || st.Status4xx != 1 || st.Status5xx != 1 {
+		t.Errorf("status classes = 2xx %d 4xx %d 5xx %d\n%s", st.Status2xx, st.Status4xx, st.Status5xx, out)
+	}
+	if st.Human != 3 || st.Bot != 2 {
+		t.Errorf("human/bot = %d/%d want 3/2\n%s", st.Human, st.Bot, out)
+	}
+	if st.PublicIPs != 3 || st.PrivateIPs != 2 {
+		t.Errorf("public/private = %d/%d want 3/2\n%s", st.PublicIPs, st.PrivateIPs, out)
+	}
+	if st.Days != 2 || st.LastSeen != time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC).Unix() {
+		t.Errorf("days %d last %d\n%s", st.Days, st.LastSeen, out)
+	}
+	if len(st.TopPaths) == 0 || st.TopPaths[0].Path != "/arquivos" || st.TopPaths[0].Count != 2 {
+		t.Errorf("top path = %+v want /arquivos×2\n%s", st.TopPaths, out)
+	}
+	// Error categories come through as fixed labels only.
+	gotErr := map[string]int{}
+	for _, e := range st.Errors {
+		gotErr[e.Category] = e.Count
+	}
+	if gotErr["php-error"] != 1 || gotErr["disk-full"] != 1 {
+		t.Errorf("error categories = %+v want php-error:1 disk-full:1\n%s", st.Errors, out)
+	}
+}
