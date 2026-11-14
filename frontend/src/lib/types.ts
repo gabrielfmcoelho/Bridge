@@ -1858,6 +1858,8 @@ export interface Database {
   tunnel_target: string;
   tls_mode: DatabaseTLSMode;
   has_credential: boolean;
+  /** The scan created this row from the DB-metadata probe (descoberto badge). */
+  discovered: boolean;
   sensitivity: DatabaseSensitivity;
   environment: DatabaseEnvironment;
   backup_policy: string;
@@ -1874,4 +1876,19 @@ export interface Database {
   /** Detail only. */
   responsaveis?: EntityResponsavel[];
   entidades?: AssetGrants;
+  /** Detail only: config-file logins the scan found on the instance host. */
+  scan_logins?: ScanLoginRef[];
+}
+
+/** One config-file login the scan captured (Phase 1), shown as "login found on
+ * host X (scan)" with a link to that host's Segredos tab. Never a value. */
+export interface ScanLoginRef {
+  host_id: number;
+  host_nickname: string;
+  host_slug: string;
+  detector: string;
+  path: string;
+  locator?: string;
+  user?: string;
+  db_name?: string;
 }

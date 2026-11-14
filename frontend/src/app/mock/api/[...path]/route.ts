@@ -830,7 +830,7 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
       const row: Database = {
         id: Math.max(0, ...db.databases.map((d) => d.id)) + 1, name: "", db_name: "", description: "", use_cases: "", engine: "postgres",
         instance_service_id: null, external_provider: "", host: "", port: null, connection_mode: "none", tunnel_host_id: null, tunnel_target: "",
-        tls_mode: "prefer", has_credential: false, sensitivity: "interno", environment: "prod", backup_policy: "", backup_retention_days: null,
+        tls_mode: "prefer", has_credential: false, discovered: false, sensitivity: "interno", environment: "prod", backup_policy: "", backup_retention_days: null,
         last_backup_at: null, created_by: currentUser().id, created_at: now, updated_at: now, consumer_service_ids: [], project_ids: [], responsaveis: [],
         ...body,
       };

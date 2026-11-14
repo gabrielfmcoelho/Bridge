@@ -29,7 +29,11 @@ type Database struct {
 	TunnelTarget        string     `json:"tunnel_target"` // container name or 127.0.0.1 on the tunnel host
 	TLSMode             string     `json:"tls_mode"`
 	HasCredential       bool       `json:"has_credential"` // the credential itself never leaves the backend
-	Sensitivity         string     `json:"sensitivity"`    // LGPD: publico | interno | pessoal | sensivel
+	// Discovered marks a row the scan created from the A5 DB-metadata probe
+	// (service.RecordScanDatabases) rather than an operator — shown as a
+	// "descoberto" badge. Operator edits don't clear it.
+	Discovered          bool       `json:"discovered"`
+	Sensitivity         string     `json:"sensitivity"` // LGPD: publico | interno | pessoal | sensivel
 	Environment         string     `json:"environment"`    // prod | homolog | dev
 	BackupPolicy        string     `json:"backup_policy"`
 	BackupRetentionDays *int       `json:"backup_retention_days"`
@@ -50,6 +54,24 @@ type Database struct {
 	// Responsaveis and Entidades are loaded on detail responses only.
 	Responsaveis []Responsavel `json:"responsaveis,omitempty"`
 	Entidades    *AssetGrants  `json:"entidades,omitempty"`
+	// ScanLogins: config-file logins the scan found (Phase 1 credential_sources)
+	// on this database's instance host that name this db. Loaded on detail only;
+	// reveal stays on the host's Segredos tab — this is a pointer, not the secret.
+	ScanLogins []ScanLoginRef `json:"scan_logins,omitempty"`
+}
+
+// ScanLoginRef is one config-file login the scan captured, as shown on a
+// database or service page: "login found on host X (scan)", linking to that
+// host's Segredos tab. Never a value — the reveal stays host-scoped.
+type ScanLoginRef struct {
+	HostID       int64  `json:"host_id"`
+	HostNickname string `json:"host_nickname"`
+	HostSlug     string `json:"host_slug"`
+	Detector     string `json:"detector"`
+	Path         string `json:"path"`
+	Locator      string `json:"locator,omitempty"`
+	User         string `json:"user,omitempty"`
+	DBName       string `json:"db_name,omitempty"`
 }
 
 // DatabaseInstanceRef summarizes the services row a database runs on.

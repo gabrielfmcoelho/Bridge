@@ -174,6 +174,11 @@ type VMInfo struct {
 	// freshness; deepfacts.go). Populated only in CaptureJob, nil in
 	// CaptureSync — "the probe didn't run", like GitRemotes.
 	DeepFacts *DeepFacts `json:"deep_facts,omitempty"`
+	// DBMeta: MySQL/MariaDB metadata read as root (schemas, accounts, exposure;
+	// dbmeta.go). Only metadata — never a value. Populated only in CaptureJob
+	// with a stored password; nil = the probe didn't run. service.RecordScanDatabases
+	// turns its schemas into Atlas database rows.
+	DBMeta *DBMeta `json:"db_meta,omitempty"`
 }
 
 // SSHAuthPolicy summarizes the SSH server's authentication policy as observed
@@ -2059,6 +2064,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	// they add an extra root session and don't fit the 120 s synchronous test.
 	if jobMode(client) {
 		info.DeepFacts = collectDeepFacts(client, sudoPassword, info.Cron, info.Ports)
+		info.DBMeta = collectDBMeta(client, sudoPassword)
 	}
 
 	// Build a map of docker host port → container for fast lookup.

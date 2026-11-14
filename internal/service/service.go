@@ -69,6 +69,10 @@ type ServiceDetail struct {
 	DependentIDs []int64              `json:"dependent_ids"`
 	Responsaveis []models.Responsavel `json:"responsaveis"`
 	Entidades    models.AssetGrants   `json:"entidades"`
+	// ScanLogins: config-file logins the scan found on this service's host(s)
+	// (Phase 1 credential_sources) — "login found on host X (scan)", linking to
+	// that host's Segredos tab. Field names only; reveal stays host-scoped.
+	ScanLogins []models.ScanLoginRef `json:"scan_logins,omitempty"`
 }
 
 // ServiceWrite carries the create/update payload (service + relations). For
@@ -178,6 +182,7 @@ func (s *ServiceService) Get(ctx context.Context, id int64) (*ServiceDetail, err
 		return nil, err
 	}
 	grants, _ := s.grants.Get(ctx, store.AssetService, id) // best effort
+	scanLogins, _ := ScanLoginsForHosts(ctx, s.db, hostIDs, "") // best effort: "login found on host X"
 	return &ServiceDetail{
 		Service:      svc,
 		Tags:         tags,
@@ -187,6 +192,7 @@ func (s *ServiceService) Get(ctx context.Context, id int64) (*ServiceDetail, err
 		DependentIDs: dependents,
 		Responsaveis: resp,
 		Entidades:    grants,
+		ScanLogins:   scanLogins,
 	}, nil
 }
 

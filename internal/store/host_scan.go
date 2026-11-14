@@ -224,6 +224,51 @@ func (r *HostScanRepo) LatestGitRemotes(ctx context.Context) ([]models.HostGitRe
 	return out, rows.Err()
 }
 
+// LatestCredentialSources returns the config-file logins (credential_sources in
+// the JSON) of each given host's latest scan — field names and provenance only,
+// never a value. Modelled on LatestGitRemotes. Empty hostIDs → empty result.
+func (r *HostScanRepo) LatestCredentialSources(ctx context.Context, hostIDs []int64) ([]models.HostCredentialSource, error) {
+	if len(hostIDs) == 0 {
+		return nil, nil
+	}
+	args := make([]any, len(hostIDs))
+	for i, id := range hostIDs {
+		args[i] = id
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		WITH latest AS MATERIALIZED (
+			SELECT hs.host_id, hs.data::jsonb AS d
+			FROM host_scans hs
+			JOIN (SELECT host_id, MAX(scanned_at) AS max_at FROM host_scans GROUP BY host_id) l
+			  ON hs.host_id = l.host_id AND hs.scanned_at = l.max_at
+			WHERE pg_input_is_valid(hs.data, 'jsonb')
+		)
+		SELECT h.id, h.nickname, h.oficial_slug,
+			COALESCE(c->>'detector', ''), COALESCE(c->>'path', ''), COALESCE(c->>'locator', ''), COALESCE(c->>'kind', ''),
+			COALESCE(c->'fields'->>'engine', ''), COALESCE(c->'fields'->>'host', ''),
+			COALESCE(c->'fields'->>'db', ''), COALESCE(c->'fields'->>'user', '')
+		FROM latest
+		JOIN hosts h ON h.id = latest.host_id AND h.deleted_at IS NULL
+		CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(d->'credential_sources') = 'array'
+			THEN d->'credential_sources' ELSE '[]'::jsonb END) c
+		WHERE h.id IN (`+placeholders(len(hostIDs))+`)
+		ORDER BY h.nickname, h.id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.HostCredentialSource
+	for rows.Next() {
+		var c models.HostCredentialSource
+		if err := rows.Scan(&c.HostID, &c.HostNickname, &c.HostSlug, &c.Detector, &c.Path, &c.Locator, &c.Kind,
+			&c.Engine, &c.DBHost, &c.DBName, &c.User); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 // parseScanMetrics extracts the sortable resource numerics from a scan's JSON
 // blob. cpu/ram/disk are display strings like "45%" → *float64 (nil when
 // absent/unparseable, so they store as NULL — distinct from a real 0%).
