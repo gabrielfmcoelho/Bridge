@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -344,107 +345,81 @@ func (r *ServiceRepo) Count(ctx context.Context) (int, error) {
 	return n, err
 }
 
-// CountsByHost returns host_id → number of linked services.
+// CountsByHost returns host_id → number of linked services the caller can see.
 func (r *ServiceRepo) CountsByHost(ctx context.Context) (map[int64]int, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT l.host_id, COUNT(*) FROM service_host_links l JOIN services s ON s.id = l.service_id WHERE s.deleted_at IS NULL GROUP BY l.host_id`)
+	vis, vargs := VisibleExpr(ctx, AssetService, "s.id")
+	rows, err := r.db.QueryContext(ctx, `SELECT l.host_id, COUNT(*) FROM service_host_links l JOIN services s ON s.id = l.service_id WHERE s.deleted_at IS NULL AND `+vis+` GROUP BY l.host_id`, vargs...)
 	if err != nil {
 		return nil, err
 	}
 	return scanCountMap(rows)
 }
 
-// ProjectCountsByHost returns host_id → number of distinct projects linked
-// either directly via project_host_links or indirectly via services.
+// ProjectCountsByHost returns host_id → number of distinct projects the
+// caller can see, linked either directly via project_host_links or indirectly
+// via services the caller can see.
 func (r *ServiceRepo) ProjectCountsByHost(ctx context.Context) (map[int64]int, error) {
+	pvis, pargs := VisibleExpr(ctx, AssetProject, "p.id")
+	svis, sargs := VisibleExpr(ctx, AssetService, "s.id")
+	spvis, spargs := VisibleExpr(ctx, AssetProject, "s.project_id")
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT host_id, COUNT(DISTINCT project_id) FROM (
 			SELECT l.host_id, l.project_id FROM project_host_links l
 				JOIN projects p ON p.id = l.project_id
-				WHERE p.deleted_at IS NULL
+				WHERE p.deleted_at IS NULL AND `+pvis+`
 			UNION
 			SELECT l.host_id, s.project_id FROM service_host_links l
 				JOIN services s ON l.service_id = s.id
-				WHERE s.project_id IS NOT NULL AND s.deleted_at IS NULL
-		) GROUP BY host_id`)
+				WHERE s.project_id IS NOT NULL AND s.deleted_at IS NULL AND `+svis+` AND `+spvis+`
+		) GROUP BY host_id`, append(append(pargs, sargs...), spargs...)...)
 	if err != nil {
 		return nil, err
 	}
 	return scanCountMap(rows)
 }
 
-// SetHostLinks replaces all host links for a service (one tx).
+// Link setters and readers below work among the assets the caller can see:
+// a setter neither removes nor adds a link to an asset the caller can't see
+// (its picker never showed it), and a reader never returns one.
+
+// SetHostLinks replaces a service's host links (one tx).
 func (r *ServiceRepo) SetHostLinks(ctx context.Context, serviceID int64, hostIDs []int64) error {
-	return replaceLinks(ctx, r.db, `service_host_links`, `service_id`, `host_id`, serviceID, hostIDs)
+	return replaceVisibleLinks(ctx, r.db, `service_host_links`, `service_id`, serviceID, `host_id`, `hosts`, AssetHost, hostIDs)
 }
 
-// HostIDs returns host ids linked to a service.
+// HostIDs returns the ids of the hosts linked to a service.
 func (r *ServiceRepo) HostIDs(ctx context.Context, serviceID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT host_id FROM service_host_links WHERE service_id = ?`, serviceID)
-	if err != nil {
-		return nil, err
-	}
-	return scanInt64s(rows)
+	return visibleLinkIDs(ctx, r.db, `service_host_links`, `service_id`, serviceID, `host_id`, `hosts`, AssetHost)
 }
 
-// SetServicesForHost replaces all service links for a host (one tx).
+// SetServicesForHost replaces a host's service links (one tx).
 func (r *ServiceRepo) SetServicesForHost(ctx context.Context, hostID int64, serviceIDs []int64) error {
-	return replaceLinks(ctx, r.db, `service_host_links`, `host_id`, `service_id`, hostID, serviceIDs)
+	return replaceVisibleLinks(ctx, r.db, `service_host_links`, `host_id`, hostID, `service_id`, `services`, AssetService, serviceIDs)
 }
 
-// SetDNSLinks replaces all dns links for a service (one tx).
+// SetDNSLinks replaces a service's DNS links (one tx).
 func (r *ServiceRepo) SetDNSLinks(ctx context.Context, serviceID int64, dnsIDs []int64) error {
-	return replaceLinks(ctx, r.db, `service_dns_links`, `service_id`, `dns_id`, serviceID, dnsIDs)
+	return replaceVisibleLinks(ctx, r.db, `service_dns_links`, `service_id`, serviceID, `dns_id`, `dns_records`, AssetDNS, dnsIDs)
 }
 
-// DNSIDs returns dns ids linked to a service.
+// DNSIDs returns the ids of the DNS records linked to a service.
 func (r *ServiceRepo) DNSIDs(ctx context.Context, serviceID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT l.dns_id FROM service_dns_links l JOIN dns_records d ON d.id = l.dns_id AND d.deleted_at IS NULL WHERE l.service_id = ?`, serviceID)
-	if err != nil {
-		return nil, err
-	}
-	return scanInt64s(rows)
+	return visibleLinkIDs(ctx, r.db, `service_dns_links`, `service_id`, serviceID, `dns_id`, `dns_records`, AssetDNS)
 }
 
-// SetDependencies replaces all dependency edges for a service (one tx).
+// SetDependencies replaces a service's dependency edges (one tx).
 func (r *ServiceRepo) SetDependencies(ctx context.Context, serviceID int64, dependsOnIDs []int64) error {
-	return replaceLinks(ctx, r.db, `service_dependencies`, `service_id`, `depends_on_id`, serviceID, dependsOnIDs)
+	return replaceVisibleLinks(ctx, r.db, `service_dependencies`, `service_id`, serviceID, `depends_on_id`, `services`, AssetService, dependsOnIDs)
 }
 
 // DependencyIDs returns the ids a service depends on.
 func (r *ServiceRepo) DependencyIDs(ctx context.Context, serviceID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT depends_on_id FROM service_dependencies WHERE service_id = ?`, serviceID)
-	if err != nil {
-		return nil, err
-	}
-	return scanInt64s(rows)
+	return visibleLinkIDs(ctx, r.db, `service_dependencies`, `service_id`, serviceID, `depends_on_id`, `services`, AssetService)
 }
 
 // DependentIDs returns the ids that depend on a service.
 func (r *ServiceRepo) DependentIDs(ctx context.Context, serviceID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT service_id FROM service_dependencies WHERE depends_on_id = ?`, serviceID)
-	if err != nil {
-		return nil, err
-	}
-	return scanInt64s(rows)
-}
-
-// replaceLinks deletes all rows in a two-column junction matching keyCol=keyID,
-// then inserts (keyID, v) for each v in vals — atomically.
-func replaceLinks(ctx context.Context, db *sql.DB, table, keyCol, valCol string, keyID int64, vals []int64) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE `+keyCol+` = ?`, keyID); err != nil {
-		return err
-	}
-	for _, v := range vals {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO `+table+` (`+keyCol+`, `+valCol+`) VALUES (?, ?)`, keyID, v); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+	return visibleLinkIDs(ctx, r.db, `service_dependencies`, `depends_on_id`, serviceID, `service_id`, `services`, AssetService)
 }
 
 // DiscoveredInventory is one scan's view of what runs on a host, as far as
@@ -549,9 +524,15 @@ func hostServiceRows(services []sshtest.DiscoveredService) []discoveredRow {
 		if s.Unit != "" {
 			desc = "Auto-discovered from systemd unit " + s.Unit
 		}
+		key, nick := s.Name, s.Label
+		if s.Instance != "" {
+			key = s.Name + "@" + s.Instance
+			short := strings.TrimSuffix(s.Instance, ".service")
+			nick = s.Label + " · " + path.Base(short)
+		}
 		rows = append(rows, discoveredRow{
-			kind: "host", key: s.Name,
-			nickname:    s.Label,
+			kind: "host", key: key,
+			nickname:    nick,
 			description: desc,
 			serviceType: sshtest.ServiceTypeForCatalog(s.Name), serviceSubtype: s.Label, serviceKind: s.Kind,
 			version: s.Version,

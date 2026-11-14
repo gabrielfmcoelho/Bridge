@@ -76,8 +76,19 @@ function ServerBlock({ server: s, servers, linked, t }: {
 function SiteRow({ site, linked, muted, t }: { site: WebSite; linked: Map<string, number> | null; muted?: boolean; t: T }) {
   const names = site.names ?? [];
   const details = [
-    site.proxy?.length ? <Detail key="p" label={t("scan.web.proxy")}>{site.proxy.join(", ")}</Detail> : null,
-    site.fastcgi?.length ? <Detail key="f" label="FastCGI">{site.fastcgi.join(", ")}</Detail> : null,
+    site.locations?.length ? (
+      <Detail key="l" label={t("scan.web.locations")}>
+        <span className="flex flex-col gap-0.5">
+          {site.locations.map((l) => (
+            <span key={l.path} className="font-mono break-all">
+              {l.path} → {[...(l.proxy ?? []), ...(l.fastcgi ?? [])].join(", ")}
+            </span>
+          ))}
+        </span>
+      </Detail>
+    ) : null,
+    !site.locations?.length && site.proxy?.length ? <Detail key="p" label={t("scan.web.proxy")}>{site.proxy.join(", ")}</Detail> : null,
+    !site.locations?.length && site.fastcgi?.length ? <Detail key="f" label="FastCGI">{site.fastcgi.join(", ")}</Detail> : null,
     site.root ? <Detail key="r" label={t("scan.web.root")}>{site.root}</Detail> : null,
     site.source ? <Detail key="s" label={t("scan.web.source")}>{site.source}</Detail> : null,
   ].filter(Boolean);

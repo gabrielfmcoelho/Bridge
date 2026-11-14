@@ -141,7 +141,7 @@ export default function TabsSection() {
             Filter chips: <code>PillButton</code> (absorbed <code>chipClass()</code> and <code>VaultPage.Chip</code>).
           </li>
           <li>
-            <code>app/hosts/[slug]/_components/SSHConfigDrawer.tsx:40-62</code> also rolls its own two-button
+            <code>app/hosts/[slug]/_components/SSHConfigDrawer.tsx:62-84</code> also rolls its own two-button
             segmented control.
           </li>
         </ul>

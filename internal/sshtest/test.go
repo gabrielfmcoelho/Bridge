@@ -40,8 +40,17 @@ func KeyAuth(keyPEM []byte, sudoPassword string) Auth {
 	return Auth{method: "key", keyPEM: keyPEM, password: sudoPassword}
 }
 
-// Dial opens an SSH connection using the provided auth method.
-func Dial(hostname, port, user string, auth Auth) (*ssh.Client, error) {
+// HostKey is how Dial checks the server's SSH host key.
+type HostKey struct {
+	Check ssh.HostKeyCallback
+	// Algorithms offered for the host key (the pinned key's, so the server
+	// shows that key); nil = x/crypto's default order.
+	Algorithms []string
+}
+
+// Dial opens an SSH connection using the provided auth method, checking the
+// server's host key with hostKey (service.HostKeyCheck builds it).
+func Dial(hostname, port, user string, auth Auth, hostKey HostKey) (*ssh.Client, error) {
 	if port == "" {
 		port = "22"
 	}
@@ -64,8 +73,9 @@ func Dial(hostname, port, user string, auth Auth) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User:            user,
 		Auth:            methods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
+		HostKeyCallback:   hostKey.Check,
+		HostKeyAlgorithms: hostKey.Algorithms,
+		Timeout:           10 * time.Second,
 	}
 	return ssh.Dial("tcp", net.JoinHostPort(hostname, port), config)
 }
@@ -115,6 +125,9 @@ type VMInfo struct {
 	InstalledPackages []InstalledPackage  `json:"installed_packages,omitempty"`
 	CronJobs          []string           `json:"cron_jobs,omitempty"`
 	Cron              *CronInfo          `json:"cron,omitempty"`
+	// SecretsRedacted: service.RecordScanSecrets ran on this scan, so its
+	// command lines hold only tokens; the startup backfill skips it.
+	SecretsRedacted   bool               `json:"secrets_redacted,omitempty"`
 	Agents            []Agent            `json:"agents,omitempty"`
 	ServiceInventory  []DiscoveredService `json:"service_inventory,omitempty"`
 	ResourceTop       *ResourceUsageSnapshot `json:"resource_top,omitempty"`
@@ -272,6 +285,8 @@ type CronJob struct {
 	NextRun  string `json:"next_run,omitempty"`
 	LastRun  string `json:"last_run,omitempty"`
 	Disabled bool   `json:"disabled,omitempty"`
+	// MissingBinary: the command's absolute binary path is not executable on the host.
+	MissingBinary bool `json:"missing_binary,omitempty"`
 }
 
 // CronInfo bundles cron daemon state and every scheduled task on the host
@@ -306,6 +321,8 @@ type DiscoveredService struct {
 	State          string   `json:"state,omitempty"`   // active|inactive|failed|running|stopped
 	Enabled        bool     `json:"enabled,omitempty"` // boot persistence
 	Unit           string   `json:"unit,omitempty"`
+	Instance       string   `json:"instance,omitempty"` // app-server instance: unit or install dir
+	Apps           []string `json:"apps,omitempty"`     // applications deployed on it
 	PID            int      `json:"pid,omitempty"`
 	Version        string   `json:"version,omitempty"` // package version when known
 	Package        string   `json:"package,omitempty"`
@@ -363,11 +380,16 @@ type ProcessDetail struct {
 	StartedVia string `json:"started_via"` // systemd, cron, manual, unknown
 	Venv    string `json:"venv,omitempty"`
 	Ports   string `json:"ports,omitempty"`
+	Unit    string `json:"unit,omitempty"` // systemd service from the cgroup
+	// InContainer: the cgroup puts the process in a container. Read in the
+	// process-details run itself, so as root when it is (a hidepid host hides
+	// other users' cgroups from the unprivileged sweep).
+	InContainer bool `json:"-"`
 }
 
 // Test runs a simple "echo OK" over SSH to verify connectivity.
 func Test(client *ssh.Client) error {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
@@ -388,7 +410,11 @@ func Test(client *ssh.Client) error {
 // error return with the panic value + stack snippet, so the HTTP handler
 // can surface a real message instead of letting net/http close the
 // connection mid-response (which the proxy logs as "socket hang up").
-func TestCapture(client *ssh.Client, sudoPassword string) (info *VMInfo, retErr error) {
+//
+// mode picks the time budgets: CaptureSync fits the browser's 120 s request,
+// CaptureJob (a background run) gives the probes more time.
+func TestCapture(client *ssh.Client, sudoPassword string, mode CaptureMode) (info *VMInfo, retErr error) {
+	defer enterMode(client, mode)()
 	defer func() {
 		if rv := recover(); rv != nil {
 			log.Printf("[sshscan] panic during capture: %v\n%s", rv, debug.Stack())
@@ -410,6 +436,51 @@ func FixDevNull(client *ssh.Client) (string, error) {
 // (df on a stuck NFS mount, curl waiting on dead DNS, etc).
 const sshCmdTimeout = 30 * time.Second
 
+// CaptureMode picks a capture's time budgets.
+type CaptureMode int
+
+const (
+	// CaptureSync fits the synchronous scan, inside the browser's 120 s request.
+	CaptureSync CaptureMode = iota
+	// CaptureJob is a background scan: the deadlines that exist only for
+	// that request are raised. Caps on output size stay.
+	CaptureJob
+)
+
+// budget is what a capture may spend: each plain command (runCmd), the
+// unprivileged git probe's whole session, its host walk and the time within
+// which a container's walk may still start (seconds).
+type budget struct {
+	cmd, gitProbe    time.Duration
+	gitWalk, gitCtrs int
+}
+
+var budgets = map[CaptureMode]budget{
+	CaptureSync: {cmd: sshCmdTimeout, gitProbe: gitProbeTimeout, gitWalk: 20, gitCtrs: gitCtrBudget},
+	CaptureJob:  {cmd: 2 * time.Minute, gitProbe: 9 * time.Minute, gitWalk: 180, gitCtrs: 300},
+}
+
+// jobClients are the clients a CaptureJob capture is running on. The budget
+// is looked up by client so the ~40 runCmd callers keep their signature.
+var jobClients sync.Map
+
+// enterMode puts client on mode's budget until the returned func is called.
+func enterMode(client *ssh.Client, mode CaptureMode) func() {
+	if mode != CaptureJob {
+		return func() {}
+	}
+	jobClients.Store(client, true)
+	return func() { jobClients.Delete(client) }
+}
+
+// budgetOf is client's budget: the job one inside a CaptureJob capture.
+func budgetOf(client *ssh.Client) budget {
+	if _, ok := jobClients.Load(client); ok {
+		return budgets[CaptureJob]
+	}
+	return budgets[CaptureSync]
+}
+
 // runCmdWithDeadline executes cmd in a fresh session with a hard deadline.
 // On timeout it closes the session (which makes the underlying
 // CombinedOutput return on its goroutine) and logs the offending command
@@ -417,7 +488,7 @@ const sshCmdTimeout = 30 * time.Second
 // captured output (possibly partial on timeout) and an error if the
 // session failed or the deadline fired.
 func runCmdWithDeadline(client *ssh.Client, cmd string, timeout time.Duration) (string, error) {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return "", fmt.Errorf("new session: %w", err)
 	}
@@ -451,7 +522,7 @@ func runCmdWithDeadline(client *ssh.Client, cmd string, timeout time.Duration) (
 }
 
 func runCmd(client *ssh.Client, cmd string) string {
-	out, err := runCmdWithDeadline(client, cmd, sshCmdTimeout)
+	out, err := runCmdWithDeadline(client, cmd, budgetOf(client).cmd)
 	if err != nil {
 		return ""
 	}
@@ -459,7 +530,7 @@ func runCmd(client *ssh.Client, cmd string) string {
 }
 
 func runCmdWithWarnings(client *ssh.Client, cmd string, warnings map[string]bool) string {
-	out, err := runCmdWithDeadline(client, cmd, sshCmdTimeout)
+	out, err := runCmdWithDeadline(client, cmd, budgetOf(client).cmd)
 	if err != nil {
 		return ""
 	}
@@ -467,7 +538,7 @@ func runCmdWithWarnings(client *ssh.Client, cmd string, warnings map[string]bool
 }
 
 func runCmdRaw(client *ssh.Client, cmd string) (string, error) {
-	out, execErr := runCmdWithDeadline(client, cmd, sshCmdTimeout)
+	out, execErr := runCmdWithDeadline(client, cmd, budgetOf(client).cmd)
 	cleaned := strings.TrimSpace(cleanCommandOutput(out, nil))
 	if execErr != nil {
 		if cleaned == "" {
@@ -490,7 +561,7 @@ func RunPrivilegedScript(client *ssh.Client, password, script string) (string, e
 // base64 transport as RunPrivilegedScript. No deadline: the caller bounds it
 // (closing the client ends the session).
 func RunScript(client *ssh.Client, script string) (string, error) {
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return "", err
 	}
@@ -521,7 +592,7 @@ func runSudoCmd(client *ssh.Client, password, cmd string) (string, error) {
 	if password == "" {
 		return "", fmt.Errorf("sudo password not available")
 	}
-	session, err := client.NewSession()
+	session, err := newSession(client)
 	if err != nil {
 		return "", err
 	}
@@ -1115,100 +1186,6 @@ func CleanupNginx(client *ssh.Client, password string, purge bool) (result *Ngin
 	return status, nil
 }
 
-func captureProcessDetails(client *ssh.Client) []ProcessDetail {
-	// Single SSH command that collects everything for all matching processes.
-	// Output format per process: PID|USER|%CPU|%MEM|CMD||CWD|EXE|PPID_COMM|PORTS
-	// Processes separated by newlines, "||" separates ps fields from /proc fields.
-	raw := runCmd(client, `ps aux 2>/dev/null | awk '$11 ~ /(python|node|java|ruby|php|gunicorn|uvicorn|celery|pm2)/ && $11 !~ /grep|ps|awk/ {printf "%s|%s|%s|%s|", $2, $1, $3, $4; for(i=11;i<=NF;i++) printf "%s ", $i; print ""}' | head -20`)
-	if raw == "" {
-		return nil
-	}
-
-	// Collect PIDs
-	var pids []string
-	var psLines []string
-	for _, line := range splitLines(raw) {
-		parts := strings.SplitN(line, "|", 5)
-		if len(parts) >= 5 && strings.TrimSpace(parts[4]) != "" {
-			pids = append(pids, parts[0])
-			psLines = append(psLines, line)
-		}
-	}
-	if len(pids) == 0 {
-		return nil
-	}
-
-	// Single batch command to get cwd, exe, parent comm, and ports for all PIDs
-	batchScript := `for pid in ` + strings.Join(pids, " ") + `; do
-		cwd=$(readlink -f /proc/$pid/cwd 2>/dev/null)
-		exe=$(readlink -f /proc/$pid/exe 2>/dev/null)
-		ppid=$(awk '/^PPid:/{print $2}' /proc/$pid/status 2>/dev/null)
-		pcomm=$(cat /proc/$ppid/comm 2>/dev/null)
-		ports=$(ss -tlnp 2>/dev/null | grep "pid=$pid," | awk '{split($4,a,":"); print a[length(a)]}' | sort -nu | tr '\n' ',' | sed 's/,$//')
-		echo "$pid||$cwd||$exe||$pcomm||$ports"
-	done`
-	batchRaw := runCmd(client, batchScript)
-
-	// Parse batch results into a map by PID
-	procInfo := map[string][4]string{} // cwd, exe, parentComm, ports
-	for _, line := range splitLines(batchRaw) {
-		parts := strings.Split(line, "||")
-		if len(parts) >= 5 {
-			procInfo[parts[0]] = [4]string{parts[1], parts[2], parts[3], parts[4]}
-		}
-	}
-
-	var details []ProcessDetail
-	for i, line := range psLines {
-		parts := strings.SplitN(line, "|", 5)
-		pid := pids[i]
-		cmd := strings.TrimSpace(parts[4])
-		info := procInfo[pid]
-		cwd, exe, parentComm, ports := info[0], info[1], info[2], info[3]
-
-		// Detect venv from exe path
-		venv := ""
-		for _, marker := range []string{"/venv/", "/.venv/", "/virtualenv/", "/env/"} {
-			if idx := strings.Index(exe, marker); idx >= 0 {
-				venv = exe[:idx+len(marker)-1]
-				break
-			}
-		}
-
-		// Classify start method from parent process
-		startedVia := "unknown"
-		switch parentComm {
-		case "systemd", "init":
-			startedVia = "systemd"
-		case "cron", "crond", "anacron":
-			startedVia = "cron"
-		case "sshd", "bash", "sh", "zsh", "tmux: server", "screen":
-			startedVia = "manual"
-		case "supervisord":
-			startedVia = "supervisor"
-		case "containerd-shim", "docker":
-			startedVia = "docker"
-		default:
-			if parentComm != "" {
-				startedVia = "parent:" + parentComm
-			}
-		}
-
-		details = append(details, ProcessDetail{
-			PID:        pid,
-			User:       parts[1],
-			CPU:        parts[2] + "%",
-			MEM:        parts[3] + "%",
-			Command:    cmd,
-			CWD:        cwd,
-			StartedVia: startedVia,
-			Venv:       venv,
-			Ports:      ports,
-		})
-	}
-	return details
-}
-
 // RemoteKeyInfo holds information about an SSH key found on the remote host.
 type RemoteKeyInfo struct {
 	Name        string `json:"name"`
@@ -1515,13 +1492,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		// Session 3: logins + services + service-details + listening
 		// ports. last -500 gives per-user grouping enough headroom even
 		// for hosts where one busy account dominates.
-		`last -500 -w 2>/dev/null | head -500`,
-		`echo '` + delim2 + `'`,
-		`ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|docker|containerd|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{print $11}' | sort -u | head -15`,
-		`echo '` + delim2 + `'`,
-		`ps aux 2>/dev/null | grep -E '(nginx|apache|httpd|php-fpm|node|python|java|postgres|mysql|mariadb|redis|mongo|caddy|haproxy|traefik|pm2|gunicorn|uvicorn|supervisord)' | grep -v grep | awk '{printf "%s  CPU:%.1f%%  MEM:%.1f%%  RSS:%sMB\n", $11, $3, $4, int($6/1024)}' | head -15`,
-		`echo '` + delim2 + `'`,
-		`ss -tlnp 2>/dev/null | awk 'NR>1{split($4,a,":"); port=a[length(a)]; proc=$7; gsub(/.*users:\(\("/,"",proc); gsub(/".*/,"",proc); if(port+0>0) print port " " proc}' | sort -n -u | head -20`,
+		loginsServicesPortsScript(delim2),
 		`echo '` + delimSession + `'`,
 
 		// Session 0 part 2: CPU sample after all the work above. The
@@ -1596,7 +1567,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		return ""
 	}
 	info.LastLogins = splitLines(section(0))
-	info.Services = splitLines(section(1))
+	info.Services = cleanServiceBinaries(splitLines(section(1)))
 	info.ServiceDetails = splitLines(section(2))
 	info.Ports = splitLines(section(3))
 
@@ -1778,7 +1749,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	go func() {
 		defer wg.Done()
 		s := time.Now()
-		procDetails = captureProcessDetails(client)
+		procDetails = captureProcessDetails(client, sudoPassword)
 		timeSession("[par] process-details", s)
 	}()
 	go func() {
@@ -2111,6 +2082,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		agentNames[a.Name] = true
 	}
 	info.ServiceInventory = captureServices(hostInv, info.ParsedContainers, agentNames, agentPortClaims)
+	info.ServiceInventory = append(info.ServiceInventory, captureAppServers(client, sudoPassword, procDetails, hostInv.ContainerPIDs)...)
 
 	// Back-fill PortOwners with agent and service attribution. `ss -tlnp`
 	// only emits a process column when the scanning user can see the

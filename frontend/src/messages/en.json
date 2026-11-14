@@ -648,6 +648,22 @@
     "idleHint": "An idle VM has no user-deployed application services and no Docker containers. Hover the chip on each card for the rule trail."
   },
   "host": {
+    "secrets": {
+      "tab": "Secrets",
+      "title": "Secrets found in the scan",
+      "hint": "Values found in command lines of this host. The scan keeps only a reference; the value lives in the vault.",
+      "empty": "No secrets found in the scan of this host.",
+      "inScan": "In latest scan",
+      "gone": "No longer seen",
+      "updated": "Changed {when}",
+      "reveal": "Reveal",
+      "hide": "Hide",
+      "copy": "Copy",
+      "copied": "Copied",
+      "loadError": "Could not load the secrets",
+      "revealError": "Could not reveal the secret",
+      "chip": "Secret stored in the vault"
+    },
     "maintenance": {
       "tab": "Maintenance",
       "system": "System",
@@ -965,6 +981,10 @@
     "scanProgress": "Scanning...",
     "scanning": "Scanning...",
     "scanSkipped": "Skipped",
+    "scanServerNote": "Runs on the server: you can close this page and come back to follow or stop it.",
+    "scanRunningAction": "Scanning {done}/{total}",
+    "scanCountOk": "{n} succeeded",
+    "scanCountFailed": "{n} failed",
     "startScan": "Start Scan",
     "rescan": "Rescan",
     "stopScan": "Stop",
@@ -1020,6 +1040,16 @@
     "sshConfigWithKey": "With Key",
     "sshConfigWithoutKey": "Without Key",
     "sshConfigHint": "Paste this block into your ~/.ssh/config file to enable quick access via: ssh {slug}",
+    "hostKey": {
+      "title": "Host key",
+      "reset": "Reset",
+      "resetTitle": "Reset the pinned host key?",
+      "resetMessage": "Do this only when you know why the key changed (VM reinstalled, keys regenerated). The next successful connection pins whatever key the host shows then.",
+      "resetDone": "Host key reset: the next connection pins it again",
+      "resetFailed": "Couldn't reset the host key",
+      "pinnedAt": "Pinned on {date}. Bridge refuses this host if it shows another key.",
+      "unpinned": "Not pinned yet: the next successful connection pins the key the host shows."
+    },
     "noAlerts": "No alerts",
     "noAlertsDesc": "This host has no active alerts.",
     "links": "Links",
@@ -2464,6 +2494,10 @@
       "attachGroupHint": "Every repo in this group and its subgroups — now and later — belongs to what you pick."
     },
     "sshOps": {
+      "sharedKeys": {
+        "title": "SSH host keys shared by several hosts ({count})",
+        "hint": "These VMs were cloned from one template and can answer for each other. On each one, regenerate the host keys (remove /etc/ssh/ssh_host_* and run ssh-keygen -A), then reset its pin in the host's SSH config."
+      },
       "title": "SSH operations",
       "intro": "Shell scripts anyone who edits hosts can run from a host's Operações tab. Write {{name}} where a value should be asked for at run time.",
       "name": "Name",
@@ -2599,6 +2633,7 @@
     "createRemoteUserNoEligibleKeys": "No SSH keys with a stored public key. Add or generate one under SSH Keys first.",
     "createRemoteUserNoPubKey": "Selected key has no public key — pick another.",
     "deleteRemoteUser": "Delete Remote User",
+    "hostKeyReset": "Host key reset",
     "deleteRemoteUserDesc": "Remove a non-system user from the remote host, kill their running processes, and clean up their NOPASSWD sudoers drop-in.",
     "deleteRemoteUserFormDesc": "Enter the username to delete. Root and other system accounts (UID < 1000) are blocked. The current SSH login user is also protected.",
     "deleteRemoteUserPlaceholder": "Username to delete",
@@ -2719,6 +2754,7 @@
       "nextRun": "Next run",
       "lastRun": "Last run",
       "disabled": "disabled",
+      "missingBinary": "binary not found",
       "timerUnit": "Timer unit",
       "jobSingular": "task",
       "jobPlural": "tasks"
@@ -2763,6 +2799,7 @@
       "enabledAtBoot": "boot",
       "enabledAtBootTooltip": "Service is enabled to start automatically at boot",
       "portsTooltip": "Listening TCP ports attributed to this service",
+      "apps": "Applications",
       "hostInstance": "on host",
       "hostInstanceTooltip": "Running on the host itself, outside any container. A row with both this and an image chip has a native instance and a containerized one.",
       "kind": {
@@ -2881,6 +2918,7 @@
       "unlinked": "Not linked: it does not resolve in DNS, its record is in the trash, or the server is stopped",
       "ignored": "Not a DNS name (default server, localhost, IP, wildcard or regex)",
       "proxy": "Proxies to",
+      "locations": "Locations",
       "root": "Document root",
       "source": "File",
       "usedBy": "Used by",

@@ -28,8 +28,37 @@ const LATENCY_MS = 150;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const mockOSRuns: OSUpdateRun[] = [];
+// Background scans: the run as created, when it started, when it was cancelled.
+const mockScans: { run: OSUpdateRun; started: number; cancelled?: number }[] = [];
+const MOCK_SCAN_HOST_MS = 2000;
+
+/** A scan run as of now: each host takes MOCK_SCAN_HOST_MS, concurrency at a
+ * time; one in seven fails; a cancel skips the hosts not started by then. */
+function scanView(m: (typeof mockScans)[number]): OSUpdateRun {
+  const elapsed = Date.now() - m.started;
+  const results = (m.run.results ?? []).map((x, i): OSUpdateResult => {
+    const start = Math.floor(i / m.run.concurrency) * MOCK_SCAN_HOST_MS;
+    if (m.cancelled !== undefined && start >= m.cancelled - m.started) return { ...x, status: "skipped", reason: "cancelled" };
+    if (elapsed < start) return x;
+    if (elapsed < start + MOCK_SCAN_HOST_MS) return { ...x, status: "running" };
+    return x.host_id % 7 === 0
+      ? { ...x, status: "failed", reason: "SSH connect: dial tcp 10.0.0.9:22: i/o timeout" }
+      : { ...x, status: "success", os_after: x.os_before,
+        output: JSON.stringify({ scan_saved: true, web_dns: { names: 2, created: 0, linked: 1, service_links: 1, unresolved: 0, trashed: 0 } }) };
+  });
+  const counts: OSUpdateRun["counts"] = {};
+  for (const x of results) counts[x.status] = (counts[x.status] ?? 0) + 1;
+  const busy = results.some((x) => x.status === "pending" || x.status === "running");
+  return { ...m.run, results, counts, status: busy ? "running" : m.cancelled !== undefined ? "cancelled" : "done" };
+}
 // Host backup profiles (host id → own paths; absent list = inherit).
 const mockProfiles = new Map<number, { include?: string[]; exclude?: string[] }>();
+// Pinned SSH host keys by host id: the first two hosts share a cloned template's key.
+const mockHostKeys = new Map<number, { fingerprint: string; key_type: string; pinned_at: string }>([
+  [1, { fingerprint: "SHA256:q0dBV3Kp6T7Yx1o9mN2cZ8uR4eF5sH7jL0aW3vX9bQk", key_type: "ecdsa-sha2-nistp256", pinned_at: "2026-11-10T14:02:00Z" }],
+  [2, { fingerprint: "SHA256:q0dBV3Kp6T7Yx1o9mN2cZ8uR4eF5sH7jL0aW3vX9bQk", key_type: "ecdsa-sha2-nistp256", pinned_at: "2026-11-11T09:30:00Z" }],
+  [3, { fingerprint: "SHA256:Zt4hE1yW8pQ2nB6vK0cM5sJ9xR3aL7uD1fG4oT8iVw0", key_type: "ssh-ed25519", pinned_at: "2026-11-12T18:45:00Z" }],
+]);
 const MOCK_BACKUP_DEFAULTS = { prefix: "bridge/os-backups", include: ["/"], exclude: ["/tmp", "/var/cache", "/var/lib/docker"], retention_days: 30 };
 // A scan with what the backup preview reads: filesystems, a host database,
 // containers and a big file.
@@ -524,6 +553,33 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     }
     return json(paginate([...groups.values()], qs.get("page"), qs.get("per_page")));
   }
+  if (p === "ssh/scans" && method === "POST") {
+    const body = await readJSON<{ host_ids: number[]; concurrency?: number; method?: "password" | "key" }>(request);
+    if (!body.host_ids?.length) return json({ error: "host_ids must have 1 to 500 hosts" }, 400);
+    const id = mockScans.length + 1;
+    const results: OSUpdateResult[] = body.host_ids.map((hid) => {
+      const h = db.hosts.find((x) => x.id === hid)!;
+      return { run_id: id, host_id: hid, host_nickname: h.nickname, host_slug: h.oficial_slug, status: "pending", os_before: h.os?.pretty,
+        reboot_required: false, rebooted: false };
+    });
+    const m = { started: Date.now(), run: { id, kind: "scan" as const, reboot: false, concurrency: Math.min(body.concurrency || 10, 10), status: "running" as const,
+      backup: false, keep_backup: false, auth_method: body.method, requested_name: "Mock", created_at: new Date().toISOString(), counts: {}, results } };
+    mockScans.unshift(m);
+    return json(scanView(m), 202);
+  }
+  if (p === "ssh/scans" && method === "GET") {
+    const hostId = Number(qs.get("host_id") ?? 0);
+    return json(mockScans.map(scanView)
+      .filter((r) => (qs.get("active") !== "1" || r.status === "running") && (!hostId || r.results?.some((x) => x.host_id === hostId)))
+      .map((r) => ({ ...r, results: undefined })));
+  }
+  const scanPath = p.match(/^ssh\/scans\/(\d+)(\/cancel)?$/);
+  if (scanPath) {
+    const m = mockScans.find((x) => x.run.id === Number(scanPath[1]));
+    if (!m) return json({ error: "run not found" }, 404);
+    if (scanPath[2] && method === "POST" && scanView(m).status === "running") m.cancelled = Date.now();
+    return json(scanView(m));
+  }
   // OS update runs: a run finishes at once, each host "upgrades" 3 packages.
   // ponytail: module memory, not reset by __reset.
   if (p === "ssh/os-updates/runs" && method === "POST") {
@@ -592,6 +648,31 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     for (const x of kept) if (!newest.has(x.host_id)) newest.set(x.host_id, x);
     return json([...newest.values()]);
   }
+  const hostConfigPath = p.match(/^ssh\/host-config\/([^/]+)$/);
+  if (hostConfigPath && method === "GET") {
+    const h = db.hosts.find((x) => x.oficial_slug === hostConfigPath[1]);
+    if (!h) return notFound("host not found");
+    return json({ config: `Host ${h.oficial_slug}\n    HostName ${h.hostname}\n    User ${h.user}\n`, host_key: mockHostKeys.get(h.id) ?? null });
+  }
+  const hostKeyResetPath = p.match(/^hosts\/([^/]+)\/ssh-host-key\/reset$/);
+  if (hostKeyResetPath && method === "POST") {
+    const h = db.hosts.find((x) => x.oficial_slug === hostKeyResetPath[1]);
+    if (!h) return notFound("host not found");
+    mockHostKeys.delete(h.id);
+    return json({ status: "reset" });
+  }
+  if (p === "ssh/host-keys/duplicates" && method === "GET") {
+    const groups = new Map<string, { fingerprint: string; key_type: string; hosts: { id: number; oficial_slug: string; nickname: string }[] }>();
+    for (const h of db.hosts) {
+      const k = mockHostKeys.get(h.id);
+      if (!k) continue;
+      const g = groups.get(k.fingerprint) ?? { fingerprint: k.fingerprint, key_type: k.key_type, hosts: [] };
+      g.hosts.push({ id: h.id, oficial_slug: h.oficial_slug, nickname: h.nickname });
+      groups.set(k.fingerprint, g);
+    }
+    return json([...groups.values()].filter((g) => g.hosts.length > 1));
+  }
+  if (p === "ssh/custom-operations" && method === "GET") return json(paginate([], null, null));
   const profilePath = p.match(/^hosts\/([^/]+)\/backup-profile$/);
   if (profilePath) {
     const h = db.hosts.find((x) => x.oficial_slug === profilePath[1]);

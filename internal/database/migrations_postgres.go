@@ -2230,8 +2230,29 @@ var migrationsPostgres = []string{
 	// differ by and its sites before and after (service.ReleaseReport).
 	`ALTER TABLE os_update_results ADD COLUMN IF NOT EXISTS report JSONB;`,
 
-	// Version 130: repair runs (kind 'repair'): finish what dpkg left half
+	// Version 130: secrets the scan found on a host (host env_var rows, group
+	// 'scan-…') are revealed only with hosts.secrets.reveal — editors here,
+	// admins always — not by every viewer of the host.
+	`INSERT INTO permissions (code, description, category) VALUES
+		('hosts.secrets.reveal', 'Reveal secrets the scan found on a host', 'hosts')
+	ON CONFLICT DO NOTHING;
+	INSERT INTO role_permissions (role, permission) VALUES ('editor', 'hosts.secrets.reveal')
+	ON CONFLICT DO NOTHING;`,
+
+	// Version 131: each host's pinned SSH host key (authorized_keys format),
+	// captured on the first successful login and checked on every dial after
+	// it (service.HostKeyCheck). NULL = not pinned yet.
+	`ALTER TABLE hosts ADD COLUMN IF NOT EXISTS ssh_host_key TEXT;
+	ALTER TABLE hosts ADD COLUMN IF NOT EXISTS ssh_host_key_at TIMESTAMPTZ;`,
+
+	// Version 132: host scans are background runs too (kind 'scan'), with
+	// the SSH method the caller picked ('' = each host's own).
+	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
+	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan'));
+	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS auth_method TEXT NOT NULL DEFAULT '';`,
+
+	// Version 133: repair runs (kind 'repair'): finish what dpkg left half
 	// done, list the config files to review, restart the failed units.
 	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
-	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','repair'));`,
+	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan','repair'));`,
 }

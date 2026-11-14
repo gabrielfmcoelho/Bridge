@@ -3,7 +3,7 @@
 import { useState, useMemo, type ReactNode } from "react";
 import { useEntityGraph } from "@/hooks/useEntityGraph";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { hostsAPI, sshAPI, globalIssuesAPI, integrationsAPI } from "@/lib/api";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,9 +31,10 @@ import { ICON_PATHS } from "@/lib/icon-paths";
 import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
 import HostDependencies from "./_components/HostDependencies";
 import HostMaintenance from "./_components/HostMaintenance";
+import HostSecretsTab from "./_components/HostSecretsTab";
 import OSBadges, { useLatestBackups } from "../_components/OSBadges";
 
-type TabKey = "overview" | "operations" | "maintenance" | "alerts" | "vulns" | "topology" | "metrics" | "requests" | "sentinel";
+type TabKey = "overview" | "operations" | "maintenance" | "alerts" | "vulns" | "topology" | "metrics" | "requests" | "sentinel" | "secrets";
 
 export default function HostDetail({ slug }: { slug: string }) {
   const { t, locale } = useLocale();
@@ -43,7 +44,20 @@ export default function HostDetail({ slug }: { slug: string }) {
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isAdmin = user?.role === "admin";
 
+  // ?tab=secrets (the scan chips) opens that tab, on a fresh load (user may still be loading)
+  // and on a same-page click; the param is dropped once used so a later chip click re-triggers.
+  const tabParam = useSearchParams().get("tab");
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const wantSecrets = tabParam === "secrets" && canEdit;
+  const [openedFor, setOpenedFor] = useState(false);
+  if (wantSecrets !== openedFor) {
+    setOpenedFor(wantSecrets);
+    if (wantSecrets) setActiveTab("secrets");
+  }
+  const selectTab = (k: TabKey) => {
+    setActiveTab(k);
+    if (tabParam) router.replace(`/hosts/${slug}`, { scroll: false });
+  };
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [formFooter, setFormFooter] = useState<ReactNode>(null);
   const [formSubHeader, setFormSubHeader] = useState<ReactNode>(null);
@@ -122,6 +136,7 @@ export default function HostDetail({ slug }: { slug: string }) {
   const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
     { key: "overview", label: t("host.tabOverview"), icon: tabIcons.overview },
     ...(canEdit ? [{ key: "operations" as TabKey, label: t("host.tabOperations"), icon: tabIcons.operations }] : []),
+    ...(canEdit ? [{ key: "secrets" as TabKey, label: t("host.secrets.tab"), icon: ICON_PATHS.lock }] : []),
     ...(isAdmin ? [{ key: "maintenance" as TabKey, label: t("host.maintenance.tab"), icon: ICON_PATHS.refresh }] : []),
     { key: "alerts" as TabKey, label: t("host.tabTracking"), icon: tabIcons.alerts, badge: issuesTabBadge || undefined },
     { key: "vulns" as TabKey, label: t("vuln.tab"), icon: ICON_PATHS.shieldAlert, badge: openVulns || undefined },
@@ -184,7 +199,7 @@ export default function HostDetail({ slug }: { slug: string }) {
               idBase: "host",
               label: data.host.nickname,
               active: activeTab,
-              onChange: (k) => setActiveTab(k as TabKey),
+              onChange: (k) => selectTab(k as TabKey),
               items: tabs,
               panelClassName: "space-y-5",
             }}
@@ -231,6 +246,10 @@ export default function HostDetail({ slug }: { slug: string }) {
                 isAdmin={isAdmin}
               />
             </div>
+          )}
+
+          {activeTab === "secrets" && canEdit && (
+            <HostSecretsTab hostId={data.host.id} scanText={data.last_scan?.data ?? ""} />
           )}
 
           {activeTab === "maintenance" && isAdmin && (

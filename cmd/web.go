@@ -19,6 +19,7 @@ import (
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/auth"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/vault"
 	"github.com/spf13/cobra"
@@ -47,6 +48,11 @@ var webCmd = &cobra.Command{
 		// Host credentials (ssh_keys) → vault, and derived columns for older
 		// secrets. Idempotent; runs before the env-gated consolidation below.
 		vault.RunSSHKeyMigration(ctx, db)
+
+		// Secrets in the command lines of older scans → vault, rows rewritten
+		// redacted. Once (settings flag); before the server starts, so no scan
+		// running alongside can see an older value win over its own.
+		service.RunScanSecretsBackfill(ctx, db)
 
 		// Env-gated one-shot: consolidate duplicate host passwords into shared
 		// credentials when MIGRATE_SHARED_HOST_PASSWORDS=1 (idempotent, safe to

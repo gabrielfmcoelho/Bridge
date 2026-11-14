@@ -190,3 +190,91 @@ func TestHostBackupProfileRepo(t *testing.T) {
 		t.Fatal("the profile goes with its host")
 	}
 }
+
+// Scans share the run tables but never show among the OS update runs; the
+// scan list filters by requester, host and still running; a restart tells a
+// scan's host it was cut, not that an update may still be running.
+func TestOSUpdateRepo_ScanRuns(t *testing.T) {
+	ctx := context.Background()
+	d := openDB(t)
+	var users []int64
+	for _, n := range []string{"A", "B"} {
+		u := &models.User{Username: n, DisplayName: n, Role: "editor", Email: n + "@example.com"}
+		if err := store.NewUserRepo(d.SQL).Create(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+		users = append(users, u.ID)
+	}
+	a, b := users[0], users[1]
+	var h1, h2 int64
+	for n, id := range map[string]*int64{"vm1": &h1, "vm2": &h2} {
+		if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ($1, $1) RETURNING id`, n).Scan(id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	repo := store.NewOSUpdateRepo(d.SQL)
+	check := &models.OSUpdateRun{Kind: "check", Concurrency: 1, RequestedBy: &a}
+	scanA := &models.OSUpdateRun{Kind: models.RunKindScan, Concurrency: 10, RequestedBy: &a, AuthMethod: "key"}
+	doneA := &models.OSUpdateRun{Kind: models.RunKindScan, Concurrency: 1, RequestedBy: &a}
+	scanB := &models.OSUpdateRun{Kind: models.RunKindScan, Concurrency: 1, RequestedBy: &b}
+	for _, x := range []struct { // in this order: the lists are id DESC
+		run   *models.OSUpdateRun
+		hosts []int64
+	}{{check, []int64{h1}}, {scanA, []int64{h1, h2}}, {doneA, []int64{h1}}, {scanB, []int64{h2}}} {
+		if err := repo.CreateRun(ctx, x.run, x.hosts); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := repo.FinishRun(ctx, doneA.ID, models.OSRunDone); err != nil {
+		t.Fatal(err)
+	}
+	ids := func(runs []models.OSUpdateRun, err error) []int64 {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := []int64{}
+		for _, r := range runs {
+			out = append(out, r.ID)
+		}
+		return out
+	}
+	eq := func(name string, got []int64, want ...int64) {
+		t.Helper()
+		if len(got) != len(want) {
+			t.Fatalf("%s = %v, want %v", name, got, want)
+		}
+		for i := range got {
+			if got[i] != want[i] {
+				t.Fatalf("%s = %v, want %v", name, got, want)
+			}
+		}
+	}
+	eq("os update runs", ids(repo.ListRuns(ctx, 50, 0)), check.ID)
+	eq("os update runs of vm2", ids(repo.ListRuns(ctx, 50, h2)))
+	eq("all scans", ids(repo.ListScanRuns(ctx, store.ScanRunFilter{})), scanB.ID, doneA.ID, scanA.ID)
+	eq("A's scans", ids(repo.ListScanRuns(ctx, store.ScanRunFilter{RequestedBy: a})), doneA.ID, scanA.ID)
+	eq("A's active scans", ids(repo.ListScanRuns(ctx, store.ScanRunFilter{RequestedBy: a, Active: true})), scanA.ID)
+	eq("scans of vm2", ids(repo.ListScanRuns(ctx, store.ScanRunFilter{HostID: h2})), scanB.ID, scanA.ID)
+	eq("limit", ids(repo.ListScanRuns(ctx, store.ScanRunFilter{Limit: 1})), scanB.ID)
+
+	got, err := repo.GetRun(ctx, scanA.ID)
+	if err != nil || got.AuthMethod != "key" || got.Kind != models.RunKindScan || got.RequestedName != "A" {
+		t.Fatalf("scan run = %+v %v", got, err)
+	}
+
+	repo.StartResult(ctx, scanA.ID, h1, "")
+	repo.StartResult(ctx, check.ID, h1, "")
+	if err := repo.MarkInterrupted(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for run, want := range map[int64]string{scanA.ID: "interrupted by a Bridge restart", check.ID: "the update may still be running"} {
+		x, err := repo.GetResult(ctx, run, h1)
+		if err != nil || x.Status != models.OSResultFailed || !strings.Contains(x.Reason, want) {
+			t.Fatalf("run %d = %+v %v, want %q", run, x, err, want)
+		}
+	}
+	if x, _ := repo.GetResult(ctx, scanA.ID, h1); strings.Contains(x.Reason, "update") {
+		t.Fatalf("a scan's reason talks about an update: %q", x.Reason)
+	}
+}

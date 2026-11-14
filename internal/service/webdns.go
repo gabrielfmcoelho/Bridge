@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net"
 	"regexp"
@@ -59,6 +60,7 @@ func LinkableName(raw string) (string, bool) {
 // any site serving it uses TLS, and who serves it (for the record's notes).
 type webName struct {
 	services map[int64]bool
+	hosts    map[int64]bool // other hosts the site proxies to
 	tls      bool
 	servedBy string
 }
@@ -104,6 +106,7 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 		}
 	}
 
+	remote := &remoteIndex{db: db, lookup: lookup, hosts: map[string][]models.Host{}, scans: map[int64]map[int]int64{}}
 	names := map[string]*webName{}
 	var order []string
 	for _, ws := range info.WebServers {
@@ -117,6 +120,10 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 		}
 		for _, site := range ws.Sites {
 			targets := pointsTo(site, ws.Container, hostAddrs, portContainer, containers)
+			remHosts, remSvcs, err := remote.resolve(ctx, remoteTargets(site, hostAddrs))
+			if err != nil {
+				return sum, err
+			}
 			for _, raw := range site.Names {
 				n, ok := LinkableName(raw)
 				if !ok {
@@ -124,13 +131,19 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 				}
 				w := names[n]
 				if w == nil {
-					w = &webName{services: map[int64]bool{}, servedBy: ws.Kind + " (" + where + ")"}
+					w = &webName{services: map[int64]bool{}, hosts: map[int64]bool{}, servedBy: ws.Kind + " (" + where + ")"}
 					names[n] = w
 					order = append(order, n)
 				}
 				w.tls = w.tls || site.TLS
 				if own != 0 {
 					w.services[own] = true
+				}
+				for _, id := range remHosts {
+					w.hosts[id] = true
+				}
+				for _, id := range remSvcs {
+					w.services[id] = true
 				}
 				for _, c := range targets {
 					if id := byContainer[c]; id != 0 {
@@ -214,6 +227,15 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 		if added {
 			sum.Linked++
 		}
+		for hid := range names[n].hosts {
+			added, err := dns.AddHostLink(ctx, id, hid)
+			if err != nil {
+				return sum, err
+			}
+			if added {
+				sum.Linked++
+			}
+		}
 		for svc := range names[n].services {
 			added, err := dns.AddServiceLink(ctx, id, svc)
 			if err != nil {
@@ -225,6 +247,120 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 		}
 	}
 	return sum, nil
+}
+
+// remoteTarget is a proxy_pass/fastcgi_pass destination outside this host.
+type remoteTarget struct {
+	Addr string
+	Port int
+}
+
+// remoteTargets lists a site's destinations that aren't this host: IP
+// literals and dotted names (a bare name is a container or compose service).
+func remoteTargets(site sshtest.WebSite, hostAddrs map[string]bool) []remoteTarget {
+	var out []remoteTarget
+	seen := map[remoteTarget]bool{}
+	for _, t := range append(append([]string{}, site.Proxy...), site.FastCGI...) {
+		h, port, ok := splitTarget(t)
+		if !ok || hostAddrs[h] || (net.ParseIP(h) == nil && !strings.Contains(h, ".")) {
+			continue
+		}
+		rt := remoteTarget{h, port}
+		if !seen[rt] {
+			seen[rt] = true
+			out = append(out, rt)
+		}
+	}
+	return out
+}
+
+// remoteIndex maps remote targets to the Bridge host (hostname match, only
+// when exactly one live host has it) and the service on that host owning the
+// port in its latest scan. Caches per RecordWebDNS call.
+type remoteIndex struct {
+	db     *sql.DB
+	lookup Resolver
+	hosts  map[string][]models.Host
+	scans  map[int64]map[int]int64 // host id -> port -> service id
+}
+
+func (r *remoteIndex) hostsFor(ctx context.Context, addr string) ([]models.Host, error) {
+	if hs, ok := r.hosts[addr]; ok {
+		return hs, nil
+	}
+	repo := store.NewHostRepo(r.db)
+	hs, err := repo.LiveByHostname(ctx, addr)
+	if err == nil && len(hs) == 0 && net.ParseIP(addr) == nil && r.lookup != nil {
+		lctx, cancel := context.WithTimeout(ctx, webDNSLookupTimeout)
+		addrs, _ := r.lookup(lctx, addr)
+		cancel()
+		for _, a := range addrs {
+			if hs, err = repo.LiveByHostname(ctx, a); err != nil || len(hs) > 0 {
+				break
+			}
+		}
+	}
+	r.hosts[addr] = hs
+	return hs, err
+}
+
+func (r *remoteIndex) portServices(ctx context.Context, hostID int64) (map[int]int64, error) {
+	if m, ok := r.scans[hostID]; ok {
+		return m, nil
+	}
+	m := map[int]int64{}
+	r.scans[hostID] = m
+	scan, err := store.NewHostScanRepo(r.db).GetLatest(ctx, hostID)
+	if err != nil || scan == nil {
+		return m, err
+	}
+	var info sshtest.VMInfo
+	if json.Unmarshal([]byte(scan.Data), &info) != nil {
+		return m, nil
+	}
+	svcs, err := store.NewServiceRepo(r.db).ListDiscoveredByHost(ctx, hostID)
+	if err != nil {
+		return m, err
+	}
+	byKey := map[string]int64{}
+	for _, s := range svcs {
+		if s.DiscoveryKind == "host" {
+			byKey[s.DiscoveryKey] = s.ID
+		}
+	}
+	for _, d := range info.ServiceInventory {
+		key := d.Name
+		if d.Instance != "" {
+			key += "@" + d.Instance
+		}
+		if id := byKey[key]; id != 0 {
+			for _, p := range d.HostPorts {
+				m[p] = id
+			}
+		}
+	}
+	return m, nil
+}
+
+func (r *remoteIndex) resolve(ctx context.Context, targets []remoteTarget) (hostIDs, svcIDs []int64, err error) {
+	for _, t := range targets {
+		hs, err := r.hostsFor(ctx, t.Addr)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(hs) != 1 {
+			continue
+		}
+		hostIDs = append(hostIDs, hs[0].ID)
+		ports, err := r.portServices(ctx, hs[0].ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if id := ports[t.Port]; id != 0 {
+			svcIDs = append(svcIDs, id)
+		}
+	}
+	return hostIDs, svcIDs, nil
 }
 
 // resolveAll looks names up in parallel; true = it resolves.

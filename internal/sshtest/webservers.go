@@ -38,6 +38,17 @@ type WebSite struct {
 	Proxy   []string `json:"proxy,omitempty"`   // proxy_pass targets, upstreams expanded
 	FastCGI []string `json:"fastcgi,omitempty"` // fastcgi_pass targets
 	Source  string   `json:"source,omitempty"`  // apache: file:line
+	// Locations keeps each nginx location with its own targets, in the order
+	// each first received one; Proxy/FastCGI stay the flattened union.
+	Locations []WebLocation `json:"locations,omitempty"`
+}
+
+// WebLocation is an nginx location that forwards somewhere. Path is the
+// pattern token as written (a regex is not interpreted).
+type WebLocation struct {
+	Path    string   `json:"path"`
+	Proxy   []string `json:"proxy,omitempty"`
+	FastCGI []string `json:"fastcgi,omitempty"`
 }
 
 // FPMPool is one php-fpm pool and where it listens (socket or host:port).
@@ -272,6 +283,8 @@ var (
 	reProxyPass   = nginxDirective("proxy_pass")
 	reFastCGIPass = nginxDirective("fastcgi_pass")
 	reRoot        = nginxDirective("root")
+	// The "{" may open on the next line; a path holding "{" ({3}) keeps it.
+	reLocation    = regexp.MustCompile(`^location\s+(?:[=~^*]+\s+)?(?:(\S+)\s*\{|(\S+)$)`)
 	reUpstream    = regexp.MustCompile(`^upstream\s+(\S+)\s*\{`)
 	reUpstreamSrv = regexp.MustCompile(`^server\s+([^;\s]+)`)
 )
@@ -287,6 +300,31 @@ func parseNginxSites(cfg string) []WebSite {
 	var cur *WebSite
 	var serverDepth, depth int
 	upstream, upstreamDepth := "", 0
+	type openLoc struct {
+		path  string
+		depth int
+	}
+	var locs []openLoc // open `location` blocks, innermost last
+	// target records a pass on the innermost named location (an `if` block
+	// belongs to its enclosing one; @named locations are skipped).
+	target := func(proxy bool, v string) {
+		if len(locs) == 0 || strings.HasPrefix(locs[len(locs)-1].path, "@") {
+			return
+		}
+		path := locs[len(locs)-1].path
+		i := 0
+		for i < len(cur.Locations) && cur.Locations[i].Path != path {
+			i++
+		}
+		if i == len(cur.Locations) {
+			cur.Locations = append(cur.Locations, WebLocation{Path: path})
+		}
+		if l := &cur.Locations[i]; proxy {
+			l.Proxy = appendUnique(l.Proxy, v)
+		} else {
+			l.FastCGI = appendUnique(l.FastCGI, v)
+		}
+	}
 
 	for _, raw := range strings.Split(cfg, "\n") {
 		line := strings.TrimSpace(raw)
@@ -306,6 +344,9 @@ func parseNginxSites(cfg string) []WebSite {
 		}
 
 		if cur != nil {
+			if m := reLocation.FindStringSubmatch(line); m != nil {
+				locs = append(locs, openLoc{m[1] + m[2], depth})
+			}
 			top := depth == serverDepth+1 || (depth == serverDepth && strings.Contains(line, "{"))
 			switch {
 			case top && (strings.HasPrefix(line, "listen ") || strings.HasPrefix(line, "listen\t")):
@@ -333,9 +374,11 @@ func parseNginxSites(cfg string) []WebSite {
 			}
 			for _, m := range reProxyPass.FindAllStringSubmatch(line, -1) {
 				cur.Proxy = appendUnique(cur.Proxy, m[1])
+				target(true, m[1])
 			}
 			for _, m := range reFastCGIPass.FindAllStringSubmatch(line, -1) {
 				cur.FastCGI = appendUnique(cur.FastCGI, m[1])
+				target(false, m[1])
 			}
 			if m := reRoot.FindStringSubmatch(line); m != nil && (cur.Root == "" || top) {
 				cur.Root = m[1]
@@ -348,9 +391,12 @@ func parseNginxSites(cfg string) []WebSite {
 				depth++
 			case '}':
 				depth--
+				if n := len(locs); n > 0 && locs[n-1].depth == depth {
+					locs = locs[:n-1]
+				}
 				if cur != nil && depth == serverDepth {
 					sites = append(sites, *cur)
-					cur = nil
+					cur, locs = nil, nil
 				}
 				if upstream != "" && depth == upstreamDepth {
 					upstream = ""
@@ -359,18 +405,23 @@ func parseNginxSites(cfg string) []WebSite {
 		}
 	}
 
-	for i := range sites {
-		var expanded []string
-		for _, p := range sites[i].Proxy {
+	expand := func(targets []string) (out []string) {
+		for _, p := range targets {
 			if srvs, ok := upstreams[proxyHost(p)]; ok {
 				for _, s := range srvs {
-					expanded = appendUnique(expanded, s)
+					out = appendUnique(out, s)
 				}
 			} else {
-				expanded = appendUnique(expanded, p)
+				out = appendUnique(out, p)
 			}
 		}
-		sites[i].Proxy = expanded
+		return out
+	}
+	for i := range sites {
+		sites[i].Proxy = expand(sites[i].Proxy)
+		for j := range sites[i].Locations {
+			sites[i].Locations[j].Proxy = expand(sites[i].Locations[j].Proxy)
+		}
 	}
 	return sites
 }

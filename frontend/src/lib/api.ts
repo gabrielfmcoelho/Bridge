@@ -22,6 +22,20 @@ export type RemoteKeyInfo = {
   source: string;
 };
 
+/** A host's pinned SSH host key: Bridge refuses the host when it shows another. */
+export type SSHHostKeyPin = {
+  fingerprint: string;
+  key_type: string;
+  pinned_at: string | null;
+};
+
+/** One host key pinned on several hosts (VMs cloned from one template). */
+export type SharedSSHHostKey = {
+  fingerprint: string;
+  key_type: string;
+  hosts: { id: number; oficial_slug: string; nickname: string }[];
+};
+
 export type DockerStatusType = {
   installed: boolean;
   docker_version?: string;
@@ -53,6 +67,7 @@ export type CronJob = {
   next_run?: string;
   last_run?: string;
   disabled?: boolean;
+  missing_binary?: boolean;
 };
 
 export type CronInfo = {
@@ -71,6 +86,8 @@ export type Agent = {
   state?: string;            // active|inactive|failed|running|stopped
   enabled?: boolean;
   unit?: string;
+  instance?: string;         // app-server instance: unit or install dir
+  apps?: string[];           // applications deployed on it
   pid?: number;
   version?: string;
   package?: string;
@@ -207,6 +224,8 @@ export type WebSite = {
   root?: string;
   proxy?: string[];
   fastcgi?: string[];
+  /** nginx: each location with its own targets (proxy/fastcgi stay the union). */
+  locations?: { path: string; proxy?: string[]; fastcgi?: string[] }[];
   /** Apache: config file:line. */
   source?: string;
 };
@@ -370,6 +389,7 @@ export type ProcessDetail = {
   started_via: string;
   venv?: string;
   ports?: string;
+  unit?: string;
 };
 
 // Default per-request timeout. Generous enough for long SSH scans
@@ -768,6 +788,18 @@ export const osUpdateAPI = {
   deleteBackup: (runId: number, hostId: number) => api.delete(`/api/ssh/os-updates/runs/${runId}/hosts/${hostId}/backup`),
 };
 
+// Background scans (editor): one run over a set of hosts, on the server, so
+// it outlives the tab. Each result's output is the scan's summary (JSON).
+export const scanAPI = {
+  start: (body: { host_ids: number[]; concurrency?: number; method?: "password" | "key" }) =>
+    api.post<import("./types").OSUpdateRun>("/api/ssh/scans", body),
+  /** The caller's runs (an admin's: everyone's), newest first. */
+  list: (q: { active?: boolean; hostId?: number } = {}) =>
+    api.get<import("./types").OSUpdateRun[]>(`/api/ssh/scans?active=${q.active ? 1 : 0}&host_id=${q.hostId ?? 0}`),
+  run: (id: number) => api.get<import("./types").OSUpdateRun>(`/api/ssh/scans/${id}`),
+  cancel: (id: number) => api.post<import("./types").OSUpdateRun>(`/api/ssh/scans/${id}/cancel`),
+};
+
 export const sshAPI = {
   previewConfig: () => api.get<{ content: string }>("/api/ssh/preview-config"),
   generateConfig: () => api.post<{ status: string; host_count: number; path: string }>("/api/ssh/generate-config"),
@@ -818,7 +850,10 @@ export const sshAPI = {
   listRemoteKeys: (slug: string) =>
     api.post<{ success: boolean; error?: string; keys?: RemoteKeyInfo[] }>(`/api/ssh/list-remote-keys/${slug}`),
   hostConfig: (slug: string, includeKey: boolean) =>
-    api.get<{ config: string }>(`/api/ssh/host-config/${slug}?include_key=${includeKey}`),
+    api.get<{ config: string; host_key: SSHHostKeyPin | null }>(`/api/ssh/host-config/${slug}?include_key=${includeKey}`),
+  // Admin: drop the pinned host key; the next successful login pins again.
+  resetHostKey: (slug: string) => api.post<{ status: string }>(`/api/hosts/${slug}/ssh-host-key/reset`),
+  sharedHostKeys: () => api.get<SharedSSHHostKey[]>("/api/ssh/host-keys/duplicates"),
   dockerSetup: (slug: string, fix: boolean) =>
     api.post<{ success: boolean; error?: string; status?: DockerStatusType }>(`/api/ssh/docker-setup/${slug}`, { fix }),
   nginxCleanup: (slug: string, purge: boolean) =>

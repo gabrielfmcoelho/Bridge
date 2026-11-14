@@ -1488,10 +1488,13 @@ export interface HostOS {
 export type OSUpdateKind = "check" | "packages" | "security" | "release" | "backup" | "repair";
 export type OSUpdateResultStatus = "pending" | "running" | "success" | "failed" | "skipped";
 
-/** One check / upgrade over a set of hosts (GET /api/ssh/os-updates/runs). */
+/** One check / upgrade over a set of hosts (GET /api/ssh/os-updates/runs), or a
+ * background scan (GET /api/ssh/scans: same shape, kind "scan"). */
 export interface OSUpdateRun {
   id: number;
-  kind: OSUpdateKind | "restore";
+  kind: OSUpdateKind | "restore" | "scan";
+  /** Scans: the SSH method every host used; none = each host's own. */
+  auth_method?: "password" | "key";
   reboot: boolean;
   concurrency: number;
   status: "running" | "done" | "cancelled" | "interrupted";

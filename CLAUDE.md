@@ -74,9 +74,15 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 2. Widen the `asset_type` CHECK constraint on `asset_entidades`
    (`internal/database/migrations_postgres.go`, ~line 1314) with a new
    migration, using the existing `DROP CONSTRAINT` / `ADD CONSTRAINT` idiom.
-3. Filter every read with `store.VisibleExpr` / `VisibleExprDyn`.
+3. Filter every read with `store.VisibleExpr` / `VisibleExprDyn`. Link
+   reads too: per id through `visibleLinkIDs`, lists built on
+   `GraphRepo.Links` (unscoped) through `store.VisibleSet` + `KeepVisible`,
+   a repo's own batch link query with `l.<col> IN (liveVisibleIDs(...))`
+   (`APICatalogRepo.LinksBulk`, `DatabaseRepo.enrich`).
 4. Gate every write through `store.ResolveGrants`
-   (`internal/store/asset_entidade.go`).
+   (`internal/store/asset_entidade.go`). Link setters go through
+   `replaceVisibleLinks`, never DELETE-all + insert: a scoped save would
+   drop links to assets the caller's picker never showed.
 5. Return **404, never 403**, when an asset is invisible — existence is not
    leaked.
 6. Embed `<EntidadeScopeFields>` (`frontend/src/components/entidades/`) in
@@ -87,7 +93,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v130**. Use idempotent idioms:
+per element, currently at **v133**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -134,6 +140,18 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   fields in the request struct, `nil` = keep), `""`/`[]` clears. `PUT
   /api/api-catalog/{id}` follows this; new update handlers must too — a plain
   `string` field silently blanks the column when a caller omits it.
+- SSH host keys (v131, `internal/service/host_key.go`): every dial goes
+  through `service.DialHost`, never `sshtest.Dial` directly. The first
+  successful login pins the key the host showed (`hosts.ssh_host_key`, an
+  authorized_keys line; a failed login pins nothing); later dials offer that
+  key's algorithms first and refuse any other key with "host key changed
+  (expected SHA256:…, got SHA256:…)", which the test path saves as a failed
+  test. `HostRepo.Update` never writes the pin, so a stale host can't undo
+  one. An admin re-trusts a host with `POST /api/hosts/{slug}/ssh-host-key/reset`
+  (SSH config drawer, operation log `host-key-reset`); `GET
+  /api/ssh/host-keys/duplicates` lists keys pinned on several hosts (VMs
+  cloned from one template), warned about in Settings › SSH operations.
+  Pins fill in on each host's next connection: rollout locks no one out.
 - Atlas API keys (`internal/api/api_key_handlers.go`, Keycloak integration in
   `internal/integrations/kcadmin`): the scope prefix `bridge` is reserved for
   Bridge's own entry; a key's secret is returned **once** (also stored in the
@@ -198,10 +216,11 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   word exactly `pull` or `clone` (`TestGitInnerScriptRuns` plants both). Each
   container frame ends with its `docker exec` status (`@@exit N`, taken off
   by `splitCtrFrames`): a walk that never started counts as done only for
-  126/127 (no shell in the image). It must stay well inside the browser's
-  120 s scan request or the whole scan is lost:
+  126/127 (no shell in the image). In the synchronous scan it must stay well
+  inside the browser's 120 s scan request or the whole scan is lost:
   host walk 20 s, containers started within 30 s (8 s each), unprivileged
-  deadline 60 s. `git_remotes` is `null` when the probe didn't run, `[]` when
+  deadline 60 s; a background scan (`CaptureJob`, below) gets 180 s, 300 s and
+  9 min. `git_remotes` is `null` when the probe didn't run, `[]` when
   it found none; `git_remotes_partial` marks a list that may be short (find
   exit > 1, cap, a container skipped, cut, paused or restarting, or the
   unprivileged fallback after a failed root run).
@@ -284,7 +303,7 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   `*.dist`, lost PHP handlers, new foreign packages) and the host's DNS names'
   `/` before and after (`ProbeSites`, body read for PHP error text, never
   stored). shortcut: only `/` of each name.
-  `repair` (v130, `sshtest/osrepair.go`) is one host per run, detached like the
+  `repair` (v133, `sshtest/osrepair.go`) is one host per run, detached like the
   others, rebooting only when asked: `dpkg --configure -a` keeping local
   conffiles (failure → `fail`/`diagnose`, stop), `apt-get -f install` only when
   `apt-get check` fails, `@@dist_file <path> <n>` per `*.dpkg-dist`/`*.ucf-dist`
@@ -339,6 +358,77 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   presigned link signed for the internal endpoint, fed to `curl -K -` on
   stdin: a link on a command line is readable by every local user in /proc,
   and it must never reach the world-readable log. Run scripts are `600`.
+- Scan on legacy VMs (`internal/sshtest/session.go`): every scan session opens
+  through `newSession`, never `client.NewSession` — sshd's default `MaxSessions
+  10` refuses the 11th concurrent session with an `OpenChannelError`
+  (Prohibited), and Go's client then failed silently, so probes just vanished;
+  `newSession` retries that refusal. New probes open through `newSession` and
+  start their script with `scanPath` (`/usr/sbin`, `/sbin` appended; some older
+  scripts inline the same export): a non-interactive CentOS 7 PATH has no
+  `ss`, which left `ports` null on every CentOS host. Process details
+  (`procdetails.go`) run as root when Bridge has the password; the systemd
+  unit comes from `/proc/<pid>/cgroup`, readable without root (`unit`,
+  `started_via = systemd`). Cron asks for the daemon name first (RHEL
+  `crond`), then is-active/is-enabled for that unit only; a job whose
+  absolute binary doesn't exist gets `missing_binary` (a real `/ust/bin/certbot`;
+  without root only where the scan user can traverse, never a `$`/`%` path).
+  nginx sites keep `locations` (path → targets, upstreams expanded);
+  `proxy` stays the flattened union for the old readers.
+- Java app servers (`appservers.go`, `services.go`): JBoss AS, WildFly/EAP,
+  Tomcat and GlassFish are matched by **main class**, not by process name (host
+  processes only: a container PID belongs to its container), and
+  yield one service per instance, keyed `<catalog>@<instance>` (the systemd
+  unit, else the install dir) — two JBoss on one host stay two services.
+  `HostPorts` come from the PID's own ports with the likely HTTP port (80xx) first, so a
+  proxy target resolves to the right instance; deployed `.war`/`.ear` (plus
+  exploded dirs on Tomcat and WildFly) go in `apps`. `service.RecordWebDNS`
+  also links a record whose `proxy_pass` points at **another VM**: to that host
+  only when exactly one live host has that hostname (ambiguous → none), and to
+  the service whose latest-scan `HostPorts` holds the port. Only adds.
+- Secrets in the scan (`service.RecordScanSecrets`, `internal/service/scansecrets.go`):
+  a command line is where legacy VMs keep their secrets (`-D…`, `--…`,
+  `NAME=…`, URL userinfo, mysql `-p`). Each one goes to the vault
+  (`vault.UpsertScanSecret`: `env_var`, host-scoped shared, `group_label`
+  `scan-<origin>`, upper-snake name, origin taken from the command line alone
+  so the identity is stable) and is replaced in the scan by `{{secret:<id>}}`
+  (`{{secret}}` when it can't be registered) **inside `recordScan`, before the
+  scan is stored or returned** — a raw value never reaches `host_scans` or the
+  response, an error or a log line: a value leaves the vault only through the
+  audited reveal (`GET /api/secrets/{id}/reveal`, which writes a
+  `secret_audit_log` row) or a share-bundle redemption (`revealRaw`, gated by
+  the same permission when the bundle is created, logged in
+  `share_bundle_access_log`). A trashed identity is never recreated. Revealing a
+  `scan-*` host secret needs `hosts.secrets.reveal` (v130, seeded for editors);
+  only admins move a host secret into or out of a `scan-` group. At startup
+  `service.RunScanSecretsBackfill` (`cmd/web.go`) redacts old `host_scans`
+  rows, synchronously, resuming after a high-water id saved every batch; a
+  scan `RecordScanSecrets` wrote carries `secrets_redacted` and is never
+  re-read. UI: the host tab **Segredos** (`?tab=secrets`, editors) lists them,
+  with reveal only for `hosts.secrets.reveal`, and scan views render the
+  tokens as lock chips linking to it (a plain chip for viewers).
+- Background scans (`internal/api/scan_job.go`, v132): a scan run is an
+  `os_update_runs` row of kind `scan` on the OS update runner — `ListRuns`
+  and every OS-update view leave scans out. `POST /api/ssh/scans`
+  `{host_ids, concurrency?, method?}` (editor, 202, default concurrency 10),
+  `GET /api/ssh/scans[?active=1&host_id=]`, `GET …/{id}`, `POST …/{id}/cancel`;
+  a run is seen and cancelled only by its requester and admins (404 otherwise).
+  `scanHostRunner` dials like `handleTestConnection` (`scanMethod`, then
+  `service.DialHost` and its pinned key; a dropped connection is retried, a
+  refused login or changed key never), captures with `sshtest.CaptureJob`,
+  reloads the host (an edit made during the scan's minutes survives), then
+  `noteTest` (shared with the synchronous scan) and `recordScan`; a result's
+  `output` is recordScan's summary as JSON. Past `scanHostTimeout` (20 min) the
+  client is closed and **nothing is recorded**: a closed client makes every
+  probe come back empty, which would mark the host's services offline.
+  `TestCapture(client, pw, mode)`: `CaptureSync` keeps the budgets of the
+  browser's 120 s request (`POST /api/ssh/test/{slug}`, still behind SSH
+  operations' tests); `CaptureJob` (scan runs, OS-update rescans) raises the
+  per-command deadline, the git walk, the containers' start budget and the
+  unprivileged git deadline (`budgets`, `test.go`), never the output caps. The
+  per-command budget is looked up by client (`budgetOf`), so `runCmd` callers
+  take no mode. UI: the hosts list's batch scan and the host's scan button
+  start runs and poll them (`useScanRun`); a reopened page picks up the
+  caller's active run.
 - Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
   names are read in bulk; wiki titles come from Outline at most once a day per
   page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title

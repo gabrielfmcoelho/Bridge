@@ -172,3 +172,38 @@ func TestHostScanRepo_LatestListSummaryBulk(t *testing.T) {
 		t.Errorf("os_info = %v", osInfo)
 	}
 }
+
+func TestHostScanRepo_ListAfterAndUpdateData(t *testing.T) {
+	ctx := context.Background()
+	d := openDB(t)
+	var hostID int64
+	if err := d.SQL.QueryRow(`INSERT INTO hosts (nickname, oficial_slug) VALUES ('web-1', 'web-1') RETURNING id`).Scan(&hostID); err != nil {
+		t.Fatalf("seed host: %v", err)
+	}
+	repo := store.NewHostScanRepo(d.SQL)
+	for _, data := range []string{`{"cpu":"1"}`, `{"cpu":"2"}`, `{"cpu":"3"}`} {
+		if err := repo.Create(ctx, hostID, data); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	first, err := repo.ListAfter(ctx, 0, 2)
+	if err != nil || len(first) != 2 || first[0].Data != `{"cpu":"1"}` || first[1].Data != `{"cpu":"2"}` || first[0].HostID != hostID {
+		t.Fatalf("first page = %+v, %v", first, err)
+	}
+	rest, err := repo.ListAfter(ctx, first[1].ID, 2)
+	if err != nil || len(rest) != 1 || rest[0].Data != `{"cpu":"3"}` {
+		t.Fatalf("second page = %+v, %v", rest, err)
+	}
+	if none, err := repo.ListAfter(ctx, rest[0].ID, 2); err != nil || len(none) != 0 {
+		t.Fatalf("past the end = %+v, %v", none, err)
+	}
+
+	if err := repo.UpdateData(ctx, first[0].ID, `{"cpu":"9"}`); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := repo.ListAfter(ctx, 0, 1)
+	if len(again) != 1 || again[0].Data != `{"cpu":"9"}` || !again[0].ScannedAt.Equal(first[0].ScannedAt) {
+		t.Fatalf("after update = %+v (scanned_at was %v)", again, first[0].ScannedAt)
+	}
+}

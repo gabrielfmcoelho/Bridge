@@ -108,7 +108,7 @@ func (h *sshHandlers) resolveAuth(w http.ResponseWriter, host *models.Host, meth
 // dial opens an SSH connection using the resolved auth. Returns the client or
 // writes an HTTP error and returns nil.
 func (h *sshHandlers) dial(w http.ResponseWriter, host *models.Host, user string, auth sshtest.Auth) *ssh.Client {
-	client, err := sshtest.Dial(host.Hostname, host.Port, user, auth)
+	client, err := service.DialHost(context.Background(), h.db, host, user, auth)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "SSH connect: "+err.Error())
 		return nil
@@ -209,75 +209,45 @@ func (h *sshHandlers) handleTestConnection(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	method, auth, ok := h.resolveAuth(w, host, req.Method)
+	method, authn, ok := h.resolveAuth(w, host, req.Method)
 	if !ok {
 		return
 	}
-
-	// Helper to update test status on the host record
-	setTestStatus := func(status string) {
-		if method == "password" {
-			host.PasswordTestStatus = &status
-		} else {
-			host.KeyTestStatus = &status
-		}
+	var userID int64
+	if u := auth.UserFromContext(r.Context()); u != nil {
+		userID = u.ID
 	}
 
 	// Dial inline (don't use h.dial helper) so we can persist
 	// "failed" test status to the DB on connection failures. The helper
 	// returns 502 without touching the DB, which leaves rows stuck as
 	// "untested" forever even though the user clearly attempted a scan.
-	client, dialErr := sshtest.Dial(host.Hostname, host.Port, user, auth)
-	if dialErr != nil {
-		host.ConnectionsFailed++
-		setTestStatus("failed")
-		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-		h.logOperation(r, host.ID, "test", &method, "failed", dialErr.Error())
-		jsonOK(w, map[string]any{"success": false, "error": "SSH connect: " + dialErr.Error()})
+	// A changed host key fails here too (service.HostKeyChangedError).
+	client, err := service.DialHost(r.Context(), h.db, host, user, authn)
+	if err != nil {
+		h.noteTest(r.Context(), host, method, userID, err)
+		jsonOK(w, map[string]any{"success": false, "error": "SSH connect: " + err.Error()})
 		return
 	}
 	defer client.Close()
 
-	result := map[string]any{}
-
+	var vmInfo *sshtest.VMInfo
 	if req.Capture {
-		vmInfo, testErr := sshtest.TestCapture(client, auth.Password())
-		if testErr != nil {
-			host.ConnectionsFailed++
-			setTestStatus("failed")
-			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
-			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
-			return
-		}
-		result["success"] = true
-		result["vm_info"] = vmInfo
-		if host.ConnectionsFailed > 0 {
-			host.ConnectionsFailed = 0
-		}
-		setTestStatus("success")
-
-		h.logOperation(r, host.ID, "test", &method, "success", "")
-		h.recordScan(r.Context(), host, vmInfo, result)
+		vmInfo, err = sshtest.TestCapture(client, authn.Password(), sshtest.CaptureSync)
 	} else {
-		testErr := sshtest.Test(client)
-		if testErr != nil {
-			host.ConnectionsFailed++
-			setTestStatus("failed")
-			store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-			h.logOperation(r, host.ID, "test", &method, "failed", testErr.Error())
-			jsonOK(w, map[string]any{"success": false, "error": testErr.Error()})
-			return
-		}
-		result["success"] = true
-		if host.ConnectionsFailed > 0 {
-			host.ConnectionsFailed = 0
-		}
-		setTestStatus("success")
-		store.NewHostRepo(h.db.SQL).Update(r.Context(), host)
-		h.logOperation(r, host.ID, "test", &method, "success", "")
+		err = sshtest.Test(client)
 	}
-
+	// Saved here: recordScan writes the host only when its specs change.
+	h.noteTest(r.Context(), host, method, userID, err)
+	if err != nil {
+		jsonOK(w, map[string]any{"success": false, "error": err.Error()})
+		return
+	}
+	result := map[string]any{"success": true}
+	if vmInfo != nil {
+		result["vm_info"] = vmInfo
+		h.recordScan(r.Context(), host, vmInfo, result)
+	}
 	jsonOK(w, result)
 }
 
@@ -1401,7 +1371,12 @@ func (h *sshHandlers) handleHostSSHConfig(w http.ResponseWriter, r *http.Request
 	}
 
 	config := sshconfig.RenderConfig([]sshconfig.HostEntry{entry})
-	jsonOK(w, map[string]any{"config": config})
+	var pin *hostKeyView
+	if key, at, err := store.NewHostRepo(h.db.SQL).SSHHostKey(r.Context(), host.ID); err == nil && key != "" {
+		pin = &hostKeyView{PinnedAt: at}
+		pin.Fingerprint, pin.KeyType = service.HostKeyFingerprint(key)
+	}
+	jsonOK(w, map[string]any{"config": config, "host_key": pin})
 }
 
 // handleOperationLogs returns operation logs for a host.
@@ -1645,6 +1620,10 @@ func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
 	rr.auth("GET /api/ssh/preview-config", h.handlePreviewConfig)
 	rr.role("editor", "POST /api/ssh/generate-config", h.handleGenerateConfig)
 	rr.role("editor", "POST /api/ssh/test/{slug}", h.handleTestConnection)
+	rr.role("editor", "POST /api/ssh/scans", h.handleStartScan)
+	rr.role("editor", "GET /api/ssh/scans", h.handleListScans)
+	rr.role("editor", "GET /api/ssh/scans/{id}", h.handleGetScan)
+	rr.role("editor", "POST /api/ssh/scans/{id}/cancel", h.handleCancelScan)
 	rr.role("editor", "POST /api/ssh/network-test/{slug}", h.handleNetworkTest)
 	rr.role("editor", "POST /api/ssh/setup-key/{slug}", h.handleSetupKey)
 	rr.role("editor", "POST /api/ssh/fix-dev-null/{slug}", h.handleFixDevNull)
@@ -1679,6 +1658,88 @@ func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
 	rr.role("admin", "GET /api/ssh/os-updates/backups", h.handleListOSBackups)
 	rr.role("admin", "GET /api/hosts/{slug}/backup-profile", h.handleGetBackupProfile)
 	rr.role("admin", "PUT /api/hosts/{slug}/backup-profile", h.handleUpdateBackupProfile)
+	rr.role("admin", "POST /api/hosts/{slug}/ssh-host-key/reset", h.handleResetSSHHostKey)
+	rr.role("admin", "GET /api/ssh/host-keys/duplicates", h.handleSharedSSHHostKeys)
+}
+
+// hostKeyView is a pinned SSH host key as the UI shows it.
+type hostKeyView struct {
+	Fingerprint string     `json:"fingerprint"`
+	KeyType     string     `json:"key_type"`
+	PinnedAt    *time.Time `json:"pinned_at"`
+}
+
+// handleResetSSHHostKey drops a host's pinned SSH host key.
+//
+//	@Summary		Re-trust a host's SSH host key
+//	@Description	Admin. Drops the pinned key; the next successful login pins the key the host shows then. Written to the host's operation log.
+//	@Tags			ssh
+//	@Produce		json
+//	@Param			slug	path		string	true	"Host slug"
+//	@Success		200		{object}	map[string]string
+//	@Failure		401		{object}	httpx.ErrorResponse
+//	@Failure		403		{object}	httpx.ErrorResponse
+//	@Failure		404		{object}	httpx.ErrorResponse
+//	@Failure		500		{object}	httpx.ErrorResponse
+//	@Router			/api/hosts/{slug}/ssh-host-key/reset [post]
+func (h *sshHandlers) handleResetSSHHostKey(w http.ResponseWriter, r *http.Request) {
+	host := h.requireHost(w, r)
+	if host == nil {
+		return
+	}
+	repo := store.NewHostRepo(h.db.SQL)
+	old, _, err := repo.SSHHostKey(r.Context(), host.ID)
+	if err != nil {
+		jsonServerError(w, r, "failed to load host key", err)
+		return
+	}
+	if err := repo.ResetSSHHostKey(r.Context(), host.ID); err != nil {
+		jsonServerError(w, r, "failed to reset host key", err)
+		return
+	}
+	was := "no pinned key"
+	if fp, typ := service.HostKeyFingerprint(old); fp != "" {
+		was = "was " + typ + " " + fp
+	}
+	h.logOperation(r, host.ID, "host-key-reset", nil, "success", was)
+	jsonOK(w, map[string]string{"status": "reset"})
+}
+
+// sharedHostKey is one SSH host key pinned on several hosts.
+type sharedHostKey struct {
+	key         string
+	Fingerprint string                   `json:"fingerprint"`
+	KeyType     string                   `json:"key_type"`
+	Hosts       []store.SSHHostKeyHolder `json:"hosts"`
+}
+
+// handleSharedSSHHostKeys lists the SSH host keys pinned on more than one
+// host: VMs cloned from one template, which can impersonate each other.
+//
+//	@Summary		SSH host keys shared by several hosts
+//	@Description	Admin. One entry per pinned key held by more than one live host, with those hosts.
+//	@Tags			ssh
+//	@Produce		json
+//	@Success		200	{array}		sharedHostKey
+//	@Failure		401	{object}	httpx.ErrorResponse
+//	@Failure		403	{object}	httpx.ErrorResponse
+//	@Failure		500	{object}	httpx.ErrorResponse
+//	@Router			/api/ssh/host-keys/duplicates [get]
+func (h *sshHandlers) handleSharedSSHHostKeys(w http.ResponseWriter, r *http.Request) {
+	holders, err := store.NewHostRepo(h.db.SQL).SharedSSHHostKeys(r.Context())
+	if err != nil {
+		jsonServerError(w, r, "failed to load host keys", err)
+		return
+	}
+	out := []sharedHostKey{}
+	for _, hk := range holders {
+		if n := len(out); n == 0 || out[n-1].key != hk.Key {
+			fp, typ := service.HostKeyFingerprint(hk.Key)
+			out = append(out, sharedHostKey{key: hk.Key, Fingerprint: fp, KeyType: typ})
+		}
+		out[len(out)-1].Hosts = append(out[len(out)-1].Hosts, hk)
+	}
+	jsonOK(w, out)
 }
 
 // recordScan applies a successful capture to Bridge: the host's specs and
@@ -1686,6 +1747,18 @@ func (h *sshHandlers) registerRoutes(rr routeRegistrar) {
 // included), web DNS and git links. Outcomes go into result; none of the
 // later steps fails the scan. Shared by the scan and the OS update runs.
 func (h *sshHandlers) recordScan(ctx context.Context, host *models.Host, vmInfo *sshtest.VMInfo, result map[string]any) {
+	// Secrets on the scanned command lines go to the vault first, written by
+	// whoever ran the scan (a job: the system actor). vmInfo keeps only
+	// {{secret:<id>}} — the stored scan and the response are both built from
+	// it — and a value the vault didn't take is blanked anyway.
+	var actor int64
+	if u := auth.UserFromContext(ctx); u != nil {
+		actor = u.ID
+	}
+	if n, err := service.RecordScanSecrets(ctx, h.db, host.ID, actor, vmInfo); err != nil {
+		result["scan_secrets_error"] = err.Error()
+		log.Printf("[ssh] scan secrets host=%s: %d stored, some blanked without being stored", host.OficialSlug, n)
+	}
 	// The host's CPU / RAM / disk specs follow every scan that measured
 	// them: a resized VM, or a disk total that now counts every partition
 	// (storage.go), would otherwise keep its first value forever.

@@ -9645,6 +9645,62 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/hosts/{slug}/ssh-host-key/reset": {
+            "post": {
+                "description": "Admin. Drops the pinned key; the next successful login pins the key the host shows then. Written to the host's operation log.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Re-trust a host's SSH host key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Host slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/import": {
             "post": {
                 "description": "Admin. {\"type\": \"hosts\"|\"dns\", \"data\": [...]} dispatched to /api/import/hosts or /api/import/dns, with the same rules.",
@@ -17619,6 +17675,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/ssh/host-keys/duplicates": {
+            "get": {
+                "description": "Admin. One entry per pinned key held by more than one live host, with those hosts.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "SSH host keys shared by several hosts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.sharedHostKey"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/ssh/keys": {
             "get": {
                 "description": "Any role.",
@@ -18317,6 +18414,157 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/scans": {
+            "get": {
+                "description": "Editor+. The caller's 50 newest scan runs (an admin's: everyone's), newest first, with how many hosts are in each status; active=1 keeps the running ones, host_id the ones that include that host.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "List background scans",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "1: only running runs",
+                        "name": "active",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only runs of this host",
+                        "name": "host_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.OSUpdateRun"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Editor+. Scans host_ids on the server, concurrency at a time (1–10, default 10), each like POST /api/ssh/test/{slug} with capture (the host's auth method — or method for every host —, its pinned host key, the same bookkeeping) but with longer probe budgets, retrying a dropped connection. The run outlives the request and the browser tab; poll GET …/scans/{id}. Answers 202 with the run. 404 when a host isn't visible.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Start a background scan",
+                "parameters": [
+                    {
+                        "description": "Hosts",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.scanRunRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/models.OSUpdateRun"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/scans/{id}": {
+            "get": {
+                "description": "Editor+. The run with every host's result: status, reason, OS, and as output a JSON summary of what the scan recorded. 404 unless the caller started it or is an admin.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Get a background scan",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Run ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OSUpdateRun"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ssh/scans/{id}/cancel": {
+            "post": {
+                "description": "Editor+. Hosts not started yet are skipped; hosts being scanned finish. Returns the run. 404 unless the caller started it or is an admin.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ssh"
+                ],
+                "summary": "Cancel a background scan",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Run ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.OSUpdateRun"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/httpx.ErrorResponse"
                         }
@@ -24841,6 +25089,25 @@ const docTemplate = `{
                 }
             }
         },
+        "api.scanRunRequest": {
+            "type": "object",
+            "properties": {
+                "concurrency": {
+                    "description": "1–10, default 10",
+                    "type": "integer"
+                },
+                "host_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "method": {
+                    "description": "\"password\" or \"key\" for every host; empty = each host's own.",
+                    "type": "string"
+                }
+            }
+        },
         "api.secretConsolidationApplyRequest": {
             "type": "object",
             "properties": {
@@ -25209,6 +25476,23 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/vault.BundleWikiItem"
                     }
+                }
+            }
+        },
+        "api.sharedHostKey": {
+            "type": "object",
+            "properties": {
+                "fingerprint": {
+                    "type": "string"
+                },
+                "hosts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/store.SSHHostKeyHolder"
+                    }
+                },
+                "key_type": {
+                    "type": "string"
                 }
             }
         },
@@ -28235,6 +28519,10 @@ const docTemplate = `{
         "models.OSUpdateRun": {
             "type": "object",
             "properties": {
+                "auth_method": {
+                    "description": "Scans: the SSH method to use, \"\" = each host's own.",
+                    "type": "string"
+                },
                 "backup": {
                     "description": "back each host up to MinIO first",
                     "type": "boolean"
@@ -30713,6 +31001,20 @@ const docTemplate = `{
                 },
                 "b_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "store.SSHHostKeyHolder": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "oficial_slug": {
+                    "type": "string"
                 }
             }
         },

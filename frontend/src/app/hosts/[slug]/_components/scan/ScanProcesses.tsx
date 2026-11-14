@@ -5,7 +5,7 @@ import SectionCard from "@/components/ui/SectionCard";
 import Badge from "@/components/ui/Badge";
 import { parseServiceRow } from "@/lib/utils";
 import type { VMInfoType } from "@/lib/api";
-import { Rows, Row, Detail, type T } from "./shared";
+import { Rows, Row, Detail, SecretText, type T } from "./shared";
 
 type NormalizedProcess = {
   key: string;
@@ -28,7 +28,7 @@ type NormalizedProcess = {
  * app processes first, OS ones dimmed at the end; a row expands to how it
  * was started, its ports, cwd and venv. Accepts all three scan formats.
  */
-export default function ScanProcesses({ info, t }: { info: VMInfoType; t: T }) {
+export default function ScanProcesses({ info, t, hostSlug }: { info: VMInfoType; t: T; hostSlug: string }) {
   const processes = useMemo((): NormalizedProcess[] => {
     if (info.process_details?.length) {
       const list = info.process_details.map((p): NormalizedProcess => ({
@@ -78,7 +78,7 @@ export default function ScanProcesses({ info, t }: { info: VMInfoType; t: T }) {
                   <span className="text-sm shrink-0 w-5 text-center" title={p.type}>{p.icon}</span>
                   <span className="w-24 shrink-0 font-medium text-[var(--text-primary)] truncate">{p.type}</span>
                   {p.isSystem && <Badge>{t("vm.os")}</Badge>}
-                  <span className="flex-1 min-w-0 truncate font-mono text-[var(--text-muted)]" title={p.command}>{p.command}</span>
+                  <span className="flex-1 min-w-0 truncate font-mono text-[var(--text-muted)]" title={p.command}><SecretText text={p.command} hostSlug={hostSlug} /></span>
                   {p.user && <span className="hidden sm:inline shrink-0 font-mono text-[var(--text-secondary)]">{p.user}</span>}
                   <span className="shrink-0 font-mono tabular-nums text-[var(--text-secondary)]" title={t("vm.cpuMemLabel")}>{p.cpu} / {p.mem}</span>
                   {p.pid && <span className="hidden md:inline shrink-0 w-16 text-right font-mono text-[var(--text-faint)]">{p.pid}</span>}
@@ -87,7 +87,7 @@ export default function ScanProcesses({ info, t }: { info: VMInfoType; t: T }) {
             >
               {details && (
                 <>
-                  <p className="font-mono text-[var(--text-secondary)] break-all">{p.command}</p>
+                  <p className="font-mono text-[var(--text-secondary)] break-all"><SecretText text={p.command} hostSlug={hostSlug} /></p>
                   {p.startedVia && (
                     <Detail label={t("scan.startedVia")} mono={false}>
                       <span className={p.startedVia === "manual" ? "text-[var(--warning)]" : p.startedVia === "systemd" ? "text-[var(--success)]" : ""}>{p.startedVia}</span>

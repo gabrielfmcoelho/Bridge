@@ -643,16 +643,23 @@ func parseContainerCgroups(s string) map[int]string {
 		if err != nil || pid <= 0 {
 			continue
 		}
-		if m := containerCgroupRe.FindStringSubmatch(cgroup); m != nil {
-			out[pid] = m[1]
-			continue
-		}
-		for _, marker := range containerCgroupMarkers {
-			if strings.Contains(cgroup, marker) {
-				out[pid] = ""
-				break
-			}
+		if id, ok := cgroupContainer(cgroup); ok {
+			out[pid] = id
 		}
 	}
 	return out
+}
+
+// cgroupContainer reports whether a /proc/<pid>/cgroup line puts the process
+// in a container, and the container's ID when the path carries one.
+func cgroupContainer(cgroup string) (string, bool) {
+	if m := containerCgroupRe.FindStringSubmatch(cgroup); m != nil {
+		return m[1], true
+	}
+	for _, marker := range containerCgroupMarkers {
+		if strings.Contains(cgroup, marker) {
+			return "", true
+		}
+	}
+	return "", false
 }

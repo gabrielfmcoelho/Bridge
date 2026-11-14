@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useFlag } from "@/contexts/FlagContext";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import StatusAlert from "@/components/ui/StatusAlert";
-import { sshAPI, type VMInfoType, type WebDNSSummary } from "@/lib/api";
+import { scanAPI, type VMInfoType, type WebDNSSummary } from "@/lib/api";
+import { useScanRun } from "@/hooks/useScanRun";
 import { getTimeAgo, resolveAuthMethod } from "@/lib/utils";
 import type { Host } from "@/lib/types";
 import VMInfoDisplay, { SCAN_GROUPS, type ScanGroup } from "./VMInfoDisplay";
@@ -32,17 +33,41 @@ export default function ScanPane({ slug, host, lastScan, canEdit, dnsRecords }: 
   const queryClient = useQueryClient();
   const method = resolveAuthMethod(host.has_password, host.has_key, host.preferred_auth);
 
+  // The scan is a one-host background run: it goes on if the page closes,
+  // and a reopened page follows the run still scanning this host.
+  const [startedId, setStartedId] = useState<number | null>(null);
+  const active = useQuery({
+    queryKey: ["scan-runs", "active", host.id],
+    queryFn: () => scanAPI.list({ active: true, hostId: host.id }),
+    enabled: canEdit,
+  });
+  const run = useScanRun(startedId ?? active.data?.[0]?.id ?? null).data;
+  const mine = run?.results?.find((x) => x.host_id === host.id);
+  const busy = mine?.status === "pending" || mine?.status === "running";
   const scan = useMutation({
-    mutationFn: () => sshAPI.testConnection(slug, method!, true),
+    mutationFn: () => scanAPI.start({ host_ids: [host.id], concurrency: 1, method: method! }),
     onMutate: () => flag({ appearance: "info", title: t("scan.pane.running") }),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["host", slug] });
-      flag(res.success
-        ? { appearance: "success", title: t("scan.pane.done"), description: webDNSLine(res.web_dns, t) }
-        : { appearance: "error", title: t("scan.pane.failed"), description: res.error });
+    onSuccess: (r) => {
+      queryClient.setQueryData(["scan-run", r.id], r);
+      setStartedId(r.id);
     },
     onError: (err: Error) => flag({ appearance: "error", title: t("scan.pane.failed"), description: err.message }),
   });
+  // Once this host's result lands — for a run this page saw scanning it.
+  const watching = useRef<number | null>(null);
+  useEffect(() => {
+    if (!mine) return;
+    if (busy) {
+      watching.current = mine.run_id;
+      return;
+    }
+    if (watching.current !== mine.run_id) return;
+    watching.current = null;
+    queryClient.invalidateQueries({ queryKey: ["host", slug] });
+    flag(mine.status === "success"
+      ? { appearance: "success", title: t("scan.pane.done"), description: webDNSLine(scanSummary(mine.output)?.web_dns, t) }
+      : { appearance: mine.status === "failed" ? "error" : "warning", title: t("scan.pane.failed"), description: mine.reason });
+  }, [mine, busy, slug, queryClient, flag, t]);
 
   const parsed = ((): { info?: VMInfoType; error?: boolean } => {
     if (!lastScan?.data) return {};
@@ -58,7 +83,7 @@ export default function ScanPane({ slug, host, lastScan, canEdit, dnsRecords }: 
       size="sm"
       variant="secondary"
       onClick={() => scan.mutate()}
-      loading={scan.isPending}
+      loading={scan.isPending || busy}
       disabled={!method}
       title={!method ? t("scan.pane.noCredentials") : undefined}
     >
@@ -87,7 +112,7 @@ export default function ScanPane({ slug, host, lastScan, canEdit, dnsRecords }: 
       ) : (
         <>
           <JumpBar t={t} />
-          <VMInfoDisplay info={parsed.info} locale={locale} anchorPrefix={ANCHOR} dnsRecords={dnsRecords} />
+          <VMInfoDisplay info={parsed.info} locale={locale} anchorPrefix={ANCHOR} dnsRecords={dnsRecords} hostSlug={slug} />
         </>
       )}
     </section>
@@ -152,6 +177,15 @@ function JumpBar({ t }: { t: (k: string) => string }) {
       </div>
     </nav>
   );
+}
+
+/** A background scan's output: what it recorded (recordScan's summary). */
+function scanSummary(output?: string): { web_dns?: WebDNSSummary } | undefined {
+  try {
+    return output ? JSON.parse(output) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** "DNS: 2 created, 3 linked, 1 not resolving" after a scan, or nothing. */

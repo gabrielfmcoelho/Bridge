@@ -648,6 +648,22 @@
     "idleHint": "Uma VM ociosa não tem serviços de aplicação implantados pelo usuário e nenhum container Docker. Passe o mouse sobre a chip de cada card para ver as regras."
   },
   "host": {
+    "secrets": {
+      "tab": "Segredos",
+      "title": "Segredos encontrados no scan",
+      "hint": "Valores achados nas linhas de comando deste host. O scan guarda só uma referência; o valor fica no cofre.",
+      "empty": "Nenhum segredo encontrado no scan deste host.",
+      "inScan": "No último scan",
+      "gone": "Não visto mais",
+      "updated": "Alterado {when}",
+      "reveal": "Revelar",
+      "hide": "Ocultar",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "loadError": "Não foi possível carregar os segredos",
+      "revealError": "Não foi possível revelar o segredo",
+      "chip": "Segredo guardado no cofre"
+    },
     "maintenance": {
       "tab": "Manutenção",
       "system": "Sistema",
@@ -965,6 +981,10 @@
     "scanProgress": "Escaneando...",
     "scanning": "Escaneando...",
     "scanSkipped": "Ignorado",
+    "scanServerNote": "Roda no servidor: você pode fechar esta página e voltar para acompanhar ou parar.",
+    "scanRunningAction": "Escaneando {done}/{total}",
+    "scanCountOk": "{n} com sucesso",
+    "scanCountFailed": "{n} com falha",
     "startScan": "Iniciar Scan",
     "rescan": "Re-escanear",
     "stopScan": "Parar",
@@ -1020,6 +1040,16 @@
     "sshConfigWithKey": "Com Chave",
     "sshConfigWithoutKey": "Sem Chave",
     "sshConfigHint": "Cole este bloco no seu arquivo ~/.ssh/config para acessar rapidamente via: ssh {slug}",
+    "hostKey": {
+      "title": "Chave do host",
+      "reset": "Redefinir",
+      "resetTitle": "Redefinir a chave fixada do host?",
+      "resetMessage": "Faça isso só quando souber por que a chave mudou (VM reinstalada, chaves regeneradas). A próxima conexão bem-sucedida fixa a chave que o host mostrar então.",
+      "resetDone": "Chave do host redefinida: a próxima conexão a fixa de novo",
+      "resetFailed": "Não foi possível redefinir a chave do host",
+      "pinnedAt": "Fixada em {date}. O Bridge recusa este host se ele mostrar outra chave.",
+      "unpinned": "Ainda não fixada: a próxima conexão bem-sucedida fixa a chave que o host mostrar."
+    },
     "noAlerts": "Sem alertas",
     "noAlertsDesc": "Este host não possui alertas ativos.",
     "links": "Vínculos",
@@ -2464,6 +2494,10 @@
       "attachGroupHint": "Todos os repositórios deste grupo e dos subgrupos — atuais e futuros — passam a ser do que você escolher."
     },
     "sshOps": {
+      "sharedKeys": {
+        "title": "Chaves de host SSH repetidas em vários hosts ({count})",
+        "hint": "Estas VMs foram clonadas de um mesmo template e podem se passar umas pelas outras. Em cada uma, regenere as chaves do host (apague /etc/ssh/ssh_host_* e rode ssh-keygen -A) e depois redefina a chave fixada na configuração SSH do host."
+      },
       "title": "Operações SSH",
       "intro": "Scripts de shell que quem edita hosts pode executar pela aba Operações de um host. Escreva {{nome}} onde um valor deve ser pedido na execução.",
       "name": "Nome",
@@ -2599,6 +2633,7 @@
     "createRemoteUserNoEligibleKeys": "Nenhuma chave SSH com chave pública armazenada. Adicione ou gere uma em Chaves SSH primeiro.",
     "createRemoteUserNoPubKey": "A chave selecionada não tem chave pública — escolha outra.",
     "deleteRemoteUser": "Excluir Usuário Remoto",
+    "hostKeyReset": "Chave do host redefinida",
     "deleteRemoteUserDesc": "Remove um usuário não-sistema do host remoto, encerra seus processos em execução e limpa o drop-in NOPASSWD do sudoers.",
     "deleteRemoteUserFormDesc": "Informe o nome do usuário a excluir. Root e outras contas de sistema (UID < 1000) estão bloqueadas. O usuário de login SSH atual também é protegido.",
     "deleteRemoteUserPlaceholder": "Usuário a excluir",
@@ -2719,6 +2754,7 @@
       "nextRun": "Próxima execução",
       "lastRun": "Última execução",
       "disabled": "desabilitado",
+      "missingBinary": "binário não encontrado",
       "timerUnit": "Unidade timer",
       "jobSingular": "tarefa",
       "jobPlural": "tarefas"
@@ -2763,6 +2799,7 @@
       "enabledAtBoot": "boot",
       "enabledAtBootTooltip": "Serviço habilitado para iniciar automaticamente no boot",
       "portsTooltip": "Portas TCP em escuta atribuídas a este serviço",
+      "apps": "Aplicações",
       "hostInstance": "no host",
       "hostInstanceTooltip": "Executando no próprio host, fora de qualquer contêiner. Uma linha com este selo e também um selo de imagem tem uma instância nativa e outra em contêiner.",
       "kind": {
@@ -2881,6 +2918,7 @@
       "unlinked": "Não vinculado: não resolve no DNS, o registro está na lixeira ou o servidor está parado",
       "ignored": "Não é um nome DNS (servidor padrão, localhost, IP, curinga ou regex)",
       "proxy": "Encaminha para",
+      "locations": "Rotas",
       "root": "Raiz dos arquivos",
       "source": "Arquivo",
       "usedBy": "Usado por",

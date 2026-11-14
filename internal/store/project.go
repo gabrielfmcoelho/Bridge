@@ -211,22 +211,10 @@ func (r *ProjectRepo) Count(ctx context.Context) (int, error) {
 	return n, err
 }
 
-// SetProjectsForHost replaces all project links for a host (one tx).
+// SetProjectsForHost replaces a host's project links among the projects the
+// caller can see (one tx); the others are kept.
 func (r *ProjectRepo) SetProjectsForHost(ctx context.Context, hostID int64, projectIDs []int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM project_host_links WHERE host_id = ?`, hostID); err != nil {
-		return err
-	}
-	for _, pid := range projectIDs {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO project_host_links (project_id, host_id) VALUES (?, ?)`, pid, hostID); err != nil {
-			return err
-		}
-	}
-	return tx.Commit()
+	return replaceVisibleLinks(ctx, r.db, `project_host_links`, `host_id`, hostID, `project_id`, `projects`, AssetProject, projectIDs)
 }
 
 // ProjectsByHost returns projects directly linked to a host, fully populated.
@@ -251,22 +239,16 @@ func (r *ProjectRepo) ProjectsByHost(ctx context.Context, hostID int64) ([]model
 	return projects, rows.Err()
 }
 
-// HostIDs returns host ids directly linked to a project.
+// HostIDs returns the live hosts directly linked to a project that the caller
+// can see.
 func (r *ProjectRepo) HostIDs(ctx context.Context, projectID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT host_id FROM project_host_links WHERE project_id = ?`, projectID)
-	if err != nil {
-		return nil, err
-	}
-	return scanInt64s(rows)
+	return visibleLinkIDs(ctx, r.db, `project_host_links`, `project_id`, projectID, `host_id`, `hosts`, AssetHost)
 }
 
-// DirectDNSIDs returns DNS ids linked directly to a project (not via services).
+// DirectDNSIDs returns the live DNS records linked directly to a project (not
+// via services) that the caller can see.
 func (r *ProjectRepo) DirectDNSIDs(ctx context.Context, projectID int64) ([]int64, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT l.dns_id FROM project_dns_links l JOIN dns_records d ON d.id = l.dns_id AND d.deleted_at IS NULL WHERE l.project_id = ?`, projectID)
-	if err != nil {
-		return nil, err
-	}
-	return scanInt64s(rows)
+	return visibleLinkIDs(ctx, r.db, `project_dns_links`, `project_id`, projectID, `dns_id`, `dns_records`, AssetDNS)
 }
 
 // ListTrash returns soft-deleted projects (deleted_at set).
@@ -354,39 +336,57 @@ func (r *ProjectRepo) Counts(ctx context.Context) (ProjectCounts, error) {
 // (project_host_links); hosts reached through the project's services are
 // separate and unaffected.
 func (r *ProjectRepo) SetDirectHosts(ctx context.Context, projectID int64, hostIDs []int64) error {
-	return r.replaceVisibleLinks(ctx, `project_host_links`, `host_id`, `hosts`, AssetHost, projectID, hostIDs)
+	return replaceVisibleLinks(ctx, r.db, `project_host_links`, `project_id`, projectID, `host_id`, `hosts`, AssetHost, hostIDs)
 }
 
 // SetDirectDNS replaces the DNS records linked straight to a project
 // (project_dns_links).
 func (r *ProjectRepo) SetDirectDNS(ctx context.Context, projectID int64, dnsIDs []int64) error {
-	return r.replaceVisibleLinks(ctx, `project_dns_links`, `dns_id`, `dns_records`, AssetDNS, projectID, dnsIDs)
+	return replaceVisibleLinks(ctx, r.db, `project_dns_links`, `project_id`, projectID, `dns_id`, `dns_records`, AssetDNS, dnsIDs)
 }
 
-func (r *ProjectRepo) replaceVisibleLinks(ctx context.Context, table, col, assetTable string, asset AssetType, projectID int64, ids []int64) error {
+// replaceVisibleLinks makes ids the assets linked to keyID in table, but only
+// among assets the caller can see: invisible links are kept, never added.
+func replaceVisibleLinks(ctx context.Context, db *sql.DB, table, keyCol string, keyID int64, col, assetTable string, asset AssetType, ids []int64) error {
 	if ids == nil {
 		ids = []int64{}
 	}
-	vis, vargs := VisibleExpr(ctx, asset, assetTable+".id")
-	// Live assets only: links to trashed ones are kept for their restore.
-	vis = assetTable + ".deleted_at IS NULL AND " + vis
-	visible := `SELECT id FROM ` + assetTable + ` WHERE ` + vis
-	tx, err := r.db.BeginTx(ctx, nil)
+	visible, vargs := liveVisibleIDs(ctx, assetTable, asset)
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx,
-		`DELETE FROM `+table+` WHERE project_id = ? AND `+col+` IN (`+visible+`) AND NOT (`+col+` = ANY(?))`,
-		append(append([]any{projectID}, vargs...), ids)...); err != nil {
+		`DELETE FROM `+table+` WHERE `+keyCol+` = ? AND `+col+` IN (`+visible+`) AND NOT (`+col+` = ANY(?))`,
+		append(append([]any{keyID}, vargs...), ids)...); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO `+table+` (project_id, `+col+`) SELECT ?, id FROM `+assetTable+` WHERE id = ANY(?) AND `+vis+` ON CONFLICT DO NOTHING`,
-		append([]any{projectID, ids}, vargs...)...); err != nil {
+		`INSERT INTO `+table+` (`+keyCol+`, `+col+`) SELECT ?, id FROM (`+visible+`) v WHERE id = ANY(?) ON CONFLICT DO NOTHING`,
+		append(append([]any{keyID}, vargs...), ids)...); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// visibleLinkIDs reads col from table where keyCol = keyID, keeping only the
+// assets replaceVisibleLinks manages: live and visible to the caller.
+func visibleLinkIDs(ctx context.Context, db *sql.DB, table, keyCol string, keyID int64, col, assetTable string, asset AssetType) ([]int64, error) {
+	visible, vargs := liveVisibleIDs(ctx, assetTable, asset)
+	rows, err := db.QueryContext(ctx, `SELECT `+col+` FROM `+table+` WHERE `+keyCol+` = ? AND `+col+` IN (`+visible+`) ORDER BY `+col,
+		append([]any{keyID}, vargs...)...)
+	if err != nil {
+		return nil, err
+	}
+	return scanInt64s(rows)
+}
+
+// liveVisibleIDs is a subquery of the ids of assetTable the caller can see.
+// Live assets only: links to trashed ones are kept for their restore.
+func liveVisibleIDs(ctx context.Context, assetTable string, asset AssetType) (string, []any) {
+	vis, vargs := VisibleExpr(ctx, asset, assetTable+".id")
+	return `SELECT id FROM ` + assetTable + ` WHERE ` + assetTable + `.deleted_at IS NULL AND ` + vis, vargs
 }
 
 // SetServices makes serviceIDs the project's services (services.project_id):

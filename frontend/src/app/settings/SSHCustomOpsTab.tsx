@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { sshCustomOpsAPI } from "@/lib/api";
+import Link from "next/link";
+import { sshAPI, sshCustomOpsAPI } from "@/lib/api";
 import { scriptParams } from "@/lib/sshCustomOps";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
@@ -58,6 +59,7 @@ export default function SSHCustomOpsTab() {
 
   return (
     <div className="space-y-4">
+      <SharedHostKeysAlert />
       <SectionCard as="h3" title={t("settings.sshOps.title")} description={t("settings.sshOps.intro")} controls={ops.length > 0 ? addButton : undefined}>
         <FormError message={deleteError} />
         {isLoading ? (
@@ -97,6 +99,30 @@ export default function SSHCustomOpsTab() {
 
       {editing && <SSHCustomOpForm op={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
     </div>
+  );
+}
+
+// Hosts that pinned the same SSH host key: clones of one VM template, which
+// can answer for each other. Regenerating the keys on each clone fixes it.
+function SharedHostKeysAlert() {
+  const { t } = useLocale();
+  const { data: shared = [] } = useQuery({ queryKey: ["ssh-host-keys-shared"], queryFn: sshAPI.sharedHostKeys });
+  if (shared.length === 0) return null;
+  return (
+    <StatusAlert variant="warning">
+      <p className="font-medium">{t("settings.sshOps.sharedKeys.title", { count: String(shared.length) })}</p>
+      <p className="text-xs mt-1 text-[var(--text-secondary)]">{t("settings.sshOps.sharedKeys.hint")}</p>
+      <ul className="mt-2 space-y-1">
+        {shared.map((k) => (
+          <li key={k.fingerprint} className="text-xs">
+            <span className="font-mono">{k.key_type} {k.fingerprint}</span>{": "}
+            {k.hosts.map((h, i) => (
+              <span key={h.id}>{i > 0 && ", "}<Link href={`/hosts/${h.oficial_slug}`} className="underline hover:no-underline">{h.nickname}</Link></span>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </StatusAlert>
   );
 }
 

@@ -121,20 +121,27 @@ func (s *ProjectService) List(ctx context.Context, f models.ProjectFilter) ([]Pr
 	}
 	svcHosts, svcDNS := store.ByFrom(links.ServiceHost), store.ByFrom(links.ServiceDNS)
 	directHosts, directDNS := store.ByFrom(links.ProjectHost), store.ByFrom(links.ProjectDNS)
+	// A project shared across entidades holds the other side's services and
+	// links its assets: they must not reach this caller, not even as a count.
+	vis, err := store.VisibleSets(ctx, s.db, store.AssetHost, store.AssetDNS, store.AssetService)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]ProjectListItem, len(projects))
 	for i, p := range projects {
 		hosts, dns := map[int64]struct{}{}, map[int64]struct{}{}
-		for _, h := range directHosts[p.ID] {
+		for _, h := range store.KeepVisible(directHosts[p.ID], vis[0]) {
 			hosts[h] = struct{}{}
 		}
-		for _, d := range directDNS[p.ID] {
+		for _, d := range store.KeepVisible(directDNS[p.ID], vis[1]) {
 			dns[d] = struct{}{}
 		}
-		for _, sid := range counts.ServiceIDs[p.ID] {
-			for _, h := range svcHosts[sid] {
+		svcIDs := store.KeepVisible(counts.ServiceIDs[p.ID], vis[2])
+		for _, sid := range svcIDs {
+			for _, h := range store.KeepVisible(svcHosts[sid], vis[0]) {
 				hosts[h] = struct{}{}
 			}
-			for _, d := range svcDNS[sid] {
+			for _, d := range store.KeepVisible(svcDNS[sid], vis[1]) {
 				dns[d] = struct{}{}
 			}
 		}
@@ -143,7 +150,7 @@ func (s *ProjectService) List(ctx context.Context, f models.ProjectFilter) ([]Pr
 			Tags:                tagMap[p.ID],
 			MainResponsavelName: mainNames[p.ID],
 			MainEntidade:        entidades[p.ID],
-			ServicesCount:       len(counts.ServiceIDs[p.ID]),
+			ServicesCount:       len(svcIDs),
 			HostsCount:          len(hosts),
 			DNSCount:            len(dns),
 			IssuesCount:         counts.OpenIssues[p.ID],
@@ -185,9 +192,14 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 	if err != nil {
 		return nil, err
 	}
+	vis, err := store.VisibleSets(ctx, s.db, store.AssetHost, store.AssetDNS)
+	if err != nil {
+		return nil, err
+	}
 	svcHosts, svcDNS := store.ByFrom(links.ServiceHost), store.ByFrom(links.ServiceDNS)
 	hostSet, dnsSet := map[int64]struct{}{}, map[int64]struct{}{}
-	directHosts, directDNS := store.ByFrom(links.ProjectHost)[id], store.ByFrom(links.ProjectDNS)[id]
+	directHosts := store.KeepVisible(store.ByFrom(links.ProjectHost)[id], vis[0])
+	directDNS := store.KeepVisible(store.ByFrom(links.ProjectDNS)[id], vis[1])
 	for _, h := range directHosts {
 		hostSet[h] = struct{}{}
 	}
@@ -195,10 +207,10 @@ func (s *ProjectService) Get(ctx context.Context, id int64) (*ProjectDetail, err
 		dnsSet[d] = struct{}{}
 	}
 	for _, svc := range services {
-		for _, h := range svcHosts[svc.ID] {
+		for _, h := range store.KeepVisible(svcHosts[svc.ID], vis[0]) {
 			hostSet[h] = struct{}{}
 		}
-		for _, d := range svcDNS[svc.ID] {
+		for _, d := range store.KeepVisible(svcDNS[svc.ID], vis[1]) {
 			dnsSet[d] = struct{}{}
 		}
 	}
