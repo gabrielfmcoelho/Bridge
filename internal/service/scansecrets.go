@@ -389,17 +389,57 @@ func recordCredentialSources(ctx context.Context, db *database.DB, hostID, actor
 		return 0, nil // the probe didn't run → CredentialSources stays nil ("didn't run")
 	}
 	sources := make([]sshtest.CredentialSource, 0, len(info.CredHits))
+	var errs []error
+	n := 0
 	for _, hit := range info.CredHits {
-		// First commit: sources and field names only. The second commit stores
-		// each value in the vault and fills the token.
-		sources = append(sources, sshtest.CredentialSource{
+		cs := sshtest.CredentialSource{
 			Detector: hit.Detector, Path: hit.Path, Locator: hit.Locator,
 			Kind: hit.Kind, Admin: hit.Admin, Fields: hit.Fields,
-		})
+		}
+		if hit.Secret != "" { // "" = an indirect reference: recorded, nothing stored
+			group := scanCredGroup(hit)
+			name := EnvVarName(hit.Locator)
+			desc := hit.Detector + " · " + hit.Path
+			switch sid, err := vault.UpsertScanSecret(ctx, db, hostID, actorUserID, scanCredType(hit.Kind), group, name, hit.Secret, desc); {
+			case err == nil:
+				cs.Token, n = fmt.Sprintf("{{secret:%d}}", sid), n+1
+			case !errors.Is(err, vault.ErrScanSecretTrashed):
+				errs = append(errs, err)
+			}
+		}
+		sources = append(sources, cs)
 	}
+	// Drop every plaintext payload from memory now the values are in the vault.
 	info.CredHits = nil
 	info.CredentialSources = sources
-	return 0, nil
+	return n, errs
+}
+
+// scanCredGroup is the group_label a config-file credential belongs to:
+// scan-<detector>-<site>, or scan-admin-<detector>-<site> for the admin tier
+// (DB-admin logins, superuser app logins, root keys).
+func scanCredGroup(hit sshtest.CredHit) string {
+	prefix := vault.ScanSecretGroupPrefix
+	if hit.Admin {
+		prefix = vault.ScanSecretAdminGroupPrefix
+	}
+	return prefix + scanKebab(hit.Detector) + "-" + hit.Site
+}
+
+// scanCredType maps a detector's kind to the vault secret type.
+func scanCredType(kind string) models.SecretType {
+	switch kind {
+	case "cred":
+		return models.SecretTypeCred
+	case "sshkey":
+		return models.SecretTypeSSHKey
+	default:
+		return models.SecretTypeEnvVar
+	}
+}
+
+func scanKebab(s string) string {
+	return strings.Trim(nonAlnumRe.ReplaceAllString(strings.ToLower(s), "-"), "-")
 }
 
 // scanSecretsError counts what the vault didn't take. Its text names no group
