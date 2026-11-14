@@ -2193,9 +2193,9 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	// probes it draws its paths from (web docroots, cron scripts, process cwds).
 	// service.RecordScanSecrets vaults the values and keeps only tokens + field
 	// names in the stored scan; CredHits (plaintext) never serializes.
-	credRoots, cronScripts, keyFiles := credProbeInputs(info)
+	credRoots, cronScripts, keyFiles, credJars := credProbeInputs(info)
 	credFiles := append(append([]string{}, cronScripts...), keyFiles...)
-	if cf, scanned := collectCredSources(client, sudoPassword, credRoots, credFiles); scanned {
+	if cf, scanned := collectCredSources(client, sudoPassword, credRoots, credFiles, credJars); scanned {
 		info.CredHits = detectCreds(cf, sliceSet(cronScripts), sliceSet(keyFiles))
 		info.CredSourcesScanned = true
 	}
