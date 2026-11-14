@@ -1855,6 +1855,15 @@ func (h *sshHandlers) recordScan(ctx context.Context, host *models.Host, vmInfo 
 	if depErr := service.RecordDependencies(ctx, h.db.SQL, host.ID, *vmInfo); depErr != nil {
 		result["dependencies_error"] = depErr.Error()
 	}
+	// Site services (C.3): each host web docroot becomes a "site" service,
+	// the natural app parent for captured DB logins / discovered databases.
+	// Before RecordWebDNS, which links each one to its DNS record. Never fails
+	// the scan.
+	if siteSum, siteErr := service.RecordSiteServices(ctx, h.db.SQL, host, *vmInfo); siteErr != nil {
+		result["site_services_error"] = siteErr.Error()
+	} else {
+		result["site_services"] = siteSum
+	}
 	// Web-server site names → DNS records linked to this host and to the
 	// services serving them (created when new and resolvable). After
 	// reconcile, so the services exist. Never fails the scan.

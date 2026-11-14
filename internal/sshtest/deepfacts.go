@@ -40,6 +40,9 @@ type DeepFacts struct {
 	Code     []CodeFingerprint `json:"code,omitempty"`
 	Owner    *OwnerClues       `json:"owner,omitempty"`
 	Firewall *Firewall         `json:"firewall,omitempty"`
+	// A11 mail/DNS role (deepfacts_roles.go): what a generic VM actually is —
+	// a mail (Postfix/Dovecot) or DNS (BIND) server. nil = neither.
+	Roles *HostRoles `json:"roles,omitempty"`
 }
 
 // OutboundFlows is where the VM pushes data off-box.
@@ -233,6 +236,12 @@ func collectDeepFacts(client *ssh.Client, sudoPassword string, cron *CronInfo, p
 		if code != nil {
 			df.Code = code.Docroots
 		}
+	}
+	if roles := collectHostRoles(client, sudoPassword); roles != nil {
+		if df == nil {
+			df = &DeepFacts{}
+		}
+		df.Roles = roles
 	}
 	return df
 }

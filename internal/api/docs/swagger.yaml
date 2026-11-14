@@ -4222,6 +4222,12 @@ definitions:
         type: string
       description:
         type: string
+      discovered:
+        description: |-
+          Discovered marks a row the scan created from the A5 DB-metadata probe
+          (service.RecordScanDatabases) rather than an operator — shown as a
+          "descoberto" badge. Operator edits don't clear it.
+        type: boolean
       engine:
         type: string
       entidades:
@@ -4269,6 +4275,14 @@ definitions:
         description: Responsaveis and Entidades are loaded on detail responses only.
         items:
           $ref: '#/definitions/models.Responsavel'
+        type: array
+      scan_logins:
+        description: |-
+          ScanLogins: config-file logins the scan found (Phase 1 credential_sources)
+          on this database's instance host that name this db. Loaded on detail only;
+          reveal stays on the host's Segredos tab — this is a pointer, not the secret.
+        items:
+          $ref: '#/definitions/models.ScanLoginRef'
         type: array
       sensitivity:
         description: 'LGPD: publico | interno | pessoal | sensivel'
@@ -5364,6 +5378,25 @@ definitions:
           type: string
         type: object
     type: object
+  models.ScanLoginRef:
+    properties:
+      db_name:
+        type: string
+      detector:
+        type: string
+      host_id:
+        type: integer
+      host_nickname:
+        type: string
+      host_slug:
+        type: string
+      locator:
+        type: string
+      path:
+        type: string
+      user:
+        type: string
+    type: object
   models.SecretAuditAction:
     enum:
     - create
@@ -6448,6 +6481,14 @@ definitions:
       responsaveis:
         items:
           $ref: '#/definitions/models.Responsavel'
+        type: array
+      scan_logins:
+        description: |-
+          ScanLogins: config-file logins the scan found on this service's host(s)
+          (Phase 1 credential_sources) — "login found on host X (scan)", linking to
+          that host's Segredos tab. Field names only; reveal stays host-scoped.
+        items:
+          $ref: '#/definitions/models.ScanLoginRef'
         type: array
       service:
         $ref: '#/definitions/models.Service'

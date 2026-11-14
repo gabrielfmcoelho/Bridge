@@ -2906,7 +2906,8 @@
         "panels": "Painéis de controle",
         "code": "Código e uploads",
         "owner": "Pistas de dono",
-        "firewall": "Firewall real"
+        "firewall": "Firewall real",
+        "roles": "Papel do servidor"
       },
       "empty": {
         "resources": "Sem dados de uso neste scan.",
@@ -2925,7 +2926,8 @@
         "panels": "Nenhum painel de controle no último scan.",
         "code": "Nenhum docroot web identificado no último scan.",
         "owner": "Nenhuma pista de dono no último scan.",
-        "firewall": "Nenhum dado de firewall no último scan."
+        "firewall": "Nenhum dado de firewall no último scan.",
+        "roles": "Nenhum papel de e-mail ou DNS no último scan."
       }
     },
     "deep": {
@@ -3008,6 +3010,23 @@
         "exposureAll": "todas as interfaces",
         "exposureOneIp": "um único IP",
         "exposureLoopback": "loopback"
+      },
+      "roles": {
+        "summary": "O que esta VM realmente é: um servidor de e-mail (Postfix/Dovecot) ou de DNS (BIND). Apenas nomes de domínio de configuração e contagens — nunca um endereço de destinatário, um IP de cliente ou um usuário de caixa postal.",
+        "mail": "Servidor de e-mail",
+        "dnsAuthoritative": "DNS autoritativo",
+        "dnsResolver": "Resolvedor DNS",
+        "daemons": "Serviços",
+        "destinations": "Aceita e-mail para",
+        "relayhost": "Host de relay",
+        "delivery": "Entregas",
+        "deliveryCounts": "{sent} enviados · {bounced} devolvidos · {deferred} adiados",
+        "logins": "Logins de caixa postal",
+        "loginCounts": "{imap} IMAP · {pop3} POP3",
+        "zones": "Zonas autoritativas",
+        "recursion": "Recursão",
+        "recursionOn": "ligada (resolvedor)",
+        "recursionOff": "desligada"
       }
     },
     "git": {
