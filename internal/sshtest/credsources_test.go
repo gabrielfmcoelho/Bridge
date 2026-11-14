@@ -39,8 +39,14 @@ func plant(t *testing.T, root, rel, content string) {
 
 func runCredProbe(t *testing.T, root string, roots, files []string) []credFile {
 	t.Helper()
-	bin := credFakeHost(t)
-	cmd := exec.Command(filepath.Join(bin, "sh"), "-c", credProbeScript(roots, files))
+	return runCredProbeJars(t, root, roots, files, nil, credFakeHost(t))
+}
+
+// runCredProbeJars runs the probe with an explicit fat-jar list and PATH dir, so
+// a fat-jar test can add unzip to the fake host.
+func runCredProbeJars(t *testing.T, root string, roots, files, jars []string, bin string) []credFile {
+	t.Helper()
+	cmd := exec.Command(filepath.Join(bin, "sh"), "-c", credProbeScript(roots, files, jars))
 	cmd.Env = []string{"PATH=" + bin, "BRIDGE_ROOT=" + root}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -133,7 +139,7 @@ func TestCredProbeTruncates(t *testing.T) {
 // Without a stored root password the probe doesn't run (it reads 0600 root
 // files): it returns scanned=false and touches no client.
 func TestCollectCredSourcesNeedsRoot(t *testing.T) {
-	if files, scanned := collectCredSources(nil, "", nil, nil); scanned || files != nil {
+	if files, scanned := collectCredSources(nil, "", nil, nil, nil); scanned || files != nil {
 		t.Fatalf("no password: scanned=%v files=%v, want false/nil", scanned, files)
 	}
 }

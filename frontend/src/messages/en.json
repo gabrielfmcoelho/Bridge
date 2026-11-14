@@ -683,7 +683,14 @@
         "virtualmin_domain": "Virtualmin domain",
         "postfix_sasl": "Postfix SASL relay",
         "cron_embedded": "Cron script",
-        "root_ssh_keys": "Root SSH key"
+        "root_ssh_keys": "Root SSH key",
+        "spring_props": "Spring Boot config",
+        "tomcat_resource": "Tomcat JDBC resource",
+        "tomcat_users": "Tomcat manager login",
+        "wildfly_ds": "WildFly datasource",
+        "weblogic_jdbc": "WebLogic JDBC",
+        "hibernate_jdbc_props": "Hibernate / JDBC config",
+        "oracle_tns": "Oracle tnsnames"
       }
     },
     "maintenance": {
