@@ -317,6 +317,7 @@ func captureServices(inv *hostInventory, containers []ContainerInfo, agentNames 
 		}
 		services = append(services, svc)
 	}
+	services = dedupeMySQLFamily(services)
 	sort.Slice(services, func(i, j int) bool {
 		if services[i].Kind != services[j].Kind {
 			return services[i].Kind < services[j].Kind
@@ -324,6 +325,36 @@ func captureServices(inv *hostInventory, containers []ContainerInfo, agentNames 
 		return services[i].Label < services[j].Label
 	})
 	return services
+}
+
+// dedupeMySQLFamily collapses the mysql + mariadb pair that both match on a
+// MariaDB host — MariaDB ships mysql.service / mysqld.service as aliases, so
+// the mysql spec fires too and the host shows two "database" rows for one
+// engine. Keeps mariadb when mariadbd is the live unit/binary (its HostRunning
+// is set only by an active mariadb unit, a mariadbd process or a host port),
+// else mysql. Only host instances are collapsed: a mysql container beside a
+// mariadb host daemon are different engines and both stay.
+func dedupeMySQLFamily(services []DiscoveredService) []DiscoveredService {
+	mysqlI, mariaI := -1, -1
+	for i, s := range services {
+		if s.ContainerID != "" {
+			continue
+		}
+		switch s.Name {
+		case "mysql":
+			mysqlI = i
+		case "mariadb":
+			mariaI = i
+		}
+	}
+	if mysqlI < 0 || mariaI < 0 {
+		return services
+	}
+	drop := mysqlI // mariadbd is the real engine: drop the alias-matched mysql row.
+	if !services[mariaI].HostRunning && services[mysqlI].HostRunning {
+		drop = mariaI // mariadb only installed/stopped while mysql is live.
+	}
+	return append(services[:drop], services[drop+1:]...)
 }
 
 // detectService is the per-spec detector. Mirrors detectAgent's structure

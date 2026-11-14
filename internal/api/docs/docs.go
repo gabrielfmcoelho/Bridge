@@ -27373,6 +27373,10 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "discovered": {
+                    "description": "Discovered marks a row the scan created from the A5 DB-metadata probe\n(service.RecordScanDatabases) rather than an operator — shown as a\n\"descoberto\" badge. Operator edits don't clear it.",
+                    "type": "boolean"
+                },
                 "engine": {
                     "type": "string"
                 },
@@ -27434,6 +27438,13 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.Responsavel"
+                    }
+                },
+                "scan_logins": {
+                    "description": "ScanLogins: config-file logins the scan found (Phase 1 credential_sources)\non this database's instance host that name this db. Loaded on detail only;\nreveal stays on the host's Segredos tab — this is a pointer, not the secret.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ScanLoginRef"
                     }
                 },
                 "sensitivity": {
@@ -29063,6 +29074,35 @@ const docTemplate = `{
                 }
             }
         },
+        "models.ScanLoginRef": {
+            "type": "object",
+            "properties": {
+                "db_name": {
+                    "type": "string"
+                },
+                "detector": {
+                    "type": "string"
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "host_nickname": {
+                    "type": "string"
+                },
+                "host_slug": {
+                    "type": "string"
+                },
+                "locator": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "user": {
+                    "type": "string"
+                }
+            }
+        },
         "models.SecretAuditAction": {
             "type": "string",
             "enum": [
@@ -30619,6 +30659,13 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.Responsavel"
+                    }
+                },
+                "scan_logins": {
+                    "description": "ScanLogins: config-file logins the scan found on this service's host(s)\n(Phase 1 credential_sources) — \"login found on host X (scan)\", linking to\nthat host's Segredos tab. Field names only; reveal stays host-scoped.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ScanLoginRef"
                     }
                 },
                 "service": {

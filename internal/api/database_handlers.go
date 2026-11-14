@@ -12,6 +12,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -195,6 +196,22 @@ func (h *databaseHandlers) attachDetail(ctx context.Context, d *models.Database)
 	d.Responsaveis = []models.Responsavel{}
 	if rs, err := store.NewResponsavelRepo(h.db.SQL).List(ctx, string(store.AssetDatabase), d.ID); err == nil && rs != nil {
 		d.Responsaveis = rs
+	}
+	// Config-file logins the scan found on this database's instance host that
+	// name this db ("login found on host X"). Reveal stays on the host tab.
+	hostIDs := map[int64]bool{}
+	if d.Instance != nil && d.Instance.HostID != nil {
+		hostIDs[*d.Instance.HostID] = true
+	}
+	if d.TunnelHostID != nil {
+		hostIDs[*d.TunnelHostID] = true
+	}
+	ids := make([]int64, 0, len(hostIDs))
+	for id := range hostIDs {
+		ids = append(ids, id)
+	}
+	if logins, err := service.ScanLoginsForHosts(ctx, h.db.SQL, ids, d.DBName); err == nil {
+		d.ScanLogins = logins
 	}
 }
 

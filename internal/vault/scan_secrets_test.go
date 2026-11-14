@@ -29,7 +29,7 @@ func TestUpsertScanSecretCreatesThenUpdates(t *testing.T) {
 		return n
 	}
 
-	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-opt-compras1", "CACHE_SERVER_PASSWORD", "abc123", scanDesc)
+	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-opt-compras1", "CACHE_SERVER_PASSWORD", "abc123", scanDesc)
 	if err != nil || id == 0 {
 		t.Fatalf("create: id=%d err=%v", id, err)
 	}
@@ -48,7 +48,7 @@ func TestUpsertScanSecretCreatesThenUpdates(t *testing.T) {
 	}
 
 	// The next scan finds the same value: same row, nothing written to the audit.
-	again, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-opt-compras1", "CACHE_SERVER_PASSWORD", "abc123", scanDesc)
+	again, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-opt-compras1", "CACHE_SERVER_PASSWORD", "abc123", scanDesc)
 	if err != nil || again != id {
 		t.Fatalf("same value: id=%d (want %d) err=%v", again, id, err)
 	}
@@ -57,7 +57,7 @@ func TestUpsertScanSecretCreatesThenUpdates(t *testing.T) {
 	}
 
 	// A changed value updates the payload in place, audited.
-	rotated, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-opt-compras1", "CACHE_SERVER_PASSWORD", "xyz789", scanDesc)
+	rotated, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-opt-compras1", "CACHE_SERVER_PASSWORD", "xyz789", scanDesc)
 	if err != nil || rotated != id {
 		t.Fatalf("new value: id=%d (want %d) err=%v", rotated, id, err)
 	}
@@ -76,7 +76,7 @@ func TestUpsertScanSecretCreatesThenUpdates(t *testing.T) {
 	}
 
 	// No actor (a backfill): the system actor owns the row.
-	sys, err := vault.UpsertScanSecret(ctx, d, hid, 0, "scan-cron-root", "PASSWORD_2", "p2", "")
+	sys, err := vault.UpsertScanSecret(ctx, d, hid, 0, models.SecretTypeEnvVar, "scan-cron-root", "PASSWORD_2", "p2", "")
 	if err != nil {
 		t.Fatalf("system actor: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestUpsertScanSecretRejectsBadNames(t *testing.T) {
 		{"opt-compras1", "CACHE_SERVER_PASSWORD", "v"},    // not a scan group: would be revealable by any viewer
 		{"scan-opt-compras1", "CACHE_SERVER_PASSWORD", ""},
 	} {
-		if _, err := vault.UpsertScanSecret(ctx, d, hid, uid, c.group, c.name, c.value, ""); err == nil {
+		if _, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, c.group, c.name, c.value, ""); err == nil {
 			t.Errorf("group %q name %q value %q: want error", c.group, c.name, c.value)
 		}
 	}
@@ -120,7 +120,7 @@ func TestRevealScanSecretNeedsPermission(t *testing.T) {
 	}
 	viewer, editor := actor("vic", "viewer"), actor("eddie", "editor")
 
-	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-opt-compras1", "CACHE_SERVER_PASSWORD", "abc123", scanDesc)
+	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-opt-compras1", "CACHE_SERVER_PASSWORD", "abc123", scanDesc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestRenameScanSecretGroupNeedsAdmin(t *testing.T) {
 	}
 	str := func(s string) *string { return &s }
 
-	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", "CACHE_SERVER_PASSWORD", "abc123", "")
+	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-x", "CACHE_SERVER_PASSWORD", "abc123", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,14 +221,14 @@ func TestUpsertScanSecretTrashedNotRecreated(t *testing.T) {
 	repo := vault.NewSecretRepo(d)
 	admin := vault.ActorContext{UserID: uid, Role: "admin"}
 
-	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", "TOKEN", "abc123", "")
+	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-x", "TOKEN", "abc123", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := repo.SoftDelete(ctx, admin, id); err != nil {
 		t.Fatal(err)
 	}
-	got, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", "TOKEN", "xyz789", "")
+	got, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-x", "TOKEN", "xyz789", "")
 	if !errors.Is(err, vault.ErrScanSecretTrashed) || got != 0 {
 		t.Fatalf("trashed identity: id=%d err=%v, want ErrScanSecretTrashed", got, err)
 	}
@@ -241,7 +241,7 @@ func TestUpsertScanSecretTrashedNotRecreated(t *testing.T) {
 	if err := repo.Restore(ctx, admin, id); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", "TOKEN", "xyz789", ""); err != nil || got != id {
+	if got, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-x", "TOKEN", "xyz789", ""); err != nil || got != id {
 		t.Fatalf("after restore: id=%d (want %d) err=%v", got, id, err)
 	}
 }
@@ -261,7 +261,7 @@ func TestUpsertScanSecretConcurrentFirstInsert(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				<-start
-				ids[g], errs[g] = vault.UpsertScanSecret(ctx, d, hid, uid, "scan-x", name, "abc123", "")
+				ids[g], errs[g] = vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-x", name, "abc123", "")
 			}()
 		}
 		close(start)
@@ -287,7 +287,7 @@ func TestScanSecretNames(t *testing.T) {
 	admin := vault.ActorContext{UserID: uid, Role: "admin"}
 	put := func(name, value string) int64 {
 		t.Helper()
-		id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-manage-py", name, value, "")
+		id, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-manage-py", name, value, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -299,7 +299,7 @@ func TestScanSecretNames(t *testing.T) {
 	put("PASSWORD_X", "x")    // not of the family
 	put("PASSWORD_2_3", "y")  // not of the family either
 	put("DB_PASSWORD", "two") // another family
-	if _, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-other", "PASSWORD", "one", ""); err != nil {
+	if _, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-other", "PASSWORD", "one", ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := repo.SoftDelete(ctx, admin, trashed); err != nil {
@@ -327,7 +327,7 @@ func TestBulkEnvVarsStampFingerprint(t *testing.T) {
 	repo := vault.NewSecretRepo(d)
 	admin := vault.ActorContext{UserID: uid, Role: "admin"}
 	desc := "--token · foo · /usr/local/bin/foo"
-	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-foo", "TOKEN", "abc123", desc)
+	id, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-foo", "TOKEN", "abc123", desc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func TestBulkEnvVarsStampFingerprint(t *testing.T) {
 		[]vault.EnvVarUpsert{{Name: "TOKEN", Value: "edited", Description: &desc}, {Name: "OTHER", Value: "v"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := vault.UpsertScanSecret(ctx, d, hid, uid, "scan-foo", "TOKEN", "abc123", desc); err != nil {
+	if _, err := vault.UpsertScanSecret(ctx, d, hid, uid, models.SecretTypeEnvVar, "scan-foo", "TOKEN", "abc123", desc); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := repo.Reveal(ctx, admin, id); err != nil || got != `{"value":"abc123"}` {

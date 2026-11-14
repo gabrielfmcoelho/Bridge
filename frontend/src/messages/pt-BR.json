@@ -421,6 +421,8 @@
       "credential": "Credencial",
       "hasCredential": "Credencial no cofre",
       "noCredential": "Sem credencial ainda",
+      "discovered": "Descoberto",
+      "scanLoginOnHost": "Login encontrado em {host} (scan)",
       "backupPolicy": "Política de backup",
       "backupPolicyHint": "Como e onde é feito o backup. Vazio em produção é sinalizado.",
       "backupPolicyPlaceholder": "pg_dump diário para o MinIO",
@@ -440,7 +442,8 @@
       "section": {
         "location": "Localização",
         "connection": "Conexão",
-        "classification": "Classificação"
+        "classification": "Classificação",
+        "scanLogins": "Logins encontrados em scans"
       },
       "instances": {
         "title": "Instâncias de banco",
@@ -662,7 +665,33 @@
       "copied": "Copiado",
       "loadError": "Não foi possível carregar os segredos",
       "revealError": "Não foi possível revelar o segredo",
-      "chip": "Segredo guardado no cofre"
+      "chip": "Segredo guardado no cofre",
+      "sectionCmd": "Linhas de comando",
+      "sectionConfig": "Arquivos de configuração",
+      "configHint": "Logins achados em arquivos de configuração deste host. O scan guarda só os nomes dos campos e uma referência ao cofre.",
+      "configEmpty": "Nenhuma credencial de arquivo de configuração no último scan.",
+      "noRoot": "A captura em arquivos de configuração precisa de root — uma senha SSH guardada.",
+      "adminOnly": "somente admin",
+      "indirect": "referência indireta",
+      "detector": {
+        "ci3_database": "Banco CodeIgniter 3",
+        "dotenv": "Arquivo .env",
+        "wp_config": "Config do WordPress",
+        "mysql_debian_cnf": "Admin MySQL (debian.cnf)",
+        "mysql_root_mycnf": "Admin MySQL (.my.cnf)",
+        "mysql_rpm_temp_root": "Senha root temporária do MySQL",
+        "virtualmin_domain": "Domínio Virtualmin",
+        "postfix_sasl": "Relay SASL do Postfix",
+        "cron_embedded": "Script de cron",
+        "root_ssh_keys": "Chave SSH root",
+        "spring_props": "Config do Spring Boot",
+        "tomcat_resource": "Resource JDBC do Tomcat",
+        "tomcat_users": "Login do gerenciador Tomcat",
+        "wildfly_ds": "Datasource do WildFly",
+        "weblogic_jdbc": "JDBC do WebLogic",
+        "hibernate_jdbc_props": "Config Hibernate / JDBC",
+        "oracle_tns": "tnsnames do Oracle"
+      }
     },
     "maintenance": {
       "tab": "Manutenção",
@@ -2870,7 +2899,15 @@
         "packages": "Pacotes e agendamentos",
         "security": "Segurança",
         "webservers": "Servidores web",
-        "git": "Repositórios git"
+        "git": "Repositórios git",
+        "outbound": "Fluxos de saída",
+        "patch": "Atualização de pacotes",
+        "traffic": "Tráfego dos sites",
+        "panels": "Painéis de controle",
+        "code": "Código e uploads",
+        "owner": "Pistas de dono",
+        "firewall": "Firewall real",
+        "roles": "Papel do servidor"
       },
       "empty": {
         "resources": "Sem dados de uso neste scan.",
@@ -2882,7 +2919,114 @@
         "packages": "Nenhum pacote ou agendamento encontrado no último scan.",
         "security": "Sem dados de firewall ou política SSH neste scan.",
         "webservers": "Nenhum nginx, Apache ou PHP-FPM encontrado.",
-        "git": "Nenhum checkout git encontrado."
+        "git": "Nenhum checkout git encontrado.",
+        "outbound": "Nenhum fluxo de saída encontrado no último scan.",
+        "patch": "Sem informações de atualização no último scan.",
+        "traffic": "Sem tráfego de access-log no último scan.",
+        "panels": "Nenhum painel de controle no último scan.",
+        "code": "Nenhum docroot web identificado no último scan.",
+        "owner": "Nenhuma pista de dono no último scan.",
+        "firewall": "Nenhum dado de firewall no último scan.",
+        "roles": "Nenhum papel de e-mail ou DNS no último scan."
+      }
+    },
+    "deep": {
+      "notRun": "Os fatos aprofundados só rodam em um scan em segundo plano, não no teste rápido de conexão.",
+      "out": {
+        "summary": "Para onde esta VM envia dados: destinos nos scripts que o cron executa (credenciais removidas no próprio host) e as conexões de saída estabelecidas.",
+        "scripts": "Transferências em scripts do cron",
+        "connections": "Conexões de saída",
+        "external": "externo"
+      },
+      "patch": {
+        "lastIndex": "Último índice atualizado",
+        "lastUpgrade": "Último upgrade",
+        "auto": "Atualizações automáticas",
+        "on": "ligadas",
+        "off": "desligadas",
+        "upgradable": "{count} atualizáveis",
+        "unknown": "desconhecido",
+        "stale": "Atualização aparenta estar quebrada",
+        "staleHelp": "As atualizações automáticas estão ligadas, mas o índice de pacotes não é atualizado há mais de duas semanas.",
+        "ok": "Índice de pacotes atualizado"
+      },
+      "traffic": {
+        "summary": "Por site, se alguém está usando — agregados de 30 dias do access-log e categorias recentes do error-log. Apenas contagens e o primeiro segmento do caminho: nenhum IP de cliente, query string ou User-Agent sai do host.",
+        "idle": "sem tráfego",
+        "requests": "{count} req",
+        "perDay": "~{count}/dia",
+        "status": "Status",
+        "who": "Visitantes",
+        "humanBot": "{human} navegador · {bot} bot/ferramenta",
+        "clients": "Clientes",
+        "pubPriv": "{pub} público · {priv} privado",
+        "paths": "Principais seções",
+        "errors": "Erros",
+        "lastSeen": "Última requisição",
+        "log": "Log de acesso",
+        "partial": "A janela pode estar curta: o log passou do limite de leitura ou tem rotações comprimidas."
+      },
+      "panels": {
+        "summary": "Virtualmin / Webmin: domínios hospedados, usuários do painel e tentativas de login malsucedidas — inclusive quando um domínio foi desativado, segundo os próprios registros do painel.",
+        "installed": "Instalado",
+        "domains": "Domínios",
+        "users": "Usuários do painel",
+        "disabled": "desativado",
+        "disabledAt": "Desativado em {date}",
+        "created": "Criado",
+        "owner": "Dono",
+        "contact": "Contato",
+        "letsencrypt": "Let's Encrypt",
+        "reason": "Motivo",
+        "failed": "Logins malsucedidos",
+        "failedPubPriv": "{public} de IPs públicos · {private} de privados"
+      },
+      "code": {
+        "summary": "O que roda sob cada docroot web — framework e versão, mudança de código mais recente e os diretórios de upload (tamanho, arquivos, mais recente).",
+        "root": "(docroot)",
+        "newest": "Código mais recente",
+        "uploads": "Uploads",
+        "files": "{count} arquivos",
+        "noApps": "Nenhum framework detectado"
+      },
+      "owner": {
+        "summary": "Pistas de quem é dono ou mantém esta VM, cada uma com sua origem. Nenhum endereço de cliente, material de chave SSH ou nome de arquivo sai do host.",
+        "lastLogins": "Últimos logins",
+        "gecos": "Nomes das contas",
+        "sudoers": "Sudo / wheel",
+        "authKeys": "Comentários de chaves SSH",
+        "ftp": "Uploads por FTP",
+        "ftpCount": "{count} uploads"
+      },
+      "firewall": {
+        "summary": "A postura real do firewall: ufw, firewalld/nft e iptables, jails do fail2ban, e quais portas sensíveis estão expostas — e com que alcance. Apenas contagens e classes, nunca um endereço de bind.",
+        "active": "ativo",
+        "inactive": "inativo",
+        "rules": "{count} regras",
+        "iptables": "iptables",
+        "fail2ban": "fail2ban",
+        "banned": "{count} banidos",
+        "adminPorts": "Portas administrativas expostas",
+        "exposureAll": "todas as interfaces",
+        "exposureOneIp": "um único IP",
+        "exposureLoopback": "loopback"
+      },
+      "roles": {
+        "summary": "O que esta VM realmente é: um servidor de e-mail (Postfix/Dovecot) ou de DNS (BIND). Apenas nomes de domínio de configuração e contagens — nunca um endereço de destinatário, um IP de cliente ou um usuário de caixa postal.",
+        "mail": "Servidor de e-mail",
+        "dnsAuthoritative": "DNS autoritativo",
+        "dnsResolver": "Resolvedor DNS",
+        "daemons": "Serviços",
+        "destinations": "Aceita e-mail para",
+        "relayhost": "Host de relay",
+        "delivery": "Entregas",
+        "deliveryCounts": "{sent} enviados · {bounced} devolvidos · {deferred} adiados",
+        "logins": "Logins de caixa postal",
+        "loginCounts": "{imap} IMAP · {pop3} POP3",
+        "zones": "Zonas autoritativas",
+        "recursion": "Recursão",
+        "recursionOn": "ligada (resolvedor)",
+        "recursionOff": "desligada"
       }
     },
     "git": {

@@ -77,6 +77,24 @@ export default function DatabaseProfile({ db, onEditResponsaveis }: { db: Databa
           </div>
         </div>
 
+        {(db.scan_logins ?? []).length > 0 && (
+          <div className={block}>
+            <SectionHeading as="h3" className="!mb-2">{t("atlas.databases.section.scanLogins")}</SectionHeading>
+            <ul className="space-y-1">
+              {db.scan_logins!.map((l, i) => (
+                <li key={i} className="text-sm">
+                  <Link href={`/hosts/${l.host_slug}?tab=secrets`} className="text-[var(--accent)] hover:underline">
+                    {t("atlas.databases.scanLoginOnHost", { host: l.host_nickname || l.host_slug })}
+                  </Link>
+                  <span className="ml-2 font-mono text-xs text-[var(--text-muted)]">
+                    {l.detector}{l.user ? ` · ${l.user}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className={block}>
           <SectionHeading as="h3" className="!mb-2">{t("topology.projects")}</SectionHeading>
           {(db.project_ids ?? []).length === 0 ? <p className="text-sm text-[var(--text-muted)]">–</p> : (

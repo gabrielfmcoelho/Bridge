@@ -81,12 +81,16 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 	}
 	byContainer := map[string]int64{}
 	byHostKind := map[string]int64{}
+	bySite := map[string]int64{} // C.3: (vhost name + docroot) → site service id
 	for _, s := range svcs {
 		if s.ContainerName != "" {
 			byContainer[s.ContainerName] = s.ID
 		}
 		if s.DiscoveryKind == "host" {
 			byHostKind[s.DiscoveryKey] = s.ID
+		}
+		if s.DiscoveryKind == "site" {
+			bySite[s.DiscoveryKey] = s.ID
 		}
 	}
 	portContainer := map[int]string{}
@@ -119,6 +123,17 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 			own, where = byContainer[ws.Container], "container "+ws.Container
 		}
 		for _, site := range ws.Sites {
+			if site.Disabled {
+				continue // Virtualmin-disabled vhost: serves disabled_by_virtualmin.html, not the app.
+			}
+			// C.3: the site service (if any) for this docroot — every DNS name
+			// this vhost serves links to it.
+			siteSvc := int64(0)
+			if site.Root != "" {
+				if name, ok := primarySiteName(site); ok {
+					siteSvc = bySite[store.SiteDiscoveryKey(name, site.Root)]
+				}
+			}
 			targets := pointsTo(site, ws.Container, hostAddrs, portContainer, containers)
 			remHosts, remSvcs, err := remote.resolve(ctx, remoteTargets(site, hostAddrs))
 			if err != nil {
@@ -138,6 +153,9 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 				w.tls = w.tls || site.TLS
 				if own != 0 {
 					w.services[own] = true
+				}
+				if siteSvc != 0 {
+					w.services[siteSvc] = true
 				}
 				for _, id := range remHosts {
 					w.hosts[id] = true

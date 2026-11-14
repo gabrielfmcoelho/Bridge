@@ -106,6 +106,29 @@ Main DocumentRoot: "/var/www/html"
 	}
 }
 
+// A vhost whose config file serves disabled_by_virtualmin.html is Disabled —
+// every vhost in that file (both ports of a Virtualmin domain), and only that
+// file's. The "@disabled <file>" lines are appended by webInnerScript.
+func TestParseApacheSDisabled(t *testing.T) {
+	out := `VirtualHost configuration:
+*:444                  app.seadprev.pi.gov.br (/etc/apache2/sites-enabled/app.seadprev.pi.gov.br.conf:20)
+         port 80 namevhost concursos.seadprev.pi.gov.br (/etc/apache2/sites-enabled/concursos.seadprev.pi.gov.br.conf:1)
+         port 443 namevhost concursos.seadprev.pi.gov.br (/etc/apache2/sites-enabled/concursos.seadprev.pi.gov.br.conf:30)
+         port 80 namevhost live.sead.pi.gov.br (/etc/apache2/sites-enabled/live.conf:1)
+@disabled /etc/apache2/sites-enabled/concursos.seadprev.pi.gov.br.conf
+@disabled /etc/apache2/sites-enabled/app.seadprev.pi.gov.br.conf
+`
+	want := []WebSite{
+		{Names: []string{"app.seadprev.pi.gov.br"}, Listen: []int{444}, Source: "/etc/apache2/sites-enabled/app.seadprev.pi.gov.br.conf:20", Disabled: true},
+		{Names: []string{"concursos.seadprev.pi.gov.br"}, Listen: []int{80}, Source: "/etc/apache2/sites-enabled/concursos.seadprev.pi.gov.br.conf:1", Disabled: true},
+		{Names: []string{"concursos.seadprev.pi.gov.br"}, Listen: []int{443}, TLS: true, Source: "/etc/apache2/sites-enabled/concursos.seadprev.pi.gov.br.conf:30", Disabled: true},
+		{Names: []string{"live.sead.pi.gov.br"}, Listen: []int{80}, Source: "/etc/apache2/sites-enabled/live.conf:1"},
+	}
+	if got := parseApacheS(out); !reflect.DeepEqual(got, want) {
+		t.Fatalf("apache sites =\n %+v\nwant\n %+v", got, want)
+	}
+}
+
 func TestParseFPMPools(t *testing.T) {
 	out := `/etc/php/8.1/fpm/pool.d/www.conf:[www]
 /etc/php/8.1/fpm/pool.d/www.conf:listen = /run/php/php8.1-fpm.sock

@@ -656,6 +656,152 @@ func (r *ServiceRepo) ReconcileDiscovered(ctx context.Context, hostID int64, inv
 	return tx.Commit()
 }
 
+// DiscoveredSite is one scan-discovered web app: a vhost serving a docroot,
+// with its framework/version when the job-mode code fingerprint (A7) saw it
+// ("" otherwise — a sync scan has the vhost but not the framework).
+type DiscoveredSite struct {
+	Name      string // the vhost's primary (linkable) server name
+	Docroot   string // its document root — the second half of the per-host identity
+	Framework string // wordpress|laravel|codeigniter3|… ("" = code fingerprint didn't run)
+	Version   string
+}
+
+// SiteDiscoveryKey is a site service's per-host identity: its vhost name and
+// docroot. The twin lookup in RecordWebDNS uses it to link the right DNS
+// record to the site service, so both sides must build it the same way.
+func SiteDiscoveryKey(name, docroot string) string { return name + "\t" + docroot }
+
+// ReconcileSites matches scan-discovered web apps against this host's existing
+// site services (discovery_kind='site', the C.3 scan-born "site" kind): a new
+// app creates an auto service (nickname = its name, linked to the host, grants
+// copied from the host); a known one refreshes only scan-owned fields it
+// doesn't already carry (technology_stack/version filled when empty, so an
+// operator's edit sticks); an app the scan no longer serves goes offline. A
+// site whose service is in the trash is never recreated. Pattern:
+// ReconcileDiscovered — but site identity is the vhost name + docroot, and it
+// derives from web_servers (seen in every scan), so a sync scan without the
+// job-mode framework never wrongly offlines or re-frameworks a live site.
+//
+// shortcut: technology_stack/version are filled only when empty, never updated
+// on a framework upgrade (Laravel 9→10) — the operator-edit guarantee wins;
+// drop the CASE guard for those two columns if live version tracking is wanted.
+func (r *ServiceRepo) ReconcileSites(ctx context.Context, hostID int64, sites []DiscoveredSite) error {
+	existing, err := r.listSiteServices(ctx, hostID)
+	if err != nil {
+		return err
+	}
+	byKey := make(map[string]*models.Service, len(existing))
+	for i := range existing {
+		byKey[existing[i].DiscoveryKey] = &existing[i]
+	}
+	trashed, err := r.trashedSiteKeys(ctx, hostID)
+	if err != nil {
+		return err
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	now := time.Now()
+	seen := make(map[string]bool, len(sites))
+	for _, s := range sites {
+		if s.Name == "" || s.Docroot == "" {
+			continue
+		}
+		key := SiteDiscoveryKey(s.Name, s.Docroot)
+		if trashed[key] {
+			continue // the operator trashed this site: never recreate it
+		}
+		if m := byKey[key]; m != nil {
+			seen[key] = true
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE services SET
+					technology_stack = CASE WHEN technology_stack = '' THEN ? ELSE technology_stack END,
+					version = CASE WHEN version = '' THEN ? ELSE version END,
+					service_kind = CASE WHEN service_kind = '' THEN 'web' ELSE service_kind END,
+					container_status = 'online', last_seen_at = ?, updated_at = CURRENT_TIMESTAMP
+				WHERE id = ?`,
+				s.Framework, s.Version, now, m.ID,
+			); err != nil {
+				return err
+			}
+			continue
+		}
+		var id int64
+		if err := tx.QueryRowContext(ctx,
+			`INSERT INTO services (nickname, description, service_type, service_kind, technology_stack, version,
+				source, discovery_kind, discovery_key, container_status, discovered_at, last_seen_at)
+			VALUES (?, ?, 'web', 'web', ?, ?, 'auto', 'site', ?, 'online', ?, ?)
+			RETURNING id`,
+			s.Name, "Auto-discovered site "+s.Name+" ("+s.Docroot+")", s.Framework, s.Version, key, now, now,
+		).Scan(&id); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO service_host_links (service_id, host_id) VALUES (?, ?)`, id, hostID,
+		); err != nil {
+			return err
+		}
+		if err := NewAssetEntidadeRepo(r.db).CopyFrom(ctx, tx, AssetHost, hostID, AssetService, id); err != nil {
+			return err
+		}
+		seen[key] = true
+	}
+
+	for i := range existing {
+		if seen[existing[i].DiscoveryKey] || existing[i].ContainerStatus == "offline" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE services SET container_status = 'offline', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+			existing[i].ID,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// listSiteServices returns this host's live site services (scan-owned, kind
+// 'site'). Like ListDiscoveredByHost, it runs unscoped: reconciliation is a
+// system-scope operation.
+func (r *ServiceRepo) listSiteServices(ctx context.Context, hostID int64) ([]models.Service, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT `+serviceColsS+`
+		 FROM services s JOIN service_host_links l ON s.id = l.service_id
+		 WHERE l.host_id = ? AND s.deleted_at IS NULL AND s.discovery_kind = 'site'
+		   AND s.source IN ('auto', 'fixed') AND s.discovery_key != ''
+		 ORDER BY s.nickname`, hostID)
+	if err != nil {
+		return nil, err
+	}
+	return scanServices(rows)
+}
+
+// trashedSiteKeys is the set of this host's site-service discovery keys that
+// are in the trash — the sites the scan must never recreate.
+func (r *ServiceRepo) trashedSiteKeys(ctx context.Context, hostID int64) (map[string]bool, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT DISTINCT s.discovery_key FROM services s JOIN service_host_links l ON s.id = l.service_id
+		 WHERE l.host_id = ? AND s.deleted_at IS NOT NULL AND s.discovery_kind = 'site'`, hostID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, err
+		}
+		out[k] = true
+	}
+	return out, rows.Err()
+}
+
 // BackfillKinds classifies scan-owned services that predate service_kind (or
 // were never classified), from the same sources the scan uses: the catalog
 // entry for host rows, the image for container rows. Idempotent — only rows

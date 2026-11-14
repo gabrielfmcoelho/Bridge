@@ -193,6 +193,202 @@ export type VMInfoType = {
   disk_fullest?: string;
   /** What a release would trip over, with its warnings. null = probe didn't run. */
   release_risks?: import("./types").ReleaseRisks | null;
+  /** Heavier non-secret enrichment (outbound flows, patch freshness). null/absent = probe didn't run (quick test). */
+  deep_facts?: DeepFacts | null;
+};
+
+/** Non-secret "deep facts" — only populated in a background scan. */
+export type DeepFacts = {
+  outbound?: OutboundFlows;
+  patch?: PatchFreshness;
+  /** A2 per-site access/error-log traffic: "is anyone actually using it?" */
+  sites?: SiteTraffic[];
+  /** A6 Virtualmin/Webmin control panels. */
+  panels?: ControlPanels;
+  /** A7 per-docroot code fingerprint. */
+  code?: CodeFingerprint[];
+  /** A8 owner clues. */
+  owner?: OwnerClues;
+  /** A10 firewall reality. */
+  firewall?: Firewall;
+  /** A11 mail/DNS role: what a generic VM actually is. */
+  roles?: HostRoles;
+};
+
+export type OutboundFlows = {
+  /** Transfer destinations found in the scripts cron jobs run (credentials stripped). */
+  scripts?: ScriptFlow[];
+  /** Established outbound TCP connections (not the host's own listeners). */
+  connections?: OutboundConn[];
+};
+
+export type ScriptFlow = {
+  script: string;
+  program: string;
+  /** Destination host[:path] or URL host, credentials removed on the VM. */
+  target: string;
+};
+
+export type OutboundConn = {
+  peer: string;
+  port?: number;
+  process?: string;
+  /** Peer is a public (non-RFC1918) address. */
+  public?: boolean;
+};
+
+export type PatchFreshness = {
+  manager?: string;
+  /** Unix seconds of the last successful package-index refresh. */
+  last_index_update?: number;
+  last_upgrade?: number;
+  auto_updates?: string;
+  auto_updates_on?: boolean;
+  upgradable?: number;
+  /** Auto-updates on but the index is stale: patching is broken, not just outdated. */
+  stale?: boolean;
+};
+
+/**
+ * A2 access/error-log aggregates for one web site. Everything is a count or a
+ * first-path-segment label — no client IP, query string or User-Agent leaves
+ * the VM.
+ */
+export type SiteTraffic = {
+  site: string;
+  /** virtualmin | apache | nginx */
+  server?: string;
+  access_log?: string;
+  /** Requests in the window (~30 d). */
+  requests?: number;
+  /** Distinct days seen in the window. */
+  days?: number;
+  /** Requests / active day — the headline. */
+  per_day?: number;
+  status_2xx?: number;
+  status_3xx?: number;
+  status_4xx?: number;
+  status_5xx?: number;
+  /** Requests with a browser-like User-Agent. */
+  human?: number;
+  /** The rest (bots, tools, no UA). */
+  bot?: number;
+  /** Requests from an RFC1918 client (count only). */
+  private_ips?: number;
+  /** Requests from a public client (count only). */
+  public_ips?: number;
+  /** Unix (day) of the newest request seen. */
+  last_seen?: number;
+  top_paths?: PathCount[];
+  errors?: ErrorSig[];
+  /** The log was larger than the byte cap or has compressed rotations: the window may be short. */
+  partial?: boolean;
+};
+
+export type PathCount = {
+  /** First path segment, "/" for root; never a query string. */
+  path: string;
+  count: number;
+};
+
+export type ErrorSig = {
+  /** Allowlisted category: disk-full, php-error, not-found… */
+  category: string;
+  count: number;
+};
+
+/** A6 Virtualmin/Webmin: counts and names only, never a password or a client IP. */
+export type ControlPanels = {
+  /** virtualmin | webmin */
+  installed?: string[];
+  domains?: PanelDomain[];
+  users?: string[];
+  failed_logins?: PanelFailedLogins;
+};
+export type PanelDomain = {
+  name: string;
+  owner?: string;
+  created?: number;
+  disabled?: boolean;
+  disabled_time?: number;
+  disabled_reason?: string;
+  contact?: string;
+  letsencrypt?: boolean;
+};
+export type PanelFailedLogins = { private?: number; public?: number };
+
+/** A7 one web docroot's apps, newest code mtime and upload directories. */
+export type CodeFingerprint = {
+  docroot: string;
+  apps?: CodeApp[];
+  newest_mtime?: number;
+  uploads?: UploadDir[];
+};
+export type CodeApp = {
+  /** Relative to the docroot; "" = the docroot itself. */
+  path?: string;
+  /** wordpress|laravel|codeigniter3|codeigniter4|joomla|drupal|moodle|scriptcase */
+  framework: string;
+  version?: string;
+};
+export type UploadDir = {
+  dir: string;
+  size_bytes?: number;
+  newest?: number;
+  files?: number;
+};
+
+/** A8 owner leads — each with its source. No client IP, key material or filename. */
+export type OwnerClues = {
+  last_logins?: OwnerLast[];
+  gecos?: OwnerGecos[];
+  sudoers?: string[];
+  auth_keys?: OwnerAuthKey[];
+  ftp?: OwnerFTP[];
+};
+export type OwnerLast = { user: string; when: number };
+export type OwnerGecos = { user: string; gecos: string };
+export type OwnerAuthKey = { user: string; comment: string };
+export type OwnerFTP = { user: string; month: string; upload: number };
+
+/** A10 firewall reality: ufw AND firewalld/nft, iptables, fail2ban, admin ports. */
+export type Firewall = {
+  ufw?: FirewallTool;
+  firewalld?: FirewallTool;
+  nft?: FirewallTool;
+  iptables_rules?: number;
+  fail2ban?: F2bJail[];
+  admin_ports?: AdminPort[];
+};
+export type FirewallTool = { active: boolean; rules?: number };
+export type F2bJail = { jail: string; banned?: number };
+/** exposure: all | one-ip | loopback */
+export type AdminPort = { port: number; exposure: string };
+
+/** A11 the VM's stated server role. Each sub-object is absent when its software isn't present. */
+export type HostRoles = {
+  mail?: MailRole;
+  dns?: DNSRole;
+};
+/** Postfix/Dovecot: daemons, accepted domains, relay host, delivery counts (no recipient) and login counts. */
+export type MailRole = {
+  postfix?: boolean;
+  dovecot?: boolean;
+  destinations?: string[];
+  relayhost?: string;
+  sent?: number;
+  bounced?: number;
+  deferred?: number;
+  imap_logins?: number;
+  pop3_logins?: number;
+  per_day?: MailDay[];
+};
+export type MailDay = { day: string; sent?: number; bounced?: number };
+/** BIND: authoritative zones (master/slave) versus a recursive resolver. */
+export type DNSRole = {
+  named?: boolean;
+  authoritative?: string[];
+  recursion?: boolean;
 };
 
 export type Filesystem = {
