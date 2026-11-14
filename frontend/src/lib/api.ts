@@ -193,6 +193,48 @@ export type VMInfoType = {
   disk_fullest?: string;
   /** What a release would trip over, with its warnings. null = probe didn't run. */
   release_risks?: import("./types").ReleaseRisks | null;
+  /** Heavier non-secret enrichment (outbound flows, patch freshness). null/absent = probe didn't run (quick test). */
+  deep_facts?: DeepFacts | null;
+};
+
+/** Non-secret "deep facts" — only populated in a background scan. */
+export type DeepFacts = {
+  outbound?: OutboundFlows;
+  patch?: PatchFreshness;
+};
+
+export type OutboundFlows = {
+  /** Transfer destinations found in the scripts cron jobs run (credentials stripped). */
+  scripts?: ScriptFlow[];
+  /** Established outbound TCP connections (not the host's own listeners). */
+  connections?: OutboundConn[];
+};
+
+export type ScriptFlow = {
+  script: string;
+  program: string;
+  /** Destination host[:path] or URL host, credentials removed on the VM. */
+  target: string;
+};
+
+export type OutboundConn = {
+  peer: string;
+  port?: number;
+  process?: string;
+  /** Peer is a public (non-RFC1918) address. */
+  public?: boolean;
+};
+
+export type PatchFreshness = {
+  manager?: string;
+  /** Unix seconds of the last successful package-index refresh. */
+  last_index_update?: number;
+  last_upgrade?: number;
+  auto_updates?: string;
+  auto_updates_on?: boolean;
+  upgradable?: number;
+  /** Auto-updates on but the index is stale: patching is broken, not just outdated. */
+  stale?: boolean;
 };
 
 export type Filesystem = {
