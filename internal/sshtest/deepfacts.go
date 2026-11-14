@@ -27,12 +27,19 @@ import (
 //   - A2 Sites: per web site, is anyone using it — 30-day access-log and recent
 //     error-log aggregates (a live site shows thousands of requests, an
 //     abandoned VM zero).
+//
 // Only names, hosts, ports, dates and counts leave the VM — never a script
 // line, a credential, a client's address, a query string or a User-Agent.
 type DeepFacts struct {
 	Outbound *OutboundFlows  `json:"outbound,omitempty"`
 	Patch    *PatchFreshness `json:"patch,omitempty"`
 	Sites    []SiteTraffic   `json:"sites,omitempty"`
+	// P2 facts (deepfacts_p2.go): control panels, per-docroot code fingerprint,
+	// owner clues and firewall reality. Each nil when its probe section was empty.
+	Panels   *ControlPanels    `json:"panels,omitempty"`
+	Code     []CodeFingerprint `json:"code,omitempty"`
+	Owner    *OwnerClues       `json:"owner,omitempty"`
+	Firewall *Firewall         `json:"firewall,omitempty"`
 }
 
 // OutboundFlows is where the VM pushes data off-box.
@@ -209,13 +216,23 @@ fi
 // collectDeepFacts runs every deep-facts probe and merges the results: A3/A4
 // (outbound flows + patch freshness) and A2 (per-site traffic). nil = nothing
 // ran. Each probe opens its own root-first/unprivileged session.
-func collectDeepFacts(client *ssh.Client, sudoPassword string, cron *CronInfo, ports []string) *DeepFacts {
+func collectDeepFacts(client *ssh.Client, sudoPassword string, cron *CronInfo, ports []string, webServers []WebServer) *DeepFacts {
 	df := collectFlowsPatch(client, sudoPassword, cron, ports)
 	if sites := collectSiteTraffic(client, sudoPassword); len(sites) > 0 {
 		if df == nil {
 			df = &DeepFacts{}
 		}
 		df.Sites = sites
+	}
+	panels, code, owner, fw := collectP2Facts(client, sudoPassword, webDocroots(webServers))
+	if panels != nil || code != nil || owner != nil || fw != nil {
+		if df == nil {
+			df = &DeepFacts{}
+		}
+		df.Panels, df.Owner, df.Firewall = panels, owner, fw
+		if code != nil {
+			df.Code = code.Docroots
+		}
 	}
 	return df
 }
