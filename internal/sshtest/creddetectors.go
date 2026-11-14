@@ -21,8 +21,9 @@ import (
 // Phase 1 ships the priority detectors that cover hosts 35/50: ci3_database,
 // dotenv, wp_config, mysql_debian_cnf, mysql_root_mycnf, mysql_rpm_temp_root,
 // virtualmin_domain, postfix_sasl, cron_embedded, root_ssh_keys. The other
-// PHP/DB-admin detectors (ci4, joomla, drupal, moodle, scriptcase, webmin,
-// plesk, pgpass, redis, php literal connect) are Phase 1b; Java/Oracle are Phase 2.
+// PHP/DB-admin detectors (ci4, ci_email, joomla, drupal, moodle, scriptcase,
+// webmin, plesk, pgpass, redis, php literal connect) are Phase 1b, in
+// credphp.go; Java/Oracle (credjava.go) are Phase 2.
 
 // detectCreds dispatches every probed file to its detector. cronScripts and
 // keyFiles name the arbitrary-path files whose detector can't be read from the
@@ -61,6 +62,31 @@ func detectCredFile(f credFile, cronScripts, keyFiles map[string]bool) []CredHit
 		return wpConfig(f)
 	case base == "database.php" && strings.HasSuffix(dir, "/application/config"):
 		return ci3Database(f)
+	// ---- PHP / CMS / DB admin (Phase 1b) ----
+	case base == "Database.php" && strings.HasSuffix(dir, "/app/Config"):
+		return ci4Database(f)
+	case base == "email.php" && strings.HasSuffix(dir, "/application/config"):
+		return ciEmail(f)
+	case base == "configuration.php":
+		return joomlaConfig(f)
+	case base == "settings.php" && strings.Contains(f.Path, "/sites/"):
+		return drupalSettings(f)
+	case base == "config.php":
+		return moodleConfig(f)
+	case base == "conexao.ini":
+		return scriptcaseConn(f)
+	case base == "db.php", base == "conexao.php", base == "conn.php":
+		return phpLiteralConnect(f)
+	case f.Path == "/etc/webmin/mysql/config":
+		return webminDB(f, "webmin_mysql", "mysql")
+	case f.Path == "/etc/webmin/postgresql/config":
+		return webminDB(f, "webmin_pgsql", "postgresql")
+	case base == ".psa.shadow":
+		return pleskAdmin(f)
+	case base == ".pgpass":
+		return pgpass(f)
+	case base == "redis.conf", base == "users.acl" && strings.Contains(dir, "/redis"):
+		return redisConf(f)
 	// ---- Java / Oracle (Phase 2) ----
 	case base == "tnsnames.ora":
 		return oracleTNS(f)
@@ -492,20 +518,30 @@ func ci3Engine(driver string) string {
 	return driver
 }
 
-// balancedParen returns the text from just after the '(' at openParen up to its
-// matching ')', so a value with its own parens isn't cut short. Bounded.
-func balancedParen(s string, openParen int) string {
-	if openParen < 0 || openParen >= len(s) || s[openParen] != '(' {
+// balancedParen returns the text from just after the delimiter at open up to
+// its match, so a value with its own delimiters isn't cut short. s[open] is '('
+// (array(…), PDO(…)) or '[' (PHP short array). Bounded.
+func balancedParen(s string, open int) string {
+	if open < 0 || open >= len(s) {
+		return ""
+	}
+	var oc, cc byte
+	switch s[open] {
+	case '(':
+		oc, cc = '(', ')'
+	case '[':
+		oc, cc = '[', ']'
+	default:
 		return ""
 	}
 	depth := 0
-	for i := openParen; i < len(s) && i < openParen+8192; i++ {
+	for i := open; i < len(s) && i < open+8192; i++ {
 		switch s[i] {
-		case '(':
+		case oc:
 			depth++
-		case ')':
+		case cc:
 			if depth--; depth == 0 {
-				return s[openParen+1 : i]
+				return s[open+1 : i]
 			}
 		}
 	}
