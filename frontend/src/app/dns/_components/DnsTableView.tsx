@@ -5,6 +5,10 @@ import Badge from "@/components/ui/Badge";
 import SituacaoText from "@/components/ui/SituacaoText";
 import SortableTable from "@/components/ui/SortableTable";
 import Pagination from "@/components/ui/Pagination";
+import IconButton from "@/components/ui/IconButton";
+import Icon from "@/components/ui/Icon";
+import { ICON_PATHS } from "@/lib/icon-paths";
+import { dnsSiteUrl } from "@/lib/webDns";
 import CertBadge from "./CertBadge";
 import type { DNSRecord } from "@/lib/types";
 
@@ -14,7 +18,7 @@ import type { DNSRecord } from "@/lib/types";
 // via onSortChange (→ server refetch). https/tags aren't server-sortable.
 const PER_PAGE = 20;
 type Sort = { field: string; direction: "asc" | "desc" };
-type ColKey = "domain" | "https" | "cert_expires_at" | "situacao" | "responsavel" | "tags";
+type ColKey = "domain" | "https" | "cert_expires_at" | "situacao" | "responsavel" | "tags" | "site";
 
 interface DnsTableViewProps {
   records: DNSRecord[];
@@ -39,11 +43,12 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
           { key: "situacao" as ColKey, label: t("common.status") },
           { key: "responsavel" as ColKey, label: t("dns.responsavel") },
           { key: "tags" as ColKey, label: t("common.tags"), sortable: false },
+          { key: "site" as ColKey, label: "", sortable: false },
         ]}
         sortKey={sort.field as ColKey}
         sortDir={sort.direction}
         onSortChange={(key, dir) => {
-          if (key === "https" || key === "tags") return; // not server-sortable
+          if (key === "https" || key === "tags" || key === "site") return; // not server-sortable
           onSortChange({ field: key, direction: dir });
         }}
       >
@@ -72,6 +77,18 @@ export default function DnsTableView({ records, total, tablePage, onPageChange, 
                   {(dns.tags || []).slice(0, 3).map((tag) => <Badge key={tag}>{tag}</Badge>)}
                   {(dns.tags?.length || 0) > 3 && <Badge>+{(dns.tags?.length || 0) - 3}</Badge>}
                 </div>
+              </td>
+              <td className="px-4 py-1.5 text-right">
+                <IconButton
+                  label={t("dns.openSite")}
+                  className="ml-auto"
+                  onClick={(e) => {
+                    e.stopPropagation(); // don't open the detail row
+                    window.open(dnsSiteUrl(dns), "_blank", "noopener,noreferrer");
+                  }}
+                >
+                  <Icon path={ICON_PATHS.externalLink} />
+                </IconButton>
               </td>
             </tr>
           ))
