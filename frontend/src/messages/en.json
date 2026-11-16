@@ -690,7 +690,16 @@
         "wildfly_ds": "WildFly datasource",
         "weblogic_jdbc": "WebLogic JDBC",
         "hibernate_jdbc_props": "Hibernate / JDBC config",
-        "oracle_tns": "Oracle tnsnames"
+        "oracle_tns": "Oracle tnsnames",
+        "netrc": ".netrc file",
+        "docker_config": "Docker registry auth",
+        "git_credentials": "Git credentials",
+        "npmrc": "npm registry token",
+        "composer_auth": "Composer auth",
+        "maven_settings": "Maven settings",
+        "pip_conf": "pip index URL",
+        "kubeconfig": "Kubeconfig",
+        "systemd_env": "systemd EnvironmentFile"
       }
     },
     "maintenance": {
