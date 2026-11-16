@@ -673,6 +673,9 @@
       "noRoot": "Config-file capture needs root — a stored SSH password.",
       "adminOnly": "admin only",
       "indirect": "indirect reference",
+      "drift": "Changed on the VM {when}",
+      "reuse": "Reused on {count} VMs",
+      "reuseHint": "The same value was captured on other VMs — one credential reused across the fleet.",
       "detector": {
         "ci3_database": "CodeIgniter 3 database",
         "dotenv": ".env file",
@@ -868,6 +871,12 @@
         "noAnswer": "no answer",
         "phpError": "PHP error on the page: {error}",
         "warningsBefore": "Warnings in the scan before the release"
+      },
+      "log": {
+        "copy": "Copy log",
+        "download": "Download log",
+        "copied": "Log copied",
+        "copyFailed": "Could not copy the log"
       },
       "kindOption": {
         "check": "Check for updates",
@@ -1244,6 +1253,7 @@
     "title": "DNS Records",
     "addDns": "Add DNS",
     "domain": "Domain",
+    "openSite": "Open site",
     "hasHttps": "HTTPS",
     "responsavel": "Responsible",
     "domainPlaceholder": "e.g. example.com",

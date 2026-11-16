@@ -16,6 +16,11 @@ export function linkableName(raw: string): string | null {
   return DNS_NAME.test(n) ? n : null;
 }
 
+/** The record's own site as a browser URL — https unless it's a plain-http record. */
+export function dnsSiteUrl(dns: { domain: string; has_https?: boolean }): string {
+  return `${dns.has_https ? "https" : "http"}://${dns.domain}`;
+}
+
 export type NameStatus =
   | { kind: "linked"; dnsId: number }
   | { kind: "unlinked" } // valid but not linked: didn't resolve, in the trash, or stopped server

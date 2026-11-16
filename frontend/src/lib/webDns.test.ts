@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { WebServer } from "./api.ts";
-import { linkableName, linkedIndex, nameStatus, poolUsers, undeclaredRecords } from "./webDns.ts";
+import { dnsSiteUrl, linkableName, linkedIndex, nameStatus, poolUsers, undeclaredRecords } from "./webDns.ts";
+
+test("dnsSiteUrl picks the scheme from has_https", () => {
+  assert.equal(dnsSiteUrl({ domain: "portal.pi.gov.br", has_https: true }), "https://portal.pi.gov.br");
+  assert.equal(dnsSiteUrl({ domain: "legacy.pi.gov.br", has_https: false }), "http://legacy.pi.gov.br");
+  assert.equal(dnsSiteUrl({ domain: "legacy.pi.gov.br" }), "http://legacy.pi.gov.br");
+});
 
 test("linkableName mirrors the Go filter", () => {
   assert.equal(linkableName("Portal.SEAD.pi.gov.br."), "portal.sead.pi.gov.br");
