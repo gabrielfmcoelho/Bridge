@@ -398,6 +398,8 @@ export interface Secret {
   /** >1: this many visible secrets hold the same value; dup_group ties them. */
   dup_count?: number;
   dup_group?: string;
+  /** >1: this credential's value is on that many distinct VMs the caller can see. */
+  reuse_hosts?: number;
 }
 
 /**

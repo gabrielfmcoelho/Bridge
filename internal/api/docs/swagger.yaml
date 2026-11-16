@@ -7044,6 +7044,12 @@ definitions:
         type: integer
       parent_name:
         type: string
+      reuse_hosts:
+        description: |-
+          ReuseHosts > 1: this credential's value is on that many distinct hosts the
+          caller can see — one password or login reused across VMs. Filled only for a
+          host-scoped list (the host Segredos tab); 0 everywhere else.
+        type: integer
       scope:
         $ref: '#/definitions/models.SecretScope'
       ssh_fingerprint:

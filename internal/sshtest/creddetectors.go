@@ -29,8 +29,16 @@ import (
 // keyFiles name the arbitrary-path files whose detector can't be read from the
 // path alone (a script cron calls, a key passed with -i).
 func detectCreds(files []credFile, cronScripts, keyFiles map[string]bool) []CredHit {
+	// systemd EnvironmentFile targets are arbitrary paths known only from the
+	// units that reference them (credstores.go) — resolved in a pre-pass so the
+	// detectCredFile dispatch stays keyed on the path alone.
+	envFiles := systemdEnvSet(files)
 	var hits []CredHit
 	for _, f := range files {
+		if envFiles[f.Path] {
+			hits = append(hits, systemdEnv(f)...)
+			continue
+		}
 		hits = append(hits, detectCredFile(f, cronScripts, keyFiles)...)
 	}
 	return hits
@@ -102,6 +110,23 @@ func detectCredFile(f credFile, cronScripts, keyFiles map[string]bool) []CredHit
 		return springProps(f)
 	case base == "hibernate.cfg.xml", base == "persistence.xml", base == "jdbc.properties", base == "db.properties":
 		return hibernateJDBC(f)
+	// ---- credential stores (credstores.go) ----
+	case base == ".netrc":
+		return netrc(f)
+	case base == "config.json" && strings.HasSuffix(dir, "/.docker"):
+		return dockerConfig(f)
+	case base == ".git-credentials":
+		return gitCredentials(f)
+	case base == ".npmrc":
+		return npmrc(f)
+	case base == "auth.json":
+		return composerAuth(f)
+	case base == "settings.xml" && strings.HasSuffix(dir, "/.m2"):
+		return mavenSettings(f)
+	case base == "pip.conf":
+		return pipConf(f)
+	case base == "config" && strings.HasSuffix(dir, "/.kube"), f.Path == "/etc/kubernetes/admin.conf":
+		return kubeconfig(f)
 	}
 	return nil
 }
