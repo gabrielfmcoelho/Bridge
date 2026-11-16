@@ -8,8 +8,11 @@ import { useSituacao } from "@/hooks/useSituacao";
 import SituacaoText from "@/components/ui/SituacaoText";
 import { useHostNames } from "@/hooks/useHostNames";
 import { CardHeader, CardMetadataGrid, CardTagsSection, CardIndicator, CardIndicatorGrid, CardMeter } from "@/components/inventory";
+import IconButton from "@/components/ui/IconButton";
+import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { certState, certTone, certDaysLeft, certValidityPct } from "@/lib/dnsCert";
+import { dnsSiteUrl } from "@/lib/webDns";
 import { certLabel } from "./CertBadge";
 import type { DNSRecord } from "@/lib/types";
 
@@ -40,6 +43,21 @@ export default function DnsCard({ dns }: { dns: DNSRecord }) {
           subtitleFont="display"
           status={<SituacaoText situacao={dns.situacao} />}
           description={dns.observacoes}
+          corner={
+            <IconButton
+              label={t("dns.openSite")}
+              variant="outline"
+              className="shrink-0 -mr-1 -mt-1"
+              onClick={(e) => {
+                // Inside the card's <Link>: don't follow it, don't nest anchors.
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(dnsSiteUrl(dns), "_blank", "noopener,noreferrer");
+              }}
+            >
+              <Icon path={ICON_PATHS.externalLink} />
+            </IconButton>
+          }
         />
 
         <CardMetadataGrid

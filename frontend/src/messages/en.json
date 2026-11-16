@@ -1238,6 +1238,7 @@
     "title": "DNS Records",
     "addDns": "Add DNS",
     "domain": "Domain",
+    "openSite": "Open site",
     "hasHttps": "HTTPS",
     "responsavel": "Responsible",
     "domainPlaceholder": "e.g. example.com",

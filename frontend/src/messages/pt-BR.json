@@ -1238,6 +1238,7 @@
     "title": "Registros DNS",
     "addDns": "Adicionar DNS",
     "domain": "Domínio",
+    "openSite": "Abrir site",
     "hasHttps": "HTTPS",
     "responsavel": "Responsável",
     "domainPlaceholder": "ex.: example.com",
