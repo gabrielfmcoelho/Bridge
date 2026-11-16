@@ -229,7 +229,7 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 		rep := sshtest.ParseOSUpdateLog(tail)
 		switch {
 		case rep.Skip != "":
-			return models.OSUpdateResult{Status: models.OSResultSkipped, Reason: rep.Skip, Output: tail}
+			return models.OSUpdateResult{Status: models.OSResultSkipped, Reason: skipReason(rep), Output: tail}
 		case err != nil:
 			res.Reason, res.Output = "release check: "+err.Error(), tail
 			return res
@@ -286,8 +286,8 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 			return res
 		}
 		if code != 0 || pre.Skip != "" {
-			why := pre.Skip
-			if why == "" {
+			why := skipReason(pre)
+			if pre.Skip == "" {
 				why = exitReason(pre, code)
 			}
 			res.Reason = "package update failed, the release did not start: " + why
@@ -352,7 +352,7 @@ func (h *sshHandlers) sshHostRunner(ctx context.Context, run models.OSUpdateRun,
 	case exitCode != 0:
 		res.Reason = exitReason(rep, exitCode)
 	case rep.Skip != "":
-		res.Status, res.Reason = models.OSResultSkipped, rep.Skip
+		res.Status, res.Reason = models.OSResultSkipped, skipReason(rep)
 		if !chained {
 			return res
 		}
@@ -522,7 +522,29 @@ func exitReason(rep sshtest.OSUpdateReport, code int) string {
 	} else if len(rep.DpkgBroken) > 0 {
 		why += "; dpkg left half configured: " + strings.Join(rep.DpkgBroken, ", ")
 	}
-	return why
+	return why + fsNote(rep)
+}
+
+// skipReason is the script's skip, with the corrupted filesystems behind it.
+func skipReason(rep sshtest.OSUpdateReport) string {
+	return rep.Skip + fsNote(rep)
+}
+
+// fsNote names the corrupted filesystems the script found ("" for none):
+// apt and dpkg fail on them with errors that don't say why.
+func fsNote(rep sshtest.OSUpdateReport) string {
+	if len(rep.FSErrors) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(rep.FSErrors))
+	for _, e := range rep.FSErrors {
+		p := fmt.Sprintf("%s %d", e.Mount, e.Count)
+		if e.Since > 0 {
+			p += " since " + time.Unix(e.Since, 0).UTC().Format("2006-01-02")
+		}
+		parts = append(parts, p)
+	}
+	return "; ext4 errors (repair with fsck, which needs a reboot): " + strings.Join(parts, ", ")
 }
 
 // osRestoreLinkTTL is how long the host's download link of a restore works:

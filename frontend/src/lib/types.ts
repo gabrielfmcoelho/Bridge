@@ -1571,7 +1571,7 @@ export interface OSUpdateResult {
 
 /** One thing to look at before a release; the UI words it from code. */
 export interface RiskWarning {
-  code: "dpkg_broken" | "foreign_packages" | "disabled_sources" | "modified_conffiles" | "pending_dist_files"
+  code: "fs_errors" | "dpkg_broken" | "foreign_packages" | "disabled_sources" | "modified_conffiles" | "pending_dist_files"
     | "failed_units" | "php_handler_missing" | "vhost_port_unlistened";
   count: number;
   /** The first few items. */

@@ -370,6 +370,16 @@ func deriveReleaseWarnings(info *VMInfo) []RiskWarning {
 		}
 		out = append(out, w)
 	}
+	// The one warning that stops an update: fs_guard skips the host.
+	var corrupt []string
+	for _, fs := range CorruptFilesystems(info.Filesystems) {
+		what := fmt.Sprintf("%s: %d", fs.Mount, fs.Errors)
+		if fs.ErrorsSince > 0 {
+			what += " since " + time.Unix(fs.ErrorsSince, 0).UTC().Format("2006-01-02")
+		}
+		corrupt = append(corrupt, what)
+	}
+	add("fs_errors", len(corrupt), corrupt)
 	add("dpkg_broken", len(r.DpkgBroken), r.DpkgBroken)
 	add("foreign_packages", r.ForeignCount, r.ForeignPackages)
 	add("disabled_sources", len(r.DisabledSources), r.DisabledSources)
