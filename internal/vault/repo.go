@@ -76,7 +76,11 @@ type SecretView struct {
 	// (a short, opaque prefix — never the fingerprint) ties them together.
 	DupCount int    `json:"dup_count,omitempty"`
 	DupGroup string `json:"dup_group,omitempty"`
-	valueFP  []byte
+	// ReuseHosts > 1: this credential's value is on that many distinct hosts the
+	// caller can see — one password or login reused across VMs. Filled only for a
+	// host-scoped list (the host Segredos tab); 0 everywhere else.
+	ReuseHosts int `json:"reuse_hosts,omitempty"`
+	valueFP    []byte
 	// Entidades carries the own grants of a shared avulso secret; filled by the
 	// GET handler (best effort), nil otherwise.
 	Entidades *models.AssetGrants `json:"entidades,omitempty"`
@@ -593,6 +597,14 @@ func (r *SecretRepo) runList(ctx context.Context, actor ActorContext, f SecretFi
 		return nil, err
 	}
 	markDuplicates(out)
+	// Reuse-across-VMs is only meaningful (and cheap) for one host's secrets:
+	// the Segredos tab's scope=host, parent_id=<host> query. Skip it for the
+	// vault-wide list, where it would run a cross-table count per fingerprint.
+	if f.Scope == models.SecretScopeHost && f.ParentID != nil {
+		if err := r.stampReuse(ctx, out); err != nil {
+			return nil, err
+		}
+	}
 	return out, nil
 }
 
