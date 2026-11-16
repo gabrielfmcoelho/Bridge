@@ -4,8 +4,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"maps"
 	"net"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1693,6 +1695,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		sshPolicy      *SSHAuthPolicy
 		storageRaw     string
 		releaseRaw     string
+		rancherRaw     string
 		nginxConfig    string
 		webServers     []WebServer
 		gitRemotes     []GitRemote
@@ -1735,6 +1738,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		s = time.Now()
 		releaseRaw = collectReleaseRisks(client, sudoPassword)
 		timeSession("[par] session 7e release-risks", s)
+		// Rancher 1.6 ports published through iptables DNAT (rancher.go).
+		s = time.Now()
+		rancherRaw = collectRancherPorts(client, sudoPassword)
+		timeSession("[par] session 7f rancher-ports", s)
 	}()
 	go func() {
 		defer wg.Done()
@@ -2069,6 +2076,14 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 
 	// Build a map of docker host port → container for fast lookup.
 	dockerHostPorts := dockerHostPortMap(info.ParsedContainers)
+	// Rancher 1.6 publishes through iptables DNAT: no listener in ss, so the
+	// ports ss didn't list are appended after the loop.
+	natPorts := parseRancherPorts(rancherRaw, info.ParsedContainers)
+	for p, c := range natPorts {
+		if dockerHostPorts[p] == nil {
+			dockerHostPorts[p] = c
+		}
+	}
 
 	// Annotate each listening port with its owner — the richer data the UI
 	// renders when available. The existing info.Ports []string stays as-is
@@ -2086,6 +2101,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		if len(fields) > 1 {
 			proc = fields[1]
 		}
+		delete(natPorts, port)
 		po := PortOwner{Port: port, Process: proc}
 		if c, ok := dockerHostPorts[port]; ok {
 			po.OwnerType = "container"
@@ -2104,6 +2120,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 			po.OwnerName = proc
 		}
 		info.PortOwners = append(info.PortOwners, po)
+	}
+	for _, p := range slices.Sorted(maps.Keys(natPorts)) {
+		c := natPorts[p]
+		info.PortOwners = append(info.PortOwners, PortOwner{Port: p, OwnerType: "container", OwnerName: c.Name, Target: c.Image})
 	}
 
 	// ── Catalog cross-reference (in-memory) ──
