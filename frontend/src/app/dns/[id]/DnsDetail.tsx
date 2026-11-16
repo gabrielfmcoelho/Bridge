@@ -12,6 +12,8 @@ import SituacaoText from "@/components/ui/SituacaoText";
 import CardIndicator from "@/components/inventory/CardIndicator";
 import Drawer from "@/components/ui/Drawer";
 import PageHeader from "@/components/ui/PageHeader";
+import { IconLink } from "@/components/ui/IconButton";
+import Icon from "@/components/ui/Icon";
 import { Skeleton } from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
 import DnsForm from "../DnsForm";
@@ -26,6 +28,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
 import { certState, certTone } from "@/lib/dnsCert";
+import { dnsSiteUrl } from "@/lib/webDns";
 import { certLabel } from "../_components/CertBadge";
 
 type TabKey = "overview" | "topology" | "issues" | "vulns";
@@ -133,6 +136,11 @@ export default function DnsDetail({ id }: { id: number }) {
               <CardIndicator icon={ICON_PATHS.gear} count={linkedServices.length} color="warning" title={`${linkedServices.length} ${t("host.services").toLowerCase()}`} />
               <CardIndicator icon={ICON_PATHS.clipboard} count={dnsIssues.length} color="accent" title={`${dnsIssues.length} ${t("nav.issues").toLowerCase()}`} />
             </>}
+            actions={
+              <IconLink href={dnsSiteUrl(dns)} label={t("dns.openSite")} variant="outline">
+                <Icon path={ICON_PATHS.externalLink} />
+              </IconLink>
+            }
             onEdit={canEdit ? () => setShowEditDrawer(true) : undefined}
             onDelete={isAdmin ? () => deleteMutation.mutate() : undefined}
             deleteConfirmMessage={t("dns.deleteConfirm", { name: dns.domain })}
