@@ -396,6 +396,10 @@ export type Filesystem = {
   size_bytes: number; used_bytes: number; avail_bytes: number; used_pct: number;
   /** NFS/CIFS…: listed, never counted. size_bytes 0 = didn't answer in time. */
   network?: boolean;
+  /** ext4's error counter: the kernel found it corrupt; only fsck clears it. */
+  errors?: number;
+  /** First of those errors, unix seconds. */
+  errors_since?: number;
 };
 export type BlockDisk = { name: string; size_bytes: number; unused?: boolean };
 export type VolumeGroup = { name: string; size_bytes: number; free_bytes: number };

@@ -89,7 +89,7 @@ const mockScan = (h: { nickname: string; os?: { pretty?: string; arch?: string }
   os: h.os?.pretty ?? "", kernel: "6.8.0-45-generic", arch: h.os?.arch ?? "x86_64",
   filesystems: [
     { mount: "/", device: "/dev/sda1", fstype: "ext4", size_bytes: 53_687_091_200, used_bytes: 21_474_836_480, avail_bytes: 32_212_254_720, used_pct: 40 },
-    { mount: "/data", device: "/dev/sdb1", fstype: "xfs", size_bytes: 214_748_364_800, used_bytes: 128_849_018_880, avail_bytes: 85_899_345_920, used_pct: 60 },
+    { mount: "/data", device: "/dev/sdb1", fstype: "ext4", size_bytes: 214_748_364_800, used_bytes: 128_849_018_880, avail_bytes: 85_899_345_920, used_pct: 60, errors: 7419, errors_since: 1755572400 },
     { mount: "/mnt/arquivos", device: "nas:/arquivos", fstype: "nfs4", size_bytes: 0, used_bytes: 0, avail_bytes: 0, used_pct: 0, network: true },
   ],
   service_inventory: [{ name: "postgresql", label: "PostgreSQL", kind: "database", host_running: true }],

@@ -1804,6 +1804,16 @@ func (h *sshHandlers) recordScan(ctx context.Context, host *models.Host, vmInfo 
 		}
 	}
 
+	// A corrupted filesystem tags the host, so the hosts list finds every one
+	// in the fleet. A storage probe that didn't answer changes nothing.
+	if len(vmInfo.Filesystems) > 0 {
+		if len(sshtest.CorruptFilesystems(vmInfo.Filesystems)) > 0 {
+			store.NewTagRepo(h.db.SQL).Add(ctx, "host", host.ID, "filesystem-corrompido")
+		} else {
+			store.NewTagRepo(h.db.SQL).Remove(ctx, "host", host.ID, "filesystem-corrompido")
+		}
+	}
+
 	if updated {
 		store.NewHostRepo(h.db.SQL).Update(ctx, host)
 	}
