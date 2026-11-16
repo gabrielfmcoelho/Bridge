@@ -10,11 +10,12 @@ import (
 
 // credFakeHost returns a PATH holding only the base tools the probe uses, so
 // the script runs for real against a planted BRIDGE_ROOT without touching the
-// machine. The probe uses POSIX sh plus stat/head/base64/tr/cat (no awk).
+// machine. The probe uses POSIX sh plus stat/head/base64/tr/cat and sed (the
+// systemd EnvironmentFile step), no awk.
 func credFakeHost(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	for _, tool := range []string{"sh", "stat", "head", "base64", "tr", "cat"} {
+	for _, tool := range []string{"sh", "stat", "head", "base64", "tr", "cat", "sed"} {
 		p, err := exec.LookPath(tool)
 		if err != nil {
 			t.Skipf("%s not available", tool)

