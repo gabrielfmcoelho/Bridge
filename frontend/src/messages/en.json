@@ -863,6 +863,12 @@
         "phpError": "PHP error on the page: {error}",
         "warningsBefore": "Warnings in the scan before the release"
       },
+      "log": {
+        "copy": "Copy log",
+        "download": "Download log",
+        "copied": "Log copied",
+        "copyFailed": "Could not copy the log"
+      },
       "kindOption": {
         "check": "Check for updates",
         "security": "Security updates",
