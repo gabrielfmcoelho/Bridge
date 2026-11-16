@@ -80,6 +80,13 @@ function StoragePanel({ info, t }: { info: VMInfoType; t: T }) {
                 <div className={`h-full rounded-full ${pctBarColor(fs.used_pct)}`} style={{ width: `${Math.min(fs.used_pct, 100)}%` }} />
               </div>
             )}
+            {!!fs.errors && (
+              <p className="mt-1 text-2xs text-[var(--danger)]">
+                {fs.errors_since
+                  ? t("scan.storage.fsErrorsSince", { count: String(fs.errors), since: new Date(fs.errors_since * 1000).toISOString().slice(0, 10) })
+                  : t("scan.storage.fsErrors", { count: String(fs.errors) })}
+              </p>
+            )}
           </div>
         ))}
       </div>

@@ -253,6 +253,11 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   totals) sum the local filesystems; `DiskPercent` (card, sorting,
   `alerta-recursos`, `sub-utilizado`, `host_scans.disk_pct`) is the **fullest**
   one (`DiskFullest`), like Sentinel; `df /` is only the fallback.
+  Corruption: `fs_errors` (`osupdate.go`, shared by this probe and the update
+  scripts) reads ext4's superblock error counter from `/sys/fs/ext4/*/errors_count`
+  (no root; dm names resolved through `/proc/mounts`). Non-zero → `Filesystem.errors`
+  / `errors_since`, release warning `fs_errors`, host tag `filesystem-corrompido`
+  (the fleet filter). Only fsck at boot clears it. ext4 only, XFS keeps no counter.
 - OS map and updates (Hosts › Sistemas operacionais): a host's OS is its own
   `dependency_inventory` row with `kind='os' AND container = ''` (`scope=host`
   on the dependency endpoints); the scan adds `arch` and `reboot_required`.
@@ -263,7 +268,11 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   picks apt / dnf / yum / apk itself, runs **detached** as root (setsid, log and
   exit code in `/var/lib/bridge-osupdate/run-<id>.*`, world-readable so polling
   needs no sudo) and reports through `@@key value` lines; never run apt on the
-  SSH session itself — a dropped session kills dpkg halfway. Containers are
+  SSH session itself — a dropped session kills dpkg halfway. On a corrupted
+  filesystem (`fs_errors`) `packages`, `security` and `release` (its precheck too)
+  skip before touching anything (`fs_guard`); `check` still runs, and every
+  failure or skip names the filesystems (`fsNote`). apt's own errors there
+  ("Structure needs cleaning", errno 117) never say why. Containers are
   never upgraded (rebuild the image). Each host is rescanned through
   `sshHandlers.recordScan`, the scan's own post-capture path.
   `release` (`osReleaseScript`) is one host per run, always reboots, 3 h:

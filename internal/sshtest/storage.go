@@ -24,6 +24,11 @@ type Filesystem struct {
 	AvailBytes int64   `json:"avail_bytes"`
 	UsedPct    float64 `json:"used_pct"`
 	Network    bool    `json:"network,omitempty"`
+	// Errors is ext4's error counter (fs_errors): the kernel found this
+	// filesystem corrupt and only fsck clears it. ErrorsSince: the first
+	// one, unix seconds.
+	Errors      int   `json:"errors,omitempty"`
+	ErrorsSince int64 `json:"errors_since,omitempty"`
 }
 
 // BlockDisk is one raw disk from lsblk. Unused: no partition, LVM member or
@@ -50,7 +55,8 @@ var networkFSTypes = map[string]bool{
 
 // storageScript: @@df local filesystems, @@net network ones (short timeout:
 // a dead NFS server would hang df), @@mounts network mounts from /proc
-// (listed even when df gave up), @@lsblk raw disks, @@vgs LVM free space.
+// (listed even when df gave up), @@lsblk raw disks, @@vgs LVM free space,
+// @@fserr corrupted filesystems (fs_errors, no root needed).
 // SUDO=1 retries vgs with sudo -n (it needs root); the root run sets nothing.
 func storageScript(asRoot bool) string {
 	sudoVgs := ""
@@ -69,6 +75,8 @@ echo @@net; if [ -n "$T" ]; then timeout 5 df -PTB1 ` + strings.Join(netTypes, "
 echo @@mounts; awk '{print $1, $2, $3}' /proc/mounts 2>/dev/null
 echo @@lsblk; $T lsblk -b -P -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,PKNAME 2>/dev/null
 echo @@vgs; $T vgs --noheadings --units b --nosuffix -o vg_name,vg_size,vg_free 2>/dev/null` + sudoVgs + `
+R=
+` + fsErrorsFn + `echo @@fserr; fs_errors
 `
 }
 
@@ -111,7 +119,26 @@ func parseStorage(raw string) Storage {
 	s.Filesystems = append(s.Filesystems, networkFilesystems(sec["net"], sec["mounts"])...)
 	s.Disks = parseLsblk(sec["lsblk"])
 	s.VolumeGroups = parseVgs(sec["vgs"])
+	for _, l := range sec["fserr"] {
+		e, ok := parseFSError(l)
+		for i := range s.Filesystems {
+			if fs := &s.Filesystems[i]; ok && !fs.Network && (fs.Mount == e.Mount || fs.Device == e.Mount) {
+				fs.Errors, fs.ErrorsSince = e.Count, e.Since
+			}
+		}
+	}
 	return s
+}
+
+// CorruptFilesystems lists the filesystems the kernel counts errors on.
+func CorruptFilesystems(fss []Filesystem) []Filesystem {
+	var out []Filesystem
+	for _, fs := range fss {
+		if fs.Errors > 0 {
+			out = append(out, fs)
+		}
+	}
+	return out
 }
 
 var skipFSTypes = map[string]bool{

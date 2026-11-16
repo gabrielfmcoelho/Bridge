@@ -102,6 +102,33 @@ func TestHumanBytes(t *testing.T) {
 	}
 }
 
+// @@fserr lands on its filesystem, matched by mount or by device; the
+// release warnings lead with it, since it is the one that stops an update.
+func TestParseStorageFSErrors(t *testing.T) {
+	s := parseStorage(storageFixture + "@@fserr\n/banco 7419 1755572400\n/dev/sdb 3 0\n/gone 5 0\n")
+	got := CorruptFilesystems(s.Filesystems)
+	if len(got) != 2 || got[0].Mount != "/banco" || got[0].Errors != 7419 || got[0].ErrorsSince != 1755572400 ||
+		got[1].Mount != "/mnt/backup" || got[1].Errors != 3 {
+		t.Fatalf("corrupt = %+v", got)
+	}
+	info := &VMInfo{Filesystems: s.Filesystems, ReleaseRisks: &ReleaseRisks{}}
+	w := deriveReleaseWarnings(info)
+	if len(w) != 1 || w[0].Code != "fs_errors" || w[0].Count != 2 || w[0].Detail != "/banco: 7419 since 2025-08-19, /mnt/backup: 3" {
+		t.Fatalf("warnings = %+v", w)
+	}
+}
+
+// fs_errors runs for real on a fake /sys: dm names resolve through /proc/mounts.
+func TestFSErrorsFn(t *testing.T) {
+	root := corruptRoot(t)
+	cmd := exec.Command("sh", "-c", fsErrorsFn+"fs_errors")
+	cmd.Env = []string{"R=" + root, "PATH=/usr/bin:/bin"}
+	out, err := cmd.CombinedOutput()
+	if err != nil || string(out) != "/var 7419 1755572400\n" {
+		t.Fatalf("err=%v out=%q", err, out)
+	}
+}
+
 func TestStorageScript(t *testing.T) {
 	for _, asRoot := range []bool{false, true} {
 		if out, err := exec.Command("sh", "-n", "-c", storageScript(asRoot)).CombinedOutput(); err != nil {
