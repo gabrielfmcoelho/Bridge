@@ -142,7 +142,7 @@ func (h *hostHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 // handleGet godoc
 //
 //	@Summary		Get a host
-//	@Description	Any role. The host with its relations. Invisible hosts answer 404.
+//	@Description	Any role. The host with its relations, and web_routes: what its web servers proxy (outbound) and other hosts' routes reaching it (inbound), per site and path, from the scans. Invisible hosts answer 404.
 //	@Tags			hosts
 //	@Produce		json
 //	@Param			slug	path		string	true	"Host oficial slug"

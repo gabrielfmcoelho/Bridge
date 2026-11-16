@@ -32,6 +32,9 @@ type serviceSpec struct {
 	// MainClasses are Java main classes / jar names that identify an app-server
 	// process; each instance becomes its own service (see appservers.go).
 	MainClasses []string
+	// SkipProc drops a process that matches Binaries but isn't this service
+	// (Kong's OpenResty is "nginx" in ps).
+	SkipProc func(user, args string) bool
 }
 
 // serviceCatalog enumerates well-known application services. The catalog
@@ -41,7 +44,7 @@ type serviceSpec struct {
 var serviceCatalog = []serviceSpec{
 	// ── Web servers / reverse proxies ──
 	{Name: "nginx", Label: "Nginx", Vendor: "F5/NGINX", Kind: "web", ServiceType: "nginx",
-		Units: []string{"nginx"}, Binaries: []string{"nginx"},
+		Units: []string{"nginx"}, Binaries: []string{"nginx"}, SkipProc: isKongProc,
 		Packages:   []string{"nginx", "nginx-core", "nginx-full", "nginx-extras", "nginx-light"},
 		ImageHints: []string{"nginx"}},
 	{Name: "apache", Label: "Apache HTTP Server", Vendor: "Apache Software Foundation", Kind: "web",
@@ -59,6 +62,12 @@ var serviceCatalog = []serviceSpec{
 		Units: []string{"haproxy"}, Binaries: []string{"haproxy"},
 		Packages:   []string{"haproxy"},
 		ImageHints: []string{"haproxy"}},
+	// Kong: no Binaries — its OpenResty is "nginx" in ps and ss, so a running
+	// node is known from the web probe's Admin API call (claimKongPorts).
+	{Name: "kong", Label: "Kong Gateway", Vendor: "Kong Inc.", Kind: "proxy",
+		Units:      []string{"kong"},
+		Packages:   []string{"kong", "kong-community-edition", "kong-enterprise-edition"},
+		ImageHints: []string{"kong:", "kong/kong", "kong-gateway"}},
 	{Name: "traefik", Label: "Traefik", Vendor: "Traefik Labs", Kind: "proxy",
 		Units: []string{"traefik"}, Binaries: []string{"traefik"},
 		Packages:   []string{"traefik"},
@@ -429,6 +438,9 @@ func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerI
 	// native daemon *and* a containerized one, and we want to see both.
 	hostProc, containerProc := false, false
 	for _, p := range inv.Procs {
+		if spec.SkipProc != nil && spec.SkipProc(p.user, p.args) {
+			continue
+		}
 		matched := false
 		for _, b := range spec.Binaries {
 			if binaryMatches(b, p.comm, p.args) {

@@ -97,6 +97,11 @@ export default function HostDetail({ slug }: { slug: string }) {
   });
 
   const { graph: filteredGraph, loading: graphLoading } = useEntityGraph(data ? `host-${data.host.id}` : undefined, activeTab === "topology");
+  // The scan pane's DNS records, flagged when another host's proxy routes them here.
+  const scanDnsRecords = useMemo(() => {
+    const inbound = new Set((data?.web_routes?.inbound ?? []).map((r) => r.dns_id));
+    return (data?.dns_records ?? []).map((r) => ({ ...r, inbound: inbound.has(r.id) }));
+  }, [data]);
 
   /* ─── Mutations ─── */
 
@@ -223,7 +228,7 @@ export default function HostDetail({ slug }: { slug: string }) {
                 />
               }
             >
-              <ScanPane slug={slug} host={data.host} lastScan={data.last_scan} canEdit={canEdit} dnsRecords={data.dns_records ?? []} />
+              <ScanPane slug={slug} host={data.host} lastScan={data.last_scan} canEdit={canEdit} dnsRecords={scanDnsRecords} />
             </DetailSplit>
           )}
 

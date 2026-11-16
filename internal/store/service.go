@@ -412,6 +412,18 @@ func (r *ServiceRepo) SetDependencies(ctx context.Context, serviceID int64, depe
 	return replaceVisibleLinks(ctx, r.db, `service_dependencies`, `service_id`, serviceID, `depends_on_id`, `services`, AssetService, dependsOnIDs)
 }
 
+// AddDependency records that serviceID depends on dependsOnID without
+// touching its other dependencies (the scan only adds; a manual save still
+// replaces the visible set). Reports whether a row was added.
+func (r *ServiceRepo) AddDependency(ctx context.Context, serviceID, dependsOnID int64) (bool, error) {
+	res, err := r.db.ExecContext(ctx, `INSERT INTO service_dependencies (service_id, depends_on_id) VALUES (?, ?) ON CONFLICT DO NOTHING`, serviceID, dependsOnID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 // DependencyIDs returns the ids a service depends on.
 func (r *ServiceRepo) DependencyIDs(ctx context.Context, serviceID int64) ([]int64, error) {
 	return visibleLinkIDs(ctx, r.db, `service_dependencies`, `service_id`, serviceID, `depends_on_id`, `services`, AssetService)

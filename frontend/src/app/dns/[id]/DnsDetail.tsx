@@ -22,7 +22,7 @@ import CertificateCard from "./_components/CertificateCard";
 import ObservationCard from "./_components/ObservationCard";
 import DetailSplit from "@/components/detail/DetailSplit";
 import TopologyPane from "@/components/detail/TopologyPane";
-import RelationsCard, { hostsGroup, servicesGroup, projectsGroup } from "@/components/detail/RelationsCard";
+import RelationsCard, { hostsGroup, servicesGroup, projectsGroup, routesGroups } from "@/components/detail/RelationsCard";
 import IssuesBoard from "@/components/issues/IssuesBoard";
 import EmptyState from "@/components/ui/EmptyState";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -161,7 +161,7 @@ export default function DnsDetail({ id }: { id: number }) {
           {activeTab === "vulns" && <EntityVulnsTab entityType="dns" entityId={id} />}
 
           {activeTab === "topology" && (() => {
-            const groups = [hostsGroup(linkedHosts, t), servicesGroup(linkedServices, t), projectsGroup(linkedProjects, t)];
+            const groups = [hostsGroup(linkedHosts, t), servicesGroup(linkedServices, t), ...routesGroups(data?.web_routes ?? [], "dns", t), projectsGroup(linkedProjects, t)];
             return (
               <TopologyPane graph={graph} loading={graphLoading} t={t}
                 hasRelations={groups.some((g) => g.rows.length > 0)}
