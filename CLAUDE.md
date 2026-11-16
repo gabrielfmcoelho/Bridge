@@ -93,7 +93,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v132**. Use idempotent idioms:
+per element, currently at **v134**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -197,6 +197,39 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   name resolves from the Bridge server. Only adds; trashed records are never
   recreated; stopped host servers contribute nothing. `LinkableName` and
   `frontend/src/lib/webDns.ts` `linkableName` are twins.
+  The same pass keeps the host's **web routes** (`web_routes`, v134,
+  `store.WebRouteRepo`): one row per site name × nginx location path × target
+  (`path ''` = whole site), with the host and service it reaches. They are
+  scan-owned: each scan replaces the proxy host's rows, except that a server
+  with an `error` keeps its own previous rows (by its proxy service; the whole
+  host's when it has none) and a scan with no web server at all keeps them all. Targets
+  resolve like the links: exactly one live host by `hostname`, the service by
+  port from that host's latest scan — `service_inventory` `host_ports`, then
+  `port_owners` of a published container. `service.LinkInboundRoutes`
+  (in `recordScan`, right after) is the backend's side: rows aimed at the
+  scanned host's address are resolved again and their DNS record gains the
+  host/service links, so whichever side is scanned last closes the link.
+  Reads (`web_routes` on host and DNS detail; `proxies to` graph edges) follow
+  the **proxy** host's visibility and blank the ends the caller can't see.
+  Status: `linked` · `no_service` · `not_scanned` · `unknown_host`. Ports a
+  Rancher 1.x host publishes through iptables DNAT are in no scan
+  (`no_service`).
+- Kong in the scan (`internal/sshtest/kong.go`, part of the web probe): each
+  running node — an OpenResty master whose `-p` prefix holds a `.kong_env` —
+  is asked its Admin API on localhost (of `.kong_env` only `admin_listen` is
+  read: the file also holds `pg_password`), through curl or, in Kong images
+  that have none, the bundled `resty`. It becomes a web server of kind `kong`:
+  its routes are sites (route host → site, `_` when none; route path →
+  location) forwarding to the service, or to every target of the upstream the
+  service names, so `RecordWebDNS` and `web_routes` treat Kong like nginx.
+  The node (`WebServer.kong`: version, database, DB reachable, traffic,
+  listeners, upstream target health) shows in the scan pane. Kong's OpenResty
+  is "nginx" in `ps`/`ss`: the nginx catalog entry skips Kong processes
+  (`SkipProc`), `claimKongPorts` gives a reached host node's listeners to the
+  `kong` service, and next to Kong an error-only `nginx -T` is dropped. Kong
+  gains a `service_dependencies` row (only added) on the service owning its
+  `pg_host:pg_port`. Kong JSON encodes an empty list as `{}` (`kongList`).
+  Plugins and consumers are not read (plugin config can hold secrets).
 - Git checkouts in the scan (`internal/sshtest/gitremotes.go`): one session
   walks every local filesystem (depth 6; pseudo, docker — wherever `docker
   info` puts its data root —, podman, cache and snapshot trees and

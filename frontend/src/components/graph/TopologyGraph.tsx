@@ -6,6 +6,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  MarkerType,
   type Node,
   type Edge,
   type NodeMouseHandler,
@@ -147,6 +148,8 @@ function getLayoutedElements(view: TopologyView, onToggleHost: (id: string) => v
     target: edge.target,
     label: edge.label,
     animated: !edge.derived,
+    // Only web routes have a direction worth drawing: proxy → backend.
+    ...(edge.label === "proxies to" ? { markerEnd: { type: MarkerType.ArrowClosed, color: "var(--border-strong)" } } : {}),
     style: { stroke: "var(--border-strong)", ...(edge.derived ? { strokeDasharray: "4 4" } : {}) },
     labelStyle: { fill: "var(--text-muted)", fontSize: 10, fontFamily: "var(--font-mono)" },
   }));

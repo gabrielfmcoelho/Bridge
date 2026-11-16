@@ -36,7 +36,7 @@ export default function VMInfoDisplay({ info, locale, anchorPrefix, dnsRecords, 
   /** The host the scan belongs to: secret chips link to its Segredos tab. */
   hostSlug: string;
   /** The host's linked DNS records: web-server names show linked / not linked. */
-  dnsRecords?: { id: number; domain: string }[];
+  dnsRecords?: { id: number; domain: string; inbound?: boolean }[];
 }) {
   const { t } = useLocale();
   const groups: Record<ScanGroup, ReactNode> = {

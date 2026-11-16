@@ -42,6 +42,7 @@ type HostService struct {
 	chamados     *store.HostChamadoRepo
 	orch         *store.OrchestratorRepo
 	responsaveis *store.ResponsavelRepo
+	routes       *store.WebRouteRepo
 }
 
 // NewHostService constructs a HostService over the given DB handle.
@@ -62,6 +63,7 @@ func NewHostService(db *database.DB) *HostService {
 		chamados:     store.NewHostChamadoRepo(db.SQL),
 		orch:         store.NewOrchestratorRepo(db.SQL),
 		responsaveis: store.NewResponsavelRepo(db.SQL),
+		routes:       store.NewWebRouteRepo(db.SQL),
 	}
 }
 
@@ -155,6 +157,14 @@ type HostDetail struct {
 	Responsaveis []models.Responsavel `json:"responsaveis"`
 	Chamados     []models.HostChamado `json:"chamados"`
 	Entidades    models.AssetGrants   `json:"entidades"`
+	WebRoutes    HostWebRoutes        `json:"web_routes"`
+}
+
+// HostWebRoutes are the scans' web routes around a host: what its web servers
+// forward (outbound) and other hosts' routes that reach it (inbound).
+type HostWebRoutes struct {
+	Outbound []store.WebRouteView `json:"outbound"`
+	Inbound  []store.WebRouteView `json:"inbound"`
 }
 
 // Count returns the number of hosts matching the filter (for pagination).
@@ -177,6 +187,8 @@ func (s *HostService) Get(ctx context.Context, slug string) (*HostDetail, error)
 	responsaveis, _ := s.responsaveis.List(ctx, "host", host.ID)
 	chamados, _ := s.chamados.ListByHost(ctx, host.ID)
 	entidades, _ := s.grants.Get(ctx, store.AssetHost, host.ID)
+	outbound, _ := s.routes.Outbound(ctx, host.ID)
+	inbound, _ := s.routes.Inbound(ctx, host.ID)
 
 	return &HostDetail{
 		Host:         host,
@@ -189,6 +201,7 @@ func (s *HostService) Get(ctx context.Context, slug string) (*HostDetail, error)
 		Responsaveis: responsaveis,
 		Chamados:     chamados,
 		Entidades:    entidades,
+		WebRoutes:    HostWebRoutes{Outbound: outbound, Inbound: inbound},
 	}, nil
 }
 

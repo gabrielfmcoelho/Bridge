@@ -252,6 +252,14 @@ func addUpstream(t *testing.T, d *database.DB, withScan bool) (*models.Host, int
 	if !withScan {
 		return u, 0
 	}
+	return u, scanUpstream(t, d, u)
+}
+
+// scanUpstream stores u's scan (JBoss compras2 on :8180) and reconciles it,
+// returning the JBoss service id.
+func scanUpstream(t *testing.T, d *database.DB, u *models.Host) int64 {
+	t.Helper()
+	ctx := context.Background()
 	inv := []sshtest.DiscoveredService{{Name: "jboss", Label: "JBoss", Kind: "app", Instance: "compras2.service",
 		HostRunning: true, Ports: []int{8180, 1190}, HostPorts: []int{8180, 1190}}}
 	b, _ := json.Marshal(sshtest.VMInfo{ServiceInventory: inv})
@@ -264,11 +272,11 @@ func addUpstream(t *testing.T, d *database.DB, withScan bool) (*models.Host, int
 	svcs, _ := store.NewServiceRepo(d.SQL).ListDiscoveredByHost(store.WithSystemScope(ctx), u.ID)
 	for _, s := range svcs {
 		if s.DiscoveryKey == "jboss@compras2.service" {
-			return u, s.ID
+			return s.ID
 		}
 	}
 	t.Fatalf("service not reconciled: %+v", svcs)
-	return u, 0
+	return 0
 }
 
 func TestRecordWebDNSRemoteUpstream(t *testing.T) {
@@ -313,5 +321,268 @@ func TestRecordWebDNSRemoteAmbiguous(t *testing.T) {
 	hosts, _ := remoteLinks(t, d, rec)
 	if !reflect.DeepEqual(hosts, []int64{p.ID}) {
 		t.Fatalf("hosts=%v, want only the proxy", hosts)
+	}
+}
+
+// routeKey is what a test compares of a route view.
+func routeKey(v store.WebRouteView) string {
+	return strings.Join([]string{v.ServerName, v.Path, v.Target, v.TargetHostSlug, v.TargetServiceName, v.Status}, "|")
+}
+
+func routeKeys(vs []store.WebRouteView) []string {
+	out := []string{}
+	for _, v := range vs {
+		out = append(out, routeKey(v))
+	}
+	return out
+}
+
+// Each nginx location becomes a route with its path; a location that goes
+// away is pruned; an unreadable config keeps the previous routes.
+func TestRecordWebDNSRoutes(t *testing.T) {
+	views := viewsOf(t)
+	d, p, info, rec := remoteSetup(t)
+	u, svc := addUpstream(t, d, true)
+	ctx := context.Background()
+	info.WebServers[0].Sites[0].Locations = []sshtest.WebLocation{
+		{Path: "/sgc", Proxy: []string{"10.0.0.11:8180"}},
+		{Path: "/bi", Proxy: []string{"http://10.0.0.99:8080"}},
+	}
+	sum, err := service.RecordWebDNS(ctx, d.SQL, p, info, nil)
+	if err != nil || sum.Routes != 2 || sum.RoutesUnresolved != 1 {
+		t.Fatalf("sum=%+v err=%v, want 2 routes, 1 unresolved", sum, err)
+	}
+	routes := store.NewWebRouteRepo(d.SQL)
+	jboss := ""
+	for _, v := range views(routes.Outbound(ctx, p.ID)) {
+		if v.TargetServiceID == svc {
+			jboss = v.TargetServiceName
+		}
+	}
+	want := []string{
+		"siace.example|/bi|http://10.0.0.99:8080|||unknown_host",
+		"siace.example|/sgc|10.0.0.11:8180|up|" + jboss + "|linked",
+	}
+	if got := routeKeys(views(routes.Outbound(ctx, p.ID))); jboss == "" || !reflect.DeepEqual(got, want) {
+		t.Fatalf("outbound = %v, want %v", got, want)
+	}
+	in := views(routes.Inbound(ctx, u.ID))
+	if len(in) != 1 || in[0].Path != "/sgc" || in[0].ProxyHostSlug != "proxy" || in[0].DNSID != rec || in[0].Domain != "siace.example" {
+		t.Fatalf("inbound = %+v, want /sgc from proxy on siace.example", in)
+	}
+	if got := routeKeys(views(routes.ByDNS(ctx, rec))); len(got) != 2 {
+		t.Fatalf("by dns = %v, want both routes", got)
+	}
+
+	info.WebServers[0].Sites[0].Locations = info.WebServers[0].Sites[0].Locations[:1]
+	if _, err := service.RecordWebDNS(ctx, d.SQL, p, info, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := routeKeys(views(routes.Outbound(ctx, p.ID))); len(got) != 1 || got[0] != want[1] {
+		t.Fatalf("after /bi removed = %v, want only /sgc", got)
+	}
+
+	broken := sshtest.VMInfo{WebServers: []sshtest.WebServer{{Kind: "nginx", Error: "permission denied"}}}
+	if _, err := service.RecordWebDNS(ctx, d.SQL, p, broken, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := routeKeys(views(routes.Outbound(ctx, p.ID))); len(got) != 1 {
+		t.Fatalf("unreadable config dropped routes: %v", got)
+	}
+}
+
+// viewsOf fails t on a read error, so a repo call can be passed straight in.
+func viewsOf(t *testing.T) func([]store.WebRouteView, error) []store.WebRouteView {
+	return func(vs []store.WebRouteView, err error) []store.WebRouteView {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return vs
+	}
+}
+
+// The proxy is scanned while its backend has no scan; the backend's first
+// scan closes the link without rescanning the proxy.
+func TestLinkInboundRoutes(t *testing.T) {
+	views := viewsOf(t)
+	d, p, info, rec := remoteSetup(t)
+	u, _ := addUpstream(t, d, false)
+	ctx := context.Background()
+	if _, err := service.RecordWebDNS(ctx, d.SQL, p, info, nil); err != nil {
+		t.Fatal(err)
+	}
+	routes := store.NewWebRouteRepo(d.SQL)
+	if in := views(routes.Inbound(ctx, u.ID)); len(in) != 1 || in[0].Status != store.RouteNotScanned {
+		t.Fatalf("before the backend scan = %+v, want one not_scanned route", in)
+	}
+	svc := scanUpstream(t, d, u)
+	sum, err := service.LinkInboundRoutes(ctx, d.SQL, u, sshtest.VMInfo{}, nil)
+	if err != nil || sum != (service.InboundSummary{Routes: 1, Updated: 1, ServiceLinks: 1}) {
+		t.Fatalf("sum=%+v err=%v", sum, err)
+	}
+	if _, svcs := remoteLinks(t, d, rec); !reflect.DeepEqual(svcs, []int64{svc}) {
+		t.Fatalf("service links = %v, want [%d]", svcs, svc)
+	}
+	if in := views(routes.Inbound(ctx, u.ID)); len(in) != 1 || in[0].Status != store.RouteLinked {
+		t.Fatalf("after = %+v, want linked", in)
+	}
+	if sum, err := service.LinkInboundRoutes(ctx, d.SQL, u, sshtest.VMInfo{}, nil); err != nil || sum.Updated+sum.Linked+sum.ServiceLinks != 0 {
+		t.Fatalf("second run %+v %v, want nothing new", sum, err)
+	}
+}
+
+// The backend wasn't in the inventory when the proxy was scanned: its route
+// is matched by address once the host exists and is scanned.
+func TestLinkInboundRoutesNewHost(t *testing.T) {
+	d, p, info, rec := remoteSetup(t)
+	ctx := context.Background()
+	if _, err := service.RecordWebDNS(ctx, d.SQL, p, info, nil); err != nil {
+		t.Fatal(err)
+	}
+	u, svc := addUpstream(t, d, true)
+	sum, err := service.LinkInboundRoutes(ctx, d.SQL, u, sshtest.VMInfo{}, nil)
+	if err != nil || sum != (service.InboundSummary{Routes: 1, Updated: 1, Linked: 1, ServiceLinks: 1}) {
+		t.Fatalf("sum=%+v err=%v", sum, err)
+	}
+	hosts, svcs := remoteLinks(t, d, rec)
+	if !reflect.DeepEqual(hosts, []int64{p.ID, u.ID}) || !reflect.DeepEqual(svcs, []int64{svc}) {
+		t.Fatalf("hosts=%v svcs=%v", hosts, svcs)
+	}
+}
+
+// A backend port published by a container on the other VM links to that
+// container's service.
+func TestRecordWebDNSRemoteContainerPort(t *testing.T) {
+	d, p, info, rec := remoteSetup(t)
+	ctx := context.Background()
+	u := &models.Host{Nickname: "docker", OficialSlug: "docker", Hostname: "10.0.0.11", Situacao: "active"}
+	if err := store.NewHostRepo(d.SQL).Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	ctrs := []sshtest.ContainerInfo{{ID: "0123456789ab", Name: "prometheus-1", Image: "prom/prometheus:v2", Status: "Up 1 hour"}}
+	if err := store.NewServiceRepo(d.SQL).ReconcileDiscovered(ctx, u.ID, store.DiscoveredInventory{Containers: ctrs, ContainersKnown: true}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(sshtest.VMInfo{ParsedContainers: ctrs,
+		PortOwners: []sshtest.PortOwner{{Port: 9090, OwnerType: "container", OwnerName: "prometheus-1"}}})
+	if err := store.NewHostScanRepo(d.SQL).Create(ctx, u.ID, string(b)); err != nil {
+		t.Fatal(err)
+	}
+	var prom int64
+	svcs, _ := store.NewServiceRepo(d.SQL).ListDiscoveredByHost(store.WithSystemScope(ctx), u.ID)
+	for _, s := range svcs {
+		if s.ContainerName == "prometheus-1" {
+			prom = s.ID
+		}
+	}
+	info.WebServers[0].Sites[0].Proxy = []string{"http://10.0.0.11:9090"}
+	if _, err := service.RecordWebDNS(ctx, d.SQL, p, info, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, got := remoteLinks(t, d, rec); prom == 0 || !reflect.DeepEqual(got, []int64{prom}) {
+		t.Fatalf("service links = %v, want [prometheus-1 = %d]", got, prom)
+	}
+}
+
+// reconcileHost gives h the discovered services in inv (host and container
+// rows) and returns their ids by discovery key or container name.
+func reconcileHost(t *testing.T, d *database.DB, h *models.Host, inv store.DiscoveredInventory) map[string]int64 {
+	t.Helper()
+	ctx := context.Background()
+	if err := store.NewServiceRepo(d.SQL).ReconcileDiscovered(ctx, h.ID, inv); err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]int64{}
+	svcs, _ := store.NewServiceRepo(d.SQL).ListDiscoveredByHost(store.WithSystemScope(ctx), h.ID)
+	for _, s := range svcs {
+		if s.ContainerName != "" {
+			ids[s.ContainerName] = s.ID
+		} else {
+			ids[s.DiscoveryKey] = s.ID
+		}
+	}
+	return ids
+}
+
+// A Kong node's routes are web routes like nginx's, from its Kong service,
+// and Kong gains a dependency on the Postgres it uses (on another VM).
+func TestRecordWebDNSKong(t *testing.T) {
+	d, p, _, rec := remoteSetup(t)
+	ctx := context.Background()
+	_, jboss := addUpstream(t, d, true)
+	kong := reconcileHost(t, d, p, store.DiscoveredInventory{Services: []sshtest.DiscoveredService{
+		{Name: "kong", Label: "Kong Gateway", Kind: "proxy", HostRunning: true, HostPorts: []int{80}}}})["kong"]
+	db := &models.Host{Nickname: "kong-db", OficialSlug: "kong-db", Hostname: "10.0.0.30", Situacao: "active"}
+	if err := store.NewHostRepo(d.SQL).Create(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	pgInv := []sshtest.DiscoveredService{{Name: "postgresql", Label: "PostgreSQL", Kind: "database", HostRunning: true, HostPorts: []int{5432}}}
+	b, _ := json.Marshal(sshtest.VMInfo{ServiceInventory: pgInv})
+	if err := store.NewHostScanRepo(d.SQL).Create(ctx, db.ID, string(b)); err != nil {
+		t.Fatal(err)
+	}
+	pg := reconcileHost(t, d, db, store.DiscoveredInventory{Services: pgInv})["postgresql"]
+	if kong == 0 || pg == 0 {
+		t.Fatalf("services kong=%d pg=%d", kong, pg)
+	}
+
+	info := sshtest.VMInfo{WebServers: []sshtest.WebServer{{Kind: "kong",
+		Kong: &sshtest.KongNode{Version: "2.8.1", Database: "postgres", DBHost: "10.0.0.30", DBPort: 5432, ProxyPorts: []int{80}},
+		Sites: []sshtest.WebSite{{Names: []string{"siace.example"}, Listen: []int{80},
+			Proxy:     []string{"http://10.0.0.11:8180/sgc"},
+			Locations: []sshtest.WebLocation{{Path: "/sgc", Proxy: []string{"http://10.0.0.11:8180/sgc"}}}}}}}}
+	sum, err := service.RecordWebDNS(ctx, d.SQL, p, info, nil)
+	if err != nil || sum.Dependencies != 1 || sum.Routes != 1 || sum.RoutesUnresolved != 0 {
+		t.Fatalf("sum=%+v err=%v, want 1 dependency, 1 resolved route", sum, err)
+	}
+	deps, _ := store.NewServiceRepo(d.SQL).DependencyIDs(store.WithSystemScope(ctx), kong)
+	if !reflect.DeepEqual(deps, []int64{pg}) {
+		t.Fatalf("kong depends on %v, want [%d]", deps, pg)
+	}
+	out, _ := store.NewWebRouteRepo(d.SQL).Outbound(ctx, p.ID)
+	if len(out) != 1 || out[0].ProxyServiceID != kong || out[0].TargetServiceID != jboss || out[0].DNSID != rec {
+		t.Fatalf("routes = %+v, want /sgc from Kong to the JBoss", out)
+	}
+	if sum, _ := service.RecordWebDNS(ctx, d.SQL, p, info, nil); sum.Dependencies != 0 {
+		t.Fatalf("second run added %d dependencies", sum.Dependencies)
+	}
+}
+
+// A server whose config can't be read keeps its own previous routes; the
+// other servers' routes are still replaced.
+func TestRecordWebDNSRoutesKeepUnreadable(t *testing.T) {
+	d, p, _, _ := remoteSetup(t)
+	addUpstream(t, d, true)
+	ctx := context.Background()
+	ctrs := []sshtest.ContainerInfo{{ID: "0123456789ab", Name: "app", Image: "nginx:1.25", Status: "Up 1 hour"}}
+	reconcileHost(t, d, p, store.DiscoveredInventory{Containers: ctrs, ContainersKnown: true,
+		Services: []sshtest.DiscoveredService{{Name: "nginx", Label: "Nginx", Kind: "web", HostRunning: true}}})
+	site := func(path string) []sshtest.WebSite {
+		return []sshtest.WebSite{{Names: []string{"siace.example"}, Listen: []int{80}, Proxy: []string{"10.0.0.11:8180"},
+			Locations: []sshtest.WebLocation{{Path: path, Proxy: []string{"10.0.0.11:8180"}}}}}
+	}
+	run := func(servers ...sshtest.WebServer) []string {
+		t.Helper()
+		if _, err := service.RecordWebDNS(ctx, d.SQL, p, sshtest.VMInfo{ParsedContainers: ctrs, WebServers: servers}, nil); err != nil {
+			t.Fatal(err)
+		}
+		vs, err := store.NewWebRouteRepo(d.SQL).Outbound(ctx, p.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var paths []string
+		for _, v := range vs {
+			paths = append(paths, v.Path)
+		}
+		return paths
+	}
+	if got := run(sshtest.WebServer{Kind: "nginx", Sites: site("/a")},
+		sshtest.WebServer{Kind: "nginx", Container: "app", Sites: site("/b")}); !reflect.DeepEqual(got, []string{"/a", "/b"}) {
+		t.Fatalf("first scan = %v", got)
+	}
+	if got := run(sshtest.WebServer{Kind: "nginx", Sites: site("/a2")},
+		sshtest.WebServer{Kind: "nginx", Container: "app", Error: "config unreadable"}); !reflect.DeepEqual(got, []string{"/a2", "/b"}) {
+		t.Fatalf("second scan = %v, want /a replaced by /a2 and the unreadable container's /b kept", got)
 	}
 }

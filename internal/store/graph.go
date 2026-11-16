@@ -24,6 +24,8 @@ type GraphLinks struct {
 	DBInstance     []LinkPair // database_id -> instance service_id
 	DBConsumer     []LinkPair // database_id -> consumer service_id
 	DBProject      []LinkPair // database_id -> project_id
+	ServiceProxies []LinkPair // web_routes: proxy service_id -> target service_id
+	HostProxies    []LinkPair // web_routes: proxy host_id -> target host_id (another host)
 }
 
 // ByFrom groups pairs as from -> []to.
@@ -74,6 +76,8 @@ func (r *GraphRepo) Links(ctx context.Context) (GraphLinks, error) {
 		{&g.DBInstance, `SELECT id, instance_service_id FROM databases WHERE instance_service_id IS NOT NULL AND deleted_at IS NULL`},
 		{&g.DBConsumer, `SELECT database_id, service_id FROM database_consumer_links`},
 		{&g.DBProject, `SELECT database_id, project_id FROM database_project_links`},
+		{&g.ServiceProxies, `SELECT DISTINCT proxy_service_id, target_service_id FROM web_routes WHERE proxy_service_id IS NOT NULL AND target_service_id IS NOT NULL AND proxy_service_id <> target_service_id`},
+		{&g.HostProxies, `SELECT DISTINCT proxy_host_id, target_host_id FROM web_routes WHERE target_host_id IS NOT NULL AND target_host_id <> proxy_host_id`},
 	} {
 		rows, err := r.db.QueryContext(ctx, q.from)
 		if err != nil {

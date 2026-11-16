@@ -33,6 +33,10 @@ type WebDNSSummary struct {
 	ServiceLinks int `json:"service_links"` // service links added
 	Unresolved   int `json:"unresolved"`    // new names that don't resolve: not created
 	Trashed      int `json:"trashed"`       // names whose record is in the trash: left alone
+	Routes       int `json:"routes"`        // web routes recorded (name × path × target)
+	Dependencies int `json:"dependencies"`  // service dependencies added (Kong → its database)
+	// RoutesUnresolved: routes whose backend host or service Bridge doesn't know.
+	RoutesUnresolved int `json:"routes_unresolved"`
 }
 
 const (
@@ -72,10 +76,15 @@ type webName struct {
 // its links. A record in the trash is never recreated or linked. Stopped
 // host servers and unreadable configs contribute nothing. Pattern:
 // DNSService.SyncFromCoolify.
+//
+// It also replaces the host's web routes (store.WebRoute): every proxy_pass /
+// fastcgi_pass per site name and location path, with the host and service it
+// reaches. LinkInboundRoutes fills them from the backend's side.
 func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshtest.VMInfo, lookup Resolver) (WebDNSSummary, error) {
 	var sum WebDNSSummary
 	ctx = store.WithSystemScope(ctx)
-	svcs, err := store.NewServiceRepo(db).ListDiscoveredByHost(ctx, host.ID)
+	services := store.NewServiceRepo(db)
+	svcs, err := services.ListDiscoveredByHost(ctx, host.ID)
 	if err != nil {
 		return sum, err
 	}
@@ -110,17 +119,67 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 		}
 	}
 
-	remote := &remoteIndex{db: db, lookup: lookup, hosts: map[string][]models.Host{}, scans: map[int64]map[int]int64{}}
+	remote := newRemoteIndex(db, lookup)
+	// resolve finds the host and service a server (own, in container ctr)
+	// reaches at addr:port: its own loopback, a port of this host's latest
+	// scan (already stored), a container by name, or another VM.
+	resolve := func(addr string, port int, ctr string, own int64) (int64, int64, error) {
+		switch {
+		case hostAddrs[addr] && ctr != "":
+			return host.ID, own, nil // the container's own loopback
+		case hostAddrs[addr]:
+			ports, err := remote.portServices(ctx, host.ID)
+			return host.ID, ports[port], err
+		case net.ParseIP(addr) == nil && !strings.Contains(addr, "."):
+			for _, c := range containers {
+				if c == addr || composeService(c) == addr {
+					return host.ID, byContainer[c], nil
+				}
+			}
+			return 0, 0, nil
+		default:
+			return remote.target(ctx, addr, port)
+		}
+	}
 	names := map[string]*webName{}
 	var order []string
+	var routes []store.WebRoute
+	// A server whose config couldn't be read keeps its previous routes (by its
+	// service); one with no service keeps the whole host's. shortcut: a scan
+	// with no web server at all keeps them too (it can't tell "removed" from
+	// "probe didn't run"); the next readable scan replaces them.
+	replaceRoutes := len(info.WebServers) > 0
+	var keepRoutes []int64
 	for _, ws := range info.WebServers {
-		if ws.Stopped || ws.Error != "" {
-			continue
-		}
 		own := byHostKind[ws.Kind]
 		where := "host"
 		if ws.Container != "" {
 			own, where = byContainer[ws.Container], "container "+ws.Container
+		}
+		if ws.Error != "" {
+			if own == 0 {
+				replaceRoutes = false
+			}
+			keepRoutes = append(keepRoutes, own)
+		}
+		if ws.Stopped || ws.Error != "" {
+			continue
+		}
+		// Kong → the database it uses (pg_host:pg_port). Only adds.
+		if k := ws.Kong; k != nil && k.DBHost != "" && own != 0 {
+			_, dep, err := resolve(strings.ToLower(k.DBHost), k.DBPort, ws.Container, own)
+			if err != nil {
+				return sum, err
+			}
+			if dep != 0 && dep != own {
+				added, err := services.AddDependency(ctx, own, dep)
+				if err != nil {
+					return sum, err
+				}
+				if added {
+					sum.Dependencies++
+				}
+			}
 		}
 		for _, site := range ws.Sites {
 			if site.Disabled {
@@ -138,6 +197,32 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 			remHosts, remSvcs, err := remote.resolve(ctx, remoteTargets(site, hostAddrs))
 			if err != nil {
 				return sum, err
+			}
+			siteNames := []string{}
+			for _, raw := range site.Names {
+				if n, ok := LinkableName(raw); ok {
+					siteNames = append(siteNames, n)
+				}
+			}
+			if len(siteNames) == 0 {
+				siteNames = []string{""} // default / IP-only site: still a route
+			}
+			for _, loc := range siteLocations(site) {
+				for _, t := range loc.targets {
+					addr, port, ok := splitTarget(t)
+					if !ok {
+						continue
+					}
+					th, ts, err := resolve(addr, port, ws.Container, own)
+					if err != nil {
+						return sum, err
+					}
+					for _, n := range siteNames {
+						routes = append(routes, store.WebRoute{ProxyHostID: host.ID, ProxyServiceID: own,
+							ServerName: n, Path: loc.path, Target: t, TargetAddr: addr, TargetPort: port,
+							TargetHostID: th, TargetServiceID: ts})
+					}
+				}
 			}
 			for _, raw := range site.Names {
 				n, ok := LinkableName(raw)
@@ -172,8 +257,21 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 		}
 	}
 	sum.Names = len(order)
+	saveRoutes := func(ids map[string]int64) error {
+		if !replaceRoutes {
+			return nil
+		}
+		for i := range routes {
+			routes[i].DNSID = ids[routes[i].ServerName]
+			if routes[i].TargetHostID == 0 || routes[i].TargetServiceID == 0 {
+				sum.RoutesUnresolved++
+			}
+		}
+		sum.Routes = len(routes)
+		return store.NewWebRouteRepo(db).ReplaceForHost(ctx, host.ID, keepRoutes, routes)
+	}
 	if len(order) == 0 {
-		return sum, nil
+		return sum, saveRoutes(nil)
 	}
 
 	dns := store.NewDNSRepo(db)
@@ -264,6 +362,92 @@ func RecordWebDNS(ctx context.Context, db *sql.DB, host *models.Host, info sshte
 			}
 		}
 	}
+	return sum, saveRoutes(ids)
+}
+
+// webLocation is one path of a site and the targets it forwards to.
+type webLocation struct {
+	path    string
+	targets []string
+}
+
+// siteLocations lists a site's forwarding paths: its nginx locations, or the
+// whole site ("") when it has none (Apache, or nginx without locations).
+func siteLocations(site sshtest.WebSite) []webLocation {
+	if len(site.Locations) == 0 {
+		return []webLocation{{"", append(append([]string{}, site.Proxy...), site.FastCGI...)}}
+	}
+	out := make([]webLocation, 0, len(site.Locations))
+	for _, l := range site.Locations {
+		out = append(out, webLocation{l.Path, append(append([]string{}, l.Proxy...), l.FastCGI...)})
+	}
+	return out
+}
+
+// InboundSummary is what a backend's scan did to other hosts' web routes.
+type InboundSummary struct {
+	Routes       int `json:"routes"`        // other hosts' routes aimed at this host
+	Updated      int `json:"updated"`       // routes whose resolved host/service changed
+	Linked       int `json:"linked"`        // DNS → host links added
+	ServiceLinks int `json:"service_links"` // DNS → service links added
+}
+
+// LinkInboundRoutes is RecordWebDNS seen from the backend: other hosts'
+// routes aimed at this host (by its address, or already resolved to it) are
+// resolved again against this scan, and their DNS records gain links to this
+// host and the service owning the port. So whichever side is scanned last
+// closes the link — the proxy needn't be rescanned. Only adds DNS links.
+// shortcut: a target written as a DNS name that only now resolves to this
+// host is caught on the proxy's next scan, not here.
+func LinkInboundRoutes(ctx context.Context, db *sql.DB, host *models.Host, info sshtest.VMInfo, lookup Resolver) (InboundSummary, error) {
+	var sum InboundSummary
+	ctx = store.WithSystemScope(ctx)
+	addrs := []string{}
+	for _, a := range []string{host.Hostname, info.PublicIP} {
+		if a != "" {
+			addrs = append(addrs, strings.ToLower(a))
+		}
+	}
+	repo := store.NewWebRouteRepo(db)
+	rs, err := repo.ListInbound(ctx, host.ID, addrs)
+	if err != nil || len(rs) == 0 {
+		return sum, err
+	}
+	sum.Routes = len(rs)
+	remote := newRemoteIndex(db, lookup)
+	dns := store.NewDNSRepo(db)
+	for _, w := range rs {
+		hid, sid, err := remote.target(ctx, w.TargetAddr, w.TargetPort)
+		if err != nil {
+			return sum, err
+		}
+		changed, err := repo.SetTarget(ctx, w, hid, sid)
+		if err != nil {
+			return sum, err
+		}
+		if changed {
+			sum.Updated++
+		}
+		if hid == 0 || w.DNSID == 0 {
+			continue
+		}
+		added, err := dns.AddHostLink(ctx, w.DNSID, hid)
+		if err != nil {
+			return sum, err
+		}
+		if added {
+			sum.Linked++
+		}
+		if sid == 0 {
+			continue
+		}
+		if added, err = dns.AddServiceLink(ctx, w.DNSID, sid); err != nil {
+			return sum, err
+		}
+		if added {
+			sum.ServiceLinks++
+		}
+	}
 	return sum, nil
 }
 
@@ -300,6 +484,10 @@ type remoteIndex struct {
 	lookup Resolver
 	hosts  map[string][]models.Host
 	scans  map[int64]map[int]int64 // host id -> port -> service id
+}
+
+func newRemoteIndex(db *sql.DB, lookup Resolver) *remoteIndex {
+	return &remoteIndex{db: db, lookup: lookup, hosts: map[string][]models.Host{}, scans: map[int64]map[int]int64{}}
 }
 
 func (r *remoteIndex) hostsFor(ctx context.Context, addr string) ([]models.Host, error) {
@@ -341,9 +529,13 @@ func (r *remoteIndex) portServices(ctx context.Context, hostID int64) (map[int]i
 		return m, err
 	}
 	byKey := map[string]int64{}
+	byContainer := map[string]int64{}
 	for _, s := range svcs {
 		if s.DiscoveryKind == "host" {
 			byKey[s.DiscoveryKey] = s.ID
+		}
+		if s.ContainerName != "" {
+			byContainer[s.ContainerName] = s.ID
 		}
 	}
 	for _, d := range info.ServiceInventory {
@@ -357,25 +549,37 @@ func (r *remoteIndex) portServices(ctx context.Context, hostID int64) (map[int]i
 			}
 		}
 	}
+	// A port a container publishes (docker, Coolify) belongs to its container.
+	for _, po := range info.PortOwners {
+		if id := byContainer[po.OwnerName]; po.OwnerType == "container" && id != 0 && m[po.Port] == 0 {
+			m[po.Port] = id
+		}
+	}
 	return m, nil
+}
+
+// target resolves one destination: the only live host with that address
+// (0 when none or several) and the service owning the port in its latest scan.
+func (r *remoteIndex) target(ctx context.Context, addr string, port int) (hostID, svcID int64, err error) {
+	hs, err := r.hostsFor(ctx, addr)
+	if err != nil || len(hs) != 1 {
+		return 0, 0, err
+	}
+	ports, err := r.portServices(ctx, hs[0].ID)
+	return hs[0].ID, ports[port], err
 }
 
 func (r *remoteIndex) resolve(ctx context.Context, targets []remoteTarget) (hostIDs, svcIDs []int64, err error) {
 	for _, t := range targets {
-		hs, err := r.hostsFor(ctx, t.Addr)
+		hid, sid, err := r.target(ctx, t.Addr, t.Port)
 		if err != nil {
 			return nil, nil, err
 		}
-		if len(hs) != 1 {
-			continue
+		if hid != 0 {
+			hostIDs = append(hostIDs, hid)
 		}
-		hostIDs = append(hostIDs, hs[0].ID)
-		ports, err := r.portServices(ctx, hs[0].ID)
-		if err != nil {
-			return nil, nil, err
-		}
-		if id := ports[t.Port]; id != 0 {
-			svcIDs = append(svcIDs, id)
+		if sid != 0 {
+			svcIDs = append(svcIDs, sid)
 		}
 	}
 	return hostIDs, svcIDs, nil
