@@ -452,6 +452,32 @@ export interface GraphNode {
   data?: Record<string, unknown>;
 }
 
+/** One proxy_pass / fastcgi_pass a scan found (backend web_routes): site ×
+ *  location path × target, with the host and service it reaches when known.
+ *  Ids and names the caller can't see come back blank. */
+export interface WebRoute {
+  proxy_host_id: number;
+  proxy_host_slug: string;
+  proxy_host_name: string;
+  proxy_service_id?: number;
+  proxy_service_name?: string;
+  /** "" = default / IP-only site. */
+  server_name: string;
+  dns_id?: number;
+  domain?: string;
+  /** "" = the whole site (no location block). */
+  path: string;
+  target: string;
+  target_addr: string;
+  target_port: number;
+  target_host_id?: number;
+  target_host_slug?: string;
+  target_host_name?: string;
+  target_service_id?: number;
+  target_service_name?: string;
+  status: "linked" | "no_service" | "not_scanned" | "unknown_host";
+}
+
 export interface GraphEdge {
   source: string;
   target: string;

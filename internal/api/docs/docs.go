@@ -4632,7 +4632,7 @@ const docTemplate = `{
         },
         "/api/dns/{id}": {
             "get": {
-                "description": "Any role. The record with its relations. Invisible records answer 404.",
+                "description": "Any role. The record with its relations, and web_routes: the scanned proxy routes serving it, per path, with the backend host/service each reaches. Invisible records answer 404.",
                 "produces": [
                     "application/json"
                 ],
@@ -8310,7 +8310,7 @@ const docTemplate = `{
         },
         "/api/hosts/{slug}": {
             "get": {
-                "description": "Any role. The host with its relations. Invisible hosts answer 404.",
+                "description": "Any role. The host with its relations, and web_routes: what its web servers proxy (outbound) and other hosts' routes reaching it (inbound), per site and path, from the scans. Invisible hosts answer 404.",
                 "produces": [
                     "application/json"
                 ],
@@ -29930,6 +29930,13 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "web_routes": {
+                    "description": "WebRoutes: the scans' proxy routes serving this name, per path.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/store.WebRouteView"
+                    }
                 }
             }
         },
@@ -30120,6 +30127,9 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "web_routes": {
+                    "$ref": "#/definitions/service.HostWebRoutes"
                 }
             }
         },
@@ -30350,6 +30360,23 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "service.HostWebRoutes": {
+            "type": "object",
+            "properties": {
+                "inbound": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/store.WebRouteView"
+                    }
+                },
+                "outbound": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/store.WebRouteView"
+                    }
                 }
             }
         },
@@ -31072,6 +31099,67 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "store.WebRouteView": {
+            "type": "object",
+            "properties": {
+                "dns_id": {
+                    "type": "integer"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "path": {
+                    "description": "\"\" = whole site (no location block)",
+                    "type": "string"
+                },
+                "proxy_host_id": {
+                    "type": "integer"
+                },
+                "proxy_host_name": {
+                    "type": "string"
+                },
+                "proxy_host_slug": {
+                    "type": "string"
+                },
+                "proxy_service_id": {
+                    "type": "integer"
+                },
+                "proxy_service_name": {
+                    "type": "string"
+                },
+                "server_name": {
+                    "description": "\"\" = default / IP-only site",
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "target_addr": {
+                    "type": "string"
+                },
+                "target_host_id": {
+                    "type": "integer"
+                },
+                "target_host_name": {
+                    "type": "string"
+                },
+                "target_host_slug": {
+                    "type": "string"
+                },
+                "target_port": {
+                    "type": "integer"
+                },
+                "target_service_id": {
+                    "type": "integer"
+                },
+                "target_service_name": {
                     "type": "string"
                 }
             }

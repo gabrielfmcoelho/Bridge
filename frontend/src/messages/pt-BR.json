@@ -1696,7 +1696,14 @@
     "groupCoolifyProject": "Projeto Coolify",
     "groupNone": "Sem agrupamento",
     "expandAll": "Expandir todos",
-    "collapseAll": "Recolher hosts grandes"
+    "collapseAll": "Recolher hosts grandes",
+    "routes": "Rotas web",
+    "routesOutbound": "Encaminha para",
+    "routesInbound": "Recebe tráfego de",
+    "routeDefaultSite": "(site padrão)",
+    "routeNoService": "sem serviço na porta",
+    "routeNotScanned": "não escaneado",
+    "routeUnknownHost": "host desconhecido"
   },
   "sshConfig": {
     "title": "Config SSH",
@@ -3076,7 +3083,15 @@
       "source": "Arquivo",
       "usedBy": "Usado por",
       "undeclared": "DNS vinculados a este host que nenhum servidor web declara",
-      "dnsResult": "DNS: {created} criados, {linked} vinculados, {unresolved} sem resolução"
+      "dnsResult": "DNS: {created} criados, {linked} vinculados, {unresolved} sem resolução",
+      "kongDbLess": "sem banco (DB-less)",
+      "kongDbUnreachable": "banco inacessível",
+      "kongFailingTargets": "destinos com falha: {count}",
+      "kongCounts": "{services} serviços · {routes} rotas",
+      "kongTraffic": "Tráfego",
+      "kongTrafficValue": "{connections} conexões ativas · {requests} requisições",
+      "kongProxyPorts": "Portas do proxy",
+      "kongAdminPorts": "Portas de administração"
     },
     "storage": {
       "diskFullest": "Disco · mais cheia: {mount}",

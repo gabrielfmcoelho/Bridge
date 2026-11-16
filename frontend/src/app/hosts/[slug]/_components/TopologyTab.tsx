@@ -1,12 +1,12 @@
 "use client";
 
 import TopologyPane from "@/components/detail/TopologyPane";
-import RelationsCard, { dnsGroup, projectsGroup, servicesGroup, type RelationGroup } from "@/components/detail/RelationsCard";
+import RelationsCard, { dnsGroup, projectsGroup, routesGroups, servicesGroup, type RelationGroup } from "@/components/detail/RelationsCard";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import type { GraphData } from "@/lib/types";
+import type { GraphData, WebRoute } from "@/lib/types";
 
 export default function TopologyTab({ data, filteredGraph, graphLoading, t }: {
-  data: { orchestrator?: { type: string; version: string } | null; dns_records?: { id: number; domain: string; has_https: boolean; situacao: string }[]; services?: { id: number; nickname: string; technology_stack?: string }[]; projects?: { id: number; name: string; situacao?: string }[] };
+  data: { orchestrator?: { type: string; version: string } | null; dns_records?: { id: number; domain: string; has_https: boolean; situacao: string }[]; services?: { id: number; nickname: string; technology_stack?: string }[]; projects?: { id: number; name: string; situacao?: string }[]; web_routes?: { outbound: WebRoute[] | null; inbound: WebRoute[] | null } };
   filteredGraph: GraphData;
   graphLoading: boolean;
   t: (k: string) => string;
@@ -18,7 +18,9 @@ export default function TopologyTab({ data, filteredGraph, graphLoading, t }: {
       trailing: <span className="text-2xs text-[var(--text-muted)] font-mono">{data.orchestrator.version}</span>,
     }] : [],
   };
-  const groups = [orchestrator, servicesGroup(data.services ?? [], t), dnsGroup(data.dns_records ?? [], t), projectsGroup(data.projects ?? [], t)];
+  const groups = [orchestrator, servicesGroup(data.services ?? [], t), dnsGroup(data.dns_records ?? [], t),
+    ...routesGroups(data.web_routes?.outbound ?? [], "outbound", t), ...routesGroups(data.web_routes?.inbound ?? [], "inbound", t),
+    projectsGroup(data.projects ?? [], t)];
   return (
     <TopologyPane
       graph={filteredGraph}

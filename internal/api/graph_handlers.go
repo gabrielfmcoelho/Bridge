@@ -207,6 +207,9 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	addEdges(links.DBInstance, dbIDMap, serviceIDMap, "runs on")
 	addEdges(links.DBConsumer, dbIDMap, serviceIDMap, "consumed by")
 	addEdges(links.DBProject, dbIDMap, projectIDMap, "part of")
+	// Directed (proxy -> backend), from the scans' web routes.
+	addEdges(links.ServiceProxies, serviceIDMap, serviceIDMap, "proxies to")
+	addEdges(links.HostProxies, hostIDMap, hostIDMap, "proxies to")
 	edges = append(edges, derivedProjectEdges(services, links, hostIDMap, dnsIDMap, projectIDMap)...)
 
 	jsonOK(w, map[string]any{

@@ -2118,6 +2118,9 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	}
 	info.ServiceInventory = captureServices(hostInv, info.ParsedContainers, agentNames, agentPortClaims)
 	info.ServiceInventory = append(info.ServiceInventory, captureAppServers(client, sudoPassword, procDetails, hostInv.ContainerPIDs)...)
+	// Kong nodes the web probe reached own their listeners (before the
+	// port-owner back-fill below, which reads ServiceInventory's ports).
+	claimKongPorts(info)
 
 	// Back-fill PortOwners with agent and service attribution. `ss -tlnp`
 	// only emits a process column when the scanning user can see the
