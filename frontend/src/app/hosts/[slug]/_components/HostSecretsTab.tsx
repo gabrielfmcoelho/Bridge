@@ -131,6 +131,36 @@ export default function HostSecretsTab({ hostId, scanText }: { hostId: number; s
   );
 }
 
+/** A scan-captured secret whose value changed on the VM after first capture. */
+function drifted(secret: Secret): boolean {
+  return secret.updated_at > secret.created_at;
+}
+
+/** "changed on the VM {when}" — the scan re-captured a different value. */
+function DriftBadge({ when }: { when: string }) {
+  const { t, formatDateTime } = useLocale();
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--warning)]/10 px-1.5 py-0.5 text-2xs text-[var(--warning)]">
+      <Icon path={ICON_PATHS.refresh} className="w-2.5 h-2.5" />
+      {t("host.secrets.drift", { when: formatDateTime(when) })}
+    </span>
+  );
+}
+
+/** "reused on N VMs" — the same value is on other hosts the caller can see. */
+function ReuseChip({ count }: { count: number }) {
+  const { t } = useLocale();
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-[var(--info)]/10 px-1.5 py-0.5 text-2xs text-[var(--info)]"
+      title={t("host.secrets.reuseHint")}
+    >
+      <Icon path={ICON_PATHS.copy} className="w-2.5 h-2.5" />
+      {t("host.secrets.reuse", { count: String(count) })}
+    </span>
+  );
+}
+
 function SecretRow({ secret, inScan, canReveal }: { secret: Secret; inScan: boolean; canReveal: boolean }) {
   const { t, formatDateTime } = useLocale();
   const flag = useFlag();
@@ -152,7 +182,12 @@ function SecretRow({ secret, inScan, canReveal }: { secret: Secret; inScan: bool
           <StatusDot color={inScan ? "success" : "muted"} />
           {inScan ? t("host.secrets.inScan") : t("host.secrets.gone")}
         </span>
-        <span className="text-2xs text-[var(--text-faint)]">{t("host.secrets.updated", { when: formatDateTime(secret.updated_at) })}</span>
+        {inScan && drifted(secret) ? (
+          <DriftBadge when={secret.updated_at} />
+        ) : (
+          <span className="text-2xs text-[var(--text-faint)]">{t("host.secrets.updated", { when: formatDateTime(secret.updated_at) })}</span>
+        )}
+        {(secret.reuse_hosts ?? 0) > 1 && <ReuseChip count={secret.reuse_hosts!} />}
         {canReveal && (
           <PillButton
             active={r.revealed}
@@ -194,7 +229,7 @@ function ConfigRow({
   hasReveal: boolean;
   gone?: boolean;
 }) {
-  const { t, formatDateTime } = useLocale();
+  const { t } = useLocale();
   const flag = useFlag();
   const r = useSecretReveal();
 
@@ -208,7 +243,7 @@ function ConfigRow({
   const admin = source?.admin ?? secret?.group_label?.startsWith("scan-admin-") ?? false;
   const fieldNames = Object.keys(source?.fields ?? {});
   const indirect = !!source && !tokenId(source.token);
-  const changed = secret && secret.updated_at !== secret.created_at;
+  const drift = !!secret && !gone && drifted(secret);
 
   // Admin tier reveals to admins only; the rest keeps hosts.secrets.reveal.
   const canReveal = !!secret && !indirect && (isAdmin || (!admin && hasReveal));
@@ -243,9 +278,8 @@ function ConfigRow({
           <StatusDot color={gone ? "muted" : "success"} />
           {gone ? t("host.secrets.gone") : t("host.secrets.inScan")}
         </span>
-        {changed && (
-          <span className="text-2xs text-[var(--text-faint)]">{t("host.secrets.updated", { when: formatDateTime(secret!.updated_at) })}</span>
-        )}
+        {drift && <DriftBadge when={secret!.updated_at} />}
+        {(secret?.reuse_hosts ?? 0) > 1 && <ReuseChip count={secret!.reuse_hosts!} />}
         {indirect && <span className="text-2xs text-[var(--text-faint)]">{t("host.secrets.indirect")}</span>}
         {lockOnly && (
           <span className="inline-flex items-center gap-1 text-2xs text-[var(--text-muted)]">

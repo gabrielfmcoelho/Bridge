@@ -673,6 +673,9 @@
       "noRoot": "A captura em arquivos de configuração precisa de root — uma senha SSH guardada.",
       "adminOnly": "somente admin",
       "indirect": "referência indireta",
+      "drift": "Mudou na VM {when}",
+      "reuse": "Reutilizada em {count} VMs",
+      "reuseHint": "O mesmo valor foi capturado em outras VMs — uma credencial reutilizada na frota.",
       "detector": {
         "ci3_database": "Banco CodeIgniter 3",
         "dotenv": "Arquivo .env",
@@ -1241,6 +1244,7 @@
     "title": "Registros DNS",
     "addDns": "Adicionar DNS",
     "domain": "Domínio",
+    "openSite": "Abrir site",
     "hasHttps": "HTTPS",
     "responsavel": "Responsável",
     "domainPlaceholder": "ex.: example.com",
