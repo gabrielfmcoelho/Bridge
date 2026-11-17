@@ -1882,6 +1882,13 @@ func (h *sshHandlers) recordScan(ctx context.Context, host *models.Host, vmInfo 
 	} else {
 		result["web_dns"] = webDNS
 	}
+	// Other hosts' web routes aimed at this one resolve against this scan, so
+	// a backend scanned after its proxy closes the link. Never fails the scan.
+	if inbound, inErr := service.LinkInboundRoutes(ctx, h.db.SQL, host, *vmInfo, service.LookupHost); inErr != nil {
+		result["web_routes_inbound_error"] = inErr.Error()
+	} else {
+		result["web_routes_inbound"] = inbound
+	}
 	// Git remotes on the configured GitLab → this host's scan links
 	// (path-keyed, visible to the token or not). Never fails the scan.
 	if gls, glErr := gitlabclient.LoadSettings(h.db.SQL, h.db.Encryptor); glErr != nil {

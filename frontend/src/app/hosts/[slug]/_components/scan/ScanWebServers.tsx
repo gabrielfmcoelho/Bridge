@@ -3,11 +3,11 @@
 import Link from "next/link";
 import SectionCard from "@/components/ui/SectionCard";
 import Badge from "@/components/ui/Badge";
-import type { VMInfoType, WebServer, WebSite } from "@/lib/api";
+import type { KongNode, VMInfoType, WebServer, WebSite } from "@/lib/api";
 import { linkedIndex, nameStatus, poolUsers, undeclaredRecords } from "@/lib/webDns";
 import { Detail, Row, Rows, SubBlock, type T } from "./shared";
 
-const KIND_LABEL: Record<WebServer["kind"], string> = { nginx: "nginx", apache: "Apache", "php-fpm": "PHP-FPM" };
+const KIND_LABEL: Record<WebServer["kind"], string> = { nginx: "nginx", apache: "Apache", "php-fpm": "PHP-FPM", kong: "Kong" };
 
 /**
  * nginx / Apache / PHP-FPM found by the scan — on the host or in a container —
@@ -17,11 +17,12 @@ const KIND_LABEL: Record<WebServer["kind"], string> = { nginx: "nginx", apache: 
  * names are plain.
  */
 export default function ScanWebServers({ info, t, dnsRecords }: {
-  info: VMInfoType; t: T; dnsRecords?: { id: number; domain: string }[];
+  info: VMInfoType; t: T; dnsRecords?: { id: number; domain: string; inbound?: boolean }[];
 }) {
   const servers = info.web_servers ?? [];
   const linked = dnsRecords ? linkedIndex(dnsRecords) : null;
-  const undeclared = dnsRecords && servers.length > 0 ? undeclaredRecords(dnsRecords, servers) : [];
+  // A record another host's proxy routes here (inbound) is explained on the Topology tab.
+  const undeclared = dnsRecords && servers.length > 0 ? undeclaredRecords(dnsRecords.filter((r) => !r.inbound), servers) : [];
 
   return (
     <SectionCard as="h3" title={t("scan.pane.group.webservers")} empty={servers.length === 0 ? t("scan.pane.empty.webservers") : undefined}>
@@ -47,6 +48,7 @@ function ServerBlock({ server: s, servers, linked, t }: {
   return (
     <SubBlock title={`${KIND_LABEL[s.kind] ?? s.kind} · ${where}`} aside={s.stopped ? t("scan.web.stopped") : s.container_image}>
       {s.error && <p className="text-xs text-[var(--warning)] mb-2 break-all">{s.error}</p>}
+      {s.kong && !s.error && <Rows><KongRow k={s.kong} t={t} /></Rows>}
       {(s.sites ?? []).length > 0 && (
         <Rows>{s.sites!.map((site, i) => <SiteRow key={i} site={site} linked={linked} muted={s.stopped} t={t} />)}</Rows>
       )}
@@ -70,6 +72,41 @@ function ServerBlock({ server: s, servers, linked, t }: {
         </Rows>
       )}
     </SubBlock>
+  );
+}
+
+const TARGET_COLOR: Record<string, "success" | "danger"> = { HEALTHY: "success", UNHEALTHY: "danger", DNS_ERROR: "danger" };
+
+/** A Kong node's status: version, database, routes; expands to traffic, listeners and upstream target health. */
+function KongRow({ k, t }: { k: KongNode; t: T }) {
+  const db = k.database && k.database !== "off" ? `${k.database} ${k.db_host}:${k.db_port}` : t("scan.web.kongDbLess");
+  const targets = (k.upstreams ?? []).flatMap((u) => u.targets ?? []);
+  const failing = targets.filter((x) => TARGET_COLOR[x.health ?? ""] === "danger").length;
+  return (
+    <Row
+      summary={<>
+        <span className="font-mono text-[var(--text-primary)] shrink-0">Kong {k.version}</span>
+        <span className="font-mono text-[var(--text-muted)] truncate" title={db}>{db}</span>
+        {k.db_reachable === false && <Badge color="danger" compact className="shrink-0 whitespace-nowrap">{t("scan.web.kongDbUnreachable")}</Badge>}
+        {failing > 0 && <Badge color="danger" compact className="shrink-0 whitespace-nowrap">{t("scan.web.kongFailingTargets", { count: String(failing) })}</Badge>}
+        <span className="ml-auto shrink-0 text-[var(--text-muted)]">{t("scan.web.kongCounts", { services: String(k.services), routes: String(k.routes) })}</span>
+      </>}
+    >
+      <Detail label={t("scan.web.kongTraffic")}>
+        {t("scan.web.kongTrafficValue", { connections: String(k.connections_active ?? 0), requests: String(k.total_requests ?? 0) })}
+      </Detail>
+      {(k.proxy_ports ?? []).length > 0 && <Detail label={t("scan.web.kongProxyPorts")}>{k.proxy_ports!.join(", ")}</Detail>}
+      {(k.admin_ports ?? []).length > 0 && <Detail label={t("scan.web.kongAdminPorts")}>{k.admin_ports!.join(", ")}</Detail>}
+      {(k.upstreams ?? []).map((u) => (
+        <Detail key={u.name} label={u.name}>
+          <span className="flex flex-wrap gap-1">
+            {(u.targets ?? []).map((x) => (
+              <span key={x.target} title={x.health}><Badge color={TARGET_COLOR[x.health ?? ""] ?? "gray"} compact>{x.target}</Badge></span>
+            ))}
+          </span>
+        </Detail>
+      ))}
+    </Row>
   );
 }
 

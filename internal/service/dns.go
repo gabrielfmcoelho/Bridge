@@ -29,6 +29,7 @@ type DNSService struct {
 	tags         *store.TagRepo
 	responsaveis *store.ResponsavelRepo
 	grants       *store.AssetEntidadeRepo
+	routes       *store.WebRouteRepo
 }
 
 // ErrSetEntidades marks a grants write that failed after the record itself
@@ -44,6 +45,7 @@ func NewDNSService(db *sql.DB) *DNSService {
 		tags:         store.NewTagRepo(db),
 		responsaveis: store.NewResponsavelRepo(db),
 		grants:       store.NewAssetEntidadeRepo(db),
+		routes:       store.NewWebRouteRepo(db),
 	}
 }
 
@@ -68,6 +70,8 @@ type DNSDetail struct {
 	ProjectIDs   []int64              `json:"project_ids"`
 	Responsaveis []models.Responsavel `json:"responsaveis"`
 	Entidades    models.AssetGrants   `json:"entidades"`
+	// WebRoutes: the scans' proxy routes serving this name, per path.
+	WebRoutes []store.WebRouteView `json:"web_routes"`
 }
 
 // DNSWrite carries the create/update payload (record + relations). For update,
@@ -170,9 +174,13 @@ func (s *DNSService) Get(ctx context.Context, id int64) (*DNSDetail, error) {
 		return nil, err
 	}
 	ents, _ := s.grants.Get(ctx, store.AssetDNS, id) // best effort: zero value on error
+	routes, err := s.routes.ByDNS(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	return &DNSDetail{Record: rec, Tags: tags, HostIDs: hostIDs,
 		ServiceIDs: nonNil(serviceIDs), ProjectIDs: nonNil(projectIDs),
-		Responsaveis: resp, Entidades: ents}, nil
+		Responsaveis: resp, Entidades: ents, WebRoutes: routes}, nil
 }
 
 // nonNil turns a nil slice into [] so it encodes as a JSON array.

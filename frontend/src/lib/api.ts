@@ -405,8 +405,28 @@ export type BlockDisk = { name: string; size_bytes: number; unused?: boolean };
 export type VolumeGroup = { name: string; size_bytes: number; free_bytes: number };
 
 /** nginx / Apache / php-fpm found by the scan, on the host or in a container. */
+/** A Kong node the scan reached through its Admin API (web server kind "kong"). */
+export type KongNode = {
+  prefix: string;
+  version?: string;
+  /** postgres, or "off" for DB-less. */
+  database?: string;
+  db_host?: string;
+  db_port?: number;
+  /** Absent when Kong doesn't report it (DB-less, older versions). */
+  db_reachable?: boolean;
+  connections_active?: number;
+  total_requests?: number;
+  proxy_ports?: number[];
+  /** Admin API, Kong Manager and status listeners. */
+  admin_ports?: number[];
+  services: number;
+  routes: number;
+  upstreams?: { name: string; targets?: { target: string; health?: string }[] }[];
+};
+
 export type WebServer = {
-  kind: "nginx" | "apache" | "php-fpm";
+  kind: "nginx" | "apache" | "php-fpm" | "kong";
   container?: string;
   container_id?: string;
   container_image?: string;
@@ -415,6 +435,8 @@ export type WebServer = {
   /** Host server whose systemd unit isn't running: its names create no DNS. */
   stopped?: boolean;
   error?: string;
+  /** Kong only: the node's status; its routes are the sites. */
+  kong?: KongNode;
 };
 
 export type WebSite = {
@@ -756,6 +778,7 @@ export const hostsAPI = {
       responsaveis: import("./types").HostResponsavel[];
       chamados: import("./types").HostChamado[];
       entidades?: import("./types").AssetGrants;
+      web_routes?: { outbound: import("./types").WebRoute[] | null; inbound: import("./types").WebRoute[] | null };
     }>(`/api/hosts/${slug}`),
   create: (data: Partial<import("./types").Host> & { password?: string; tags?: string[]; dns_ids?: number[]; service_ids?: number[]; project_ids?: number[]; } & import("./types").AssetGrantsInput) =>
     api.post<import("./types").Host>("/api/hosts", data),
@@ -799,7 +822,7 @@ export const hostChamadosAPI = {
 export const dnsAPI = {
   list: () => api.getList<import("./types").DNSRecord>("/api/dns"),
   listPaginated: (params: Record<string, string>) => api.getListPaginated<import("./types").DNSRecord>(`/api/dns?${new URLSearchParams(params).toString()}`),
-  get: (id: number) => api.get<{ dns_record: import("./types").DNSRecord; tags: string[]; host_ids: number[]; service_ids?: number[]; project_ids?: number[]; responsaveis: import("./types").EntityResponsavel[]; entidades?: import("./types").AssetGrants }>(`/api/dns/${id}`),
+  get: (id: number) => api.get<{ dns_record: import("./types").DNSRecord; tags: string[]; host_ids: number[]; service_ids?: number[]; project_ids?: number[]; responsaveis: import("./types").EntityResponsavel[]; entidades?: import("./types").AssetGrants; web_routes?: import("./types").WebRoute[] }>(`/api/dns/${id}`),
   create: (data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; service_ids?: number[]; project_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>
     api.post<import("./types").DNSRecord>("/api/dns", data),
   update: (id: number, data: Partial<import("./types").DNSRecord> & { tags?: string[]; host_ids?: number[]; service_ids?: number[]; project_ids?: number[]; responsaveis?: import("./types").EntityResponsavelInput[] } & import("./types").AssetGrantsInput) =>

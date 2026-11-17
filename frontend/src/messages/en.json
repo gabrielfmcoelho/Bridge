@@ -1696,7 +1696,14 @@
     "groupCoolifyProject": "Coolify project",
     "groupNone": "No grouping",
     "expandAll": "Expand all",
-    "collapseAll": "Collapse large hosts"
+    "collapseAll": "Collapse large hosts",
+    "routes": "Web routes",
+    "routesOutbound": "Forwards to",
+    "routesInbound": "Reached through",
+    "routeDefaultSite": "(default site)",
+    "routeNoService": "no service on port",
+    "routeNotScanned": "not scanned",
+    "routeUnknownHost": "unknown host"
   },
   "sshConfig": {
     "title": "SSH Config",
@@ -3076,7 +3083,15 @@
       "source": "File",
       "usedBy": "Used by",
       "undeclared": "DNS records linked to this host that no web server declares",
-      "dnsResult": "DNS: {created} created, {linked} linked, {unresolved} not resolving"
+      "dnsResult": "DNS: {created} created, {linked} linked, {unresolved} not resolving",
+      "kongDbLess": "DB-less",
+      "kongDbUnreachable": "database unreachable",
+      "kongFailingTargets": "failing targets: {count}",
+      "kongCounts": "{services} services · {routes} routes",
+      "kongTraffic": "Traffic",
+      "kongTrafficValue": "{connections} active connections · {requests} requests",
+      "kongProxyPorts": "Proxy ports",
+      "kongAdminPorts": "Admin ports"
     },
     "storage": {
       "diskFullest": "Disk · fullest: {mount}",
