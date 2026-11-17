@@ -398,6 +398,23 @@ export interface Secret {
   /** >1: this many visible secrets hold the same value; dup_group ties them. */
   dup_count?: number;
   dup_group?: string;
+  /** >1: this credential's value is on that many distinct VMs the caller can see. */
+  reuse_hosts?: number;
+}
+
+/**
+ * Provenance of a config-file credential the scan captured (credsources).
+ * Stored in the scan JSON as `credential_sources` — field names and a vault
+ * token only, never a value.
+ */
+export interface CredentialSource {
+  detector: string;
+  path: string;
+  locator?: string;
+  kind?: string;
+  admin?: boolean;
+  fields?: Record<string, string>;
+  token?: string; // {{secret:<id>}}; empty for an indirect reference
 }
 
 /** Identical per-host copies of a password/key the admin can consolidate. */
@@ -433,6 +450,32 @@ export interface GraphNode {
   /** Service nodes may carry container_name, source, coolify_project,
    *  coolify_environment, coolify_stack, project_id (all optional). */
   data?: Record<string, unknown>;
+}
+
+/** One proxy_pass / fastcgi_pass a scan found (backend web_routes): site ×
+ *  location path × target, with the host and service it reaches when known.
+ *  Ids and names the caller can't see come back blank. */
+export interface WebRoute {
+  proxy_host_id: number;
+  proxy_host_slug: string;
+  proxy_host_name: string;
+  proxy_service_id?: number;
+  proxy_service_name?: string;
+  /** "" = default / IP-only site. */
+  server_name: string;
+  dns_id?: number;
+  domain?: string;
+  /** "" = the whole site (no location block). */
+  path: string;
+  target: string;
+  target_addr: string;
+  target_port: number;
+  target_host_id?: number;
+  target_host_slug?: string;
+  target_host_name?: string;
+  target_service_id?: number;
+  target_service_name?: string;
+  status: "linked" | "no_service" | "not_scanned" | "unknown_host";
 }
 
 export interface GraphEdge {
@@ -1554,7 +1597,7 @@ export interface OSUpdateResult {
 
 /** One thing to look at before a release; the UI words it from code. */
 export interface RiskWarning {
-  code: "dpkg_broken" | "foreign_packages" | "disabled_sources" | "modified_conffiles" | "pending_dist_files"
+  code: "fs_errors" | "dpkg_broken" | "foreign_packages" | "disabled_sources" | "modified_conffiles" | "pending_dist_files"
     | "failed_units" | "php_handler_missing" | "vhost_port_unlistened";
   count: number;
   /** The first few items. */
@@ -1847,6 +1890,8 @@ export interface Database {
   tunnel_target: string;
   tls_mode: DatabaseTLSMode;
   has_credential: boolean;
+  /** The scan created this row from the DB-metadata probe (descoberto badge). */
+  discovered: boolean;
   sensitivity: DatabaseSensitivity;
   environment: DatabaseEnvironment;
   backup_policy: string;
@@ -1863,4 +1908,19 @@ export interface Database {
   /** Detail only. */
   responsaveis?: EntityResponsavel[];
   entidades?: AssetGrants;
+  /** Detail only: config-file logins the scan found on the instance host. */
+  scan_logins?: ScanLoginRef[];
+}
+
+/** One config-file login the scan captured (Phase 1), shown as "login found on
+ * host X (scan)" with a link to that host's Segredos tab. Never a value. */
+export interface ScanLoginRef {
+  host_id: number;
+  host_nickname: string;
+  host_slug: string;
+  detector: string;
+  path: string;
+  locator?: string;
+  user?: string;
+  db_name?: string;
 }

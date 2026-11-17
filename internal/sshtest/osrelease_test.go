@@ -187,6 +187,45 @@ func TestReleaseScript_Skips(t *testing.T) {
 	}
 }
 
+// do-release-upgrade -c exits 1 for "no new release" and for a crash alike:
+// only the first is a skip. SAPASP-INGEST01's broken apt cache was reported
+// as "no newer LTS" until the crash got its own error.
+func TestReleaseScript_UbuntuCheckFails(t *testing.T) {
+	const focal = "ID=ubuntu\nVERSION_ID=\"20.04\"\nVERSION_CODENAME=focal\n"
+	for _, c := range []struct{ name, out, skip, err string }{
+		{"no release", "Checking for a new Ubuntu release\nNo new release found", "no newer LTS", ""},
+		{"crash", "Traceback (most recent call last):\napt_pkg.Error: E:can not open /var/lib/apt/lists/x_InRelease - fopen (13: Permission denied)\n",
+			"", "do-release-upgrade -c failed: apt_pkg.Error: E:can not open /var/lib/apt/lists/x_InRelease"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := newReleaseHost(t, focal, "9000000", map[string]string{
+				"apt-get": aptGetStub(""), "apt": "exit 0",
+				"do-release-upgrade": "printf '%s\\n' '" + strings.ReplaceAll(c.out, "'", "") + "'; exit 1",
+			})
+			r, out, err := h.run()
+			if (c.skip != "") != (err == nil) || !strings.Contains(r.Skip+"|", c.skip) || !strings.HasPrefix(r.Error, c.err) || r.RebootRequired {
+				t.Fatalf("err=%v report=%+v\n%s", err, r, out)
+			}
+		})
+	}
+}
+
+// A corrupted filesystem: the release and its check skip before anything.
+func TestReleaseScript_FSErrors(t *testing.T) {
+	h := newReleaseHost(t, bookworm, "9000000", map[string]string{"apt-get": aptGetStub("")})
+	h.write("sys/fs/ext4/sda1/errors_count", "194\n")
+	h.write("proc/mounts", "/dev/sda1 / ext4 rw 0 0\n")
+	for _, script := range []string{osReleaseScript, ReleasePrecheck(true)} {
+		r, out, err := h.runScript(script)
+		if err != nil || !strings.Contains(r.Skip, "corrupted") || r.Ready || len(r.FSErrors) != 1 || r.FSErrors[0].Mount != "/" {
+			t.Fatalf("err=%v report=%+v\n%s", err, r, out)
+		}
+	}
+	if calls := h.read("calls"); calls != "" {
+		t.Fatalf("apt-get ran: %q", calls)
+	}
+}
+
 // The check-only pass changes nothing and ends with @@ready. A package that
 // "apt list" still shows but an update wouldn't install (Ubuntu's phased
 // updates) doesn't count as waiting.

@@ -23,18 +23,29 @@ func NewDatabaseRepo(db *sql.DB) *DatabaseRepo { return &DatabaseRepo{db: db} }
 
 const databaseCols = `d.id, d.name, d.db_name, d.description, d.use_cases, d.engine, d.instance_service_id,
 	d.external_provider, d.host, d.port, d.connection_mode, d.tunnel_host_id, d.tunnel_target, d.tls_mode,
-	d.credential_secret_id IS NOT NULL, d.sensitivity, d.environment, d.backup_policy, d.backup_retention_days,
+	d.credential_secret_id IS NOT NULL, d.discovered, d.sensitivity, d.environment, d.backup_policy, d.backup_retention_days,
 	d.last_backup_at, d.created_by, d.created_at, d.updated_at, d.deleted_at`
 
 func scanDatabase(sc interface{ Scan(...any) error }, d *models.Database) error {
 	return sc.Scan(&d.ID, &d.Name, &d.DBName, &d.Description, &d.UseCases, &d.Engine, &d.InstanceServiceID,
 		&d.ExternalProvider, &d.Host, &d.Port, &d.ConnectionMode, &d.TunnelHostID, &d.TunnelTarget, &d.TLSMode,
-		&d.HasCredential, &d.Sensitivity, &d.Environment, &d.BackupPolicy, &d.BackupRetentionDays,
+		&d.HasCredential, &d.Discovered, &d.Sensitivity, &d.Environment, &d.BackupPolicy, &d.BackupRetentionDays,
 		&d.LastBackupAt, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt, &d.DeletedAt)
 }
 
-// Create inserts a database row (grants and links are set by the caller).
+// Create inserts an operator-made database row (grants and links are set by the
+// caller). discovered stays false — only RecordScanDatabases marks a row discovered.
 func (r *DatabaseRepo) Create(ctx context.Context, d *models.Database) error {
+	return r.create(ctx, d, false)
+}
+
+// CreateDiscovered inserts a scan-born database row (discovered = true), used by
+// service.RecordScanDatabases.
+func (r *DatabaseRepo) CreateDiscovered(ctx context.Context, d *models.Database) error {
+	return r.create(ctx, d, true)
+}
+
+func (r *DatabaseRepo) create(ctx context.Context, d *models.Database, discovered bool) error {
 	d.ApplyDefaults()
 	if err := d.Validate(); err != nil {
 		return err
@@ -42,16 +53,26 @@ func (r *DatabaseRepo) Create(ctx context.Context, d *models.Database) error {
 	id, err := database.InsertReturningID(r.db,
 		`INSERT INTO databases (name, db_name, description, use_cases, engine, instance_service_id, external_provider,
 			host, port, connection_mode, tunnel_host_id, tunnel_target, tls_mode, sensitivity, environment,
-			backup_policy, backup_retention_days, last_backup_at, created_by)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			backup_policy, backup_retention_days, last_backup_at, created_by, discovered)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		d.Name, d.DBName, d.Description, d.UseCases, d.Engine, d.InstanceServiceID, d.ExternalProvider,
 		d.Host, d.Port, d.ConnectionMode, d.TunnelHostID, d.TunnelTarget, d.TLSMode, d.Sensitivity, d.Environment,
-		d.BackupPolicy, d.BackupRetentionDays, d.LastBackupAt, d.CreatedBy)
+		d.BackupPolicy, d.BackupRetentionDays, d.LastBackupAt, d.CreatedBy, discovered)
 	if err != nil {
 		return err
 	}
-	d.ID = id
+	d.ID, d.Discovered = id, discovered
 	return nil
+}
+
+// ExistsByInstanceAndName reports whether a row for (instanceID, dbName) already
+// exists — live OR trashed, ignoring visibility (RecordScanDatabases runs under
+// system scope). It is what keeps the scan from recreating a trashed discovery.
+func (r *DatabaseRepo) ExistsByInstanceAndName(ctx context.Context, instanceID int64, dbName string) (bool, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM databases WHERE instance_service_id = ? AND db_name = ?`, instanceID, dbName).Scan(&n)
+	return n > 0, err
 }
 
 // Update writes every editable field of d (the handler merges a partial

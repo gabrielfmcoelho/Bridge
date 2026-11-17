@@ -24,7 +24,7 @@ export default function ScanPane({ slug, host, lastScan, canEdit, dnsRecords }: 
   slug: string;
   host: Host;
   /** DNS records linked to the host (web-server names show their link). */
-  dnsRecords?: { id: number; domain: string }[];
+  dnsRecords?: { id: number; domain: string; inbound?: boolean }[];
   lastScan: { data: string; scanned_at: string } | null | undefined;
   canEdit: boolean;
 }) {

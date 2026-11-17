@@ -5,19 +5,22 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Drawer from "@/components/ui/Drawer";
 import Button from "@/components/ui/Button";
+import Icon from "@/components/ui/Icon";
 import Lozenge, { type LozengeAppearance } from "@/components/ui/Lozenge";
 import SectionHeading from "@/components/ui/SectionHeading";
 import StatusAlert from "@/components/ui/StatusAlert";
 import { tableClasses } from "@/components/ui/Table";
 import { useLocale } from "@/contexts/LocaleContext";
 import { useFlag } from "@/contexts/FlagContext";
+import { useCopy } from "@/hooks/useCopy";
 import { osUpdateAPI } from "@/lib/api";
+import { ICON_PATHS } from "@/lib/icon-paths";
 import { getTimeAgo } from "@/lib/utils";
 import type { OSUpdateResult, OSUpdateRun } from "@/lib/types";
 import OSRestoreModal from "./OSRestoreModal";
 import OSUpdateModal, { type UpdateHost } from "./OSUpdateModal";
 import BackupActions from "./BackupActions";
-import RunReport, { needsRepair, reportIssues } from "./RunReport";
+import RunReport, { needsRepair, reportIssues, reportText } from "./RunReport";
 
 const RUN_TONE: Record<OSUpdateRun["status"], LozengeAppearance> = { running: "inprogress", done: "success", cancelled: "default", interrupted: "moved" };
 const RESULT_TONE: Record<OSUpdateResult["status"], LozengeAppearance> = { pending: "default", running: "inprogress", success: "success", failed: "removed", skipped: "moved" };
@@ -107,8 +110,20 @@ export function RunDrawer({ id, onClose, onRestore, onRepair }: {
   id: number; onClose: () => void; onRestore: (x: OSUpdateResult) => void; onRepair: (h: UpdateHost) => void;
 }) {
   const { t } = useLocale();
+  const flag = useFlag();
+  const { copy } = useCopy();
   const queryClient = useQueryClient();
   const [openHost, setOpenHost] = useState<number | null>(null);
+
+  const copyLog = async (text: string) =>
+    flag(await copy(text)
+      ? { appearance: "success", title: t("host.osUpdate.log.copied") }
+      : { appearance: "error", title: t("host.osUpdate.log.copyFailed") });
+  const downloadLog = (x: OSUpdateResult, kind: OSUpdateRun["kind"], runId: number, text: string) => {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+    Object.assign(document.createElement("a"), { href: url, download: `${x.host_slug}-${kind}-run${runId}.log` }).click();
+    URL.revokeObjectURL(url);
+  };
   const { data: run, isError, error } = useQuery({
     queryKey: ["os-updates", "run", id],
     queryFn: () => osUpdateAPI.run(id),
@@ -152,7 +167,9 @@ export function RunDrawer({ id, onClose, onRestore, onRepair }: {
               </tr>
             </thead>
             <tbody>
-              {(run.results ?? []).map((x) => (
+              {(run.results ?? []).map((x) => {
+                const logText = [x.reason, x.report && reportText(x.report, t), x.output].filter(Boolean).join("\n\n");
+                return (
                 <Fragment key={x.host_id}>
                   <tr className={`${tableClasses.row} ${x.output || x.report ? "cursor-pointer" : ""}`}
                     onClick={() => (x.output || x.report) && setOpenHost(openHost === x.host_id ? null : x.host_id)}>
@@ -188,13 +205,20 @@ export function RunDrawer({ id, onClose, onRestore, onRepair }: {
                   {openHost === x.host_id && (
                     <tr className={tableClasses.row}>
                       <td className={tableClasses.td} colSpan={run.backup ? 6 : 5}>
+                        {logText && (
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            <Button size="sm" variant="ghost" onClick={() => copyLog(logText)}><Icon path={ICON_PATHS.copy} />{t("host.osUpdate.log.copy")}</Button>
+                            <Button size="sm" variant="ghost" onClick={() => downloadLog(x, run.kind, run.id, logText)}><Icon path={ICON_PATHS.download} />{t("host.osUpdate.log.download")}</Button>
+                          </div>
+                        )}
                         {x.report && <RunReport report={x.report} />}
                         {x.output && <pre className="text-xs font-mono whitespace-pre-wrap max-h-80 overflow-auto bg-[var(--bg-elevated)] rounded-[var(--radius-md)] p-3">{x.output}</pre>}
                       </td>
                     </tr>
                   )}
                 </Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

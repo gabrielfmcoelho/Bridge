@@ -73,7 +73,7 @@ func (h *dnsHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 // handleGet godoc
 //
 //	@Summary		Get a DNS record
-//	@Description	Any role. The record with its relations. Invisible records answer 404.
+//	@Description	Any role. The record with its relations, and web_routes: the scanned proxy routes serving it, per path, with the backend host/service each reaches. Invisible records answer 404.
 //	@Tags			dns
 //	@Produce		json
 //	@Param			id	path		int	true	"DNS record ID"

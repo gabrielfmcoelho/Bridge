@@ -4222,6 +4222,12 @@ definitions:
         type: string
       description:
         type: string
+      discovered:
+        description: |-
+          Discovered marks a row the scan created from the A5 DB-metadata probe
+          (service.RecordScanDatabases) rather than an operator — shown as a
+          "descoberto" badge. Operator edits don't clear it.
+        type: boolean
       engine:
         type: string
       entidades:
@@ -4269,6 +4275,14 @@ definitions:
         description: Responsaveis and Entidades are loaded on detail responses only.
         items:
           $ref: '#/definitions/models.Responsavel'
+        type: array
+      scan_logins:
+        description: |-
+          ScanLogins: config-file logins the scan found (Phase 1 credential_sources)
+          on this database's instance host that name this db. Loaded on detail only;
+          reveal stays on the host's Segredos tab — this is a pointer, not the secret.
+        items:
+          $ref: '#/definitions/models.ScanLoginRef'
         type: array
       sensitivity:
         description: 'LGPD: publico | interno | pessoal | sensivel'
@@ -5364,6 +5378,25 @@ definitions:
           type: string
         type: object
     type: object
+  models.ScanLoginRef:
+    properties:
+      db_name:
+        type: string
+      detector:
+        type: string
+      host_id:
+        type: integer
+      host_nickname:
+        type: string
+      host_slug:
+        type: string
+      locator:
+        type: string
+      path:
+        type: string
+      user:
+        type: string
+    type: object
   models.SecretAuditAction:
     enum:
     - create
@@ -5955,6 +5988,11 @@ definitions:
         items:
           type: string
         type: array
+      web_routes:
+        description: 'WebRoutes: the scans'' proxy routes serving this name, per path.'
+        items:
+          $ref: '#/definitions/store.WebRouteView'
+        type: array
     type: object
   service.DNSListItem:
     properties:
@@ -6082,6 +6120,8 @@ definitions:
         items:
           type: string
         type: array
+      web_routes:
+        $ref: '#/definitions/service.HostWebRoutes'
     type: object
   service.HostListItem:
     properties:
@@ -6236,6 +6276,17 @@ definitions:
         type: boolean
       version:
         type: string
+    type: object
+  service.HostWebRoutes:
+    properties:
+      inbound:
+        items:
+          $ref: '#/definitions/store.WebRouteView'
+        type: array
+      outbound:
+        items:
+          $ref: '#/definitions/store.WebRouteView'
+        type: array
     type: object
   service.ProjectDetail:
     properties:
@@ -6448,6 +6499,14 @@ definitions:
       responsaveis:
         items:
           $ref: '#/definitions/models.Responsavel'
+        type: array
+      scan_logins:
+        description: |-
+          ScanLogins: config-file logins the scan found on this service's host(s)
+          (Phase 1 credential_sources) — "login found on host X (scan)", linking to
+          that host's Segredos tab. Field names only; reveal stays host-scoped.
+        items:
+          $ref: '#/definitions/models.ScanLoginRef'
         type: array
       service:
         $ref: '#/definitions/models.Service'
@@ -6733,6 +6792,47 @@ definitions:
       name:
         type: string
     type: object
+  store.WebRouteView:
+    properties:
+      dns_id:
+        type: integer
+      domain:
+        type: string
+      path:
+        description: '"" = whole site (no location block)'
+        type: string
+      proxy_host_id:
+        type: integer
+      proxy_host_name:
+        type: string
+      proxy_host_slug:
+        type: string
+      proxy_service_id:
+        type: integer
+      proxy_service_name:
+        type: string
+      server_name:
+        description: '"" = default / IP-only site'
+        type: string
+      status:
+        type: string
+      target:
+        type: string
+      target_addr:
+        type: string
+      target_host_id:
+        type: integer
+      target_host_name:
+        type: string
+      target_host_slug:
+        type: string
+      target_port:
+        type: integer
+      target_service_id:
+        type: integer
+      target_service_name:
+        type: string
+    type: object
   vault.BundleAPIDocItem:
     properties:
       external_url:
@@ -7003,6 +7103,12 @@ definitions:
         type: integer
       parent_name:
         type: string
+      reuse_hosts:
+        description: |-
+          ReuseHosts > 1: this credential's value is on that many distinct hosts the
+          caller can see — one password or login reused across VMs. Filled only for a
+          host-scoped list (the host Segredos tab); 0 everywhere else.
+        type: integer
       scope:
         $ref: '#/definitions/models.SecretScope'
       ssh_fingerprint:
@@ -10204,8 +10310,9 @@ paths:
       tags:
       - dns
     get:
-      description: Any role. The record with its relations. Invisible records answer
-        404.
+      description: 'Any role. The record with its relations, and web_routes: the scanned
+        proxy routes serving it, per path, with the backend host/service each reaches.
+        Invisible records answer 404.'
       parameters:
       - description: DNS record ID
         in: path
@@ -12750,7 +12857,9 @@ paths:
       tags:
       - hosts
     get:
-      description: Any role. The host with its relations. Invisible hosts answer 404.
+      description: 'Any role. The host with its relations, and web_routes: what its
+        web servers proxy (outbound) and other hosts'' routes reaching it (inbound),
+        per site and path, from the scans. Invisible hosts answer 404.'
       parameters:
       - description: Host oficial slug
         in: path

@@ -35,6 +35,20 @@ export function needsRepair(r?: ReleaseReport): boolean {
   return !!(r?.dpkg_errors?.length || r?.dpkg_broken?.length);
 }
 
+/** The report as plain text, for copying / downloading a run's failure log.
+ *  Same labels the UI renders; only the broken sites, like the issue count. */
+export function reportText(r: ReleaseReport, t: (k: string, v?: Record<string, string>) => string): string {
+  const blocks = reportLists(r).map(([key, items]) =>
+    `${t(`host.osUpdate.report.${key}`, { count: String(items.length) })}\n${items.join("\n")}`);
+  const sites = (r.sites ?? []).filter((s) => s.broken);
+  if (sites.length) {
+    const answer = (s: number) => (s ? String(s) : t("host.osUpdate.report.noAnswer"));
+    blocks.push(`${t("host.osUpdate.report.sites", { count: String(sites.length) })}\n` +
+      sites.map((s) => `${s.name}: ${answer(s.before)} → ${answer(s.after)}${s.error ? ` · ${t("host.osUpdate.report.phpError", { error: s.error })}` : ""}`).join("\n"));
+  }
+  return blocks.join("\n\n");
+}
+
 /** One host's report of a run: the scan's warnings right before it, what
  *  dpkg failed on, what the scans before and after differ by, its sites, and
  *  a repair's unit restarts and config files to review. */

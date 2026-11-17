@@ -32,6 +32,9 @@ type serviceSpec struct {
 	// MainClasses are Java main classes / jar names that identify an app-server
 	// process; each instance becomes its own service (see appservers.go).
 	MainClasses []string
+	// SkipProc drops a process that matches Binaries but isn't this service
+	// (Kong's OpenResty is "nginx" in ps).
+	SkipProc func(user, args string) bool
 }
 
 // serviceCatalog enumerates well-known application services. The catalog
@@ -41,7 +44,7 @@ type serviceSpec struct {
 var serviceCatalog = []serviceSpec{
 	// ── Web servers / reverse proxies ──
 	{Name: "nginx", Label: "Nginx", Vendor: "F5/NGINX", Kind: "web", ServiceType: "nginx",
-		Units: []string{"nginx"}, Binaries: []string{"nginx"},
+		Units: []string{"nginx"}, Binaries: []string{"nginx"}, SkipProc: isKongProc,
 		Packages:   []string{"nginx", "nginx-core", "nginx-full", "nginx-extras", "nginx-light"},
 		ImageHints: []string{"nginx"}},
 	{Name: "apache", Label: "Apache HTTP Server", Vendor: "Apache Software Foundation", Kind: "web",
@@ -59,6 +62,12 @@ var serviceCatalog = []serviceSpec{
 		Units: []string{"haproxy"}, Binaries: []string{"haproxy"},
 		Packages:   []string{"haproxy"},
 		ImageHints: []string{"haproxy"}},
+	// Kong: no Binaries — its OpenResty is "nginx" in ps and ss, so a running
+	// node is known from the web probe's Admin API call (claimKongPorts).
+	{Name: "kong", Label: "Kong Gateway", Vendor: "Kong Inc.", Kind: "proxy",
+		Units:      []string{"kong"},
+		Packages:   []string{"kong", "kong-community-edition", "kong-enterprise-edition"},
+		ImageHints: []string{"kong:", "kong/kong", "kong-gateway"}},
 	{Name: "traefik", Label: "Traefik", Vendor: "Traefik Labs", Kind: "proxy",
 		Units: []string{"traefik"}, Binaries: []string{"traefik"},
 		Packages:   []string{"traefik"},
@@ -317,6 +326,7 @@ func captureServices(inv *hostInventory, containers []ContainerInfo, agentNames 
 		}
 		services = append(services, svc)
 	}
+	services = dedupeMySQLFamily(services)
 	sort.Slice(services, func(i, j int) bool {
 		if services[i].Kind != services[j].Kind {
 			return services[i].Kind < services[j].Kind
@@ -324,6 +334,36 @@ func captureServices(inv *hostInventory, containers []ContainerInfo, agentNames 
 		return services[i].Label < services[j].Label
 	})
 	return services
+}
+
+// dedupeMySQLFamily collapses the mysql + mariadb pair that both match on a
+// MariaDB host — MariaDB ships mysql.service / mysqld.service as aliases, so
+// the mysql spec fires too and the host shows two "database" rows for one
+// engine. Keeps mariadb when mariadbd is the live unit/binary (its HostRunning
+// is set only by an active mariadb unit, a mariadbd process or a host port),
+// else mysql. Only host instances are collapsed: a mysql container beside a
+// mariadb host daemon are different engines and both stay.
+func dedupeMySQLFamily(services []DiscoveredService) []DiscoveredService {
+	mysqlI, mariaI := -1, -1
+	for i, s := range services {
+		if s.ContainerID != "" {
+			continue
+		}
+		switch s.Name {
+		case "mysql":
+			mysqlI = i
+		case "mariadb":
+			mariaI = i
+		}
+	}
+	if mysqlI < 0 || mariaI < 0 {
+		return services
+	}
+	drop := mysqlI // mariadbd is the real engine: drop the alias-matched mysql row.
+	if !services[mariaI].HostRunning && services[mysqlI].HostRunning {
+		drop = mariaI // mariadb only installed/stopped while mysql is live.
+	}
+	return append(services[:drop], services[drop+1:]...)
 }
 
 // detectService is the per-spec detector. Mirrors detectAgent's structure
@@ -398,6 +438,9 @@ func detectService(spec serviceSpec, inv *hostInventory, containers []ContainerI
 	// native daemon *and* a containerized one, and we want to see both.
 	hostProc, containerProc := false, false
 	for _, p := range inv.Procs {
+		if spec.SkipProc != nil && spec.SkipProc(p.user, p.args) {
+			continue
+		}
 		matched := false
 		for _, b := range spec.Binaries {
 			if binaryMatches(b, p.comm, p.args) {

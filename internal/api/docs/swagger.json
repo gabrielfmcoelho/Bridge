@@ -4625,7 +4625,7 @@
         },
         "/api/dns/{id}": {
             "get": {
-                "description": "Any role. The record with its relations. Invisible records answer 404.",
+                "description": "Any role. The record with its relations, and web_routes: the scanned proxy routes serving it, per path, with the backend host/service each reaches. Invisible records answer 404.",
                 "produces": [
                     "application/json"
                 ],
@@ -8303,7 +8303,7 @@
         },
         "/api/hosts/{slug}": {
             "get": {
-                "description": "Any role. The host with its relations. Invisible hosts answer 404.",
+                "description": "Any role. The host with its relations, and web_routes: what its web servers proxy (outbound) and other hosts' routes reaching it (inbound), per site and path, from the scans. Invisible hosts answer 404.",
                 "produces": [
                     "application/json"
                 ],
@@ -27366,6 +27366,10 @@
                 "description": {
                     "type": "string"
                 },
+                "discovered": {
+                    "description": "Discovered marks a row the scan created from the A5 DB-metadata probe\n(service.RecordScanDatabases) rather than an operator — shown as a\n\"descoberto\" badge. Operator edits don't clear it.",
+                    "type": "boolean"
+                },
                 "engine": {
                     "type": "string"
                 },
@@ -27427,6 +27431,13 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.Responsavel"
+                    }
+                },
+                "scan_logins": {
+                    "description": "ScanLogins: config-file logins the scan found (Phase 1 credential_sources)\non this database's instance host that name this db. Loaded on detail only;\nreveal stays on the host's Segredos tab — this is a pointer, not the secret.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ScanLoginRef"
                     }
                 },
                 "sensitivity": {
@@ -29056,6 +29067,35 @@
                 }
             }
         },
+        "models.ScanLoginRef": {
+            "type": "object",
+            "properties": {
+                "db_name": {
+                    "type": "string"
+                },
+                "detector": {
+                    "type": "string"
+                },
+                "host_id": {
+                    "type": "integer"
+                },
+                "host_nickname": {
+                    "type": "string"
+                },
+                "host_slug": {
+                    "type": "string"
+                },
+                "locator": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "user": {
+                    "type": "string"
+                }
+            }
+        },
         "models.SecretAuditAction": {
             "type": "string",
             "enum": [
@@ -29883,6 +29923,13 @@
                     "items": {
                         "type": "string"
                     }
+                },
+                "web_routes": {
+                    "description": "WebRoutes: the scans' proxy routes serving this name, per path.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/store.WebRouteView"
+                    }
                 }
             }
         },
@@ -30073,6 +30120,9 @@
                     "items": {
                         "type": "string"
                     }
+                },
+                "web_routes": {
+                    "$ref": "#/definitions/service.HostWebRoutes"
                 }
             }
         },
@@ -30303,6 +30353,23 @@
                 },
                 "version": {
                     "type": "string"
+                }
+            }
+        },
+        "service.HostWebRoutes": {
+            "type": "object",
+            "properties": {
+                "inbound": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/store.WebRouteView"
+                    }
+                },
+                "outbound": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/store.WebRouteView"
+                    }
                 }
             }
         },
@@ -30612,6 +30679,13 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.Responsavel"
+                    }
+                },
+                "scan_logins": {
+                    "description": "ScanLogins: config-file logins the scan found on this service's host(s)\n(Phase 1 credential_sources) — \"login found on host X (scan)\", linking to\nthat host's Segredos tab. Field names only; reveal stays host-scoped.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ScanLoginRef"
                     }
                 },
                 "service": {
@@ -31022,6 +31096,67 @@
                 }
             }
         },
+        "store.WebRouteView": {
+            "type": "object",
+            "properties": {
+                "dns_id": {
+                    "type": "integer"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "path": {
+                    "description": "\"\" = whole site (no location block)",
+                    "type": "string"
+                },
+                "proxy_host_id": {
+                    "type": "integer"
+                },
+                "proxy_host_name": {
+                    "type": "string"
+                },
+                "proxy_host_slug": {
+                    "type": "string"
+                },
+                "proxy_service_id": {
+                    "type": "integer"
+                },
+                "proxy_service_name": {
+                    "type": "string"
+                },
+                "server_name": {
+                    "description": "\"\" = default / IP-only site",
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "target": {
+                    "type": "string"
+                },
+                "target_addr": {
+                    "type": "string"
+                },
+                "target_host_id": {
+                    "type": "integer"
+                },
+                "target_host_name": {
+                    "type": "string"
+                },
+                "target_host_slug": {
+                    "type": "string"
+                },
+                "target_port": {
+                    "type": "integer"
+                },
+                "target_service_id": {
+                    "type": "integer"
+                },
+                "target_service_name": {
+                    "type": "string"
+                }
+            }
+        },
         "vault.BundleAPIDocItem": {
             "type": "object",
             "properties": {
@@ -31410,6 +31545,10 @@
                 },
                 "parent_name": {
                     "type": "string"
+                },
+                "reuse_hosts": {
+                    "description": "ReuseHosts \u003e 1: this credential's value is on that many distinct hosts the\ncaller can see — one password or login reused across VMs. Filled only for a\nhost-scoped list (the host Segredos tab); 0 everywhere else.",
+                    "type": "integer"
                 },
                 "scope": {
                     "$ref": "#/definitions/models.SecretScope"

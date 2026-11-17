@@ -4,8 +4,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"maps"
 	"net"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -153,12 +155,32 @@ type VMInfo struct {
 	// ReleaseRisks: what a release upgrade would trip over, with its
 	// warnings (releaserisk.go). nil = the probe didn't run.
 	ReleaseRisks *ReleaseRisks `json:"release_risks"`
+	// CredHits: config-file credentials captured by the credsources probe
+	// (credsources.go). Transient — each holds plaintext, never serialized;
+	// service.RecordScanSecrets vaults them and builds CredentialSources.
+	CredHits []CredHit `json:"-"`
+	// CredSourcesScanned marks that the credsources probe ran (root, in a job
+	// scan), so an empty CredentialSources means "found none", not "didn't run".
+	CredSourcesScanned bool `json:"-"`
+	// CredentialSources: provenance of the captured config-file credentials —
+	// tokens and field names only, never a value (credsources.go). nil = the
+	// probe didn't run; service.RecordScanSecrets fills the tokens.
+	CredentialSources []CredentialSource `json:"credential_sources"`
 	// Dependencies is the host's and each container's OS, runtimes and
 	// packages (deps.go). Kept out of the stored scan JSON: the scan handler
 	// writes it to dependency_inventory; container package lists would
 	// bloat host_scans.
 	Dependencies []DepScope `json:"-"`
 	SSHAuthPolicy     *SSHAuthPolicy     `json:"ssh_auth_policy,omitempty"`
+	// DeepFacts: heavier, non-secret enrichment (outbound flows, patch
+	// freshness; deepfacts.go). Populated only in CaptureJob, nil in
+	// CaptureSync — "the probe didn't run", like GitRemotes.
+	DeepFacts *DeepFacts `json:"deep_facts,omitempty"`
+	// DBMeta: MySQL/MariaDB metadata read as root (schemas, accounts, exposure;
+	// dbmeta.go). Only metadata — never a value. Populated only in CaptureJob
+	// with a stored password; nil = the probe didn't run. service.RecordScanDatabases
+	// turns its schemas into Atlas database rows.
+	DBMeta *DBMeta `json:"db_meta,omitempty"`
 }
 
 // SSHAuthPolicy summarizes the SSH server's authentication policy as observed
@@ -479,6 +501,14 @@ func budgetOf(client *ssh.Client) budget {
 		return budgets[CaptureJob]
 	}
 	return budgets[CaptureSync]
+}
+
+// jobMode reports whether client is inside a CaptureJob capture — the gate for
+// heavy probes (the config-file secret probe) that stay null in the 120 s
+// synchronous scan.
+func jobMode(client *ssh.Client) bool {
+	_, ok := jobClients.Load(client)
+	return ok
 }
 
 // runCmdWithDeadline executes cmd in a fresh session with a hard deadline.
@@ -1665,6 +1695,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		sshPolicy      *SSHAuthPolicy
 		storageRaw     string
 		releaseRaw     string
+		rancherRaw     string
 		nginxConfig    string
 		webServers     []WebServer
 		gitRemotes     []GitRemote
@@ -1707,6 +1738,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		s = time.Now()
 		releaseRaw = collectReleaseRisks(client, sudoPassword)
 		timeSession("[par] session 7e release-risks", s)
+		// Rancher 1.6 ports published through iptables DNAT (rancher.go).
+		s = time.Now()
+		rancherRaw = collectRancherPorts(client, sudoPassword)
+		timeSession("[par] session 7f rancher-ports", s)
 	}()
 	go func() {
 		defer wg.Done()
@@ -2032,8 +2067,23 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		info.ReleaseRisks.Warnings = deriveReleaseWarnings(info)
 	}
 
+	// Deep facts (outbound flows, patch freshness) only in a background scan:
+	// they add an extra root session and don't fit the 120 s synchronous test.
+	if jobMode(client) {
+		info.DeepFacts = collectDeepFacts(client, sudoPassword, info.Cron, info.Ports, info.WebServers)
+		info.DBMeta = collectDBMeta(client, sudoPassword)
+	}
+
 	// Build a map of docker host port → container for fast lookup.
 	dockerHostPorts := dockerHostPortMap(info.ParsedContainers)
+	// Rancher 1.6 publishes through iptables DNAT: no listener in ss, so the
+	// ports ss didn't list are appended after the loop.
+	natPorts := parseRancherPorts(rancherRaw, info.ParsedContainers)
+	for p, c := range natPorts {
+		if dockerHostPorts[p] == nil {
+			dockerHostPorts[p] = c
+		}
+	}
 
 	// Annotate each listening port with its owner — the richer data the UI
 	// renders when available. The existing info.Ports []string stays as-is
@@ -2051,6 +2101,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		if len(fields) > 1 {
 			proc = fields[1]
 		}
+		delete(natPorts, port)
 		po := PortOwner{Port: port, Process: proc}
 		if c, ok := dockerHostPorts[port]; ok {
 			po.OwnerType = "container"
@@ -2070,6 +2121,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		}
 		info.PortOwners = append(info.PortOwners, po)
 	}
+	for _, p := range slices.Sorted(maps.Keys(natPorts)) {
+		c := natPorts[p]
+		info.PortOwners = append(info.PortOwners, PortOwner{Port: p, OwnerType: "container", OwnerName: c.Name, Target: c.Image})
+	}
 
 	// ── Catalog cross-reference (in-memory) ──
 	// Inventory was already collected in the parallel block above.
@@ -2083,6 +2138,9 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	}
 	info.ServiceInventory = captureServices(hostInv, info.ParsedContainers, agentNames, agentPortClaims)
 	info.ServiceInventory = append(info.ServiceInventory, captureAppServers(client, sudoPassword, procDetails, hostInv.ContainerPIDs)...)
+	// Kong nodes the web probe reached own their listeners (before the
+	// port-owner back-fill below, which reads ServiceInventory's ports).
+	claimKongPorts(info)
 
 	// Back-fill PortOwners with agent and service attribution. `ss -tlnp`
 	// only emits a process column when the scanning user can see the
@@ -2159,6 +2217,17 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		info.Warnings = append(info.Warnings, "Docker requires sudo to run. Container data was collected via sudo -n. Consider adding the user to the docker group.")
 	}
 	info.ContainersKnown = !warnFlags["docker_unreadable"]
+
+	// Config-file secrets (credsources.go): root-only, job-mode-only, after the
+	// probes it draws its paths from (web docroots, cron scripts, process cwds).
+	// service.RecordScanSecrets vaults the values and keeps only tokens + field
+	// names in the stored scan; CredHits (plaintext) never serializes.
+	credRoots, cronScripts, keyFiles, credJars := credProbeInputs(info)
+	credFiles := append(append([]string{}, cronScripts...), keyFiles...)
+	if cf, scanned := collectCredSources(client, sudoPassword, credRoots, credFiles, credJars); scanned {
+		info.CredHits = detectCreds(cf, sliceSet(cronScripts), sliceSet(keyFiles))
+		info.CredSourcesScanned = true
+	}
 	return info, nil
 }
 

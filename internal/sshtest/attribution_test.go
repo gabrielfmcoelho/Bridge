@@ -118,6 +118,54 @@ func TestDetectService_NativeAndContainer(t *testing.T) {
 	}
 }
 
+// A MariaDB host matches both the mariadb spec (real) and the mysql spec
+// (MariaDB ships mysql.service / mysqld.service aliases), which used to yield
+// two "database" rows for one engine. captureServices must collapse them to
+// one — mariadb, since mariadbd is the live binary — while a pure MySQL host
+// keeps its single mysql row untouched.
+func TestCaptureServices_DedupeMySQLMariaDB(t *testing.T) {
+	databases := func(svcs []DiscoveredService) []DiscoveredService {
+		var out []DiscoveredService
+		for _, s := range svcs {
+			if s.Kind == "database" {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+
+	maria := &hostInventory{
+		UnitFiles:     map[string]string{"mariadb.service": "enabled", "mysql.service": "alias", "mysqld.service": "alias"},
+		LoadedUnits:   map[string]string{"mariadb.service": "active"},
+		Packages:      map[string]string{"mariadb-server": "10.6.12"},
+		Procs:         []procEntry{{pid: 402, user: "mysql", comm: "mariadbd"}},
+		PortsByProc:   map[string][]int{},
+		ListenPorts:   map[int]bool{3306: true},
+		ContainerPIDs: map[int]string{},
+	}
+	db := databases(captureServices(maria, nil, map[string]bool{}, map[int]bool{}))
+	if len(db) != 1 || db[0].Name != "mariadb" {
+		t.Fatalf("MariaDB host: database services = %+v, want one mariadb", db)
+	}
+	if !db[0].HostRunning {
+		t.Errorf("mariadb HostRunning = false, want true: %+v", db[0])
+	}
+
+	// Single-engine case must be untouched by the dedupe.
+	mysql := &hostInventory{
+		UnitFiles:     map[string]string{"mysql.service": "enabled"},
+		LoadedUnits:   map[string]string{"mysql.service": "active"},
+		Packages:      map[string]string{"mysql-server": "8.0.46"},
+		Procs:         []procEntry{{pid: 500, user: "mysql", comm: "mysqld"}},
+		PortsByProc:   map[string][]int{},
+		ListenPorts:   map[int]bool{3306: true},
+		ContainerPIDs: map[int]string{},
+	}
+	if db := databases(captureServices(mysql, nil, map[string]bool{}, map[int]bool{})); len(db) != 1 || db[0].Name != "mysql" {
+		t.Fatalf("pure MySQL host: database services = %+v, want one mysql", db)
+	}
+}
+
 // An installed-but-stopped service is detected for the scan panel but is not
 // running on the host, so it never becomes a service row.
 func TestDetectService_PackageOnlyIsNotHostRunning(t *testing.T) {

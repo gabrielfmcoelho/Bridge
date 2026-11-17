@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -122,6 +123,63 @@ esac`})
 	}
 	if _, err := OSUpdateInnerScript("bogus"); err == nil {
 		t.Fatal("unknown kind must error")
+	}
+}
+
+// corruptRoot is SAPASP-INGEST01's layout: /var on an LVM volume (dm-2) with
+// ext4 errors, /boot clean.
+func corruptRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for rel, body := range map[string]string{
+		"sys/fs/ext4/dm-2/errors_count":     "7419\n",
+		"sys/fs/ext4/dm-2/first_error_time": "1755572400\n",
+		"sys/block/dm-2/dm/name":            "ubuntu--vg-lv--1\n",
+		"sys/fs/ext4/sda2/errors_count":     "0\n",
+		"proc/mounts":                       "/dev/sda2 /boot ext4 rw 0 0\n/dev/mapper/ubuntu--vg-lv--1 /var ext4 rw,relatime 0 0\n",
+	} {
+		p := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
+}
+
+// A corrupted filesystem: package updates skip before touching apt; a check
+// still runs, and its failure names the filesystem.
+func TestOSUpdateScript_FSErrors(t *testing.T) {
+	root := corruptRoot(t)
+	calls := filepath.Join(root, "calls")
+	run := func(kind, aptGet string) (OSUpdateReport, error) {
+		path := fakeHost(t, map[string]string{"apt": "exit 0", "apt-get": `echo "$*" >> ` + calls + "\n" + aptGet})
+		script, _ := OSUpdateInnerScript(kind)
+		cmd := exec.Command(filepath.Join(path, "sh"), "-c", script)
+		cmd.Env = []string{"PATH=" + path, "BRIDGE_ROOT=" + root}
+		out, err := cmd.CombinedOutput()
+		return ParseOSUpdateLog(string(out)), err
+	}
+	want := []FSError{{Mount: "/var", Count: 7419, Since: 1755572400}}
+
+	for _, kind := range []string{OSUpdatePackages, OSUpdateSecurity} {
+		r, err := run(kind, "exit 0")
+		if err != nil || !strings.Contains(r.Skip, "corrupted") || !reflect.DeepEqual(r.FSErrors, want) {
+			t.Fatalf("%s: err=%v report=%+v", kind, err, r)
+		}
+	}
+	if b, _ := os.ReadFile(calls); len(b) > 0 {
+		t.Fatalf("apt-get ran on a corrupted filesystem: %q", b)
+	}
+
+	r, err := run(OSUpdateCheck, `case "$*" in *update*) exit 100 ;; esac`)
+	if err == nil || r.Error != "apt-get update failed" || !reflect.DeepEqual(r.FSErrors, want) {
+		t.Fatalf("failed check: err=%v report=%+v", err, r)
+	}
+	if r, err := run(OSUpdateCheck, "exit 0"); err != nil || r.Skip != "" || r.FSErrors != nil {
+		t.Fatalf("check must run and stay quiet when it works: err=%v report=%+v", err, r)
 	}
 }
 

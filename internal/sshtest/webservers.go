@@ -13,11 +13,11 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// WebServer is one nginx, Apache or php-fpm found by the scan, on the host
+// WebServer is one nginx, Apache, php-fpm or Kong found by the scan, on the host
 // (Container "") or inside a running container. The scan stores it in the
 // host_scans JSON; service.RecordWebDNS turns its site names into DNS links.
 type WebServer struct {
-	Kind           string    `json:"kind"` // nginx | apache | php-fpm
+	Kind           string    `json:"kind"` // nginx | apache | php-fpm | kong
 	Container      string    `json:"container,omitempty"`
 	ContainerID    string    `json:"container_id,omitempty"`
 	ContainerImage string    `json:"container_image,omitempty"`
@@ -27,6 +27,9 @@ type WebServer struct {
 	// still there). Its names are shown but never create DNS records.
 	Stopped bool   `json:"stopped,omitempty"`
 	Error   string `json:"error,omitempty"`
+	// Kong: the node's version, database and listeners (kind "kong" only);
+	// its routes are Sites.
+	Kong *KongNode `json:"kong,omitempty"`
 }
 
 // WebSite is one nginx server block or Apache virtual host.
@@ -38,6 +41,9 @@ type WebSite struct {
 	Proxy   []string `json:"proxy,omitempty"`   // proxy_pass targets, upstreams expanded
 	FastCGI []string `json:"fastcgi,omitempty"` // fastcgi_pass targets
 	Source  string   `json:"source,omitempty"`  // apache: file:line
+	// Disabled: the vhost config serves disabled_by_virtualmin.html (a
+	// Virtualmin-disabled domain). Its names are still shown but never linked.
+	Disabled bool `json:"disabled,omitempty"`
 	// Locations keeps each nginx location with its own targets, in the order
 	// each first received one; Proxy/FastCGI stay the flattened union.
 	Locations []WebLocation `json:"locations,omitempty"`
@@ -64,18 +70,23 @@ const (
 )
 
 // webInnerScript runs on the host (SUDO=1: retry with sudo -n) and inside
-// each container. Sections: @@nginx (nginx -T), @@apache (apachectl -S),
-// @@fpm (pool headers and listen lines). Every command is bounded by
-// timeout(1) when present: the root run (runSudoCmd) has no deadline of its own.
+// each container. Sections: @@nginx (nginx -T), @@apache (apachectl -S, then
+// "@disabled <file>" lines for each enabled vhost config that serves
+// disabled_by_virtualmin.html — a Virtualmin-disabled domain), @@fpm (pool
+// headers and listen lines), @@kong (kongInnerScript: each Kong node's Admin
+// API). Grepping the enabled globs follows the
+// command-line symlinks, so the path matches apachectl -S's source. Every
+// command is bounded by timeout(1) when present: the root run (runSudoCmd)
+// has no deadline of its own.
 const webInnerScript = `export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"
 T=""; command -v timeout >/dev/null 2>&1 && T="timeout 20"
 P(){ printf '@@%s\n' "$1"; }
 run(){ o=$($T "$@" 2>&1); r=$?; if [ "$r" -ne 0 ] && [ -n "$SUDO" ]; then o2=$(sudo -n $T "$@" 2>&1) && o=$o2; fi; printf '%s\n' "$o"; }
 if command -v nginx >/dev/null 2>&1; then P nginx; run nginx -T | head -c 1048576; echo; fi
-for b in apachectl apache2ctl httpd; do if command -v $b >/dev/null 2>&1; then P apache; run $b -S | head -n 500; break; fi; done
+for b in apachectl apache2ctl httpd; do if command -v $b >/dev/null 2>&1; then P apache; run $b -S | head -n 500; $T grep -lI disabled_by_virtualmin /etc/apache2/sites-enabled/*.conf /etc/httpd/conf.d/*.conf 2>/dev/null | sed 's#^#@disabled #'; break; fi; done
 f=$(ls /etc/php/*/fpm/pool.d/*.conf /etc/php-fpm.d/*.conf /usr/local/etc/php-fpm.d/*.conf 2>/dev/null)
 if [ -n "$f" ]; then P fpm; grep -H -E '^\[|^[[:space:]]*listen[[:space:]]*=' $f; fi
-`
+` + kongInnerScript
 
 // webProbeScript is the whole remote script: the host part, then every
 // running container (up to maxWebContainers) through docker exec. One SSH session.
@@ -191,9 +202,9 @@ func webSections(text string) map[string]string {
 	var b strings.Builder
 	for _, line := range strings.Split(text, "\n") {
 		switch strings.TrimSpace(line) {
-		case "@@nginx", "@@apache", "@@fpm":
+		case "@@nginx", "@@apache", "@@fpm", "@@kong":
 			if cur != "" {
-				out[cur] = b.String()
+				out[cur] += b.String() // a repeated section (several Kong nodes) appends
 			}
 			cur = strings.TrimPrefix(strings.TrimSpace(line), "@@")
 			b.Reset()
@@ -205,7 +216,7 @@ func webSections(text string) map[string]string {
 		}
 	}
 	if cur != "" {
-		out[cur] = b.String()
+		out[cur] += b.String()
 	}
 	return out
 }
@@ -226,13 +237,20 @@ func webServersFrom(sec map[string]string) []WebServer {
 		out = append(out, ws)
 	}
 	if cfg, ok := sec["nginx"]; ok {
-		add("nginx", parseNginxSites(cfg), nil, cfg)
+		// Next to Kong, the nginx on PATH is Kong's OpenResty, whose built-in
+		// default config doesn't exist: its "[emerg]" is no finding.
+		if _, kong := sec["kong"]; !kong || len(parseNginxSites(cfg)) > 0 {
+			add("nginx", parseNginxSites(cfg), nil, cfg)
+		}
 	}
 	if s, ok := sec["apache"]; ok {
 		add("apache", parseApacheS(s), nil, s)
 	}
 	if s, ok := sec["fpm"]; ok {
 		add("php-fpm", nil, parseFPMPools(s), "")
+	}
+	if s, ok := sec["kong"]; ok {
+		out = append(out, parseKong(s)...)
 	}
 	return out
 }
@@ -470,11 +488,20 @@ var (
 
 // parseApacheS reads `apachectl -S`: one WebSite per virtual host
 // (namevhost lines, or the single vhost on an address), aliases attached.
+// "@disabled <file>" lines (appended by webInnerScript) mark every vhost
+// whose source file serves disabled_by_virtualmin.html as Disabled.
 // ponytail: names, port and source file only — no per-vhost DocumentRoot or
 // ProxyPass; parse the vhost files (apachectl -t -D DUMP_INCLUDES) if needed.
 func parseApacheS(out string) []WebSite {
 	var sites []WebSite
+	disabled := map[string]bool{}
 	for _, line := range strings.Split(out, "\n") {
+		if f, ok := strings.CutPrefix(strings.TrimSpace(line), "@disabled "); ok {
+			if f = strings.TrimSpace(f); f != "" {
+				disabled[f] = true
+			}
+			continue
+		}
 		var port, name, src string
 		if m := reApacheNameVHost.FindStringSubmatch(line); m != nil {
 			port, name, src = m[1], m[2], m[3]
@@ -488,6 +515,17 @@ func parseApacheS(out string) []WebSite {
 		}
 		p, _ := strconv.Atoi(port)
 		sites = append(sites, WebSite{Names: []string{name}, Listen: []int{p}, TLS: p == 443, Source: src})
+	}
+	// Source is "file:line"; a disabled file disables every vhost in it (both
+	// :80 and :443 of a Virtualmin domain live in one file).
+	if len(disabled) > 0 {
+		for i := range sites {
+			file := sites[i].Source
+			if j := strings.LastIndexByte(file, ':'); j >= 0 {
+				file = file[:j]
+			}
+			sites[i].Disabled = disabled[file]
+		}
 	}
 	return sites
 }

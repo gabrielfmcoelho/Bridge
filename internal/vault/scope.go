@@ -20,9 +20,15 @@ var revealPermission = map[models.SecretScope]string{
 
 // revealPermitted reports whether actor may read the plaintext of a secret in
 // scope, as far as the scope's extra permission goes (admins always may). A
-// host secret the scan found (group "scan-…") needs PermHostSecretsReveal; the
-// host's SSH password and keys keep the plain host rule.
+// host secret the scan found (group "scan-…") needs PermHostSecretsReveal; a
+// captured DB-admin login, superuser app login or root SSH key (group
+// "scan-admin-…") is admin-only; the host's SSH password and keys keep the
+// plain host rule.
 func revealPermitted(ctx context.Context, db *sql.DB, actor ActorContext, scope models.SecretScope, groupLabel string) bool {
+	if scope == models.SecretScopeHost && strings.HasPrefix(groupLabel, ScanSecretAdminGroupPrefix) {
+		// Admin-only tier — checked before the scan- branch it also matches.
+		return actor.Role == "admin"
+	}
 	perm, ok := revealPermission[scope]
 	if scope == models.SecretScopeHost && strings.HasPrefix(groupLabel, ScanSecretGroupPrefix) {
 		perm, ok = PermHostSecretsReveal, true

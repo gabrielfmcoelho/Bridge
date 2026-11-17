@@ -14,7 +14,7 @@ import { canTransition } from "@/lib/requests";
 import { extractJSON, coerceToSchema, coercePriority } from "@/lib/aiDraft";
 import type {
   Offering, ServiceRequest, RequestEvent, RequestStatus, CatalogHit, AssetGrantsInput,
-  Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool, Database, OSUpdateRun, OSUpdateResult, ReleaseReport, RiskWarning,
+  Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool, Database, OSUpdateRun, OSUpdateResult, ReleaseReport, RiskWarning, WebRoute,
 } from "@/lib/types";
 import {
   db, resetDB, currentUser, switchUser, requestVisible, abilitiesForRequest,
@@ -52,6 +52,30 @@ function scanView(m: (typeof mockScans)[number]): OSUpdateRun {
   return { ...m.run, results, counts, status: busy ? "running" : m.cancelled !== undefined ? "cancelled" : "done" };
 }
 // Host backup profiles (host id → own paths; absent list = inherit).
+// Web routes for dev:mock: srv-sga-web01's nginx fronting portal.sead.pi.gov.br,
+// one route per status the UI shows.
+function mockWebRoutes(): WebRoute[] {
+  const proxy = db.hosts.find((h) => h.id === 2);
+  if (!proxy) return [];
+  const row = (path: string, target: string, port: number, status: WebRoute["status"], hostId?: number, serviceId?: number): WebRoute => {
+    const h = db.hosts.find((x) => x.id === hostId);
+    const s = db.services.find((x) => x.id === serviceId);
+    return {
+      proxy_host_id: proxy.id, proxy_host_slug: proxy.oficial_slug, proxy_host_name: proxy.nickname,
+      server_name: "portal.sead.pi.gov.br", dns_id: 1, domain: "portal.sead.pi.gov.br", path, target,
+      target_addr: target.replace(/^\w+:\/\//, "").split(":")[0], target_port: port,
+      target_host_id: h?.id, target_host_slug: h?.oficial_slug, target_host_name: h?.nickname,
+      target_service_id: s?.id, target_service_name: s?.nickname, status,
+    };
+  };
+  return [
+    row("/api", "10.0.0.15:8080", 8080, "linked", 5, 3),
+    row("/bi", "10.0.0.99:8080", 8080, "unknown_host"),
+    row("/metrics", "http://10.0.0.18:9090", 9090, "no_service", 3),
+    row("/relatorios", "10.0.0.16:8180", 8180, "not_scanned", 4),
+  ];
+}
+
 const mockProfiles = new Map<number, { include?: string[]; exclude?: string[] }>();
 // Pinned SSH host keys by host id: the first two hosts share a cloned template's key.
 const mockHostKeys = new Map<number, { fingerprint: string; key_type: string; pinned_at: string }>([
@@ -108,11 +132,18 @@ const mockScan = (h: { id: number; nickname: string; os?: { pretty?: string; arc
   os: h.os?.pretty ?? "", kernel: "6.8.0-45-generic", arch: h.os?.arch ?? "x86_64",
   filesystems: [
     { mount: "/", device: "/dev/sda1", fstype: "ext4", size_bytes: 53_687_091_200, used_bytes: 21_474_836_480, avail_bytes: 32_212_254_720, used_pct: 40 },
-    { mount: "/data", device: "/dev/sdb1", fstype: "xfs", size_bytes: 214_748_364_800, used_bytes: 128_849_018_880, avail_bytes: 85_899_345_920, used_pct: 60 },
+    { mount: "/data", device: "/dev/sdb1", fstype: "ext4", size_bytes: 214_748_364_800, used_bytes: 128_849_018_880, avail_bytes: 85_899_345_920, used_pct: 60, errors: 7419, errors_since: 1755572400 },
     { mount: "/mnt/arquivos", device: "nas:/arquivos", fstype: "nfs4", size_bytes: 0, used_bytes: 0, avail_bytes: 0, used_pct: 0, network: true },
   ],
   service_inventory: [{ name: "postgresql", label: "PostgreSQL", kind: "database", host_running: true }],
   parsed_containers: [{ id: "a1", name: "web", image: "nginx:1.25", status: "Up 3 days", ports: "80/tcp" }],
+  // srv-sga-web01 runs a Kong node (the web routes fixture's proxy).
+  web_servers: h.nickname !== "srv-sga-web01" ? undefined : [{ kind: "kong",
+    kong: { prefix: "/usr/local/kong", version: "2.8.1", database: "postgres", db_host: "10.0.0.30", db_port: 5432, db_reachable: true,
+      connections_active: 17, total_requests: 482113, proxy_ports: [80, 443], admin_ports: [8001, 8444], services: 4, routes: 4,
+      upstreams: [{ name: "chamados-upstream", targets: [{ target: "10.0.0.15:8080", health: "HEALTHY" }, { target: "10.0.0.16:8080", health: "UNHEALTHY" }] }] },
+    sites: [{ names: ["portal.sead.pi.gov.br"], listen: [80, 443], tls: true,
+      locations: [{ path: "/api", proxy: ["http://10.0.0.15:8080", "http://10.0.0.16:8080"] }, { path: "/bi", proxy: ["http://10.0.0.99:8080"] }] }] }],
   resource_top: { top_disk: [{ path: "/data/dumps/full.sql", size_bytes: 3_221_225_472 }] },
   release_risks: { foreign_count: 2, foreign_packages: ["libssl1.1 1.1.1f-1ubuntu2.20", "php8.2-cli 8.2.6-1+ubuntu18.04.1+deb.sury.org+1"],
     modified_conffiles: ["/etc/proftpd/proftpd.conf"], apache_listen: [80, 443],
@@ -691,8 +722,10 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   if (hostPath && method === "GET") {
     const h = db.hosts.find((x) => x.oficial_slug === hostPath[1]);
     if (!h) return notFound("host not found");
+    const routes = mockWebRoutes();
     return json({ host: h, tags: [], responsaveis: [], chamados: [], dns_records: [], services: [], projects: [], entidades: [],
-      last_scan: { id: 1, data: mockScan(h), scanned_at: new Date().toISOString() } });
+      last_scan: { id: 1, data: mockScan(h), scanned_at: new Date().toISOString() },
+      web_routes: { outbound: routes.filter((r) => r.proxy_host_id === h.id), inbound: routes.filter((r) => r.target_host_id === h.id) } });
   }
   const backupPath = p.match(/^ssh\/os-updates\/runs\/(\d+)\/hosts\/(\d+)\/backup$/);
   if (backupPath) {
@@ -729,7 +762,8 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   if (method === "GET" && segs[0] === "dns" && segs.length === 2) {
     const record = db.dns.find((d) => d.id === Number(segs[1]));
     return record
-      ? json({ dns_record: record, tags: record.tags ?? [], host_ids: record.host_ids ?? [], service_ids: record.service_ids ?? [], project_ids: record.project_ids ?? [], responsaveis: [] })
+      ? json({ dns_record: record, tags: record.tags ?? [], host_ids: record.host_ids ?? [], service_ids: record.service_ids ?? [], project_ids: record.project_ids ?? [], responsaveis: [],
+        web_routes: mockWebRoutes().filter((r) => r.dns_id === record.id) })
       : notFound("DNS record not found");
   }
   // ponytail: links live on the row itself; grants/responsaveis are ignored by the mock.
@@ -853,7 +887,7 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
       const row: Database = {
         id: Math.max(0, ...db.databases.map((d) => d.id)) + 1, name: "", db_name: "", description: "", use_cases: "", engine: "postgres",
         instance_service_id: null, external_provider: "", host: "", port: null, connection_mode: "none", tunnel_host_id: null, tunnel_target: "",
-        tls_mode: "prefer", has_credential: false, sensitivity: "interno", environment: "prod", backup_policy: "", backup_retention_days: null,
+        tls_mode: "prefer", has_credential: false, discovered: false, sensitivity: "interno", environment: "prod", backup_policy: "", backup_retention_days: null,
         last_backup_at: null, created_by: currentUser().id, created_at: now, updated_at: now, consumer_service_ids: [], project_ids: [], responsaveis: [],
         ...body,
       };

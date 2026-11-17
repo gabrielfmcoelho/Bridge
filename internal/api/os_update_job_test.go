@@ -620,4 +620,15 @@ func TestExitReason(t *testing.T) {
 	if got := exitReason(sshtest.OSUpdateReport{}, 0); got != "the script ended without a result" {
 		t.Fatalf("no result = %q", got)
 	}
+
+	// SAPASP-INGEST01: the failure and the skip both name the corrupted
+	// filesystems, each once though diagnose and fs_guard both report.
+	log := "@@fs_errors /var 7419 1755572400\n@@fs_errors / 194 0\n@@fs_errors /var 7419 1755572400\n"
+	const fs = "; ext4 errors (repair with fsck, which needs a reboot): /var 7419 since 2025-08-19, / 194"
+	if got := exitReason(sshtest.ParseOSUpdateLog("@@error apt-get update failed\n"+log), 1); got != "apt-get update failed"+fs {
+		t.Fatalf("fs errors = %q", got)
+	}
+	if got := skipReason(sshtest.ParseOSUpdateLog("@@skip the filesystem is corrupted, nothing was changed\n" + log)); got != "the filesystem is corrupted, nothing was changed"+fs {
+		t.Fatalf("skip = %q", got)
+	}
 }

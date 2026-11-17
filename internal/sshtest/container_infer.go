@@ -50,7 +50,7 @@ var imageRules = []imageRule{
 	{"sqlite", "database", "SQLite", "database"},
 
 	// Infrastructure
-	{"kong", "infrastructure", "Kong", "proxy"},
+	{"konga", "infrastructure", "Konga", "platform"}, // Kong's admin UI; Kong itself is in serviceCatalog
 	{"portainer", "infrastructure", "Portainer", "platform"},
 	{"coolify", "infrastructure", "Coolify", "platform"},
 	{"vault", "infrastructure", "", "platform"},

@@ -5,8 +5,10 @@ import SectionCard from "@/components/ui/SectionCard";
 import SituacaoText from "@/components/ui/SituacaoText";
 import Badge from "@/components/ui/Badge";
 import Icon from "@/components/ui/Icon";
+import Lozenge from "@/components/ui/Lozenge";
 import { RowGroup, ListRow } from "@/components/ui/RowList";
 import { ICON_PATHS } from "@/lib/icon-paths";
+import type { WebRoute } from "@/lib/types";
 
 type T = (k: string) => string;
 
@@ -83,3 +85,49 @@ export const projectsGroup = (projects: { id: number; name: string; situacao?: s
     label: p.name, trailing: p.situacao ? <SituacaoText situacao={p.situacao} /> : undefined,
   })),
 });
+
+/* Web routes (scans): "outbound" — what this host's web servers forward;
+   "inbound" — other hosts' routes reaching this host; "dns" — one record's
+   routes. One group per site, one row per path; each row opens the far end. */
+export type RouteView = "outbound" | "inbound" | "dns";
+
+export const routesGroups = (routes: WebRoute[], view: RouteView, t: T): RelationGroup[] => {
+  const title = view === "outbound" ? t("topology.routesOutbound") : view === "inbound" ? t("topology.routesInbound") : t("topology.routes");
+  const bySite = new Map<string, WebRoute[]>();
+  for (const r of routes) {
+    const site = view === "dns" ? "" : r.domain || r.server_name || t("topology.routeDefaultSite");
+    bySite.set(site, [...(bySite.get(site) ?? []), r]);
+  }
+  return [...bySite].map(([site, rs]) => ({
+    title: site ? `${title} · ${site}` : title,
+    rows: rs.map((r) => ({
+      key: `r${r.proxy_host_id}|${r.server_name}|${r.path}|${r.target}`,
+      href: view === "inbound" ? `/hosts/${r.proxy_host_slug}`
+        : r.target_service_id ? `/services/${r.target_service_id}` : r.target_host_slug ? `/hosts/${r.target_host_slug}` : undefined,
+      icon: view === "inbound" ? ICON_PATHS.arrowLeft : ICON_PATHS.arrowRight,
+      tone: "var(--info)",
+      label: r.path || "/",
+      mono: true,
+      trailing: <RouteEnd r={r} view={view} t={t} />,
+    })),
+  }));
+};
+
+const ROUTE_STATUS: Record<Exclude<WebRoute["status"], "linked">, { msg: string; appearance: "moved" | "removed" }> = {
+  no_service: { msg: "topology.routeNoService", appearance: "moved" },
+  not_scanned: { msg: "topology.routeNotScanned", appearance: "moved" },
+  unknown_host: { msg: "topology.routeUnknownHost", appearance: "removed" },
+};
+
+/** Who forwards (inbound / dns), what it reaches, and why Bridge can't tell. */
+function RouteEnd({ r, view, t }: { r: WebRoute; view: RouteView; t: T }) {
+  const host = view === "inbound" ? "" : r.target_host_name || r.target_addr;
+  const status = r.status === "linked" ? null : ROUTE_STATUS[r.status];
+  return (
+    <span className="flex items-center gap-1.5 min-w-0 max-w-[60%] text-xs text-[var(--text-muted)]" title={r.target}>
+      {view !== "outbound" && <span className="truncate min-w-0">{r.proxy_host_name} →</span>}
+      <span className="font-mono truncate min-w-0">{host}:{r.target_port}{r.target_service_name ? ` · ${r.target_service_name}` : ""}</span>
+      {status && <Lozenge appearance={status.appearance} className="shrink-0">{t(status.msg)}</Lozenge>}
+    </span>
+  );
+}

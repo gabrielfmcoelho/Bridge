@@ -33,12 +33,35 @@ const (
 // osUpdateDir holds each run's script, log and exit code on the host.
 const osUpdateDir = "/var/lib/bridge-osupdate"
 
+// fsErrorsFn defines fs_errors: one "<mount> <count> <first error, unix>"
+// line per ext4 filesystem whose superblock counts errors. The kernel found
+// it corrupt and only fsck clears the count, so apt, dpkg and tar fail on
+// it in ways that name no cause ("Structure needs cleaning"). /sys and
+// /proc/mounts are world-readable: no root needed. $R is the test root. No
+// "%" in it: osUpdateScript goes through fmt.Sprintf.
+// shortcut: ext4 only (XFS keeps no such counter), add XFS when RHEL hosts need it.
+const fsErrorsFn = `fs_errors() {
+  for d in "$R"/sys/fs/ext4/*; do
+    n=$(cat "$d/errors_count" 2>/dev/null)
+    case "$n" in ''|0|*[!0-9]*) continue ;; esac
+    k=${d##*/}; dev=/dev/$k
+    [ -f "$R/sys/block/$k/dm/name" ] && dev=/dev/mapper/$(cat "$R/sys/block/$k/dm/name")
+    m=$(awk -v d="$dev" '$1 == d {print $2; exit}' "$R/proc/mounts" 2>/dev/null)
+    f=$(cat "$d/first_error_time" 2>/dev/null)
+    echo "${m:-$dev} $n ${f:-0}"
+  done
+}
+`
+
 // osScriptCommon opens both update scripts: say, and fail = say error,
-// diagnose, exit 1. diagnose tells why dpkg is stuck:
+// diagnose, exit 1. diagnose tells why the run failed:
 //
+//	@@fs_errors <mount> <n> <since>  a corrupted filesystem (fs_errors)
 //	@@dpkg_broken <pkg>          what dpkg --audit names
 //	@@dpkg_error <pkg>: <msg>    the packages dpkg failed on in this run
 //
+// fs_guard skips, changing nothing, when a filesystem is corrupted: writing
+// packages onto it can only make it worse, and fsck needs a reboot.
 // The errors come from the part of term.log and the dist-upgrade logs
 // written since the script started (the first non-empty line after
 // "error processing package X", or main.log's "got an error from dpkg"),
@@ -46,9 +69,16 @@ const osUpdateDir = "/var/lib/bridge-osupdate"
 // BRIDGE_ROOT prefixes the files they read and write (tests only).
 const osScriptCommon = `R="${BRIDGE_ROOT:-}"
 say() { echo "@@$*"; }
+` + fsErrorsFn + `fs_report() { fs_errors | awk '{print "@@fs_errors " $0}'; }
+fs_guard() {
+  FSERR=$(fs_report)
+  [ -z "$FSERR" ] && return 0
+  echo "$FSERR"; say skip "the filesystem is corrupted, nothing was changed"; exit 0
+}
 DLOGS="/var/log/apt/term.log /var/log/dist-upgrade/apt-term.log /var/log/dist-upgrade/main.log"
 DMARK=$(for f in $DLOGS; do if [ -f "$R$f" ]; then echo "$f $(wc -c < "$R$f")"; else echo "$f 0"; fi; done)
 diagnose() {
+  fs_report
   command -v dpkg >/dev/null 2>&1 && dpkg --audit 2>/dev/null | awk '/^ [a-z0-9]/ {print "@@dpkg_broken " $1}' | head -n 20
   echo "$DMARK" | while read -r f n; do
     [ -f "$R$f" ] || continue
@@ -85,7 +115,8 @@ fail() { say error "$*"; diagnose; exit 1; }
 // Security counts on apt are the upgradable packages from a *-security
 // suite; on dnf/yum, the packages named by a security advisory.
 const osUpdateScript = `MODE='%s'
-` + osScriptCommon + `export DEBIAN_FRONTEND=noninteractive
+` + osScriptCommon + `[ "$MODE" = check ] || fs_guard
+export DEBIAN_FRONTEND=noninteractive
 reboot_flag() {
   if [ -f /var/run/reboot-required ]; then say reboot yes
   elif command -v needs-restarting >/dev/null 2>&1; then needs-restarting -r >/dev/null 2>&1; [ $? -eq 1 ] && say reboot yes
@@ -152,7 +183,8 @@ exit 0
 // Ubuntu LTS → next LTS (do-release-upgrade), Debian N → N+1 (codename
 // rewritten in the apt sources, then full-upgrade) and Alpine 3.x → 3.x+1
 // (repositories bumped, apk upgrade --available). It skips, changing
-// nothing, when a reboot is pending, / has under 5 GB free, packages are
+// nothing, when a filesystem is corrupted (fs_guard), a reboot is pending,
+// / has under 5 GB free, packages are
 // still waiting for a package update, or the path isn't supported (RHEL
 // family: Leapp/ELevate). "Packages waiting" counts what a package update
 // would install (apt-get -s), not "apt list --upgradable": Ubuntu's phased
@@ -171,6 +203,7 @@ osr() ( . "$R/etc/os-release" 2>/dev/null; echo "$ID $VERSION_ID" )
 . "$R/etc/os-release" 2>/dev/null || { say skip "no /etc/os-release"; exit 0; }
 ready() { if [ -n "${BRIDGE_PRECHECK:-}" ]; then say ready; exit 0; fi; }
 say release_from "$(osr)"
+fs_guard
 if [ -z "${BRIDGE_UPDATE_FIRST:-}" ] && [ -f "$R/var/run/reboot-required" ]; then say skip "a reboot is pending: reboot the host first"; exit 0; fi
 FREE=$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}')
 if [ "${FREE:-0}" -lt 5242880 ]; then say skip "less than 5 GB free on /"; exit 0; fi
@@ -187,7 +220,13 @@ ubuntu)
   command -v do-release-upgrade >/dev/null 2>&1 || { say skip "do-release-upgrade is not installed (ubuntu-release-upgrader-core)"; exit 0; }
   apt_pending
   [ -f "$R/etc/update-manager/release-upgrades" ] && sed -i 's/^Prompt=.*/Prompt=lts/' "$R/etc/update-manager/release-upgrades"
-  do-release-upgrade -c >/dev/null 2>&1 || { say skip "no newer LTS release is available yet"; exit 0; }
+  # -c exits 1 both for "no new release" and for a crash (a traceback on a
+  # broken apt cache): only the first is a skip. C locale: English to match.
+  OUT=$(LC_ALL=C do-release-upgrade -c 2>&1) || {
+    WHY=$(printf '%s\n' "$OUT" | awk '/^(Checking for a new|No new release found)/ || !NF {next} {l = $0} END {gsub(/[^ -~]/, "", l); print substr(l, 1, 200)}')
+    [ -n "$WHY" ] && fail "do-release-upgrade -c failed: $WHY"
+    say skip "no newer LTS release is available yet"; exit 0
+  }
   ready
   do-release-upgrade -f DistUpgradeViewNonInteractive || fail do-release-upgrade failed ;;
 debian)
@@ -370,6 +409,29 @@ type OSUpdateReport struct {
 	// A repair's: each failed unit it restarted, each config file to review.
 	UnitRestarts []UnitRestart
 	DistFiles    []DistFile
+	// Corrupted filesystems (fs_errors), each mount once.
+	FSErrors []FSError
+}
+
+// FSError is a filesystem whose ext4 error counter isn't zero.
+type FSError struct {
+	Mount string `json:"mount"`
+	Count int    `json:"count"`
+	Since int64  `json:"since,omitempty"` // first error, unix seconds
+}
+
+// parseFSError reads one fs_errors line: "<mount> <count> <since>".
+func parseFSError(line string) (FSError, bool) {
+	f := strings.Fields(line)
+	if len(f) != 3 {
+		return FSError{}, false
+	}
+	n, err := strconv.Atoi(f[1])
+	if err != nil || n <= 0 {
+		return FSError{}, false
+	}
+	since, _ := strconv.ParseInt(f[2], 10, 64)
+	return FSError{Mount: f[0], Count: n, Since: since}, true
 }
 
 // ParseOSUpdateLog reads the "@@key value" markers of a run's log; the last
@@ -422,6 +484,11 @@ func ParseOSUpdateLog(logText string) OSUpdateReport {
 				if n, err := strconv.Atoi(val[i+1:]); err == nil && validRiskPath(val[:i]) {
 					r.DistFiles = append(r.DistFiles, DistFile{Path: val[:i], Changed: n})
 				}
+			}
+		case "fs_errors":
+			// fs_guard and diagnose may both report: one entry per mount.
+			if e, ok := parseFSError(val); ok && !slices.ContainsFunc(r.FSErrors, func(x FSError) bool { return x.Mount == e.Mount }) {
+				r.FSErrors = append(r.FSErrors, e)
 			}
 		}
 	}

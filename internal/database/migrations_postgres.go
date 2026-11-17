@@ -2250,8 +2250,34 @@ var migrationsPostgres = []string{
 	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
 	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan'));
 	ALTER TABLE os_update_runs ADD COLUMN IF NOT EXISTS auth_method TEXT NOT NULL DEFAULT '';`,
+	// Version 133: an Atlas database row the scan created from the A5
+	// DB-metadata probe (service.RecordScanDatabases) carries a "descoberto"
+	// badge. Operator-made rows stay false.
+	`ALTER TABLE databases ADD COLUMN IF NOT EXISTS discovered BOOLEAN NOT NULL DEFAULT FALSE;`,
 
-	// Version 133: repair runs (kind 'repair'): finish what dpkg left half
+	// Version 134: web routes — each proxy_pass / fastcgi_pass of a scanned
+	// web server, per site name and location path, with the host and service
+	// it reaches when Bridge knows them. Scan-owned: service.RecordWebDNS
+	// replaces a proxy host's rows on every readable scan, and a backend's
+	// scan fills its inbound rows (service.LinkInboundRoutes).
+	`CREATE TABLE IF NOT EXISTS web_routes (
+		proxy_host_id     BIGINT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+		proxy_service_id  BIGINT REFERENCES services(id) ON DELETE SET NULL,
+		server_name       TEXT NOT NULL,
+		dns_id            BIGINT REFERENCES dns_records(id) ON DELETE SET NULL,
+		path              TEXT NOT NULL,
+		target            TEXT NOT NULL,
+		target_addr       TEXT NOT NULL,
+		target_port       INT NOT NULL,
+		target_host_id    BIGINT REFERENCES hosts(id) ON DELETE SET NULL,
+		target_service_id BIGINT REFERENCES services(id) ON DELETE SET NULL,
+		PRIMARY KEY (proxy_host_id, server_name, path, target)
+	);
+	CREATE INDEX IF NOT EXISTS web_routes_target_addr_idx ON web_routes (target_addr);
+	CREATE INDEX IF NOT EXISTS web_routes_target_host_idx ON web_routes (target_host_id);
+	CREATE INDEX IF NOT EXISTS web_routes_dns_idx ON web_routes (dns_id);`,
+
+	// Version 135: repair runs (kind 'repair'): finish what dpkg left half
 	// done, list the config files to review, restart the failed units.
 	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
 	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan','repair'));`,
