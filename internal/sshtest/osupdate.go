@@ -27,6 +27,7 @@ const (
 	OSUpdateRelease  = "release"  // next release (osReleaseScript)
 	OSUpdateRestore  = "restore"  // a kept backup back onto its host (osrestore.go)
 	OSUpdateBackup   = "backup"   // back up to MinIO only (Bridge side; no script on the host)
+	OSUpdateRepair   = "repair"   // finish what dpkg left half done, restart failed units (osRepairScript)
 )
 
 // osUpdateDir holds each run's script, log and exit code on the host.
@@ -272,6 +273,8 @@ func OSUpdateInnerScript(kind string) (string, error) {
 		return fmt.Sprintf(osUpdateScript, kind), nil
 	case OSUpdateRelease:
 		return osReleaseScript, nil
+	case OSUpdateRepair:
+		return osRepairScript, nil
 	}
 	return "", fmt.Errorf("unknown OS update kind %q", kind)
 }
@@ -403,6 +406,9 @@ type OSUpdateReport struct {
 	// dpkg --audit names. Each once, in log order.
 	DpkgErrors []string
 	DpkgBroken []string
+	// A repair's: each failed unit it restarted, each config file to review.
+	UnitRestarts []UnitRestart
+	DistFiles    []DistFile
 	// Corrupted filesystems (fs_errors), each mount once.
 	FSErrors []FSError
 }
@@ -469,6 +475,16 @@ func ParseOSUpdateLog(logText string) OSUpdateReport {
 			r.DpkgErrors = appendNew(r.DpkgErrors, val)
 		case "dpkg_broken":
 			r.DpkgBroken = appendNew(r.DpkgBroken, val)
+		case "unit_restart":
+			if u, st, _ := strings.Cut(val, " "); unitName.MatchString(u) {
+				r.UnitRestarts = append(r.UnitRestarts, UnitRestart{Unit: u, OK: st == "ok"})
+			}
+		case "dist_file":
+			if i := strings.LastIndexByte(val, ' '); i > 0 {
+				if n, err := strconv.Atoi(val[i+1:]); err == nil && validRiskPath(val[:i]) {
+					r.DistFiles = append(r.DistFiles, DistFile{Path: val[:i], Changed: n})
+				}
+			}
 		case "fs_errors":
 			// fs_guard and diagnose may both report: one entry per mount.
 			if e, ok := parseFSError(val); ok && !slices.ContainsFunc(r.FSErrors, func(x FSError) bool { return x.Mount == e.Mount }) {

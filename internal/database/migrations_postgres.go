@@ -2276,4 +2276,9 @@ var migrationsPostgres = []string{
 	CREATE INDEX IF NOT EXISTS web_routes_target_addr_idx ON web_routes (target_addr);
 	CREATE INDEX IF NOT EXISTS web_routes_target_host_idx ON web_routes (target_host_id);
 	CREATE INDEX IF NOT EXISTS web_routes_dns_idx ON web_routes (dns_id);`,
+
+	// Version 135: repair runs (kind 'repair'): finish what dpkg left half
+	// done, list the config files to review, restart the failed units.
+	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
+	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan','repair'));`,
 }

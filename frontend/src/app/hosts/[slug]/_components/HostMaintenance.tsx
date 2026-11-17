@@ -45,6 +45,9 @@ export default function HostMaintenance({ host, scanData, scannedAt }: { host: H
   const { data: profile } = useQuery({ queryKey: ["backup-profile", host.oficial_slug], queryFn: () => osUpdateAPI.backupProfile(host.oficial_slug) });
   const { data: kept = [], isError: keptError, error: keptErr } = useQuery({ queryKey: ["os-updates", "backups", host.id], queryFn: () => osUpdateAPI.backups(host.id) });
   const custom = !!(profile?.profile.include || profile?.profile.exclude);
+  // What a repair run fixes, as the latest scan saw it.
+  const risks = scan?.release_risks;
+  const broken = !!(risks?.dpkg_broken?.length || risks?.failed_units?.length || risks?.pending_dist_files?.length);
 
   const backupNow = useMutation({
     mutationFn: () => osUpdateAPI.start({ kind: "backup", host_ids: [host.id], reboot: false, concurrency: 1 }),
@@ -60,6 +63,7 @@ export default function HostMaintenance({ host, scanData, scannedAt }: { host: H
     <div className="space-y-5 animate-fade-in">
       <SectionCard as="h3" title={t("host.maintenance.system")}
         controls={<div className="flex flex-wrap gap-2">
+          {broken && <Button size="sm" variant="secondary" onClick={() => setUpdate("repair")}>{t("host.maintenance.repair")}</Button>}
           <Button size="sm" variant="secondary" onClick={() => setUpdate("check")}>{t("host.maintenance.check")}</Button>
           <Button size="sm" onClick={() => setUpdate("security")}>{t("host.maintenance.update")}</Button>
           <Button size="sm" variant="secondary" onClick={() => setUpdate("release")}>{t("host.osRelease.start")}</Button>

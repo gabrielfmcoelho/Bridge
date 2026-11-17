@@ -1528,7 +1528,7 @@ export interface HostOS {
   reboot_required?: boolean;
 }
 
-export type OSUpdateKind = "check" | "packages" | "security" | "release" | "backup";
+export type OSUpdateKind = "check" | "packages" | "security" | "release" | "backup" | "repair";
 export type OSUpdateResultStatus = "pending" | "running" | "success" | "failed" | "skipped";
 
 /** One check / upgrade over a set of hosts (GET /api/ssh/os-updates/runs), or a
@@ -1655,6 +1655,10 @@ export interface ReleaseReport {
   lost_php_handlers?: string[];
   new_foreign_packages?: string[];
   sites?: SiteCheck[];
+  /** Repair only: each failed unit it restarted (ok: active afterwards)… */
+  unit_restarts?: { unit: string; ok: boolean }[];
+  /** …and each config file a package left to review, with how many lines differ. */
+  dist_files?: { path: string; changed: number }[];
 }
 
 export interface BackupPaths {
