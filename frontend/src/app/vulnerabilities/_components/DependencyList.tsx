@@ -21,12 +21,17 @@ import { vulnAPI } from "@/lib/api";
 import { VULN_SEVERITY_BADGE, VULN_STATUS_LOZENGE } from "@/lib/alert-colors";
 import type { Dependency, DependencyDetail, DependencyGroup, DependencyInstance, OSUpdateKind } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
+import IconButton from "@/components/ui/IconButton";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
 const PER_PAGE = 50;
 
 export type DependencyKindFilter = "components" | "packages" | "all";
 export type DependencyFlag = "" | "cves" | "eol";
+
+/** A version on this many installations or fewer opens all their CVEs at once;
+ *  beyond that each installation opens on its own (one read per installation). */
+const INLINE_OPEN = 3;
 
 const KINDS: Record<DependencyKindFilter, string> = { components: "os,runtime", packages: "package", all: "os,runtime,package" };
 
@@ -35,15 +40,14 @@ const KINDS: Record<DependencyKindFilter, string> = { components: "os,runtime", 
  *  installations have it. A row expands to its installations; one opens its
  *  advisories and the findings they produced. With hostId, that host only
  *  (its host and container installations of a version are one row).
- *  inlineVulns (the host tab): a row with CVEs opens them right under it,
- *  each with its finding's status, instead of only in the drawer. */
-export default function DependencyList({ search, kind, flag, onOpenFinding, hostId, inlineVulns }: {
+ *  A row with CVEs opens them right under it, per installation, each with
+ *  its finding's status; the drawer stays behind "Detalhes". */
+export default function DependencyList({ search, kind, flag, onOpenFinding, hostId }: {
   search: string;
   kind: DependencyKindFilter;
   flag: DependencyFlag;
   onOpenFinding: (id: number) => void;
   hostId?: number;
-  inlineVulns?: boolean;
 }) {
   const { t } = useLocale();
   const key = [search, kind, flag, hostId].join("|");
@@ -94,7 +98,7 @@ export default function DependencyList({ search, kind, flag, onOpenFinding, host
                 {groups.map((g, i) => {
                   const gk = `${g.kind}|${g.name}|${g.version}`;
                   const open = expanded === gk;
-                  const inline = !!inlineVulns && g.cve_count > 0;
+                  const inline = g.cve_count > 0;
                   const expands = inline || g.installs > 1;
                   return (
                     <Fragment key={gk}>
@@ -129,7 +133,7 @@ export default function DependencyList({ search, kind, flag, onOpenFinding, host
                         <tr className="bg-[var(--bg-elevated)]/40">
                           <td className={`${tableClasses.td} space-y-4`} colSpan={6}>
                             {g.instances.map((inst) => (
-                              <InstanceVulns key={inst.id} inst={inst} onDetails={() => setOpenId(inst.id)} onOpenFinding={onOpenFinding} />
+                              <InstanceVulns key={inst.id} inst={inst} defaultOpen={g.instances.length <= INLINE_OPEN} onDetails={() => setOpenId(inst.id)} onOpenFinding={onOpenFinding} />
                             ))}
                           </td>
                         </tr>
@@ -206,23 +210,33 @@ function Where({ d }: { d: DependencyInstance }) {
 }
 
 /** One installation under its component row: where it is and its CVEs, each
- *  with the status of the finding it produced. */
-function InstanceVulns({ inst, onDetails, onOpenFinding }: { inst: DependencyInstance; onDetails: () => void; onOpenFinding: (id: number) => void }) {
+ *  with the status of the finding it produced. Read only once opened. */
+function InstanceVulns({ inst, defaultOpen, onDetails, onOpenFinding }: {
+  inst: DependencyInstance; defaultOpen: boolean; onDetails: () => void; onOpenFinding: (id: number) => void;
+}) {
   const { t } = useLocale();
+  const has = inst.cve_count > 0;
+  const [open, setOpen] = useState(defaultOpen);
   const { data: d, isLoading, isError, error } = useQuery({
     queryKey: ["vulnerabilities", "dependency", inst.id],
     queryFn: () => vulnAPI.dependency(inst.id),
-    enabled: inst.cve_count > 0,
+    enabled: open && has,
   });
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Where d={inst} />
+        <span className="inline-flex items-center gap-2 min-w-0">
+          {has && (
+            <IconButton label={t("vuln.deps.vulns")} aria-expanded={open} onClick={() => setOpen(!open)}>
+              <Icon path={ICON_PATHS.chevronRight} className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`} />
+            </IconButton>
+          )}
+          <Where d={inst} />
+          <span className="font-mono text-xs text-[var(--text-muted)]">{inst.cve_count}</span>
+        </span>
         <Button size="sm" variant="ghost" onClick={onDetails}>{t("vuln.deps.details")}</Button>
       </div>
-      {inst.cve_count === 0 ? (
-        <p className="text-sm text-[var(--text-muted)]">{t("vuln.deps.noVulns")}</p>
-      ) : isLoading ? (
+      {!open || !has ? null : isLoading ? (
         <SkeletonTable rows={2} />
       ) : isError ? (
         <StatusAlert variant="error">{(error as Error)?.message}</StatusAlert>

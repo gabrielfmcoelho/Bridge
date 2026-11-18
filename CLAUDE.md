@@ -478,8 +478,9 @@ element" of the slice — the next migration breaks that test (v99's did when v1
 - Host page tabs (`frontend/src/app/hosts/[slug]/HostDetail.tsx`): **Operações**
   has two sections, Comandos SSH (editors) and Manutenção (admins only);
   **Vulnerabilidades** (`HostVulns`) is the host's software with each version's
-  CVEs inline (`DependencyList inlineVulns`, host only) and then the scanner
-  findings; **Monitoramento** has Requisições and Sentinel, each under its own
+  CVEs inline and then the scanner findings (`DependencyList` expands a row to
+  its installations' CVEs on the fleet page too; more than three installations
+  open one at a time); **Monitoramento** has Requisições and Sentinel, each under its own
   condition, the tab showing when either applies. `TAB_LINKS` maps every
   `?tab=` value to its tab and section, the keys of the merged tabs included
   (`maintenance`, `sentinel`, `requests`, `dependencies`): a new deep link goes

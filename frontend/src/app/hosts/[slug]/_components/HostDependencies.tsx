@@ -79,7 +79,7 @@ export default function HostDependencies({ hostId, host }: { hostId: number; hos
           </StatusAlert>
         </div>
       )}
-      <DependencyList search="" kind={kind} flag={flag} hostId={hostId} onOpenFinding={setFindingId} inlineVulns />
+      <DependencyList search="" kind={kind} flag={flag} hostId={hostId} onOpenFinding={setFindingId} />
       {updating && host && <OSUpdateModal target={{ by: "hosts", hosts: [host] }} preset="security"
         onClose={() => setUpdating(false)} onStarted={() => setUpdating(false)} />}
       <VulnDrawer id={findingId} onClose={() => setFindingId(null)} />

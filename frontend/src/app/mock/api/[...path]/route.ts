@@ -190,6 +190,10 @@ const MOCK_DEPS: DependencyDetail[] = [
     findings: [mkFinding({ id: 9103, source: "inventory", title: "CVE-2021-23017 nginx 1.14.0", severity: "critical", cve: "CVE-2021-23017" })] }),
   mkDep({ id: 9003, kind: "runtime", name: "nginx", version: "1.14.0", version_source: "image_env", lookup: "nvd", container: "proxy", image: "nginx:1.14", vulns: [NGINX_CVE],
     findings: [mkFinding({ id: 9104, source: "inventory", title: "CVE-2021-23017 nginx 1.14.0", severity: "critical", cve: "CVE-2021-23017", target: "srv-ntgd-backup01 · proxy" })] }),
+  // Four installations of one version: past the "open them all" limit of the list.
+  ...[9006, 9007].map((id, i) => mkDep({ id, kind: "runtime", name: "nginx", version: "1.14.0", version_source: "image_env", lookup: "nvd",
+    container: `proxy-${i + 2}`, image: "nginx:1.14", vulns: [NGINX_CVE],
+    findings: [mkFinding({ id: id + 100, source: "inventory", title: "CVE-2021-23017 nginx 1.14.0", severity: "critical", cve: "CVE-2021-23017", target: `srv-ntgd-backup01 · proxy-${i + 2}`, status: i ? "accepted" : "open" })] })),
   mkDep({ id: 9004, kind: "os", name: "ubuntu", version: "18.04", version_source: "os_release", eol: true, eol_date: "2023-05-31", eol_product: "ubuntu" }),
   mkDep({ id: 9005, kind: "package", name: "bash", version: "4.4.18-2ubuntu1.3", lookup: "osv", ecosystem: "Ubuntu:18.04" }),
 ];
@@ -764,17 +768,19 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
   if (method === "GET" && p === "vulnerabilities") {
     const csv = (k: string) => (qs.get(k) ? qs.get(k)!.split(",") : null);
     const status = csv("status"), source = qs.get("source");
-    const mine = qs.get("entity_type") === "host" && Number(qs.get("entity_id")) === MOCK_VULN_HOST;
+    // The fleet list (no entity) is every finding; another entity has none.
+    const mine = !qs.get("entity_type") || (qs.get("entity_type") === "host" && Number(qs.get("entity_id")) === MOCK_VULN_HOST);
     const rows = MOCK_FINDINGS.filter((f) => mine && (!status || status.includes(f.status)) && (!source || f.source === source))
       .sort((a, b) => SEVERITY_ORDER.indexOf(b.severity) - SEVERITY_ORDER.indexOf(a.severity));
     return json(paginate(rows, qs.get("page"), qs.get("per_page")));
   }
   // One row per kind/name/version, worst first (the OS tab's kind=os read is above).
-  if (method === "GET" && p === "vulnerabilities/dependencies/groups" && qs.get("host_id")) {
+  if (method === "GET" && p === "vulnerabilities/dependencies/groups") {
     const kinds = (qs.get("kind") ?? "os,runtime,package").split(",");
+    const hostId = Number(qs.get("host_id") ?? 0);
     const groups = new Map<string, DependencyGroup>();
     for (const d of MOCK_DEPS) {
-      if (d.host_id !== Number(qs.get("host_id")) || !kinds.includes(d.kind)) continue;
+      if ((hostId && d.host_id !== hostId) || !kinds.includes(d.kind)) continue;
       if (qs.get("scope") === "host" && d.container) continue;
       const k = `${d.kind}|${d.name}|${d.version}`;
       const g = groups.get(k) ?? { kind: d.kind, name: d.name, version: d.version, hosts: 1, installs: 0, cve_count: 0, max_severity: "", eol: d.eol,
