@@ -1287,17 +1287,35 @@ func listRemoteKeys(client *ssh.Client) ([]RemoteKeyInfo, error) {
 	return keys, nil
 }
 
+// Docker is non-essential to the scan — if the daemon hangs (busy engine,
+// stale socket, network namespace issue) we don't want it to stall the entire
+// capture. 8 seconds is long enough for `docker ps` on a host with hundreds of
+// containers, short enough that two attempts (direct + sudo retry) can't blow
+// past 16s.
+const dockerTimeout = 8 * time.Second
+
+// dockerPsAndStats runs `docker ps` and `docker stats` through run. Only ps
+// decides whether the container list is known (warnings): a failed stats
+// costs the CPU/MEM figures, never the list.
+func dockerPsAndStats(run func(cmd string) (string, error), warnings map[string]bool) (ps, stats string) {
+	ps = captureDocker(run,
+		`docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'`,
+		`sudo -n docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null`,
+		warnings,
+	)
+	stats = captureDocker(run,
+		`docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}'`,
+		`sudo -n docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}' 2>/dev/null`,
+		map[string]bool{},
+	)
+	return ps, stats
+}
+
 // captureDocker tries a docker command without sudo first. If the output
 // contains "permission denied" or "connect: ...", it retries with sudo -n
 // and sets a warning flag so the scan records the issue.
-func captureDocker(client *ssh.Client, cmd, sudoCmd string, warnings map[string]bool) string {
-	// Docker is non-essential to the scan — if the daemon hangs (busy
-	// engine, stale socket, network namespace issue) we don't want it to
-	// stall the entire capture. 8 seconds is long enough for `docker ps`
-	// on a host with hundreds of containers, short enough that two
-	// attempts (direct + sudo retry) can't blow past 16s.
-	const dockerTimeout = 8 * time.Second
-	out, execErr := runCmdWithDeadline(client, cmd, dockerTimeout)
+func captureDocker(run func(cmd string) (string, error), cmd, sudoCmd string, warnings map[string]bool) string {
+	out, execErr := run(cmd)
 	raw := strings.TrimSpace(string(out))
 	lower := strings.ToLower(raw)
 
@@ -1317,7 +1335,7 @@ func captureDocker(client *ssh.Client, cmd, sudoCmd string, warnings map[string]
 		// daemon doesn't double the budget. runCmdWithDeadline already
 		// closes the session on timeout, so sudo's own prompt timeout
 		// can't pin the scan either.
-		sudoOut, sudoErr := runCmdWithDeadline(client, sudoCmd, dockerTimeout)
+		sudoOut, sudoErr := run(sudoCmd)
 		if sudoErr == nil {
 			// sudo worked (even if output is empty = 0 containers)
 			warnings["docker_requires_sudo"] = true
@@ -1760,16 +1778,9 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	go func() {
 		defer wg.Done()
 		s := time.Now()
-		dockerPsRaw = captureDocker(client,
-			`docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'`,
-			`sudo -n docker ps --format '{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null`,
-			warnFlags,
-		)
-		dockerStatsRaw = captureDocker(client,
-			`docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}'`,
-			`sudo -n docker stats --no-stream --format '{{.Name}}  CPU:{{.CPUPerc}}  MEM:{{.MemUsage}}  NET:{{.NetIO}}' 2>/dev/null`,
-			warnFlags,
-		)
+		dockerPsRaw, dockerStatsRaw = dockerPsAndStats(func(cmd string) (string, error) {
+			return runCmdWithDeadline(client, cmd, dockerTimeout)
+		}, warnFlags)
 		// Container dependencies reuse what docker ps needed (sudo or
 		// not) and stay in this goroutine, so the block keeps 10 sessions.
 		if dockerPsRaw != "" && !warnFlags["docker_unreadable"] {
@@ -2131,7 +2142,7 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	// captureAgents + captureServices intersect it with the catalogs;
 	// no extra SSH work happens here.
 	var agentPortClaims map[int]bool
-	info.Agents, agentPortClaims = captureAgents(hostInv)
+	info.Agents, agentPortClaims = captureAgents(hostInv, dockerHostPorts)
 	agentNames := make(map[string]bool, len(info.Agents))
 	for _, a := range info.Agents {
 		agentNames[a.Name] = true

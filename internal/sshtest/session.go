@@ -12,14 +12,15 @@ import (
 const scanPath = "export PATH=\"$PATH:/usr/local/sbin:/usr/sbin:/sbin\""
 
 // retrySessionOpen retries while the peer refuses the channel (sshd MaxSessions,
-// default 10); any other error returns at once. wait gets the attempt just failed.
+// default 10): "administratively prohibited" up to OpenSSH 7.5, "connect
+// failed" since. Any other error returns at once. wait gets the attempt just failed.
 func retrySessionOpen(open func() (*ssh.Session, error), attempts int, wait func(attempt int)) (*ssh.Session, error) {
 	var sess *ssh.Session
 	var err error
 	for a := 1; a <= attempts; a++ {
 		sess, err = open()
 		var oce *ssh.OpenChannelError
-		if err == nil || !errors.As(err, &oce) || oce.Reason != ssh.Prohibited {
+		if err == nil || !errors.As(err, &oce) || (oce.Reason != ssh.Prohibited && oce.Reason != ssh.ConnectionFailed) {
 			return sess, err
 		}
 		if a < attempts {

@@ -27,6 +27,22 @@ func TestRetrySessionOpenRetriesRefusal(t *testing.T) {
 	}
 }
 
+// OpenSSH 7.6+ refuses a session over MaxSessions with "connect failed (open
+// failed)", not "administratively prohibited" (SAPASP-AVALIE04, Ubuntu 22.04).
+func TestRetrySessionOpenRetriesConnectFailed(t *testing.T) {
+	calls := 0
+	_, err := retrySessionOpen(func() (*ssh.Session, error) {
+		calls++
+		if calls == 1 {
+			return nil, &ssh.OpenChannelError{Reason: ssh.ConnectionFailed, Message: "open failed"}
+		}
+		return nil, nil
+	}, 5, func(int) {})
+	if err != nil || calls != 2 {
+		t.Fatalf("err=%v calls=%d", err, calls)
+	}
+}
+
 func TestRetrySessionOpenOtherErrorReturnsAtOnce(t *testing.T) {
 	calls := 0
 	_, err := retrySessionOpen(func() (*ssh.Session, error) { calls++; return nil, io.EOF }, 5, func(int) {})
