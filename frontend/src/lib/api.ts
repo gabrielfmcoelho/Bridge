@@ -113,6 +113,8 @@ export type DiscoveredService = {
   sources?: string[];        // ["systemd","process","package","port","container"]
   host_running?: boolean;    // a live instance outside any container cgroup
   host_ports?: number[];     // the subset of ports owned by that host instance
+  instance?: string;         // app-server instance: unit or install dir
+  apps?: string[];           // applications deployed on it
 };
 
 export type NginxCleanupStepType = {

@@ -2917,6 +2917,16 @@
     "userPasswordNoneTooltip": "Nenhuma senha definida (passwd -S = NP) — login por senha impossível.",
     "lastScanLabel": "Último scan:",
     "noScanData": "Sem dados de scan",
+    "workloads": {
+      "kind": {"container": "Container", "service": "Serviço", "process": "Processo"},
+      "image": "Imagem",
+      "network": "Rede (E/S)",
+      "unit": "Unit systemd",
+      "instance": "Instância",
+      "vendor": "Fornecedor",
+      "alsoIn": "Também em container",
+      "signals": "Sinais"
+    },
     "pane": {
       "title": "Último scan",
       "ago": "Último scan · {ago}",
@@ -2939,7 +2949,9 @@
         "system": "Sistema e manutenção"
       },
       "group": {
-        "ports": "Portas em escuta",
+        "workloads": "Aplicações e serviços",
+        "agents": "Agentes de gestão",
+        "ports": "Outras portas em escuta",
         "resources": "Recursos",
         "system": "Sistema",
         "users": "Usuários",
@@ -2960,7 +2972,9 @@
         "roles": "Papel do servidor"
       },
       "empty": {
-        "ports": "Nenhuma porta em escuta encontrada no último scan.",
+        "workloads": "Nenhum container, serviço ou processo de aplicação encontrado no último scan.",
+        "agents": "Nenhum agente de gestão encontrado no último scan.",
+        "ports": "Nenhuma outra porta em escuta no último scan.",
         "resources": "Sem dados de uso neste scan.",
         "system": "Sem informações do sistema neste scan.",
         "users": "Nenhum usuário encontrado no último scan.",
