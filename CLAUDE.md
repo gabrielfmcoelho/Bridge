@@ -404,7 +404,12 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   through `newSession`, never `client.NewSession` — sshd's default `MaxSessions
   10` refuses the 11th concurrent session with an `OpenChannelError`
   (Prohibited), and Go's client then failed silently, so probes just vanished;
-  `newSession` retries that refusal. New probes open through `newSession` and
+  `newSession` retries that refusal (also `connect failed`, what OpenSSH 7.6+
+  answers) and, inside a capture, first waits for one of 8 slots, so the cap
+  is not reached. A command that was refused or cut at its deadline is counted
+  and ends in the scan's `warnings`: its probe is empty, not "nothing found".
+  `docker ps` alone decides `containers_known`; CPU is sampled over its own
+  second before any probe (`cpuSampleCmd`). New probes open through `newSession` and
   start their script with `scanPath` (`/usr/sbin`, `/sbin` appended; some older
   scripts inline the same export): a non-interactive CentOS 7 PATH has no
   `ss`, which left `ports` null on every CentOS host. Process details
@@ -485,6 +490,16 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   `?tab=` value to its tab and section, the keys of the merged tabs included
   (`maintenance`, `sentinel`, `requests`, `dependencies`): a new deep link goes
   there. A link to a tab the caller can't see opens nothing.
+- Scan pane (`frontend/src/lib/scanSections.ts`, pure, tested): five groups by
+  question (Recursos, Cargas, Web, Acesso e segurança, Sistema e manutenção),
+  each showing only the sections with data; a closing note lists what the scan
+  found nothing for and what it did not check (`notRun`: quick test's deep
+  facts, `containers_known: false`, a cut git walk). `scanWorkloads` makes one
+  row per container / service (with its processes) / unclaimed process, each
+  with its ports; `siteFacts` puts a site's traffic and code on its web-server
+  row. A card whose data all rides on other rows is `elsewhere`: not drawn,
+  not listed. A new section needs its rule in `sectionState`, mirroring the
+  component's own empty rule.
 - List endpoints return `{data, meta:{page,per_page,total}}`
   (`internal/api/list.go`), unwrapped client-side by `getList` /
   `getListPaginated` in `frontend/src/lib/api.ts`.
