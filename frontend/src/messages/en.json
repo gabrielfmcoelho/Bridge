@@ -2917,6 +2917,16 @@
     "userPasswordNoneTooltip": "No password set (passwd -S = NP) — password login impossible.",
     "lastScanLabel": "Last scan:",
     "noScanData": "No scan data",
+    "workloads": {
+      "kind": {"container": "Container", "service": "Service", "process": "Process"},
+      "image": "Image",
+      "network": "Network I/O",
+      "unit": "systemd unit",
+      "instance": "Instance",
+      "vendor": "Vendor",
+      "alsoIn": "Also in a container",
+      "signals": "Signals"
+    },
     "pane": {
       "title": "Last scan",
       "ago": "Last scan · {ago}",
@@ -2939,7 +2949,9 @@
         "system": "System and maintenance"
       },
       "group": {
-        "ports": "Listening ports",
+        "workloads": "Applications and services",
+        "agents": "Management agents",
+        "ports": "Other listening ports",
         "resources": "Resources",
         "system": "System",
         "users": "Users",
@@ -2960,7 +2972,9 @@
         "roles": "Server role"
       },
       "empty": {
-        "ports": "No listening port found in the last scan.",
+        "workloads": "No container, service or application process found in the last scan.",
+        "agents": "No management agent found in the last scan.",
+        "ports": "No other listening port in the last scan.",
         "resources": "No usage data in this scan.",
         "system": "No system information in this scan.",
         "users": "No users found in the last scan.",

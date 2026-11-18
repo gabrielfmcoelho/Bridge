@@ -3,6 +3,7 @@
 import SectionCard from "@/components/ui/SectionCard";
 import { portIcon } from "@/lib/utils";
 import type { VMInfoType, PortOwner } from "@/lib/api";
+import { scanWorkloads } from "@/lib/scanSections";
 import type { T } from "./shared";
 
 // Chip colour by port owner type, so the panel scans at a glance: agents
@@ -19,11 +20,11 @@ function ownerClasses(ownerType?: string): string {
 }
 
 /**
- * The listening ports and who owns each — first in the workloads group, right
- * above the containers, services and processes the chips name.
+ * The listening ports no workload or agent row already shows (lib/scanSections
+ * `scanWorkloads`), with whatever owner the scan could name.
  */
 export default function ScanPorts({ info, t }: { info: VMInfoType; t: T }) {
-  const ports = info.ports ?? [];
+  const ports = scanWorkloads(info).otherPorts;
   const ownerByPort = new Map<number, PortOwner>();
   for (const po of info.port_owners ?? []) ownerByPort.set(po.port, po);
 

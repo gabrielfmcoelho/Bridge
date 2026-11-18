@@ -9,9 +9,8 @@ import ScanResources from "./scan/ScanResources";
 import ScanSystem from "./scan/ScanSystem";
 import ScanPorts from "./scan/ScanPorts";
 import ScanUsers from "./scan/ScanUsers";
-import ScanProcesses from "./scan/ScanProcesses";
-import ScanContainers from "./scan/ScanContainers";
-import ScanServices from "./scan/ScanServices";
+import ScanWorkloads from "./scan/ScanWorkloads";
+import ScanAgents from "./scan/ScanAgents";
 import ScanWebServers from "./scan/ScanWebServers";
 import ScanGitRemotes from "./scan/ScanGitRemotes";
 import ScanOutbound from "./scan/ScanOutbound";
@@ -42,10 +41,9 @@ export default function VMInfoDisplay({ info, locale, anchorPrefix, dnsRecords, 
   const { t } = useLocale();
   const sections: Record<ScanSection, ReactNode> = {
     resources: <ScanResources info={info} t={t} hostSlug={hostSlug} />,
+    workloads: <ScanWorkloads info={info} t={t} hostSlug={hostSlug} />,
+    agents: <ScanAgents info={info} t={t} />,
     ports: <ScanPorts info={info} t={t} />,
-    containers: <ScanContainers info={info} t={t} />,
-    services: <ScanServices info={info} t={t} />,
-    processes: <ScanProcesses info={info} t={t} hostSlug={hostSlug} />,
     git: <ScanGitRemotes info={info} t={t} />,
     roles: <ScanRoles info={info} t={t} />,
     webservers: <ScanWebServers info={info} t={t} dnsRecords={dnsRecords} />,

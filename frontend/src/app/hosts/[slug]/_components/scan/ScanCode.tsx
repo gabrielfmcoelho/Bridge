@@ -4,16 +4,18 @@ import SectionCard from "@/components/ui/SectionCard";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { CodeFingerprint, VMInfoType } from "@/lib/api";
 import { formatBytes } from "@/lib/backupPreview";
+import { siteFacts } from "@/lib/scanSections";
 import { Detail, Row, Rows, type T } from "./shared";
 
 /**
  * A7 code fingerprint: per web docroot, which framework and version runs
  * (CodeIgniter, Laravel, WordPress…), the newest code change, and the upload
  * directories (size, file count, newest) — the "what runs here / how much data
- * is at rest" signal. Background scan only.
+ * is at rest" signal. Background scan only. A docroot a web-server site serves
+ * shows on that site's row (ScanWebServers); this card keeps the rest.
  */
 export default function ScanCode({ info, t }: { info: VMInfoType; t: T }) {
-  const docs = info.deep_facts?.code ?? [];
+  const docs = siteFacts(info).code;
   const empty = info.deep_facts == null
     ? t("scan.deep.notRun")
     : docs.length === 0
@@ -35,21 +37,36 @@ export default function ScanCode({ info, t }: { info: VMInfoType; t: T }) {
 }
 
 function DocRow({ d, t }: { d: CodeFingerprint; t: T }) {
-  const { formatDate } = useLocale();
-  const apps = d.apps ?? [];
   return (
     <Row
       summary={<>
         <span className="min-w-0 truncate font-mono text-[var(--text-primary)]" title={d.docroot}>{d.docroot}</span>
-        <span className="ml-auto flex shrink-0 flex-wrap justify-end gap-1">
-          {apps.slice(0, 4).map((a, i) => (
-            <span key={i} className="rounded px-1.5 text-2xs bg-[var(--accent)]/10 text-[var(--accent)]">
-              {a.framework}{a.version ? ` ${a.version}` : ""}
-            </span>
-          ))}
-        </span>
+        <span className="ml-auto flex shrink-0 flex-wrap justify-end gap-1"><CodeChips d={d} /></span>
       </>}
     >
+      <CodeDetails d={d} t={t} />
+    </Row>
+  );
+}
+
+/** The frameworks found under a docroot, as chips (four at most). */
+export function CodeChips({ d }: { d: CodeFingerprint }) {
+  return (
+    <>
+      {(d.apps ?? []).slice(0, 4).map((a, i) => (
+        <span key={i} className="shrink-0 rounded px-1.5 text-2xs bg-[var(--accent)]/10 text-[var(--accent)]">
+          {a.framework}{a.version ? ` ${a.version}` : ""}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/** A docroot's frameworks per path, newest code change and upload directories. */
+export function CodeDetails({ d, t }: { d: CodeFingerprint; t: T }) {
+  const { formatDate } = useLocale();
+  const apps = d.apps ?? [];
+  return (
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
         {apps.length > 0 ? (
           apps.map((a, i) => (
@@ -78,6 +95,5 @@ function DocRow({ d, t }: { d: CodeFingerprint; t: T }) {
           </Detail>
         )}
       </dl>
-    </Row>
   );
 }
