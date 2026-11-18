@@ -1171,6 +1171,7 @@
       "dashboardIframeTitle": "Dashboard Grafana de {slug}"
     },
     "ops": {
+      "sectionSsh": "Comandos SSH",
       "noReportReturned": "Nenhum relatório retornado.",
       "installFailed": "Falha na instalação",
       "grafanaAgentInstalled": "grafana-agent instalado",
@@ -1255,6 +1256,7 @@
     "profileTitle": "Host",
     "declared": "Declarado",
     "tabMetrics": "Métricas",
+    "tabMonitoring": "Monitoramento",
     "authPickDefault": "Com senha e chave configuradas, escolha o método de autenticação padrão.",
     "syncCoolify": "Sincronizar do Coolify",
     "syncCoolifyRunning": "Lendo aplicações, stacks e bancos do Coolify…",
@@ -2915,6 +2917,16 @@
     "userPasswordNoneTooltip": "Nenhuma senha definida (passwd -S = NP) — login por senha impossível.",
     "lastScanLabel": "Último scan:",
     "noScanData": "Sem dados de scan",
+    "workloads": {
+      "kind": {"container": "Container", "service": "Serviço", "process": "Processo"},
+      "image": "Imagem",
+      "network": "Rede (E/S)",
+      "unit": "Unit systemd",
+      "instance": "Instância",
+      "vendor": "Fornecedor",
+      "alsoIn": "Também em container",
+      "signals": "Sinais"
+    },
     "pane": {
       "title": "Último scan",
       "ago": "Último scan · {ago}",
@@ -2927,7 +2939,19 @@
       "noCredentials": "Cadastre uma senha ou chave SSH para executar um scan.",
       "parseError": "Não foi possível ler o último scan.",
       "sections": "Seções do scan",
+      "notChecked": "Não verificado neste scan: {list}.",
+      "nothingFound": "Nada encontrado: {list}.",
+      "area": {
+        "resources": "Recursos",
+        "workloads": "Cargas",
+        "web": "Web",
+        "access": "Acesso e segurança",
+        "system": "Sistema e manutenção"
+      },
       "group": {
+        "workloads": "Aplicações e serviços",
+        "agents": "Agentes de gestão",
+        "ports": "Outras portas em escuta",
         "resources": "Recursos",
         "system": "Sistema",
         "users": "Usuários",
@@ -2935,7 +2959,7 @@
         "containers": "Containers",
         "services": "Serviços",
         "packages": "Pacotes e agendamentos",
-        "security": "Segurança",
+        "security": "Autenticação SSH",
         "webservers": "Servidores web",
         "git": "Repositórios git",
         "outbound": "Fluxos de saída",
@@ -2944,10 +2968,13 @@
         "panels": "Painéis de controle",
         "code": "Código e uploads",
         "owner": "Pistas de dono",
-        "firewall": "Firewall real",
+        "firewall": "Firewall",
         "roles": "Papel do servidor"
       },
       "empty": {
+        "workloads": "Nenhum container, serviço ou processo de aplicação encontrado no último scan.",
+        "agents": "Nenhum agente de gestão encontrado no último scan.",
+        "ports": "Nenhuma outra porta em escuta no último scan.",
         "resources": "Sem dados de uso neste scan.",
         "system": "Sem informações do sistema neste scan.",
         "users": "Nenhum usuário encontrado no último scan.",
@@ -2955,7 +2982,7 @@
         "containers": "Nenhum container encontrado no último scan.",
         "services": "Nenhum serviço ou agente encontrado no último scan.",
         "packages": "Nenhum pacote ou agendamento encontrado no último scan.",
-        "security": "Sem dados de firewall ou política SSH neste scan.",
+        "security": "Sem política de autenticação SSH neste scan.",
         "webservers": "Nenhum nginx, Apache ou PHP-FPM encontrado.",
         "git": "Nenhum checkout git encontrado.",
         "outbound": "Nenhum fluxo de saída encontrado no último scan.",
@@ -4718,7 +4745,17 @@
       "noRepos": "nenhum",
       "meta": "Gerado {ago} · {model}"
     },
+    "host": {
+      "software": "Software instalado",
+      "softwareHint": "Cada versão encontrada no host e nos contêineres. Abra uma linha para ver as CVEs dela e a situação de cada uma.",
+      "eolCallout": "{count} componente(s) deste host sem suporte (fim de vida).",
+      "otherFindings": "Outros achados",
+      "otherFindingsHint": "Achados de scanners (ETIPI, Wazuh), inclusive os que chegam pelos registros DNS e serviços relacionados. As CVEs do inventário ficam em cada componente acima.",
+      "originScanners": "Scanners externos",
+      "originInventory": "Inventário (lista corrida)"
+    },
     "deps": {
+      "details": "Detalhes",
       "updateSecurity": "Atualizar (segurança)…",
       "updateHosts": "Atualizar {count} host(s) afetado(s)…",
       "fixableCallout": "{count} pacotes da distro neste host têm CVEs com aviso da própria distro: uma atualização de segurança costuma corrigi-los.",

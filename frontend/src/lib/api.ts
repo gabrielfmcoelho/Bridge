@@ -113,6 +113,8 @@ export type DiscoveredService = {
   sources?: string[];        // ["systemd","process","package","port","container"]
   host_running?: boolean;    // a live instance outside any container cgroup
   host_ports?: number[];     // the subset of ports owned by that host instance
+  instance?: string;         // app-server instance: unit or install dir
+  apps?: string[];           // applications deployed on it
 };
 
 export type NginxCleanupStepType = {
@@ -179,6 +181,8 @@ export type VMInfoType = {
   remote_users?: RemoteUserInfo[];
   port_owners?: PortOwner[];
   parsed_containers?: ParsedContainer[];
+  /** false: `docker ps` did not answer, so an empty container list means "not checked". */
+  containers_known?: boolean;
   ssh_auth_policy?: SSHAuthPolicy;
   web_servers?: WebServer[];
   /** Remotes of git checkouts on the host and in containers. null = probe didn't run. */

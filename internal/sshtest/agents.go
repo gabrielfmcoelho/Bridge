@@ -366,11 +366,11 @@ func collectHostInventory(client *ssh.Client, portOwners []PortOwner) *hostInven
 // Returns the matched agents and the set of signature ports they claimed,
 // so captureServices can avoid re-attributing the same port (e.g., :10050
 // → Zabbix Agent 2 should not also be flagged by any service spec).
-func captureAgents(inv *hostInventory) ([]Agent, map[int]bool) {
+func captureAgents(inv *hostInventory, published map[int]*ContainerInfo) ([]Agent, map[int]bool) {
 	portClaims := map[int]bool{}
 	var agents []Agent
 	for _, spec := range agentCatalog {
-		agent, ok := detectAgent(spec, inv, portClaims)
+		agent, ok := detectAgent(spec, inv, portClaims, published)
 		if !ok {
 			continue
 		}
@@ -395,7 +395,7 @@ func captureAgents(inv *hostInventory) ([]Agent, map[int]bool) {
 // the matching signals provided. portClaims is the set of signature
 // ports already claimed by an earlier spec; ports in this set don't
 // trigger detection here so the catalog can't double-count.
-func detectAgent(spec agentSpec, inv *hostInventory, portClaims map[int]bool) (Agent, bool) {
+func detectAgent(spec agentSpec, inv *hostInventory, portClaims map[int]bool, published map[int]*ContainerInfo) (Agent, bool) {
 	agent := Agent{Name: spec.Name, Label: spec.Label, Vendor: spec.Vendor, Category: spec.Category}
 	if len(spec.ConfigPaths) > 0 {
 		agent.ConfigPath = spec.ConfigPaths[0]
@@ -475,6 +475,11 @@ procsDone:
 		if portClaims[p] {
 			continue
 		}
+		// A port some other container publishes (a Next.js app on :3000) is
+		// not this agent.
+		if c := published[p]; c != nil && !containerIsAgent(c, spec) {
+			continue
+		}
 		portSet[p] = true
 		sources["port"] = true
 	}
@@ -487,6 +492,10 @@ procsDone:
 
 	if len(sources) == 0 {
 		return Agent{}, false
+	}
+	// A listening port alone says nothing about files on the host.
+	if len(sources) == 1 && sources["port"] {
+		agent.ConfigPath = ""
 	}
 
 	// Finalize state. If we have a package signal but no systemd/process
@@ -502,6 +511,19 @@ procsDone:
 	}
 	sort.Strings(agent.Sources)
 	return agent, true
+}
+
+// containerIsAgent: the container's image or name names one of the agent's
+// binaries (prom/node-exporter, grafana/grafana), `_` and `-` alike.
+func containerIsAgent(c *ContainerInfo, spec agentSpec) bool {
+	norm := func(s string) string { return strings.ReplaceAll(strings.ToLower(s), "_", "-") }
+	hay := norm(c.Image + " " + c.Name)
+	for _, b := range spec.Binaries {
+		if strings.Contains(hay, norm(b)) {
+			return true
+		}
+	}
+	return false
 }
 
 // unitMatches reports whether `unit` (with optional .service suffix) matches

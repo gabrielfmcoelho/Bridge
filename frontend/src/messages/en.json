@@ -1171,6 +1171,7 @@
       "dashboardIframeTitle": "Grafana dashboard for {slug}"
     },
     "ops": {
+      "sectionSsh": "SSH commands",
       "noReportReturned": "No report returned.",
       "installFailed": "Install failed",
       "grafanaAgentInstalled": "grafana-agent installed",
@@ -1255,6 +1256,7 @@
     "profileTitle": "Host",
     "declared": "Declared",
     "tabMetrics": "Metrics",
+    "tabMonitoring": "Monitoring",
     "authPickDefault": "With both a password and a key, pick the default auth method.",
     "syncCoolify": "Sync from Coolify",
     "syncCoolifyRunning": "Reading Coolify applications, stacks and databases…",
@@ -2915,6 +2917,16 @@
     "userPasswordNoneTooltip": "No password set (passwd -S = NP) — password login impossible.",
     "lastScanLabel": "Last scan:",
     "noScanData": "No scan data",
+    "workloads": {
+      "kind": {"container": "Container", "service": "Service", "process": "Process"},
+      "image": "Image",
+      "network": "Network I/O",
+      "unit": "systemd unit",
+      "instance": "Instance",
+      "vendor": "Vendor",
+      "alsoIn": "Also in a container",
+      "signals": "Signals"
+    },
     "pane": {
       "title": "Last scan",
       "ago": "Last scan · {ago}",
@@ -2927,7 +2939,19 @@
       "noCredentials": "Store an SSH password or key to run a scan.",
       "parseError": "The last scan couldn't be read.",
       "sections": "Scan sections",
+      "notChecked": "Not checked in this scan: {list}.",
+      "nothingFound": "Nothing found: {list}.",
+      "area": {
+        "resources": "Resources",
+        "workloads": "Workloads",
+        "web": "Web",
+        "access": "Access and security",
+        "system": "System and maintenance"
+      },
       "group": {
+        "workloads": "Applications and services",
+        "agents": "Management agents",
+        "ports": "Other listening ports",
         "resources": "Resources",
         "system": "System",
         "users": "Users",
@@ -2935,7 +2959,7 @@
         "containers": "Containers",
         "services": "Services",
         "packages": "Packages and schedules",
-        "security": "Security",
+        "security": "SSH authentication",
         "webservers": "Web servers",
         "git": "Git repositories",
         "outbound": "Outbound flows",
@@ -2944,10 +2968,13 @@
         "panels": "Control panels",
         "code": "Code & uploads",
         "owner": "Owner clues",
-        "firewall": "Firewall reality",
+        "firewall": "Firewall",
         "roles": "Server role"
       },
       "empty": {
+        "workloads": "No container, service or application process found in the last scan.",
+        "agents": "No management agent found in the last scan.",
+        "ports": "No other listening port in the last scan.",
         "resources": "No usage data in this scan.",
         "system": "No system information in this scan.",
         "users": "No users found in the last scan.",
@@ -2955,7 +2982,7 @@
         "containers": "No containers found in the last scan.",
         "services": "No services or agents found in the last scan.",
         "packages": "No packages or schedules found in the last scan.",
-        "security": "No firewall or SSH policy data in this scan.",
+        "security": "No SSH authentication policy in this scan.",
         "webservers": "No nginx, Apache or PHP-FPM found.",
         "git": "No git checkouts found.",
         "outbound": "No outbound flows found in the last scan.",
@@ -4718,7 +4745,17 @@
       "noRepos": "none",
       "meta": "Generated {ago} · {model}"
     },
+    "host": {
+      "software": "Installed software",
+      "softwareHint": "Every version found on the host and in its containers. Open a row to see its CVEs and where each one stands.",
+      "eolCallout": "{count} component(s) on this host are end of life.",
+      "otherFindings": "Other findings",
+      "otherFindingsHint": "Scanner findings (ETIPI, Wazuh), including those reaching the host through related DNS records and services. Inventory CVEs sit under each component above.",
+      "originScanners": "External scanners",
+      "originInventory": "Inventory (flat list)"
+    },
     "deps": {
+      "details": "Details",
       "updateSecurity": "Update (security)…",
       "updateHosts": "Update {count} affected host(s)…",
       "fixableCallout": "{count} distro packages on this host have CVEs from the distro's own advisories: a security update usually fixes them.",

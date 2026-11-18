@@ -162,17 +162,4 @@ export function hasScanPermissionWarning(sr: {
     || hasPermissionDeniedMessage(sr.disk_percent);
 }
 
-/** Parse a container_stats entry. */
-export function parseContainerRow(raw: string) {
-  const nameMatch = raw.match(/^(.+?)\s+CPU:/);
-  const name = nameMatch?.[1]?.trim() || raw.split(/\s+/)[0] || raw;
-  const cpuMatch = raw.match(/CPU:([\d.]+%?)/);
-  const cpu = cpuMatch?.[1] || "";
-  const memMatch = raw.match(/MEM:(.+?)(?:\s+NET:|$)/);
-  const mem = memMatch?.[1]?.trim() || "";
-  const netMatch = raw.match(/NET:(.+)$/);
-  const net = netMatch?.[1]?.trim() || "";
-  return { name, cpu, mem, net, cpuNum: parseFloat(cpu) || 0, memNum: parseFloat(mem) || 0 };
-}
-
 export { formatPhone } from "./phone";
