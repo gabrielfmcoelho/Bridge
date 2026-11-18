@@ -9,17 +9,11 @@ import { SubBlock, type T } from "./shared";
 type YN = "yes" | "no" | "unknown";
 const yn = (v?: string): YN => (v === "yes" ? "yes" : v === "no" ? "no" : "unknown");
 
-/** Firewall status and the SSH auth policy ("does this host accept passwords, and for whom?"). */
+/** The SSH auth policy ("does this host accept passwords, and for whom?"). The firewall has its own card (ScanFirewall). */
 export default function ScanSecurity({ info, t }: { info: VMInfoType; t: T }) {
-  const empty = !info.firewall_status && !info.ssh_auth_policy;
   return (
-    <SectionCard as="h3" title={t("scan.pane.group.security")} empty={empty ? t("scan.pane.empty.security") : undefined}>
+    <SectionCard as="h3" title={t("scan.pane.group.security")} empty={!info.ssh_auth_policy ? t("scan.pane.empty.security") : undefined}>
       {info.ssh_auth_policy && <SSHAuthPolicy policy={info.ssh_auth_policy} users={info.remote_users ?? []} t={t} />}
-      {info.firewall_status && (
-        <SubBlock title={t("scan.firewallStatus")}>
-          <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all font-mono">{info.firewall_status}</pre>
-        </SubBlock>
-      )}
     </SectionCard>
   );
 }

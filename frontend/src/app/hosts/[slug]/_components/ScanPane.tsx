@@ -11,14 +11,15 @@ import { scanAPI, type VMInfoType, type WebDNSSummary } from "@/lib/api";
 import { useScanRun } from "@/hooks/useScanRun";
 import { getTimeAgo, resolveAuthMethod } from "@/lib/utils";
 import type { Host } from "@/lib/types";
-import VMInfoDisplay, { SCAN_GROUPS, type ScanGroup } from "./VMInfoDisplay";
+import { scanLayout, type ScanGroup } from "@/lib/scanSections";
+import VMInfoDisplay from "./VMInfoDisplay";
 
 const ANCHOR = "scan-";
 
 /**
  * Right column of the host overview: what the last scan observed. Header
- * (when, and "Executar scan" for editors), a sticky jump bar over the
- * groups, then the groups in one continuous scroll.
+ * (when, and "Executar scan" for editors), the scan's own warnings, a sticky
+ * jump bar over the groups, then the groups in one continuous scroll.
  */
 export default function ScanPane({ slug, host, lastScan, canEdit, dnsRecords }: {
   slug: string;
@@ -111,7 +112,14 @@ export default function ScanPane({ slug, host, lastScan, canEdit, dnsRecords }: 
         <StatusAlert variant="error">{t("scan.pane.parseError")}</StatusAlert>
       ) : (
         <>
-          <JumpBar t={t} />
+          {parsed.info.warnings && parsed.info.warnings.length > 0 && (
+            <StatusAlert variant="warning" className="mb-3">
+              <ul className="space-y-1">
+                {parsed.info.warnings.map((w, i) => <li key={i}>{w}</li>)}
+              </ul>
+            </StatusAlert>
+          )}
+          <JumpBar t={t} groups={scanLayout(parsed.info).groups.map((g) => g.group)} />
           <VMInfoDisplay info={parsed.info} locale={locale} anchorPrefix={ANCHOR} dnsRecords={dnsRecords} hostSlug={slug} />
         </>
       )}
@@ -119,9 +127,10 @@ export default function ScanPane({ slug, host, lastScan, canEdit, dnsRecords }: 
   );
 }
 
-/** Sticky chips, one per group; the group in view is marked `aria-current`. */
-function JumpBar({ t }: { t: (k: string) => string }) {
-  const [active, setActive] = useState<ScanGroup>(SCAN_GROUPS[0]);
+/** Sticky chips, one per group shown; the group in view is marked `aria-current`. */
+function JumpBar({ t, groups }: { t: (k: string) => string; groups: ScanGroup[] }) {
+  const [active, setActive] = useState<ScanGroup | undefined>(groups[0]);
+  const key = groups.join(",");
 
   useEffect(() => {
     // A group counts as "in view" while it crosses the top 40% of the viewport;
@@ -134,22 +143,26 @@ function JumpBar({ t }: { t: (k: string) => string }) {
           if (e.isIntersecting) visible.add(g);
           else visible.delete(g);
         }
-        const first = SCAN_GROUPS.find((g) => visible.has(g));
+        const first = groups.find((g) => visible.has(g));
         if (first) setActive(first);
       },
       { rootMargin: "-64px 0px -60% 0px" },
     );
-    for (const g of SCAN_GROUPS) {
+    for (const g of groups) {
       const el = document.getElementById(ANCHOR + g);
       if (el) obs.observe(el);
     }
     return () => obs.disconnect();
-  }, []);
+    // `key` stands for `groups`, a new array on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  if (groups.length < 2) return null;
 
   return (
     <nav aria-label={t("scan.pane.sections")} className="sticky top-0 z-10 -mx-1 px-1 py-2 mb-3 bg-[var(--bg-base)]">
       <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-        {SCAN_GROUPS.map((g) => {
+        {groups.map((g) => {
           const on = g === active;
           return (
             <a
@@ -170,7 +183,7 @@ function JumpBar({ t }: { t: (k: string) => string }) {
                   : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]"
               }`}
             >
-              {t(`scan.pane.group.${g}`)}
+              {t(`scan.pane.area.${g}`)}
             </a>
           );
         })}

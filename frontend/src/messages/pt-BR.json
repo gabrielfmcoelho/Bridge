@@ -2929,7 +2929,17 @@
       "noCredentials": "Cadastre uma senha ou chave SSH para executar um scan.",
       "parseError": "Não foi possível ler o último scan.",
       "sections": "Seções do scan",
+      "notChecked": "Não verificado neste scan: {list}.",
+      "nothingFound": "Nada encontrado: {list}.",
+      "area": {
+        "resources": "Recursos",
+        "workloads": "Cargas",
+        "web": "Web",
+        "access": "Acesso e segurança",
+        "system": "Sistema e manutenção"
+      },
       "group": {
+        "ports": "Portas em escuta",
         "resources": "Recursos",
         "system": "Sistema",
         "users": "Usuários",
@@ -2937,7 +2947,7 @@
         "containers": "Containers",
         "services": "Serviços",
         "packages": "Pacotes e agendamentos",
-        "security": "Segurança",
+        "security": "Autenticação SSH",
         "webservers": "Servidores web",
         "git": "Repositórios git",
         "outbound": "Fluxos de saída",
@@ -2946,10 +2956,11 @@
         "panels": "Painéis de controle",
         "code": "Código e uploads",
         "owner": "Pistas de dono",
-        "firewall": "Firewall real",
+        "firewall": "Firewall",
         "roles": "Papel do servidor"
       },
       "empty": {
+        "ports": "Nenhuma porta em escuta encontrada no último scan.",
         "resources": "Sem dados de uso neste scan.",
         "system": "Sem informações do sistema neste scan.",
         "users": "Nenhum usuário encontrado no último scan.",
@@ -2957,7 +2968,7 @@
         "containers": "Nenhum container encontrado no último scan.",
         "services": "Nenhum serviço ou agente encontrado no último scan.",
         "packages": "Nenhum pacote ou agendamento encontrado no último scan.",
-        "security": "Sem dados de firewall ou política SSH neste scan.",
+        "security": "Sem política de autenticação SSH neste scan.",
         "webservers": "Nenhum nginx, Apache ou PHP-FPM encontrado.",
         "git": "Nenhum checkout git encontrado.",
         "outbound": "Nenhum fluxo de saída encontrado no último scan.",
