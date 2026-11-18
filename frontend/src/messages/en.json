@@ -1171,6 +1171,7 @@
       "dashboardIframeTitle": "Grafana dashboard for {slug}"
     },
     "ops": {
+      "sectionSsh": "SSH commands",
       "noReportReturned": "No report returned.",
       "installFailed": "Install failed",
       "grafanaAgentInstalled": "grafana-agent installed",
@@ -1255,6 +1256,7 @@
     "profileTitle": "Host",
     "declared": "Declared",
     "tabMetrics": "Metrics",
+    "tabMonitoring": "Monitoring",
     "authPickDefault": "With both a password and a key, pick the default auth method.",
     "syncCoolify": "Sync from Coolify",
     "syncCoolifyRunning": "Reading Coolify applications, stacks and databases…",
@@ -4718,7 +4720,17 @@
       "noRepos": "none",
       "meta": "Generated {ago} · {model}"
     },
+    "host": {
+      "software": "Installed software",
+      "softwareHint": "Every version found on the host and in its containers. Open a row to see its CVEs and where each one stands.",
+      "eolCallout": "{count} component(s) on this host are end of life.",
+      "otherFindings": "Other findings",
+      "otherFindingsHint": "Scanner findings (ETIPI, Wazuh), including those reaching the host through related DNS records and services. Inventory CVEs sit under each component above.",
+      "originScanners": "External scanners",
+      "originInventory": "Inventory (flat list)"
+    },
     "deps": {
+      "details": "Details",
       "updateSecurity": "Update (security)…",
       "updateHosts": "Update {count} affected host(s)…",
       "fixableCallout": "{count} distro packages on this host have CVEs from the distro's own advisories: a security update usually fixes them.",

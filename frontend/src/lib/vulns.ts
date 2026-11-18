@@ -70,3 +70,12 @@ export function findingSummary(f: SummaryFinding, labels: SummaryLabels, glpi?: 
   ];
   return rows.filter(([, v]) => v).map(([k, v]) => `**${k}:** ${clean(v)}`).join("\n\n");
 }
+
+const SEVERITY_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+
+/** Several finding lists as one, in the server's reading order: most severe
+ *  first, then most recently seen. */
+export function mergeFindings<T extends { severity: string; last_seen_at: string }>(lists: T[][]): T[] {
+  return lists.flat().sort((a, b) =>
+    (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9) || b.last_seen_at.localeCompare(a.last_seen_at));
+}

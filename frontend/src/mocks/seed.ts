@@ -165,6 +165,7 @@ function hosts(): Host[] {
       setor_responsavel: "NTGD", responsavel_interno: "Gabriela Exemplo Dias",
       contato_responsavel_interno: "gabriela.exemplo@sead.pi.gov.br",
       situacao: "maintenance", precisa_manutencao: true,
+      coolify_server_uuid: "mock-coolify-backup01", // the one host with a Sentinel half
       os: { id: "ubuntu", version: "18.04", pretty: "Ubuntu 18.04.6 LTS", arch: "x86_64", eol: true, eol_date: "2023-05-31" },
     }),
     mkHost({

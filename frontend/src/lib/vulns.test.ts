@@ -1,7 +1,7 @@
 // Run: node --test src/lib/vulns.test.ts   (Node 24 native TS, no runner dep)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { findingSummary, linkifyParts, nvdURL, parseVia, safeHref } from "./vulns.ts";
+import { findingSummary, linkifyParts, mergeFindings, nvdURL, parseVia, safeHref } from "./vulns.ts";
 
 test("safeHref only accepts http(s)", () => {
   assert.equal(safeHref("https://example.test/a"), "https://example.test/a");
@@ -39,4 +39,14 @@ test("findingSummary escapes payloads, and keeps evidence out of GLPI", () => {
   assert.ok(!glpi.includes("script") && !glpi.includes("Evidence"), "no evidence in GLPI");
   assert.ok(!/[<>]/.test(glpi), "no angle brackets survive for GLPI's decode + innerHTML");
   assert.ok(glpi.includes("**Details:** https://bridge.test/vulnerabilities?id=7"));
+});
+
+test("mergeFindings orders several sources by severity, then last seen", () => {
+  const f = (id: number, severity: string, last_seen_at: string) => ({ id, severity, last_seen_at });
+  const merged = mergeFindings([
+    [f(1, "medium", "2026-01-02"), f(2, "low", "2026-01-09")],
+    [f(3, "critical", "2026-01-01"), f(4, "medium", "2026-01-05")],
+    [],
+  ]);
+  assert.deepEqual(merged.map((x) => x.id), [3, 4, 1, 2]);
 });
