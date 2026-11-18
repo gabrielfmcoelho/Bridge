@@ -2929,7 +2929,17 @@
       "noCredentials": "Store an SSH password or key to run a scan.",
       "parseError": "The last scan couldn't be read.",
       "sections": "Scan sections",
+      "notChecked": "Not checked in this scan: {list}.",
+      "nothingFound": "Nothing found: {list}.",
+      "area": {
+        "resources": "Resources",
+        "workloads": "Workloads",
+        "web": "Web",
+        "access": "Access and security",
+        "system": "System and maintenance"
+      },
       "group": {
+        "ports": "Listening ports",
         "resources": "Resources",
         "system": "System",
         "users": "Users",
@@ -2937,7 +2947,7 @@
         "containers": "Containers",
         "services": "Services",
         "packages": "Packages and schedules",
-        "security": "Security",
+        "security": "SSH authentication",
         "webservers": "Web servers",
         "git": "Git repositories",
         "outbound": "Outbound flows",
@@ -2946,10 +2956,11 @@
         "panels": "Control panels",
         "code": "Code & uploads",
         "owner": "Owner clues",
-        "firewall": "Firewall reality",
+        "firewall": "Firewall",
         "roles": "Server role"
       },
       "empty": {
+        "ports": "No listening port found in the last scan.",
         "resources": "No usage data in this scan.",
         "system": "No system information in this scan.",
         "users": "No users found in the last scan.",
@@ -2957,7 +2968,7 @@
         "containers": "No containers found in the last scan.",
         "services": "No services or agents found in the last scan.",
         "packages": "No packages or schedules found in the last scan.",
-        "security": "No firewall or SSH policy data in this scan.",
+        "security": "No SSH authentication policy in this scan.",
         "webservers": "No nginx, Apache or PHP-FPM found.",
         "git": "No git checkouts found.",
         "outbound": "No outbound flows found in the last scan.",

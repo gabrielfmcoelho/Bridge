@@ -179,6 +179,8 @@ export type VMInfoType = {
   remote_users?: RemoteUserInfo[];
   port_owners?: PortOwner[];
   parsed_containers?: ParsedContainer[];
+  /** false: `docker ps` did not answer, so an empty container list means "not checked". */
+  containers_known?: boolean;
   ssh_auth_policy?: SSHAuthPolicy;
   web_servers?: WebServer[];
   /** Remotes of git checkouts on the host and in containers. null = probe didn't run. */

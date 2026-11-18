@@ -2,7 +2,7 @@
 
 import SectionCard from "@/components/ui/SectionCard";
 import type { FirewallTool, VMInfoType } from "@/lib/api";
-import { Detail, type T } from "./shared";
+import { Detail, SubBlock, type T } from "./shared";
 
 /**
  * A10 firewall reality: ufw AND firewalld/nft (host 35's firewalld is invisible
@@ -12,15 +12,21 @@ import { Detail, type T } from "./shared";
  */
 export default function ScanFirewall({ info, t }: { info: VMInfoType; t: T }) {
   const f = info.deep_facts?.firewall;
-  const empty = info.deep_facts == null
-    ? t("scan.deep.notRun")
-    : !f
-      ? t("scan.pane.empty.firewall")
-      : undefined;
+  // The quick test's raw status (ufw / iptables output) shows here too, so
+  // the firewall is one card; `sectionState` in lib/scanSections mirrors this.
+  const raw = info.firewall_status;
+  const empty = raw
+    ? undefined
+    : info.deep_facts == null
+      ? t("scan.deep.notRun")
+      : !f
+        ? t("scan.pane.empty.firewall")
+        : undefined;
 
   return (
     <SectionCard as="h3" title={t("scan.pane.group.firewall")} empty={empty}>
-      {f && !empty && (
+      {f && (
+        <SubBlock>
         <div className="space-y-3">
           <p className="text-2xs text-[var(--text-muted)]">{t("scan.deep.firewall.summary")}</p>
           <div className="flex flex-wrap gap-1.5">
@@ -58,6 +64,12 @@ export default function ScanFirewall({ info, t }: { info: VMInfoType; t: T }) {
             )}
           </dl>
         </div>
+        </SubBlock>
+      )}
+      {raw && (
+        <SubBlock title={f ? t("scan.firewallStatus") : undefined}>
+          <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap break-all font-mono">{raw}</pre>
+        </SubBlock>
       )}
     </SectionCard>
   );
