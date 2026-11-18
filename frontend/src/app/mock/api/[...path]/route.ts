@@ -15,6 +15,7 @@ import { extractJSON, coerceToSchema, coercePriority } from "@/lib/aiDraft";
 import type {
   Offering, ServiceRequest, RequestEvent, RequestStatus, CatalogHit, AssetGrantsInput,
   Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool, Database, OSUpdateRun, OSUpdateResult, ReleaseReport, RiskWarning, WebRoute,
+  VulnFinding, DependencyDetail, DependencyGroup,
 } from "@/lib/types";
 import {
   db, resetDB, currentUser, switchUser, requestVisible, abilitiesForRequest,
@@ -157,6 +158,48 @@ const profileView = (hostId: number) => {
     defaults: MOCK_BACKUP_DEFAULTS,
     effective: { include: p.include ?? MOCK_BACKUP_DEFAULTS.include, exclude: p.exclude ?? MOCK_BACKUP_DEFAULTS.exclude } };
 };
+
+// The Vulnerabilidades tab of one host (srv-ntgd-backup01, id 4): software
+// with CVEs on the host and in a container, an end-of-life OS, and findings
+// from the scanners. Just enough to read the tab; nothing is editable.
+const MOCK_VULN_HOST = 4;
+const mockNow = new Date().toISOString();
+const mkFinding = (o: Partial<VulnFinding> & Pick<VulnFinding, "id" | "source" | "title" | "severity">): VulnFinding => ({
+  cve: "", cvss: null, cwe: "", scanner: o.source, target: "srv-ntgd-backup01", vm_hint: "", evidence: "", risk: "", remediation: "",
+  reference: "", known_exploited: false, status: "open", status_note: "", status_by: null, issue_id: null, glpi_ticket_id: null,
+  glpi_ticket_url: "", first_seen_at: mockNow, last_seen_at: mockNow, resolved_at: null, links: [], ...o,
+});
+const mkDep = (o: Partial<DependencyDetail> & Pick<DependencyDetail, "id" | "kind" | "name" | "version">): DependencyDetail => ({
+  host_id: MOCK_VULN_HOST, host_nickname: "srv-ntgd-backup01", host_slug: "srv-ntgd-backup01", service_id: null, container: "", image: "", image_id: "",
+  version_source: "package", lookup: "", ecosystem: "", lookup_name: o.name, lookup_version: o.version, eol_product: "", cve_count: o.vulns?.length ?? 0,
+  max_severity: o.vulns?.[0]?.severity ?? "", eol: false, eol_date: "", evaluated_at: mockNow, first_seen_at: mockNow, last_seen_at: mockNow,
+  vulns: [], findings: [], ...o,
+});
+const NGINX_CVE = { id: "CVE-2021-23017", severity: "critical" as const, cvss: 9.4, summary: "Off-by-one in the nginx resolver lets a forged DNS answer overwrite memory.", fixed: "1.20.1", source: "nvd" as const };
+const MOCK_DEPS: DependencyDetail[] = [
+  mkDep({ id: 9001, kind: "package", name: "openssl", version: "1.1.1-1ubuntu2.1~18.04.23", lookup: "osv", ecosystem: "Ubuntu:18.04",
+    vulns: [
+      { id: "CVE-2023-0286", osv_id: "UBUNTU-CVE-2023-0286", severity: "high", cvss: 7.4, summary: "X.400 address type confusion in X.509 GeneralName.", fixed: "1.1.1-1ubuntu2.1~18.04.21+esm1", source: "osv" },
+      { id: "CVE-2022-4304", osv_id: "UBUNTU-CVE-2022-4304", severity: "medium", cvss: 5.9, summary: "Timing oracle in RSA decryption.", fixed: "1.1.1-1ubuntu2.1~18.04.21+esm1", source: "osv" },
+    ],
+    findings: [
+      mkFinding({ id: 9101, source: "inventory", title: "CVE-2023-0286 openssl 1.1.1-1ubuntu2.1~18.04.23", severity: "high", cve: "CVE-2023-0286" }),
+      mkFinding({ id: 9102, source: "inventory", title: "CVE-2022-4304 openssl 1.1.1-1ubuntu2.1~18.04.23", severity: "medium", cve: "CVE-2022-4304", status: "accepted" }),
+    ] }),
+  mkDep({ id: 9002, kind: "runtime", name: "nginx", version: "1.14.0", version_source: "probe", lookup: "nvd", vulns: [NGINX_CVE],
+    findings: [mkFinding({ id: 9103, source: "inventory", title: "CVE-2021-23017 nginx 1.14.0", severity: "critical", cve: "CVE-2021-23017" })] }),
+  mkDep({ id: 9003, kind: "runtime", name: "nginx", version: "1.14.0", version_source: "image_env", lookup: "nvd", container: "proxy", image: "nginx:1.14", vulns: [NGINX_CVE],
+    findings: [mkFinding({ id: 9104, source: "inventory", title: "CVE-2021-23017 nginx 1.14.0", severity: "critical", cve: "CVE-2021-23017", target: "srv-ntgd-backup01 · proxy" })] }),
+  mkDep({ id: 9004, kind: "os", name: "ubuntu", version: "18.04", version_source: "os_release", eol: true, eol_date: "2023-05-31", eol_product: "ubuntu" }),
+  mkDep({ id: 9005, kind: "package", name: "bash", version: "4.4.18-2ubuntu1.3", lookup: "osv", ecosystem: "Ubuntu:18.04" }),
+];
+const MOCK_FINDINGS: VulnFinding[] = [
+  ...MOCK_DEPS.flatMap((d) => d.findings),
+  mkFinding({ id: 9201, source: "etipi", title: "Cabeçalho X-Frame-Options ausente", severity: "medium", scanner: "zap", target: "https://backup.exemplo.pi.gov.br", via: "dns:backup.exemplo.pi.gov.br" }),
+  mkFinding({ id: 9202, source: "wazuh", title: "CVE-2024-6387 openssh-server", severity: "high", cve: "CVE-2024-6387", scanner: "wazuh", known_exploited: true }),
+  mkFinding({ id: 9203, source: "etipi", title: "TLS 1.0 habilitado", severity: "low", scanner: "nmap", target: "backup.exemplo.pi.gov.br:443", status: "resolved", resolved_at: mockNow }),
+];
+const SEVERITY_ORDER = ["", "info", "low", "medium", "high", "critical"];
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
@@ -717,6 +760,53 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     }
     return json(profileView(h.id));
   }
+  // ── A host's Vulnerabilidades and Monitoramento tabs ─────────────────
+  if (method === "GET" && p === "vulnerabilities") {
+    const csv = (k: string) => (qs.get(k) ? qs.get(k)!.split(",") : null);
+    const status = csv("status"), source = qs.get("source");
+    const mine = qs.get("entity_type") === "host" && Number(qs.get("entity_id")) === MOCK_VULN_HOST;
+    const rows = MOCK_FINDINGS.filter((f) => mine && (!status || status.includes(f.status)) && (!source || f.source === source))
+      .sort((a, b) => SEVERITY_ORDER.indexOf(b.severity) - SEVERITY_ORDER.indexOf(a.severity));
+    return json(paginate(rows, qs.get("page"), qs.get("per_page")));
+  }
+  // One row per kind/name/version, worst first (the OS tab's kind=os read is above).
+  if (method === "GET" && p === "vulnerabilities/dependencies/groups" && qs.get("host_id")) {
+    const kinds = (qs.get("kind") ?? "os,runtime,package").split(",");
+    const groups = new Map<string, DependencyGroup>();
+    for (const d of MOCK_DEPS) {
+      if (d.host_id !== Number(qs.get("host_id")) || !kinds.includes(d.kind)) continue;
+      if (qs.get("scope") === "host" && d.container) continue;
+      const k = `${d.kind}|${d.name}|${d.version}`;
+      const g = groups.get(k) ?? { kind: d.kind, name: d.name, version: d.version, hosts: 1, installs: 0, cve_count: 0, max_severity: "", eol: d.eol,
+        eol_date: d.eol_date, evaluated: 0, lookup: d.lookup, version_source: d.version_source, instances: [] };
+      g.installs++; g.evaluated++;
+      g.cve_count = Math.max(g.cve_count, d.cve_count);
+      if (SEVERITY_ORDER.indexOf(d.max_severity) > SEVERITY_ORDER.indexOf(g.max_severity)) g.max_severity = d.max_severity;
+      g.instances.push({ id: d.id, host_id: d.host_id, host_nickname: d.host_nickname, host_slug: d.host_slug, container: d.container, image: d.image, service_id: null, cve_count: d.cve_count });
+      groups.set(k, g);
+    }
+    const rows = [...groups.values()]
+      .filter((g) => (qs.get("has_cves") !== "true" || g.cve_count > 0) && (qs.get("eol") !== "true" || g.eol))
+      .sort((a, b) => SEVERITY_ORDER.indexOf(b.max_severity) - SEVERITY_ORDER.indexOf(a.max_severity));
+    return json(paginate(rows, qs.get("page"), qs.get("per_page")));
+  }
+  if (method === "GET" && segs[0] === "vulnerabilities" && segs[1] === "dependencies" && segs.length === 3) {
+    const d = MOCK_DEPS.find((x) => x.id === Number(segs[2]));
+    return d ? json(d) : notFound("dependency not found");
+  }
+  if (method === "GET" && segs[0] === "vulnerabilities" && segs[1] === "cves" && segs.length === 3) return json(null);
+  if (method === "GET" && segs[0] === "vulnerabilities" && segs[2] === "fix-plan") return json(null);
+  if (method === "GET" && segs[0] === "vulnerabilities" && segs.length === 2) {
+    const f = MOCK_FINDINGS.find((x) => x.id === Number(segs[1]));
+    return f ? json(f) : notFound("finding not found");
+  }
+  // Both monitoring halves answer, each with its own "nothing to read here".
+  if (method === "GET" && p === "telemetry/status") return json({ enabled: true });
+  if (method === "GET" && (p === "telemetry/requests" || p === "telemetry/spans")) return json({ available: false, reason: "no_domain" });
+  if (method === "GET" && /^hosts\/[^/]+\/sentinel$/.test(p)) {
+    return json({ status: { available: false, reason: "no_sentinel", metrics: false, traffic: false }, snapshot: null, services: {}, alerts: [] });
+  }
+
   // A host's page: just what its Overview and Manutenção tabs need.
   const hostPath = p.match(/^hosts\/([^/]+)$/);
   if (hostPath && method === "GET") {

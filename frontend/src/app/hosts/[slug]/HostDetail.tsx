@@ -28,13 +28,46 @@ import IssuesTab from "./IssuesTab";
 import SSHConfigDrawer from "./_components/SSHConfigDrawer";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
-import EntityVulnsTab, { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
-import HostDependencies from "./_components/HostDependencies";
+import { useEntityVulnCount } from "@/components/vulns/EntityVulnsTab";
+import PillButton from "@/components/ui/PillButton";
+import HostVulns from "./_components/HostVulns";
 import HostMaintenance from "./_components/HostMaintenance";
 import HostSecretsTab from "./_components/HostSecretsTab";
 import OSBadges, { useLatestBackups } from "../_components/OSBadges";
 
-type TabKey = "overview" | "operations" | "maintenance" | "alerts" | "vulns" | "topology" | "metrics" | "requests" | "sentinel" | "secrets";
+type TabKey = "overview" | "operations" | "alerts" | "vulns" | "topology" | "metrics" | "monitoring" | "secrets";
+type OpsSection = "ssh" | "maintenance";
+type MonSection = "requests" | "sentinel";
+
+/** ?tab= values → the tab (and section) they open. The keys of the tabs that
+ *  were merged (maintenance, sentinel, requests, dependencies) keep working. */
+const TAB_LINKS: Record<string, { tab: TabKey; ops?: OpsSection; mon?: MonSection }> = {
+  overview: { tab: "overview" },
+  operations: { tab: "operations", ops: "ssh" },
+  maintenance: { tab: "operations", ops: "maintenance" },
+  secrets: { tab: "secrets" },
+  alerts: { tab: "alerts" },
+  vulns: { tab: "vulns" },
+  dependencies: { tab: "vulns" },
+  topology: { tab: "topology" },
+  monitoring: { tab: "monitoring" },
+  requests: { tab: "monitoring", mon: "requests" },
+  sentinel: { tab: "monitoring", mon: "sentinel" },
+  metrics: { tab: "metrics" },
+};
+
+/** The switch between the halves of a merged tab. */
+function SectionSwitch<K extends string>({ label, value, onChange, items }: {
+  label: string; value: K; onChange: (k: K) => void; items: { key: K; label: string }[];
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap gap-2">
+      {items.map((i) => (
+        <PillButton key={i.key} size="lg" active={i.key === value} onClick={() => onChange(i.key)}>{i.label}</PillButton>
+      ))}
+    </div>
+  );
+}
 
 export default function HostDetail({ slug }: { slug: string }) {
   const { t, locale } = useLocale();
@@ -44,16 +77,14 @@ export default function HostDetail({ slug }: { slug: string }) {
   const canEdit = user?.role === "admin" || user?.role === "editor";
   const isAdmin = user?.role === "admin";
 
-  // ?tab=secrets (the scan chips) opens that tab, on a fresh load (user may still be loading)
-  // and on a same-page click; the param is dropped once used so a later chip click re-triggers.
+  // ?tab=<key> (the scan chips' ?tab=secrets, old links to merged tabs) opens that tab, on a
+  // fresh load and on a same-page click: applied below, once the tab list is known. The param
+  // is dropped once the user picks a tab so a later chip click re-triggers.
   const tabParam = useSearchParams().get("tab");
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
-  const wantSecrets = tabParam === "secrets" && canEdit;
-  const [openedFor, setOpenedFor] = useState(false);
-  if (wantSecrets !== openedFor) {
-    setOpenedFor(wantSecrets);
-    if (wantSecrets) setActiveTab("secrets");
-  }
+  const [opsSection, setOpsSection] = useState<OpsSection>("ssh");
+  const [monSection, setMonSection] = useState<MonSection>("requests");
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
   const selectTab = (k: TabKey) => {
     setActiveTab(k);
     if (tabParam) router.replace(`/hosts/${slug}`, { scroll: false });
@@ -138,18 +169,37 @@ export default function HostDetail({ slug }: { slug: string }) {
   const telemetryEnabled = useTelemetryEnabled();
   const openVulns = useEntityVulnCount("host", data?.host.id);
 
+  // Monitoramento: each half has its own condition; the tab shows when either applies.
+  const monSections: { key: MonSection; label: string }[] = [
+    ...(telemetryEnabled ? [{ key: "requests" as const, label: t("telemetry.tab") }] : []),
+    ...(sentinelEnabled && data?.host.coolify_server_uuid ? [{ key: "sentinel" as const, label: "Sentinel" }] : []),
+  ];
+  const mon = monSections.some((s) => s.key === monSection) ? monSection : monSections[0]?.key;
+  // Manutenção is the admin half of Operações.
+  const ops: OpsSection = isAdmin ? opsSection : "ssh";
+
   const tabs: { key: TabKey; label: string; icon?: string; badge?: number }[] = [
     { key: "overview", label: t("host.tabOverview"), icon: tabIcons.overview },
     ...(canEdit ? [{ key: "operations" as TabKey, label: t("host.tabOperations"), icon: tabIcons.operations }] : []),
     ...(canEdit ? [{ key: "secrets" as TabKey, label: t("host.secrets.tab"), icon: ICON_PATHS.lock }] : []),
-    ...(isAdmin ? [{ key: "maintenance" as TabKey, label: t("host.maintenance.tab"), icon: ICON_PATHS.refresh }] : []),
     { key: "alerts" as TabKey, label: t("host.tabTracking"), icon: tabIcons.alerts, badge: issuesTabBadge || undefined },
     { key: "vulns" as TabKey, label: t("vuln.tab"), icon: ICON_PATHS.shieldAlert, badge: openVulns || undefined },
     { key: "topology", label: t("host.tabTopology"), icon: tabIcons.topology },
-    ...(telemetryEnabled ? [{ key: "requests" as TabKey, label: t("telemetry.tab"), icon: ICON_PATHS.clock }] : []),
-    ...(sentinelEnabled && data?.host.coolify_server_uuid ? [{ key: "sentinel" as TabKey, label: "Sentinel", icon: ICON_PATHS.bolt }] : []),
+    ...(monSections.length > 0 ? [{ key: "monitoring" as TabKey, label: t("host.tabMonitoring"), icon: ICON_PATHS.clock }] : []),
     ...(grafanaEnabled ? [{ key: "metrics" as TabKey, label: t("host.tabMetrics"), icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" }] : []),
   ];
+
+  // A link's tab opens once it is in the list (the user and the integrations may still be
+  // loading); one the caller can't see opens nothing.
+  const link = tabParam ? TAB_LINKS[tabParam] : undefined;
+  if (tabParam !== openedFor && (!link || tabs.some((x) => x.key === link.tab))) {
+    setOpenedFor(tabParam);
+    if (link) {
+      setActiveTab(link.tab);
+      if (link.ops) setOpsSection(link.ops);
+      if (link.mon) setMonSection(link.mon);
+    }
+  }
 
   /* ─── Render ─── */
 
@@ -233,8 +283,20 @@ export default function HostDetail({ slug }: { slug: string }) {
           )}
 
           {/* ═══ OPERATIONS TAB ═══ */}
+          {/* Comandos SSH (editors) and Manutenção (admins) */}
           {activeTab === "operations" && canEdit && (
-            <div className="animate-fade-in">
+            <div className="space-y-4 animate-fade-in">
+              {isAdmin && (
+                <SectionSwitch<OpsSection>
+                  label={t("host.tabOperations")}
+                  value={ops}
+                  onChange={setOpsSection}
+                  items={[{ key: "ssh", label: t("host.ops.sectionSsh") }, { key: "maintenance", label: t("host.maintenance.tab") }]}
+                />
+              )}
+              {ops === "maintenance" ? (
+                <HostMaintenance host={{ ...data.host, os: listHost?.os }} scanData={data.last_scan?.data} scannedAt={data.last_scan?.scanned_at} />
+              ) : (
               <SSHOperations
                 slug={data.host.oficial_slug}
                 hasPassword={data.host.has_password}
@@ -250,15 +312,12 @@ export default function HostDetail({ slug }: { slug: string }) {
                 locale={locale}
                 isAdmin={isAdmin}
               />
+              )}
             </div>
           )}
 
           {activeTab === "secrets" && canEdit && (
             <HostSecretsTab hostId={data.host.id} scanText={data.last_scan?.data ?? ""} />
-          )}
-
-          {activeTab === "maintenance" && isAdmin && (
-            <HostMaintenance host={{ ...data.host, os: listHost?.os }} scanData={data.last_scan?.data} scannedAt={data.last_scan?.scanned_at} />
           )}
 
           {/* ═══ ISSUES TAB ═══ */}
@@ -279,10 +338,7 @@ export default function HostDetail({ slug }: { slug: string }) {
           )}
 
           {activeTab === "vulns" && (
-            <div className="space-y-6">
-              <EntityVulnsTab entityType="host" entityId={data.host.id} />
-              <HostDependencies hostId={data.host.id} host={{ id: data.host.id, nickname: data.host.nickname, slug: data.host.oficial_slug }} />
-            </div>
+            <HostVulns hostId={data.host.id} host={{ id: data.host.id, nickname: data.host.nickname, slug: data.host.oficial_slug }} />
           )}
 
           {/* ═══ TOPOLOGY TAB ═══ */}
@@ -292,8 +348,15 @@ export default function HostDetail({ slug }: { slug: string }) {
 
           {/* ═══ METRICS TAB ═══ */}
           {activeTab === "metrics" && grafanaEnabled && <MetricsTab slug={slug} />}
-          {activeTab === "requests" && telemetryEnabled && <RequestsTab kind="host" id={slug} />}
-          {activeTab === "sentinel" && <HostSentinelTab slug={slug} />}
+          {/* Requisições (telemetry) and Sentinel (Coolify) */}
+          {activeTab === "monitoring" && mon && (
+            <div className="space-y-4">
+              {monSections.length > 1 && (
+                <SectionSwitch<MonSection> label={t("host.tabMonitoring")} value={mon} onChange={setMonSection} items={monSections} />
+              )}
+              {mon === "requests" ? <RequestsTab kind="host" id={slug} /> : <HostSentinelTab slug={slug} />}
+            </div>
+          )}
           </PageHeader>
         </div>
       ) : null}

@@ -18,8 +18,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import Button from "@/components/ui/Button";
 import OSUpdateModal, { type UpdateHost } from "@/app/hosts/_components/OSUpdateModal";
 import { vulnAPI } from "@/lib/api";
-import { VULN_SEVERITY_BADGE } from "@/lib/alert-colors";
-import type { Dependency, DependencyGroup, DependencyInstance, OSUpdateKind } from "@/lib/types";
+import { VULN_SEVERITY_BADGE, VULN_STATUS_LOZENGE } from "@/lib/alert-colors";
+import type { Dependency, DependencyDetail, DependencyGroup, DependencyInstance, OSUpdateKind } from "@/lib/types";
 import Icon from "@/components/ui/Icon";
 import { ICON_PATHS } from "@/lib/icon-paths";
 
@@ -34,13 +34,16 @@ const KINDS: Record<DependencyKindFilter, string> = { components: "os,runtime", 
  *  scans found, one row per component version with how many hosts and
  *  installations have it. A row expands to its installations; one opens its
  *  advisories and the findings they produced. With hostId, that host only
- *  (its host and container installations of a version are one row). */
-export default function DependencyList({ search, kind, flag, onOpenFinding, hostId }: {
+ *  (its host and container installations of a version are one row).
+ *  inlineVulns (the host tab): a row with CVEs opens them right under it,
+ *  each with its finding's status, instead of only in the drawer. */
+export default function DependencyList({ search, kind, flag, onOpenFinding, hostId, inlineVulns }: {
   search: string;
   kind: DependencyKindFilter;
   flag: DependencyFlag;
   onOpenFinding: (id: number) => void;
   hostId?: number;
+  inlineVulns?: boolean;
 }) {
   const { t } = useLocale();
   const key = [search, kind, flag, hostId].join("|");
@@ -91,14 +94,16 @@ export default function DependencyList({ search, kind, flag, onOpenFinding, host
                 {groups.map((g, i) => {
                   const gk = `${g.kind}|${g.name}|${g.version}`;
                   const open = expanded === gk;
+                  const inline = !!inlineVulns && g.cve_count > 0;
+                  const expands = inline || g.installs > 1;
                   return (
                     <Fragment key={gk}>
                       <tr className={`${tableClasses.row} cursor-pointer ${i % 2 === 1 ? tableClasses.rowAlt : ""}`}
-                        onClick={() => (g.installs === 1 ? setOpenId(g.instances[0].id) : setExpanded(open ? null : gk))}
-                        aria-expanded={g.installs > 1 ? open : undefined}>
+                        onClick={() => (expands ? setExpanded(open ? null : gk) : setOpenId(g.instances[0].id))}
+                        aria-expanded={expands ? open : undefined}>
                         <td className={tableClasses.td}>
                           <span className="inline-flex items-center gap-2">
-                            {g.installs > 1 && (
+                            {expands && (
                               <Icon path={ICON_PATHS.chevronRight} className={`w-3.5 h-3.5 shrink-0 text-[var(--text-muted)] transition-transform ${open ? "rotate-90" : ""}`} />
                             )}
                             <Lozenge appearance={g.kind === "os" ? "inprogress" : g.kind === "runtime" ? "new" : "default"}>{t(`vuln.deps.kind.${g.kind}`)}</Lozenge>
@@ -120,7 +125,16 @@ export default function DependencyList({ search, kind, flag, onOpenFinding, host
                           <CveCell kind={g.kind} lookup={g.lookup} versionSource={g.version_source} evaluated={g.evaluated > 0} cves={g.cve_count} severity={g.max_severity} />
                         </td>
                       </tr>
-                      {open && g.instances.map((inst) => (
+                      {open && inline && (
+                        <tr className="bg-[var(--bg-elevated)]/40">
+                          <td className={`${tableClasses.td} space-y-4`} colSpan={6}>
+                            {g.instances.map((inst) => (
+                              <InstanceVulns key={inst.id} inst={inst} onDetails={() => setOpenId(inst.id)} onOpenFinding={onOpenFinding} />
+                            ))}
+                          </td>
+                        </tr>
+                      )}
+                      {open && !inline && g.instances.map((inst) => (
                         <tr key={inst.id} className={`${tableClasses.row} cursor-pointer bg-[var(--bg-elevated)]/40`} onClick={() => setOpenId(inst.id)}>
                           <td className={tableClasses.td} />
                           <td className={tableClasses.td} />
@@ -191,6 +205,78 @@ function Where({ d }: { d: DependencyInstance }) {
   );
 }
 
+/** One installation under its component row: where it is and its CVEs, each
+ *  with the status of the finding it produced. */
+function InstanceVulns({ inst, onDetails, onOpenFinding }: { inst: DependencyInstance; onDetails: () => void; onOpenFinding: (id: number) => void }) {
+  const { t } = useLocale();
+  const { data: d, isLoading, isError, error } = useQuery({
+    queryKey: ["vulnerabilities", "dependency", inst.id],
+    queryFn: () => vulnAPI.dependency(inst.id),
+    enabled: inst.cve_count > 0,
+  });
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Where d={inst} />
+        <Button size="sm" variant="ghost" onClick={onDetails}>{t("vuln.deps.details")}</Button>
+      </div>
+      {inst.cve_count === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]">{t("vuln.deps.noVulns")}</p>
+      ) : isLoading ? (
+        <SkeletonTable rows={2} />
+      ) : isError ? (
+        <StatusAlert variant="error">{(error as Error)?.message}</StatusAlert>
+      ) : d ? (
+        <AdvisoryTable d={d} onOpenFinding={onOpenFinding} showStatus />
+      ) : null}
+    </div>
+  );
+}
+
+/** A dependency's advisories; a row opens the finding it produced. */
+function AdvisoryTable({ d, onOpenFinding, showStatus }: { d: DependencyDetail; onOpenFinding: (id: number) => void; showStatus?: boolean }) {
+  const { t } = useLocale();
+  return (
+    <div className={tableClasses.wrapper}>
+      <table className={tableClasses.table}>
+        <thead>
+          <tr className={tableClasses.headRow}>
+            <th className={tableClasses.th}>{t("vuln.cve")}</th>
+            <th className={tableClasses.th}>{t("vuln.severity")}</th>
+            <th className={tableClasses.th}>{t("vuln.cvss")}</th>
+            <th className={tableClasses.th}>{t("vuln.deps.fixed")}</th>
+            {showStatus && <th className={tableClasses.th}>{t("common.status")}</th>}
+            <th className={tableClasses.th}>{t("vuln.cveAnalysis.description")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {d.vulns.map((v, i) => {
+            const finding = d.findings.find((f) => (f.cve && f.cve === v.id) || f.title.startsWith(`${v.id} `));
+            return (
+              <tr key={v.id} className={`${tableClasses.row} ${finding ? "cursor-pointer" : ""} ${i % 2 === 1 ? tableClasses.rowAlt : ""}`}
+                onClick={finding ? () => onOpenFinding(finding.id) : undefined}>
+                <td className={`${tableClasses.td} font-mono text-xs whitespace-nowrap`}>
+                  {v.id}
+                  {v.osv_id && v.osv_id !== v.id && <span className="block text-[var(--text-muted)]">{v.osv_id}</span>}
+                </td>
+                <td className={tableClasses.td}><Badge color={VULN_SEVERITY_BADGE[v.severity]}>{t(`vuln.severityLevel.${v.severity}`)}</Badge></td>
+                <td className={tableClasses.td}>{v.cvss || "—"}</td>
+                <td className={`${tableClasses.td} font-mono text-xs`}>{v.fixed || "—"}</td>
+                {showStatus && (
+                  <td className={tableClasses.td}>
+                    {finding ? <Lozenge appearance={VULN_STATUS_LOZENGE[finding.status]}>{t(`vuln.status.${finding.status}`)}</Lozenge> : "—"}
+                  </td>
+                )}
+                <td className={`${tableClasses.td} max-w-0 w-[50%]`}><span className="block truncate text-[var(--text-secondary)]" title={v.summary}>{v.summary}</span></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function CveCell({ kind, lookup, versionSource, evaluated, cves, severity }: {
   kind: Dependency["kind"]; lookup: Dependency["lookup"]; versionSource: Dependency["version_source"];
   evaluated: boolean; cves: number; severity: Dependency["max_severity"];
@@ -250,37 +336,7 @@ function DependencyDrawer({ id, onClose, onOpenFinding, onUpdate }: {
             {d.vulns.length === 0 ? (
               <p className="text-sm text-[var(--text-muted)]">{d.evaluated_at ? t("vuln.deps.noVulns") : t("vuln.deps.notEvaluatedHint")}</p>
             ) : (
-              <div className={tableClasses.wrapper}>
-                <table className={tableClasses.table}>
-                  <thead>
-                    <tr className={tableClasses.headRow}>
-                      <th className={tableClasses.th}>{t("vuln.cve")}</th>
-                      <th className={tableClasses.th}>{t("vuln.severity")}</th>
-                      <th className={tableClasses.th}>{t("vuln.cvss")}</th>
-                      <th className={tableClasses.th}>{t("vuln.deps.fixed")}</th>
-                      <th className={tableClasses.th}>{t("vuln.cveAnalysis.description")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {d.vulns.map((v, i) => {
-                      const finding = d.findings.find((f) => (f.cve && f.cve === v.id) || f.title.startsWith(`${v.id} `));
-                      return (
-                        <tr key={v.id} className={`${tableClasses.row} ${finding ? "cursor-pointer" : ""} ${i % 2 === 1 ? tableClasses.rowAlt : ""}`}
-                          onClick={finding ? () => onOpenFinding(finding.id) : undefined}>
-                          <td className={`${tableClasses.td} font-mono text-xs whitespace-nowrap`}>
-                            {v.id}
-                            {v.osv_id && v.osv_id !== v.id && <span className="block text-[var(--text-muted)]">{v.osv_id}</span>}
-                          </td>
-                          <td className={tableClasses.td}><Badge color={VULN_SEVERITY_BADGE[v.severity]}>{t(`vuln.severityLevel.${v.severity}`)}</Badge></td>
-                          <td className={tableClasses.td}>{v.cvss || "—"}</td>
-                          <td className={`${tableClasses.td} font-mono text-xs`}>{v.fixed || "—"}</td>
-                          <td className={`${tableClasses.td} max-w-0 w-[50%]`}><span className="block truncate text-[var(--text-secondary)]" title={v.summary}>{v.summary}</span></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <AdvisoryTable d={d} onOpenFinding={onOpenFinding} />
             )}
           </div>
         </div>

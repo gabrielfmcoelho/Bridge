@@ -1171,6 +1171,7 @@
       "dashboardIframeTitle": "Dashboard Grafana de {slug}"
     },
     "ops": {
+      "sectionSsh": "Comandos SSH",
       "noReportReturned": "Nenhum relatório retornado.",
       "installFailed": "Falha na instalação",
       "grafanaAgentInstalled": "grafana-agent instalado",
@@ -1255,6 +1256,7 @@
     "profileTitle": "Host",
     "declared": "Declarado",
     "tabMetrics": "Métricas",
+    "tabMonitoring": "Monitoramento",
     "authPickDefault": "Com senha e chave configuradas, escolha o método de autenticação padrão.",
     "syncCoolify": "Sincronizar do Coolify",
     "syncCoolifyRunning": "Lendo aplicações, stacks e bancos do Coolify…",
@@ -4718,7 +4720,17 @@
       "noRepos": "nenhum",
       "meta": "Gerado {ago} · {model}"
     },
+    "host": {
+      "software": "Software instalado",
+      "softwareHint": "Cada versão encontrada no host e nos contêineres. Abra uma linha para ver as CVEs dela e a situação de cada uma.",
+      "eolCallout": "{count} componente(s) deste host sem suporte (fim de vida).",
+      "otherFindings": "Outros achados",
+      "otherFindingsHint": "Achados de scanners (ETIPI, Wazuh), inclusive os que chegam pelos registros DNS e serviços relacionados. As CVEs do inventário ficam em cada componente acima.",
+      "originScanners": "Scanners externos",
+      "originInventory": "Inventário (lista corrida)"
+    },
     "deps": {
+      "details": "Detalhes",
       "updateSecurity": "Atualizar (segurança)…",
       "updateHosts": "Atualizar {count} host(s) afetado(s)…",
       "fixableCallout": "{count} pacotes da distro neste host têm CVEs com aviso da própria distro: uma atualização de segurança costuma corrigi-los.",
