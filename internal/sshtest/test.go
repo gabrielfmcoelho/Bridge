@@ -437,6 +437,7 @@ func Test(client *ssh.Client) error {
 // CaptureJob (a background run) gives the probes more time.
 func TestCapture(client *ssh.Client, sudoPassword string, mode CaptureMode) (info *VMInfo, retErr error) {
 	defer enterMode(client, mode)()
+	defer trackScan(client)()
 	defer func() {
 		if rv := recover(); rv != nil {
 			log.Printf("[sshscan] panic during capture: %v\n%s", rv, debug.Stack())
@@ -547,6 +548,9 @@ func runCmdWithDeadline(client *ssh.Client, cmd string, timeout time.Duration) (
 			snippet = snippet[:120] + "..."
 		}
 		log.Printf("[sshcmd] timeout after %s: %q", timeout, snippet)
+		if st := stateOf(client); st != nil {
+			st.timedOut.Add(1)
+		}
 		return "", fmt.Errorf("ssh cmd timeout after %s", timeout)
 	}
 }
@@ -1287,6 +1291,22 @@ func listRemoteKeys(client *ssh.Client) ([]RemoteKeyInfo, error) {
 	return keys, nil
 }
 
+// cpuSampleCmd measures CPU usage over one second, before the scan does any
+// work, and keeps it in $CPU; cpuPrintCmd prints it later in the same shell.
+// A window bracketing the scan's own probes reads the scan, not the host (94%
+// on an idle 2-vCPU VM). /proc/stat busy/total delta; `top` only when
+// /proc/stat is unreadable. BRIDGE_ROOT is the tests' fake root.
+const cpuSampleCmd = `STAT="${BRIDGE_ROOT}/proc/stat"; ` +
+	`if [ -r "$STAT" ]; then ` +
+	`C1=$(awk '/^cpu /{print $2+$3+$4, $2+$3+$4+$5}' "$STAT"); sleep 1; ` +
+	`C2=$(awk '/^cpu /{print $2+$3+$4, $2+$3+$4+$5}' "$STAT"); ` +
+	`CPU=$(echo "$C1 $C2" | awk '{ if(($4-$2)>0) printf "%.0f%%", ($3-$1)/($4-$2)*100; else print "0%" }'); ` +
+	`else ` +
+	`CPU=$(top -bn2 2>/dev/null | grep '^%Cpu' | tail -1 | awk '{printf "%.0f%%", 100-$8}'); ` +
+	`fi`
+
+const cpuPrintCmd = `echo "$CPU"`
+
 // Docker is non-essential to the scan — if the daemon hangs (busy engine,
 // stale socket, network namespace issue) we don't want it to stall the entire
 // capture. 8 seconds is long enough for `docker ps` on a host with hundreds of
@@ -1478,20 +1498,16 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	// the four startup probes cost ~16s sequentially even though their
 	// remote work is sub-second. By chaining everything through a
 	// single shell session, we pay the channel-open cost once and let
-	// the remote shell run all four probes back-to-back. The CPU delta
-	// (`sleep 1` for /proc/stat sampling) ends up bracketing the rest
-	// of the work — we capture the second sample at the end so the
-	// 1-second sleep is "free" (it overlaps with all subsequent probes
-	// in the same session).
+	// the remote shell run all four probes back-to-back. The CPU sample
+	// comes first, over its own second (cpuSampleCmd): it costs 1 s and
+	// measures the host, not this batch.
 	const delimSession = "---SESSION---"
 	const delim = "---FIELD---"
 	const delim2 = "---SECTION---"
 
 	startupCmd := strings.Join([]string{
-		// Session 0: CPU usage. /proc/stat delta over the time it takes
-		// to run the rest of the batch (≥1s). Fallback to top -bn2 only
-		// when /proc/stat is unreadable.
-		`if [ -f /proc/stat ]; then C1=$(awk '/^cpu /{print $2+$3+$4, $2+$3+$4+$5}' /proc/stat); fi`,
+		// Session 0: CPU usage, sampled before any probe runs (cpuSampleCmd).
+		cpuSampleCmd,
 		`echo '` + delimSession + `'`,
 
 		// Session 1: hardware metrics, 14 fields delimited by FIELD.
@@ -1543,16 +1559,8 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 		loginsServicesPortsScript(delim2),
 		`echo '` + delimSession + `'`,
 
-		// Session 0 part 2: CPU sample after all the work above. The
-		// time spent on sessions 1-3 is the natural "delay" for the
-		// /proc/stat delta — guaranteed >= 1s on any real host, and we
-		// avoid the dedicated `sleep 1` that used to sit at the start.
-		`if [ -f /proc/stat ]; then ` +
-			`C2=$(awk '/^cpu /{print $2+$3+$4, $2+$3+$4+$5}' /proc/stat); ` +
-			`echo "$C1 $C2" | awk '{ if(($4-$2)>0) printf "%.0f%%", ($3-$1)/($4-$2)*100; else print "0%" }'; ` +
-			`else ` +
-			`top -bn2 2>/dev/null | grep '^%Cpu' | tail -1 | awk '{printf "%.0f%%", 100-$8}'; ` +
-			`fi`,
+		// Session 0 part 2: print the figure sampled at the start.
+		cpuPrintCmd,
 	}, "; ")
 
 	sStartup := time.Now()
@@ -2238,6 +2246,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	if cf, scanned := collectCredSources(client, sudoPassword, credRoots, credFiles, credJars); scanned {
 		info.CredHits = detectCreds(cf, sliceSet(cronScripts), sliceSet(keyFiles))
 		info.CredSourcesScanned = true
+	}
+	// Last, so every probe above is counted.
+	if w := stateOf(client).incompleteWarning(); w != "" {
+		info.Warnings = append(info.Warnings, w)
 	}
 	return info, nil
 }

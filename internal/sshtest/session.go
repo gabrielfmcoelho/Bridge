@@ -2,7 +2,10 @@ package sshtest
 
 import (
 	"errors"
+	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -30,12 +33,93 @@ func retrySessionOpen(open func() (*ssh.Session, error), attempts int, wait func
 	return sess, err
 }
 
-// newSession opens a session, riding out sshd's per-connection session cap
-// (20 attempts, about 30 s worst case, spent before the command's own deadline).
-func newSession(client *ssh.Client) (*ssh.Session, error) {
-	return retrySessionOpen(client.NewSession, 20, func(a int) {
+// maxScanSessions keeps a capture under sshd's MaxSessions (default 10), with
+// room for the sessions sshd has not finished closing.
+const maxScanSessions = 8
+
+// scanState is what a capture keeps per client: its session slots and the
+// commands that never ran.
+type scanState struct {
+	slots    chan struct{}
+	refused  atomic.Int32 // the session never opened
+	timedOut atomic.Int32 // cut at its deadline
+}
+
+func newScanState() *scanState {
+	return &scanState{slots: make(chan struct{}, maxScanSessions)}
+}
+
+// scanStates: *ssh.Client → *scanState, for the length of a capture. Looked up
+// by client, like the budget, so callers keep their signature.
+var scanStates sync.Map
+
+// trackScan gives client a scanState until the returned func is called.
+func trackScan(client *ssh.Client) func() {
+	scanStates.Store(client, newScanState())
+	return func() { scanStates.Delete(client) }
+}
+
+// stateOf is client's scanState: nil outside a capture.
+func stateOf(client *ssh.Client) *scanState {
+	v, _ := scanStates.Load(client)
+	st, _ := v.(*scanState)
+	return st
+}
+
+// acquire waits for a session slot and returns what gives it back (once).
+// Outside a capture (nil) there is no cap.
+func (st *scanState) acquire() func() {
+	if st == nil {
+		return func() {}
+	}
+	st.slots <- struct{}{}
+	return sync.OnceFunc(func() { <-st.slots })
+}
+
+// incompleteWarning says how many commands never ran, or "" when all did:
+// their probes came back empty, which would otherwise read as "nothing found".
+func (st *scanState) incompleteWarning() string {
+	if st == nil {
+		return ""
+	}
+	refused, timedOut := st.refused.Load(), st.timedOut.Load()
+	if refused+timedOut == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d scan commands did not complete (%d refused by sshd, %d timed out). Parts of this scan may be missing.",
+		refused+timedOut, refused, timedOut)
+}
+
+// scanSession is an ssh.Session that gives its slot back when closed.
+type scanSession struct {
+	*ssh.Session
+	release func()
+}
+
+func (s *scanSession) Close() error {
+	err := s.Session.Close()
+	s.release()
+	return err
+}
+
+// newSession opens a session. Inside a capture it first waits for one of the
+// capture's slots, so sshd's per-connection cap is not reached; the retry
+// (20 attempts, about 30 s worst case, spent before the command's own
+// deadline) stays for the sessions sshd is still closing.
+func newSession(client *ssh.Client) (*scanSession, error) {
+	st := stateOf(client)
+	release := st.acquire()
+	sess, err := retrySessionOpen(client.NewSession, 20, func(a int) {
 		time.Sleep(time.Duration(a) * 150 * time.Millisecond)
 	})
+	if err != nil {
+		release()
+		if st != nil {
+			st.refused.Add(1)
+		}
+		return nil, err
+	}
+	return &scanSession{Session: sess, release: release}, nil
 }
 
 // loginsServicesPortsScript is session 3: logins, services, service details and
