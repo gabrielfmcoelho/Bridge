@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import SectionCard from "@/components/ui/SectionCard";
 import SortDropdown from "@/components/ui/SortDropdown";
 import StatusDot from "@/components/ui/StatusDot";
-import { parseContainerRow } from "@/lib/utils";
-import type { VMInfoType, ParsedContainer } from "@/lib/api";
+import { containerRows } from "@/lib/containerRows";
+import type { VMInfoType } from "@/lib/api";
 import { Rows, Row, Detail, pctColor, type T } from "./shared";
 
 type SortKey = "name" | "cpu" | "mem";
@@ -13,20 +13,19 @@ type SortKey = "name" | "cpu" | "mem";
 /**
  * Docker containers as compact rows — state, name, image, CPU, memory, short
  * id — sortable; a row expands to status, network I/O and published ports.
- * `container_stats` (docker stats) and `parsed_containers` (docker ps) come
- * from separate commands, so a stats row without a ps match still renders.
+ * `docker ps` is the list and `docker stats` only adds figures
+ * (`containerRows`): a container whose stats are missing still shows.
  */
 export default function ScanContainers({ info, t }: { info: VMInfoType; t: T }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "name", dir: "asc" });
-  const byName = useMemo(() => new Map((info.parsed_containers ?? []).map((c) => [c.name, c])), [info.parsed_containers]);
   const rows = useMemo(() => {
-    const list = (info.container_stats ?? []).map(parseContainerRow);
+    const list = containerRows(info);
     list.sort((a, b) => {
       const cmp = sort.key === "name" ? a.name.localeCompare(b.name) : sort.key === "cpu" ? a.cpuNum - b.cpuNum : a.memNum - b.memNum;
       return sort.dir === "desc" ? -cmp : cmp;
     });
     return list;
-  }, [info.container_stats, sort]);
+  }, [info, sort]);
 
   return (
     <SectionCard
@@ -46,7 +45,7 @@ export default function ScanContainers({ info, t }: { info: VMInfoType; t: T }) 
     >
       <Rows>
         {rows.map((r) => {
-          const c: ParsedContainer | undefined = byName.get(r.name);
+          const c = r.container;
           const up = !!c?.status && /^up\b/i.test(c.status.trim());
           const bindings = parseContainerPortBindings(c?.ports ?? "");
           return (
