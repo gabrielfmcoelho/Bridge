@@ -1,5 +1,5 @@
 // No runtime imports: Node's test runner loads this file directly.
-import type { DiscoveredService, ParsedContainer, ProcessDetail, VMInfoType } from "./api";
+import type { CodeFingerprint, DiscoveredService, ParsedContainer, ProcessDetail, SiteTraffic, VMInfoType, WebSite } from "./api";
 
 /**
  * The scan pane's groups, each answering one question, and the sections
@@ -22,8 +22,11 @@ export type ScanGroup = keyof typeof GROUP_SECTIONS;
 export type ScanSection = (typeof GROUP_SECTIONS)[ScanGroup][number];
 export const SCAN_GROUPS = Object.keys(GROUP_SECTIONS) as ScanGroup[];
 
-/** `empty`: the scan looked and found nothing. `notRun`: it did not look. */
-export type SectionState = "data" | "empty" | "notRun";
+/**
+ * `empty`: the scan looked and found nothing. `notRun`: it did not look.
+ * `elsewhere`: it has data, all of it shown on another card's rows.
+ */
+export type SectionState = "data" | "empty" | "notRun" | "elsewhere";
 
 const has = (v: unknown[] | null | undefined) => (v?.length ?? 0) > 0;
 
@@ -53,8 +56,11 @@ export function sectionState(info: VMInfoType, s: ScanSection): SectionState {
       return info.git_remotes == null || info.git_remotes_partial ? "notRun" : "empty";
     case "roles": return deep(info, (d) => !!d.roles);
     case "webservers": return data(has(info.web_servers));
-    case "traffic": return deep(info, (d) => has(d.sites));
-    case "code": return deep(info, (d) => has(d.code));
+    // What a web-server site row already carries is not repeated in a card.
+    case "traffic":
+      return has(info.deep_facts?.sites) && siteFacts(info).traffic.length === 0 ? "elsewhere" : deep(info, (d) => has(d.sites));
+    case "code":
+      return has(info.deep_facts?.code) && siteFacts(info).code.length === 0 ? "elsewhere" : deep(info, (d) => has(d.code));
     case "panels": return deep(info, (d) => !!d.panels);
     case "users": return data(has(info.remote_users) || has(info.ssh_keys));
     case "owner": return deep(info, (d) => !!d.owner);
@@ -86,7 +92,9 @@ export function scanLayout(info: VMInfoType): {
     const sections: ScanSection[] = [];
     for (const s of GROUP_SECTIONS[group]) {
       const state = sectionState(info, s);
-      (state === "data" ? sections : state === "empty" ? empty : notRun).push(s);
+      if (state === "data") sections.push(s);
+      else if (state === "empty") empty.push(s);
+      else if (state === "notRun") notRun.push(s);
     }
     if (sections.length > 0) groups.push({ group, sections });
   }
@@ -228,4 +236,39 @@ export function scanWorkloads(info: VMInfoType): { workloads: Workload[]; otherP
   const shown = new Set<number>([...workloads.flatMap((w) => w.ports), ...(info.agents ?? []).flatMap((a) => a.ports ?? [])]);
   const otherPorts = (info.ports ?? []).filter((p) => !shown.has(parseInt(p, 10)));
   return { workloads, otherPorts };
+}
+
+// ── one row per site ──
+
+const siteName = (n: string) => n.toLowerCase().replace(/^www\./, "");
+/** Same directory, or one inside the other (a docroot above the served `public/`). */
+const samePath = (a: string, b: string) => a === b || a.startsWith(b.replace(/\/$/, "") + "/") || b.startsWith(a.replace(/\/$/, "") + "/");
+
+/**
+ * The deep facts that belong to a web-server site — its access-log traffic
+ * (by name, `www.` aside) and its docroot's code fingerprint (by path) — so
+ * the site's row can carry them, plus the traffic and code no site claims,
+ * which keep their own cards.
+ */
+export function siteFacts(info: VMInfoType): {
+  bySite: Map<WebSite, { traffic?: SiteTraffic; code?: CodeFingerprint }>;
+  traffic: SiteTraffic[];
+  code: CodeFingerprint[];
+} {
+  const traffic = [...(info.deep_facts?.sites ?? [])];
+  const code = [...(info.deep_facts?.code ?? [])];
+  const bySite = new Map<WebSite, { traffic?: SiteTraffic; code?: CodeFingerprint }>();
+  const take = <X,>(list: X[], match: (x: X) => boolean): X | undefined => {
+    const i = list.findIndex(match);
+    return i < 0 ? undefined : list.splice(i, 1)[0];
+  };
+  for (const server of info.web_servers ?? []) {
+    for (const site of server.sites ?? []) {
+      const names = new Set((site.names ?? []).map(siteName));
+      const t = take(traffic, (x) => names.has(siteName(x.site)));
+      const c = site.root ? take(code, (x) => samePath(x.docroot, site.root!)) : undefined;
+      if (t || c) bySite.set(site, { traffic: t, code: c });
+    }
+  }
+  return { bySite, traffic, code };
 }

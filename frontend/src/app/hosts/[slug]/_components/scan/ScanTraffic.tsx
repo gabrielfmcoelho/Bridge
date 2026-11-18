@@ -3,6 +3,7 @@
 import SectionCard from "@/components/ui/SectionCard";
 import { useLocale } from "@/contexts/LocaleContext";
 import type { SiteTraffic, VMInfoType } from "@/lib/api";
+import { siteFacts } from "@/lib/scanSections";
 import { Detail, Row, Rows, type T } from "./shared";
 
 /**
@@ -11,10 +12,11 @@ import { Detail, Row, Rows, type T } from "./shared";
  * top path sections) and recent error-log categories — a live site shows
  * thousands of requests, an abandoned VM zero. Everything is a count or a
  * first-path-segment label; no client IP, query string or User-Agent ever
- * leaves the VM. Background scan only.
+ * leaves the VM. Background scan only. A site a web server serves shows its
+ * traffic on that site's row (ScanWebServers); this card keeps the rest.
  */
 export default function ScanTraffic({ info, t }: { info: VMInfoType; t: T }) {
-  const sites = info.deep_facts?.sites ?? [];
+  const sites = siteFacts(info).traffic;
   const empty = info.deep_facts == null
     ? t("scan.deep.notRun")
     : sites.length === 0
@@ -34,7 +36,6 @@ export default function ScanTraffic({ info, t }: { info: VMInfoType; t: T }) {
 }
 
 function SiteRow({ s, t }: { s: SiteTraffic; t: T }) {
-  const { formatDateTime } = useLocale();
   const req = s.requests ?? 0;
   const idle = req === 0;
   const chip = "shrink-0 rounded px-1.5 text-2xs";
@@ -56,6 +57,23 @@ function SiteRow({ s, t }: { s: SiteTraffic; t: T }) {
         )}
       </>}
     >
+      <TrafficDetails s={s} t={t} />
+    </Row>
+  );
+}
+
+/** Requests per active day, or "no traffic": the headline of a site's traffic. */
+export function TrafficHeadline({ s, t }: { s: SiteTraffic; t: T }) {
+  return (s.requests ?? 0) === 0
+    ? <span className="text-[var(--text-muted)]">{t("scan.deep.traffic.idle")}</span>
+    : <>{t("scan.deep.traffic.perDay", { count: (s.per_day ?? 0).toLocaleString() })}</>;
+}
+
+/** A site's traffic breakdown: status classes, humans vs bots, clients, top paths, errors. */
+export function TrafficDetails({ s, t }: { s: SiteTraffic; t: T }) {
+  const { formatDateTime } = useLocale();
+  const idle = (s.requests ?? 0) === 0;
+  return (
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
         {!idle && (
           <Detail label={t("scan.deep.traffic.status")}>
@@ -118,7 +136,6 @@ function SiteRow({ s, t }: { s: SiteTraffic; t: T }) {
           </Detail>
         )}
       </dl>
-    </Row>
   );
 }
 

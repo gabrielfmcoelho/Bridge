@@ -144,7 +144,18 @@ const mockScan = (h: { id: number; nickname: string; os?: { pretty?: string; arc
       connections_active: 17, total_requests: 482113, proxy_ports: [80, 443], admin_ports: [8001, 8444], services: 4, routes: 4,
       upstreams: [{ name: "chamados-upstream", targets: [{ target: "10.0.0.15:8080", health: "HEALTHY" }, { target: "10.0.0.16:8080", health: "UNHEALTHY" }] }] },
     sites: [{ names: ["portal.sead.pi.gov.br"], listen: [80, 443], tls: true,
-      locations: [{ path: "/api", proxy: ["http://10.0.0.15:8080", "http://10.0.0.16:8080"] }, { path: "/bi", proxy: ["http://10.0.0.99:8080"] }] }] }],
+      locations: [{ path: "/api", proxy: ["http://10.0.0.15:8080", "http://10.0.0.16:8080"] }, { path: "/bi", proxy: ["http://10.0.0.99:8080"] }] }] },
+    { kind: "nginx", sites: [{ names: ["intranet.sead.pi.gov.br"], listen: [8080], root: "/var/www/intranet/public" }] }],
+  // Deep facts of a background scan: the portal's traffic and the intranet's code
+  // ride on their site rows; the retired site's traffic keeps its own card.
+  deep_facts: h.nickname !== "srv-sga-web01" ? undefined : {
+    sites: [
+      { site: "portal.sead.pi.gov.br", server: "nginx", requests: 96_420, days: 30, per_day: 3214, status_2xx: 90_100, status_3xx: 3_200, status_4xx: 2_900, status_5xx: 220, human: 71_000, bot: 25_420 },
+      { site: "legado.sead.pi.gov.br", server: "nginx", requests: 0 },
+    ],
+    code: [{ docroot: "/var/www/intranet", apps: [{ framework: "laravel", version: "10.48" }], newest_mtime: 1_760_623_643 }],
+    patch: { manager: "apt", last_index_update: 1_794_961_885, auto_updates: "unattended-upgrades", auto_updates_on: true, upgradable: 111 },
+  },
   resource_top: { top_disk: [{ path: "/data/dumps/full.sql", size_bytes: 3_221_225_472 }] },
   release_risks: { foreign_count: 2, foreign_packages: ["libssl1.1 1.1.1f-1ubuntu2.20", "php8.2-cli 8.2.6-1+ubuntu18.04.1+deb.sury.org+1"],
     modified_conffiles: ["/etc/proftpd/proftpd.conf"], apache_listen: [80, 443],

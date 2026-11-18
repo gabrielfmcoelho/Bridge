@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { containerRows, scanLayout, scanWorkloads, sectionState } from "./scanSections.ts";
+import { containerRows, scanLayout, scanWorkloads, sectionState, siteFacts } from "./scanSections.ts";
 import type { VMInfoType } from "./api.ts";
 
 const scan = (v: Partial<VMInfoType>) => v as VMInfoType;
@@ -148,4 +148,54 @@ test("a stats row with no docker ps match still renders", () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].name, "old");
   assert.equal(rows[0].container, undefined);
+});
+
+// ── one row per site ──
+
+const web = scan({
+  web_servers: [{ kind: "nginx", sites: [
+    { names: ["portal.pi.gov.br", "www.portal.pi.gov.br"], root: "/var/www/portal/public" },
+    { names: ["api.pi.gov.br"], proxy: ["127.0.0.1:8000"] },
+  ] }],
+  deep_facts: {
+    sites: [{ site: "www.portal.pi.gov.br", requests: 900, per_day: 30 }, { site: "legado.pi.gov.br", requests: 0 }],
+    code: [{ docroot: "/var/www/portal", apps: [{ framework: "laravel", version: "10" }] }, { docroot: "/srv/outro" }],
+  },
+} as Partial<VMInfoType>);
+
+test("a site's traffic and code ride on its row", () => {
+  const facts = siteFacts(web);
+  const [portal, api] = web.web_servers![0].sites!;
+  assert.equal(facts.bySite.get(portal)?.traffic?.per_day, 30);
+  // The docroot above the served `public/` directory is still that site's code.
+  assert.equal(facts.bySite.get(portal)?.code?.docroot, "/var/www/portal");
+  assert.equal(facts.bySite.get(api), undefined);
+});
+
+test("traffic and code no site claims keep their own cards", () => {
+  const facts = siteFacts(web);
+  assert.deepEqual(facts.traffic.map((s) => s.site), ["legado.pi.gov.br"]);
+  assert.deepEqual(facts.code.map((d) => d.docroot), ["/srv/outro"]);
+  assert.equal(sectionState(web, "traffic"), "data");
+});
+
+test("facts shown on site rows are neither a card nor 'nothing found'", () => {
+  const all = scan({
+    web_servers: [{ kind: "nginx", sites: [{ names: ["a.gov.br"], root: "/var/www/a" }] }],
+    deep_facts: { sites: [{ site: "a.gov.br", requests: 5 }], code: [{ docroot: "/var/www/a" }] },
+  } as Partial<VMInfoType>);
+  assert.equal(sectionState(all, "traffic"), "elsewhere");
+  assert.equal(sectionState(all, "code"), "elsewhere");
+  const { groups, empty } = scanLayout(all);
+  assert.deepEqual(groups.find((g) => g.group === "web")?.sections, ["webservers"]);
+  assert.ok(!empty.includes("traffic") && !empty.includes("code"));
+});
+
+test("a docroot is not matched by a sibling directory with the same prefix", () => {
+  const facts = siteFacts(scan({
+    web_servers: [{ kind: "apache", sites: [{ names: ["a.gov.br"], root: "/var/www/app" }] }],
+    deep_facts: { code: [{ docroot: "/var/www/app2" }] },
+  } as Partial<VMInfoType>));
+  assert.equal(facts.bySite.size, 0);
+  assert.equal(facts.code.length, 1);
 });
