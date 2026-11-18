@@ -181,7 +181,7 @@ export default function ServicesPage() {
               <>
                 {allServices.length > 0 && (
                   <>
-                    <GroupByMenu options={["host", "dns", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
+                    <GroupByMenu options={["host", "dns", "project", "app", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
                     <ToolbarActionButton icon={ICON_PATHS.exportDoc} label={t("common.export")} onClick={exportCSV} hideLabel="md" />
                   </>
                 )}

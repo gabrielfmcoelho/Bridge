@@ -26,6 +26,9 @@ import type {
   Contact,
   ShareBundleView,
   ShareBundleAccessEntry,
+  AppDepSource,
+  AppDepSyncStatus,
+  AppDepAssetLink,
 } from "@/lib/types";
 import { seed } from "./seed";
 import type { ProxmoxServer } from "@/lib/api";
@@ -61,6 +64,13 @@ export interface Seed {
   proxmoxServers: (ProxmoxServer & { token?: string })[];
   /** users.home_prefs by user id; absent = {} (never set up). */
   homePrefs: Record<number, object>;
+  /** GET /api/app-deps: catalog/dependencies.yml as if synced from GitLab. */
+  appDeps: AppDepSource[];
+  /** The background sync: a POST starts it, the next GET finishes it. */
+  appDepsSync: AppDepSyncStatus;
+  /** Application ↔ asset links, as GET /api/app-deps/links returns them
+   *  (derived ones fixed, "manual" ones added and removed by the routes). */
+  appDepLinks: AppDepAssetLink[];
 }
 
 // ponytail: dev-singleton pin on globalThis — Fast Refresh re-evaluates this

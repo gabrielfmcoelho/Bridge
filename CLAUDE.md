@@ -93,7 +93,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v134**. Use idempotent idioms:
+per element, currently at **v136**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -460,6 +460,43 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   take no mode. UI: the hosts list's batch scan and the host's scan button
   start runs and poll them (`useScanRun`); a reopened page picks up the
   caller's active run.
+- App dependencies (Atlas › Dependências de aplicações, `/atlas/app-deps`; v135):
+  each repository declares its systems in `catalog/dependencies.yml`, in the
+  schema of catalog-parser (`ci`, `components`, `dependencies.upstream` /
+  `downstream`). `service.AppDepsService.Sync` (`POST /api/app-deps/sync`,
+  editor, background `bgJob`) reads that file at each repository's default
+  branch through the GitLab service token (`gitlab.Client.GetFile`), in the groups of
+  the `gitlab_catalog_groups` setting (Settings › Integrações › GitLab; empty =
+  every project the token is a member of), into `app_dep_catalogs`. A 404 removes
+  a repository's row, any other error keeps it, and only a complete project list
+  prunes the repositories no longer listed. Bridge **parses, never lints**: the
+  rules and vocabulary belong to catalog-parser and catalog-governance; a file
+  that doesn't parse is stored with `parse_error`. Every authenticated user
+  reads (`GET /api/app-deps`, scope `inventory`). The report, the per-CI diagram
+  (what that CI declares, as `catalog-diagram` draws it) and the landscape map
+  are all built client-side from that one list by `frontend/src/lib/appDeps.ts`.
+  Named `appdeps` everywhere: "catalog" is already the service catalog
+  (`/catalog`) and the API catalog, "dependencies" the package inventory.
+  `bgJob[R]` (`internal/api/bg_job.go`) is the one in-memory background run
+  shared with the CVE evaluation and the GitLab-author scan.
+  **Links to hosts, DNS, services and projetos** (`service.AppDepLinks`,
+  `GET /api/app-deps/links[?ci=|?entity_type=&entity_id=]`): derived on every
+  read from the CI's repository — whatever Bridge already links to it: a host
+  or DNS repo link (`gitlab_repo_links`: one repo, a group holding it, or a
+  scan-found checkout), a projeto GitLab link (repo or group), a service's
+  `repository_url`/`gitlab_url`/`git_repository` — plus manual links
+  (`app_dep_links`, v136, keyed by CI name; `POST`/`DELETE
+  /api/app-deps/links`, editor, 404 for a CI no catalog declares or an asset
+  the caller can't see). Only manual links are removable in Bridge; a derived
+  one goes away at its source. `sources` says where each comes from (`manual`,
+  `repo`, `scan`, `group`). Only live assets the caller can see come back. A
+  CI's numeric id is its catalog's GitLab project id (`ci_id`): it is the
+  `app` type of `/api/relations` (lists group by application) and the
+  `app-<id>` node of `/api/graph` (drawn only when linked to a visible node).
+  UI: the Aplicações group of the Relações card on host, DNS, service and
+  projeto pages and the CI's Topologia tab, both with the link manager
+  (`components/appdeps/AppDepLinksManager`); the report's "No Bridge" counts
+  and "Vínculos" filter.
 - Share links list (`/shares`, `vault.scanBundleViews`): items, secret and API
   names are read in bulk; wiki titles come from Outline at most once a day per
   page (in-memory `wikiTitleCache`, 24h), so a renamed page shows its old title

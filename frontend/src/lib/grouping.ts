@@ -3,7 +3,8 @@
 // related entity's own list, which is also what makes an id groupable: a link
 // to something the caller can't name (deleted, out of scope) is dropped.
 
-export type GroupEntity = "host" | "dns" | "service" | "project" | "contact" | "entidade";
+/** "app" is an application (app-deps CI), keyed by its GitLab project id. */
+export type GroupEntity = "host" | "dns" | "service" | "project" | "contact" | "entidade" | "app";
 /** What can be grouped: any GroupEntity, plus assets only ever grouped (APIs). */
 export type GroupItemEntity = GroupEntity | "api_catalog" | "database";
 

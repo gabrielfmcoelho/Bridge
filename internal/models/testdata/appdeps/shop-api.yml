@@ -1,0 +1,57 @@
+# Dependency catalog of the shop-api repository.
+ci: shop-api
+description: Orders and payments API of the web shop
+
+owners:
+  - name: Jane Doe
+    email: jane@example.org
+    username: jdoe
+
+entity:
+  - name: Example Corp
+    slug: example-corp
+    type: company
+
+git:
+  type: github
+  host: github.com
+  path: example-corp/shop-api
+
+components:
+  - name: api
+    category: application
+    technology: rest-api
+    protocol: https
+    port: 8443
+    criticality: high
+    description: Public REST API
+  - name: worker
+    category: application
+    technology: celery
+    criticality: medium
+    description: Sends order e-mails and settles payments
+  - name: orders-db
+    category: data
+    technology: postgresql
+    criticality: high
+    description: Orders and payments tables
+
+dependencies:
+  upstream:
+    # external system: no catalog of its own, so its traits are inline
+    - ci: payment-gateway
+      local_component: worker
+      category: service
+      technology: rest-api
+      protocol: https
+      port: 443
+      criticality: high
+      description: Card payments provider
+  downstream:
+    # mirrored by shop-web's upstream entry
+    - ci: shop-web
+      component: frontend
+      local_component: api
+    # consumer without a catalog
+    - ci: bi-dashboard
+      local_component: api

@@ -1853,6 +1853,209 @@
                 }
             }
         },
+        "/api/app-deps": {
+            "get": {
+                "description": "Every repository's catalog/dependencies.yml as last synced from GitLab, parsed (catalog-parser schema: ci, components, upstream/downstream links). catalog is null and parse_error set when the file failed to parse. Not linted.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "app-deps"
+                ],
+                "summary": "App dependency catalogs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_AppDepSource"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/app-deps/links": {
+            "get": {
+                "description": "Links between applications (CIs of the synced catalogs) and the hosts, DNS records, services and projetos the caller can see. Derived from the CI's GitLab repository (repo, group and scan links of hosts and DNS, projeto GitLab links, service repository fields) plus the links editors add; sources lists where each comes from. Filter by ci, or by entity_type + entity_id.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "app-deps"
+                ],
+                "summary": "Application ↔ asset links",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Application (CI)",
+                        "name": "ci",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "host, dns, service or project",
+                        "name": "entity_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Asset id (with entity_type)",
+                        "name": "entity_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ListEnvelope-models_AppDepAssetLink"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Editor. Stores a manual link between an application (CI) and a host, DNS record, service or projeto; adding one that exists is a no-op. 404 when the CI is in no synced catalog or the asset is not visible.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "app-deps"
+                ],
+                "summary": "Link an application to an asset",
+                "parameters": [
+                    {
+                        "description": "The link",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.AppDepManualLink"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.AppDepManualLink"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/app-deps/links/{ci}/{type}/{id}": {
+            "delete": {
+                "description": "Editor. Removes a manual link. Links derived from the repository stay: remove them at their source (the host/DNS/projeto GitLab link, the service's repository field). 404 when there is no such manual link or the asset is not visible.",
+                "tags": [
+                    "app-deps"
+                ],
+                "summary": "Unlink an application from an asset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Application (CI)",
+                        "name": "ci",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "host, dns, service or project",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Asset id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/app-deps/sync": {
+            "get": {
+                "description": "Whether a sync is under way, and the result or error of the last one (since the server started).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "app-deps"
+                ],
+                "summary": "Status of the background app dependencies sync",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.AppDepSyncStatus"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Editor. Answers 202 with the run's status at once; a sync already under way is returned instead of starting another. Poll GET for the result. Reads catalog/dependencies.yml at each repository's default branch, in the groups of the gitlab_catalog_groups setting (or every project the service token is a member of). A missing file removes the repository's row; a read error keeps it. 400 when GitLab is not configured.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "app-deps"
+                ],
+                "summary": "Sync app dependency catalogs (background)",
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/api.AppDepSyncStatus"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpx.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/assets/{type}/{id}/entidades": {
             "get": {
                 "description": "Any role. Invisible assets answer 404.",
@@ -8050,7 +8253,7 @@
         },
         "/api/graph": {
             "get": {
-                "description": "Any role. {\"nodes\": [graphNode], \"edges\": [graphEdge]} over visible hosts, DNS records, projects, services, APIs and databases; edges only between visible nodes.",
+                "description": "Any role. {\"nodes\": [graphNode], \"edges\": [graphEdge]} over visible hosts, DNS records, projects, services, APIs, databases and the applications (app-deps CIs, \"app-\u003cgitlab project id\u003e\") linked to them; edges only between visible nodes.",
                 "produces": [
                     "application/json"
                 ],
@@ -12250,7 +12453,7 @@
         },
         "/api/relations": {
             "get": {
-                "description": "Any role. Every link between visible inventory entities (host-service, dns-project, ...), used by list pages to group rows.",
+                "description": "Any role. Every link between visible inventory entities (host-service, dns-project, ...), used by list pages to group rows. Applications (app-deps CIs) appear as type \"app\" with the CI's GitLab project id.",
                 "produces": [
                     "application/json"
                 ],
@@ -21100,6 +21303,26 @@
         }
     },
     "definitions": {
+        "api.AppDepSyncStatus": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "result": {
+                    "$ref": "#/definitions/service.AppDepSyncResult"
+                },
+                "running": {
+                    "type": "boolean"
+                },
+                "started_at": {
+                    "type": "string"
+                }
+            }
+        },
         "api.AutoresVarreduraStatus": {
             "type": "object",
             "properties": {
@@ -21245,6 +21468,34 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/models.APIToken"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
+        "api.ListEnvelope-models_AppDepAssetLink": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.AppDepAssetLink"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/api.Meta"
+                }
+            }
+        },
+        "api.ListEnvelope-models_AppDepSource": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.AppDepSource"
                     }
                 },
                 "meta": {
@@ -27074,6 +27325,246 @@
                 }
             }
         },
+        "models.AppDepAssetLink": {
+            "type": "object",
+            "properties": {
+                "ci": {
+                    "type": "string"
+                },
+                "ci_id": {
+                    "type": "integer"
+                },
+                "entity_id": {
+                    "type": "integer"
+                },
+                "entity_type": {
+                    "type": "string"
+                },
+                "sources": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "via": {
+                    "description": "Via is the repository or group path a derived link goes through.",
+                    "type": "string"
+                }
+            }
+        },
+        "models.AppDepCatalog": {
+            "type": "object",
+            "properties": {
+                "ci": {
+                    "type": "string"
+                },
+                "components": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.AppDepComponent"
+                    }
+                },
+                "dependencies": {
+                    "$ref": "#/definitions/models.AppDepLinks"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "entity": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.AppDepEntity"
+                    }
+                },
+                "git": {
+                    "$ref": "#/definitions/models.AppDepGit"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "owners": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.AppDepOwner"
+                    }
+                }
+            }
+        },
+        "models.AppDepComponent": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "criticality": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "integer"
+                },
+                "protocol": {
+                    "type": "string"
+                },
+                "technology": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AppDepEntity": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AppDepGit": {
+            "type": "object",
+            "properties": {
+                "host": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AppDepLink": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "ci": {
+                    "type": "string"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "criticality": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "local_component": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "port": {
+                    "type": "integer"
+                },
+                "protocol": {
+                    "type": "string"
+                },
+                "technology": {
+                    "type": "string"
+                },
+                "via": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AppDepLinks": {
+            "type": "object",
+            "properties": {
+                "downstream": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.AppDepLink"
+                    }
+                },
+                "upstream": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.AppDepLink"
+                    }
+                }
+            }
+        },
+        "models.AppDepManualLink": {
+            "type": "object",
+            "properties": {
+                "ci": {
+                    "type": "string"
+                },
+                "entity_id": {
+                    "type": "integer"
+                },
+                "entity_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AppDepOwner": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.AppDepSource": {
+            "type": "object",
+            "properties": {
+                "catalog": {
+                    "$ref": "#/definitions/models.AppDepCatalog"
+                },
+                "commit_id": {
+                    "type": "string"
+                },
+                "file_url": {
+                    "type": "string"
+                },
+                "gitlab_project_id": {
+                    "type": "integer"
+                },
+                "parse_error": {
+                    "type": "string"
+                },
+                "project_path": {
+                    "type": "string"
+                },
+                "ref": {
+                    "type": "string"
+                },
+                "synced_at": {
+                    "type": "string"
+                },
+                "web_url": {
+                    "type": "string"
+                }
+            }
+        },
         "models.AppSettings": {
             "type": "object",
             "properties": {
@@ -29797,6 +30288,41 @@
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "service.AppDepSyncResult": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "failed": {
+                    "description": "found but failed to parse (stored with its error)",
+                    "type": "integer"
+                },
+                "found": {
+                    "description": "with a catalog/dependencies.yml",
+                    "type": "integer"
+                },
+                "parsed": {
+                    "description": "found and read",
+                    "type": "integer"
+                },
+                "removed": {
+                    "description": "rows dropped: the file or the repository is gone",
+                    "type": "integer"
+                },
+                "repos": {
+                    "description": "repositories looked at",
+                    "type": "integer"
+                },
+                "truncated": {
+                    "description": "Truncated: GitLab's project list hit its cap, so rows of repositories\nthat weren't listed were kept rather than removed.",
+                    "type": "boolean"
                 }
             }
         },

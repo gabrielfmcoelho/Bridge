@@ -107,3 +107,15 @@ type Contributor struct {
 	Email   string `json:"email"`
 	Commits int    `json:"commits"`
 }
+
+// RepoFile is a file from /projects/:id/repository/files/:path. Content is
+// decoded when GetFile returns it.
+type RepoFile struct {
+	FilePath     string `json:"file_path"`
+	Ref          string `json:"ref"`
+	Encoding     string `json:"encoding"`
+	Content      string `json:"content"`
+	BlobID       string `json:"blob_id"`
+	CommitID     string `json:"commit_id"`
+	LastCommitID string `json:"last_commit_id"`
+}

@@ -287,7 +287,7 @@ export default function HostDetail({ slug }: { slug: string }) {
 
           {/* ═══ TOPOLOGY TAB ═══ */}
           {activeTab === "topology" && (
-            <TopologyTab data={data} filteredGraph={filteredGraph} graphLoading={graphLoading} t={t} />
+            <TopologyTab data={data} hostId={data.host.id} canEdit={canEdit} filteredGraph={filteredGraph} graphLoading={graphLoading} t={t} />
           )}
 
           {/* ═══ METRICS TAB ═══ */}

@@ -226,5 +226,7 @@ export const NAV_ICONS: Record<string, string> = {
   Database: ICON_PATHS.database,
   Plug: "M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 01-4 4h-4a4 4 0 01-4-4V8z",
   Share: ICON_PATHS.share,
+  // App dependencies: two boxes joined by a link (a system and what it uses).
+  Workflow: "M5 3h4a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm10 10h4a2 2 0 012 2v4a2 2 0 01-2 2h-4a2 2 0 01-2-2v-4a2 2 0 012-2zM7 11v4a2 2 0 002 2h4",
   Trash2: "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6",
 };

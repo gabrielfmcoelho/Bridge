@@ -208,7 +208,7 @@ export default function DNSPage() {
             actions={
               <>
                 {allRecords.length > 0 && (
-                  <GroupByMenu options={["host", "service", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
+                  <GroupByMenu options={["host", "service", "project", "app", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
                 )}
                 {bulkActions.length > 0 && (
                   <DropdownMenu trigger={<ToolbarActionButton icon={ICON_PATHS.bolt} label={t("host.bulkActions")} hideLabel="md" />}>

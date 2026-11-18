@@ -2,12 +2,10 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/httpx"
@@ -149,21 +147,10 @@ func (h *vulnHandlers) handleGetDependency(w http.ResponseWriter, r *http.Reques
 
 // DependencyEvalStatus is the background "Evaluate CVEs" run: under way, or
 // how the last one ended.
-type DependencyEvalStatus struct {
-	Running    bool                          `json:"running"`
-	StartedAt  *time.Time                    `json:"started_at,omitempty"`
-	FinishedAt *time.Time                    `json:"finished_at,omitempty"`
-	Result     *service.DependencyEvalResult `json:"result,omitempty"`
-	Error      string                        `json:"error,omitempty"`
-}
+type DependencyEvalStatus = bgJobStatus[service.DependencyEvalResult]
 
 // evalJob runs one evaluation at a time in the background.
-// ponytail: in memory, one process — a restart forgets a run under way (the
-// next click starts over); move it to a table if Bridge ever runs replicated.
-type evalJob struct {
-	mu     sync.Mutex
-	status DependencyEvalStatus
-}
+type evalJob = bgJob[service.DependencyEvalResult]
 
 var depEvalJob = &evalJob{}
 
@@ -174,46 +161,6 @@ const (
 	depEvalTimeout = 45 * time.Minute
 	depEvalReserve = 10 * time.Minute
 )
-
-func (j *evalJob) get() DependencyEvalStatus {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	return j.status
-}
-
-// start launches run unless one is under way; either way it returns the
-// current status and whether this call started it.
-func (j *evalJob) start(run func() (*service.DependencyEvalResult, error)) (DependencyEvalStatus, bool) {
-	j.mu.Lock()
-	if j.status.Running {
-		s := j.status
-		j.mu.Unlock()
-		return s, false
-	}
-	now := time.Now().UTC()
-	j.status = DependencyEvalStatus{Running: true, StartedAt: &now}
-	s := j.status
-	j.mu.Unlock()
-
-	go func() {
-		var res *service.DependencyEvalResult
-		var err error
-		defer func() {
-			if rv := recover(); rv != nil {
-				err = fmt.Errorf("panic: %v", rv)
-			}
-			end := time.Now().UTC()
-			j.mu.Lock()
-			j.status.Running, j.status.FinishedAt, j.status.Result = false, &end, res
-			if err != nil {
-				j.status.Error = err.Error()
-			}
-			j.mu.Unlock()
-		}()
-		res, err = run()
-	}()
-	return s, true
-}
 
 // handleEvaluateDependencies godoc
 //

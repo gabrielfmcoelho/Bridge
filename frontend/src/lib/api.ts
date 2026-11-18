@@ -2681,6 +2681,25 @@ export const sentinelAPI = {
 };
 
 // Gestor integration
+export const appDepsAPI = {
+  list: () => api.getList<import("./types").AppDepSource>("/api/app-deps"),
+  // Starts the sync in the background (202); poll syncStatus() for the result.
+  sync: () => api.post<import("./types").AppDepSyncStatus>("/api/app-deps/sync"),
+  syncStatus: () => api.get<import("./types").AppDepSyncStatus>("/api/app-deps/sync"),
+  /** Application ↔ asset links: every one, one CI's, or one asset's. */
+  links: (f: { ci?: string; entity_type?: import("./types").AppDepEntityType; entity_id?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (f.ci) q.set("ci", f.ci);
+    if (f.entity_type && f.entity_id) { q.set("entity_type", f.entity_type); q.set("entity_id", String(f.entity_id)); }
+    const qs = q.toString();
+    return api.getList<import("./types").AppDepAssetLink>(`/api/app-deps/links${qs ? `?${qs}` : ""}`);
+  },
+  addLink: (body: { ci: string; entity_type: import("./types").AppDepEntityType; entity_id: number }) =>
+    api.post("/api/app-deps/links", body),
+  removeLink: (ci: string, type: import("./types").AppDepEntityType, id: number) =>
+    api.delete(`/api/app-deps/links/${encodeURIComponent(ci)}/${type}/${id}`),
+};
+
 export const gestorAPI = {
   projetos: (q: string) =>
     api.get<import("./types").GestorProjetosResult>(`/api/gestor/projetos?q=${encodeURIComponent(q)}`),

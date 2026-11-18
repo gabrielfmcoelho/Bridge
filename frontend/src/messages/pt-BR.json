@@ -50,7 +50,129 @@
     "canvas": "Quadros de ideias",
     "home": "Início",
     "vulnerabilities": "Vulnerabilidades",
-    "databases": "Bancos de dados"
+    "databases": "Bancos de dados",
+    "appDeps": "Dependências de aplicações"
+  },
+  "appDeps": {
+    "title": "Dependências de aplicações",
+    "description": "Do que cada aplicação é feita e com quais sistemas conversa, lido do catalog/dependencies.yml de cada repositório do GitLab.",
+    "indicator": "{count} aplicações",
+    "syncedAgo": "sincronizado {ago}",
+    "searchPlaceholder": "Buscar aplicação, tecnologia, responsável…",
+    "filter": {
+      "criticality": "Criticidade",
+      "allCriticalities": "Todas as criticidades",
+      "links": "Vínculos",
+      "linksAll": "Todos os vínculos",
+      "linksNoHost": "Sem host",
+      "linksNone": "Sem nenhum vínculo"
+    },
+    "tabReport": "Relatório",
+    "tabMap": "Mapa",
+    "loadError": "Não foi possível carregar os catálogos de dependências.",
+    "empty": "Nenhum catálogo sincronizado ainda",
+    "emptyHint": "A sincronização lê o catalog/dependencies.yml de cada repositório que o token de serviço do GitLab alcança (ou dos grupos definidos em Configurações › Integrações › GitLab).",
+    "openSettings": "Configurações do GitLab",
+    "failed": {
+      "title": "Catálogos com erro de leitura",
+      "description": "Encontrados no repositório, mas não legíveis como YAML: corrija o arquivo e sincronize de novo."
+    },
+    "duplicates": "O mesmo CI é declarado por mais de um repositório; o primeiro é exibido: {list}",
+    "noParsed": "Nenhum catálogo pôde ser lido",
+    "noMatch": "Nenhuma aplicação corresponde à busca ou ao filtro.",
+    "criticality": {
+      "high": "Alta",
+      "medium": "Média",
+      "low": "Baixa"
+    },
+    "legend": {
+      "external": "Sem catálogo",
+      "arrow": "A → B: A depende de B"
+    },
+    "links": {
+      "empty": "Esta aplicação não declara dependências.",
+      "direction": "Direção",
+      "other": "Aplicação",
+      "component": "Componente dela",
+      "local": "Componente local",
+      "technology": "Tecnologia",
+      "endpoint": "Endpoint",
+      "criticality": "Criticidade",
+      "description": "Descrição",
+      "upstream": "Consome",
+      "downstream": "Consumido por",
+      "notCatalogued": "Sem catálogo no Bridge: um sistema externo ou um consumidor",
+      "via": "através de {via}"
+    },
+    "report": {
+      "expand": "Expandir",
+      "ci": "Aplicação",
+      "entity": "Entidade",
+      "owners": "Responsáveis",
+      "technologies": "Tecnologias",
+      "upstream": "Consome",
+      "upstreamHint": "Sistemas dos quais esta aplicação depende (upstream)",
+      "downstream": "Consumidores",
+      "downstreamHint": "Sistemas que dependem desta aplicação (downstream)",
+      "criticality": "Criticidade",
+      "repository": "Repositório",
+      "expandRow": "Mostrar as dependências de {ci}",
+      "collapseRow": "Ocultar as dependências de {ci}",
+      "openDiagram": "Abrir o diagrama",
+      "inBridge": "No Bridge",
+      "inBridgeHint": "Hosts, serviços, registros DNS e projetos vinculados à aplicação"
+    },
+    "sync": {
+      "button": "Sincronizar com o GitLab",
+      "running": "Sincronizando…",
+      "done": "Sincronização concluída: {found} catálogos em {repos} repositórios ({failed} ilegíveis, {removed} removidos)",
+      "error": "Falha na sincronização",
+      "truncated": "A lista de projetos do GitLab veio cortada: os catálogos de repositórios não listados foram mantidos.",
+      "errors": "Não lidos: {errors}"
+    },
+    "detail": {
+      "notFound": "Aplicação {ci} não encontrada",
+      "notFoundHint": "Nenhum catálogo sincronizado declara este CI. Pode ser um sistema externo, ou o repositório dele ainda não foi sincronizado.",
+      "back": "Voltar para dependências de aplicações",
+      "owners": "responsáveis: {owners}",
+      "duplicate": "Este CI é declarado por mais de um repositório. Exibido: {repo}; também em: {others}",
+      "links": "Dependências",
+      "components": "Componentes",
+      "noComponents": "O catálogo não declara componentes.",
+      "component": "Componente",
+      "category": "Categoria",
+      "tabDependencies": "Dependências",
+      "tabTopology": "Topologia"
+    },
+    "graphNode": "Aplicação",
+    "relations": {
+      "apps": "Aplicações"
+    },
+    "source": {
+      "manual": "manual",
+      "repo": "repositório",
+      "scan": "encontrado no host",
+      "group": "via grupo"
+    },
+    "entity": {
+      "host": "Hosts",
+      "service": "Serviços",
+      "dns": "Registros DNS",
+      "project": "Projetos"
+    },
+    "manage": {
+      "open": "Gerenciar vínculos de aplicações",
+      "title": "Vínculos de aplicações",
+      "hintCi": "Vínculos que vêm deste repositório (vínculos GitLab de projetos, hosts e DNS, checkouts encontrados pelo scan, URL do repositório de um serviço) aparecem sozinhos; remova-os na origem. Adicione aqui o que o Bridge não consegue derivar.",
+      "hintEntity": "Aplicações vinculadas pelo repositório do GitLab aparecem sozinhas; remova-as na origem. Adicione aqui uma aplicação que o Bridge não consegue derivar.",
+      "error": "Não foi possível salvar o vínculo.",
+      "none": "Nenhum vínculo de aplicação ainda.",
+      "remove": "Remover o vínculo com {name}",
+      "derivedHint": "Vem do repositório: remova na origem",
+      "type": "Tipo",
+      "application": "Aplicação",
+      "add": "Vincular"
+    }
   },
   "atlas": {
     "apis": {
@@ -2120,6 +2242,8 @@
         "serviceAccessToken": "Token de acesso do serviço",
         "serviceTokenHint": "Um Personal / Group / Project Access Token com o escopo read_api. Usado em todas as chamadas REST — um único token para todos os usuários.",
         "defaultBranch": "Branch padrão (opcional)",
+        "catalogGroups": "Grupos com catálogos",
+        "catalogGroupsHint": "Grupos (caminho completo, um por linha ou separados por vírgula) cujos repositórios a Dependências de aplicações lê o catalog/dependencies.yml, subgrupos incluídos. Vazio: todo projeto do qual o token de serviço é membro.",
         "connectedAs": "Conectado como {username}",
         "unknownUser": "(desconhecido)"
       },
@@ -4032,6 +4156,7 @@
       "dns": "DNS",
       "service": "Serviço",
       "project": "Projeto",
+      "app": "Aplicação",
       "contact": "Contato",
       "entidade": "Entidade responsável"
     },
@@ -4040,6 +4165,7 @@
       "dns": "Sem DNS",
       "service": "Sem serviço",
       "project": "Sem projeto",
+      "app": "Sem aplicação",
       "contact": "Sem contato",
       "entidade": "Sem entidade responsável"
     },

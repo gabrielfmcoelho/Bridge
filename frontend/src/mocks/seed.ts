@@ -16,6 +16,7 @@ import type {
   ServiceRequest,
   RequestEvent,
   Contact,
+  AppDepSource,
 } from "@/lib/types";
 import type { Seed } from "./db";
 
@@ -919,8 +920,57 @@ function events(userList: User[]): RequestEvent[] {
   return out;
 }
 
+// catalog-parser's examples (shop-api, shop-web) plus one file that fails to parse.
+function appDeps(): AppDepSource[] {
+  const at = "2026-11-17T09:00:00Z";
+  const src = (id: number, path: string, commit: string): Omit<AppDepSource, "catalog"> => ({
+    gitlab_project_id: id, project_path: path, web_url: `https://gitlab.example.org/${path}`, ref: "main", commit_id: commit,
+    file_url: `https://gitlab.example.org/${path}/-/blob/main/catalog/dependencies.yml`, synced_at: at,
+  });
+  const corp = [{ name: "Example Corp", slug: "example-corp", type: "company" }];
+  return [
+    {
+      ...src(101, "example-corp/shop-api", "9f2c1e7a4b"),
+      catalog: {
+        ci: "shop-api", description: "Orders and payments API of the web shop",
+        owners: [{ name: "Jane Doe", email: "jane@example.org", username: "jdoe" }], entity: corp,
+        git: { type: "gitlab", host: "gitlab.example.org", path: "example-corp/shop-api" }, metadata: {},
+        components: [
+          { name: "api", category: "application", technology: "rest-api", protocol: "https", port: 8443, criticality: "high", description: "Public REST API" },
+          { name: "worker", category: "application", technology: "celery", criticality: "medium", description: "Sends order e-mails and settles payments" },
+          { name: "orders-db", category: "data", technology: "postgresql", criticality: "high", description: "Orders and payments tables" },
+        ],
+        dependencies: {
+          upstream: [
+            { ci: "payment-gateway", local_component: "worker", category: "service", technology: "rest-api", protocol: "https", port: 443, criticality: "high", description: "Card payments provider" },
+          ],
+          downstream: [
+            { ci: "shop-web", component: "frontend", local_component: "api" },
+            { ci: "bi-dashboard", local_component: "api" },
+          ],
+        },
+      },
+    },
+    {
+      ...src(102, "example-corp/shop-web", "3b81d0c2ee"),
+      catalog: {
+        ci: "shop-web", description: "Storefront single-page application",
+        owners: [{ name: "John Roe", email: "john@example.org", username: "jroe" }], entity: corp,
+        git: { type: "gitlab", host: "gitlab.example.org", path: "example-corp/shop-web" }, metadata: {},
+        components: [
+          { name: "frontend", category: "application", technology: "react", protocol: "https", port: 443, criticality: "high", description: "Storefront served by a CDN" },
+        ],
+        dependencies: { upstream: [{ ci: "shop-api", component: "api", local_component: "frontend" }], downstream: [] },
+      },
+    },
+    { ...src(103, "example-corp/legacy-reports", "77aa01bc3d"), catalog: null, parse_error: "yaml: line 12: mapping values are not allowed in this context" },
+  ];
+}
+
 export function seed(): Seed {
   const entidadeList = entidades();
+  const hostList = hosts();
+  const serviceList = services();
   const userList = users();
   // Every seeded offering carries a `global` grant, as B1's v85 migration will —
   // without it a fresh install would show an empty catalog to non-admins.
@@ -933,8 +983,8 @@ export function seed(): Seed {
     users: userList,
     actorId: 1,
     enums: enums(),
-    hosts: hosts(),
-    services: services(),
+    hosts: hostList,
+    services: serviceList,
     dns: dns(),
     projects: projects(),
     apiCatalogs: apiCatalogs(),
@@ -949,6 +999,13 @@ export function seed(): Seed {
       { id: 2, name: "Cluster SEAD 2", base_url: "https://pve2.sead.pi.gov.br:8006", token_id: "bridge@pve!sync", has_token: true, token: "mock", skip_verify: true, enabled: false, created_at: "2026-09-02T10:00:00Z", updated_at: "2026-09-02T10:00:00Z" },
     ],
     homePrefs: {},
+    appDeps: appDeps(),
+    appDepsSync: { running: false },
+    // shop-api (project 101) runs on the first host and is served by the first service.
+    appDepLinks: [
+      { ci_id: 101, ci: "shop-api", entity_type: "host", entity_id: hostList[0].id, sources: ["scan"], via: "example-corp/shop-api" },
+      { ci_id: 101, ci: "shop-api", entity_type: "service", entity_id: serviceList[0].id, sources: ["manual"] },
+    ],
   };
 }
 

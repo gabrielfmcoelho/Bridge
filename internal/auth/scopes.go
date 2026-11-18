@@ -36,6 +36,7 @@ var domainRules = map[string]string{
 	"/api/secrets":         "vault",
 	"/api/share-bundles":   "vault",
 	"/api/graph":           "inventory",
+	"/api/app-deps":        "inventory",
 	"/api/relations":       "inventory",
 	"/api/dashboard":       "inventory",
 	"/api/tags":            "inventory",

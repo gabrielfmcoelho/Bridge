@@ -3,6 +3,8 @@ package api
 import (
 	"net/http"
 
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -10,12 +12,15 @@ import (
 // pages group by (hosts by service, DNS by project, ...).
 type relationHandlers struct {
 	relations *store.RelationRepo
+	// db reads the application links (type "app", id = the CI's GitLab
+	// project id); nil leaves them out.
+	db *database.DB
 }
 
 // handleList godoc
 //
 //	@Summary		List entity relations
-//	@Description	Any role. Every link between visible inventory entities (host-service, dns-project, ...), used by list pages to group rows.
+//	@Description	Any role. Every link between visible inventory entities (host-service, dns-project, ...), used by list pages to group rows. Applications (app-deps CIs) appear as type "app" with the CI's GitLab project id.
 //	@Tags			relations
 //	@Produce		json
 //	@Param			page		query		int	false	"Page (1-based)"
@@ -28,6 +33,16 @@ func (h *relationHandlers) handleList(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		jsonServerError(w, r, "failed to list relations", err)
 		return
+	}
+	if h.db != nil {
+		links, err := appDepLinks(r, h.db, service.AppDepLinkFilter{})
+		if err != nil {
+			jsonServerError(w, r, "failed to list application links", err)
+			return
+		}
+		for _, l := range links {
+			rels = append(rels, store.Relation{A: "app", AID: int64(l.CIID), B: l.EntityType, BID: l.EntityID})
+		}
 	}
 	jsonPaged(w, r, rels)
 }

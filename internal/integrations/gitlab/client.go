@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -314,6 +315,32 @@ func (c *Client) GetRawFile(projectID int, filePath, ref string) ([]byte, error)
 	}
 	return c.get(fmt.Sprintf("/projects/%d/repository/files/%s/raw", projectID, encodeNamespacedPath(filePath)),
 		url.Values{"ref": {ref}})
+}
+
+// GetFile returns a file at ref ("" = HEAD) with the commit it was read at
+// (CommitID) and the last commit that changed it (LastCommitID). A missing
+// file or ref is a *StatusError with Code 404.
+func (c *Client) GetFile(projectID int, filePath, ref string) (*RepoFile, error) {
+	if ref == "" {
+		ref = "HEAD"
+	}
+	body, err := c.get(fmt.Sprintf("/projects/%d/repository/files/%s", projectID, encodeNamespacedPath(filePath)),
+		url.Values{"ref": {ref}})
+	if err != nil {
+		return nil, err
+	}
+	var f RepoFile
+	if err := json.Unmarshal(body, &f); err != nil {
+		return nil, err
+	}
+	if f.Encoding == "base64" {
+		raw, err := base64.StdEncoding.DecodeString(f.Content)
+		if err != nil {
+			return nil, fmt.Errorf("gitlab file %s: %w", filePath, err)
+		}
+		f.Content = string(raw)
+	}
+	return &f, nil
 }
 
 // SearchBlobs searches file contents in one project at ref ("" = the

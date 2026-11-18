@@ -1,0 +1,35 @@
+# Dependency catalog of the shop-web repository.
+ci: shop-web
+description: Storefront single-page application
+
+owners:
+  - name: John Roe
+    email: john@example.org
+    username: jroe
+
+entity:
+  - name: Example Corp
+    slug: example-corp
+    type: company
+
+git:
+  type: github
+  host: github.com
+  path: example-corp/shop-web
+
+components:
+  - name: frontend
+    category: application
+    technology: react
+    protocol: https
+    port: 443
+    criticality: high
+    description: Storefront served by a CDN
+
+dependencies:
+  upstream:
+    # mirrored by shop-api's downstream entry
+    - ci: shop-api
+      component: api
+      local_component: frontend
+  downstream: []

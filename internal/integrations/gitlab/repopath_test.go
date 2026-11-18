@@ -39,3 +39,13 @@ func TestRemoteHostPath(t *testing.T) {
 		}
 	}
 }
+
+func TestSplitGroups(t *testing.T) {
+	got := SplitGroups(" seadpi/2.-produtos/ ,\r\n,other\n\n")
+	if len(got) != 2 || got[0] != "seadpi/2.-produtos" || got[1] != "other" {
+		t.Fatalf("got %q", got)
+	}
+	if SplitGroups("  ") != nil {
+		t.Fatal("blank = no groups")
+	}
+}

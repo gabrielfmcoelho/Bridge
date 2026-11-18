@@ -6,6 +6,7 @@ import (
 
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/database"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/models"
+	"github.com/gabrielfmcoelho/ssh-config-manager/internal/service"
 	"github.com/gabrielfmcoelho/ssh-config-manager/internal/store"
 )
 
@@ -33,7 +34,7 @@ type graphEdge struct {
 // handleGraph godoc
 //
 //	@Summary		Inventory graph
-//	@Description	Any role. {"nodes": [graphNode], "edges": [graphEdge]} over visible hosts, DNS records, projects, services, APIs and databases; edges only between visible nodes.
+//	@Description	Any role. {"nodes": [graphNode], "edges": [graphEdge]} over visible hosts, DNS records, projects, services, APIs, databases and the applications (app-deps CIs, "app-<gitlab project id>") linked to them; edges only between visible nodes.
 //	@Tags			graph
 //	@Produce		json
 //	@Success		200	{object}	map[string]interface{}
@@ -211,6 +212,36 @@ func (h *graphHandlers) handleGraph(w http.ResponseWriter, r *http.Request) {
 	addEdges(links.ServiceProxies, serviceIDMap, serviceIDMap, "proxies to")
 	addEdges(links.HostProxies, hostIDMap, hostIDMap, "proxies to")
 	edges = append(edges, derivedProjectEdges(services, links, hostIDMap, dnsIDMap, projectIDMap)...)
+
+	// Applications (app-deps CIs): a node only when linked to a node above.
+	appLinks, err := appDepLinks(r, h.db, service.AppDepLinkFilter{})
+	if err != nil {
+		jsonErrorLogged(w, r, http.StatusInternalServerError, "failed to load graph", err)
+		return
+	}
+	appEnds := map[string]struct {
+		ids   map[int64]string
+		label string
+	}{
+		"host":    {hostIDMap, "runs on"},
+		"service": {serviceIDMap, "served by"},
+		"dns":     {dnsIDMap, "served at"},
+		"project": {projectIDMap, "part of"},
+	}
+	appNodes := map[int]bool{}
+	for _, l := range appLinks {
+		end := appEnds[l.EntityType]
+		dst, ok := end.ids[l.EntityID]
+		if !ok {
+			continue
+		}
+		nid := fmt.Sprintf("app-%d", l.CIID)
+		if !appNodes[l.CIID] {
+			appNodes[l.CIID] = true
+			nodes = append(nodes, graphNode{ID: nid, Type: "app", Label: l.CI, Data: map[string]any{"ci": l.CI}})
+		}
+		edges = append(edges, graphEdge{Source: nid, Target: dst, Label: end.label})
+	}
 
 	jsonOK(w, map[string]any{
 		"nodes": nodes,

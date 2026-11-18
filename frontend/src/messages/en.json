@@ -50,7 +50,129 @@
     "canvas": "Idea boards",
     "home": "Home",
     "vulnerabilities": "Vulnerabilities",
-    "databases": "Databases"
+    "databases": "Databases",
+    "appDeps": "App dependencies"
+  },
+  "appDeps": {
+    "title": "App dependencies",
+    "description": "What each application is made of and which systems it talks to, read from the catalog/dependencies.yml of every GitLab repository.",
+    "indicator": "{count} applications",
+    "syncedAgo": "synced {ago}",
+    "searchPlaceholder": "Search application, technology, owner…",
+    "filter": {
+      "criticality": "Criticality",
+      "allCriticalities": "All criticalities",
+      "links": "Links",
+      "linksAll": "All links",
+      "linksNoHost": "No host",
+      "linksNone": "Linked to nothing"
+    },
+    "tabReport": "Report",
+    "tabMap": "Map",
+    "loadError": "Could not load the dependency catalogs.",
+    "empty": "No catalog synced yet",
+    "emptyHint": "Sync reads catalog/dependencies.yml from every repository the GitLab service token reaches (or from the groups set in Settings › Integrations › GitLab).",
+    "openSettings": "GitLab settings",
+    "failed": {
+      "title": "Catalogs that failed to parse",
+      "description": "Found in the repository but not readable as YAML: fix the file and sync again."
+    },
+    "duplicates": "The same CI is declared by more than one repository; the first one is shown: {list}",
+    "noParsed": "No catalog could be read",
+    "noMatch": "No application matches the search or the filter.",
+    "criticality": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "legend": {
+      "external": "Not catalogued",
+      "arrow": "A → B: A depends on B"
+    },
+    "links": {
+      "empty": "This application declares no dependencies.",
+      "direction": "Direction",
+      "other": "Application",
+      "component": "Its component",
+      "local": "Local component",
+      "technology": "Technology",
+      "endpoint": "Endpoint",
+      "criticality": "Criticality",
+      "description": "Description",
+      "upstream": "Consumes",
+      "downstream": "Consumed by",
+      "notCatalogued": "No catalog in Bridge: an external system or a consumer",
+      "via": "via {via}"
+    },
+    "report": {
+      "expand": "Expand",
+      "ci": "Application",
+      "entity": "Entity",
+      "owners": "Owners",
+      "technologies": "Technologies",
+      "upstream": "Consumes",
+      "upstreamHint": "Systems this application depends on (upstream)",
+      "downstream": "Consumers",
+      "downstreamHint": "Systems that depend on this application (downstream)",
+      "criticality": "Criticality",
+      "repository": "Repository",
+      "expandRow": "Show the dependencies of {ci}",
+      "collapseRow": "Hide the dependencies of {ci}",
+      "openDiagram": "Open the diagram",
+      "inBridge": "In Bridge",
+      "inBridgeHint": "Hosts, services, DNS records and projects linked to the application"
+    },
+    "sync": {
+      "button": "Sync with GitLab",
+      "running": "Syncing…",
+      "done": "Sync finished: {found} catalogs in {repos} repositories ({failed} unreadable, {removed} removed)",
+      "error": "Sync failed",
+      "truncated": "GitLab's project list was cut short: catalogs of repositories not listed were kept.",
+      "errors": "Not read: {errors}"
+    },
+    "detail": {
+      "notFound": "Application {ci} not found",
+      "notFoundHint": "No synced catalog declares this CI. It may be an external system, or its repository has not been synced yet.",
+      "back": "Back to app dependencies",
+      "owners": "owners: {owners}",
+      "duplicate": "This CI is declared by more than one repository. Shown: {repo}; also in: {others}",
+      "links": "Dependencies",
+      "components": "Components",
+      "noComponents": "The catalog declares no components.",
+      "component": "Component",
+      "category": "Category",
+      "tabDependencies": "Dependencies",
+      "tabTopology": "Topology"
+    },
+    "graphNode": "Application",
+    "relations": {
+      "apps": "Applications"
+    },
+    "source": {
+      "manual": "manual",
+      "repo": "repository",
+      "scan": "found on host",
+      "group": "via group"
+    },
+    "entity": {
+      "host": "Hosts",
+      "service": "Services",
+      "dns": "DNS records",
+      "project": "Projects"
+    },
+    "manage": {
+      "open": "Manage application links",
+      "title": "Application links",
+      "hintCi": "Links derived from this repository (projeto and host/DNS GitLab links, checkouts the host scan found, a service's repository URL) appear on their own; remove them where they come from. Add here what Bridge can't derive.",
+      "hintEntity": "Applications linked through the GitLab repository appear on their own; remove them where they come from. Add here an application Bridge can't derive.",
+      "error": "Could not save the link.",
+      "none": "No application links yet.",
+      "remove": "Remove the link to {name}",
+      "derivedHint": "Derived from the repository: remove it at its source",
+      "type": "Type",
+      "application": "Application",
+      "add": "Link"
+    }
   },
   "atlas": {
     "apis": {
@@ -2120,6 +2242,8 @@
         "serviceAccessToken": "Service Access Token",
         "serviceTokenHint": "A Personal / Group / Project Access Token with read_api scope. Used for all REST calls — one token for every viewer.",
         "defaultBranch": "Default Branch (optional)",
+        "catalogGroups": "Groups with catalogs",
+        "catalogGroupsHint": "Groups (full path, one per line or comma-separated) whose repositories App dependencies reads catalog/dependencies.yml from, subgroups included. Empty: every project the service token is a member of.",
         "connectedAs": "Connected as {username}",
         "unknownUser": "(unknown)"
       },
@@ -4032,6 +4156,7 @@
       "dns": "DNS",
       "service": "Service",
       "project": "Project",
+      "app": "Application",
       "contact": "Contact",
       "entidade": "Responsible entidade"
     },
@@ -4040,6 +4165,7 @@
       "dns": "No DNS",
       "service": "No service",
       "project": "No project",
+      "app": "No application",
       "contact": "No contact",
       "entidade": "No responsible entidade"
     },

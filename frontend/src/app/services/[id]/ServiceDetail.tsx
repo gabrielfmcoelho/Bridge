@@ -17,7 +17,9 @@ import PageHeader from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import DetailSplit from "@/components/detail/DetailSplit";
 import TopologyPane from "@/components/detail/TopologyPane";
-import RelationsCard, { hostsGroup, dnsGroup, servicesGroup, projectsGroup } from "@/components/detail/RelationsCard";
+import RelationsCard, { appsGroup, hostsGroup, dnsGroup, servicesGroup, projectsGroup } from "@/components/detail/RelationsCard";
+import AppDepLinksButton from "@/components/appdeps/AppDepLinksManager";
+import { useAppDepLinks } from "@/hooks/useAppDepLinks";
 import IssuesBoard from "@/components/issues/IssuesBoard";
 import { ICON_PATHS } from "@/lib/icon-paths";
 import { getTimeAgo } from "@/lib/utils";
@@ -72,6 +74,7 @@ export default function ServiceDetail({ id }: { id: number }) {
   const telemetryEnabled = useTelemetryEnabled();
   const openVulns = useEntityVulnCount("service", data ? id : undefined);
   const { graph, loading: graphLoading } = useEntityGraph(data ? `service-${id}` : undefined, activeTab === "topology");
+  const { links: apps } = useAppDepLinks({ entity_type: "service", entity_id: id }, activeTab === "topology");
   const { data: linkedApis = [] } = useQuery({ ...linkedApisQuery({ service_id: id }), enabled: !!data });
   const isEngine = ["database", "cache"].includes(data?.service.service_kind ?? "") || data?.service.coolify_resource_type === "database";
   const { data: hostedDbs = [] } = useQuery({ ...linkedDatabasesQuery({ instance_service_id: id }), enabled: !!data && isEngine });
@@ -138,6 +141,7 @@ export default function ServiceDetail({ id }: { id: number }) {
     { ...servicesGroup(dependsOn, t), title: t("service.dependsOn") },
     { ...servicesGroup(dependents, t), title: t("service.dependents") },
     projectsGroup(project ? [project] : [], t),
+    appsGroup(apps, t),
   ];
 
   return (
@@ -185,7 +189,7 @@ export default function ServiceDetail({ id }: { id: number }) {
           {activeTab === "topology" && (
             <TopologyPane graph={graph} loading={graphLoading} t={t}
               hasRelations={relationGroups.some((g) => g.rows.length > 0)}
-              relations={<RelationsCard groups={relationGroups} t={t} />} />
+              relations={<RelationsCard groups={relationGroups} t={t} controls={canEdit ? <AppDepLinksButton entity={{ type: "service", id }} /> : undefined} />} />
           )}
 
           {activeTab === "credentials" && <CredentialsTab serviceId={id} isAdmin={isAdmin} t={t} />}

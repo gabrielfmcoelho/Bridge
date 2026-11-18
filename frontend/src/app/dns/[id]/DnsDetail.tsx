@@ -7,6 +7,8 @@ import { dnsAPI, hostsAPI, servicesAPI, projectsAPI, globalIssuesAPI } from "@/l
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntityGraph } from "@/hooks/useEntityGraph";
+import { useAppDepLinks } from "@/hooks/useAppDepLinks";
+import AppDepLinksButton from "@/components/appdeps/AppDepLinksManager";
 import PageShell from "@/components/layout/PageShell";
 import SituacaoText from "@/components/ui/SituacaoText";
 import CardIndicator from "@/components/inventory/CardIndicator";
@@ -22,7 +24,7 @@ import CertificateCard from "./_components/CertificateCard";
 import ObservationCard from "./_components/ObservationCard";
 import DetailSplit from "@/components/detail/DetailSplit";
 import TopologyPane from "@/components/detail/TopologyPane";
-import RelationsCard, { hostsGroup, servicesGroup, projectsGroup, routesGroups } from "@/components/detail/RelationsCard";
+import RelationsCard, { appsGroup, hostsGroup, servicesGroup, projectsGroup, routesGroups } from "@/components/detail/RelationsCard";
 import IssuesBoard from "@/components/issues/IssuesBoard";
 import EmptyState from "@/components/ui/EmptyState";
 import { ICON_PATHS } from "@/lib/icon-paths";
@@ -61,6 +63,7 @@ export default function DnsDetail({ id }: { id: number }) {
   const dns = data?.dns_record;
   const responsaveis = data?.responsaveis || [];
   const { graph, loading: graphLoading } = useEntityGraph(data ? `dns-${id}` : undefined, activeTab === "topology");
+  const { links: apps } = useAppDepLinks({ entity_type: "dns", entity_id: id }, activeTab === "topology");
 
   const linkedHosts = useMemo(() => {
     if (!data?.host_ids || !allHosts.length) return [];
@@ -161,11 +164,11 @@ export default function DnsDetail({ id }: { id: number }) {
           {activeTab === "vulns" && <EntityVulnsTab entityType="dns" entityId={id} />}
 
           {activeTab === "topology" && (() => {
-            const groups = [hostsGroup(linkedHosts, t), servicesGroup(linkedServices, t), ...routesGroups(data?.web_routes ?? [], "dns", t), projectsGroup(linkedProjects, t)];
+            const groups = [hostsGroup(linkedHosts, t), servicesGroup(linkedServices, t), ...routesGroups(data?.web_routes ?? [], "dns", t), projectsGroup(linkedProjects, t), appsGroup(apps, t)];
             return (
               <TopologyPane graph={graph} loading={graphLoading} t={t}
                 hasRelations={groups.some((g) => g.rows.length > 0)}
-                relations={<RelationsCard groups={groups} t={t} />} />
+                relations={<RelationsCard groups={groups} t={t} controls={canEdit ? <AppDepLinksButton entity={{ type: "dns", id }} /> : undefined} />} />
             );
           })()}
 

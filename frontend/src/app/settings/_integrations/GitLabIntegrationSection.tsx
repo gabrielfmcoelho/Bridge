@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { integrationsAPI } from "@/lib/api";
 import Input from "@/components/ui/Input";
+import Textarea from "@/components/ui/Textarea";
 import Toggle from "@/components/ui/Toggle";
 import SectionCard from "@/components/ui/SectionCard";
 import IntegrationCard from "./IntegrationCard";
@@ -76,6 +77,14 @@ export default function GitLabIntegrationSection({ ssoActive }: { ssoActive: boo
               value={f.form.gitlab_code_default_ref ?? ""}
               onChange={(e) => f.set("gitlab_code_default_ref", e.target.value)}
               placeholder="main"
+            />
+            <Textarea
+              label={t("settings.integrations.gitlab.catalogGroups")}
+              value={f.form.gitlab_catalog_groups ?? ""}
+              onChange={(e) => f.set("gitlab_catalog_groups", e.target.value)}
+              placeholder="seadpi/2.-produtos/datalakehouse"
+              hint={t("settings.integrations.gitlab.catalogGroupsHint")}
+              rows={2}
             />
             {/* Tests what is typed; an untouched (masked) token falls back to the stored one. */}
             <TestConnectionButton

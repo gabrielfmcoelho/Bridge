@@ -51,6 +51,7 @@ var integrationGroups = map[string][]string{
 		"gitlab_integration_enabled",
 		"gitlab_code_service_token",
 		"gitlab_code_default_ref",
+		"gitlab_catalog_groups",
 	},
 	"keycloak": {
 		"auth_keycloak_base_url",

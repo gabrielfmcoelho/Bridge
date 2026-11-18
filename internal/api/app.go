@@ -100,7 +100,7 @@ func newApp(db *database.DB, configPath string) *App {
 		tool:                &toolHandlers{db: db},
 		contact:             &contactHandlers{contacts: store.NewContactRepo(db.SQL)},
 		canvas:              &canvasHandlers{canvases: store.NewCanvasRepo(db.SQL)},
-		relation:            &relationHandlers{relations: store.NewRelationRepo(db.SQL)},
+		relation:            &relationHandlers{relations: store.NewRelationRepo(db.SQL), db: db},
 		importH:             &importHandlers{db: db},
 		backup:              &backupHandlers{db: db},
 		globalIssue:         &globalIssueHandlers{db: db},

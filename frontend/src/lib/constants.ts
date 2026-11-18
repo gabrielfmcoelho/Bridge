@@ -101,6 +101,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/atlas/topology", label: "nav.topology", icon: "Network" },
       { href: "/atlas/apis", label: "nav.apis", icon: "Plug" },
       { href: "/atlas/databases", label: "nav.databases", icon: "Database" },
+      { href: "/atlas/app-deps", label: "nav.appDeps", icon: "Workflow" },
     ],
   },
   {

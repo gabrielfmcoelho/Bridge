@@ -70,3 +70,12 @@ test("groups: two or more visible services sharing the key", () => {
   // Hidden siblings never form a group.
   assert.deepEqual(buildTopologyView(graph, { focus: "service-1" }).groups, []);
 });
+
+test("application (app-deps CI): shown around a host it runs on; its own focus shows its assets", () => {
+  const g: GraphData = {
+    nodes: [...graph.nodes, node("app-7", { ci: "shop-api" })],
+    edges: [...graph.edges, edge("app-7", "host-2"), edge("app-7", "service-9"), edge("app-7", "project-1")],
+  };
+  assert.ok(ids(buildTopologyView(g, { focus: "host-2" })).includes("app-7"));
+  assert.deepEqual(ids(buildTopologyView(g, { focus: "app-7" })), ["app-7", "host-2", "project-1", "service-9"]);
+});

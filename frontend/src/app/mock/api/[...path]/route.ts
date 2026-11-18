@@ -15,6 +15,7 @@ import { extractJSON, coerceToSchema, coercePriority } from "@/lib/aiDraft";
 import type {
   Offering, ServiceRequest, RequestEvent, RequestStatus, CatalogHit, AssetGrantsInput,
   Host, Service, DNSRecord, Project, ApiCatalog, ExternalTool, Database, OSUpdateRun, OSUpdateResult, ReleaseReport, RiskWarning, WebRoute,
+  AppDepAssetLink,
 } from "@/lib/types";
 import {
   db, resetDB, currentUser, switchUser, requestVisible, abilitiesForRequest,
@@ -833,6 +834,47 @@ async function dispatch(method: string, request: NextRequest, segs: string[]): P
     return record ? json(mockCertScan(record)) : notFound("DNS record not found");
   }
   if (method === "GET" && p === "projects") return json(paginate(db.projects, qs.get("page"), qs.get("per_page")));
+  // ── App dependencies (catalogs "synced" from GitLab) ─────────────────
+  if (method === "GET" && p === "app-deps") return json(paginate(db.appDeps, qs.get("page"), qs.get("per_page")));
+  if (p === "app-deps/sync") {
+    if (method === "POST") {
+      if (!db.appDepsSync.running) db.appDepsSync = { running: true, started_at: new Date().toISOString() };
+      return json(db.appDepsSync, 202);
+    }
+    if (method === "GET") {
+      // The run ends on the first poll after it started.
+      if (db.appDepsSync.running) {
+        const parsed = db.appDeps.filter((s) => s.catalog).length;
+        db.appDepsSync = {
+          running: false, started_at: db.appDepsSync.started_at, finished_at: new Date().toISOString(),
+          result: { repos: 12, found: db.appDeps.length, parsed, failed: db.appDeps.length - parsed, removed: 0, truncated: false, errors: [] },
+        };
+      }
+      return json(db.appDepsSync);
+    }
+  }
+  if (p === "app-deps/links" && method === "GET") {
+    const ci = qs.get("ci"), type = qs.get("entity_type"), id = Number(qs.get("entity_id"));
+    const rows = db.appDepLinks.filter((l) => (!ci || l.ci === ci) && (!type || (l.entity_type === type && l.entity_id === id)));
+    return json(paginate(rows, qs.get("page"), qs.get("per_page")));
+  }
+  if (p === "app-deps/links" && method === "POST") {
+    const b = await readJSON<{ ci: string; entity_type: AppDepAssetLink["entity_type"]; entity_id: number }>(request);
+    const src = db.appDeps.find((s) => s.catalog?.ci === b.ci);
+    if (!src) return notFound("application not found");
+    const prev = db.appDepLinks.find((l) => l.ci === b.ci && l.entity_type === b.entity_type && l.entity_id === b.entity_id);
+    if (prev) { if (!prev.sources.includes("manual")) prev.sources = ["manual", ...prev.sources]; }
+    else db.appDepLinks.push({ ci_id: src.gitlab_project_id, ci: b.ci, entity_type: b.entity_type, entity_id: b.entity_id, sources: ["manual"] });
+    return json(b, 201);
+  }
+  if (segs[0] === "app-deps" && segs[1] === "links" && segs.length === 5 && method === "DELETE") {
+    const [, , ci, type, id] = segs;
+    const l = db.appDepLinks.find((x) => x.ci === decodeURIComponent(ci) && x.entity_type === type && x.entity_id === Number(id) && x.sources.includes("manual"));
+    if (!l) return notFound("link not found");
+    l.sources = l.sources.filter((s) => s !== "manual");
+    db.appDepLinks = db.appDepLinks.filter((x) => x.sources.length > 0);
+    return new Response(null, { status: 204 });
+  }
   // ── Atlas databases ──────────────────────────────────────────────────
   if (segs[0] === "databases") {
     const live = () => db.databases.filter((d) => !d.deleted_at);

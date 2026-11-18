@@ -444,7 +444,7 @@ export interface EnumOption {
 
 export interface GraphNode {
   id: string;
-  type: "host" | "service" | "dns" | "project" | "api" | "database";
+  type: "host" | "service" | "dns" | "project" | "api" | "database" | "app";
   label: string;
   status?: string;
   /** Service nodes may carry container_name, source, coolify_project,
@@ -1919,4 +1919,91 @@ export interface ScanLoginRef {
   locator?: string;
   user?: string;
   db_name?: string;
+}
+
+// ── App dependencies (catalog/dependencies.yml read from GitLab) ─────────
+// The catalog-parser schema; Bridge only reads it (no linting).
+
+export interface AppDepComponent {
+  name: string;
+  category: string;
+  technology: string;
+  protocol?: string;
+  port?: number;
+  criticality: string;
+  description: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** One end of a link: ci + component name the OTHER end, local_component this CI's end.
+ *  An external system (no catalog) has no component and carries its traits inline. */
+export interface AppDepLink {
+  ci: string;
+  component?: string;
+  local_component?: string;
+  via?: string;
+  category?: string;
+  technology?: string;
+  protocol?: string;
+  port?: number;
+  criticality?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AppDepCatalog {
+  ci: string;
+  description: string;
+  owners: { name: string; email: string; username: string }[];
+  entity: { name: string; slug: string; type: string }[];
+  git: { type: string; host: string; path: string } | null;
+  metadata: Record<string, unknown>;
+  components: AppDepComponent[];
+  dependencies: { upstream: AppDepLink[]; downstream: AppDepLink[] };
+}
+
+/** GET /api/app-deps: one GitLab repository's catalog as last synced. catalog is null when parse_error is set. */
+export interface AppDepSource {
+  gitlab_project_id: number;
+  project_path: string;
+  web_url: string;
+  ref: string;
+  commit_id: string;
+  file_url: string;
+  catalog: AppDepCatalog | null;
+  parse_error?: string;
+  synced_at: string;
+}
+
+export interface AppDepSyncResult {
+  repos: number;
+  found: number;
+  parsed: number;
+  failed: number;
+  removed: number;
+  truncated: boolean;
+  errors: string[];
+}
+
+export interface AppDepSyncStatus {
+  running: boolean;
+  started_at?: string;
+  finished_at?: string;
+  result?: AppDepSyncResult;
+  error?: string;
+}
+
+export type AppDepEntityType = "host" | "dns" | "service" | "project";
+export type AppDepLinkSource = "manual" | "repo" | "scan" | "group";
+
+/** GET /api/app-deps/links: one application (CI) ↔ asset link. ci_id is the
+ *  CI's GitLab project id (how relations and the graph key it); sources says
+ *  where it comes from, most specific first ("manual" = removable here). */
+export interface AppDepAssetLink {
+  ci_id: number;
+  ci: string;
+  entity_type: AppDepEntityType;
+  entity_id: number;
+  sources: AppDepLinkSource[];
+  via?: string;
 }

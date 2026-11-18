@@ -401,7 +401,7 @@ export default function HostsPage() {
             actions={
               <div className="flex items-center gap-1.5">
                 {hosts.length > 0 && (
-                  <GroupByMenu options={["service", "dns", "project", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
+                  <GroupByMenu options={["service", "dns", "project", "app", "contact", "entidade"]} value={groupBy} onChange={setGroupBy} />
                 )}
                 {bulkActions.length > 0 && (
                   <DropdownMenu trigger={<ToolbarActionButton icon={ICON_PATHS.bolt} label={t("host.bulkActions")} hideLabel="md" />}>

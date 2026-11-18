@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { relationsAPI, hostsAPI, dnsAPI, servicesAPI, projectsAPI, contactsAPI, entidadesAPI } from "@/lib/api";
+import { relationsAPI, hostsAPI, dnsAPI, servicesAPI, projectsAPI, contactsAPI, entidadesAPI, appDepsAPI } from "@/lib/api";
 import { groupItems, type GroupEntity, type GroupItemEntity, type ItemGroup } from "@/lib/grouping";
 import { useLocale } from "@/contexts/LocaleContext";
 
@@ -14,6 +14,8 @@ const NAME_SOURCES: Record<GroupEntity, () => Promise<{ id: number; name: string
   project: () => projectsAPI.list().then((l) => l.map((p) => ({ id: p.id, name: p.name }))),
   contact: () => contactsAPI.list().then((l) => l.map((c) => ({ id: c.id, name: c.name }))),
   entidade: () => entidadesAPI.list().then((l) => l.map((e) => ({ id: e.id, name: e.name }))),
+  // A CI's id is its catalog's GitLab project id (what /api/relations uses).
+  app: () => appDepsAPI.list().then((l) => l.flatMap((s) => (s.catalog ? [{ id: s.gitlab_project_id, name: s.catalog.ci }] : []))),
 };
 
 /**

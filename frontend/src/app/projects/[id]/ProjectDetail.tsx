@@ -7,6 +7,8 @@ import { projectsAPI, issuesAPI, integrationsAPI, hostsAPI, dnsAPI, projectEmbed
 import { useLocale } from "@/contexts/LocaleContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntityGraph } from "@/hooks/useEntityGraph";
+import { useAppDepLinks } from "@/hooks/useAppDepLinks";
+import AppDepLinksButton from "@/components/appdeps/AppDepLinksManager";
 import PageShell from "@/components/layout/PageShell";
 import SituacaoText from "@/components/ui/SituacaoText";
 import CardIndicator from "@/components/inventory/CardIndicator";
@@ -17,7 +19,7 @@ import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import DetailSplit from "@/components/detail/DetailSplit";
 import TopologyPane from "@/components/detail/TopologyPane";
-import RelationsCard, { hostsGroup, dnsGroup, servicesGroup } from "@/components/detail/RelationsCard";
+import RelationsCard, { appsGroup, hostsGroup, dnsGroup, servicesGroup } from "@/components/detail/RelationsCard";
 import IssuesBoard from "@/components/issues/IssuesBoard";
 import { useFlag } from "@/contexts/FlagContext";
 import ProjectForm from "../ProjectForm";
@@ -62,6 +64,7 @@ export default function ProjectDetail({ id }: { id: number }) {
   const fetchIssues = () => issuesAPI.listByProject(id);
   const { data: issues = [] } = useQuery({ queryKey: ["issues", "project", id], queryFn: fetchIssues, enabled: !!data });
   const { graph, loading: graphLoading } = useEntityGraph(data ? `project-${id}` : undefined, activeTab === "topology");
+  const { links: apps } = useAppDepLinks({ entity_type: "project", entity_id: id }, activeTab === "topology");
   // Names for the relation rows (cached from the inventory pages).
   const { data: allHosts = [] } = useQuery({ queryKey: ["hosts"], queryFn: () => hostsAPI.list(), enabled: activeTab === "topology" });
   const { data: allDns = [] } = useQuery({ queryKey: ["dns"], queryFn: dnsAPI.list, enabled: activeTab === "topology" });
@@ -157,11 +160,12 @@ export default function ProjectDetail({ id }: { id: number }) {
                 servicesGroup(data.services || [], t),
                 hostsGroup(allHosts.filter((h) => data.host_ids?.includes(h.id)), t),
                 dnsGroup(allDns.filter((d) => data.dns_ids?.includes(d.id)), t),
+                appsGroup(apps, t),
               ];
               return (
                 <TopologyPane graph={graph} loading={graphLoading} t={t}
                   hasRelations={groups.some((g) => g.rows.length > 0)}
-                  relations={<RelationsCard groups={groups} t={t} />} />
+                  relations={<RelationsCard groups={groups} t={t} controls={canEdit ? <AppDepLinksButton entity={{ type: "project", id }} /> : undefined} />} />
               );
             })()}
             {activeTab === "issues" && (

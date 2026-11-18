@@ -29,6 +29,8 @@ import ProjectNode from "./nodes/ProjectNode";
 import ApiNode from "./nodes/ApiNode";
 import DatabaseNode from "./nodes/DatabaseNode";
 import GroupNode from "./nodes/GroupNode";
+import AppNode from "./nodes/AppNode";
+import { appDepsHref } from "@/lib/appDeps";
 
 const nodeTypes = {
   host: HostNode,
@@ -37,6 +39,7 @@ const nodeTypes = {
   project: ProjectNode,
   api: ApiNode,
   database: DatabaseNode,
+  app: AppNode,
   stackGroup: GroupNode,
 };
 
@@ -49,8 +52,10 @@ const GROUP_PAD_TOP = 44;
 // Desired rank: project at top (0), APIs and services below, dns, host at bottom.
 // An API sits on its services' rank: it is served by them, not above them.
 // A database sits below the services that consume it, beside the DNS rank.
+// An application (app-deps CI) sits with the projects: above what runs it.
 const RANK_ORDER: Record<string, number> = {
   project: 0,
+  app: 0,
   api: 1,
   service: 1,
   database: 2,
@@ -223,6 +228,9 @@ function Canvas({ nodes: initialNodes, edges: initialEdges }: { nodes: Node[]; e
         case "database":
           router.push(`/atlas/databases/${id}`);
           break;
+        case "app":
+          if (node.data.ci) router.push(appDepsHref(node.data.ci as string));
+          break;
       }
     },
     [router]
@@ -259,6 +267,7 @@ function Canvas({ nodes: initialNodes, edges: initialEdges }: { nodes: Node[]; e
             case "project": return "var(--warning)";
             case "api": return "var(--rose)";
             case "database": return "var(--info)";
+            case "app": return "var(--text-secondary)";
             case "stackGroup": return "transparent";
             default: return "var(--text-faint)";
           }

@@ -7,8 +7,9 @@ import Badge from "@/components/ui/Badge";
 import Icon from "@/components/ui/Icon";
 import Lozenge from "@/components/ui/Lozenge";
 import { RowGroup, ListRow } from "@/components/ui/RowList";
-import { ICON_PATHS } from "@/lib/icon-paths";
-import type { WebRoute } from "@/lib/types";
+import { ICON_PATHS, NAV_ICONS } from "@/lib/icon-paths";
+import { appDepsHref, linkSourceKey } from "@/lib/appDeps";
+import type { AppDepAssetLink, WebRoute } from "@/lib/types";
 
 type T = (k: string) => string;
 
@@ -24,12 +25,13 @@ export interface Relation {
 }
 export interface RelationGroup { title: string; rows: Relation[] }
 
-/** One card, grouped flush rows: what an asset is linked to. Empty groups drop out. */
-export default function RelationsCard({ groups, t }: { groups: RelationGroup[]; t: T }) {
+/** One card, grouped flush rows: what an asset is linked to. Empty groups drop out.
+ *  `controls` sits in the header (e.g. managing application links). */
+export default function RelationsCard({ groups, t, controls }: { groups: RelationGroup[]; t: T; controls?: ReactNode }) {
   const shown = groups.filter((g) => g.rows.length > 0);
   const count = shown.reduce((n, g) => n + g.rows.length, 0);
   return (
-    <SectionCard as="h3" title={t("topology.relations")} count={count} body="flush" empty={count === 0 ? t("topology.noRelations") : undefined}>
+    <SectionCard as="h3" title={t("topology.relations")} count={count} body="flush" controls={controls} empty={count === 0 ? t("topology.noRelations") : undefined}>
       {shown.map((g) => (
         <RowGroup key={g.title} title={g.title}>
           {g.rows.map((r) => (
@@ -83,6 +85,15 @@ export const projectsGroup = (projects: { id: number; name: string; situacao?: s
   rows: projects.map((p) => ({
     key: `p${p.id}`, href: `/projects/${p.id}`, icon: ICON_PATHS.folder, tone: "var(--warning)",
     label: p.name, trailing: p.situacao ? <SituacaoText situacao={p.situacao} /> : undefined,
+  })),
+});
+
+/** Applications (app-deps CIs) an asset is linked to, each with where the link comes from. */
+export const appsGroup = (links: AppDepAssetLink[], t: T): RelationGroup => ({
+  title: t("appDeps.relations.apps"),
+  rows: links.map((l) => ({
+    key: `a${l.ci_id}`, href: appDepsHref(l.ci), icon: NAV_ICONS.Workflow, tone: "var(--text-secondary)", label: l.ci, mono: true,
+    trailing: <Lozenge>{t(linkSourceKey(l))}</Lozenge>,
   })),
 });
 

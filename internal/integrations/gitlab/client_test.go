@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -211,5 +212,28 @@ func TestListContributorsRepoVazio(t *testing.T) {
 		if err != nil || len(got) != 0 {
 			t.Fatalf("id=%d got=%v err=%v, want empty", id, got, err)
 		}
+	}
+}
+
+func TestGetFileDecodesAndKeepsCommit(t *testing.T) {
+	c := fakeGitLab(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.EscapedPath() == "/api/v4/projects/7/repository/files/catalog%2Fmissing.yml" {
+			http.Error(w, `{"message":"404 File Not Found"}`, http.StatusNotFound)
+			return
+		}
+		if r.URL.EscapedPath() != "/api/v4/projects/7/repository/files/catalog%2Fdependencies.yml" || r.URL.Query().Get("ref") != "main" {
+			t.Errorf("unexpected request %s", r.URL.RequestURI())
+		}
+		// "ci: shop-api\n" in base64
+		_, _ = w.Write([]byte(`{"file_path":"catalog/dependencies.yml","ref":"main","encoding":"base64","content":"Y2k6IHNob3AtYXBpCg==","commit_id":"abc","last_commit_id":"def"}`))
+	})
+	f, err := c.GetFile(7, "catalog/dependencies.yml", "main")
+	if err != nil || f.Content != "ci: shop-api\n" || f.CommitID != "abc" || f.LastCommitID != "def" {
+		t.Fatalf("got %+v, %v", f, err)
+	}
+	_, err = c.GetFile(7, "catalog/missing.yml", "main")
+	var se *StatusError
+	if !errors.As(err, &se) || se.Code != http.StatusNotFound {
+		t.Fatalf("missing file: got %v, want a 404 StatusError", err)
 	}
 }

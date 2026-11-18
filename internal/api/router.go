@@ -91,6 +91,7 @@ func NewRouter(db *database.DB, configPath string) http.Handler {
 	apiCatalogH := &apiCatalogHandlers{db: db, allowPrivateFetch: atlasAllowPrivateFetch()}
 	apiCatalogH.registerRoutes(rr)                 // /api/api-catalog/*
 	(&databaseHandlers{db: db}).registerRoutes(rr) // /api/databases/*
+	(&appDepsHandlers{db: db}).registerRoutes(rr)  // /api/app-deps/*: catalogs read from GitLab
 	app.apiKey.registerRoutes(rr)                  // /api/api-catalog/{id}/keys*, /key-management*
 
 	// Share bundles (Phase D). Authenticated owner routes + a public,

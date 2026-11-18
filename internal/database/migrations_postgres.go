@@ -2276,4 +2276,38 @@ var migrationsPostgres = []string{
 	CREATE INDEX IF NOT EXISTS web_routes_target_addr_idx ON web_routes (target_addr);
 	CREATE INDEX IF NOT EXISTS web_routes_target_host_idx ON web_routes (target_host_id);
 	CREATE INDEX IF NOT EXISTS web_routes_dns_idx ON web_routes (dns_id);`,
+
+	// Version 135: app dependencies — the catalog/dependencies.yml of each
+	// GitLab repository, as last synced (service.AppDepsService). Sync-owned:
+	// a 404 removes the row, a read error keeps it. ci is NULL when the file
+	// failed to parse. gitlab_catalog_groups narrows the sync to those groups
+	// ('' = every project the service token is a member of).
+	`CREATE TABLE IF NOT EXISTS app_dep_catalogs (
+		gitlab_project_id INT PRIMARY KEY,
+		project_path      TEXT NOT NULL,
+		web_url           TEXT NOT NULL DEFAULT '',
+		ref               TEXT NOT NULL DEFAULT '',
+		commit_id         TEXT NOT NULL DEFAULT '',
+		ci                TEXT,
+		catalog           JSONB,
+		parse_error       TEXT NOT NULL DEFAULT '',
+		synced_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+	);
+	CREATE INDEX IF NOT EXISTS app_dep_catalogs_ci_idx ON app_dep_catalogs (ci);
+	INSERT INTO app_settings (key, value) VALUES ('gitlab_catalog_groups', '') ON CONFLICT DO NOTHING;`,
+
+	// Version 136: links an editor adds between an application (a CI of
+	// app_dep_catalogs, by name) and a host, DNS record, service or projeto.
+	// The links derived from the CI's GitLab repository are not stored:
+	// service.AppDepLinks computes them on every read. A link to a trashed or
+	// deleted asset is kept here and dropped on read.
+	`CREATE TABLE IF NOT EXISTS app_dep_links (
+		ci          TEXT NOT NULL,
+		entity_type TEXT NOT NULL CHECK (entity_type IN ('host','dns','service','project')),
+		entity_id   BIGINT NOT NULL,
+		created_by  BIGINT REFERENCES users(id) ON DELETE SET NULL,
+		created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+		PRIMARY KEY (ci, entity_type, entity_id)
+	);
+	CREATE INDEX IF NOT EXISTS app_dep_links_entity_idx ON app_dep_links (entity_type, entity_id);`,
 }
