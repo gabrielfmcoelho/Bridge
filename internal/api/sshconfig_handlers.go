@@ -523,8 +523,10 @@ func (h *sshHandlers) handleDockerLogsApplyRotation(w http.ResponseWriter, r *ht
 		return
 	}
 	if !ok {
-		jsonError(w, http.StatusBadRequest, "host has no stored password — required to elevate for /etc/docker/daemon.json write")
-		return
+		if password = sudoSecret(host, ""); password == "" {
+			jsonError(w, http.StatusBadRequest, "host has no stored password — required to elevate for /etc/docker/daemon.json write")
+			return
+		}
 	}
 
 	method, auth, ok := h.resolveAuth(w, host, "")
@@ -750,6 +752,16 @@ func (h *sshHandlers) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// sudoSecret is what a root operation elevates with: the host's stored
+// password, or sshtest.NoPassword when it has none and its scan found that
+// root needs none (hosts.sudo_nopasswd). "" = neither: it cannot elevate.
+func sudoSecret(host *models.Host, stored string) string {
+	if stored == "" && host.SudoNoPasswd {
+		return sshtest.NoPassword
+	}
+	return stored
+}
+
 // handleSetupSudoNopasswd configures passwordless sudo for the remote host's user.
 //
 //	@Summary		Configure NOPASSWD sudo for the host user
@@ -779,7 +791,7 @@ func (h *sshHandlers) handleSetupSudoNopasswd(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
-	password := auth.Password()
+	password := sudoSecret(host, auth.Password())
 	if password == "" {
 		jsonError(w, http.StatusBadRequest, "stored password required for sudo -S")
 		return
@@ -876,7 +888,7 @@ func (h *sshHandlers) handleCreateRemoteUser(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	password := auth.Password()
+	password := sudoSecret(host, auth.Password())
 	if password == "" {
 		jsonError(w, http.StatusBadRequest, "stored password required for sudo")
 		return
@@ -969,7 +981,7 @@ func (h *sshHandlers) handleDeleteRemoteUser(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	password := auth.Password()
+	password := sudoSecret(host, auth.Password())
 	if password == "" {
 		jsonError(w, http.StatusBadRequest, "stored password required for sudo")
 		return
@@ -1048,7 +1060,7 @@ func (h *sshHandlers) handleDockerSetup(w http.ResponseWriter, r *http.Request) 
 	}
 	defer client.Close()
 
-	status, opErr := sshtest.CheckAndFixDockerGroup(client, user, auth.Password(), req.Fix)
+	status, opErr := sshtest.CheckAndFixDockerGroup(client, user, sudoSecret(host, auth.Password()), req.Fix)
 	if opErr != nil {
 		s := "failed"
 		host.DockerGroupStatus = &s
@@ -1131,7 +1143,7 @@ func (h *sshHandlers) handleNginxCleanup(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	password := auth.Password()
+	password := sudoSecret(host, auth.Password())
 	if password == "" {
 		jsonError(w, http.StatusBadRequest, "stored password required for sudo operations")
 		return
@@ -1212,7 +1224,7 @@ func (h *sshHandlers) handleGrafanaAgentSetup(w http.ResponseWriter, r *http.Req
 	if !ok {
 		return
 	}
-	password := auth.Password()
+	password := sudoSecret(host, auth.Password())
 	if password == "" {
 		jsonError(w, http.StatusBadRequest, "stored password required for agent install (uses sudo)")
 		return
@@ -1751,6 +1763,14 @@ func (h *sshHandlers) recordScan(ctx context.Context, host *models.Host, vmInfo 
 	// whoever ran the scan (a job: the system actor). vmInfo keeps only
 	// {{secret:<id>}} — the stored scan and the response are both built from
 	// it — and a value the vault didn't take is blanked anyway.
+	// Whether root needs a password here: what lets later root operations run
+	// on a host with no stored password (sudoSecret).
+	if err := store.NewHostRepo(h.db.SQL).SetSudoNoPasswd(ctx, host.ID, vmInfo.SudoNoPasswd); err != nil {
+		log.Printf("[ssh] scan host=%s: sudo_nopasswd not stored: %v", host.OficialSlug, err)
+	} else {
+		host.SudoNoPasswd = vmInfo.SudoNoPasswd
+	}
+
 	var actor int64
 	if u := auth.UserFromContext(ctx); u != nil {
 		actor = u.ID

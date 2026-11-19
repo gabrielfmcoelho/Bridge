@@ -332,7 +332,7 @@ func RunAsRoot(client *ssh.Client, p Privilege, script string) (string, error) {
 	switch {
 	case p.User == "root":
 		return RunScript(client, script)
-	case p.Password != "":
+	case p.feedsPassword():
 		return RunPrivilegedScript(client, p.Password, script)
 	}
 	b64 := base64.StdEncoding.EncodeToString([]byte(script))

@@ -267,7 +267,8 @@ func (h *sshHandlers) handleRunCustomOp(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	if op.UseSudo && auth.Password() == "" {
+	password := sudoSecret(host, auth.Password())
+	if op.UseSudo && password == "" {
 		jsonError(w, http.StatusBadRequest, "stored password required for this operation (uses sudo)")
 		return
 	}
@@ -281,7 +282,7 @@ func (h *sshHandlers) handleRunCustomOp(w http.ResponseWriter, r *http.Request) 
 	var output string
 	var runErr error
 	if op.UseSudo {
-		output, runErr = sshtest.RunPrivilegedScript(client, auth.Password(), script)
+		output, runErr = sshtest.RunPrivilegedScript(client, password, script)
 	} else {
 		output, runErr = sshtest.RunScript(client, script)
 	}
