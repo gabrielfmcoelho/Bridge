@@ -120,6 +120,10 @@ type VMInfo struct {
 	// container services offline. Docker simply not being installed counts as
 	// known-empty.
 	ContainersKnown   bool               `json:"containers_known"`
+	// SudoNoPasswd: the login user reaches root with no password
+	// (noPasswdProbeCmd). Kept on the host (hosts.sudo_nopasswd), where it lets
+	// root operations run on a host with no stored password.
+	SudoNoPasswd bool `json:"sudo_nopasswd"`
 	Warnings          []string           `json:"warnings,omitempty"`
 	ProcessDetails    []ProcessDetail    `json:"process_details,omitempty"`
 	SSHKeys           []SSHKeyInfo       `json:"ssh_keys,omitempty"`
@@ -632,18 +636,6 @@ func runSudoCmd(client *ssh.Client, password, cmd string) (string, error) {
 	}
 	defer session.Close()
 
-	stdin, err := session.StdinPipe()
-	if err != nil {
-		return "", fmt.Errorf("stdin pipe: %w", err)
-	}
-
-	// Feed the password followed by a newline to sudo -S, then close stdin
-	// so the wrapped command's own stdin is EOF (safe for non-interactive use).
-	go func() {
-		fmt.Fprintln(stdin, password)
-		stdin.Close()
-	}()
-
 	// Base64-encode the script so no shell metacharacter (esp. `$var` or `$(…)`
 	// inside awk/sh single-quoted regions) is interpreted by the outer login
 	// shell before sudo dispatches it. Without this, a `%q` double-quoted
@@ -655,7 +647,19 @@ func runSudoCmd(client *ssh.Client, password, cmd string) (string, error) {
 	// with `2>&1` merging stderr into stdout, that prompt gets glued onto the
 	// first real output line and corrupts it for line-oriented parsers.
 	encoded := base64.StdEncoding.EncodeToString([]byte(cmd))
-	fullCmd := fmt.Sprintf("sudo -S -p '' sh -c 'echo %s | base64 -d | sh' 2>&1", encoded)
+	fullCmd, feed := sudoInvocation(password, fmt.Sprintf("sh -c 'echo %s | base64 -d | sh' 2>&1", encoded))
+	if feed {
+		stdin, err := session.StdinPipe()
+		if err != nil {
+			return "", fmt.Errorf("stdin pipe: %w", err)
+		}
+		// Feed the password followed by a newline to sudo -S, then close stdin
+		// so the wrapped command's own stdin is EOF (safe for non-interactive use).
+		go func() {
+			fmt.Fprintln(stdin, password)
+			stdin.Close()
+		}()
+	}
 	out, execErr := session.CombinedOutput(fullCmd)
 	cleaned := strings.TrimSpace(cleanCommandOutput(string(out), nil))
 	if execErr != nil {
@@ -1561,6 +1565,10 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 
 		// Session 0 part 2: print the figure sampled at the start.
 		cpuPrintCmd,
+		`echo '` + delimSession + `'`,
+
+		// Session 4: does root need a password here? (noPasswdProbeCmd)
+		noPasswdProbeCmd,
 	}, "; ")
 
 	sStartup := time.Now()
@@ -1588,9 +1596,16 @@ func captureVMInfo(client *ssh.Client, sudoPassword string) (*VMInfo, error) {
 	// delta. Empty when /proc/stat fallback failed.
 	cpuUsage := strings.TrimSpace(startupSection(4))
 
+	// A host with no stored password whose root needs none (a key-only host
+	// with NOPASSWD) is scanned as root all the same: from here on every
+	// root probe runs through `sudo -n` (NoPassword).
+	noPasswd := parseNoPasswdProbe(startupSection(5))
+	sudoPassword = elevationSecret(sudoPassword, noPasswd)
+
 	info := &VMInfo{
 		CPU:         field(0) + " vCPU",
 		CPUUsage:    cpuUsage,
+		SudoNoPasswd: noPasswd,
 		RAM:         field(1),
 		RAMUsed:     field(2),
 		RAMPercent:  field(3),

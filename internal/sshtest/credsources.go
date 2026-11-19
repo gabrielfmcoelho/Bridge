@@ -219,16 +219,19 @@ func runSudoCmdPTY(client *ssh.Client, password, cmd string) (string, error) {
 	if err := session.RequestPty("vt100", 200, 80, modes); err != nil {
 		return "", err
 	}
-	stdin, err := session.StdinPipe()
-	if err != nil {
-		return "", err
-	}
-	go func() {
-		fmt.Fprintln(stdin, password)
-		stdin.Close()
-	}()
 	encoded := base64.StdEncoding.EncodeToString([]byte(cmd))
-	out, err := session.CombinedOutput(fmt.Sprintf("sudo -S -p '' sh -c 'echo %s | base64 -d | sh' 2>&1", encoded))
+	fullCmd, feed := sudoInvocation(password, fmt.Sprintf("sh -c 'echo %s | base64 -d | sh' 2>&1", encoded))
+	if feed {
+		stdin, err := session.StdinPipe()
+		if err != nil {
+			return "", err
+		}
+		go func() {
+			fmt.Fprintln(stdin, password)
+			stdin.Close()
+		}()
+	}
+	out, err := session.CombinedOutput(fullCmd)
 	return string(out), err
 }
 

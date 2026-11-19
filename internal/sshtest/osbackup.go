@@ -77,7 +77,7 @@ func StreamBackup(ctx context.Context, client *ssh.Client, p Privilege, include,
 	cmd := inner
 	switch {
 	case p.User == "root":
-	case p.Password != "":
+	case p.feedsPassword():
 		stdin, err := session.StdinPipe()
 		if err != nil {
 			return err

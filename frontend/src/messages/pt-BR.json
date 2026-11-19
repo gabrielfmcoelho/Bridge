@@ -1114,6 +1114,8 @@
     "addChamado": "Adicionar Chamado",
     "sshKey": "Chave SSH",
     "sshKeyStored": "Armazenada no banco de dados",
+    "rootAccess": "Acesso root",
+    "rootAccessNoPassword": "sudo sem senha (detectado no scan)",
     "sshKeyNone": "-- Nenhuma --",
     "sshKeyKeepCurrent": "-- Manter atual --",
     "sshKeyKeepCurrentHint": "Deixar inalterado mantém a chave atualmente vinculada a este host.",
@@ -2730,7 +2732,7 @@
       "title": "Operações personalizadas",
       "empty": "Nenhuma operação personalizada ainda. Crie em Configurações › Operações SSH.",
       "manage": "Gerenciar",
-      "needsPassword": "Precisa da senha salva do host (roda com sudo)",
+      "needsPassword": "Roda com sudo: precisa da senha salva do host, ou de sudo sem senha (detectado no scan)",
       "confirm": "Executar \"{name}\" neste host?",
       "confirmSudo": "Executar \"{name}\" neste host com sudo (como root)?",
       "paramsDesc": "Preencha os valores que o script desta operação pede. Cada valor entra como uma única palavra literal."

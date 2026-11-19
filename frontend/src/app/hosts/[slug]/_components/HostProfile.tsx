@@ -61,6 +61,7 @@ export default function HostProfile({
               <Field label={t("host.port")} value={host.port || "22"} mono />
               <Field label={t("host.proxyJump")} value={host.proxy_jump} mono />
               <Field label={t("host.sshKey")} value={host.has_key ? t("host.sshKeyStored") : ""} />
+              <Field label={t("host.rootAccess")} value={host.sudo_nopasswd ? t("host.rootAccessNoPassword") : ""} />
               {host.has_password && isAdmin && <div className="col-span-2"><PasswordField slug={slug} /></div>}
             </div>
           </div>

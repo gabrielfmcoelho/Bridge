@@ -46,6 +46,7 @@ type Host struct {
 	PasswordTestStatus        *string   `json:"password_test_status"`
 	KeyTestStatus             *string   `json:"key_test_status"`
 	DockerGroupStatus         *string   `json:"docker_group_status"`
+	SudoNoPasswd              bool      `json:"sudo_nopasswd"` // root needs no password, per the last scan; set only by HostRepo.SetSudoNoPasswd
 	CoolifyServerUUID         *string   `json:"coolify_server_uuid"`
 	ProxmoxID                 *string   `json:"proxmox_id"`     // set only by the Proxmox sync
 	ParentHostID              *int64    `json:"parent_host_id"` // Proxmox node the guest runs on

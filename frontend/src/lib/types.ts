@@ -113,6 +113,8 @@ export interface Host {
   password_test_status?: "success" | "failed" | null;
   key_test_status?: "success" | "failed" | null;
   docker_group_status?: "ok" | "fixed" | "needs_sudo" | "needs_relogin" | "not_installed" | "failed" | null;
+  /** The SSH user reaches root with no password, as the last scan found: root operations need no stored password. */
+  sudo_nopasswd?: boolean;
   coolify_server_uuid?: string | null;
   observacoes: string;
   grafana_dashboard_uid?: string;

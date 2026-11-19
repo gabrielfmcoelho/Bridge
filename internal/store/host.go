@@ -42,7 +42,7 @@ func hostColumns() string {
 		acesso_empresa_externa, empresa_responsavel, responsavel_externo, contato_responsavel_externo,
 		recurso_cpu, recurso_ram, recurso_armazenamento,
 		situacao, precisa_manutencao, preferred_auth, connections_failed, password_test_status, key_test_status, docker_group_status, coolify_server_uuid, observacoes,
-		grafana_dashboard_uid, proxmox_id, parent_host_id,
+		grafana_dashboard_uid, proxmox_id, parent_host_id, sudo_nopasswd,
 		(SELECT p.oficial_slug FROM hosts p WHERE p.id = hosts.parent_host_id) AS parent_host_slug,
 		created_at, updated_at`
 }
@@ -56,7 +56,7 @@ func hostScanDest(h *models.Host) []any {
 		&h.AcessoEmpresaExterna, &h.EmpresaResponsavel, &h.ResponsavelExterno, &h.ContatoResponsavelExterno,
 		&h.RecursoCPU, &h.RecursoRAM, &h.RecursoArmazenamento,
 		&h.Situacao, &h.PrecisaManutencao, &h.PreferredAuth, &h.ConnectionsFailed, &h.PasswordTestStatus, &h.KeyTestStatus, &h.DockerGroupStatus, &h.CoolifyServerUUID, &h.Observacoes,
-		&h.GrafanaDashboardUID, &h.ProxmoxID, &h.ParentHostID, &h.ParentHostSlug,
+		&h.GrafanaDashboardUID, &h.ProxmoxID, &h.ParentHostID, &h.SudoNoPasswd, &h.ParentHostSlug,
 		&h.CreatedAt, &h.UpdatedAt,
 	}
 }
@@ -548,6 +548,14 @@ func (r *HostRepo) SlugExists(ctx context.Context, slug string, excludeID int64)
 // in the vault).
 func (r *HostRepo) UpdateHasPassword(ctx context.Context, id int64, hasPassword bool) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE hosts SET has_password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, hasPassword, id)
+	return err
+}
+
+// SetSudoNoPasswd records what the host's scan found: whether its SSH user
+// reaches root with no password. Create and Update never write it, so a save
+// from a stale copy of the host can't undo it.
+func (r *HostRepo) SetSudoNoPasswd(ctx context.Context, id int64, noPasswd bool) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE hosts SET sudo_nopasswd = ? WHERE id = ?`, noPasswd, id)
 	return err
 }
 
