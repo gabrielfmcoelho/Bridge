@@ -1114,6 +1114,8 @@
     "addChamado": "Add Ticket",
     "sshKey": "SSH Key",
     "sshKeyStored": "Stored in database",
+    "rootAccess": "Root access",
+    "rootAccessNoPassword": "sudo with no password (found by the scan)",
     "sshKeyNone": "-- None --",
     "sshKeyKeepCurrent": "-- Keep current --",
     "sshKeyKeepCurrentHint": "Leaving this unchanged keeps the key currently linked to this host.",
@@ -2730,7 +2732,7 @@
       "title": "Custom operations",
       "empty": "No custom operations yet. Create them in Settings › SSH operations.",
       "manage": "Manage",
-      "needsPassword": "Needs the host's stored password (runs with sudo)",
+      "needsPassword": "Runs with sudo: needs the host's stored password, or sudo with no password (found by the scan)",
       "confirm": "Run \"{name}\" on this host?",
       "confirmSudo": "Run \"{name}\" on this host with sudo (as root)?",
       "paramsDesc": "Fill in the values this operation's script asks for. Each value goes in as one literal word."

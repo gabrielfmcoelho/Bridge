@@ -2281,4 +2281,9 @@ var migrationsPostgres = []string{
 	// done, list the config files to review, restart the failed units.
 	`ALTER TABLE os_update_runs DROP CONSTRAINT IF EXISTS os_update_runs_kind_check;
 	ALTER TABLE os_update_runs ADD CONSTRAINT os_update_runs_kind_check CHECK (kind IN ('check','packages','security','release','restore','backup','scan','repair'));`,
+
+	// Version 136: the SSH user reaches root with no password (NOPASSWD),
+	// as the host's scan found. It lets the scan's root probes and the root
+	// operations run on a key-only host with no stored password.
+	`ALTER TABLE hosts ADD COLUMN IF NOT EXISTS sudo_nopasswd BOOLEAN NOT NULL DEFAULT FALSE;`,
 }

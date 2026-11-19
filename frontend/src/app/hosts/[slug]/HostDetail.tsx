@@ -301,6 +301,7 @@ export default function HostDetail({ slug }: { slug: string }) {
                 slug={data.host.oficial_slug}
                 hasPassword={data.host.has_password}
                 hasKey={data.host.has_key}
+                sudoNoPasswd={data.host.sudo_nopasswd}
                 preferredAuth={data.host.preferred_auth}
                 passwordTestStatus={data.host.password_test_status}
                 keyTestStatus={data.host.key_test_status}

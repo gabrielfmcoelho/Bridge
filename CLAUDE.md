@@ -93,7 +93,7 @@ are `(asset_type, asset_id, entidade_id, relation)` with
 Postgres only (`internal/database/dialect.go`); `SSHCM_DB_DSN` is required.
 Migrations are Go string literals appended to the `migrationsPostgres` slice
 in `internal/database/migrations_postgres.go`, one `// Version N` comment
-per element, currently at **v135**. Use idempotent idioms:
+per element, currently at **v136**. Use idempotent idioms:
 `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`,
 `INSERT ... ON CONFLICT DO NOTHING`.
 A test about one migration must find it **by its content**, never as "the last
@@ -490,6 +490,20 @@ element" of the slice — the next migration breaks that test (v99's did when v1
   `?tab=` value to its tab and section, the keys of the merged tabs included
   (`maintenance`, `sentinel`, `requests`, `dependencies`): a new deep link goes
   there. A link to a tab the caller can't see opens nothing.
+- Passwordless sudo (v136, `internal/sshtest/nopasswd.go`): the scan's startup
+  batch asks `sudo -n true`; the answer is `sudo_nopasswd` in the scan and on
+  the host (`HostRepo.SetSudoNoPasswd` from `recordScan`; scan-owned — `Create`
+  and `Update` never write it). A host with no stored password whose root needs
+  none (key-only + NOPASSWD) is elevated with `sshtest.NoPassword`: a stand-in
+  that passes every `password != ""` guard, while the three places that talk to
+  sudo (`sudoInvocation` in `runSudoCmd` / `runSudoCmdPTY`,
+  `Privilege.feedsPassword`) run `sudo -n` and feed nothing. API root
+  operations take `sudoSecret(host, stored)` instead of the raw password
+  (custom ops, docker group / log rotation, nginx cleanup, agent install,
+  create / delete user). Still need the real password: testing it, and
+  installing a key (it is the login password there). A stored password always
+  wins. New root code must go through those sinks, never write a password to
+  sudo itself.
 - Scan pane (`frontend/src/lib/scanSections.ts`, pure, tested): five groups by
   question (Recursos, Cargas, Web, Acesso e segurança, Sistema e manutenção),
   each showing only the sections with data; a closing note lists what the scan

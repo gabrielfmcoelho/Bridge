@@ -33,8 +33,10 @@ type ConsoleEntry = {
   timestamp: number;
 };
 
-export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth, passwordTestStatus, keyTestStatus, dockerGroupStatus, coolifyServerUUID, serverInfo, lastScan, t, locale, isAdmin }: {
+export default function SSHOperations({ slug, hasPassword, hasKey, sudoNoPasswd, preferredAuth, passwordTestStatus, keyTestStatus, dockerGroupStatus, coolifyServerUUID, serverInfo, lastScan, t, locale, isAdmin }: {
   slug: string; hasPassword: boolean; hasKey: boolean;
+  /** Root needs no password on this host (found by its scan): root operations run without a stored one. */
+  sudoNoPasswd?: boolean;
   preferredAuth?: "password" | "key" | "";
   passwordTestStatus?: "success" | "failed" | null;
   keyTestStatus?: "success" | "failed" | null;
@@ -47,6 +49,8 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
   isAdmin: boolean;
 }) {
   const confirm = useConfirm();
+  // Root is reachable: with the stored password, or with none at all.
+  const canSudo = hasPassword || !!sudoNoPasswd;
   // Derive the list of non-system users discovered by the most recent scan
   // (see sshtest.captureVMInfo → RemoteUsers). Used by the delete-user wizard
   // to show a picker instead of a free-form text input.
@@ -659,7 +663,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       loading: runningOp === "docker-logs-inspect",
       onClick: () => { setRunningOp("docker-logs-inspect"); dockerLogsInspectMutation.mutate(); },
     },
-    ...(isAdmin && hasPassword ? [{
+    ...(isAdmin && canSudo ? [{
       id: "docker-logs-apply-rotation",
       label: t("operation.dockerLogsApplyRotation"),
       description: t("operation.dockerLogsApplyRotationDesc"),
@@ -692,7 +696,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
         ? "Installs grafana-agent on this host (with node_exporter built in) configured to remote_write to the endpoint in Settings → Integrations → Grafana. Requires sudo."
         : "Disabled — configure the Prometheus remote_write URL in Settings → Integrations → Grafana first.",
       command: `curl -fsSL https://github.com/grafana/agent/releases/... -o grafana-agent && install /usr/local/bin/grafana-agent && systemctl enable --now grafana-agent`,
-      disabled: !hasPassword || !grafanaRemoteWriteConfigured,
+      disabled: !canSudo || !grafanaRemoteWriteConfigured,
       loading: runningOp === "grafana-agent-setup",
       onClick: async () => {
         if (!(await confirm({ title: t("confirm.runOperation"), message: t("operation.confirmGrafanaAgent") }))) return;
@@ -708,7 +712,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       loading: runningOp === "setup-sudo-nopasswd",
       onClick: handleSetupSudoNopasswd,
     } satisfies OpDef] : []),
-    ...(hasPassword && isAdmin ? [{
+    ...(canSudo && isAdmin ? [{
       id: "create-remote-user",
       label: t("operation.createRemoteUser"),
       description: t("operation.createRemoteUserDesc"),
@@ -716,7 +720,7 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
       loading: runningOp === "create-remote-user",
       onClick: () => setShowCreateUser(true),
     } satisfies OpDef] : []),
-    ...(hasPassword && isAdmin ? [{
+    ...(canSudo && isAdmin ? [{
       id: "delete-remote-user",
       label: t("operation.deleteRemoteUser"),
       description: t("operation.deleteRemoteUserDesc"),
@@ -828,8 +832,8 @@ export default function SSHOperations({ slug, hasPassword, hasKey, preferredAuth
               label: op.name,
               description: [op.use_sudo && "sudo", op.description].filter(Boolean).join(" · "),
               command: op.script,
-              disabled: (!hasPassword && !hasKey) || (op.use_sudo && !hasPassword),
-              disabledReason: op.use_sudo && !hasPassword ? t("operation.custom.needsPassword") : undefined,
+              disabled: (!hasPassword && !hasKey) || (op.use_sudo && !canSudo),
+              disabledReason: op.use_sudo && !canSudo ? t("operation.custom.needsPassword") : undefined,
               loading: runningOp === `custom-${op.id}`,
               onClick: () => startCustomOp(op),
             })}
